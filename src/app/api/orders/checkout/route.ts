@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -140,6 +141,20 @@ export async function POST(request: Request) {
             )
         }
 
+        if (!customer.phone?.trim()) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Phone number is required' } },
+                { status: 422 }
+            )
+        }
+
+        if (!customer.address?.line1?.trim()) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Address line 1 is required' } },
+                { status: 422 }
+            )
+        }
+
         // State is required for shipping calculation — Zod enum already blocks invalid/empty values, this guards undefined
         if (!customer.address?.state) {
             return NextResponse.json(
@@ -209,26 +224,63 @@ export async function POST(request: Request) {
 
         // Decrement inventory for COD only — bank_transfer reserves stock without decrement
         // (decrement happens at Approve step in P06)
+        // CAS-style: UPDATE WHERE inventory >= qty prevents oversell under concurrent requests.
+        // Compensation: if any item fails the CAS, re-increment all already-decremented items
+        // and delete the order so the buyer sees a clear out-of-stock error.
         if (paymentMethod === 'cod') {
+            const decremented: Array<{ productId: number | string; quantity: number }> = []
+            let failedItem: string | undefined
+
             for (const item of aggregatedItems) {
+                const productId = typeof item.productId === 'string' && !isNaN(Number(item.productId))
+                    ? Number(item.productId) : item.productId
                 try {
-                    const product = await payload.findByID({
-                        collection: 'products',
-                        id: item.productId,
-                        depth: 0,
-                        overrideAccess: true,
-                    })
-                    const p = product as any
-                    if (p.inventory !== undefined && p.inventory !== null) {
-                        await payload.update({
-                            collection: 'products',
-                            id: item.productId,
-                            data: { inventory: Math.max(0, p.inventory - item.quantity) } as any,
-                        })
+                    const result = await (payload.db.drizzle as any).execute(sql`
+                        UPDATE products
+                        SET inventory = inventory - ${item.quantity}
+                        WHERE id = ${productId}
+                        AND inventory IS NOT NULL
+                        AND inventory >= ${item.quantity}
+                        RETURNING id
+                    `)
+                    if (result.rows?.length) {
+                        decremented.push({ productId, quantity: item.quantity })
+                    } else {
+                        failedItem = String(item.productId)
+                        break
                     }
                 } catch (err) {
-                    console.warn(`[Stock Decrement] Failed for product ${item.productId}:`, err)
+                    console.warn(`[Stock Decrement] CAS failed for product ${item.productId}:`, err)
+                    failedItem = String(item.productId)
+                    break
                 }
+            }
+
+            if (failedItem) {
+                // Compensate: re-increment all previously decremented items
+                for (const p of decremented) {
+                    try {
+                        await (payload.db.drizzle as any).execute(sql`
+                            UPDATE products SET inventory = inventory + ${p.quantity}
+                            WHERE id = ${p.productId} AND inventory IS NOT NULL
+                        `)
+                    } catch (e) {
+                        console.error(`[Stock Decrement] Compensation re-increment failed for product ${p.productId}:`, e)
+                    }
+                }
+                // Delete the just-created order to keep DB consistent
+                await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true })
+                    .catch((e: unknown) => console.error(`[Stock Decrement] Failed to delete orphaned order ${order.id} after CAS failure — manual cleanup required:`, e))
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'OUT_OF_STOCK',
+                            message: `Product ${failedItem} ran out of stock — please reduce quantity and try again`,
+                        },
+                    },
+                    { status: 422 },
+                )
             }
         }
 
@@ -237,7 +289,7 @@ export async function POST(request: Request) {
         const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
         const shopName = (tenantForSlug as any)?.name ?? ''
         const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
         const siteLocale = (site as any).locale ?? 'ms'
@@ -347,6 +399,7 @@ export async function POST(request: Request) {
         // HttpOnly cookie so the confirm page can verify access without exposing token in URL
         res.cookies.set(`ct_${order.id}`, confirmToken, {
             httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             maxAge: 30 * 24 * 60 * 60, // 30 days
             path: '/',

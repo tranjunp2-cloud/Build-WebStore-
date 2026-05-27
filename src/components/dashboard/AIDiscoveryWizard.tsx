@@ -129,6 +129,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   }
 
   return (
+    <div className="dash-shell">
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000]/60 backdrop-blur-[2px] p-6 sm:p-4">
       {/* Modal Container */}
       <div
@@ -304,6 +305,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

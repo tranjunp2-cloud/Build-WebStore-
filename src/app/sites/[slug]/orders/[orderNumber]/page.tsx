@@ -3,8 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import OrderTrackingClient from './OrderTrackingClient'
-import UploadClient from './UploadClient'
 import { OT_CSS } from './order-tracking-styles'
+import ResendUploadLinkForm from './ResendUploadLinkForm'
 
 const UPLOAD_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
@@ -93,31 +93,11 @@ export default async function OrderTrackingPage({
         UPLOAD_STATUSES.has(order.paymentStatus ?? '')
 
     if (isBtPending) {
-        const pc = site.paymentConfig ?? {}
-        const _qr = pc.merchantQrCode
-        const qrUrl: string = (_qr && typeof _qr === 'object') ? (_qr.url ?? '') : ''
-        const expiresAt = order.paymentExpiresAt
-        const expiresAtIso: string = expiresAt
-            ? (typeof expiresAt === 'string' ? expiresAt : new Date(expiresAt).toISOString())
-            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-
         return (
             <>
                 {fontLinks}
-                <UploadClient
-                    orderId={order.id}
-                    slug={slug}
-                    token={token}
-                    status={order.paymentStatus as 'awaiting_payment' | 'pending_verification'}
-                    paymentReference={order.paymentReference ?? ''}
-                    total={order.total ?? 0}
-                    currency={order.currency ?? 'MYR'}
-                    expiresAtIso={expiresAtIso}
-                    bankName={pc.bankName ?? ''}
-                    bankAccountNo={pc.bankAccountNo ?? ''}
-                    bankAccountHolder={pc.bankAccountHolder ?? ''}
-                    qrUrl={qrUrl || undefined}
-                />
+                <style dangerouslySetInnerHTML={{ __html: OT_CSS }} />
+                <ResendUploadLinkForm orderNumber={orderNumber} />
             </>
         )
     }

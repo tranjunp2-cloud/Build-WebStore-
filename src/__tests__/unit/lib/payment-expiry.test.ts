@@ -45,13 +45,18 @@ const makeOrder = (id: number, overrides: Record<string, unknown> = {}) => ({
     ...overrides,
 })
 
-const makePayload = (docs: unknown[], updateImpl?: (args: unknown) => Promise<unknown>) => ({
+const makePayload = (docs: unknown[], drizzleExecuteImpl?: () => Promise<unknown>) => ({
     find: vi.fn().mockResolvedValue({ docs, totalDocs: docs.length }),
-    update: updateImpl
-        ? vi.fn().mockImplementation(updateImpl)
-        : vi.fn().mockResolvedValue({}),
+    update: vi.fn().mockResolvedValue({}),
     sendEmail: vi.fn().mockResolvedValue(undefined),
     logger: { error: vi.fn() },
+    db: {
+        drizzle: {
+            execute: drizzleExecuteImpl
+                ? vi.fn().mockImplementation(drizzleExecuteImpl)
+                : vi.fn().mockResolvedValue({ rows: [{ id: 1 }] }),
+        },
+    },
 })
 
 // ─── TC-F10-06-10: happy path ─────────────────────────────────────────────────
@@ -62,17 +67,7 @@ describe('paymentExpiryJob — happy path', () => {
 
         const result = await paymentExpiryJob(payload as any)
 
-        expect(payload.update).toHaveBeenCalledTimes(3)
-        expect(payload.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                collection: 'orders',
-                data: expect.objectContaining({
-                    status: 'cancelled',
-                    paymentStatus: 'cancelled',
-                    cancelReason: 'Auto-cancelled: payment not received within 24h',
-                }),
-            }),
-        )
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(3)
         expect(result).toEqual({ processed: 3, errors: 0, total: 3 })
     })
 
@@ -130,12 +125,12 @@ describe('paymentExpiryJob — update error is isolated', () => {
     it('counts failed update as error; other orders still process', async () => {
         const orders = [makeOrder(1), makeOrder(2), makeOrder(3)]
         let callCount = 0
-        const updateImpl = async () => {
+        const drizzleExecuteImpl = async () => {
             callCount++
             if (callCount === 2) throw new Error('DB write failed')
-            return {}
+            return { rows: [{ id: callCount }] }
         }
-        const payload = makePayload(orders, updateImpl)
+        const payload = makePayload(orders, drizzleExecuteImpl)
 
         const result = await paymentExpiryJob(payload as any)
 

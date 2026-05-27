@@ -27,7 +27,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         vi.clearAllMocks()
     })
 
-    it('cancels order with valid reason', async () => {
+    it('[TC-F10-03-01] cancels order with valid reason', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [] }) // order
         mockUpdate.mockResolvedValue({ id: 'order-1', status: 'cancelled', customer: {} })
@@ -40,7 +40,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.success).toBe(true)
     })
 
-    it('rejects cancellation from terminal state [TC-F10.16]', async () => {
+    it('[TC-F10-03-04] rejects cancellation from terminal state', async () => {
         mockFindByID.mockResolvedValue({ id: 'order-1', status: 'completed', items: [] })
 
         const req = { json: () => Promise.resolve({ reason: 'Too late' }) } as unknown as Request
@@ -51,14 +51,21 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.error.code).toBe('INVALID_TRANSITION')
     })
 
-    it('rejects empty reason', async () => {
+    it('[TC-F10-03-03] rejects empty reason', async () => {
         const req = { json: () => Promise.resolve({ reason: '' }) } as unknown as Request
         const res = await POST(req, ctx as any)
 
         expect(res.status).toBe(400)
     })
 
-    it('returns 404 when order not found', async () => {
+    it('[TC-F10-03-03] Rejects whitespace-only reason', async () => {
+        const req = { json: () => Promise.resolve({ reason: '   ' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+
+        expect(res.status).toBe(400)
+    })
+
+    it('[GUARD] returns 404 when order not found', async () => {
         mockFindByID.mockResolvedValue(null)
 
         const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
@@ -67,7 +74,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(res.status).toBe(404)
     })
 
-    it('restocks inventory on cancellation', async () => {
+    it('[TC-F10-03-05] restocks inventory on cancellation', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-1', quantity: 3 }] }) // order
             .mockResolvedValueOnce({ id: 'prod-1', stock: 5 }) // product for restock (stock field, not inventory)
@@ -123,7 +130,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         )
     })
 
-    it('[TC-F10.16-FIX-3] Cancel QR Banking order → paymentStatus set to cancelled', async () => {
+    it('[TC-F10-03-01] Cancel QR Banking order in pending status succeeds', async () => {
         mockFindByID
             .mockResolvedValueOnce({
                 id: 'order-3',
@@ -156,5 +163,27 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 })
             })
         )
+    })
+
+    it('[TC-F10-03-07] Idempotency: already-cancelled order returns success without re-restocking', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'order-4', status: 'cancelled', items: [{ product: 'prod-1', quantity: 1 }] })
+
+        const req = { json: () => Promise.resolve({ reason: 'Duplicate request' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // No update or restock should occur
+        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(body.restock).toEqual([])
+    })
+
+    it('[TC-F10-03-11] Rejects cancel reason exceeding 500 characters', async () => {
+        const longReason = 'a'.repeat(501)
+        const req = { json: () => Promise.resolve({ reason: longReason }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+
+        expect(res.status).toBe(400)
     })
 })

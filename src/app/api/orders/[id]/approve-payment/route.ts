@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
@@ -55,26 +56,19 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             overrideAccess: false,
         })
 
-        // Decrement inventory per item — per-item try/catch, non-blocking
+        // Atomic inventory decrement — GREATEST(0, ...) prevents negative stock;
+        // raw SQL avoids read-modify-write race if two concurrent approve-payment calls arrive.
         const items = (order.items as any[]) ?? []
         for (const item of items) {
             try {
                 const productId = typeof item.product === 'object' ? item.product?.id : item.product
                 if (!productId) continue
-                const product = await payload.findByID({
-                    collection: 'products',
-                    id: productId,
-                    overrideAccess: true,
-                })
-                if (product && typeof (product as any).inventory === 'number') {
-                    const newInventory = Math.max(0, (product as any).inventory - (item.quantity ?? 0))
-                    await payload.update({
-                        collection: 'products',
-                        id: productId,
-                        data: { inventory: newInventory } as any,
-                        overrideAccess: true,
-                    })
-                }
+                await (payload.db.drizzle as any).execute(sql`
+                    UPDATE products
+                    SET inventory = GREATEST(0, inventory - ${item.quantity ?? 0})
+                    WHERE id = ${productId}
+                    AND inventory IS NOT NULL
+                `)
             } catch (err) {
                 payload.logger.error({ err }, '[approve-payment] inventory decrement failed for item')
             }
@@ -84,7 +78,7 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
         const siteObj = typeof order.site === 'object' ? (order.site as any) : null
         const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
         const siteSlug = tenantObj?.slug ?? ''
-        const orderPageUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/sites/${siteSlug}/orders/${order.orderNumber}`
+        const orderPageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/sites/${siteSlug}/orders/${order.orderNumber}`
 
         const emailPayload = paymentConfirmedEmail({
             orderNumber: order.orderNumber as string,

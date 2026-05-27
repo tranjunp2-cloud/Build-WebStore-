@@ -23,6 +23,7 @@ export function OrdersClientLayout() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
     const [currentOrders, setCurrentOrders] = useState<Order[]>([])
     const [refreshCounter, setRefreshCounter] = useState(0)
+    const [silentRefreshTrigger, setSilentRefreshTrigger] = useState(0)
     const [isConfirming, setIsConfirming] = useState(false)
 
     // Filters
@@ -37,6 +38,18 @@ export function OrdersClientLayout() {
         }, 500)
         return () => clearTimeout(handler)
     }, [searchQuery])
+
+    // Listen for ORDER_NEW notification → silently prepend new orders without full reload
+    useEffect(() => {
+        function handleNotification(e: Event) {
+            const detail = (e as CustomEvent).detail
+            if (detail?.type === 'ORDER_NEW') {
+                setSilentRefreshTrigger(prev => prev + 1)
+            }
+        }
+        window.addEventListener('notification-toast', handleNotification)
+        return () => window.removeEventListener('notification-toast', handleNotification)
+    }, [])
 
     const isOpen = selectedOrderId !== null
 
@@ -103,6 +116,7 @@ export function OrdersClientLayout() {
                 onSelectionChange={setSelectedRows}
                 onOrdersLoaded={setCurrentOrders}
                 refreshCounter={refreshCounter}
+                silentRefreshTrigger={silentRefreshTrigger}
                 searchQuery={debouncedSearch}
                 statusFilter={statusFilter}
                 dateFilter={dateFilter}

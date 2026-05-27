@@ -3840,6 +3840,11 @@ const MIGRATIONS = [
   { name: 'malaysia_districts.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_districts_state ON malaysia_districts(state_id);` },
   { name: 'malaysia_postcodes.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_postcodes (id serial PRIMARY KEY, postcode varchar(5) NOT NULL UNIQUE, district_id integer NOT NULL REFERENCES malaysia_districts(id));` },
   { name: 'malaysia_postcodes.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_postcodes_district ON malaysia_postcodes(district_id);` },
+  // Normalize state names to match MY_STATES enum used by checkout validation (Zod)
+  { name: 'malaysia_states.normalize_penang', sql: `UPDATE malaysia_states SET name = 'Penang' WHERE name = 'Pulau Pinang'` },
+  { name: 'malaysia_states.normalize_kl', sql: `UPDATE malaysia_states SET name = 'Kuala Lumpur' WHERE name = 'W.P. Kuala Lumpur'` },
+  { name: 'malaysia_states.normalize_putrajaya', sql: `UPDATE malaysia_states SET name = 'Putrajaya' WHERE name = 'W.P. Putrajaya'` },
+  { name: 'malaysia_states.normalize_labuan', sql: `UPDATE malaysia_states SET name = 'Labuan' WHERE name = 'W.P. Labuan'` },
 
   // GH-960 — _pages_v column required by CI check (billing_toggle is a block field, harmless extra col)
   { name: '_pages_v.version_billing_toggle', sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_billing_toggle varchar;` },
@@ -3968,6 +3973,9 @@ const MIGRATIONS = [
   { name: 'orders.enum_payment_method_bank_transfer', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'bank_transfer'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.backfill_bank_transfer_method', sql: `UPDATE orders SET payment_method='bank_transfer' WHERE payment_method='qr_banking' AND payment_status NOT IN ('paid','cancelled','refunded') AND created_at > NOW() - INTERVAL '7 days';` },
   // ── F13: FPX + Card payment via Stripe Checkout Session (issue #963) ──
+  { name: 'orders.enum_payment_method_fpx', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'fpx'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  // 'new' = order confirmed by Stripe webhook (checkout.session.completed). Webhook sets status 'pending' → 'new'.
+  { name: 'orders.enum_status_new', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'new'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
