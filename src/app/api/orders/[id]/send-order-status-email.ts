@@ -19,7 +19,6 @@ interface SendEmailOptions {
  */
 export async function sendOrderStatusEmail(
     payload: Payload,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     order: any,
     newStatus: string,
     { notes, trackingNumber }: SendEmailOptions,
