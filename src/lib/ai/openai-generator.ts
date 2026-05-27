@@ -38,6 +38,8 @@ import {
     type ContentLang,
 } from './content-rules'
 import { detectLanguage } from './lang-detect'
+import { getNavLabels } from './block-i18n'
+import { prefetchNavLabels } from './nav-label-translator'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -163,6 +165,14 @@ export async function generateSiteWithAI(
 
     try {
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
+
+        // For non-English languages not yet in the nav label cache, fire a GPT
+        // micro-call (gpt-4.1-nano, ~50 tokens) to translate the 5 nav labels.
+        // Fire-and-forget: this request keeps GPT output; next warm request uses
+        // the cached translated labels. See nav-label-translator.ts for details.
+        if (gpLang && gpLang !== 'English' && !getNavLabels(blockLang)) {
+            prefetchNavLabels(gpLang, blockLang, openai)
+        }
 
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.

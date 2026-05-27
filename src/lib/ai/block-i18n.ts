@@ -357,7 +357,10 @@ export interface NavLabels {
     getStarted: string
 }
 
-const NAV_LABELS: Record<string, NavLabels> = {
+// Static seed — covers non-Latin script languages where GPT nav-label bias is worst.
+// At runtime this is loaded into runtimeNavCache so additional languages can be
+// injected by nav-label-translator without modifying this file.
+const NAV_LABELS_SEED: Record<string, NavLabels> = {
     en: { home: 'Home', about: 'About', services: 'Services', contact: 'Contact', getStarted: 'Get Started' },
     ms: { home: 'Utama', about: 'Tentang Kami', services: 'Perkhidmatan', contact: 'Hubungi', getStarted: 'Mulakan' },
     vi: { home: 'Trang Chủ', about: 'Giới Thiệu', services: 'Dịch Vụ', contact: 'Liên Hệ', getStarted: 'Bắt Đầu' },
@@ -368,13 +371,25 @@ const NAV_LABELS: Record<string, NavLabels> = {
     th: { home: 'หน้าหลัก', about: 'เกี่ยวกับเรา', services: 'บริการ', contact: 'ติดต่อ', getStarted: 'เริ่มต้น' },
 }
 
+// Runtime cache — module-level Map persists across requests within a warm server
+// instance. Pre-seeded from NAV_LABELS_SEED; extended at runtime for new languages
+// via injectNavLabels() (called by nav-label-translator after a GPT micro-call).
+const runtimeNavCache = new Map<string, NavLabels>(Object.entries(NAV_LABELS_SEED))
+
+/** Inject GPT-translated nav labels for a language not in the static seed. */
+export function injectNavLabels(lang: string, labels: NavLabels): void {
+    runtimeNavCache.set(lang, labels)
+}
+
 /**
  * Get nav labels for the given language code.
- * Returns null when the language has no entry — caller keeps GPT output.
+ * Checks runtime cache (includes GPT-translated entries) then falls back by
+ * stripping region tag (e.g. "zh-TW" → "zh"). Returns null when unknown —
+ * caller keeps GPT output and nav-label-translator fires a prefetch for next request.
  */
 export function getNavLabels(lang?: string): NavLabels | null {
     if (!lang) return null
-    if (NAV_LABELS[lang]) return NAV_LABELS[lang]
+    if (runtimeNavCache.has(lang)) return runtimeNavCache.get(lang)!
     const prefix = lang.split('-')[0]
-    return NAV_LABELS[prefix] ?? null
+    return runtimeNavCache.get(prefix) ?? null
 }
