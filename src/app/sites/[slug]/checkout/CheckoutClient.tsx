@@ -807,7 +807,7 @@ const CK_CSS = `
 /* Responsive */
 @media(max-width:768px){
   .ck-shell{grid-template-columns:1fr;padding:16px;}
-  .ck-sum{position:static;}
+  .ck-sum{position:static;order:-1;}
   .ck-card{padding:20px;}
   .ck-row.c3{grid-template-columns:1fr 1fr;}
   .ck-row.c2{grid-template-columns:1fr;}
