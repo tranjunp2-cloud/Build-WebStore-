@@ -175,6 +175,9 @@ function normalizeSectionLabels(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
+    // Languages with full BlockStrings (hasDedicatedStrings) get their sectionLabels
+    // from the STRINGS chain after the guard below — skip to avoid double-patching.
+    if (hasDedicatedStrings(language)) return blocks
     const labels = getSectionLabels(language)
     if (!labels) return blocks
 
@@ -215,15 +218,18 @@ function normalizeAboutHeadline(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
+    // Prefer SectionLabels seed (has aboutHeadlinePrefix); fall back to BlockStrings if available.
     const labels = getSectionLabels(language)
-    if (!labels) return blocks
+    const i18nPrefix = hasDedicatedStrings(language) ? getBlockStrings(language).about.headlinePrefix : null
+    const prefix = labels?.aboutHeadlinePrefix ?? i18nPrefix
+    // No localized prefix found — nothing to replace.
+    if (prefix === null) return blocks
 
     return blocks.map((block) => {
         if (block.blockType !== 'about') return block
         const headline = typeof block.headline === 'string' ? block.headline : ''
         if (!/^About\s+/i.test(headline)) return block
         const bizPart = headline.replace(/^About\s+/i, '')
-        const prefix = labels.aboutHeadlinePrefix
         return { ...block, headline: prefix ? `${prefix} ${bizPart}` : bizPart }
     })
 }

@@ -38,8 +38,9 @@ import {
     type ContentLang,
 } from './content-rules'
 import { detectLanguage } from './lang-detect'
-import { getNavLabels } from './block-i18n'
+import { getNavLabels, hasDedicatedStrings } from './block-i18n'
 import { prefetchNavLabels } from './nav-label-translator'
+import { prefetchBlockStrings } from './block-strings-translator'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -172,6 +173,11 @@ export async function generateSiteWithAI(
         // the cached translated labels. See nav-label-translator.ts for details.
         if (gpLang && gpLang !== 'English' && !getNavLabels(blockLang)) {
             prefetchNavLabels(gpLang, blockLang, openai)
+        }
+        // Same pattern for full block strings (structural labels, form labels, footer text).
+        // Covers long-tail languages not in the static STRINGS seed (en/ms/vi/ja/zh/ko/ar/th).
+        if (gpLang && gpLang !== 'English' && !hasDedicatedStrings(blockLang)) {
+            prefetchBlockStrings(gpLang, blockLang, openai)
         }
 
         // Resolve category + pick deterministic theme preset BEFORE prompt build

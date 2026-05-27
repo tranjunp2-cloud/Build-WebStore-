@@ -313,29 +313,237 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'Đánh giá thực từ khách hàng của chúng tôi',
         },
     },
+
+    ja: {
+        navigation: { home: 'ホーム', about: '会社概要', services: 'サービス', contact: 'お問い合わせ', getStarted: '今すぐ始める' },
+        about: { headlinePrefix: '' },
+        faq: { headline: 'よくある質問', headlineWithBiz: (biz) => `${biz} — よくある質問` },
+        cta: {
+            headlineReady: (name) => `${name}で始めませんか？`,
+            headlineDiscover: (name) => `${name}を体験する`,
+            subheadline: '今すぐお問い合わせください。',
+        },
+        contact: {
+            headline: 'お問い合わせ',
+            subheadline: 'お気軽にご連絡ください。',
+            subheadlineWithBiz: (name) => `${name}へのお問い合わせ`,
+            nameLabel: 'お名前', emailLabel: 'メールアドレス', phoneLabel: '電話番号',
+            addressLabel: '住所', messageLabel: 'メッセージ',
+            namePlaceholder: '山田 太郎', messagePlaceholder: 'メッセージをご入力ください',
+            submitLabel: '送信する',
+        },
+        footer: {
+            allRightsReserved: 'All rights reserved.',
+            explore: 'サービス', company: '会社情報', support: 'サポート', legal: '法的情報',
+            aboutUs: '会社概要', careers: '採用情報', helpCenter: 'ヘルプセンター', getInTouch: 'お問い合わせ',
+            privacyPolicy: 'プライバシーポリシー', termsOfService: '利用規約', cookiePolicy: 'Cookieポリシー',
+        },
+        features: { headlineWhyChoose: (name) => `${name}が選ばれる理由` },
+        stats: { headline: '実績と数字' },
+        team: { headline: 'チームメンバー', subheadline: 'チームをご紹介します。' },
+        serviceCards: { headline: 'サービス内容', subheadline: (name) => `${name}のサービスをご覧ください。`, ctaLabel: '詳細を見る' },
+        clientLogos: { headline: 'お客様・パートナー' },
+        gallery: { headline: 'ギャラリー' },
+        newsletter: {
+            headlineStayUpdated: (name) => `${name}の最新情報`,
+            subheadlineFallback: 'ニュースレターに登録して最新情報をお届けします。',
+            subscribeLabel: '登録する',
+        },
+        pricing: { headline: '料金プラン', subheadline: '明確な料金体系、隠れた費用なし。', getStarted: '今すぐ始める', learnMore: '詳細を見る' },
+        testimonials: { headline: 'お客様の声', headlineWithBiz: (biz) => `${biz}のお客様の声`, subheadline: 'お客様からの真のレビュー' },
+    },
+
+    zh: {
+        navigation: { home: '首页', about: '关于我们', services: '服务', contact: '联系我们', getStarted: '立即开始' },
+        about: { headlinePrefix: '关于' },
+        faq: { headline: '常见问题', headlineWithBiz: (biz) => `${biz} — 常见问题` },
+        cta: {
+            headlineReady: (name) => `准备好与${name}合作了吗？`,
+            headlineDiscover: (name) => `探索${name}`,
+            subheadline: '立即联系我们，让我们帮助您实现目标。',
+        },
+        contact: {
+            headline: '联系我们',
+            subheadline: '欢迎随时与我们联系。',
+            subheadlineWithBiz: (name) => `联系${name}，我们期待您的来信。`,
+            nameLabel: '姓名', emailLabel: '邮箱', phoneLabel: '电话',
+            addressLabel: '地址', messageLabel: '留言',
+            namePlaceholder: '您的姓名', messagePlaceholder: '请留下您的信息',
+            submitLabel: '发送消息',
+        },
+        footer: {
+            allRightsReserved: '版权所有。',
+            explore: '探索', company: '公司', support: '支持', legal: '法律',
+            aboutUs: '关于我们', careers: '招聘', helpCenter: '帮助中心', getInTouch: '联系我们',
+            privacyPolicy: '隐私政策', termsOfService: '服务条款', cookiePolicy: 'Cookie政策',
+        },
+        features: { headlineWhyChoose: (name) => `为什么选择${name}` },
+        stats: { headline: '我们的数字' },
+        team: { headline: '团队介绍', subheadline: '认识我们背后的团队。' },
+        serviceCards: { headline: '我们的服务', subheadline: (name) => `探索${name}能为您做什么。`, ctaLabel: '了解更多' },
+        clientLogos: { headline: '合作客户' },
+        gallery: { headline: '作品展示' },
+        newsletter: {
+            headlineStayUpdated: (name) => `${name}最新资讯`,
+            subheadlineFallback: '订阅获取独家新闻和优惠。',
+            subscribeLabel: '订阅',
+        },
+        pricing: { headline: '价格方案', subheadline: '透明定价，无隐藏费用。', getStarted: '立即开始', learnMore: '了解更多' },
+        testimonials: { headline: '客户评价', headlineWithBiz: (biz) => `${biz}客户评价`, subheadline: '来自客户的真实评价' },
+    },
+
+    ko: {
+        navigation: { home: '홈', about: '소개', services: '서비스', contact: '연락처', getStarted: '시작하기' },
+        about: { headlinePrefix: '' },
+        faq: { headline: '자주 묻는 질문', headlineWithBiz: (biz) => `${biz} — 자주 묻는 질문` },
+        cta: {
+            headlineReady: (name) => `${name}와 함께 시작할 준비가 되셨나요?`,
+            headlineDiscover: (name) => `${name} 알아보기`,
+            subheadline: '오늘 바로 연락하세요.',
+        },
+        contact: {
+            headline: '문의하기',
+            subheadline: '궁금한 점이 있으시면 편하게 연락해 주세요.',
+            subheadlineWithBiz: (name) => `${name}에 문의해 보세요.`,
+            nameLabel: '이름', emailLabel: '이메일', phoneLabel: '전화번호',
+            addressLabel: '주소', messageLabel: '메시지',
+            namePlaceholder: '홍길동', messagePlaceholder: '메시지를 입력해 주세요',
+            submitLabel: '메시지 보내기',
+        },
+        footer: {
+            allRightsReserved: '모든 권리 보유.',
+            explore: '탐색', company: '회사', support: '지원', legal: '법적 사항',
+            aboutUs: '회사 소개', careers: '채용', helpCenter: '도움말 센터', getInTouch: '연락하기',
+            privacyPolicy: '개인정보 처리방침', termsOfService: '이용약관', cookiePolicy: '쿠키 정책',
+        },
+        features: { headlineWhyChoose: (name) => `왜 ${name}인가요?` },
+        stats: { headline: '우리의 실적' },
+        team: { headline: '팀 소개', subheadline: '저희 팀을 소개합니다.' },
+        serviceCards: { headline: '서비스 안내', subheadline: (name) => `${name}가 할 수 있는 것을 알아보세요.`, ctaLabel: '자세히 보기' },
+        clientLogos: { headline: '파트너 & 고객사' },
+        gallery: { headline: '갤러리' },
+        newsletter: {
+            headlineStayUpdated: (name) => `${name} 최신 소식`,
+            subheadlineFallback: '뉴스레터를 구독하고 소식을 받아보세요.',
+            subscribeLabel: '구독하기',
+        },
+        pricing: { headline: '요금제', subheadline: '투명한 가격, 숨겨진 요금 없음.', getStarted: '시작하기', learnMore: '자세히 보기' },
+        testimonials: { headline: '고객 후기', headlineWithBiz: (biz) => `${biz} 고객 후기`, subheadline: '실제 고객의 솔직한 후기' },
+    },
+
+    ar: {
+        navigation: { home: 'الرئيسية', about: 'عن الشركة', services: 'الخدمات', contact: 'اتصل بنا', getStarted: 'ابدأ الآن' },
+        about: { headlinePrefix: 'عن' },
+        faq: { headline: 'الأسئلة الشائعة', headlineWithBiz: (biz) => `${biz} — الأسئلة الشائعة` },
+        cta: {
+            headlineReady: (name) => `هل أنت مستعد للبدء مع ${name}؟`,
+            headlineDiscover: (name) => `اكتشف ${name}`,
+            subheadline: 'تواصل معنا اليوم ودعنا نساعدك على تحقيق أهدافك.',
+        },
+        contact: {
+            headline: 'اتصل بنا',
+            subheadline: 'يسعدنا التواصل معك. أرسل لنا رسالة.',
+            subheadlineWithBiz: (name) => `تواصل مع ${name} اليوم.`,
+            nameLabel: 'الاسم', emailLabel: 'البريد الإلكتروني', phoneLabel: 'رقم الهاتف',
+            addressLabel: 'العنوان', messageLabel: 'الرسالة',
+            namePlaceholder: 'الاسم الكامل', messagePlaceholder: 'كيف يمكننا مساعدتك؟',
+            submitLabel: 'إرسال الرسالة',
+        },
+        footer: {
+            allRightsReserved: 'جميع الحقوق محفوظة.',
+            explore: 'استكشف', company: 'الشركة', support: 'الدعم', legal: 'القانوني',
+            aboutUs: 'عن الشركة', careers: 'الوظائف', helpCenter: 'مركز المساعدة', getInTouch: 'تواصل معنا',
+            privacyPolicy: 'سياسة الخصوصية', termsOfService: 'شروط الخدمة', cookiePolicy: 'سياسة ملفات تعريف الارتباط',
+        },
+        features: { headlineWhyChoose: (name) => `لماذا تختار ${name}؟` },
+        stats: { headline: 'أرقامنا تتحدث' },
+        team: { headline: 'فريق العمل', subheadline: 'الأشخاص الذين يصنعون الفارق.' },
+        serviceCards: { headline: 'خدماتنا', subheadline: (name) => `اكتشف ما يمكن لـ${name} تقديمه لك.`, ctaLabel: 'اعرف المزيد' },
+        clientLogos: { headline: 'شركاؤنا وعملاؤنا' },
+        gallery: { headline: 'معرض أعمالنا' },
+        newsletter: {
+            headlineStayUpdated: (name) => `ابق على اطلاع مع ${name}`,
+            subheadlineFallback: 'اشترك للحصول على أخبار وعروض حصرية.',
+            subscribeLabel: 'اشترك',
+        },
+        pricing: { headline: 'خطط الأسعار', subheadline: 'أسعار شفافة بدون رسوم مخفية.', getStarted: 'ابدأ الآن', learnMore: 'اعرف المزيد' },
+        testimonials: { headline: 'آراء عملائنا', headlineWithBiz: (biz) => `آراء عملاء ${biz}`, subheadline: 'تقييمات حقيقية من عملائنا' },
+    },
+
+    th: {
+        navigation: { home: 'หน้าหลัก', about: 'เกี่ยวกับเรา', services: 'บริการ', contact: 'ติดต่อ', getStarted: 'เริ่มต้น' },
+        about: { headlinePrefix: 'เกี่ยวกับ' },
+        faq: { headline: 'คำถามที่พบบ่อย', headlineWithBiz: (biz) => `${biz} — คำถามที่พบบ่อย` },
+        cta: {
+            headlineReady: (name) => `พร้อมเริ่มต้นกับ ${name} แล้วหรือยัง?`,
+            headlineDiscover: (name) => `สำรวจ ${name}`,
+            subheadline: 'ติดต่อเราวันนี้เพื่อให้เราช่วยคุณบรรลุเป้าหมาย',
+        },
+        contact: {
+            headline: 'ติดต่อเรา',
+            subheadline: 'ยินดีรับฟังความคิดเห็นของคุณ ส่งข้อความถึงเราได้เลย',
+            subheadlineWithBiz: (name) => `ติดต่อ ${name} วันนี้`,
+            nameLabel: 'ชื่อ', emailLabel: 'อีเมล', phoneLabel: 'เบอร์โทรศัพท์',
+            addressLabel: 'ที่อยู่', messageLabel: 'ข้อความ',
+            namePlaceholder: 'ชื่อ-นามสกุล', messagePlaceholder: 'เราจะช่วยคุณได้อย่างไร?',
+            submitLabel: 'ส่งข้อความ',
+        },
+        footer: {
+            allRightsReserved: 'สงวนลิขสิทธิ์',
+            explore: 'สำรวจ', company: 'บริษัท', support: 'การสนับสนุน', legal: 'กฎหมาย',
+            aboutUs: 'เกี่ยวกับเรา', careers: 'ร่วมงานกับเรา', helpCenter: 'ศูนย์ช่วยเหลือ', getInTouch: 'ติดต่อเรา',
+            privacyPolicy: 'นโยบายความเป็นส่วนตัว', termsOfService: 'เงื่อนไขการให้บริการ', cookiePolicy: 'นโยบายคุกกี้',
+        },
+        features: { headlineWhyChoose: (name) => `ทำไมต้องเลือก ${name}?` },
+        stats: { headline: 'ตัวเลขของเรา' },
+        team: { headline: 'ทีมงานของเรา', subheadline: 'คนที่อยู่เบื้องหลังความสำเร็จ' },
+        serviceCards: { headline: 'บริการของเรา', subheadline: (name) => `ค้นพบสิ่งที่ ${name} ทำได้เพื่อคุณ`, ctaLabel: 'เรียนรู้เพิ่มเติม' },
+        clientLogos: { headline: 'ลูกค้าและพันธมิตรที่ไว้วางใจ' },
+        gallery: { headline: 'ผลงานของเรา' },
+        newsletter: {
+            headlineStayUpdated: (name) => `ติดตามข่าวสารจาก ${name}`,
+            subheadlineFallback: 'สมัครรับข่าวสารและข้อเสนอพิเศษ',
+            subscribeLabel: 'สมัคร',
+        },
+        pricing: { headline: 'แผนราคา', subheadline: 'ราคาโปร่งใส ไม่มีค่าใช้จ่ายซ่อนเร้น', getStarted: 'เริ่มต้น', learnMore: 'เรียนรู้เพิ่มเติม' },
+        testimonials: { headline: 'รีวิวจากลูกค้า', headlineWithBiz: (biz) => `รีวิวลูกค้า ${biz}`, subheadline: 'รีวิวที่แท้จริงจากลูกค้าของเรา' },
+    },
+}
+
+// ── Runtime block-strings cache ────────────────────────────────────────────────
+//
+// Populated by block-strings-translator fire-and-forget GPT micro-call for
+// languages not in STRINGS seed (long-tail: Tagalog, Tamil, Swahili, etc.).
+// Cache miss → current request keeps GPT output; next warm request gets correct strings.
+
+const runtimeBlockStringsCache = new Map<string, BlockStrings>()
+
+/** Inject GPT-translated block strings for a language not in the static seed. */
+export function injectBlockStrings(lang: string, strings: BlockStrings): void {
+    runtimeBlockStringsCache.set(lang, strings)
 }
 
 /**
  * Get block UI strings for any language code (ISO 639-1 or BCP 47).
- * Falls back by stripping region tag (e.g. "zh-TW" → "zh"), then to English.
+ * Order: static STRINGS seed → runtime cache → prefix fallback → English.
  */
 export function getBlockStrings(lang?: string): BlockStrings {
     if (!lang) return STRINGS.en
     if (STRINGS[lang]) return STRINGS[lang]
+    if (runtimeBlockStringsCache.has(lang)) return runtimeBlockStringsCache.get(lang)!
     const prefix = lang.split('-')[0]
-    return STRINGS[prefix] ?? STRINGS.en
+    return STRINGS[prefix] ?? runtimeBlockStringsCache.get(prefix) ?? STRINGS.en
 }
 
 /**
- * Returns true only when there are dedicated i18n strings for this language
- * (i.e. not the English fallback). Used by the normalization chain in
- * post-ai-swap to decide whether to trust GPT's output vs. override it.
+ * Returns true when there are dedicated i18n strings for this language
+ * (static seed or runtime cache — i.e. not the English fallback).
  */
 export function hasDedicatedStrings(lang?: string): boolean {
     if (!lang) return false
-    if (STRINGS[lang]) return true
+    if (STRINGS[lang] || runtimeBlockStringsCache.has(lang)) return true
     const prefix = lang.split('-')[0]
-    return !!STRINGS[prefix]
+    return !!(STRINGS[prefix] || runtimeBlockStringsCache.has(prefix))
 }
 
 // ── Minimal nav label lookup ──────────────────────────────────────────────────
