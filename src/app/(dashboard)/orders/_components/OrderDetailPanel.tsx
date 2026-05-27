@@ -425,20 +425,12 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
     )
 }
 
-function fmtPaymentMethod(m?: string | null) {
-    const map: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'Cash on Delivery', ewallet: 'e-Wallet' }
-    return map[m ?? ''] ?? m ?? '—'
+function fmtPaymentMethod(m: string | null | undefined, labels: Record<string, string>) {
+    return labels[m ?? ''] ?? m ?? '—'
 }
 
-function fmtPaymentStatus(s?: string | null) {
-    const map: Record<string, string> = {
-        awaiting_payment: 'Awaiting Payment',
-        pending_verification: 'Pending Verification',
-        paid: 'Paid',
-        payment_failed: 'Payment Failed',
-        refunded: 'Refunded',
-    }
-    return map[s ?? ''] ?? s ?? '—'
+function fmtPaymentStatus(s: string | null | undefined, labels: Record<string, string>) {
+    return labels[s ?? ''] ?? s ?? '—'
 }
 
 // ─── PAYMENT INFORMATION ───
@@ -450,6 +442,8 @@ function fmtPaymentStatus(s?: string | null) {
 function PaymentInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
+    const methodLabels = (d as any).paymentMethods as Record<string, string>
+    const statusLabels = (d as any).paymentStatuses as Record<string, string>
 
     let statusColor = '#FF8904'
     let statusBg = 'rgba(255, 105, 0, 0.1)'
@@ -522,7 +516,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.method}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                            {fmtPaymentMethod(order.paymentMethod)}
+                            {fmtPaymentMethod(order.paymentMethod, methodLabels)}
                         </span>
                     </div>
                 </div>
@@ -539,7 +533,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
-                            {fmtPaymentStatus(order.paymentStatus)}
+                            {fmtPaymentStatus(order.paymentStatus, statusLabels)}
                         </span>
                     </div>
                 </div>

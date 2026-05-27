@@ -845,7 +845,20 @@
         "tax": "Tax (SST 6%)",
         "total": "Total",
         "free": "Free",
-        "noItems": "No items"
+        "noItems": "No items",
+        "paymentMethods": {
+          "bank_transfer": "Bank Transfer",
+          "card": "Credit Card",
+          "cod": "Cash on Delivery",
+          "ewallet": "e-Wallet"
+        },
+        "paymentStatuses": {
+          "awaiting_payment": "Awaiting Payment",
+          "pending_verification": "Pending Verification",
+          "paid": "Paid",
+          "payment_failed": "Payment Failed",
+          "refunded": "Refunded"
+        }
       },
       "actions": {
         "confirmOrder": "Confirm Order",

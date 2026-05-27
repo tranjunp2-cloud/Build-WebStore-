@@ -845,7 +845,20 @@
         "tax": "Cukai (SST 6%)",
         "total": "Jumlah Besar",
         "free": "Percuma",
-        "noItems": "Tiada barangan"
+        "noItems": "Tiada barangan",
+        "paymentMethods": {
+          "bank_transfer": "Pindahan Bank",
+          "card": "Kad Kredit",
+          "cod": "Bayar Semasa Terima",
+          "ewallet": "e-Dompet"
+        },
+        "paymentStatuses": {
+          "awaiting_payment": "Menunggu Pembayaran",
+          "pending_verification": "Pengesahan Tertunda",
+          "paid": "Dibayar",
+          "payment_failed": "Pembayaran Gagal",
+          "refunded": "Dikembalikan"
+        }
       },
       "actions": {
         "confirmOrder": "Sahkan Pesanan",
