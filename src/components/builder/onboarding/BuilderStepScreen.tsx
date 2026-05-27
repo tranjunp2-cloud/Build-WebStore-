@@ -9,6 +9,7 @@ interface BuilderStepScreenProps {
     leftBody: ReactNode
     leftFooter?: ReactNode
     right?: ReactNode
+    gridClassName?: string
     rightPaneClassName?: string
     rightContentClassName?: string
     floatingControls?: ReactNode
@@ -21,6 +22,7 @@ export function BuilderStepScreen({
     leftBody,
     leftFooter,
     right,
+    gridClassName,
     rightPaneClassName,
     rightContentClassName,
     floatingControls,
@@ -52,6 +54,7 @@ export function BuilderStepScreen({
             <BuilderOnboardingShell
                 left={leftPane}
                 right={right}
+                gridClassName={gridClassName}
                 rightContentClassName={rightContentClassName}
                 rightPaneClassName={rightPaneClassName}
             />
