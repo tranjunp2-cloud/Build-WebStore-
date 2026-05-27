@@ -73,7 +73,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const siteObj = typeof order.site === 'object' ? (order.site as any) : null
         const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
         const siteSlug = tenantObj?.slug ?? ''
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const magicLinkUrl = `${baseUrl}/api/orders/${order.id}/confirm-redirect?slug=${siteSlug}&token=${token}`
         const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
 

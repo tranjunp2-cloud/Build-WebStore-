@@ -97,7 +97,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({})
+    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string; line1?: string; state?: string; city?: string; postcode?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -185,19 +185,40 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
-        if (field === 'email' || field === 'phone') {
+        if (field === 'name' || field === 'email' || field === 'phone' || field === 'line1') {
             setFieldErrors(prev => ({ ...prev, [field]: undefined }))
         }
     }
 
+    const handleNameBlur = () => {
+        if (!form.name.trim()) setFieldErrors(prev => ({ ...prev, name: 'Full name is required' }))
+    }
+
+    const handleLine1Blur = () => {
+        if (!form.line1.trim()) setFieldErrors(prev => ({ ...prev, line1: 'Address line 1 is required' }))
+    }
+
     const handleEmailBlur = () => {
-        const err = validateEmail(form.email)
+        const v = form.email.trim()
+        const err = !v ? 'Email address is required' : validateEmail(form.email)
         if (err) setFieldErrors(prev => ({ ...prev, email: err }))
     }
 
     const handlePhoneBlur = () => {
         const err = validatePhone(form.phone)
         if (err) setFieldErrors(prev => ({ ...prev, phone: err }))
+    }
+
+    const handleStateBlur = () => {
+        if (!selectedStateId) setFieldErrors(prev => ({ ...prev, state: 'Please select a state' }))
+    }
+
+    const handleCityBlur = () => {
+        if (selectedStateId && !selectedDistrictId) setFieldErrors(prev => ({ ...prev, city: 'Please select a city' }))
+    }
+
+    const handlePostcodeBlur = () => {
+        if (selectedDistrictId && !form.postcode) setFieldErrors(prev => ({ ...prev, postcode: 'Please select a postcode' }))
     }
 
     const handleStateChange = (stateId: string) => {
@@ -209,6 +230,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         setSelectedDistrictId('')
         setDistricts([])
         setPostcodeOpts([])
+        if (stateId) setFieldErrors(prev => ({ ...prev, state: undefined, city: undefined, postcode: undefined }))
         if (!stateId) return
         setDistrictsLoading(true)
         fetch(`/api/geo/districts?stateId=${stateId}`)
@@ -224,6 +246,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         updateField('city', d?.name || '')
         updateField('postcode', '')
         setPostcodeOpts([])
+        if (districtId) setFieldErrors(prev => ({ ...prev, city: undefined, postcode: undefined }))
         if (!districtId) return
         setPostcodesLoading(true)
         fetch(`/api/geo/postcodes?districtId=${districtId}`)
@@ -255,11 +278,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
-    const contactVerified = form.name.trim().length > 0 && form.email.trim().length > 0 && !fieldErrors.email && !fieldErrors.phone
+    const contactVerified = form.name.trim().length > 0 && form.email.trim().length > 0 && form.phone.trim().length > 0 && !fieldErrors.email && !fieldErrors.phone
 
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
-        form.city && form.postcode && items.length > 0 &&
+        form.line1.trim() && form.city && form.postcode && items.length > 0 &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe')
     )
 
@@ -355,7 +378,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             <div className="ck-empty">
                 <ShoppingBag size={48} />
                 <h2>{ck.cartEmpty}</h2>
-                <Link href={`/sites/${slug}/products`}>{ck.browseProducts}</Link>
+                <Link href={`/sites/${slug}`}>{ck.browseProducts}</Link>
                 <style>{`
                   .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
@@ -409,7 +432,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                 {/* ── Header ───────────────────────────────── */}
                 <header className="ck-hd">
-                    <Link href={`/sites/${slug}/products`} className="ck-back">
+                    <Link href={`/sites/${slug}`} className="ck-back">
                         <ArrowLeft size={16} />
                     </Link>
                     <h1 className="ck-h1">Checkout</h1>
@@ -441,7 +464,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.fullName}</label>
-                                <div className="ck-iw"><input value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="e.g. Ahmad bin Ibrahim" /></div>
+                                <div className={`ck-iw${fieldErrors.name ? ' err' : ''}`}><input value={form.name} onChange={e => updateField('name', e.target.value)} onBlur={handleNameBlur} placeholder="e.g. Ahmad bin Ibrahim" /></div>
+                                {fieldErrors.name && <p className="ck-ferr">{fieldErrors.name}</p>}
                             </div>
                             <div className="ck-row c2">
                                 <div className="ck-f">
@@ -452,7 +476,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                     {fieldErrors.email && <p className="ck-ferr">{fieldErrors.email}</p>}
                                 </div>
                                 <div className="ck-f">
-                                    <label className="ck-lb">{ck.phone} (+60)</label>
+                                    <label className="ck-lb">{ck.phone}</label>
                                     <div className={`ck-iw${fieldErrors.phone ? ' err' : ''}`}>
                                         <input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} onBlur={handlePhoneBlur} placeholder="+60 12 345 6789" />
                                     </div>
@@ -474,7 +498,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
-                                <div className="ck-iw"><input value={form.line1} onChange={e => updateField('line1', e.target.value)} placeholder="No. 17, Jalan Kenari 22..." /></div>
+                                <div className={`ck-iw${fieldErrors.line1 ? ' err' : ''}`}><input value={form.line1} onChange={e => updateField('line1', e.target.value)} onBlur={handleLine1Blur} placeholder="No. 17, Jalan Kenari 22..." /></div>
+                                {fieldErrors.line1 && <p className="ck-ferr">{fieldErrors.line1}</p>}
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine2}</label>
@@ -483,30 +508,33 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-row c3">
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.state}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.state ? ' err' : ''}`}>
+                                        <select value={selectedStateId} onChange={e => handleStateChange(e.target.value)} onBlur={handleStateBlur} disabled={statesLoading}>
                                             <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
                                             {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.state && <p className="ck-ferr">{fieldErrors.state}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.city}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.city ? ' err' : ''}`}>
+                                        <select value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} onBlur={handleCityBlur} disabled={!selectedStateId || districtsLoading}>
                                             <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
                                             {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.city && <p className="ck-ferr">{fieldErrors.city}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.postcode}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={form.postcode} onChange={e => updateField('postcode', e.target.value)} disabled={!selectedDistrictId || postcodesLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.postcode ? ' err' : ''}`}>
+                                        <select value={form.postcode} onChange={e => { updateField('postcode', e.target.value); if (e.target.value) setFieldErrors(prev => ({ ...prev, postcode: undefined })) }} onBlur={handlePostcodeBlur} disabled={!selectedDistrictId || postcodesLoading}>
                                             <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
                                             {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.postcode && <p className="ck-ferr">{fieldErrors.postcode}</p>}
                                 </div>
                             </div>
                         </div>
@@ -707,8 +735,8 @@ const CK_CSS = `
 .ck-sel select{appearance:none;padding-right:36px;cursor:pointer;}
 .ck-sel::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:1.5px solid var(--f3);border-bottom:1.5px solid var(--f3);transform:translateY(-70%) rotate(45deg);pointer-events:none;}
 .ck-row{display:grid;gap:14px;margin-top:14px;}
-.ck-row.c2{grid-template-columns:1fr 1fr;}
-.ck-row.c3{grid-template-columns:1fr 1fr 1fr;}
+.ck-row.c2{grid-template-columns:1fr 1fr;align-items:start;}
+.ck-row.c3{grid-template-columns:1fr 1fr 1fr;align-items:start;}
 .ck-row.c2>*,.ck-row.c3>*{display:flex;flex-direction:column;margin-top:0;}
 .ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */

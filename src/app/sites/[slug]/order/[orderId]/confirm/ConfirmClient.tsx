@@ -85,8 +85,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
             await fetch(`/api/orders/${order.id}/clear-confirm-token`, { method: 'DELETE' }).catch(() => {})
+            // Replace history entry so back button cannot return to confirm page after order is done
+            window.location.replace(href)
+        } else {
+            router.push(href)
         }
-        router.push(href)
     }, [order.id, router])
 
     const [uploadStatus, setUploadStatus] = useState<UploadStatus>(
@@ -124,7 +127,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         window.history.pushState(null, '', window.location.href)
         const onPop = () => {
             window.history.pushState(null, '', window.location.href)
-            setLeaveHref(`/sites/${slug}/products`)
+            setLeaveHref(`/sites/${slug}`)
         }
         const onBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault()
@@ -144,8 +147,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
     const isPaid = order.paymentStatus === 'paid'
-    // Order is "done" from the confirm page POV: BT approved, Stripe charged, or COD placed
-    const isOrderSuccess = isPaid || isCod || isStripe
+    // Order is "done" from the confirm page POV: payment confirmed or COD placed.
+    // Stripe without isPaid means webhook hasn't fired yet — don't clear token prematurely.
+    const isOrderSuccess = isPaid || isCod
     const isSubmitted = isBT && uploadStatus === 'success' && !isPaid
     const addr = order.shippingAddress
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')
@@ -260,9 +264,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     className="ty-back"
                     onClick={() => {
                         if (isBT && uploadStatus !== 'success') {
-                            setLeaveHref(`/sites/${slug}/products`)
+                            setLeaveHref(`/sites/${slug}`)
                         } else {
-                            clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                            clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
                         }
                     }}
                 ><ArrowLeft size={16} /></button>
@@ -602,9 +606,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         <div className="ty-cta-row">
                             <button className="ty-btn primary lg" onClick={() => {
                                 if (isBT && uploadStatus !== 'success') {
-                                    setLeaveHref(`/sites/${slug}/products`)
+                                    setLeaveHref(`/sites/${slug}`)
                                 } else {
-                                    clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                                    clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
                                 }
                             }}>
                                 <ShoppingBag size={15} /> Continue Shopping
