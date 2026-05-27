@@ -75,7 +75,7 @@ function formatTime(iso: string) {
 const STAGES = [
     { key: 'placed', label: 'Order Placed', Icon: ShoppingBag },
     { key: 'processing', label: 'Processing', Icon: Package },
-    { key: 'shipped', label: 'Shipped', Icon: Truck },
+    { key: 'shipped', label: 'Shipping', Icon: Truck },
     { key: 'delivered', label: 'Delivered', Icon: PackageCheck },
 ] as const
 
@@ -119,7 +119,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
             <div className="ot-oh-left">
                 <span className="ot-oh-eyebrow"><ReceiptText size={12} /> Order Details</span>
                 <div className="ot-oh-id-row">
-                    <span className="ot-oh-id"><span className="hash">#</span>{order.orderNumber}</span>
+                    <span className="ot-oh-id">{order.orderNumber}</span>
                     <button className="ot-oh-copy" onClick={handleCopy} title="Copy order ID">
                         {copied ? <Check size={13} /> : <Copy size={13} />}
                     </button>
@@ -263,7 +263,7 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     type Entry = { state: 'latest' | 'completed'; Icon: React.ElementType; title: string; meta?: string; date: string; time: string }
     const entries: Entry[] = []
 
-    entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received #${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
+    entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received ${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     if (order.paymentStatus === 'paid') {
         entries.push({ state: 'completed', Icon: CreditCard, title: 'Payment confirmed', meta: formatMoney(order.total, order.currency), date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     }
@@ -468,7 +468,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                 <div className="crumbs">
                     <span>My Orders</span>
                     <ChevronRight size={14} />
-                    <strong>#{liveOrder.orderNumber}</strong>
+                    <strong>{liveOrder.orderNumber}</strong>
                 </div>
                 <Link href={`/sites/${slug}/products`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop

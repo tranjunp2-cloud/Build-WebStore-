@@ -743,7 +743,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed",
         "cancelled": "Cancelled",
         "refunded": "Refunded"
@@ -787,7 +787,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed",
         "cancelled": "Cancelled",
         "refunded": "Refunded",
@@ -806,7 +806,7 @@
       "metrics": {
         "pending": "Pending",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed"
       },
       "tableHeaders": {
@@ -859,7 +859,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "ready": "Ready",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed"
       },
       "ship": {

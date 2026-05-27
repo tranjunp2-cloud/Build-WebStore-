@@ -743,7 +743,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "readyToShip": "Sedia untuk Dihantar",
-        "shipped": "Telah Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai",
         "cancelled": "Dibatalkan",
         "refunded": "Dikembalikan"
@@ -787,7 +787,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "readyToShip": "Sedia untuk Dihantar",
-        "shipped": "Telah Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai",
         "cancelled": "Dibatalkan",
         "refunded": "Dikembalikan",
@@ -806,7 +806,7 @@
       "metrics": {
         "pending": "Menunggu",
         "readyToShip": "Sedia Dihantar",
-        "shipped": "Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai"
       },
       "tableHeaders": {
@@ -859,7 +859,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "ready": "Sedia",
-        "shipped": "Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai"
       },
       "ship": {
