@@ -185,7 +185,7 @@ export async function generateSiteWithAI(
             `[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}, recipe=${layoutRecipe.id}) for category=${presetCategory} (seed=${themeSeed})`,
         )
 
-        const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
+        const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory, gpLang })
         // Map stored override shape { [slug]: { prompt, updatedAt } } → { [slug]: { prompt } }
         // as expected by buildUserPrompt. Empty-string prompts are filtered out inside buildUserPrompt.
         const aiFirstOverrides = blockPromptOverrides

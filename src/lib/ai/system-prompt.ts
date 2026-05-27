@@ -15,6 +15,10 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 export type ThemePromptContext = {
   preset: ThemePreset
   category: string
+  /** Human-readable language name (e.g. "Japanese", "Korean") — injected into
+   *  LANGUAGE DETECTION to override the default English fallback for languages
+   *  not in the en/ms/vi trio. */
+  gpLang?: string
 }
 
 /**
@@ -75,6 +79,8 @@ export function buildSystemPrompt(
   // Unused locale parameter placeholder — suppress TS lint without affecting runtime.
   void language
 
+  const sysGpLang = themeContext?.gpLang
+
   const themeSection = themeContext
     ? (() => {
         const { preset, category } = themeContext
@@ -97,6 +103,13 @@ Write hero headlines, section titles, and CTA copy that reinforces this mood. Do
 Spacing: "${preset.spacingPreset}" — apply this consistently across ALL pages. When "relaxed", sections should feel open and airy; when "compact", sections should feel tight and dense; when "default", use standard spacing. NEVER mix spacing styles within the same website.
 `
       })()
+    : ''
+
+  // When a non-English language is detected (Japanese, Korean, Arabic, etc.), inject an
+  // OVERRIDE rule at the top of LANGUAGE DETECTION so GPT does not fall back to English.
+  // This overrides the generic "unsupported language → English" training prior.
+  const langOverrideRule = sysGpLang && sysGpLang !== 'English'
+    ? `- **LANGUAGE OVERRIDE (HIGHEST PRIORITY)**: The site language is ${sysGpLang}. Generate EVERY word in ${sysGpLang}. NAVIGATION LABELS (most common mistake): translate "Home", "About", "Services", "Contact", "Get Started" to ${sysGpLang} — never leave them in English. All headlines, descriptions, buttons, form labels, and footer text must also be in ${sysGpLang}. The "unsupported language → fallback to English" rule below does NOT apply.\n`
     : ''
 
   // NOTE: 'video-showcase' removed from VARIETY RULES #6 — temporarily hidden (aiVisible: false, archived). Re-add when block is production-ready.
@@ -172,10 +185,10 @@ ${blockList}
 9. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
 
 ## LANGUAGE DETECTION
-- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
+${langOverrideRule}- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
 - Vietnamese input → ALL text in professional Vietnamese (\`"language": "vi"\`)
 - English/Manglish input → ALL text in English (\`"language": "en"\`)
-- Unsupported language (Tamil, Mandarin) → fallback to English
+- Other languages (e.g. Tamil, Mandarin) → if a LANGUAGE OVERRIDE rule is present above, follow it; otherwise fallback to English
 - Vietnamese slang/abbreviations → interpret and generate professional Vietnamese
   Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery
 - CRITICAL for non-English: EVERY piece of item-level text must be in the target language — feature card titles and descriptions, testimonial quotes, FAQ questions and answers, CTA button labels. NEVER output English placeholder phrases like "Authentic Recipes", "Fast Delivery", "Learn More" for non-English sites.
