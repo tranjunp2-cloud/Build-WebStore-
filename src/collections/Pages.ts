@@ -176,6 +176,7 @@ const ContactBlock = {
                 { label: 'Minimal Inline', value: 'minimal-inline' },
             ],
         },
+        { name: 'sectionLabel', type: 'text' },
         { name: 'headline', type: 'text', defaultValue: 'Contact Us' },
         { name: 'subtext', type: 'textarea' },
         { name: 'email', type: 'email' },
@@ -206,6 +207,10 @@ const ContactBlock = {
                 { name: 'placeholder', type: 'text' },
             ],
         },
+        { name: 'submitLabel', type: 'text', defaultValue: 'Send Message' },
+        { name: 'phoneLabel', type: 'text', defaultValue: 'Phone' },
+        { name: 'addressLabel', type: 'text', defaultValue: 'Address' },
+        { name: 'emailLabel', type: 'text', defaultValue: 'Email' },
         { name: 'showMap', type: 'checkbox', defaultValue: false },
         { name: 'mapEmbedUrl', type: 'text' },
     ],
@@ -358,6 +363,7 @@ const TestimonialsBlock = {
     labels: { singular: 'Testimonials Section', plural: 'Testimonials Sections' },
     fields: [
         { name: 'headline', type: 'text', defaultValue: 'What Our Customers Say' },
+        { name: 'subheadline', type: 'textarea' },
         {
             name: 'variant',
             type: 'select',
@@ -394,6 +400,7 @@ const GalleryBlock = {
     slug: 'gallery',
     labels: { singular: 'Gallery Section', plural: 'Gallery Sections' },
     fields: [
+        { name: 'sectionLabel', type: 'text' },
         { name: 'headline', type: 'text' },
         {
             name: 'variant',
@@ -480,6 +487,7 @@ const StatsBlock = {
             ],
         },
         { name: 'headline', type: 'text' },
+        { name: 'sectionLabel', type: 'text' },
         {
             name: 'stats',
             type: 'array',
@@ -511,6 +519,7 @@ const PricingBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        { name: 'sectionLabel', type: 'text' },
         {
             name: 'plans',
             type: 'array',
@@ -653,6 +662,7 @@ const TeamBlock = {
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },
+        { name: 'sectionLabel', type: 'text' },
         {
             name: 'members',
             type: 'array',
@@ -718,6 +728,7 @@ const NewsletterBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        { name: 'sectionLabel', type: 'text' },
         { name: 'buttonLabel', type: 'text', defaultValue: 'Subscribe' },
         { name: 'placeholder', type: 'text', defaultValue: 'Enter your email' },
     ],
@@ -776,6 +787,7 @@ const BlogListBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        { name: 'sectionLabel', type: 'text' },
         { name: 'limit', type: 'number', defaultValue: 6 },
     ],
 }
@@ -837,6 +849,7 @@ const ServiceCardsBlock = {
         },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
+        { name: 'sectionLabel', type: 'text' },
         {
             name: 'services', type: 'array',
             fields: [
@@ -1094,6 +1107,7 @@ const ClientLogosBlock = {
             ],
         },
         { name: 'headline', type: 'text' },
+        { name: 'sectionLabel', type: 'text' },
         {
             name: 'logos', type: 'array',
             fields: [

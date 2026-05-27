@@ -13,6 +13,7 @@
 
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
+import { getBlockStrings } from './block-i18n'
 import { pickLogosByCategory } from './content/client-logos-library'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
@@ -50,6 +51,8 @@ export interface InjectionContext {
      * "Contact Us" labels remain when mood is absent.
      */
     mood?: ThemeMood
+    /** ISO 639-1 code for block-i18n string selection — any language franc can detect. */
+    language?: string
 }
 
 // ── Plan 07 helpers — threading user data into canned library blocks ─────
@@ -162,10 +165,13 @@ function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
     return seededShuffle(pool, seed)
 }
 
-/** Normalized testimonial for Zod schema shape. */
-function mapTestimonial(t: TestimonialSample): Block {
+/** Normalized testimonial for Zod schema shape. Picks language-specific quote when available. */
+function mapTestimonial(t: TestimonialSample, language?: string): Block {
+    const quote = (language === 'ms' && t.quote_ms) ? t.quote_ms
+                : (language === 'vi' && t.quote_vi) ? t.quote_vi
+                : t.quote
     return {
-        quote: t.quote,
+        quote,
         name: t.name,
         title: t.title ?? 'Customer',
         company: t.company ?? '',
@@ -186,6 +192,14 @@ export function buildBlockFromLibrary(
     category: string,
     ctx: InjectionContext = {},
 ): Block | null {
+    // Content-heavy blocks (testimonials, features, faq) use English-only library
+    // data. For non-English sites, returning null tells the structure-enforcer to
+    // skip injection — GPT should provide these blocks in the target language.
+    // Structural blocks (nav, footer, hero, contact, about, cta) are still injected.
+    if (ctx.language && ctx.language !== 'en' && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+        return null
+    }
+
     // Fallback to 'business' category content when category is unknown — ensures
     // gap-filler can still inject generic blocks for long-tail industries.
     const content = getCategoryContent(category) ?? getCategoryContent('business')
@@ -222,6 +236,8 @@ export function buildBlockFromLibrary(
         ...(userBiz ?? {}),
     }
 
+    const i18n = getBlockStrings(ctx.language)
+
     switch (blockType) {
         case 'navigation':
             return {
@@ -229,12 +245,12 @@ export function buildBlockFromLibrary(
                 variant: 'pill',
                 logoText: name,
                 links: [
-                    { label: 'Home', url: '/' },
-                    { label: 'About', url: '/about' },
-                    { label: 'Services', url: '/services' },
-                    { label: 'Contact', url: '/contact' },
+                    { label: i18n.navigation.home, url: '/' },
+                    { label: i18n.navigation.about, url: '/about' },
+                    { label: i18n.navigation.services, url: '/services' },
+                    { label: i18n.navigation.contact, url: '/contact' },
                 ],
-                ctaButton: { show: true, label: 'Get Started', url: '/contact' },
+                ctaButton: { show: true, label: i18n.navigation.getStarted, url: '/contact' },
             }
 
         case 'hero': {
@@ -289,7 +305,8 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'about',
                 variant: 'simple',
-                headline: `About ${name}`,
+                sectionLabel: i18n.footer.aboutUs,
+                headline: `${i18n.about.headlinePrefix} ${name}`,
                 // Plan 07 — prefer user description, fall back to canned pool.
                 body: userDescription
                     ?? biz?.description
@@ -300,15 +317,15 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'testimonials',
                 variant: 'cards',
-                headline: 'What Our Customers Say',
-                testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
+                headline: i18n.testimonials.headline,
+                testimonials: testimonialSlice.slice(0, 4).map((t) => mapTestimonial(t, ctx.language)),
             }
 
         case 'faq':
             return {
                 blockType: 'faq',
                 variant: 'accordion',
-                headline: 'Frequently Asked Questions',
+                headline: i18n.faq.headline,
                 faqs: faqSlice.slice(0, 5).map(mapFaq),
             }
 
@@ -316,13 +333,13 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'cta',
                 variant: 'banner',
-                headline: `Ready to experience ${name}?`,
+                headline: i18n.cta.headlineReady(name),
                 // Plan 07 — user tagline > canned tagline > generic.
                 subheadline:
                     userTagline
                     ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
                     ?? biz?.tagline
-                    ?? 'Get in touch today and let us exceed your expectations.',
+                    ?? i18n.cta.subheadline,
                 ctaButton: {
                     label: resolveLibraryCTA(ctx.mood, category, 'primary'),
                     url: '/contact',
@@ -334,18 +351,23 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'contact',
                 variant: 'form',
-                headline: 'Get in Touch',
-                subheadline: 'We would love to hear from you. Send us a message.',
+                headline: i18n.contact.headline,
+                subheadline: i18n.contact.subheadline,
+                sectionLabel: i18n.navigation.contact,
                 // Plan 07 — user-supplied contact fields win over canned pool.
                 address: userAddress ?? biz?.address ?? '',
                 phone: userPhone ?? biz?.phone ?? '',
                 // null not '' — Payload email-type field validates format even without required:true,
                 // so empty string causes ValidationError on publish.
                 email: userEmail ?? biz?.email ?? null,
+                submitLabel: i18n.contact.submitLabel,
+                phoneLabel: i18n.contact.phoneLabel,
+                addressLabel: i18n.contact.addressLabel,
+                emailLabel: i18n.contact.emailLabel,
                 formFields: [
-                    { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
-                    { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
-                    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
+                    { fieldName: 'name', label: i18n.contact.nameLabel, fieldType: 'text', required: true },
+                    { fieldName: 'email', label: i18n.contact.emailLabel, fieldType: 'email', required: true },
+                    { fieldName: 'message', label: i18n.contact.messageLabel, fieldType: 'textarea', required: true },
                 ],
             }
 
@@ -356,10 +378,10 @@ export function buildBlockFromLibrary(
                 logoText: name,
                 // Plan 07 — user tagline/description wins over canned.
                 tagline: userTagline ?? (userDescription ? truncateOnWord(userDescription, 90) : biz?.tagline ?? ''),
-                copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+                copyrightText: `© ${new Date().getFullYear()} ${name}. ${i18n.footer.allRightsReserved}`,
                 columns: [
-                    { title: 'Explore', links: [{ label: 'Home', url: '/' }, { label: 'About', url: '/about' }] },
-                    { title: 'Contact', links: [{ label: 'Contact Us', url: '/contact' }] },
+                    { title: i18n.footer.explore, links: [{ label: i18n.navigation.home, url: '/' }, { label: i18n.navigation.about, url: '/about' }] },
+                    { title: i18n.navigation.contact, links: [{ label: i18n.footer.aboutUs, url: '/contact' }] },
                 ],
             }
 
@@ -371,7 +393,7 @@ export function buildBlockFromLibrary(
             // so same-category businesses diverge. Fallback to legacy Phase 03
             // shuffle pool on error (defensive).
             try {
-                return composerBuildFeatures(mergedBiz, category)
+                return composerBuildFeatures(mergedBiz, category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildFeatures failed, falling back:', err)
             }
@@ -404,7 +426,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'features',
                 variant: 'grid-3',
-                headline: `Why Choose ${name}`,
+                headline: i18n.features.headlineWhyChoose(name),
                 features,
             }
         }
@@ -414,7 +436,7 @@ export function buildBlockFromLibrary(
             // buildStats for category-curated stats (20+ Years / 15000+ Patients
             // Treated for health; 50000+ Customers for restaurant; etc).
             try {
-                return composerBuildStats(category)
+                return composerBuildStats(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildStats failed, falling back:', err)
             }
@@ -431,7 +453,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'stats',
                 variant: 'row',
-                headline: 'Our Impact',
+                headline: i18n.stats.headline,
                 stats: shuffled.slice(0, 3),
             }
         }
@@ -443,7 +465,7 @@ export function buildBlockFromLibrary(
             // Note: Payload schema uses `image` field (not `avatar`) — composer
             // bios don't set image, media pipeline fills via BLOCK_IMAGE_SPEC.team.
             try {
-                return composerBuildTeam(category)
+                return composerBuildTeam(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildTeam failed, falling back:', err)
             }
@@ -460,7 +482,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'team',
                 variant: 'grid',
-                headline: 'Meet Our Team',
+                headline: i18n.team.headline,
                 members: shuffled.slice(0, 3),
             }
         }
@@ -471,7 +493,7 @@ export function buildBlockFromLibrary(
             // for fnb; "Dental Implants" for health; etc). Composer also reads
             // biz.products so user-supplied services drive output when provided.
             try {
-                return composerBuildServiceCards(mergedBiz, category)
+                return composerBuildServiceCards(mergedBiz, category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildServiceCards failed, falling back:', err)
             }
@@ -490,7 +512,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'service-cards',
                 variant: 'grid',
-                headline: 'Our Services',
+                headline: i18n.serviceCards.headline,
                 services: shuffled.slice(0, 4),
             }
         }
@@ -499,7 +521,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'gallery',
                 variant: 'grid',
-                headline: 'Our Work',
+                headline: i18n.gallery.headline,
                 // Empty images array — media-injector fills from Unsplash
                 images: Array.from({ length: 6 }, () => ({})),
             }
@@ -508,12 +530,12 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'newsletter',
                 variant: 'banner',
-                headline: `Stay Updated with ${name}`,
+                headline: i18n.newsletter.headlineStayUpdated(name),
                 subheadline:
                     userTagline
                     ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
-                    ?? 'Subscribe for exclusive news and offers.',
-                buttonLabel: 'Subscribe',
+                    ?? i18n.newsletter.subheadlineFallback,
+                buttonLabel: i18n.newsletter.subscribeLabel,
                 placeholder: 'your@email.com',
             }
 
@@ -523,7 +545,7 @@ export function buildBlockFromLibrary(
             // for beauty, "Executive Checkup RM 1200" for health, etc). Composer
             // has 7 category-specific maps + RM default for other categories.
             try {
-                return composerBuildPricing(category)
+                return composerBuildPricing(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildPricing failed, falling back:', err)
             }
@@ -531,7 +553,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'pricing',
                 variant: 'cards',
-                headline: 'Simple Pricing',
+                headline: i18n.pricing.headline,
                 plans: [
                     {
                         name: 'Starter',
@@ -573,7 +595,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'logo-cloud',
                 variant: 'row',
-                headline: 'Trusted By',
+                headline: i18n.clientLogos.headline,
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
                     .slice(0, 6)
                     .map((l) => ({ name: l.name, logo: { url: l.url ?? '', alt: l.name } })),
@@ -583,7 +605,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'client-logos',
                 variant: 'scroll',
-                headline: 'Trusted By Industry Leaders',
+                headline: i18n.clientLogos.headline,
                 // Seed library lacks image urls (copyright); pass name as alt + empty url.
                 // Render falls back to initials badge placeholder — see LogoImage in client-logos/index.tsx.
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
@@ -608,6 +630,21 @@ export function buildBlockFromLibrary(
  * start offset rotates per-business; same-category gens no longer converge on
  * the same first 4 testimonials.
  */
+/**
+ * Block types where item copy (quotes, Q&A, feature titles) must come from GPT
+ * for non-English sites. Library content is English-only — padding these blocks
+ * with library items corrupts language consistency.
+ */
+const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set([
+    'testimonials',
+    'faq',
+    'features',
+    'team',
+    'stats',
+    'service-cards',
+    'pricing',
+])
+
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
@@ -617,6 +654,14 @@ export function padItems(
 ): unknown[] {
     if (existing.length >= minCount) return [...existing]
 
+    // For non-English sites, skip library padding for content-heavy blocks.
+    // GPT has already generated items in the target language; adding English
+    // library items would produce mixed-language output (e.g. 3 Vietnamese
+    // FAQ + 2 English FAQ). Return GPT's items as-is even if below minCount.
+    if (ctx.language && ctx.language !== 'en' && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+        return [...existing]
+    }
+
     const content = getCategoryContent(category)
     const result: unknown[] = [...existing]
     const baseSeed = ctx.seed ?? 0
@@ -625,7 +670,7 @@ export function padItems(
         const pool = rotateSlice(content.testimonials, baseSeed)
         let i = 0
         while (result.length < minCount && i < pool.length) {
-            const candidate = mapTestimonial(pool[i]!)
+            const candidate = mapTestimonial(pool[i]!, ctx.language)
             const isDupe = result.some(
                 (r) =>
                     typeof r === 'object' && r !== null && (r as Block).name === candidate.name,
