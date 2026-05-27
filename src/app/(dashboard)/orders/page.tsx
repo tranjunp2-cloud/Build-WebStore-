@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Metadata } from 'next'
 import { OrdersClientLayout } from './_components/OrdersClientLayout'
 
@@ -11,8 +11,9 @@ export default function OrdersPage() {
 
     return (
         <div className="flex flex-col gap-[22px] w-full">
-            {/* Header + Client layout (manages selectedOrder state) */}
-            <OrdersClientLayout />
+            <Suspense>
+                <OrdersClientLayout />
+            </Suspense>
         </div>
     )
 }

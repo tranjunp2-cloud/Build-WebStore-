@@ -43,13 +43,17 @@ function csvField(value: unknown): string {
     if (value == null) return ''
     let s = String(value)
 
+    // Strip CR/LF — prevents row-boundary confusion in line-based CSV parsers.
+    // Matches sanitizeCell behavior in the dashboard export UI.
+    s = s.replace(/[\r\n]+/g, ' ')
+
     // Formula-injection guard (spreadsheet formula prefix attack)
     if (s.length > 0 && ['=', '+', '-', '@'].includes(s[0])) {
         s = `'${s}`
     }
 
-    // Wrap in double-quotes if the field contains comma, double-quote, or newline
-    if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    // Wrap in double-quotes if the field contains comma or double-quote
+    if (s.includes(',') || s.includes('"')) {
         s = `"${s.replace(/"/g, '""')}"`
     }
 

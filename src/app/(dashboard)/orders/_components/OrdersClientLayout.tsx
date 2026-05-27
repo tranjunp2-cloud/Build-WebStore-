@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { OrdersMetrics } from './OrdersMetrics'
@@ -15,7 +16,10 @@ import { AwaitingVerificationChip } from './AwaitingVerificationChip'
 export function OrdersClientLayout() {
     const { t, ti } = useI18n()
     const o = t.dashboard.orders
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+    const searchParams = useSearchParams()
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(
+        searchParams.get('order')
+    )
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
     const [currentOrders, setCurrentOrders] = useState<Order[]>([])
     const [refreshCounter, setRefreshCounter] = useState(0)
