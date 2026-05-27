@@ -15,6 +15,64 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F25 Code Review Gap Fixes (Phase 1 — CQ-01 to CQ-04)
+
+**4 important issues fixed post-implementation review:**
+- **CQ-01:** Added `orders.customer_id_fk` FK migration with `ON DELETE SET NULL` constraint. Ensures customer deletion (if ever enabled) does not cascade-delete orders; sets `customer_id` to NULL instead.
+- **CQ-02:** Phone field schema + validation hardened. Added `customers.phone_type_varchar20` migration (aligns schema to spec); added > 20 chars null-guard in `normalizePhone()` for defence-in-depth against malicious direct API calls bypassing frontend validation.
+- **CQ-03:** Fixed useCallback missing dep warning in `customers-client-layout.tsx`. Extracted `loadFailedMsg` const before `load` callback to avoid stale-closure on locale change; added to dependency array.
+- **CQ-04:** CSV export `csvField` now strips `\r\n` before formula-injection guard (aligns with `sanitizeCell` behavior in dashboard, prevents row-boundary confusion in RFC 4180 parsers).
+
+**Tests:** All customers-related unit tests pass; ESLint exhaustive-deps warning resolved.
+
+**Impact:** F25 backend robustness + API contract hardening. Zero breaking changes; feature fully spec-compliant.
+
+### F25 Code Review Gap Fixes (Phase 2 — CQ-05 to CQ-06)
+
+**2 minor docs issues resolved post-implementation review:**
+- **CQ-05:** Fixed stale architecture description — `docs/architecture/F25-shop-customers.md` §2 now correctly documents latest-wins behavior: `syncCustomerSnapshot` patches denormalized name/phone on `operation=create` AND on `update` when `customerName` or `customerPhone` differ from `previousDoc`. Previously doc said "create-only", but implementation was already correct.
+- **CQ-06:** Added missing `customers.normalize_existing_phones` migration entry to `docs/architecture/F25-shop-customers.md` §4 migrations table. Migration exists in `scripts/db-setup.js` and is required for partial unique index on existing phone data; now spec-aligned.
+
+**Impact:** Architecture docs now fully align with implementation. Zero code changes; pure documentation accuracy fix.
+
+### F25 Light/Dark Mode Theming (CSS Variable Refactor)
+
+**Theming refactor — pure visual, no behavior changes:**
+- **CSS variables added:** `src/app/globals.css` introduces `--cus-*` semantic token set for F25 Customers feature (26 tokens + rank badge variants). Covers surfaces (card, header, dropdown, info), borders (subtle/medium/strong), text layers (secondary/muted/subtle/faint), code blocks, skeletons, and 4 rank badges (VIP/Gold/Silver/Bronze) with light + dark mode overrides.
+- **Component refactoring:** All 6 customer UI components refactored to replace hardcoded dark colors with `var(--cus-*)` tokens. Affected: `customer-list.tsx`, `customer-detail.tsx`, `customer-*-tab.tsx`, rank badge components.
+- **Light mode support:** Full light mode palette added to complement existing dark baseline; all UI automatically respects `<html class="dark">` toggle.
+
+**Impact:** F25 feature now theme-aware; no breaking changes; visual behavior identical, just token-driven instead of hardcoded.
+
+### F25 Review Bug Fixes (Wave 2 polish)
+
+**10 bugs fixed across backend + frontend after code review:**
+- **BE-1:** `Customers.ts` beforeChange hook now normalizes phone: trim → strip `[-\s().]` → lowercase → null on empty
+- **BE-2:** `auto-link-customer.ts` found-customer path no longer overwrites existing customer addresses (was losing address book on duplicate phone)
+- **FE-1:** `customers-client-layout.tsx` — added stale genRef response guard + useCallback memoization for click handler
+- **BE-3/BE-4:** `Orders.ts` corrected `shippingAddress` + `customerName` field descriptions (were swapped)
+- **FE-3:** Renamed `customers-atoms.tsx` → `customers-shared-ui.tsx` (clarity)
+- **FE-4:** `customers-detail-default-tab.tsx` added fallback split guard `?? ''` (prevent undefined spread in JSX)
+- **FE-5:** `actions.ts` `meta` returns `safePage` not raw `page` (defensive pagination bound)
+- **FE-6:** `customers-list-toolbar.tsx` Apply button now disabled when `localFrom > localTo` (date range validation)
+- **BE-7:** Added 3 regression tests: `auto-link-customer.test.ts` (TC-F25-006b, TC-F25-02-20) covering phone edge cases + address preservation
+
+**Impact:** F25 feature now spec-aligned; no breaking changes; all tests pass.
+
+### F25 Round 2 — Bug Fixes (Phone Normalization + Hooks Stability)
+
+**6 issues fixed post-review:**
+- **fix(customers):** strip `+` from phone normalization — prevents identity fragmentation (`+60...` vs `60...` treated as different customers). Regex `/[-\s()+.]/g` applied in `auto-link-customer.ts`, `Customers.ts` beforeChange hook, plus tests (TC-F25-09-01..02).
+- **fix(customers):** `latestOrderAt` now only written on `operation=create` in `syncCustomerSnapshot.ts`. Previously updated on edit, causing historical timestamp corruption (TC-F25-09-03).
+- **fix(customers):** `syncCustomerSnapshot.ts` checks `operation === 'create'` before writing denormalized fields, preventing overwrites on order edits (TC-F25-09-04..05).
+- **fix(customers):** CSV export `sanitizeCell` now strips embedded newlines (`\r\n`) per RFC 4180. Prevents cell value escape corruption in Excel (TC-F25-09-06).
+- **fix(customers):** `fetchOrderStats` single-customer limit raised from 1 000 to 5 000 rows. Supports high-volume customer detail pages without query pagination (TC-F25-09-07).
+- **test(customers):** new `sync-customer-snapshot.test.ts` — 9 tests covering operation semantics, field isolation, latestOrderAt timing (TC-F25-09-01..07).
+
+**Impact:** Phone identity fragmentation eliminated; snapshot isolation guarantees met; large customer exports stable. Zero breaking changes; 79 tests pass.
+
+---
+
 ### GH-1018 — Code Review Bug Fixes (iframe guard + DRY editor detection)
 
 **Bug fixes (fix/BUG-F05-1018-block-product-view-detail):**

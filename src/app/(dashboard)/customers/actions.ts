@@ -4,22 +4,8 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
 import type { Where } from 'payload'
-import {
-    mapContactSubmission,
-    mapSubscriber,
-    CS_DISPLAY_TO_DB_STATUSES,
-    CS_STATUS_TO_DB,
-} from './_lib/customer-record'
-import { toCsv } from './_lib/csv-exporter'
-import type { CustomerRecord } from './_lib/customer-record'
-
-type CustomerFilters = {
-    search?: string
-    status?: string   // new | contacted | ignored | subscribed | ''
-    source?: string   // contact-form | newsletter | ''
-    page?: number
-    limit?: number
-}
+import { mapCustomer, toCsv } from './_lib/shop-customer-record'
+import type { ShopCustomerFilters, UpdateCustomerData } from './_lib/shop-customer-record'
 
 async function requireTenantId(): Promise<string> {
     const tenantId = await getCurrentTenantId()
@@ -27,216 +13,246 @@ async function requireTenantId(): Promise<string> {
     return tenantId
 }
 
-// Resolve site IDs owned by this tenant (shared by list + mutation guards)
-async function getTenantSiteIds(payload: Awaited<ReturnType<typeof getPayload>>, tenantId: string): Promise<number[]> {
-    const res = await payload.find({
-        collection: 'sites',
-        where: { tenant: { equals: tenantId } },
-        limit: 100,
-        depth: 0,
-    })
-    return res.docs.map(s => s.id as number)
+function assertTenantOwnership(doc: Record<string, unknown>, tenantId: string): void {
+    const docTenantId =
+        typeof doc.tenant === 'object' && doc.tenant !== null
+            ? String((doc.tenant as Record<string, unknown>).id)
+            : String(doc.tenant)
+    if (docTenantId !== tenantId) throw new Error('Unauthorized')
 }
 
-// IDOR guard — throws if record's site doesn't belong to this tenant
-function assertSiteOwnership(siteId: number | null, siteIds: number[]): void {
-    if (!siteId || !siteIds.includes(siteId)) throw new Error('Unauthorized')
-}
+function buildCustomerWhere(tenantId: string, filters: ShopCustomerFilters): Where {
+    const conditions: Where[] = [{ tenant: { equals: tenantId } }]
 
-function buildContactWhere(siteIds: number[], search: string, displayStatus: string): Where {
-    const conditions: Where[] = [{ site: { in: siteIds } }]
-    if (search) {
-        conditions.push({ or: [{ email: { like: search } }, { name: { like: search } }] })
+    if (filters.search?.trim()) {
+        const q = filters.search.trim()
+        conditions.push({
+            or: [{ email: { like: q } }, { name: { like: q } }, { phone: { like: q } }],
+        })
     }
-    if (displayStatus && CS_DISPLAY_TO_DB_STATUSES[displayStatus]) {
-        const dbStatuses = CS_DISPLAY_TO_DB_STATUSES[displayStatus]!
-        conditions.push(
-            dbStatuses.length === 1
-                ? { status: { equals: dbStatuses[0] } }
-                : { or: dbStatuses.map(s => ({ status: { equals: s } })) },
-        )
+
+    if (filters.rank && filters.rank !== 'all') {
+        if (filters.rank === 'none') {
+            conditions.push({ rank: { equals: null } })
+        } else {
+            conditions.push({ rank: { equals: filters.rank } })
+        }
     }
+
+    if (filters.dateFrom) conditions.push({ createdAt: { greater_than_equal: filters.dateFrom } })
+    if (filters.dateTo) conditions.push({ createdAt: { less_than_equal: filters.dateTo } })
+
     return { and: conditions }
 }
 
-// Internal — no pagination cap, shared by paginated list + export
-async function queryAllCustomers(tenantId: string, search: string, status: string, source: string, dedup = true): Promise<CustomerRecord[]> {
-    const payload = await getPayload({ config: configPromise })
-    const siteIds = await getTenantSiteIds(payload, tenantId)
-    if (siteIds.length === 0) return []
+type OrderStats = { count: number; total: number; completed: number; cancelled: number }
 
-    // 'subscribed' is newsletter-only — skip contact query to avoid returning all contacts
-    const doContact = (!source || source === 'contact-form') && status !== 'subscribed'
-    // Bug fix: old expression skipped newsletter when source='newsletter' AND status='new' (because
-    // 'new' is in the exclusion list). The inner short-circuit ensures source='newsletter' always
-    // queries regardless of status filter (subscribers only have 'subscribed' status anyway).
-    // For 'all sources', newsletter is still skipped for contact-only statuses (new/read/contacted/ignored).
-    const doNewsletter = (!source || source === 'newsletter') &&
-        (source === 'newsletter' || !['new', 'contacted', 'ignored', 'read'].includes(status))
-
-    const [contactDocs, subscriberDocs] = await Promise.all([
-        doContact
-            ? payload
-                  .find({
-                      collection: 'contact-submissions',
-                      where: buildContactWhere(siteIds, search, status),
-                      sort: '-createdAt',
-                      limit: 1000,
-                      depth: 0,
-                  })
-                  .then(r => r.docs)
-            : Promise.resolve([]),
-        doNewsletter
-            ? payload
-                  .find({
-                      collection: 'subscribers',
-                      where: search
-                          ? { and: [{ site: { in: siteIds } }, { email: { like: search } }] }
-                          : { site: { in: siteIds } },
-                      sort: '-createdAt',
-                      limit: 1000,
-                      depth: 0,
-                  })
-                  .then(r => r.docs)
-            : Promise.resolve([]),
-    ])
-
-    const contactRecords = contactDocs.map(d => mapContactSubmission(d as Record<string, unknown>))
-    const subscriberRecords = subscriberDocs.map(d => mapSubscriber(d as Record<string, unknown>))
-
-    let resolvedContacts: CustomerRecord[]
-    if (dedup) {
-        // Keep latest submission per email for the list view
-        const emailMap = new Map<string, CustomerRecord>()
-        for (const r of contactRecords) {
-            const existing = emailMap.get(r.email)
-            if (!existing || new Date(r.createdAt) > new Date(existing.createdAt)) {
-                emailMap.set(r.email, r)
-            }
-        }
-        resolvedContacts = [...emailMap.values()]
-    } else {
-        resolvedContacts = contactRecords
-    }
-
-    return [...resolvedContacts, ...subscriberRecords]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+// 2-decimal rounding (prime-web-api parity); 0 when no orders
+function rate(numerator: number, count: number): number {
+    if (count <= 0) return 0
+    return Math.round((numerator / count) * 10000) / 100
 }
 
-export async function getCustomersAction(filters: CustomerFilters = {}) {
-    const tenantId = await requireTenantId()
-    const { search = '', status = '', source = '', page = 1, limit = 10 } = filters
-    const safeLimit = Math.min(200, Math.max(1, limit))
-    const all = await queryAllCustomers(tenantId, search, status, source)
-    const start = (page - 1) * safeLimit
-    return JSON.parse(
-        JSON.stringify({
-            data: all.slice(start, start + safeLimit),
-            meta: { page, limit: safeLimit, total: all.length },
-        }),
-    )
-}
+async function fetchOrderStats(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    customerIds: number[],
+    tenantId: string,
+    orderLimit?: number,
+): Promise<Map<number, OrderStats>> {
+    const map = new Map<number, OrderStats>()
+    if (customerIds.length === 0) return map
 
-export async function updateContactStatusAction(rawId: number, displayStatus: string) {
-    const tenantId = await requireTenantId()
-    const dbStatus = CS_STATUS_TO_DB[displayStatus]
-    if (!dbStatus) throw new Error('Invalid status')
-    const payload = await getPayload({ config: configPromise })
+    // Single-customer detail: 5 000 cap (handles high-volume buyers).
+    // List page (25–100 customers): 200×N cap, max 10 000 (fast, accurate for typical stores).
+    // Export (up to 1 000 customers): caller passes explicit limit — default to 200×N, max 100 000.
+    const defaultLimit = customerIds.length === 1
+        ? 5_000
+        : Math.min(customerIds.length * 200, 10_000)
 
-    // Resolve email + siteId from the target record
-    const sourceDoc = await payload.findByID({ collection: 'contact-submissions', id: rawId, depth: 0 })
-    const sourceRecord = mapContactSubmission(sourceDoc as Record<string, unknown>)
-
-    // IDOR guard — verify the submission belongs to this tenant
-    const siteIds = await getTenantSiteIds(payload, tenantId)
-    assertSiteOwnership(sourceRecord.siteId, siteIds)
-
-    // Batch update all submissions for the same email + site
-    const siblings = await payload.find({
-        collection: 'contact-submissions',
+    const res = await payload.find({
+        collection: 'orders',
         where: {
             and: [
-                { email: { equals: sourceRecord.email } },
-                { site: { equals: sourceRecord.siteId } },
+                { customer: { in: customerIds } },
+                { tenant: { equals: tenantId } },
             ],
         },
-        limit: 100,
+        limit: orderLimit ?? defaultLimit,
         depth: 0,
+        overrideAccess: true,
     })
-    await Promise.all(
-        siblings.docs.map(doc =>
-            payload.update({
-                collection: 'contact-submissions',
-                id: doc.id as number,
-                data: { status: dbStatus },
-                depth: 0,
-            }),
-        ),
-    )
 
-    const updated = await payload.findByID({ collection: 'contact-submissions', id: rawId, depth: 0 })
-    return JSON.parse(JSON.stringify(mapContactSubmission(updated as Record<string, unknown>)))
-}
-
-export async function deleteCustomerAction(rawId: number, source: string) {
-    const tenantId = await requireTenantId()
-    const collection = source === 'contact-form' ? 'contact-submissions' : source === 'newsletter' ? 'subscribers' : null
-    if (!collection) throw new Error('Invalid source')
-    const payload = await getPayload({ config: configPromise })
-
-    // IDOR guard — verify the record belongs to this tenant before deleting
-    const doc = await payload.findByID({ collection, id: rawId, depth: 0 })
-    const record = source === 'contact-form'
-        ? mapContactSubmission(doc as Record<string, unknown>)
-        : mapSubscriber(doc as Record<string, unknown>)
-    const siteIds = await getTenantSiteIds(payload, tenantId)
-    assertSiteOwnership(record.siteId, siteIds)
-
-    await payload.delete({ collection, id: rawId })
-}
-
-export async function exportCustomersCsvAction(filters: Omit<CustomerFilters, 'page' | 'limit'> = {}) {
-    const tenantId = await requireTenantId()
-    const { search = '', status = '', source = '' } = filters
-    const all = await queryAllCustomers(tenantId, search, status, source, false)
-    return toCsv(all)
-}
-
-export async function getCustomerDetailAction(rawId: number, source: string) {
-    const tenantId = await requireTenantId()
-    const payload = await getPayload({ config: configPromise })
-
-    if (source === 'contact-form') {
-        const doc = await payload.findByID({ collection: 'contact-submissions', id: rawId, depth: 0 })
-        const record = mapContactSubmission(doc as Record<string, unknown>)
-
-        // IDOR guard
-        const siteIds = await getTenantSiteIds(payload, tenantId)
-        assertSiteOwnership(record.siteId, siteIds)
-
-        const timeline = await payload
-            .find({
-                collection: 'contact-submissions',
-                where: {
-                    and: [
-                        { email: { equals: record.email } },
-                        { site: { equals: record.siteId } },
-                    ],
-                },
-                sort: '-createdAt',
-                limit: 20,
-                depth: 0,
-            })
-            .then(r => r.docs.map(d => mapContactSubmission(d as Record<string, unknown>)))
-        return JSON.parse(JSON.stringify({ record, timeline }))
+    if (res.totalDocs > res.docs.length) {
+        console.warn(
+            `[fetchOrderStats] truncated: ${res.docs.length}/${res.totalDocs} orders for ${customerIds.length} customers (limit=${customerIds.length === 1 ? 5_000 : Math.min(customerIds.length * 200, 10_000)})`,
+        )
     }
 
-    const doc = await payload.findByID({ collection: 'subscribers', id: rawId, depth: 0 })
-    const record = mapSubscriber(doc as Record<string, unknown>)
+    for (const doc of res.docs) {
+        const raw = doc.customer as number | { id: number } | null
+        const custId = typeof raw === 'object' && raw !== null ? raw.id : (raw as number)
+        if (!custId) continue
 
-    // IDOR guard
-    const siteIds = await getTenantSiteIds(payload, tenantId)
-    assertSiteOwnership(record.siteId, siteIds)
+        const s = map.get(custId) ?? { count: 0, total: 0, completed: 0, cancelled: 0 }
+        s.count++
+        s.total += (doc.total as number) ?? 0
+        if (doc.status === 'completed') s.completed++
+        if (doc.status === 'cancelled') s.cancelled++
+        map.set(custId, s)
+    }
 
-    return JSON.parse(JSON.stringify({ record, timeline: [] }))
+    return map
+}
+
+export async function getShopCustomersAction(filters: ShopCustomerFilters = {}) {
+    const tenantId = await requireTenantId()
+    const { page = 1, limit = 25 } = filters
+    const safePage = Math.max(1, page)
+    const safeLimit = Math.min(100, Math.max(1, limit))
+
+    const payload = await getPayload({ config: configPromise })
+    const res = await payload.find({
+        collection: 'customers',
+        where: buildCustomerWhere(tenantId, filters),
+        sort: '-createdAt',
+        page: safePage,
+        limit: safeLimit,
+        depth: 0,
+    })
+
+    const ids = res.docs.map(d => d.id as number)
+    const statsMap = await fetchOrderStats(payload, ids, tenantId)
+
+    const data = res.docs.map(doc => {
+        const s = statsMap.get(doc.id as number)
+        const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
+        const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+        return mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
+    })
+
+    return JSON.parse(
+        JSON.stringify({ data, meta: { page: safePage, limit: safeLimit, total: res.totalDocs } }),
+    )
+}
+
+export async function getShopCustomerDetailAction(id: number) {
+    const tenantId = await requireTenantId()
+    const payload = await getPayload({ config: configPromise })
+
+    const doc = await payload.findByID({ collection: 'customers', id, depth: 0 })
+    assertTenantOwnership(doc as Record<string, unknown>, tenantId)
+
+    const statsMap = await fetchOrderStats(payload, [id], tenantId)
+    const s = statsMap.get(id)
+    const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
+    const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+
+    const mapped = mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
+
+    return JSON.parse(JSON.stringify(mapped))
+}
+
+const VALID_RANKS = new Set(['bronze', 'silver', 'gold', 'vip'])
+
+export async function updateShopCustomerAction(id: number, data: UpdateCustomerData) {
+    const tenantId = await requireTenantId()
+    const payload = await getPayload({ config: configPromise })
+
+    const existing = await payload.findByID({ collection: 'customers', id, depth: 0 })
+    assertTenantOwnership(existing as Record<string, unknown>, tenantId)
+
+    if (data.rank !== undefined && data.rank !== null && !VALID_RANKS.has(data.rank)) {
+        throw new Error('Invalid rank value')
+    }
+
+    const updated = await payload.update({
+        collection: 'customers',
+        id,
+        data: {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.rank !== undefined && { rank: data.rank }),
+            ...(data.notes !== undefined && { notes: data.notes }),
+            ...(data.addresses !== undefined && { addresses: data.addresses }),
+        },
+        depth: 0,
+    })
+
+    return JSON.parse(JSON.stringify(mapCustomer(updated as Record<string, unknown>)))
+}
+
+export async function exportShopCustomersCsvAction(
+    filters: Omit<ShopCustomerFilters, 'page' | 'limit'> = {},
+) {
+    const tenantId = await requireTenantId()
+    const payload = await getPayload({ config: configPromise })
+
+    const res = await payload.find({
+        collection: 'customers',
+        where: buildCustomerWhere(tenantId, filters),
+        sort: '-createdAt',
+        limit: 1000,
+        depth: 0,
+        overrideAccess: true, // tenant isolation applied via buildCustomerWhere
+    })
+
+    const ids = res.docs.map(d => d.id as number)
+    // Export: use a higher order cap (1 000 orders/customer avg) so large tenants
+    // get accurate orderCount and lifetime totals in the CSV.
+    const statsMap = await fetchOrderStats(payload, ids, tenantId, Math.min(ids.length * 1_000, 100_000))
+
+    // JSON round-trip ensures Payload date fields (Date objects) become ISO strings
+    // before toCsv processes them — same pattern used by all other actions.
+    const rawRecords = res.docs.map(doc => {
+        const s = statsMap.get(doc.id as number)
+        const completedRate = rate(s?.completed ?? 0, s?.count ?? 0)
+        const failedRate = rate(s?.cancelled ?? 0, s?.count ?? 0)
+        return mapCustomer(doc as Record<string, unknown>, s?.count ?? 0, s?.total ?? 0, completedRate, failedRate)
+    })
+    const records = JSON.parse(JSON.stringify(rawRecords)) as typeof rawRecords
+
+    return {
+        csv: toCsv(records),
+        truncated: res.totalDocs > res.docs.length,
+        total: res.totalDocs,
+    }
+}
+
+export async function getCustomerOrdersAction(customerId: number, page = 1) {
+    const tenantId = await requireTenantId()
+    const payload = await getPayload({ config: configPromise })
+    const safePage = Math.max(1, page)
+
+    const customer = await payload.findByID({ collection: 'customers', id: customerId, depth: 0 })
+    assertTenantOwnership(customer as Record<string, unknown>, tenantId)
+
+    const res = await payload.find({
+        collection: 'orders',
+        where: {
+            and: [
+                { customer: { equals: customerId } },
+                { tenant: { equals: tenantId } },
+            ],
+        },
+        sort: '-createdAt',
+        page: safePage,
+        limit: 25,
+        depth: 0,
+    })
+
+    return JSON.parse(
+        JSON.stringify({
+            orders: res.docs.map(doc => ({
+                id: doc.id as number,
+                orderNumber: doc.orderNumber as string,
+                status: doc.status as string,
+                total: doc.total as number,
+                currency: (doc.currency as string) || 'MYR',
+                paymentStatus: doc.paymentStatus as string,
+                createdAt: doc.createdAt as string,
+            })),
+            total: res.totalDocs,
+            totalPages: res.totalPages,
+            page: safePage,
+        }),
+    )
 }

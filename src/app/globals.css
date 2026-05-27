@@ -131,6 +131,61 @@ html:not(.dark) {
   --auth-footer-color: #64748B;
 }
 
+/* ── Customer Feature (F25) semantic tokens ─────────────────────────────── */
+/* Dark mode (default — matches current hardcoded values exactly) */
+:root {
+  --cus-surface-card: rgba(15,23,42,0.4);
+  --cus-surface-header: rgba(15,23,42,0.7);
+  --cus-surface-dropdown: #1e293b;
+  --cus-surface-select: #1e293b;
+  --cus-surface-sticky: rgba(10,17,33,0.96);
+  --cus-surface-info: rgba(15,23,42,0.6);
+  --cus-border-subtle: rgba(255,255,255,0.04);
+  --cus-border-medium: rgba(255,255,255,0.08);
+  --cus-border-strong: rgba(255,255,255,0.14);
+  --cus-text-secondary: rgba(255,255,255,0.65);
+  --cus-text-muted: #94a3b8;
+  --cus-text-subtle: rgba(255,255,255,0.40);
+  --cus-text-faint: rgba(255,255,255,0.30);
+  --cus-code-bg: rgba(255,255,255,0.06);
+  --cus-code-border: rgba(255,255,255,0.10);
+  --cus-code-fg: #94a3b8;
+  --cus-skeleton: rgba(255,255,255,0.06);
+  --cus-dot-sep: #475569;
+  /* Rank badges */
+  --cus-rank-vip-fg: #c4b5fd;    --cus-rank-vip-bg: rgba(124,58,237,0.10);    --cus-rank-vip-border: rgba(124,58,237,0.28);
+  --cus-rank-gold-fg: #fbbf24;   --cus-rank-gold-bg: rgba(245,158,11,0.10);   --cus-rank-gold-border: rgba(245,158,11,0.30);
+  --cus-rank-silver-fg: #cbd5e1; --cus-rank-silver-bg: rgba(148,163,184,0.14); --cus-rank-silver-border: rgba(148,163,184,0.35);
+  --cus-rank-bronze-fg: #fb923c; --cus-rank-bronze-bg: rgba(180,83,9,0.10);   --cus-rank-bronze-border: rgba(180,83,9,0.28);
+}
+
+/* Customer feature — light mode overrides */
+html:not(.dark) {
+  --cus-surface-card: rgba(248,250,252,0.85);
+  --cus-surface-header: rgba(241,245,249,0.95);
+  --cus-surface-dropdown: #ffffff;
+  --cus-surface-select: #f8fafc;
+  --cus-surface-sticky: rgba(248,250,252,0.96);
+  --cus-surface-info: rgba(248,250,252,0.9);
+  --cus-border-subtle: rgba(0,0,0,0.04);
+  --cus-border-medium: rgba(0,0,0,0.08);
+  --cus-border-strong: rgba(0,0,0,0.14);
+  --cus-text-secondary: #334155;
+  --cus-text-muted: #64748b;
+  --cus-text-subtle: rgba(15,23,42,0.40);
+  --cus-text-faint: rgba(15,23,42,0.30);
+  --cus-code-bg: rgba(0,0,0,0.05);
+  --cus-code-border: rgba(0,0,0,0.10);
+  --cus-code-fg: #475569;
+  --cus-skeleton: rgba(0,0,0,0.06);
+  --cus-dot-sep: #94a3b8;
+  /* Rank badges */
+  --cus-rank-vip-fg: #6d28d9;    --cus-rank-vip-bg: rgba(109,40,217,0.08);   --cus-rank-vip-border: rgba(109,40,217,0.22);
+  --cus-rank-gold-fg: #b45309;   --cus-rank-gold-bg: rgba(180,83,9,0.08);    --cus-rank-gold-border: rgba(180,83,9,0.24);
+  --cus-rank-silver-fg: #475569; --cus-rank-silver-bg: rgba(71,85,105,0.10); --cus-rank-silver-border: rgba(71,85,105,0.28);
+  --cus-rank-bronze-fg: #92400e; --cus-rank-bronze-bg: rgba(146,64,14,0.08); --cus-rank-bronze-border: rgba(146,64,14,0.24);
+}
+
 
 /* ── Dashboard Shell — Legacy Color Overrides ────────────────────────────── */
 /* Remaps hardcoded Tailwind dark utilities to dash-* semantic tokens.
@@ -329,6 +384,7 @@ html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color
 .dash-shell .text-\[\#DDE2F8\],
 .dash-shell .text-\[\#e1e2eb\],
 .dash-shell .text-\[\#E1E2EB\],
+.dash-shell .text-\[\#f1f5f9\],
 .dash-shell .text-\[\#F1F5F9\],
 .dash-shell .text-\[\#f8fafc\],
 .dash-shell .text-\[\#F8FAFC\],
@@ -385,6 +441,12 @@ html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color
 .dash-shell .text-white\/40,
 .dash-shell .text-white\/30,
 .dash-shell .text-white\/20 { color: var(--dash-text-muted); }
+/* F25 Customers — intermediate opacity variants not in original sweep */
+.dash-shell .text-white\/75 { color: var(--dash-text); }
+.dash-shell .text-white\/65,
+.dash-shell .text-white\/55,
+.dash-shell .text-white\/45,
+.dash-shell .text-white\/35 { color: var(--dash-text-muted); }
 
 /* ── Phase 06: rgba 0.6 near-white text (complement to 0.7/0.9 above) ───── */
 .dash-shell .text-\[rgba\(248\,250\,252\,0\.6\)\] { color: var(--dash-text-muted); }
@@ -488,6 +550,9 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 html:not(.dark) .dash-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
 html:not(.dark) .dash-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
 html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
+/* F25 Customers — skeleton bg + subtle row dividers (light mode only) */
+html:not(.dark) .dash-shell .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .border-white\/\[0\.04\] { border-color: rgba(0,0,0,0.04); }
 
 /* ── Editor Shell — Legacy Color Overrides ────────────────────────────── */
 /* Remaps hardcoded Tailwind dark utilities to editor-* semantic tokens.
