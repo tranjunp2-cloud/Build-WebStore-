@@ -79,7 +79,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                             {items.map(item => (
-                                <div key={item.productId} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                                <div key={`${item.productId}:${item.variantName ?? ''}`} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                                     {/* Product image */}
                                     <div style={{
                                         width: '96px', height: '128px', flexShrink: 0,
@@ -94,10 +94,15 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                     {/* Product info */}
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                                            <p style={{ fontSize: '16px', fontWeight: 700, color: '#191c1d', margin: 0, lineHeight: '24px', fontFamily: CSS_VARS.fontHeading }}>
-                                                {item.name}
-                                            </p>
-                                            <button onClick={() => removeItem(item.productId)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: '8px' }}>
+                                            <div>
+                                                <p style={{ fontSize: '16px', fontWeight: 700, color: '#191c1d', margin: 0, lineHeight: '24px', fontFamily: CSS_VARS.fontHeading }}>
+                                                    {item.name}
+                                                </p>
+                                                {item.variantName && (
+                                                    <p style={{ fontSize: '12px', color: '#71717a', margin: '2px 0 0' }}>{item.variantName}</p>
+                                                )}
+                                            </div>
+                                            <button onClick={() => removeItem(item.productId, item.variantName)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', flexShrink: 0, marginLeft: '8px' }}>
                                                 <Trash2 size={11} color={'#71717a'} />
                                             </button>
                                         </div>
@@ -110,7 +115,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 borderRadius: '4px',
                                             }}>
                                                 <button
-                                                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                                    onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantName)}
                                                     disabled={item.quantity <= 1}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.quantity <= 1 ? 0.3 : 1 }}>
                                                     <Minus size={7} />
@@ -119,7 +124,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                     {item.quantity}
                                                 </span>
                                                 <button
-                                                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                    onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantName)}
                                                     disabled={item.inventory !== undefined && item.quantity >= item.inventory}
                                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: (item.inventory !== undefined && item.quantity >= item.inventory) ? 0.3 : 1 }}>
                                                     <Plus size={7} />

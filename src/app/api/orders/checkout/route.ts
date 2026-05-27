@@ -104,16 +104,42 @@ export async function POST(request: Request) {
 
             const p = product as any
 
-            // Check stock — top-level field in Products collection is `inventory` (variants have per-variant `stock`)
-            if (p.inventory !== undefined && p.inventory !== null && p.inventory < item.quantity) {
+            // Guard: hasVariants products require an explicit variant selection
+            if (p.hasVariants && !item.variant) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'VARIANT_REQUIRED', message: `A variant must be selected for "${p.name}"` } },
+                    { status: 422 }
+                )
+            }
+
+            // Variant resolution — depth:0 is safe: variants is an array field, present on the doc
+            const variant = (p.hasVariants && item.variant && Array.isArray(p.variants))
+                ? (p.variants as Array<{ name: string; price: number; stock?: number }>).find(v => v.name === item.variant) ?? null
+                : null
+
+            // Stale or unknown variant → reject; prevents silent base-price fallback exploit
+            if (p.hasVariants && item.variant && !variant) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'VARIANT_NOT_FOUND', message: `Variant "${item.variant}" not found for "${p.name}"` } },
+                    { status: 422 }
+                )
+            }
+
+            const unitPrice = variant ? variant.price : p.price
+            // Advisory OOS guard: use aggregate p.inventory (decremented by COD CAS in stock-cas.ts).
+            // Per-variant stock decrement (products_variants.stock) is a follow-up task — variant.stock
+            // is never decremented today, so reading it would give a permanently stale value.
+            const stockAvail = p.inventory ?? Infinity
+
+            if (stockAvail < item.quantity) {
                 return NextResponse.json(
                     {
                         success: false,
                         error: {
                             code: 'OUT_OF_STOCK',
-                            message: `"${p.name}" has only ${p.inventory} left in stock`,
+                            message: `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
                             product: p.name,
-                            available: p.inventory,
+                            available: p.inventory ?? 0,
                             requested: item.quantity,
                         },
                     },
@@ -122,15 +148,14 @@ export async function POST(request: Request) {
             }
 
             currency = p.currency || 'MYR'
-            const lineTotal = p.price * item.quantity
-            subtotal += lineTotal
+            subtotal += unitPrice * item.quantity
 
             orderItems.push({
                 product: productLookupId,
                 productName: p.name,
                 variant: item.variant || '',
                 quantity: item.quantity,
-                unitPrice: p.price,
+                unitPrice,
             })
         }
 

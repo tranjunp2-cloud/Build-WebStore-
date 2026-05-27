@@ -397,4 +397,160 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
             }),
         }))
     })
+
+    // ─── TC-F09.226–228: Variant cart/checkout fixes ──────────────────────
+
+    it('[TC-F09.226] variant product: order unitPrice = variant.price not base price', async () => {
+        // Arrange: product with Red variant @ RM 75 (base price RM 50)
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })   // site
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-v', name: 'Shirt', price: 50,  // base price — must NOT be used
+            currency: 'MYR', inventory: 10,
+            hasVariants: true,
+            variants: [
+                { name: 'Red', price: 75, stock: 5 },
+                { name: 'Blue', price: 80, stock: 3 },
+            ],
+        }))
+        mockCreate.mockResolvedValue({ id: 'order-v1' })
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-v', quantity: 1, variant: 'Red' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: unitPrice is variant.price
+        expect(res.status).toBe(200)
+        const createdItem = mockCreate.mock.calls[0][0].data.items[0]
+        expect(createdItem.unitPrice).toBe(75)        // variant.price, not base price 50
+        expect(createdItem.variant).toBe('Red')
+    })
+
+    it('[TC-F09.227] variant OOS check uses aggregate p.inventory (not per-variant stock)', async () => {
+        // Arrange: variant product with aggregate inventory=1 and variant.stock=5 (stale).
+        // OOS guard must fire based on p.inventory (the field CAS decrements), not variant.stock.
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-v', name: 'Shirt', price: 50, inventory: 1, // aggregate: only 1 left
+            hasVariants: true,
+            variants: [
+                { name: 'Red', price: 75, stock: 5 },  // variant.stock is stale — NOT used
+            ],
+        }))
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-v', quantity: 2, variant: 'Red' }], // qty=2 > p.inventory=1
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: rejects because p.inventory (1) < requested qty (2)
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        expect(data.error.available).toBe(1)
+    })
+
+    it('[TC-F09.226b] stale variant name returns 422 VARIANT_NOT_FOUND', async () => {
+        // Arrange: product with Red variant, request Purple (doesn't exist)
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-v', name: 'Shirt', price: 50, inventory: 10,
+            hasVariants: true,
+            variants: [{ name: 'Red', price: 75, stock: 5 }],
+        }))
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-v', quantity: 1, variant: 'Purple' }], // doesn't exist
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: VARIANT_NOT_FOUND error
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('VARIANT_NOT_FOUND')
+    })
+
+    it('[TC-F09.226c] variant product with multiple variants — correct unitPrice per variant', async () => {
+        // Arrange: product with 2 variants, add both to order
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+        // Need 2 find() calls: one for Red, one for Blue
+        const shirtProduct = {
+            id: 'prod-v', name: 'Shirt', price: 50,
+            currency: 'MYR', inventory: 10,
+            hasVariants: true,
+            variants: [
+                { name: 'Red', price: 75, stock: 5 },
+                { name: 'Blue', price: 80, stock: 3 },
+            ],
+        }
+        mockFind
+            .mockResolvedValueOnce(mockProduct(shirtProduct)) // Red variant lookup
+            .mockResolvedValueOnce(mockProduct(shirtProduct)) // Blue variant lookup
+        mockCreate.mockResolvedValue({ id: 'order-v2' })
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-v', quantity: 1, variant: 'Red' },
+                { productId: 'prod-v', quantity: 1, variant: 'Blue' },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: each line has correct unitPrice
+        expect(res.status).toBe(200)
+        const createdItems = mockCreate.mock.calls[0][0].data.items
+        expect(createdItems).toHaveLength(2)
+        expect(createdItems[0].variant).toBe('Red')
+        expect(createdItems[0].unitPrice).toBe(75)
+        expect(createdItems[1].variant).toBe('Blue')
+        expect(createdItems[1].unitPrice).toBe(80)
+    })
+
+    it('[TC-F09.229] hasVariants product without variant field returns 422 VARIANT_REQUIRED', async () => {
+        // Arrange: variant product sent without variant name (direct API bypass attempt)
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-v', name: 'Shirt', price: 50, inventory: 100,
+            hasVariants: true,
+            variants: [{ name: 'Red', price: 75, stock: 5 }],
+        }))
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-v', quantity: 1 }], // no variant field
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: rejected before stock/price logic; base price not silently used
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('VARIANT_REQUIRED')
+    })
 })

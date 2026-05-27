@@ -3177,6 +3177,7 @@
       "sku": "SKU:",
       "outOfStock": "Out of Stock",
       "addToCart": "🛒 Add to Cart",
+      "selectVariant": "Select a variant",
       "allProducts": "All Products",
       "priceRange": "Price Range",
       "applyFilter": "Apply Filter"
