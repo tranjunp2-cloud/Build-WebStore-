@@ -400,6 +400,7 @@ const GalleryBlock = {
     slug: 'gallery',
     labels: { singular: 'Gallery Section', plural: 'Gallery Sections' },
     fields: [
+        { name: 'sectionLabel', type: 'text' },
         { name: 'headline', type: 'text' },
         {
             name: 'variant',

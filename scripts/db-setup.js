@@ -3942,6 +3942,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_testimonials.add_subheadline', sql: `ALTER TABLE "_pages_v_blocks_testimonials" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
   { name: 'pages_blocks_contact.add_section_label', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_contact.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_gallery.add_section_label', sql: `ALTER TABLE "pages_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_gallery.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
 ];
 
 async function runMigrations(pool) {
