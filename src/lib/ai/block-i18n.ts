@@ -751,10 +751,19 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
     },
 }
 
+// Runtime section labels cache — populated by block-strings-translator for long-tail languages.
+const runtimeSectionLabelsCache = new Map<string, SectionLabels>()
+
+/** Inject GPT-translated section labels for a language not in the static seed. */
+export function injectSectionLabels(lang: string, labels: SectionLabels): void {
+    runtimeSectionLabelsCache.set(lang, labels)
+}
+
 /** Get section labels for the given language code. Returns null for unsupported languages. */
 export function getSectionLabels(lang?: string): SectionLabels | null {
     if (!lang) return null
     if (SECTION_LABELS_SEED[lang]) return SECTION_LABELS_SEED[lang]!
+    if (runtimeSectionLabelsCache.has(lang)) return runtimeSectionLabelsCache.get(lang)!
     const prefix = lang.split('-')[0]
-    return SECTION_LABELS_SEED[prefix] ?? null
+    return SECTION_LABELS_SEED[prefix] ?? runtimeSectionLabelsCache.get(prefix) ?? null
 }

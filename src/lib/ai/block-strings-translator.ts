@@ -12,8 +12,8 @@
  */
 
 import type OpenAI from 'openai'
-import type { BlockStrings } from './block-i18n'
-import { getBlockStrings, hasDedicatedStrings, injectBlockStrings } from './block-i18n'
+import type { BlockStrings, SectionLabels } from './block-i18n'
+import { getBlockStrings, hasDedicatedStrings, injectBlockStrings, injectSectionLabels } from './block-i18n'
 
 /** Flat string keys sent to GPT — function fields reconstructed from these. */
 interface RawTranslation {
@@ -62,6 +62,22 @@ interface RawTranslation {
     pricing_learn_more: string
     testimonials_headline: string
     testimonials_subheadline: string
+    // Section label tags (short, shown above block headlines)
+    sl_about: string
+    sl_gallery: string
+    sl_contact: string
+    sl_features: string
+    sl_testimonials: string
+    sl_faq: string
+    sl_team: string
+    sl_service_cards: string
+    sl_stats: string
+    sl_pricing: string
+    sl_newsletter: string
+    sl_client_logos: string
+    sl_blog: string
+    sl_contact_submit: string
+    sl_about_prefix: string
 }
 
 const ENGLISH_VALUES: RawTranslation = {
@@ -110,6 +126,21 @@ const ENGLISH_VALUES: RawTranslation = {
     pricing_learn_more: 'Learn More',
     testimonials_headline: 'What Our Customers Say',
     testimonials_subheadline: 'Genuine reviews from our customers',
+    sl_about: 'About Us',
+    sl_gallery: 'Gallery',
+    sl_contact: 'Contact',
+    sl_features: 'Features',
+    sl_testimonials: 'Testimonials',
+    sl_faq: 'FAQ',
+    sl_team: 'Our Team',
+    sl_service_cards: 'Services',
+    sl_stats: 'Our Numbers',
+    sl_pricing: 'Pricing',
+    sl_newsletter: 'Newsletter',
+    sl_client_logos: 'Our Clients',
+    sl_blog: 'Blog',
+    sl_contact_submit: 'Send Message',
+    sl_about_prefix: 'About',
 }
 
 function buildBlockStrings(t: RawTranslation): BlockStrings {
@@ -190,14 +221,37 @@ function buildBlockStrings(t: RawTranslation): BlockStrings {
     }
 }
 
+function buildSectionLabels(t: RawTranslation): SectionLabels {
+    return {
+        about: t.sl_about,
+        gallery: t.sl_gallery,
+        contact: t.sl_contact,
+        features: t.sl_features,
+        testimonials: t.sl_testimonials,
+        faq: t.sl_faq,
+        team: t.sl_team,
+        serviceCards: t.sl_service_cards,
+        stats: t.sl_stats,
+        pricing: t.sl_pricing,
+        newsletter: t.sl_newsletter,
+        clientLogos: t.sl_client_logos,
+        blogList: t.sl_blog,
+        contactSubmitLabel: t.sl_contact_submit,
+        aboutHeadlinePrefix: t.sl_about_prefix,
+    }
+}
+
 function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation {
     return !!(
         raw.nav_home && raw.nav_contact && raw.contact_submit &&
-        raw.footer_rights && raw.testimonials_headline
+        raw.footer_rights && raw.testimonials_headline && raw.sl_gallery
     )
 }
 
-async function callGptTranslation(gpLang: string, openai: OpenAI): Promise<BlockStrings | null> {
+async function callGptTranslation(
+    gpLang: string,
+    openai: OpenAI,
+): Promise<{ blockStrings: BlockStrings; sectionLabels: SectionLabels } | null> {
     const completion = await openai.chat.completions.create({
         model: 'gpt-4.1-nano',
         messages: [{
@@ -205,7 +259,7 @@ async function callGptTranslation(gpLang: string, openai: OpenAI): Promise<Block
             content: `Translate all values in the JSON below to ${gpLang}. Return ONLY valid JSON with the same keys. Do not add or remove keys.\n\n${JSON.stringify(ENGLISH_VALUES)}`,
         }],
         temperature: 0,
-        max_tokens: 800,
+        max_tokens: 1000,
         response_format: { type: 'json_object' },
     })
 
@@ -213,7 +267,7 @@ async function callGptTranslation(gpLang: string, openai: OpenAI): Promise<Block
     const parsed = JSON.parse(raw) as Partial<RawTranslation>
 
     if (!isValidTranslation(parsed)) return null
-    return buildBlockStrings(parsed)
+    return { blockStrings: buildBlockStrings(parsed), sectionLabels: buildSectionLabels(parsed) }
 }
 
 /**
@@ -226,10 +280,11 @@ export function prefetchBlockStrings(gpLang: string, blockLang: string, openai: 
     if (hasDedicatedStrings(blockLang)) return
 
     void callGptTranslation(gpLang, openai)
-        .then((strings) => {
-            if (strings) {
-                injectBlockStrings(blockLang, strings)
-                console.log(`[block-strings-translator] cached block strings for ${blockLang} (${gpLang})`)
+        .then((result) => {
+            if (result) {
+                injectBlockStrings(blockLang, result.blockStrings)
+                injectSectionLabels(blockLang, result.sectionLabels)
+                console.log(`[block-strings-translator] cached block strings + section labels for ${blockLang} (${gpLang})`)
             }
         })
         .catch((err) => {
@@ -245,10 +300,11 @@ export async function translateBlockStrings(
 ): Promise<BlockStrings> {
     const cached = hasDedicatedStrings(blockLang) ? getBlockStrings(blockLang) : null
     if (cached) return cached
-    const translated = await callGptTranslation(gpLang, openai)
-    if (translated) {
-        injectBlockStrings(blockLang, translated)
-        return translated
+    const result = await callGptTranslation(gpLang, openai)
+    if (result) {
+        injectBlockStrings(blockLang, result.blockStrings)
+        injectSectionLabels(blockLang, result.sectionLabels)
+        return result.blockStrings
     }
     return getBlockStrings('en')
 }
