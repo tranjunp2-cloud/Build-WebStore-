@@ -3944,6 +3944,20 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_contact.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: 'pages_blocks_gallery.add_section_label', sql: `ALTER TABLE "pages_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
   { name: '_pages_v_blocks_gallery.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_stats.add_section_label', sql: `ALTER TABLE "pages_blocks_stats" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_stats.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_stats" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_pricing.add_section_label', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_pricing.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_team.add_section_label', sql: `ALTER TABLE "pages_blocks_team" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_team.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_team" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_newsletter.add_section_label', sql: `ALTER TABLE "pages_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_newsletter.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_blog_list.add_section_label', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_blog_list.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_service_cards.add_section_label', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_service_cards.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_client_logos.add_section_label', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_client_logos.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
 ];
 
 async function runMigrations(pool) {
