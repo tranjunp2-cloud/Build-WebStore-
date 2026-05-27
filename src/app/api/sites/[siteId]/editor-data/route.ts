@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 
@@ -105,6 +106,23 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             page = pagesResult.docs[0] || null
         }
 
+        // F-26: Fetch locale_content from pages table (raw SQL — not a Payload field)
+        let localeContent: Record<string, unknown> = {}
+        if (page) {
+            try {
+                const db = payload.db.drizzle as { execute: (q: unknown) => Promise<{ rows: Array<{ locale_content: unknown }> }> }
+                const result = await db.execute(sql`
+                    SELECT locale_content FROM pages WHERE id = ${page.id} LIMIT 1
+                `)
+                const row = result.rows?.[0]
+                if (row?.locale_content && typeof row.locale_content === 'object') {
+                    localeContent = row.locale_content as Record<string, unknown>
+                }
+            } catch {
+                // Non-fatal — locale_content is additive
+            }
+        }
+
         return NextResponse.json({
             site: {
                 id: site.id,
@@ -114,6 +132,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
                 locale: site.locale || 'ms',
+                pendingLocaleConfirm: (site as Record<string, unknown>).pendingLocaleConfirm === true,
                 contactInfo: site.contactInfo || {},
                 socialLinks: site.socialLinks || {},
                 branding: site.branding || {},
@@ -152,6 +171,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 layout: normalizeEditorLayout(page.layout),
                 _status: page._status || 'published',
                 updatedAt: page.updatedAt,
+                /** F-26: Per-block locale content map for multilingual editor */
+                localeContent,
             } : null,
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,

@@ -592,6 +592,11 @@ export async function POST(req: NextRequest) {
             return resolveSiteType(resolveComposerCategory(businessInfo.industry))
         })()
 
+        // F26-01: Set pendingLocaleConfirm when AI generates non-English site
+        // so user can confirm or correct the detected locale in editor.
+        const detectedLocale = ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en'
+        const pendingLocaleConfirm = detectedLocale === 'ms'
+
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
             site = await payload.update({
@@ -602,7 +607,8 @@ export async function POST(req: NextRequest) {
                     status: 'draft',
                     generationStatus: 'generating',
                     siteType: safeSiteType,
-                    locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
+                    locale: detectedLocale,
+                    pendingLocaleConfirm,
                     theme: resolvedTheme,
                     seo: {
                         metaTitle: result.seo.title,
@@ -642,7 +648,8 @@ export async function POST(req: NextRequest) {
                     status: 'draft',
                     generationStatus: 'generating',
                     siteType: safeSiteType,
-                    locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
+                    locale: detectedLocale,
+                    pendingLocaleConfirm,
                     theme: resolvedTheme,
                     seo: {
                         metaTitle: result.seo.title,

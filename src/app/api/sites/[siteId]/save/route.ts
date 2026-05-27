@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { sql } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -91,7 +92,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
         // Navigation: allow draft links (empty/#) but reject malformed external URLs
         if (headerBlock && typeof headerBlock === 'object') {
             const hb = headerBlock as Record<string, unknown>
@@ -121,11 +122,14 @@ export async function PATCH(
             socialLinks: unknown;
             branding: unknown;
             seo: unknown;
+            pendingLocaleConfirm: boolean;
         }>;
         const siteUpdateData: SiteUpdateData = {}
         if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
         if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
+        // F26-01: Clear pendingLocaleConfirm when user confirms/dismisses the dialog
+        if (pendingLocaleConfirm !== undefined) siteUpdateData.pendingLocaleConfirm = pendingLocaleConfirm
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
         // Draft saves write to pending fields — only promoted to live on publish.
         // Prevents in-progress header/footer edits from immediately affecting the live storefront.
@@ -289,6 +293,73 @@ export async function PATCH(
                         draft: isDraft ?? false,
                     })
                 }
+
+                // F-26: Persist locale_content alongside blocks (raw SQL — not a Payload field)
+                if (localeContent) {
+                    try {
+                        const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
+                        await db.execute(sql`
+                            UPDATE pages
+                            SET locale_content = ${JSON.stringify(localeContent)}::jsonb
+                            WHERE id = ${page.id}
+                        `)
+                    } catch (lcErr) {
+                        console.warn('[Save] locale_content update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
+                    }
+                }
+            }
+        }
+
+        // F-26: Persist locale_content when provided without blocks (locale-only save)
+        if (localeContent && !normalizedBlocks) {
+            const numericSiteId = Number(siteId)
+
+            // C1: Verify page-ownership before writing locale_content (mirrors with-blocks guard)
+            if (pageId && /^\d+$/.test(pageId)) {
+                let requestedPage = null
+                try {
+                    requestedPage = await payload.findByID({ collection: 'pages', id: pageId, draft: true })
+                } catch { /* not found */ }
+                const pageSiteId = typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+                if (!requestedPage || Number(pageSiteId) !== numericSiteId) {
+                    return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
+                }
+            }
+
+            try {
+                let lcPageId: string | number | null = null
+
+                if (pageId && /^\d+$/.test(pageId)) {
+                    lcPageId = pageId
+                } else {
+                    // Find homepage or first page for this site
+                    let pagesResult = await payload.find({
+                        collection: 'pages',
+                        where: { site: { equals: numericSiteId }, isHomepage: { equals: true } },
+                        limit: 1,
+                        draft: true,
+                    })
+                    if (pagesResult.docs.length === 0) {
+                        pagesResult = await payload.find({
+                            collection: 'pages',
+                            where: { site: { equals: numericSiteId } },
+                            limit: 1,
+                            draft: true,
+                        })
+                    }
+                    lcPageId = pagesResult.docs[0]?.id ?? null
+                }
+
+                if (lcPageId) {
+                    const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
+                    await db.execute(sql`
+                        UPDATE pages
+                        SET locale_content = ${JSON.stringify(localeContent)}::jsonb
+                        WHERE id = ${lcPageId}
+                    `)
+                }
+            } catch (lcErr) {
+                console.warn('[Save] locale_content-only update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
             }
         }
 

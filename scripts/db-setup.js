@@ -4043,6 +4043,16 @@ const MIGRATIONS = [
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
   { name: 'orders.customer_id_index',
     sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
+  // ── F26: Per-locale content storage for multilingual editor ──
+  {
+    name: 'pages.locale_content',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS locale_content jsonb DEFAULT '{}';`,
+  },
+  // ── F26-01: Language confirm flag after AI generation ──
+  {
+    name: 'sites.pending_locale_confirm',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_locale_confirm boolean DEFAULT false;`,
+  },
 ];
 
 async function runMigrations(pool) {

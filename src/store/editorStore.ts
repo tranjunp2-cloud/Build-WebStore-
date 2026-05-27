@@ -1,15 +1,18 @@
 /**
  * Editor Store (Zustand)
  * Manages editor state with undo/redo history and auto-save.
- * Features: F-11 (Undo/Redo) + F-07 (Auto-Save & Draft)
+ * Features: F-11 (Undo/Redo) + F-07 (Auto-Save & Draft) + F-26 (Multilingual)
  */
 
 import { create } from 'zustand'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type BlockData = { blockType: string;[key: string]: unknown }
+
+export type SiteLocale = 'en' | 'ms'
 
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
@@ -69,6 +72,14 @@ type EditorState = {
     // Pages (F-05-02)
     pages: PageData[]
     currentPageId: string | null
+
+    // F-26: Multilingual locale state
+    /** Active editing locale. Defaults to site's generation locale. */
+    activeLocale: SiteLocale
+    /** The locale used when the site was AI-generated (flat blocks are in this language). */
+    siteLocale: SiteLocale
+    /** Per-block locale overrides: localeOverrides[blockId][locale] = { field: value } */
+    localeOverrides: Record<string, Record<SiteLocale, Record<string, unknown>>>
 
     // History (F-06 / F-11)
     history: EditorSnapshot[]
@@ -153,6 +164,23 @@ type EditorActions = {
     deleteGlobalBlock: (type: GlobalBlockKey) => void
     flipBlockVariant: (blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => void
 
+    // F-26: Multilingual locale actions
+    setActiveLocale: (locale: SiteLocale) => void
+    /** Set the site's generation locale — called once on data load, resets on init/reset. */
+    setSiteLocale: (locale: SiteLocale) => void
+    setLocaleOverride: (blockId: string, locale: SiteLocale, fields: Record<string, unknown>) => void
+    initLocaleFromBlock: (blockId: string, localeInit: { en: Record<string, unknown>; ms: Record<string, unknown> }) => void
+    /**
+     * Merge localeOverrides[block.id][activeLocale] onto block for rendering.
+     * Priority: localeOverride wins → fall back to flat block if same locale → defaults.
+     */
+    getDisplayBlock: (block: BlockData) => BlockData
+    /**
+     * Returns all blocks with locale display applied — use this for every iframe send.
+     * Ensures BM/EN content is always correct regardless of the action (add/delete/undo/redo/reorder).
+     */
+    getDisplayBlocks: () => BlockData[]
+
     // Reset
     reset: () => void
 }
@@ -236,6 +264,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
     autoSaveTimer: null,
+    // F-26: Multilingual
+    activeLocale: 'en',
+    siteLocale: 'en',
+    localeOverrides: {},
 
     init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null) => {
         // Clear any pending auto-save timer from previous page to prevent cross-page save
@@ -267,6 +299,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             isSaving: false,
             saveStatus: 'idle',
             isAIStreaming: false,
+            // M1 fix: reset locale state on every page switch so stale overrides never bleed.
+            // The loadData caller sets siteLocale + activeLocale + localeOverrides after init().
+            activeLocale: 'en',
+            siteLocale: 'en',
+            localeOverrides: {},
         })
     },
 
@@ -706,6 +743,81 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().handleContentChange()
     },
 
+    // ── F-26: Multilingual locale actions ───────────────────────────────
+
+    setActiveLocale: (locale) => set({ activeLocale: locale }),
+
+    setSiteLocale: (locale) => set({ siteLocale: locale }),
+
+    setLocaleOverride: (blockId, locale, fields) => {
+        const { localeOverrides } = get()
+        const existing = localeOverrides[blockId]?.[locale] ?? {}
+        set({
+            localeOverrides: {
+                ...localeOverrides,
+                [blockId]: {
+                    ...(localeOverrides[blockId] ?? { en: {}, ms: {} }),
+                    [locale]: { ...existing, ...fields },
+                },
+            },
+            // Mark dirty so auto-save + nav guard fire for non-EN edits
+            hasUnsavedChanges: true,
+            saveStatus: 'idle',
+        })
+    },
+
+    initLocaleFromBlock: (blockId, localeInit) => {
+        const { localeOverrides } = get()
+        // Seed both EN and MS slots with template defaults — only for blocks that have no user edits yet.
+        // EN edits go through setLocaleOverride (handleBlockFieldChange / handleBlockUpdate paths),
+        // which merges on top of the seeded defaults, so user edits always win.
+        const existing = localeOverrides[blockId]
+        set({
+            localeOverrides: {
+                ...localeOverrides,
+                [blockId]: {
+                    en: existing?.en && Object.keys(existing.en).length > 0 ? existing.en : localeInit.en,
+                    ms: existing?.ms && Object.keys(existing.ms).length > 0 ? existing.ms : localeInit.ms,
+                },
+            },
+        })
+    },
+
+    getDisplayBlock: (block) => {
+        const { activeLocale, siteLocale, localeOverrides, siteName } = get()
+
+        // Blocks without id (pre-save new blocks) fall through to locale resolver
+        if (!block.id) {
+            // Flat block is in siteLocale — return as-is when viewing that locale
+            if (activeLocale === siteLocale) return block
+            const resolved = resolveBlockContent(block.blockType, activeLocale, siteName || 'Your Brand')
+            return resolved.content && Object.keys(resolved.content).length > 0 ? { ...block, ...resolved.content } : block
+        }
+
+        // User override wins for any locale
+        const override = localeOverrides[block.id as string]?.[activeLocale]
+        if (override && Object.keys(override).length > 0) {
+            return { ...block, ...override }
+        }
+
+        // Viewing the site's generation locale with no override → flat block is authoritative
+        // (flat block is in siteLocale, so this only short-circuits when locales match)
+        if (activeLocale === siteLocale) return block
+
+        // Alternate locale with no override → resolve locale defaults
+        // (e.g. EN switch on MS site, or MS preview on EN site)
+        const resolved = resolveBlockContent(block.blockType, activeLocale, siteName || 'Your Brand')
+        if (resolved.content && Object.keys(resolved.content).length > 0) {
+            return { ...block, ...resolved.content }
+        }
+        return block
+    },
+
+    getDisplayBlocks: () => {
+        const state = get()
+        return state.blocks.map(b => state.getDisplayBlock(b))
+    },
+
     reset: () => {
         // Cancel any pending auto-save/retry timer before clearing state — prevents
         // stale cross-site writes when the user navigates to a different site.
@@ -721,6 +833,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
+            activeLocale: 'en',
+            siteLocale: 'en',
+            localeOverrides: {},
         })
     },
 }))

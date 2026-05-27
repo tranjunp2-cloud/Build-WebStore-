@@ -116,6 +116,13 @@ export const Sites: CollectionConfig = {
             defaultValue: 'ms',
         },
         {
+            // F26-01: Flag set by AI generate; cleared once user confirms/dismisses dialog
+            name: 'pendingLocaleConfirm',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'Show language confirm dialog when user opens editor after AI generation' },
+        },
+        {
             name: 'theme',
             type: 'group',
             label: 'Site Theme & Branding',

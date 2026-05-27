@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
     AlertTriangle,
@@ -199,6 +200,8 @@ interface EditorToolbarProps {
     siteUrl?: string | null
     wasPublished?: boolean
     onViewportChange: (viewport: 'desktop' | 'mobile') => void
+    /** F-26: Optional language switcher rendered near workspace controls */
+    languageSwitcherSlot?: React.ReactNode
 }
 
 export function EditorToolbar({
@@ -232,6 +235,7 @@ export function EditorToolbar({
     siteUrl,
     wasPublished,
     onViewportChange,
+    languageSwitcherSlot,
 }: EditorToolbarProps) {
     const { t } = useI18n()
     const et = t.editor.toolbar
@@ -436,6 +440,11 @@ export function EditorToolbar({
                 </div>
 
                 <WorkspaceLayoutControls />
+                {languageSwitcherSlot && (
+                    <div className="hidden lg:flex items-center">
+                        {languageSwitcherSlot}
+                    </div>
+                )}
             </div>
 
             {/* Spacer 2 — symmetric counterpart so CENTER lands at the visual midpoint. */}
