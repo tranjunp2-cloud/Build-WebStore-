@@ -28,7 +28,17 @@ async function callGptTranslation(gpLang: string, openai: OpenAI): Promise<NavLa
     })
 
     const raw = completion.choices[0]?.message?.content ?? ''
-    const parsed = JSON.parse(raw) as Partial<NavLabels>
+    if (!raw) {
+        console.warn(`[nav-label-translator] empty response for ${gpLang}`)
+        return null
+    }
+    let parsed: Partial<NavLabels>
+    try {
+        parsed = JSON.parse(raw) as Partial<NavLabels>
+    } catch {
+        console.warn(`[nav-label-translator] JSON.parse failed for ${gpLang}`)
+        return null
+    }
 
     if (!parsed.home || !parsed.about || !parsed.services || !parsed.contact) {
         return null
