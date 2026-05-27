@@ -199,7 +199,9 @@ function normalizeSectionLabels(
         const bt = typeof block.blockType === 'string' ? block.blockType : ''
         const label = blockTypeToLabel[bt]
         if (!label) return block
-        return { ...block, sectionLabel: label }
+        // Contact block: also patch submitLabel which GPT keeps as "Send Message"
+        const extra = bt === 'contact' ? { submitLabel: labels.contactSubmitLabel } : {}
+        return { ...block, sectionLabel: label, ...extra }
     })
 }
 

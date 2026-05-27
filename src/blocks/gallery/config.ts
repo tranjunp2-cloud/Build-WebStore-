@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { BaseBlockSchema, ImageRefSchema } from '../types'
 
-export type GalleryConfig = { blockType: 'gallery'; variant?: 'grid' | 'masonry' | 'carousel' | 'lightbox' | 'filmstrip' | 'justified'; headline?: string; images: { image: { url: string; alt?: string }; caption?: string }[] }
+export type GalleryConfig = { blockType: 'gallery'; variant?: 'grid' | 'masonry' | 'carousel' | 'lightbox' | 'filmstrip' | 'justified'; headline?: string; sectionLabel?: string; images: { image: { url: string; alt?: string }; caption?: string }[] }
 export const GalleryConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('gallery'), variant: z.enum(['grid', 'masonry', 'carousel', 'lightbox', 'filmstrip', 'justified']).default('grid'),
     headline: z.string().optional(),

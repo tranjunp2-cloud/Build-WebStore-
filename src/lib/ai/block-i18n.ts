@@ -416,6 +416,7 @@ export interface SectionLabels {
     newsletter: string
     clientLogos: string
     blogList: string
+    contactSubmitLabel: string
 }
 
 const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
@@ -433,6 +434,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         newsletter: 'ニュースレター',
         clientLogos: 'お客様・パートナー',
         blogList: 'ブログ・最新情報',
+        contactSubmitLabel: '送信する',
     },
     zh: {
         about: '关于我们',
@@ -448,6 +450,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         newsletter: '订阅通讯',
         clientLogos: '合作客户',
         blogList: '博客资讯',
+        contactSubmitLabel: '发送消息',
     },
     ko: {
         about: '회사 소개',
@@ -463,6 +466,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         newsletter: '뉴스레터',
         clientLogos: '파트너 & 고객사',
         blogList: '블로그',
+        contactSubmitLabel: '메시지 보내기',
     },
     ar: {
         about: 'من نحن',
@@ -478,6 +482,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         newsletter: 'النشرة البريدية',
         clientLogos: 'شركاؤنا وعملاؤنا',
         blogList: 'المدونة',
+        contactSubmitLabel: 'إرسال الرسالة',
     },
     th: {
         about: 'เกี่ยวกับเรา',
@@ -493,6 +498,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         newsletter: 'จดหมายข่าว',
         clientLogos: 'ลูกค้าและพันธมิตร',
         blogList: 'บทความและข่าวสาร',
+        contactSubmitLabel: 'ส่งข้อความ',
     },
 }
 
