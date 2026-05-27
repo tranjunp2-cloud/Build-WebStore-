@@ -12,7 +12,7 @@ import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
 // ─── TYPES & MOCKS ───
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface OrderDetail {
     id: string | number
@@ -311,11 +311,12 @@ function OrderProgress({ status }: { status: OrderStatus }) {
     const STEPS = getProgressSteps(progressLabels)
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
+        new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
         confirmed: 1,
         ready_to_ship: 2,
         shipped: 3,
         completed: 4,
-        cancelled: -1, // No progress if cancelled
+        cancelled: -1,
         refunded: -1,
         paid: 1,
         payment_failed: -1,
@@ -731,6 +732,25 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
         }
     }
 
+    const handleRefund = async () => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${id}/refund`, { method: 'POST' })
+            if (!res.ok) {
+                const data = await res.json()
+                console.error('Failed to refund order:', data.error)
+                throw new Error('API_ERROR')
+            }
+            toast.success(t.dashboard.orders.toast.updated)
+            onUpdate()
+        } catch (error: unknown) {
+            console.error('Refund order error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const handleCancel = async (reason: string) => {
         setIsLoading(true)
         try {
@@ -798,8 +818,8 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Bottom Row — layout_BH1FFS: row, gap 12px */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
+                    const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
+                    const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}
@@ -828,7 +848,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
 
                             {/* Refund Button */}
                             <button
-                                onClick={() => handleAction('refunded')}
+                                onClick={handleRefund}
                                 disabled={refundDisabled}
                                 className={`flex-1 flex items-center justify-center gap-2 font-bold transition-opacity ${refundDisabled ? 'cursor-not-allowed opacity-30' : 'hover:opacity-80'}`}
                                 style={{

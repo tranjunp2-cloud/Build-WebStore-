@@ -16,7 +16,7 @@ interface TenantDoc {
     slug?: string
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
+const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
 /**
  * GET /api/orders/[id]/resume?ut=<uploadToken>

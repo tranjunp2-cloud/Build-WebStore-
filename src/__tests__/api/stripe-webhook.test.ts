@@ -47,6 +47,12 @@ function createRequest(body: string, signature?: string) {
 describe('POST /api/webhooks/stripe [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // mockReset clears queued mockResolvedValueOnce values that vi.clearAllMocks() leaves behind
+        mockFind.mockReset()
+        mockUpdate.mockReset()
+        mockFindByID.mockReset()
+        mockCreate.mockReset()
+        mockDrizzleExecute.mockReset()
         // Default: atomic SQL transition succeeds (1 row updated = order was pending → now new)
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
     })
@@ -169,6 +175,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: {
                 id: 'sess_fpx_123',
                 client_reference_id: '201',
@@ -176,8 +183,9 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 payment_intent: 'pi_fpx_456',
             },
         })
-        mockFind.mockResolvedValue({ docs: [] }) // Not already processed
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 201, tenant: 'tenant-1' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-1', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '201',
             items: [],
@@ -196,7 +204,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: '201',
+                id: 201,
                 data: expect.objectContaining({
                     paymentMethod: 'fpx',
                 }),
@@ -210,6 +218,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: {
                 id: 'sess_card_123',
                 client_reference_id: '202',
@@ -217,8 +226,9 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 payment_intent: 'pi_card_456',
             },
         })
-        mockFind.mockResolvedValue({ docs: [] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 202, tenant: 'tenant-1' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-1', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '202',
             items: [],
@@ -237,7 +247,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: '202',
+                id: 202,
                 data: expect.objectContaining({
                     paymentMethod: 'card',
                 }),
@@ -253,6 +263,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: {
                 id: 'sess_charge_123',
                 client_reference_id: '203',
@@ -260,8 +271,9 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 payment_intent: 'pi_with_charge', // string — as Stripe actually sends it
             },
         })
-        mockFind.mockResolvedValue({ docs: [] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 203, tenant: 'tenant-1' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-1', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '203',
             items: [],
@@ -355,10 +367,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: { id: 'sess_notify_fail', client_reference_id: '204' },
         })
-        mockFind.mockResolvedValue({ docs: [] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 204, tenant: 'tenant-notify' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-notify', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '204',
             items: [],
@@ -384,10 +398,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: { id: 'sess_email_fail', client_reference_id: '205' },
         })
-        mockFind.mockResolvedValue({ docs: [] })
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 205, tenant: 'tenant-1' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-1', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '205',
             items: [],
@@ -492,10 +508,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
+            connectedAccountId: 'acct_connect_1',
             data: { id: 'sess_success', client_reference_id: '206', payment_intent: 'pi_success' },
         })
-        mockFind.mockResolvedValue({ docs: [] }) // Not already processed
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 206, tenant: 'tenant-1' }] }) // IDOR pre-check
         mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValueOnce({ id: 'tenant-1', stripeAccountId: 'acct_connect_1' }) // verifyConnectedAccountOwnership
         mockFindByID.mockResolvedValue({
             id: '206',
             items: [],
@@ -513,7 +531,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: '206',
+                id: 206,
                 data: expect.objectContaining({ stripePaymentIntentId: 'pi_success' }),
             }),
         )

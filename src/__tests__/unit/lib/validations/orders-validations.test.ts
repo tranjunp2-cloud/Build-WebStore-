@@ -18,6 +18,13 @@ describe('orderCreateSchema [TC-F10.09, TC-F10.13]', () => {
         customer: {
             name: 'John',
             email: 'john@example.com',
+            phone: '012-3456789',
+            address: {
+                line1: '123 Jalan Test',
+                city: 'Kuala Lumpur',
+                postcode: '50000',
+                country: 'MY',
+            },
         },
         paymentMethod: 'cod' as const,
     }
