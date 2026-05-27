@@ -4,9 +4,14 @@ const mockFindByID = vi.fn()
 const mockFind = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
+const mockDelete = vi.fn()
 const mockSendEmail = vi.fn(() => Promise.resolve())
+const mockDrizzleExecute = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate, sendEmail: mockSendEmail })),
+    getPayload: vi.fn(() => Promise.resolve({
+        findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate, delete: mockDelete, sendEmail: mockSendEmail,
+        db: { drizzle: { execute: mockDrizzleExecute } },
+    })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/auth/order-token', () => ({
@@ -54,6 +59,7 @@ const validBody = {
     customer: {
         name: 'John',
         email: 'john@test.com',
+        phone: '0123456789',
         address: { line1: '123 Main St', city: 'Kuala Lumpur', state: 'Selangor', postcode: '50100', country: 'Malaysia' },
     },
     paymentMethod: 'cod',
@@ -62,6 +68,16 @@ const validBody = {
 describe('POST /api/orders/checkout [TC-F10]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // mockReset clears queued mockResolvedValueOnce values that vi.clearAllMocks() leaves behind
+        mockFindByID.mockReset()
+        mockFind.mockReset()
+        mockCreate.mockReset()
+        mockUpdate.mockReset()
+        mockDrizzleExecute.mockReset()
+        mockDelete.mockReset()
+        // CAS stock decrement succeeds by default (COD only)
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
+        mockDelete.mockResolvedValue({})
     })
 
     it('creates order with valid input', async () => {
