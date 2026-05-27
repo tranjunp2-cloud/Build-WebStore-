@@ -5,6 +5,7 @@ import { render } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { ProductImageFallback } from '../../../components/dashboard/ProductImageFallback'
 import { slugify, buildSavePayload } from '../../../components/dashboard/BulkCreateModal'
+import { formatPrice } from '../../../lib/utils'
 
 describe('ProductImageFallback Component', () => {
     it('renders default size correctly', () => {
@@ -138,13 +139,6 @@ describe('Products CRUD Form Zod Validation Logic', () => {
 })
 
 describe('Product Price Formatting', () => {
-    // Abstracted logic matching the component's formatPrice
-    function formatPrice(price: number, currency: string) {
-        if (currency === 'MYR') return `RM ${price.toFixed(2)}`
-        if (currency === 'SGD') return `S$${price.toFixed(2)}`
-        return `$${price.toFixed(2)}`
-    }
-
     it('formats MYR correctly', () => {
         expect(formatPrice(10.5, 'MYR')).toBe('RM 10.50')
     })
@@ -156,6 +150,52 @@ describe('Product Price Formatting', () => {
     it('formats USD as default correctly', () => {
         expect(formatPrice(9.99, 'USD')).toBe('$9.99')
         expect(formatPrice(9.99, 'UNKNOWN')).toBe('$9.99')
+    })
+})
+
+// ── F08-bug-1032-01: Variant product price/SKU round-trip ─────────────────────
+// Bug #1032 root cluster: save mapping forced price=0 and sku='' for variant
+// products regardless of form values. Fix: always use form field values.
+// These schema tests verify the form value contract that load→schema→save preserves.
+
+describe('F08-bug-1032-01: variant product price/SKU schema contract', () => {
+    const schema = getProductFormSchema({})
+
+    it('TC-F08-01-20 (variant): accepts basePrice=0 for variant product', () => {
+        // Load mapping fix: data.price != null → parseFloat(0) = 0, not undefined.
+        // Schema must accept 0 so that the round-trip preserves the value on re-save.
+        // variants required when hasVariants=true (variantsRequired validation)
+        const result = schema.safeParse({
+            name: 'T-Shirt',
+            categoryIds: ['cat-1'],
+            images: [],
+            hasVariants: true,
+            basePrice: 0,
+            baseSku: 'TSHIRT-001',
+            baseInventory: 0,
+            urlSlug: 't-shirt',
+            variants: [{ id: 'v1', variantName: 'White - M', skuCode: 'TSHIRT-001-WHT-M', price: 0, stock: 10 }],
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('F08-bug-1032-01: variant product with empty SKU fails validation', () => {
+        // Save fix: sku no longer forced to '' for variant products.
+        // Schema enforces baseSku is always required — even for variant products.
+        const result = schema.safeParse({
+            name: 'T-Shirt',
+            categoryIds: ['cat-1'],
+            images: [],
+            hasVariants: true,
+            basePrice: 10,
+            baseSku: '',
+            baseInventory: 0,
+            urlSlug: 't-shirt',
+        })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(JSON.stringify(result.error.flatten())).toContain('SKU')
+        }
     })
 })
 
@@ -327,5 +367,63 @@ describe('US-F08-04 — ProductImageFallback in Bulk Grid context (AC-1, AC-3)',
         // Verify the component is importable and renders without crashing
         const { container } = render(<ProductImageFallback />)
         expect(container.firstChild).toBeInTheDocument()
+    })
+})
+
+import { parseServerError, localizeFieldError } from '../../../lib/products/server-errors'
+
+describe('server-errors: parseServerError', () => {
+    it('[TC-F08-FORM-ERR-01] JSON FIELD_ERRORS payload → returns parsed payload with fieldErrors', () => {
+        // Arrange
+        const err = new Error(JSON.stringify({
+            code: 'FIELD_ERRORS',
+            fieldErrors: {
+                baseSku: { code: 'SKU_ALREADY_IN_USE', values: ['SKU-001'] },
+                'variants.0.skuCode': { code: 'SKU_ALREADY_IN_USE', values: ['VAR-A'] },
+            },
+            message: 'SKU already in use: SKU-001, VAR-A',
+        }))
+
+        // Act
+        const result = parseServerError(err)
+
+        // Assert
+        expect(result).not.toBeNull()
+        expect(result?.code).toBe('FIELD_ERRORS')
+        expect(result?.fieldErrors.baseSku.code).toBe('SKU_ALREADY_IN_USE')
+        expect(result?.fieldErrors.baseSku.values).toEqual(['SKU-001'])
+        expect(result?.fieldErrors['variants.0.skuCode'].code).toBe('SKU_ALREADY_IN_USE')
+        expect(result?.message).toBe('SKU already in use: SKU-001, VAR-A')
+    })
+
+    it('[TC-F08-FORM-ERR-02] plain non-JSON Error → returns null', () => {
+        expect(parseServerError(new Error('Network error'))).toBeNull()
+    })
+
+    it('[TC-F08-FORM-ERR-03] JSON without code:FIELD_ERRORS discriminator → returns null', () => {
+        expect(parseServerError(new Error('{"foo":"bar"}'))).toBeNull()
+    })
+
+    it('[TC-F08-FORM-ERR-03b] non-Error value → returns null', () => {
+        expect(parseServerError('string error')).toBeNull()
+        expect(parseServerError(null)).toBeNull()
+    })
+})
+
+describe('server-errors: localizeFieldError', () => {
+    it('[TC-F08-FORM-ERR-01b] SKU_ALREADY_IN_USE with errorsMap → interpolates value', () => {
+        const errorsMap = { skuAlreadyInUse: 'SKU "{value}" is already in use' }
+        const result = localizeFieldError({ code: 'SKU_ALREADY_IN_USE', values: ['SKU-001'] }, errorsMap)
+        expect(result).toBe('SKU "SKU-001" is already in use')
+    })
+
+    it('[TC-F08-FORM-ERR-01c] SKU_ALREADY_IN_USE without errorsMap → uses English fallback', () => {
+        const result = localizeFieldError({ code: 'SKU_ALREADY_IN_USE', values: ['SKU-X'] }, undefined)
+        expect(result).toContain('SKU-X')
+    })
+
+    it('[TC-F08-FORM-ERR-04] unknown error code → returns code as fallback message', () => {
+        const result = localizeFieldError({ code: 'SOMETHING_NEW' }, {})
+        expect(result).toBe('SOMETHING_NEW')
     })
 })

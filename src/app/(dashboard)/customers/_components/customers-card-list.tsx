@@ -39,7 +39,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                         key={record.id}
                         onClick={() => onSelect(record)}
                         className="rounded-[16px] border border-white/[0.08] overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
-                        style={{ background: 'rgba(30,41,59,0.6)' }}
+                        style={{ background: 'var(--dash-surface)' }}
                     >
                         {/* Card body */}
                         <div className="flex flex-col gap-[10px] px-[17px] pt-[17px] pb-[14px]">

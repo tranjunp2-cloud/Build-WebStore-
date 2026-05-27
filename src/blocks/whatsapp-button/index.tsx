@@ -3,7 +3,6 @@
 import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
@@ -24,7 +23,7 @@ function sanitizeLabel(raw: string | undefined): string {
 
 export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<WhatsappButtonConfig>) {
     void _theme
-    const { variant = 'floating', phoneNumber, countryCode, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
+    const { phoneNumber, countryCode, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
     const label = sanitizeLabel(rawLabel)
 
     const callback = useBlockEditCallback()
@@ -36,27 +35,6 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
     const fullPhone = phoneDigits.startsWith(dialDigits) ? phoneDigits : dialDigits + phoneDigits
     const whatsappUrl = `https://wa.me/${fullPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
 
-    // ── Inline variant ─────────────────────────────────────────────────
-    if (variant === 'inline') {
-        return (
-            <section className={SECTION_PADDING.default}>
-                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} text-center`}>
-                    <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg ${TOUCH_TARGET.min}`}
-                        style={{ backgroundColor: '#25D366' }}
-                    >
-                        <WhatsAppIcon />
-                        <span>{label}</span>
-                    </a>
-                </div>
-            </section>
-        )
-    }
-
-    // ── Default: floating variant ────────────────────────────────────────
     return (
         <div
             className={inContainer ? '' : `fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}

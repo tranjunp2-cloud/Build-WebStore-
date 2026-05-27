@@ -8,7 +8,9 @@ export type PlatformUser = {
     roles?: ('super-admin' | 'tenant-owner' | 'editor' | 'viewer')[]
     tenants?: Array<{
         tenant: string | { id: string; name?: string; slug?: string }
-        role: 'owner' | 'admin' | 'editor' | 'viewer'
+        role: 'owner' | 'admin' | 'editor' | 'viewer' | 'custom'
+        permissions?: string[]
+        status?: 'pending' | 'active'
     }>
     avatar?: string | { url: string }
     lastLoginAt?: string

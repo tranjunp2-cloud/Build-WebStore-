@@ -26,12 +26,16 @@ describe('isUnsupportedBlock', () => {
         }
     })
 
-    it('menu-display is NOT in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
-        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(false)
+    it('menu-display, property-card, pricing-table are in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
+        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(true)
+        expect(BLOCKS_TEMP_HIDDEN.has('property-card')).toBe(true)
+        expect(BLOCKS_TEMP_HIDDEN.has('pricing-table')).toBe(true)
     })
 
-    it('isUnsupportedBlock returns false for menu-display', () => {
-        expect(isUnsupportedBlock('menu-display')).toBe(false)
+    it('isUnsupportedBlock returns true for GH-1024 hidden blocks', () => {
+        expect(isUnsupportedBlock('menu-display')).toBe(true)
+        expect(isUnsupportedBlock('property-card')).toBe(true)
+        expect(isUnsupportedBlock('pricing-table')).toBe(true)
     })
 
     it('returns false for supported blocks', () => {

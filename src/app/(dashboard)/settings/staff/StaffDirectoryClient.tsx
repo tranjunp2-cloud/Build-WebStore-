@@ -111,7 +111,7 @@ export function StaffDirectoryClient({
                     <button
                         type="button"
                         onClick={() => { setEditingStaff(null); setIsDrawerOpen(true); }}
-                        style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', boxShadow: '0px 4px 6px -4px rgba(59, 130, 246, 0.3), 0px 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
+                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)', boxShadow: '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' }}
                         className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                     >
                         <UserPlus className="h-5 w-5" />
@@ -141,10 +141,10 @@ export function StaffDirectoryClient({
                     <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                             <tr>
-                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
-                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
-                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
-                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
+                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
+                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
+                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
+                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -164,7 +164,7 @@ export function StaffDirectoryClient({
                                 return (
                                     <tr key={user.id} className="h-[73px] hover:bg-white/[0.02] transition-colors group">
                                         {/* NAME / EMAIL */}
-                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
                                             <div className="flex items-center gap-[12px]">
                                                 {user.avatar ? (
                                                     <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-full object-cover" />
@@ -184,7 +184,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* ROLE */}
-                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
                                             {isOwner ? (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
                                                     <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
@@ -201,7 +201,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* STATUS */}
-                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
                                             {user.status === 'active' ? (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
@@ -221,7 +221,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* ACTIONS */}
-                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap relative">
+                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap relative">
                                             {(!canEdit && !canDelete) ? (
                                                 <span className="text-[14px] font-normal text-[rgba(248,250,252,0.4)] leading-[1.428em] font-['Inter']">—</span>
                                             ) : (

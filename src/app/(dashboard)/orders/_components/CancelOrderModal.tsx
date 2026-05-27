@@ -17,16 +17,27 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
     const { t } = useI18n()
     const c = t.dashboard.orders.cancel
     const [reason, setReason] = useState('')
+    const [touched, setTouched] = useState(false)
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
+    // Reset form state whenever modal closes so stale errors don't persist on re-open
+    useEffect(() => {
+        if (!isOpen) {
+            setReason('')
+            setTouched(false)
+        }
+    }, [isOpen])
+
     if (!isOpen || !mounted) return null
 
+    const isEmpty = reason.trim() === ''
+    const showError = touched && isEmpty
     // Determine if button should be disabled (empty reason or currently loading)
-    const isDisabled = reason.trim() === '' || isLoading
+    const isDisabled = isEmpty || isLoading
 
     return createPortal(
         <div
@@ -40,8 +51,8 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                 className="flex flex-col items-center"
                 style={{
                     width: 448,
-                    background: '#0B1120',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'var(--dash-surface)',
+                    border: '1px solid var(--dash-border)',
                     borderRadius: 16,
                     padding: 25,
                     boxShadow: '0px 8px 24px 0px rgba(25, 32, 56, 0.1)'
@@ -69,7 +80,7 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         fontWeight: 700,
                         fontSize: 20,
                         lineHeight: '1.4em',
-                        color: '#F8FAFC',
+                        color: 'var(--dash-text)',
                         marginBottom: 8
                     }}
                 >
@@ -84,11 +95,26 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         fontWeight: 400,
                         fontSize: 14,
                         lineHeight: '1.4285714285714286em',
-                        color: 'rgba(248, 250, 252, 0.6)',
-                        marginBottom: 24
+                        color: 'var(--dash-text-muted)',
+                        marginBottom: 12
                     }}
                 >
                     {c.orderLabel} {orderNumber}
+                </p>
+
+                {/* Warning — restock notice (TC-F10-03-10) */}
+                <p
+                    className="w-full text-center"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 400,
+                        fontSize: 13,
+                        lineHeight: '1.4em',
+                        color: '#F0B100',
+                        marginBottom: 24
+                    }}
+                >
+                    {c.warning}
                 </p>
 
                 {/* Form Field */}
@@ -99,7 +125,7 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                             fontWeight: 600,
                             fontSize: 14,
                             lineHeight: '1.4285714285714286em',
-                            color: '#F8FAFC'
+                            color: 'var(--dash-text)'
                         }}
                     >
                         {c.reasonLabel} *
@@ -107,23 +133,39 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                     <textarea
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
+                        onBlur={() => setTouched(true)}
                         placeholder={c.reasonPlaceholder}
                         disabled={isLoading}
+                        maxLength={500}
                         style={{
                             height: 128,
                             padding: '12px 16px',
-                            background: '#1E293B',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            background: 'var(--dash-secondary-bg)',
+                            border: `1px solid ${showError ? '#FB2C36' : 'var(--dash-border)'}`,
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 400,
                             fontSize: 16,
                             lineHeight: '1.5em',
-                            color: '#F8FAFC',
+                            color: 'var(--dash-text)',
                             resize: 'none',
                             outline: 'none',
                         }}
                     />
+                    <div className="flex justify-between items-center" style={{ minHeight: 16 }}>
+                        {showError ? (
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#FB2C36' }}>
+                                {c.reasonRequired}
+                            </span>
+                        ) : <span />}
+                        <span
+                            title={c.reasonMaxLength}
+                            aria-label={c.reasonMaxLength}
+                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? '#FB2C36' : 'var(--dash-text-muted)' }}
+                        >
+                            {reason.length}/500
+                        </span>
+                    </div>
                 </div>
 
                 {/* Buttons Row */}
@@ -138,13 +180,13 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         disabled={isLoading}
                         className="flex items-center justify-center flex-1 transition-opacity hover:opacity-80"
                         style={{
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            border: '1px solid var(--dash-border)',
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 16,
                             lineHeight: '1.5em',
-                            color: '#F8FAFC',
+                            color: 'var(--dash-text)',
                             opacity: isLoading ? 0.5 : 1
                         }}
                     >

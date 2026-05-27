@@ -7,6 +7,7 @@ import { OrdersMetrics } from './OrdersMetrics'
 import { OrdersActionBar } from './OrdersActionBar'
 import { OrdersTable, Order } from './OrdersTable'
 import { OrderDetailPanel } from './OrderDetailPanel'
+import { AwaitingVerificationChip } from './AwaitingVerificationChip'
 
 // ─── ORDERS CLIENT LAYOUT ───
 // Table stays full width at all times.
@@ -18,6 +19,7 @@ export function OrdersClientLayout() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
     const [currentOrders, setCurrentOrders] = useState<Order[]>([])
     const [refreshCounter, setRefreshCounter] = useState(0)
+    const [silentRefreshTrigger, setSilentRefreshTrigger] = useState(0)
     const [isConfirming, setIsConfirming] = useState(false)
 
     // Filters
@@ -32,6 +34,18 @@ export function OrdersClientLayout() {
         }, 500)
         return () => clearTimeout(handler)
     }, [searchQuery])
+
+    // Listen for ORDER_NEW notification → silently prepend new orders without full reload
+    useEffect(() => {
+        function handleNotification(e: Event) {
+            const detail = (e as CustomEvent).detail
+            if (detail?.type === 'ORDER_NEW') {
+                setSilentRefreshTrigger(prev => prev + 1)
+            }
+        }
+        window.addEventListener('notification-toast', handleNotification)
+        return () => window.removeEventListener('notification-toast', handleNotification)
+    }, [])
 
     const isOpen = selectedOrderId !== null
 
@@ -73,15 +87,16 @@ export function OrdersClientLayout() {
         <div className="relative flex flex-col gap-[22px] w-full">
             {/* Page Header */}
             <div className="flex flex-col gap-1 w-full">
-                <h1 className="text-2xl font-bold text-[#F8FAFC] leading-8">
+                <h1 className="text-2xl font-bold text-dash-text leading-8">
                     {o.pageTitle}
                 </h1>
-                <p className="text-sm font-normal text-[rgba(248,250,252,0.6)] leading-5">
+                <p className="text-sm font-normal text-dash-text-muted leading-5">
                     {o.pageSubtitle}
                 </p>
             </div>
 
             <OrdersMetrics refreshCounter={refreshCounter} />
+            <AwaitingVerificationChip />
             <OrdersActionBar
                 pendingCount={pendingCount}
                 onBulkConfirm={handleBulkConfirm}
@@ -97,6 +112,7 @@ export function OrdersClientLayout() {
                 onSelectionChange={setSelectedRows}
                 onOrdersLoaded={setCurrentOrders}
                 refreshCounter={refreshCounter}
+                silentRefreshTrigger={silentRefreshTrigger}
                 searchQuery={debouncedSearch}
                 statusFilter={statusFilter}
                 dateFilter={dateFilter}
@@ -114,9 +130,9 @@ export function OrdersClientLayout() {
             <div
                 className={`fixed z-50 overflow-y-auto transition-transform duration-300 shadow-2xl right-0 w-full top-0 h-[100dvh] md:w-[488px] md:top-[80px] md:h-[calc(100vh-80px)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
                 style={{
-                    background: 'rgba(11, 17, 32, 0.95)',
-                    borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'var(--dash-surface)',
+                    borderLeft: '1px solid var(--dash-border)',
+                    borderTop: '1px solid var(--dash-border)',
                     backdropFilter: 'blur(20px)',
                 }}
             >

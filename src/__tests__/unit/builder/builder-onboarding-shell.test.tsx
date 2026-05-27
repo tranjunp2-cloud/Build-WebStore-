@@ -112,6 +112,33 @@ describe('[TC-F01.04] BuilderOnboardingShell', () => {
         expect(grid).toBeInTheDocument()
     })
 
+    it('applies gridClassName to grid container when provided', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderOnboardingShell
+                left={<div>Left</div>}
+                gridClassName="custom-grid-override"
+            />,
+        )
+
+        // Assert — grid container has the custom class merged in
+        const grid = container.querySelector('.custom-grid-override')
+        expect(grid).toBeInTheDocument()
+    })
+
+    it('preserves default lg:grid-cols-2 when gridClassName is omitted', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderOnboardingShell
+                left={<div>Left</div>}
+            />,
+        )
+
+        // Assert — default grid class still present
+        const grid = container.querySelector('.lg\\:grid-cols-2')
+        expect(grid).toBeInTheDocument()
+    })
+
     it('TC-F01.04: left pane is always visible (not hidden)', () => {
         // Arrange + Act
         render(

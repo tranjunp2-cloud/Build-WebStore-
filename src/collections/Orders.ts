@@ -1,11 +1,15 @@
 import type { CollectionConfig } from 'payload'
+import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
+import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
+import { updatePaymentStatus } from './orders-hooks/update-payment-status'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
  * Exported for reuse in API route validation.
  */
 export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
-    pending: ['confirmed', 'cancelled'],
+    pending: ['new', 'confirmed', 'cancelled'],  // 'new' = Stripe webhook success target
+    new: ['confirmed', 'cancelled'],
     confirmed: ['ready_to_ship', 'cancelled'],
     ready_to_ship: ['shipped'],
     shipped: ['completed', 'refunded'],
@@ -23,23 +27,8 @@ export const Orders: CollectionConfig = {
     slug: 'orders',
     hooks: {
         beforeChange: [
-            async ({ data, originalDoc }) => {
-                // COD: seller marks completed → auto paymentStatus=paid
-                if (
-                    data.status === 'completed' &&
-                    originalDoc?.status !== 'completed' &&
-                    originalDoc?.paymentMethod === 'cod'
-                ) {
-                    data.paymentStatus = 'paid'
-                }
-                // Any method cancelled → paymentStatus=cancelled (if still unpaid)
-                if (data.status === 'cancelled' && originalDoc?.status !== 'cancelled') {
-                    if (!data.paymentStatus || data.paymentStatus === 'unpaid') {
-                        data.paymentStatus = 'cancelled'
-                    }
-                }
-                return data
-            },
+            autoLinkCustomer,
+            updatePaymentStatus,
         ],
         afterChange: [
             async ({ doc, operation, req }) => {
@@ -61,6 +50,7 @@ export const Orders: CollectionConfig = {
                     .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
                 return doc
             },
+            syncCustomerSnapshot,
         ],
     },
     admin: {
@@ -189,6 +179,7 @@ export const Orders: CollectionConfig = {
             index: true,
             options: [
                 { label: 'Pending', value: 'pending' },
+                { label: 'New', value: 'new' },          // Stripe webhook success target (Architecture §2.1)
                 { label: 'Confirmed', value: 'confirmed' },
                 { label: 'Ready to Ship', value: 'ready_to_ship' },
                 { label: 'Shipped', value: 'shipped' },
@@ -209,6 +200,8 @@ export const Orders: CollectionConfig = {
             index: true,
             options: [
                 { label: 'Unpaid', value: 'unpaid' },
+                { label: 'Awaiting Payment', value: 'awaiting_payment' },
+                { label: 'Pending Verification', value: 'pending_verification' },
                 { label: 'Paid', value: 'paid' },
                 { label: 'Failed', value: 'failed' },
                 { label: 'Refunded', value: 'refunded' },
@@ -220,10 +213,13 @@ export const Orders: CollectionConfig = {
             type: 'select',
             options: [
                 { label: 'Cash on Delivery', value: 'cod' },
-                { label: 'QR Banking', value: 'qr_banking' },
+                { label: 'QR Banking (legacy)', value: 'qr_banking' },
+                { label: 'Bank Transfer', value: 'bank_transfer' },
                 { label: 'Credit Card', value: 'card' },
-                { label: 'Bank Transfer', value: 'bank' },
+                { label: 'FPX (Online Banking)', value: 'fpx' },
+                { label: 'Bank Transfer (old)', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
+                { label: 'Free (100% discount)', value: 'free' },
             ],
         },
         {
@@ -235,7 +231,65 @@ export const Orders: CollectionConfig = {
         {
             name: 'paymentReference',
             type: 'text',
-            admin: { description: 'External payment gateway reference ID' },
+            admin: { description: 'Bank Transfer reference code (BT-XXXXXX)' },
+        },
+        {
+            name: 'paymentExpiresAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'BT order TTL — auto-cancel after this timestamp' },
+        },
+        {
+            name: 'paymentRejectionReason',
+            type: 'select',
+            options: [
+                { label: 'Ảnh mờ', value: 'image_blurry' },
+                { label: 'Sai số tiền', value: 'wrong_amount' },
+                { label: 'Trùng đơn', value: 'duplicate_order' },
+                { label: 'Khác', value: 'other' },
+            ],
+            admin: { description: 'Reason set when seller rejects payment proof' },
+        },
+        {
+            name: 'paymentRejectionDetail',
+            type: 'textarea',
+            admin: { description: 'Required if rejectionReason=other (≥10 chars)' },
+        },
+        {
+            name: 'paymentVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'paymentVerifiedBy',
+            type: 'relationship',
+            relationTo: 'users',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'magicLinkSecret',
+            type: 'text',
+            access: { read: () => false, update: () => false },
+            admin: { hidden: true },
+        },
+        {
+            name: 'verificationSource',
+            type: 'select',
+            defaultValue: 'manual',
+            options: [
+                { label: 'Manual', value: 'manual' },
+                { label: 'Auto (Open Banking)', value: 'auto' },
+            ],
+            admin: { readOnly: true },
+        },
+        {
+            name: 'autoVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
+        },
+        {
+            name: 'bankTransactionId',
+            type: 'text',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
         },
         {
             name: 'stripeSessionId',
@@ -249,6 +303,12 @@ export const Orders: CollectionConfig = {
             type: 'text',
             index: true,
             admin: { readOnly: true, description: 'Stripe PaymentIntent ID' },
+        },
+        {
+            name: 'stripeChargeId',
+            type: 'text',
+            index: true,
+            admin: { readOnly: true, description: 'Stripe Charge ID (from payment_intent.latest_charge)' },
         },
         // --- Customer ---
         {
@@ -264,6 +324,16 @@ export const Orders: CollectionConfig = {
         {
             name: 'customerPhone',
             type: 'text',
+        },
+        {
+            name: 'customer',
+            type: 'relationship',
+            relationTo: 'customers',
+            index: true,
+            admin: {
+                description: 'Auto-linked customer record (matched by email + tenant).',
+                readOnly: true,
+            },
         },
         {
             name: 'shippingAddress',

@@ -20,6 +20,7 @@ export const GET = withAuth(async (user, request) => {
         const page = parseInt(url.searchParams.get('page') || '1')
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100)
         const paymentMethod = url.searchParams.get('paymentMethod')
+        const paymentStatus = url.searchParams.get('paymentStatus')
         const dateFilter = url.searchParams.get('date')
 
         // Build where clause (tenant scoping is handled by collection access)
@@ -31,6 +32,10 @@ export const GET = withAuth(async (user, request) => {
 
         if (paymentMethod) {
             where.paymentMethod = { equals: paymentMethod }
+        }
+
+        if (paymentStatus) {
+            where.paymentStatus = { equals: paymentStatus }
         }
 
         if (search) {

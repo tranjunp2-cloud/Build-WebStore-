@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from 'react'
-import { Truck } from 'lucide-react'
+import { Truck, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { WEST_MY_STATES } from '@/lib/shipping'
+import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LivePreviewPanel } from './live-preview-panel'
 
@@ -20,6 +21,11 @@ type Props = {
     onEastChange: (v: string) => void
     westError?: string
     eastError?: string
+    onWestBlur: (raw?: string) => void
+    onEastBlur: (raw?: string) => void
+    westWarning?: string
+    eastWarning?: string
+    helperText: string
 }
 
 const INPUT_CLS =
@@ -38,6 +44,11 @@ export function ShippingRatesCard({
     onEastChange,
     westError,
     eastError,
+    onWestBlur,
+    onEastBlur,
+    westWarning,
+    eastWarning,
+    helperText,
 }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
@@ -68,7 +79,7 @@ export function ShippingRatesCard({
                                     {s.westBadge}
                                 </span>
                             </TooltipTrigger>
-                            <TooltipContent>{s.westBadgeTooltip}</TooltipContent>
+                            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{s.westBadgeTooltip}</TooltipContent>
                         </Tooltip>
                     </div>
                     <div className="relative">
@@ -76,18 +87,34 @@ export function ShippingRatesCard({
                             RM
                         </span>
                         <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="1000"
+                            id="ship-rate-west"
+                            type="text"
                             inputMode="decimal"
+                            aria-label={s.westMalaysia}
+                            aria-invalid={westError ? true : undefined}
+                            aria-describedby={westError ? 'ship-rate-west-err' : undefined}
                             className={INPUT_CLS + (westError ? ' border-destructive' : '')}
                             placeholder="8.00"
                             value={westRateRm}
-                            onChange={e => onWestChange(e.target.value)}
+                            onChange={e => {
+                                const v = e.target.value
+                                if (v === '' || INPUT_FILTER.test(v)) onWestChange(v)
+                            }}
+                            onBlur={() => onWestBlur()}
+                            onPaste={e => {
+                                e.preventDefault()
+                                const raw = e.clipboardData.getData('text').trim()
+                                // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
+                                const stripped = raw.replace(/^RM\s*/i, '')
+                                const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                                onWestChange(filtered)
+                                onWestBlur(filtered)
+                            }}
                         />
                     </div>
-                    {westError && <p className="mt-1 text-xs text-destructive">{westError}</p>}
+                    {westError && <p id="ship-rate-west-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{westError}</p>}
+                    {westWarning && !westError && <p role="status" className="mt-1 text-xs text-slate-300">{westWarning}</p>}
+                    {!westError && !westWarning && <p className="mt-1 text-xs text-slate-400">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">
                         {westStates.map(state => (
                             <span key={state} className={CHIP_CLS}>{state}</span>
@@ -123,7 +150,7 @@ export function ShippingRatesCard({
                                     {s.eastBadge}
                                 </span>
                             </TooltipTrigger>
-                            <TooltipContent>{s.eastBadgeTooltip}</TooltipContent>
+                            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{s.eastBadgeTooltip}</TooltipContent>
                         </Tooltip>
                     </div>
                     <div className="relative">
@@ -131,18 +158,34 @@ export function ShippingRatesCard({
                             RM
                         </span>
                         <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="1000"
+                            id="ship-rate-east"
+                            type="text"
                             inputMode="decimal"
+                            aria-label={s.eastMalaysia}
+                            aria-invalid={eastError ? true : undefined}
+                            aria-describedby={eastError ? 'ship-rate-east-err' : undefined}
                             className={INPUT_CLS + (eastError ? ' border-destructive' : '')}
                             placeholder="15.00"
                             value={eastRateRm}
-                            onChange={e => onEastChange(e.target.value)}
+                            onChange={e => {
+                                const v = e.target.value
+                                if (v === '' || INPUT_FILTER.test(v)) onEastChange(v)
+                            }}
+                            onBlur={() => onEastBlur()}
+                            onPaste={e => {
+                                e.preventDefault()
+                                const raw = e.clipboardData.getData('text').trim()
+                                // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
+                                const stripped = raw.replace(/^RM\s*/i, '')
+                                const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                                onEastChange(filtered)
+                                onEastBlur(filtered)
+                            }}
                         />
                     </div>
-                    {eastError && <p className="mt-1 text-xs text-destructive">{eastError}</p>}
+                    {eastError && <p id="ship-rate-east-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{eastError}</p>}
+                    {eastWarning && !eastError && <p role="status" className="mt-1 text-xs text-slate-300">{eastWarning}</p>}
+                    {!eastError && !eastWarning && <p className="mt-1 text-xs text-slate-400">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">
                         {EAST_STATES_DISPLAY.map(s => (
                             <span key={s} className={CHIP_CLS}>{s}</span>

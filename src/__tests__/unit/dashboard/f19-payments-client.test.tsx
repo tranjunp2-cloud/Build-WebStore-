@@ -18,7 +18,7 @@ vi.mock('sonner', () => ({
 vi.mock('@/app/(dashboard)/settings/payments/actions', () => ({
     getPaymentSettings: vi.fn().mockResolvedValue({ success: true, payments: { payment_cod: false, payment_qr: false, qr_image: null } }),
     updatePaymentSettings: vi.fn().mockResolvedValue({ success: true }),
-    uploadQrMedia: vi.fn().mockResolvedValue({ success: true, doc: { id: 'img-123', url: 'https://example.com/qr.png' } })
+    uploadQrMedia: vi.fn().mockResolvedValue({ success: true, doc: { id: 'img-123', url: 'https://example.com/qr.png' } }),
 }));
 
 import { PaymentsFormClient } from '@/app/(dashboard)/settings/payments/PaymentsFormClient';
@@ -41,16 +41,21 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
     });
 
-    it('[TC-F19.12] Allows toggling COD and saves changes (Auto-Save)', async () => {
+    it('[TC-F19.12] Allows toggling COD and saves changes', async () => {
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
         });
 
+        // Toggle COD on (marks form dirty)
         const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const codSwitch = checkboxes[0];
+        const codSwitch = checkboxes[0]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
         fireEvent.click(codSwitch);
+
+        // Click Save changes button (form requires explicit save, no auto-save)
+        const saveBtn = screen.getByRole('button', { name: /save changes/i });
+        fireEvent.click(saveBtn);
 
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith('Changes saved! ✅');
@@ -65,13 +70,13 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         });
 
         const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1];
+        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
 
         // Click to enable without image - Auto-expands the widget
         fireEvent.click(qrSwitch);
 
         await waitFor(() => {
-            expect(screen.getByText('Upload QR Code Image')).toBeInTheDocument();
+            expect(screen.getByText('Click to upload QR Code')).toBeInTheDocument();
         });
     });
 
@@ -84,7 +89,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         // Click QR Toggle to show upload widget
         const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1];
+        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
         fireEvent.click(qrSwitch);
 
         const file = new File(['x'.repeat(3 * 1024 * 1024)], 'large_qr.png', { type: 'image/png' });
@@ -109,7 +114,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         // Click QR Toggle to show upload widget
         const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1];
+        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
         fireEvent.click(qrSwitch);
 
         const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -133,13 +138,11 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         
         await waitFor(() => {
-            expect((container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement).checked).toBe(true);
+            expect((container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement).checked).toBe(true); // Stripe not connected → COD[0], QR[1]
         });
 
-        const qrSwitch = container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement;
-        const removeBtns = container.querySelectorAll('button');
-        
-        const removeBtn = (Array.from(removeBtns) as HTMLButtonElement[]).find(btn => btn.innerHTML.includes('lucide-x'));
+        const qrSwitch = container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement; // Stripe not connected → COD[0], QR[1]
+        const removeBtn = container.querySelector('button[title="Remove"]') as HTMLButtonElement | null;
         if (removeBtn) {
             fireEvent.click(removeBtn);
         }

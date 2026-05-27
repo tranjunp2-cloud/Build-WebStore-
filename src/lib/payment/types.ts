@@ -8,6 +8,8 @@
 
 // ── Checkout ─────────────────────────────────────────────────────────
 
+export type StripePaymentMethod = 'card' | 'fpx'
+
 export interface CheckoutParams {
     orderId: string
     items: Array<{
@@ -21,10 +23,11 @@ export interface CheckoutParams {
     successUrl: string
     cancelUrl: string
     metadata?: Record<string, string>
-    /** Stripe Connected Account ID (required for Direct Charges) */
+    /** Stripe Connected Account ID (OAuth Connect — required for Direct Charges) */
     stripeAccountId: string
-    /** Platform fee percentage (default: 3%) */
-    applicationFeePercent?: number
+    /** Stripe payment methods enabled for this checkout. MUST be non-empty.
+     *  Built by backend from tenant.payment_card/fpx filtered by site.paymentConfig. */
+    paymentMethodTypes: StripePaymentMethod[]
 }
 
 export interface CheckoutResult {
@@ -39,6 +42,7 @@ export type PaymentEventType =
     | 'payment_failed'
     | 'subscription_updated'
     | 'account_updated'
+    | 'account_deauthorized'
     | 'refund_completed'
 
 export interface PaymentWebhookEvent {

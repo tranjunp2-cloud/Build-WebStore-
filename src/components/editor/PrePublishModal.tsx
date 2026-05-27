@@ -92,8 +92,8 @@ export function PrePublishModal({
                                 transition={{ duration: 0.18, ease: 'easeOut' }}
                                 className="fixed inset-0 z-50 grid place-items-center p-4 focus:outline-none"
                             >
-                                <div className={`${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] backdrop-blur-[25px]`}>
-                                    <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal text-[#F8FAFC]">
+                                <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(59,130,246,0.15)] dark:bg-[rgba(30,41,59,0.6)] bg-white dark:backdrop-blur-[25px] backdrop-blur-none p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
+                                    <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal dark:text-[#F8FAFC] text-slate-900">
                                         <span className="mr-2">🚀</span>
                                         {pm.title}
                                     </Dialog.Title>
@@ -128,7 +128,7 @@ export function PrePublishModal({
                                         <Dialog.Close asChild>
                                             <button
                                                 type="button"
-                                                className="h-[42px] flex-1 rounded-[12px] border border-[rgba(59,130,246,0.07)] text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/[0.04]"
+                                                className="h-[42px] flex-1 rounded-[12px] border dark:border-[rgba(59,130,246,0.07)] border-[rgba(0,0,0,0.1)] text-[14px] font-medium dark:text-[#F8FAFC] text-slate-700 transition-colors dark:hover:bg-white/[0.04] hover:bg-slate-50"
                                             >
                                                 {pm.cancel}
                                             </button>

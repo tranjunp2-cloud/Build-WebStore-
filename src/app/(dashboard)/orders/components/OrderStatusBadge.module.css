@@ -1,16 +1,16 @@
 .dropdown {
-    background-color: #1E293B !important;
-    border: 1px solid #334155 !important;
-    color: #e2e8f0 !important;
+    background-color: var(--dash-surface) !important;
+    border: 1px solid var(--dash-border) !important;
+    color: var(--dash-text) !important;
 }
 
 .dropdownItem {
     background-color: transparent !important;
-    color: #cbd5e1 !important;
+    color: var(--dash-text-muted) !important;
     transition: background-color 0.15s ease;
 }
 
 .dropdownItem:hover {
-    background-color: #334155 !important;
-    color: #f1f5f9 !important;
+    background-color: var(--dash-surface-hover) !important;
+    color: var(--dash-text) !important;
 }

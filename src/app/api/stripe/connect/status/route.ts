@@ -3,6 +3,14 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { getConnectedAccountStatus } from '@/lib/payment/stripe'
+import type { TenantMembership } from '@/lib/normalize-tenants'
+
+/** Minimal shape of a tenant document for Stripe Connect status check. */
+interface TenantDoc {
+    id: string | number
+    stripeAccountId?: string | null
+    stripeOnboardingComplete?: boolean
+}
 
 /**
  * GET /api/stripe/connect/status?tenantId=xxx
@@ -26,10 +34,10 @@ export const GET = withAuth(async (user, request) => {
         }
 
         // Verify user owns this tenant
-        const userTenantIds = ((user as any).tenants || []).map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        const userTenantIds = ((user.tenants ?? []) as TenantMembership[]).map((t) =>
+            String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
-        if (!userTenantIds.includes(tenantId)) {
+        if (!userTenantIds.includes(String(tenantId))) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'You do not own this tenant' } },
                 { status: 403 },
@@ -46,7 +54,8 @@ export const GET = withAuth(async (user, request) => {
             )
         }
 
-        const stripeAccountId = (tenant as any).stripeAccountId
+        const tenantTyped = tenant as unknown as TenantDoc
+        const stripeAccountId = tenantTyped.stripeAccountId
 
         if (!stripeAccountId) {
             return NextResponse.json({
@@ -61,19 +70,33 @@ export const GET = withAuth(async (user, request) => {
         }
 
         const status = await getConnectedAccountStatus(stripeAccountId)
+        const onboardingComplete = status.chargesEnabled && status.detailsSubmitted
+
+        // Only flip false→true; downgrades handled by account.updated webhook to avoid racing the UI.
+        if (onboardingComplete && tenantTyped.stripeOnboardingComplete !== true) {
+            await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                // Payload update data type is overly strict; cast required until generated types exist
+                data: { stripeOnboardingComplete: true } as Record<string, unknown>,
+            })
+        }
+
+        const dbOnboardingComplete = tenantTyped.stripeOnboardingComplete === true
 
         return NextResponse.json({
             success: true,
             data: {
                 connected: true,
                 accountId: status.accountId,
+                email: status.email,
                 chargesEnabled: status.chargesEnabled,
                 payoutsEnabled: status.payoutsEnabled,
                 detailsSubmitted: status.detailsSubmitted,
-                onboardingComplete: status.chargesEnabled && status.payoutsEnabled && status.detailsSubmitted,
+                onboardingComplete: onboardingComplete || dbOnboardingComplete,
             },
         })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Stripe Connect Status Error]', error)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Stripe status check failed' } },

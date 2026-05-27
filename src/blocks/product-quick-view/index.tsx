@@ -16,10 +16,16 @@ import {
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
+import { useAddToCart } from '@/lib/storefront/use-add-to-cart'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-const CART_ENABLED = true
-type QuickViewProductWithCurrency = QuickViewProduct & { _currency?: string }
+type QuickViewProductWithCurrency = QuickViewProduct & {
+    _currency?: string
+    _currencyCode?: string  // raw ISO code (MYR/USD) — needed by useAddToCart
+    _id?: string            // Payload doc id (live API only)
+    _inventory?: number     // stock count (live API only)
+    _compareAtPrice?: number
+}
 
 const PRODUCT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
@@ -71,13 +77,32 @@ function QuickViewModal({
     product,
     currency,
     onClose,
+    siteSlug,
+    siteId,
 }: {
-    product: QuickViewProduct
+    product: QuickViewProductWithCurrency
     currency: string
     onClose: () => void
+    siteSlug: string
+    siteId?: string
 }) {
     const [selectedImage, setSelectedImage] = useState(0)
     const images = product.imageUrls.length > 0 ? product.imageUrls : []
+    const hasLiveData = Boolean(product._id)
+    const { handleAddToCart, isOutOfStock } = useAddToCart(
+        {
+            id: product._id ?? '',
+            slug: product.slug ?? '',
+            name: product.name,
+            priceRaw: product.price,
+            compareAtPrice: product._compareAtPrice,
+            currency: product._currencyCode ?? 'MYR',
+            imageUrl: product.imageUrls[0],
+            inventory: product._inventory ?? 0,
+        },
+        siteSlug,
+        siteId,
+    )
 
     return (
         <motion.div
@@ -185,7 +210,8 @@ function QuickViewModal({
                             </div>
                         )}
 
-                        {CART_ENABLED && (product.ctaUrl ? (
+                        {product.ctaUrl ? (
+                            // (A) ctaUrl → navigation; editor intercept keeps iframe safe
                             <a
                                 href={product.ctaUrl}
                                 className={`block w-full py-3 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
@@ -194,7 +220,19 @@ function QuickViewModal({
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </a>
+                        ) : hasLiveData ? (
+                            // (B) live product → real cart action
+                            <button
+                                type="button"
+                                disabled={isOutOfStock}
+                                className={`w-full py-3 rounded-xl font-semibold text-white ${TOUCH_TARGET.min} ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'transition-opacity hover:opacity-90'}`}
+                                style={{ background: 'var(--brand-primary)' }}
+                                onClick={handleAddToCart}
+                            >
+                                {isOutOfStock ? 'Out of Stock' : (product.ctaLabel || 'Add to Cart')}
+                            </button>
                         ) : (
+                            // (C) static CMS product — no live data; editor toast / no-op in production
                             <button
                                 type="button"
                                 className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
@@ -203,7 +241,7 @@ function QuickViewModal({
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </button>
-                        ))}
+                        )}
                     </div>
                 </div>
             </motion.div>
@@ -211,70 +249,21 @@ function QuickViewModal({
     )
 }
 
-export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickViewConfig>) {
-    const {
-        headline,
-        subheadline,
-        products: staticProducts = [],
-        variant = 'grid',
-        columns = 4,
-        showQuickView = true,
-        currency: defaultCurrency = 'RM',
-    } = block
-
-    const [liveProducts, setLiveProducts] = useState<QuickViewProductWithCurrency[]>([])
-    const [loading, setLoading] = useState(false)
-    const [quickViewProduct, setQuickViewProduct] = useState<QuickViewProduct | null>(null)
-    const scrollRef = useRef<HTMLDivElement>(null)
-
-    const siteId = site?.id ? String(site.id) : null
-
-    useEffect(() => {
-        if (!siteId) return
-
-        setLoading(true)
-        const controller = new AbortController()
-        const limit = staticProducts.length > 0 ? staticProducts.length : 8
-
-        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
-            .then(res => res.ok ? res.json() : Promise.reject(res))
-            .then(json => {
-                const docs = (json.docs || []) as Array<Record<string, unknown>>
-                const mapped: QuickViewProductWithCurrency[] = docs.map((doc) => {
-                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
-                    const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
-                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
-                    return {
-                        name: String(doc.name || ''),
-                        price,
-                        imageUrls: (images ?? []).map(i => i.image?.url).filter((u): u is string => typeof u === 'string'),
-                        description: typeof doc.shortDescription === 'string' ? doc.shortDescription : undefined,
-                        _currency: CURRENCY_DISPLAY[currencyCode] ?? currencyCode,
-                    }
-                })
-                setLiveProducts(mapped)
-            })
-            .catch(err => {
-                if (err.name !== 'AbortError') console.error('[ProductQuickViewBlock] Failed to fetch products:', err)
-            })
-            .finally(() => setLoading(false))
-
-        return () => controller.abort()
-    }, [siteId, staticProducts.length])
-
-    const displayProducts: QuickViewProductWithCurrency[] = liveProducts.length > 0 ? liveProducts : staticProducts
-
-    // Cap columns to actual product count so items stay centered when fewer than configured
-    const effectiveCols = Math.min(columns, displayProducts.length || columns)
-    const colClass = effectiveCols === 2
-        ? 'grid-cols-1 sm:grid-cols-2'
-        : effectiveCols === 3
-            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-            : 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'
-
-    const ProductCard = ({ product, minimal = false }: { product: QuickViewProductWithCurrency; minimal?: boolean }) => {
-        const currency = product._currency ?? defaultCurrency
-        return (
+function ProductCard({
+    product,
+    minimal = false,
+    defaultCurrency,
+    showQuickView,
+    onQuickView,
+}: {
+    product: QuickViewProductWithCurrency
+    minimal?: boolean
+    defaultCurrency: string
+    showQuickView: boolean
+    onQuickView: (p: QuickViewProductWithCurrency) => void
+}) {
+    const currency = product._currency ?? defaultCurrency
+    return (
         <div
             className="group rounded-2xl overflow-hidden transition-shadow duration-300 hover:shadow-lg"
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
@@ -297,7 +286,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
                         <button
                             type="button"
-                            onClick={() => setQuickViewProduct(product)}
+                            onClick={() => onQuickView(product)}
                             className={`px-4 rounded-xl font-semibold text-sm text-white opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
@@ -320,8 +309,76 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 </div>
             </div>
         </div>
-        )
-    }
+    )
+}
+
+export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickViewConfig>) {
+    const {
+        headline,
+        subheadline,
+        products: staticProducts = [],
+        variant = 'grid',
+        columns = 4,
+        showQuickView = true,
+        currency: defaultCurrency = 'RM',
+    } = block
+
+    const [liveProducts, setLiveProducts] = useState<QuickViewProductWithCurrency[]>([])
+    const [loading, setLoading] = useState(false)
+    const [quickViewProduct, setQuickViewProduct] = useState<QuickViewProductWithCurrency | null>(null)
+    const scrollRef = useRef<HTMLDivElement>(null)
+
+    const siteId = site?.id ? String(site.id) : null
+    const siteRec = site as Record<string, unknown> | undefined
+    const siteSlug = String(siteRec?.tenantSlug || '')
+
+    useEffect(() => {
+        if (!siteId) return
+
+        setLoading(true)
+        const controller = new AbortController()
+        const limit = staticProducts.length > 0 ? staticProducts.length : 8
+
+        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
+            .then(res => res.ok ? res.json() : Promise.reject(res))
+            .then(json => {
+                const docs = (json.docs || []) as Array<Record<string, unknown>>
+                const mapped: QuickViewProductWithCurrency[] = docs.map((doc) => {
+                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
+                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    return {
+                        name: String(doc.name || ''),
+                        slug: String(doc.slug || ''),
+                        price,
+                        imageUrls: (images ?? []).map(i => i.image?.url).filter((u): u is string => typeof u === 'string'),
+                        description: typeof doc.shortDescription === 'string' ? doc.shortDescription : undefined,
+                        _currency: CURRENCY_DISPLAY[currencyCode] ?? currencyCode,
+                        _currencyCode: currencyCode,
+                        _id: doc.id ? String(doc.id) : undefined,
+                        _inventory: Number(doc.inventory) || 0,
+                        _compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
+                    }
+                })
+                setLiveProducts(mapped)
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') console.error('[ProductQuickViewBlock] Failed to fetch products:', err)
+            })
+            .finally(() => setLoading(false))
+
+        return () => controller.abort()
+    }, [siteId, staticProducts.length])
+
+    const displayProducts: QuickViewProductWithCurrency[] = liveProducts.length > 0 ? liveProducts : staticProducts
+
+    // Cap columns to actual product count so items stay centered when fewer than configured
+    const effectiveCols = Math.min(columns, displayProducts.length || columns)
+    const colClass = effectiveCols === 2
+        ? 'grid-cols-1 sm:grid-cols-2'
+        : effectiveCols === 3
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            : 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4'
 
     /* ── Grid ────────────────────────────────────────────────────────────────── */
     const renderGrid = () => (
@@ -334,7 +391,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} />
+                    <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
                 </motion.div>
             ))}
         </div>
@@ -342,6 +399,19 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
 
     /* ── Carousel ────────────────────────────────────────────────────────────── */
     const renderCarousel = () => {
+        // ≤4 items: snap-mandatory left-aligns sparse items; use centered grid instead
+        if (displayProducts.length <= 4) {
+            const n = displayProducts.length
+            const sparseGrid = n === 1 ? 'grid-cols-1' : n === 2 ? 'grid-cols-1 sm:grid-cols-2' : n === 3 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-4'
+            return (
+                <div className={`grid ${sparseGrid} gap-6 max-w-5xl mx-auto`}>
+                    {displayProducts.map((product, i) => (
+                        <ProductCard key={i} product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                    ))}
+                </div>
+            )
+        }
+
         const scroll = (dir: 'left' | 'right') => {
             if (!scrollRef.current) return
             scrollRef.current.scrollBy({ left: dir === 'left' ? -280 : 280, behavior: 'smooth' })
@@ -354,16 +424,14 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 >
                     {displayProducts.map((product, i) => (
                         <div key={i} className="snap-start shrink-0 w-[260px]">
-                            <ProductCard product={product} />
+                            <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
                         </div>
                     ))}
                 </div>
-                {displayProducts.length > 4 && (
-                    <div className="flex justify-center gap-3 mt-6">
-                        <CarouselArrow direction="left" onClick={() => scroll('left')} label="Previous products" />
-                        <CarouselArrow direction="right" onClick={() => scroll('right')} label="Next products" />
-                    </div>
-                )}
+                <div className="flex justify-center gap-3 mt-6">
+                    <CarouselArrow direction="left" onClick={() => scroll('left')} label="Previous products" />
+                    <CarouselArrow direction="right" onClick={() => scroll('right')} label="Next products" />
+                </div>
             </div>
         )
     }
@@ -379,7 +447,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} minimal />
+                    <ProductCard product={product} minimal defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
                 </motion.div>
             ))}
         </div>
@@ -446,8 +514,10 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 {quickViewProduct && (
                     <QuickViewModal
                         product={quickViewProduct}
-                        currency={(quickViewProduct as QuickViewProductWithCurrency)._currency ?? defaultCurrency}
+                        currency={quickViewProduct._currency ?? defaultCurrency}
                         onClose={() => setQuickViewProduct(null)}
+                        siteSlug={siteSlug}
+                        siteId={siteId ?? undefined}
                     />
                 )}
             </AnimatePresence>

@@ -4,6 +4,7 @@ import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useI18n } from '@/i18n'
+import { isInEditorPreview, EDITOR_CART_TOAST_MSG, getParentOrigin } from '@/lib/storefront/editor-intercept'
 
 type AddToCartButtonProps = {
     product: {
@@ -30,10 +31,10 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
     const handleClick = () => {
         if (isOutOfStock) return
         // GH-960: In editor iframe show preview toast; real cart logic ships in #961.
-        if (typeof window !== 'undefined' && window.parent !== window) {
+        if (isInEditorPreview()) {
             window.parent.postMessage(
-                { type: 'SHOW_TOAST', variant: 'info', message: 'Navigation is disabled inside the Editor.' },
-                window.location.origin,
+                { type: 'SHOW_TOAST', variant: 'info', message: EDITOR_CART_TOAST_MSG },
+                getParentOrigin(),
             )
             return
         }

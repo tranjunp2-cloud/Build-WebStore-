@@ -32,35 +32,35 @@ export interface CategoryRule {
     ctaIsMandatory: boolean
 }
 
-// GH-960: restaurant/fnb reference menu-display; ecommerce references product-quick-view + pricing-table;
-// tech references pricing-table; realestate references property-card — all hidden until #961 ships.
-// Structure-enforcer and template-composer guard these at runtime via isUnsupportedBlock / TEMP_HIDDEN_BLOCK_TYPES.
-// On re-enable, restore: block configs (aiVisible, category), EDITOR_HIDDEN_BLOCKS, BLOCKS_TEMP_HIDDEN,
-// TEMP_HIDDEN_BLOCK_TYPES, SECTION_TYPE_MATCHERS, Pages.ts layout.blocks, PAGES_BLOCK_WHITELIST/SCHEMA/FIELDS,
-// SUPPORTED_BLOCK_IDS, category-recipes, system-prompt VARIETY RULES 8-10.
+// GH-960: restaurant/fnb used menu-display; ecommerce used pricing-table; tech used pricing-table;
+// realestate used property-card — all now replaced/substituted via GH-1024.
+// GH-1024: menu-display → menu-food (restaurant/fnb); property-card → features (realestate);
+// pricing-table removed from dnaMandatoryGroups (ecommerce/tech) — use pricing as sole representative.
+// On re-enable, restore: EDITOR_HIDDEN_BLOCKS, BLOCKS_TEMP_HIDDEN, TEMP_HIDDEN_BLOCK_TYPES,
+// SUPPORTED_BLOCK_IDS, category-recipes, system-prompt VARIETY RULES, and entries below.
 export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
     restaurant: {
         minBlocks: 11,
         mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'contact', 'footer'],
-        dnaMandatoryGroups: [['menu-display', 'booking-widget'], ['gallery', 'gallery-masonry']],
-        signatureBlocks: ['menu-display', 'booking-widget', 'review-cards'],
+        dnaMandatoryGroups: [['menu-food', 'booking-widget'], ['gallery', 'gallery-masonry']], // GH-1024: menu-display → menu-food
+        signatureBlocks: ['menu-food', 'booking-widget', 'review-cards'], // GH-1024: menu-display → menu-food
         recommendedBlocks: ['stats', 'team', 'cta', 'faq'],
-        industryBlocks: ['menu-display', 'booking-widget', 'review-cards'],
+        industryBlocks: ['menu-food', 'booking-widget', 'review-cards'], // GH-1024: menu-display → menu-food
         ctaIsMandatory: false,
     },
     fnb: {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'cta', 'footer'],
-        dnaMandatoryGroups: [['menu-display', 'features'], ['gallery', 'gallery-masonry']],
-        signatureBlocks: ['menu-display', 'gallery', 'review-cards'],
+        dnaMandatoryGroups: [['menu-food', 'features'], ['gallery', 'gallery-masonry']], // GH-1024: menu-display → menu-food
+        signatureBlocks: ['menu-food', 'gallery', 'review-cards'], // GH-1024: menu-display → menu-food
         recommendedBlocks: ['stats', 'faq', 'team'],
-        industryBlocks: ['menu-display', 'review-cards'],
+        industryBlocks: ['menu-food', 'review-cards'], // GH-1024: menu-display → menu-food
         ctaIsMandatory: true,
     },
     ecommerce: {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'features', 'testimonials', 'newsletter', 'cta', 'footer'],
-        dnaMandatoryGroups: [['product-quick-view', 'features'], ['pricing', 'pricing-table']],
+        dnaMandatoryGroups: [['product-quick-view', 'features'], ['pricing']], // GH-1024: pricing-table removed
         signatureBlocks: ['product-quick-view', 'pricing'],
         recommendedBlocks: ['about', 'faq', 'stats', 'gallery', 'logo-cloud'],
         industryBlocks: ['product-quick-view', 'review-cards'],
@@ -78,10 +78,10 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
     tech: {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'features', 'pricing', 'testimonials', 'faq', 'cta', 'footer'],
-        dnaMandatoryGroups: [['pricing', 'pricing-table'], ['features']],
+        dnaMandatoryGroups: [['pricing'], ['features']], // GH-1024: pricing-table removed
         signatureBlocks: ['pricing', 'features', 'feature-comparison', /* 'video-showcase' */], // temporarily hidden (aiVisible: false, archived)
         recommendedBlocks: ['about', 'stats', 'team', 'logo-cloud'],
-        industryBlocks: ['feature-comparison', 'pricing-table', /* 'video-showcase' */], // temporarily hidden
+        industryBlocks: ['feature-comparison', /* 'pricing-table', */ /* 'video-showcase' */], // GH-1024: pricing-table hidden
         ctaIsMandatory: true,
     },
     health: {
@@ -105,10 +105,10 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
     realestate: {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'gallery', 'stats', 'testimonials', 'contact', 'footer'],
-        dnaMandatoryGroups: [['property-card', 'gallery'], ['stats', 'features']],
-        signatureBlocks: ['property-card', 'gallery'],
+        dnaMandatoryGroups: [['gallery', 'gallery-masonry'], ['stats', 'features']], // GH-1024: property-card removed; restored independent invariants
+        signatureBlocks: ['features', 'gallery'], // GH-1024: property-card → features
         recommendedBlocks: ['about', 'team', 'features', 'cta', 'faq'],
-        industryBlocks: ['property-card', 'review-cards'],
+        industryBlocks: ['features', 'review-cards'], // GH-1024: property-card → features
         ctaIsMandatory: false,
     },
     fitness: {

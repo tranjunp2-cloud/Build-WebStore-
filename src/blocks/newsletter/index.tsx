@@ -11,6 +11,7 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { GridLines, DuotoneOverlay, NoiseTexture, LayeredShapes } from '../shared/decorative'
+import { isInEditorPreview } from '@/lib/storefront/editor-intercept'
 
 // ── Local helpers (Plan 260415 newsletter-compliance) ──────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -278,7 +279,7 @@ function PopupVariant({ block, siteId }: { block: NewsletterConfig; siteId?: str
         const { pathname } = window.location
         if (pathname.startsWith('/test-harness/')) return
         if (pathname.startsWith('/builder/')) return
-        if (window.parent !== window) return
+        if (isInEditorPreview()) return
 
         const prefersReducedMotion =
             typeof window.matchMedia === 'function' &&

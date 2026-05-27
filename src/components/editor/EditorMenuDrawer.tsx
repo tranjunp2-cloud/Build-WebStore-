@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
     Dialog,
@@ -20,6 +21,7 @@ import {
     LogOut,
     Package,
     Settings,
+    ShoppingCart,
     Users,
     X,
 } from 'lucide-react'
@@ -45,10 +47,11 @@ type EditorMenuDrawerProps = {
     currentUserRole?: string
     userName?: string
     userInitial?: string
+    userAvatarUrl?: string | null
     hasUnsavedChanges?: boolean
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, hasUnsavedChanges }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, userAvatarUrl, hasUnsavedChanges }: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { t, locale, toggleLocale } = useI18n()
@@ -85,6 +88,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 ],
             },
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
+            { label: { en: 'Orders', ms: 'Pesanan' }, href: '/orders', icon: ShoppingCart },
             { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers', icon: Users },
             {
                 label: { en: 'Settings', ms: 'Tetapan' },
@@ -92,6 +96,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 icon: Settings,
                 children: [
                     { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
+                    { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments' },
                     { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff', roleFilter: (role) => role === 'owner' },
                     { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping' },
                     { label: { en: 'Account Profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
@@ -181,13 +186,13 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                         onClick={() => setExpandedGroups(prev =>
                                             prev.includes(item.href) ? prev.filter(g => g !== item.href) : [...prev, item.href]
                                         )}
-                                        className="flex h-[44px] w-full items-center gap-3 rounded-[16px] px-4 text-left text-[14px] font-medium text-[rgba(248,250,252,0.7)] transition-colors hover:bg-white/5 hover:text-white"
+                                        className="flex h-[44px] w-full items-center gap-3 rounded-[16px] px-4 text-left text-[14px] font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
                                     >
                                         {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
                                         <span className="flex-1">{label}</span>
                                         <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                                     </button>
-                                    <div className={cn('overflow-hidden transition-all', isExpanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0')}>
+                                    <div className={cn('overflow-hidden transition-all', isExpanded ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0')}>
                                         <div className="flex flex-col gap-1 pl-4">
                                             {item.children?.map(child => {
                                                 const childActive =
@@ -201,17 +206,15 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                                         href={child.href}
                                                         onClick={guardedNavigate(child.href)}
                                                         className={cn(
-                                                            'flex h-10 items-center gap-[18px] rounded-[12px] px-4 text-[14px] font-medium transition-colors',
+                                                            'flex h-10 items-center gap-3 rounded-[12px] px-4 text-[14px] font-medium transition-colors',
                                                             childActive
                                                                 ? 'text-[#3B82F6]'
-                                                                : 'text-[rgba(248,250,252,0.6)] hover:text-white',
+                                                                : 'text-slate-300 hover:text-white',
                                                         )}
                                                     >
                                                         <span
-                                                            className={cn(
-                                                                'h-1.5 w-1.5 rounded-full',
-                                                                childActive ? 'bg-[#3B82F6]' : 'bg-[rgba(248,250,252,0.6)]',
-                                                            )}
+                                                            className="h-2 w-2 shrink-0 rounded-full"
+                                                            style={{ backgroundColor: childActive ? '#3B82F6' : 'var(--editor-text-muted)' }}
                                                         />
                                                         <span>{childLabel}</span>
                                                     </Link>
@@ -232,7 +235,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                     'flex h-[44px] items-center gap-3 rounded-[16px] px-4 text-[14px] font-medium transition-colors',
                                     isActive
                                         ? 'bg-[rgba(59,130,246,0.1)] text-[#3B82F6] shadow-[0_0_20px_rgba(59,130,246,0.3)]'
-                                        : 'text-[rgba(248,250,252,0.7)] hover:bg-white/5 hover:text-white',
+                                        : 'text-slate-300 hover:bg-white/5 hover:text-white',
                                 )}
                             >
                                 {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
@@ -251,8 +254,11 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                     {/* User info + Notification bell */}
                     <div className="flex items-center gap-3">
                         <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
-                                {userInitial || '?'}
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden bg-[rgba(255,255,255,0.06)]">
+                                {userAvatarUrl
+                                    ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="w-full h-full object-cover" />
+                                    : <span className="text-[12px] font-bold text-white">{userInitial || '?'}</span>
+                                }
                             </div>
                             <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || t.editor.menuDrawer.defaultUserName}</span>
                         </Link>
@@ -307,10 +313,10 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
             </aside>
 
             <Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null) }}>
-                <DialogContent className="max-w-sm border-white/[0.08] bg-[#0F172A] text-white">
+                <DialogContent className="editor-portal max-w-sm dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#0F172A] bg-white dark:text-white text-slate-900">
                     <DialogHeader>
-                        <DialogTitle className="text-white">{menu.unsavedTitle}</DialogTitle>
-                        <DialogDescription className="text-slate-400">
+                        <DialogTitle className="dark:text-white text-slate-900">{menu.unsavedTitle}</DialogTitle>
+                        <DialogDescription className="dark:text-slate-400 text-slate-500">
                             {menu.unsavedConfirm}
                         </DialogDescription>
                     </DialogHeader>
@@ -318,7 +324,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                         <button
                             type="button"
                             onClick={() => setPendingAction(null)}
-                            className="flex-1 rounded-[10px] border border-white/[0.08] py-2 text-[13px] font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                            className="flex-1 rounded-[10px] border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] py-2 text-[13px] font-medium dark:text-slate-300 text-slate-600 dark:hover:bg-white/5 hover:bg-slate-50 transition-colors"
                         >
                             {menu.unsavedStay}
                         </button>

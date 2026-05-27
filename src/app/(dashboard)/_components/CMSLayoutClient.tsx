@@ -14,11 +14,12 @@ type CMSLayoutClientProps = {
     userEmail: string
     userAvatarUrl?: string | null
     currentUserRole?: string
+    userPermissions?: string[]
     isSuperAdmin?: boolean
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', isSuperAdmin = false, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', userPermissions = [], isSuperAdmin = false, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const pathname = usePathname()
 
@@ -31,7 +32,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            <div className="min-h-screen bg-[#0B1120] flex flex-col overflow-x-hidden">
+            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col overflow-x-hidden">
                 <TenantAccessWatcher />
                 <TopHeader
                     userName={userName}
@@ -45,6 +46,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                         userName={userName}
                         userInitial={userInitial}
                         currentUserRole={currentUserRole}
+                        permissions={userPermissions}
                         isSuperAdmin={isSuperAdmin}
                         mobileOpen={sidebarOpen}
                         setMobileOpen={setSidebarOpen}
@@ -60,8 +62,8 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                     style={{ '--width': '207px' } as React.CSSProperties}
                     toastOptions={{
                         classNames: {
-                            toast: "bg-[#1E293B] border border-white/[0.08] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[16px] px-[24px] flex items-center gap-[8px] min-h-[46px] w-full",
-                            title: "text-[14px] font-medium text-slate-50",
+                            toast: "bg-dash-surface border border-dash-border shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[16px] px-[24px] flex items-center gap-[8px] min-h-[46px] w-full",
+                            title: "text-[14px] font-medium text-dash-text",
                             success: "[&>div>svg]:text-[#05DF72]",
                             error: "[&>div>svg]:text-red-500",
                             icon: "w-[20px] h-[20px]",

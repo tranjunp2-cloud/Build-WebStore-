@@ -38,6 +38,11 @@ vi.mock('@/app/(dashboard)/actions', () => ({
     logoutAction: vi.fn(() => Promise.resolve({ success: true })),
 }))
 
+vi.mock('@/providers/theme-provider', () => ({
+    useTheme: () => ({ theme: 'dark', toggle: vi.fn() }),
+    ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 // ── Imports ─────────────────────────────────────────────────────────────
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
@@ -71,6 +76,8 @@ describe('F18 CMS Core Layout', () => {
             userInitial: 'T',
             mobileOpen: false,
             setMobileOpen: vi.fn(),
+            currentUserRole: 'owner',
+            permissions: ['builder', 'blog', 'products', 'orders', 'settings'],
         }
 
         it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {

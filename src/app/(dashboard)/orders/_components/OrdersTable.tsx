@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n'
 import { OrdersPagination } from './OrdersPagination'
 
 // ───────── TYPES ─────────
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface Order {
     id: string
@@ -19,6 +19,7 @@ export interface Order {
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotColor: string; textColor: string }> = {
     'pending': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
+    'new': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
     'confirmed': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
     'ready_to_ship': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
     'shipped': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
@@ -33,6 +34,7 @@ const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotCo
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
     const keyMap: Record<OrderStatus, string> = {
         'pending': 'pending',
+        'new': 'pending',
         'confirmed': 'confirmed',
         'ready_to_ship': 'readyToShip',
         'shipped': 'shipped',
@@ -107,7 +109,7 @@ function Checkbox({
                     width: 18,
                     height: 18,
                     borderRadius: 6,
-                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.16)',
+                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid var(--dash-border)',
                     background: checked || indeterminate ? '#2563EB' : 'transparent',
                     transition: 'background 0.2s, border 0.2s'
                 }}
@@ -156,7 +158,7 @@ function HeaderCell({ children }: { children: React.ReactNode }) {
                 lineHeight: '1.3333333333333333em',
                 letterSpacing: '0.025em',
                 textTransform: 'uppercase',
-                color: 'rgba(248, 250, 252, 0.6)',
+                color: 'var(--dash-text-muted)',
             }}
         >
             {children}
@@ -174,7 +176,7 @@ function EmptyOrderState({ text }: { text: string }) {
                     fontWeight: 400,
                     fontSize: 16,
                     lineHeight: '1.5em',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {text}
@@ -190,9 +192,10 @@ interface TableProps {
     selectedOrderId?: string | null
     selectedRows: Set<string>
     onSelectionChange: (selectedIds: Set<string>) => void
+    newOrderIds?: Set<string>
 }
 
-function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange }: TableProps) {
+function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange, newOrderIds }: TableProps) {
     const { t } = useI18n()
     const o = t.dashboard.orders
     const statusLabels = o.status
@@ -242,7 +245,8 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             <div
                                 key={order.id}
                                 onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border border-[rgba(255,255,255,0.08)] rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5' : 'bg-slate-800/60'}`}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : newOrderIds?.has(order.id) ? 'bg-emerald-500/10 border-emerald-500/30' : isSelected ? 'bg-blue-500/5 border-dash-border' : 'bg-dash-surface border-dash-border'}`}
+                                style={{ transition: 'background 1s ease-out, border-color 1s ease-out' }}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
@@ -278,24 +282,14 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     style={{ tableLayout: 'fixed', minWidth: 960 }}
                 >
                     <colgroup>
-                        <col style={{ width: '11.06%' }} />
-                        <col style={{ width: '17.58%' }} />
-                        <col style={{ width: '26.15%' }} />
-                        <col style={{ width: '17.47%' }} />
-                        <col style={{ width: '27.74%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '30%' }} />
                     </colgroup>
 
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                        <tr style={{ background: 'rgba(11, 17, 32, 0.5)' }}>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px', backdropFilter: 'blur(12px)' }}>
-                                <Checkbox
-                                    checked={allSelected}
-                                    indeterminate={someSelected}
-                                    onChange={toggleAll}
-                                    inputRef={allCheckboxRef}
-                                    aria-label="Select all rows"
-                                />
-                            </th>
+                        <tr style={{ background: 'var(--dash-surface)' }}>
                             <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
                                 <HeaderCell>{o.tableHeaders.orderNumber}</HeaderCell>
                             </th>
@@ -314,13 +308,13 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
-                                    <span style={{ color: 'rgba(248, 250, 252, 0.6)' }}>{o.tableHeaders.loading}</span>
+                                <td colSpan={4} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                    <span style={{ color: 'var(--dash-text-muted)' }}>{o.tableHeaders.loading}</span>
                                 </td>
                             </tr>
                         ) : orders.length === 0 ? (
                             <tr>
-                                <td colSpan={5} style={{ padding: 0 }}>
+                                <td colSpan={4} style={{ padding: 0 }}>
                                     <EmptyOrderState text={o.tableHeaders.noOrders} />
                                 </td>
                             </tr>
@@ -334,36 +328,29 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             return (
                                 <tr
                                     key={order.id}
-                                    className="transition-colors cursor-pointer"
+                                    className="cursor-pointer"
                                     style={{
                                         height: rowHeight,
                                         borderBottom: i < orders.length - 1
-                                            ? '1px solid rgba(255, 255, 255, 0.05)'
+                                            ? '1px solid var(--dash-border)'
                                             : 'none',
                                         background: isDetailOpen
                                             ? 'rgba(59,130,246,0.12)'
-                                            : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                            : newOrderIds?.has(order.id)
+                                                ? 'rgba(0,201,80,0.12)'
+                                                : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                        transition: 'background 1s ease-out',
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.03)'
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
                                     }}
                                     onMouseLeave={e => {
-                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = ''
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = ''
                                     }}
                                     onClick={() => {
                                         if (onSelectOrder) onSelectOrder(order.id)
                                     }}
                                 >
-                                    <td
-                                        style={{ padding: '18px 24px' }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onChange={() => toggleRow(order.id)}
-                                            aria-label={`Select order ${order.id}`}
-                                        />
-                                    </td>
                                     <td style={{ padding: `${textPadY}px 24px` }}>
                                         <span
                                             style={{
@@ -371,7 +358,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 600,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             #{order.orderNumber}
@@ -384,7 +371,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 400,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             {order.customerName || 'N/A'}
@@ -397,7 +384,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 600,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
@@ -420,6 +407,7 @@ export function OrdersTable({
     onSelectOrder,
     selectedOrderId,
     refreshCounter = 0,
+    silentRefreshTrigger = 0,
     selectedRows = new Set(),
     onSelectionChange,
     onOrdersLoaded,
@@ -430,6 +418,7 @@ export function OrdersTable({
     onSelectOrder?: (orderId: string) => void
     selectedOrderId?: string | null
     refreshCounter?: number
+    silentRefreshTrigger?: number
     selectedRows?: Set<string>
     onSelectionChange?: (selectedIds: Set<string>) => void
     onOrdersLoaded?: (orders: Order[]) => void
@@ -441,6 +430,18 @@ export function OrdersTable({
     const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
+    const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
+
+    // Refs keep latest filter values accessible inside the silentFetch effect without
+    // adding them as deps (which would turn silent-refresh into a full reload on every filter change)
+    const searchQueryRef = useRef(searchQuery)
+    const statusFilterRef = useRef(statusFilter)
+    const dateFilterRef = useRef(dateFilter)
+    const onOrdersLoadedRef = useRef(onOrdersLoaded)
+    useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+    useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+    useEffect(() => { dateFilterRef.current = dateFilter }, [dateFilter])
+    useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
 
     useEffect(() => {
         async function fetchOrders() {
@@ -469,9 +470,59 @@ export function OrdersTable({
         fetchOrders()
     }, [page, refreshCounter, searchQuery, statusFilter, dateFilter])
 
+    // Silent background merge — only on page 1, no loading spinner, preserves scroll/selection
+    useEffect(() => {
+        if (silentRefreshTrigger === 0) return
+        if (page !== 1) return
+
+        async function silentFetch() {
+            try {
+                let url = `/api/orders?page=1&limit=10`
+                // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
+                if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
+                if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
+                if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
+
+                const res = await fetch(url)
+                if (!res.ok) return
+                const data = await res.json()
+                if (!data.success || !data.docs) return
+
+                const incoming: Order[] = data.docs
+                // Use a captured variable to read computed fresh IDs after the updater runs.
+                // This avoids both stale closure (functional form reads fresh prev) and
+                // side-effect-in-updater (setNewOrderIds called outside, once, not in updater).
+                let capturedFreshIds: Set<string> | null = null
+                setOrders((prev) => {
+                    const existingIds = new Set(prev.map((o) => o.id))
+                    const fresh = incoming.filter((o) => !existingIds.has(o.id))
+                    if (fresh.length === 0) return prev
+                    capturedFreshIds = new Set(fresh.map((o) => o.id))
+                    return [...fresh, ...prev]
+                })
+                if (capturedFreshIds) {
+                    const freshIds = capturedFreshIds as Set<string>
+                    setNewOrderIds((cur) => new Set([...cur, ...freshIds]))
+                    setTimeout(() => {
+                        setNewOrderIds((cur) => {
+                            const next = new Set(cur)
+                            freshIds.forEach((id) => next.delete(id))
+                            return next
+                        })
+                    }, 4000)
+                }
+                setTotalPages(data.totalPages || 1)
+                if (onOrdersLoadedRef.current) onOrdersLoadedRef.current(incoming)
+            } catch (err) {
+                console.error('[Orders] Silent refresh failed:', err)
+            }
+        }
+        silentFetch()
+    }, [silentRefreshTrigger])
+
     return (
         <div
-            className="flex flex-col w-full md:rounded-[16px] md:bg-slate-800/60 md:border md:border-[rgba(255,255,255,0.08)] md:p-[1px]"
+            className="flex flex-col w-full md:rounded-[16px] md:overflow-hidden md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
         >
             <Table
                 orders={orders}
@@ -480,6 +531,7 @@ export function OrdersTable({
                 selectedOrderId={selectedOrderId}
                 selectedRows={selectedRows}
                 onSelectionChange={onSelectionChange || (() => { })}
+                newOrderIds={newOrderIds}
             />
 
             <div className="flex items-center justify-end px-6 py-3">

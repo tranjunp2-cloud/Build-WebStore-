@@ -120,14 +120,15 @@ export const fnbContent: CategoryContent = {
   ],
   industryBlocks: [
     {
-      blockType: 'menu-display',
-      variant: 'categorised',
+      blockType: 'menu-food',
+      variant: 'classic',
       title: 'Our Menu',
-      showImages: true,
-      showPrices: true,
-      showDescription: true,
-      currency: 'RM',
-      categories: ['Hot Drinks', 'Cold Drinks', 'Pastries', 'Snacks'],
+      items: [
+        { name: 'Kopi O', description: 'Traditional black coffee brewed the old-school way', price: 'RM 3.50' },
+        { name: 'Kopi Tarik', description: 'Pulled coffee with condensed milk, smooth and rich', price: 'RM 4' },
+        { name: 'Kaya Toast', description: 'Charcoal bread with housemade kaya and butter', price: 'RM 3', tag: 'Bestseller' },
+        { name: 'Half-Boiled Eggs', description: 'Soft eggs with soy sauce and white pepper', price: 'RM 2.50' },
+      ],
     },
     {
       blockType: 'order-widget',

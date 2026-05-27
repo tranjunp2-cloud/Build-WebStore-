@@ -118,8 +118,17 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 socialLinks: site.socialLinks || {},
                 branding: site.branding || {},
                 seo: site.seo || {},
-                headerBlock: site.headerBlock || null,
-                footerBlock: site.footerBlock || null,
+                // Editor loads pending draft when available (null = no pending changes, fall back to live).
+                // Explicit null check avoids treating `{}` as "no pending" (falsy-OR would shadow live data).
+                headerBlock: site.pendingHeaderBlock != null
+                    ? (site.pendingHeaderBlock as typeof site.headerBlock)
+                    : site.headerBlock ?? null,
+                footerBlock: site.pendingFooterBlock != null
+                    ? (site.pendingFooterBlock as typeof site.footerBlock)
+                    : site.footerBlock ?? null,
+                globalBlocks: site.pendingGlobalBlocks != null
+                    ? (site.pendingGlobalBlocks as typeof site.globalBlocks)
+                    : site.globalBlocks ?? null,
                 shippingConfig: site.shippingConfig || {},
                 publishedAt: site.publishedAt || null,
                 tenantSlug: (typeof site.tenant === 'object' && site.tenant !== null)
@@ -147,6 +156,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,
                 email: user.email || null,
+                // avatar is a Payload Media object (depth≥1) or a numeric ID (depth=0) or null
+                avatar: (user as Record<string, unknown>).avatar ?? null,
                 // Role from matched tenant — guaranteed to exist since tenant check at line 56 already returns 403 if no match
                 role: (rawTenants.find((t: { tenant: TenantRef; role?: string }) => resolveTenantId(t.tenant) === siteTenantId) as { role?: string })?.role || 'viewer',
             },

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useEffect, useMemo, useState } from 'react'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { AlertTriangle, ChevronDown, Globe2, Loader2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,19 +18,23 @@ import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
 import PricingSettings from './PricingSettings'
+import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
+import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config'
+import type { MenuCategory, MenuItem } from '@/blocks/menu-food/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
 import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { toast } from 'sonner'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
+import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
@@ -1209,23 +1213,74 @@ function SettingsPanelInner({
     const bt = block?.blockType
     const currentBlockIndex = blockIndex ?? 0
 
+    const focusedBlockIndexRef = useRef<number>(currentBlockIndex)
+
+    // Global block routing — floating blocks use negative __editorBlockIndex
+    // (cartWidget=-1, whatsapp-button=-2, socialWidget=-3). Reads go to the live store
+    // entry; writes route to updateGlobalBlock.
+    const storeGlobalBlocks = useEditorStore(state => state.globalBlocks)
+    const storeUpdateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
+
+    const isGlobal = block?.__editorBlockIndex !== undefined && (block.__editorBlockIndex as number) < 0
+    const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
+    const effectiveBlock = (isGlobal && globalKey
+        ? (storeGlobalBlocks?.[globalKey] ?? block)
+        : block) as BlockData | null
+
+    const handleBlockUpdate = (changes: Record<string, unknown>) => {
+        if (isGlobal && globalKey) {
+            storeUpdateGlobalBlock(globalKey, changes)
+        } else {
+            onBlockUpdate(currentBlockIndex, changes)
+        }
+    }
+
+    const handleBlockFieldChange = (field: string, value: string) => {
+        if (isGlobal && globalKey) {
+            storeUpdateGlobalBlock(globalKey, { [field]: value })
+        } else {
+            onBlockFieldChange(currentBlockIndex, field, value)
+        }
+    }
+
     // Helper: update item in an array field
     const updateArrayItem = (field: string, index: number, key: string, val: unknown) => {
-        const arr = [...(((block?.[field] as Record<string, unknown>[] | undefined) || []))]
+        const arr = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || []))]
         arr[index] = { ...arr[index], [key]: val }
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        handleBlockUpdate({ [field]: arr })
     }
 
     // Helper: add item to array field
     const addArrayItem = (field: string, template: Record<string, unknown>) => {
-        const arr = [...(((block?.[field] as Record<string, unknown>[] | undefined) || [])), template]
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        const arr = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || [])), template]
+        handleBlockUpdate({ [field]: arr })
     }
 
     // Helper: remove item from array field
     const removeArrayItem = (field: string, index: number) => {
-        const arr = (((block?.[field] as Record<string, unknown>[] | undefined) || [])).filter((_: unknown, i: number) => i !== index)
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        const arr = (((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || [])).filter((_: unknown, i: number) => i !== index)
+        handleBlockUpdate({ [field]: arr })
+    }
+
+    // Helpers: nested two-level CRUD (categories[].items[])
+    const updateNestedItem = (field: string, catIdx: number, itemIdx: number, key: string, val: unknown) => {
+        const cats = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || []))]
+        const catItems = [...((cats[catIdx]?.['items'] as Record<string, unknown>[] || []))]
+        catItems[itemIdx] = { ...catItems[itemIdx], [key]: val }
+        cats[catIdx] = { ...cats[catIdx], items: catItems }
+        handleBlockUpdate({ [field]: cats })
+    }
+    const addNestedItem = (field: string, catIdx: number, template: Record<string, unknown>) => {
+        const cats = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || []))]
+        const catItems = [...((cats[catIdx]?.['items'] as Record<string, unknown>[] || [])), template]
+        cats[catIdx] = { ...cats[catIdx], items: catItems }
+        handleBlockUpdate({ [field]: cats })
+    }
+    const removeNestedItem = (field: string, catIdx: number, itemIdx: number) => {
+        const cats = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || []))]
+        const catItems = ((cats[catIdx]?.['items'] as Record<string, unknown>[] || [])).filter((_, i) => i !== itemIdx)
+        cats[catIdx] = { ...cats[catIdx], items: catItems }
+        handleBlockUpdate({ [field]: cats })
     }
 
     const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
@@ -1283,7 +1338,7 @@ function SettingsPanelInner({
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
                 <div className="mb-6">
                     <div className="flex items-start gap-4">
                         <div>
@@ -1294,7 +1349,14 @@ function SettingsPanelInner({
                                 <p className="pt-[2px] text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
                             </div>
                             {activeTab === 'block' && block ? (
-                                <p className="mt-1 pl-7 text-[11px] text-slate-500">[{block.blockType}]</p>
+                                <div className="mt-1 pl-7 flex items-center gap-2">
+                                    <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
+                                    {isGlobal && (
+                                        <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+                                            🌐 Global
+                                        </span>
+                                    )}
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -1336,7 +1398,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Layout & Spacing */}
-                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && (
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && block.blockType !== 'feature-comparison' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
                                     <div className="mt-3 space-y-3">
@@ -1911,6 +1973,140 @@ function SettingsPanelInner({
                             )}
 
 
+                            {/* ─── Feature Comparison Products + Features ──── */}
+                            {bt === 'feature-comparison' && block && (
+                                <>
+                                    <FeatureComparisonSettings
+                                        block={block as FeatureComparisonConfig}
+                                        blockIndex={currentBlockIndex}
+                                        onBlockUpdate={onBlockUpdate}
+                                    />
+                                    {/* Layout & Spacing — after comparison content, mirrors pricing pattern */}
+                                    <div className={sectionCls}>
+                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
+                                        <div className="mt-3 space-y-3">
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Top Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={0} max={120} step={4}
+                                                    value={localPaddingTop}
+                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Bottom Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={0} max={120} step={4}
+                                                    value={localPaddingBottom}
+                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ─── Menu Food Categories ─────────────────────── */}
+                            {bt === 'menu-food' && (() => {
+                                const categories = (block.categories || []) as MenuCategory[]
+                                return (
+                                    <div className={sectionCls}>
+                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">{s.categoriesLabel}</p>
+                                        {categories.map((cat, ci) => (
+                                            <div key={`mf-cat-${ci}`} className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2">
+                                                <div className="mb-1 flex items-center justify-between">
+                                                    <span className="text-xs font-medium text-gray-300">{ti(s.categoryN, { n: ci + 1 })}</span>
+                                                    <button type="button" onClick={() => removeArrayItem('categories', ci)}
+                                                        className="text-xs text-red-400 hover:text-red-300 transition-colors">✕</button>
+                                                </div>
+                                                <Input defaultValue={plainText(cat.name)} placeholder={s.name}
+                                                    onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                    onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateArrayItem('categories', ci, 'name', e.target.value) }}
+                                                    variant="editor" className={editorInputClassName} />
+                                                {/* Items */}
+                                                <p className="mt-2 mb-1 text-xs font-medium text-[#94a3b8]">{s.itemsLabel}</p>
+                                                {(cat.items || []).map((item: MenuItem, ii: number) => (
+                                                    <div key={`mf-item-${ci}-${ii}`} className="mb-2 rounded border border-white/5 bg-black/20 p-2">
+                                                        <div className="mb-1 flex items-center justify-between">
+                                                            <span className="text-[11px] text-gray-400">{ti(s.menuItemN, { n: ii + 1 })}</span>
+                                                            <button type="button" onClick={() => removeNestedItem('categories', ci, ii)}
+                                                                className="text-xs text-red-400 hover:text-red-300 transition-colors">✕</button>
+                                                        </div>
+                                                        <Input defaultValue={plainText(item.name)} placeholder={s.name}
+                                                            onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                            onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateNestedItem('categories', ci, ii, 'name', e.target.value) }}
+                                                            variant="editor" className={editorInputClassName} />
+                                                        <Input defaultValue={plainText(item.description || '')} placeholder={s.description}
+                                                            onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                            onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateNestedItem('categories', ci, ii, 'description', e.target.value || undefined) }}
+                                                            variant="editor" className={cn(editorInputClassName, 'mt-1')} />
+                                                        <Input defaultValue={item.price} placeholder={s.price}
+                                                            onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                            onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateNestedItem('categories', ci, ii, 'price', e.target.value) }}
+                                                            variant="editor" className={cn(editorInputClassName, 'mt-1')} />
+                                                        <Input defaultValue={item.currency || ''} placeholder={s.currency}
+                                                            onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                            onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateNestedItem('categories', ci, ii, 'currency', e.target.value || undefined) }}
+                                                            variant="editor" className={cn(editorInputClassName, 'mt-1')} />
+                                                        <Input defaultValue={item.tag || ''} placeholder={s.tag}
+                                                            onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
+                                                            onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateNestedItem('categories', ci, ii, 'tag', e.target.value || undefined) }}
+                                                            variant="editor" className={cn(editorInputClassName, 'mt-1')} />
+                                                        <div className="mt-1.5">
+                                                            <BlockImageEditor
+                                                                imageUrl={
+                                                                    typeof item.image === 'object' && item.image !== null
+                                                                        ? (item.image as { url?: string }).url ?? ''
+                                                                        : typeof item.image === 'string' ? item.image : ''
+                                                                }
+                                                                altText={
+                                                                    typeof item.image === 'object' && item.image !== null
+                                                                        ? (item.image as { alt?: string }).alt ?? ''
+                                                                        : ''
+                                                                }
+                                                                onImageChange={(id, url) => {
+                                                                    focusedBlockIndexRef.current = currentBlockIndex
+                                                                    const prev = typeof item.image === 'object' && item.image !== null ? item.image as { alt?: string } : {}
+                                                                    updateNestedItem('categories', ci, ii, 'image', { id, url, alt: prev.alt ?? '' })
+                                                                }}
+                                                                onAltTextChange={(alt) => {
+                                                                    const prev = typeof item.image === 'object' && item.image !== null ? item.image as { id?: number; url?: string } : {}
+                                                                    updateNestedItem('categories', ci, ii, 'image', { id: prev.id, url: prev.url, alt })
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <button type="button" onClick={() => addNestedItem('categories', ci, { name: 'New Item', description: '', price: '', currency: 'RM', tag: '', image: null })}
+                                                    className="mt-1 w-full rounded bg-blue-500/10 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addMenuItem}</button>
+                                            </div>
+                                        ))}
+                                        <button type="button" onClick={() => addArrayItem('categories', { name: 'New Category', items: [] })}
+                                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addCategory}</button>
+                                    </div>
+                                )
+                            })()}
+
                             {/* ─── Step Process Configuration ─────────────── */}
                             {bt === 'step-process' && (() => {
                                 const steps = (block.steps || []) as StepItem[]
@@ -2040,7 +2236,7 @@ function SettingsPanelInner({
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
                                     {(() => {
-                                        const normalizedSocialBlock = normalizeSocialWidgetConfig(block as Record<string, unknown>)
+                                        const normalizedSocialBlock = normalizeSocialWidgetConfig((effectiveBlock ?? block) as Record<string, unknown>)
 
                                         return (
                                             <>
@@ -2050,31 +2246,11 @@ function SettingsPanelInner({
                                                         <label className={labelCls}>{s.headline}</label>
                                                         <Input
                                                             defaultValue={(normalizedSocialBlock.headline as string) || ''}
-                                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
+                                                            onBlur={(e: FieldBlurEvent) => handleBlockFieldChange('headline', e.target.value)}
                                                             variant="editor"
                                                             className={editorInputClassName}
                                                             placeholder={s.stayConnected}
                                                         />
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>{s.displayStyle}</label>
-                                                        <div className="mt-2 grid grid-cols-2 gap-2">
-                                                            {['floating', 'inline'].map(variant => (
-                                                                <button
-                                                                    key={variant}
-                                                                    type="button"
-                                                                    onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                                                    className={cn(
-                                                                        'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                                        (block.variant || 'floating') === variant
-                                                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                                    )}
-                                                                >
-                                                                    {variant}
-                                                                </button>
-                                                            ))}
-                                                        </div>
                                                     </div>
                                                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                                         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -2148,30 +2324,10 @@ function SettingsPanelInner({
                                             </p>
                                         </div>
                                         <div>
-                                            <label className={labelCls}>{s.displayStyle}</label>
-                                            <div className="mt-2 grid grid-cols-2 gap-2">
-                                                {['floating', 'inline'].map(variant => (
-                                                    <button
-                                                        key={variant}
-                                                        type="button"
-                                                        onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                                        className={cn(
-                                                            'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                            (block.variant || 'floating') === variant
-                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                        )}
-                                                    >
-                                                        {variant}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
                                             <label className={labelCls}>{s.buttonLabel}</label>
                                             <Input
-                                                defaultValue={(block.label as string) || s.cart}
-                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
+                                                defaultValue={(effectiveBlock?.label as string) || s.cart}
+                                                onBlur={(e: FieldBlurEvent) => handleBlockFieldChange('label', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName}
                                                 placeholder={s.cart}
@@ -2182,15 +2338,15 @@ function SettingsPanelInner({
                                             <div className="mt-2 flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => onBlockUpdate(currentBlockIndex, { showLabel: !block.showLabel })}
+                                                    onClick={() => handleBlockUpdate({ showLabel: !effectiveBlock?.showLabel })}
                                                     className={cn(
                                                         'rounded-full px-3 py-2 text-xs font-medium transition-colors',
-                                                        block.showLabel
+                                                        effectiveBlock?.showLabel
                                                             ? 'bg-blue-500/15 text-blue-300'
                                                             : 'bg-white/5 text-slate-400 hover:bg-white/10',
                                                     )}
                                                 >
-                                                    {block.showLabel ? s.labelVisible : s.iconOnly}
+                                                    {effectiveBlock?.showLabel ? s.labelVisible : s.iconOnly}
                                                 </button>
                                                 <span className="text-[11px] text-slate-500">
                                                     {s.badgeDesc}
@@ -2209,9 +2365,9 @@ function SettingsPanelInner({
                                         <div>
                                             <label className={labelCls}>{s.phone}</label>
                                             {(() => {
-                                                const waCode = (block.countryCode as string) || '+60'
+                                                const waCode = (effectiveBlock?.countryCode as string) || '+60'
                                                 const waCountry = PHONE_COUNTRIES.find(c => c.code === waCode) ?? PHONE_COUNTRIES[0]
-                                                const phoneVal = (block.phoneNumber as string) || ''
+                                                const phoneVal = (effectiveBlock?.phoneNumber as string) || ''
                                                 const phoneEmpty = !phoneVal
                                                 const phoneTouched = phoneTouchedSet.has(bk)
                                                 const showPhoneError = phoneEmpty && phoneTouched
@@ -2221,8 +2377,7 @@ function SettingsPanelInner({
                                                             <PhoneCountryPicker
                                                                 value={waCode}
                                                                 onChange={code => {
-                                                                    // Not clearing phoneNumber here — would trigger showPhoneError prematurely when user switches country.
-                                                                    onBlockFieldChange(currentBlockIndex, 'countryCode', code)
+                                                                    handleBlockFieldChange('countryCode', code)
                                                                 }}
                                                             />
                                                             <div className="h-[31px] w-px shrink-0 bg-white/10" />
@@ -2236,7 +2391,7 @@ function SettingsPanelInner({
                                                                         toast.error(t.editor.settingsValidation.invalidPhone)
                                                                         return
                                                                     }
-                                                                    onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                                    handleBlockFieldChange('phoneNumber', v)
                                                                 }}
                                                                 className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
                                                                 placeholder={waCountry.placeholder}
@@ -2249,43 +2404,26 @@ function SettingsPanelInner({
                                                 )
                                             })()}
                                         </div>
-                                        {/* Button text — inline only (issue #892) */}
-                                        {(block.variant || 'floating') === 'inline' && (
-                                            <div>
-                                                <label className={labelCls}>{s.buttonLabel}</label>
-                                                <Input
-                                                    defaultValue={(block.label as string) || 'Chat with us'}
-                                                    key={`wa-label-${bk}`}
-                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', sanitizeInput(e.target.value))}
-                                                    variant="editor"
-                                                    className={editorInputClassName}
-                                                    placeholder="Chat with us"
-                                                />
+                                        <div>
+                                            <label className={labelCls}>{s.whatsappPosition}</label>
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                                {(['bottom-right', 'bottom-left'] as const).map(pos => (
+                                                    <button
+                                                        key={pos}
+                                                        type="button"
+                                                        onClick={() => handleBlockUpdate({ position: pos })}
+                                                        className={cn(
+                                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                                            ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
+                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                        )}
+                                                    >
+                                                        {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
+                                                    </button>
+                                                ))}
                                             </div>
-                                        )}
-                                        {/* Position — floating only */}
-                                        {(block.variant || 'floating') === 'floating' && (
-                                            <div>
-                                                <label className={labelCls}>{s.whatsappPosition}</label>
-                                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                                    {(['bottom-right', 'bottom-left'] as const).map(pos => (
-                                                        <button
-                                                            key={pos}
-                                                            type="button"
-                                                            onClick={() => onBlockUpdate(currentBlockIndex, { position: pos })}
-                                                            className={cn(
-                                                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                                                (block.position || 'bottom-right') === pos
-                                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                            )}
-                                                        >
-                                                            {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

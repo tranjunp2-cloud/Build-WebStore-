@@ -38,6 +38,11 @@ export const saveSiteSchema = z.object({
     blocks: z.array(z.record(z.unknown())).optional(),
     headerBlock: z.record(z.unknown()).nullable().optional(),
     footerBlock: z.record(z.unknown()).nullable().optional(),
+    globalBlocks: z.object({
+        cartWidget: z.object({ blockType: z.literal('cartWidget') }).passthrough().nullable().optional(),
+        whatsappButton: z.object({ blockType: z.literal('whatsapp-button') }).passthrough().nullable().optional(),
+        socialWidget: z.object({ blockType: z.literal('socialWidget') }).passthrough().nullable().optional(),
+    }).nullable().optional(),
     theme: z.record(z.unknown()).optional(),
     siteName: z.string().min(1).max(200).transform(v => stripHtml(v).trim()).optional(),
     locale: z.enum(['en', 'ms']).optional(),
@@ -75,6 +80,7 @@ export const saveSiteSchema = z.object({
     || data.shippingConfig !== undefined
     || data.headerBlock !== undefined
     || data.footerBlock !== undefined
+    || data.globalBlocks !== undefined
     || data.siteName !== undefined
     || data.contactInfo !== undefined
     || data.socialLinks !== undefined

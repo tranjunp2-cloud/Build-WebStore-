@@ -18,6 +18,13 @@ describe('orderCreateSchema [TC-F10.09, TC-F10.13]', () => {
         customer: {
             name: 'John',
             email: 'john@example.com',
+            phone: '012-3456789',
+            address: {
+                line1: '123 Jalan Test',
+                city: 'Kuala Lumpur',
+                postcode: '50000',
+                country: 'MY',
+            },
         },
         paymentMethod: 'cod' as const,
     }
@@ -27,11 +34,10 @@ describe('orderCreateSchema [TC-F10.09, TC-F10.13]', () => {
         expect(result.success).toBe(true)
     })
 
-    it('accepts valid QR banking order with payment proof [TC-F10.13]', () => {
+    it('accepts valid bank_transfer order without payment proof [TC-F10.13]', () => {
         const result = orderCreateSchema.safeParse({
             ...validOrder,
-            paymentMethod: 'qr_banking',
-            paymentProofImage: 'media-123',
+            paymentMethod: 'bank_transfer',
         })
         expect(result.success).toBe(true)
     })

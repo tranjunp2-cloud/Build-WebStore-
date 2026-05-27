@@ -312,7 +312,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
     }[state]
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-200">
+        <div className="dash-shell fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-200">
             <div className="flex flex-col w-full max-w-[672px] max-h-[85vh] bg-[#1E293B] border border-white/10 rounded-2xl shadow-[0px_25px_50px_-12px_rgba(59,130,246,0.2)] overflow-hidden animate-in zoom-in-95 duration-200 antialiased" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
                 {/* Header */}
@@ -390,7 +390,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                     const hasReplace = titleIsReplace || descIsReplace
                                     const isChecked = selectedIds.has(fixKey(fix))
                                     return (
-                                        <label key={fixKey(fix)} className={`flex gap-3 p-4 rounded-xl border cursor-pointer transition-colors duration-200 ${isChecked ? 'bg-[#064E3B]/40 border-emerald-500/30' : 'bg-[#0F172A]/80 border-[#1F2937] hover:border-[#374151]'}`}>
+                                        <label key={fixKey(fix)} className={`flex gap-3 p-4 rounded-xl border cursor-pointer transition-colors duration-200 ${isChecked ? 'bg-emerald-500/10 dark:bg-[#064E3B]/40 border-emerald-500/30' : 'bg-black/[0.02] dark:bg-[#0F172A]/80 border-[#1F2937] hover:border-[#374151]'}`}>
                                             <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                                                 <input
                                                     type="checkbox"
@@ -403,7 +403,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1.5">
                                                     <span className="text-sm font-semibold text-white truncate">{fix.name}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1E293B] text-[#9CA3AF] uppercase font-medium">{fix.collection}</span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded uppercase font-medium" style={{ background: 'var(--dash-secondary-bg)', color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}>{fix.collection}</span>
                                                     {hasReplace && (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">{seo.proposedLabel}</span>
                                                     )}
@@ -415,10 +415,10 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                                             <span className="text-[12px] leading-relaxed">
                                                                 <span className="text-red-400/80 line-through">{fix.currentTitle}</span>
                                                                 <span className="text-[#6B7280]"> → </span>
-                                                                <span className="text-emerald-400">{fix.proposedTitle}</span>
+                                                                <span className="text-emerald-600 dark:text-emerald-400">{fix.proposedTitle}</span>
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[12px] text-emerald-400">{fix.proposedTitle}</span>
+                                                            <span className="text-[12px] text-emerald-600 dark:text-emerald-400">{fix.proposedTitle}</span>
                                                         )}
                                                     </div>
                                                 )}
@@ -429,10 +429,10 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                                             <span className="text-[12px] leading-relaxed">
                                                                 <span className="text-red-400/80 line-through">{fix.currentDescription?.slice(0, 60)}...</span>
                                                                 <span className="text-[#6B7280]"> → </span>
-                                                                <span className="text-emerald-400">{fix.proposedDescription.slice(0, 60)}...</span>
+                                                                <span className="text-emerald-600 dark:text-emerald-400">{fix.proposedDescription.slice(0, 60)}...</span>
                                                             </span>
                                                         ) : (
-                                                            <span className="text-[12px] text-emerald-400">{fix.proposedDescription.slice(0, 80)}...</span>
+                                                            <span className="text-[12px] text-emerald-600 dark:text-emerald-400">{fix.proposedDescription.slice(0, 80)}...</span>
                                                         )}
                                                     </div>
                                                 )}
@@ -446,11 +446,11 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                         {/* ── Done ── */}
                         {state === 'done' && (
                             <div className="flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-300">
-                                <div className="flex flex-col gap-3.5 p-5 bg-[#064E3B]/20 border border-emerald-500/50 rounded-xl max-h-[200px] overflow-y-auto">
+                                <div className="flex flex-col gap-3.5 p-5 bg-emerald-500/10 dark:bg-[#064E3B]/20 border border-emerald-500/50 rounded-xl max-h-[200px] overflow-y-auto">
                                     {taskMessages.map((msg, idx) => (
                                         <div key={idx} className="flex items-center gap-2">
-                                            <Check className="w-[18px] h-[18px] text-emerald-500 shrink-0" strokeWidth={2} />
-                                            <span className="text-sm font-medium text-emerald-500">{msg}</span>
+                                            <Check className="w-[18px] h-[18px] text-emerald-600 dark:text-emerald-500 shrink-0" strokeWidth={2} />
+                                            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-500">{msg}</span>
                                         </div>
                                     ))}
                                 </div>

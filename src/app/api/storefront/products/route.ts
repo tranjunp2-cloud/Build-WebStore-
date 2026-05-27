@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const ALLOWED_SORT = new Set(['-createdAt', 'createdAt', '-price', 'price', '-name', 'name'])
 
@@ -11,6 +12,17 @@ const ALLOWED_SORT = new Set(['-createdAt', 'createdAt', '-price', 'price', '-na
  */
 export async function GET(req: Request) {
     try {
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')?.trim()
+            || 'unknown'
+        const rateCheck = await checkRateLimit(`storefront-products:${ip}`, 60, 60_000)
+        if (!rateCheck.allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil((rateCheck.resetAt - Date.now()) / 1000)) },
+            })
+        }
+
         const url = new URL(req.url)
         const siteId = url.searchParams.get('site')
         const limit = Math.min(Math.max(1, parseInt(url.searchParams.get('limit') || '12') || 12), 100)
@@ -60,6 +72,7 @@ export async function GET(req: Request) {
             images: doc.images,
             status: doc.status,
             hasVariants: doc.hasVariants ?? false,
+            inventory: typeof doc.inventory === 'number' ? doc.inventory : 0,
             variants: Array.isArray(doc.variants)
                 ? doc.variants.map((v: Record<string, unknown>) => ({
                       name: v.name,

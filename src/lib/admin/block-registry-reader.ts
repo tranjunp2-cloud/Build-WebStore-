@@ -27,6 +27,8 @@ export type NormalizedBlock = {
     editableFields: string[]
     aiVisible: boolean
     isSystem: boolean
+    scope: 'global' | 'page'
+    scopeTooltip?: string
 }
 
 // Vietnamese name map (curated for common blocks; others fall back to English)
@@ -90,6 +92,9 @@ const EDITOR_HIDDEN_BLOCKS = new Set([
     // feat/fix-broken-block-variants: temporarily hidden — re-enable by removing from this set
     'step-process',
     'booking-widget',
+    'property-card',  // GH-1024 — hidden until redesigned
+    'menu-display',   // GH-1024 — hidden; use menu-food
+    'pricing-table',  // GH-1024 — hidden; use pricing
 ])
 
 // ── Module-level cache (process lifetime) ────────────────────────────────────
@@ -121,6 +126,7 @@ export function listAllBlocks(): NormalizedBlock[] {
                 editableFields: [],
                 aiVisible: true,
                 isSystem: false,
+                scope: 'page' as const,
             }
         }
         return {
@@ -135,6 +141,8 @@ export function listAllBlocks(): NormalizedBlock[] {
             editableFields: meta.editableFields,
             aiVisible: meta.aiVisible ?? true,
             isSystem: meta.isSystem ?? false,
+            scope: meta.scope ?? 'page',
+            scopeTooltip: meta.scopeTooltip,
         }
     })
     return _cached

@@ -6,11 +6,13 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
+import { ShipOrderModal } from './ShipOrderModal'
+import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
 // ─── TYPES & MOCKS ───
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface OrderDetail {
     id: string | number
@@ -19,6 +21,10 @@ export interface OrderDetail {
     paymentStatus: string
     paymentMethod: string
     paymentProofImage?: string | { url?: string } | null
+    paymentReference?: string
+    paymentRejectionReason?: string
+    paymentVerifiedAt?: string
+    paymentVerifiedBy?: string | { id: string; email?: string } | null
     subtotal: number
     shippingFee: number
     tax: number
@@ -36,6 +42,7 @@ export interface OrderDetail {
         country?: string
     }
     items: {
+        product?: string | number
         productName: string
         variant?: string
         quantity: number
@@ -59,8 +66,8 @@ function SectionCard({
             style={{
                 display: 'flex',
                 flexDirection: 'column',
-                background: 'rgba(30, 41, 59, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: 'var(--dash-secondary-bg)',
+                border: '1px solid var(--dash-border)',
                 borderRadius: 16,
                 ...style,
             }}
@@ -82,7 +89,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
                 lineHeight: '1.3333333333333333em',
                 letterSpacing: '0.025em',
                 textTransform: 'uppercase',
-                color: 'rgba(248, 250, 252, 0.6)',
+                color: 'var(--dash-text-muted)',
             }}
         >
             {children}
@@ -118,7 +125,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                         fontWeight: 400,
                         fontSize: 12,
                         lineHeight: '1.3333333333333333em',
-                        color: 'rgba(248, 250, 252, 0.4)',
+                        color: 'var(--dash-text-muted)',
                     }}
                 >
                     {label}
@@ -130,7 +137,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                         fontWeight: 400,
                         fontSize: 14,
                         lineHeight: '1.4285714285714286em',
-                        color: '#F8FAFC',
+                        color: 'var(--dash-text)',
                     }}
                 >
                     {value}
@@ -184,8 +191,8 @@ const IconUnconfirmed = () => (
 
 const IconRefund = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C6.32263 2.00631 4.71265 2.66082 3.50667 3.82667L2 5.33333" stroke="#F8FAFC" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M2 2V5.33333H5.33333" stroke="#F8FAFC" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C6.32263 2.00631 4.71265 2.66082 3.50667 3.82667L2 5.33333" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2 2V5.33333H5.33333" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 )
 
@@ -233,56 +240,66 @@ const PROGRESS_LINES = [
 ]
 
 function StepPendingIcon({ isActive }: { isActive: boolean }) {
+    const iStroke = isActive ? "white" : undefined
+    const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-[rgba(255,255,255,0.1)]"} />
-            <path d="M18.0002 24.6673C21.6821 24.6673 24.6668 21.6825 24.6668 18.0007C24.6668 14.3188 21.6821 11.334 18.0002 11.334C14.3183 11.334 11.3335 14.3188 11.3335 18.0007C11.3335 21.6825 14.3183 24.6673 18.0002 24.6673Z" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M18 14V18L20.6667 19.3333" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M18.0002 24.6673C21.6821 24.6673 24.6668 21.6825 24.6668 18.0007C24.6668 14.3188 21.6821 11.334 18.0002 11.334C14.3183 11.334 11.3335 14.3188 11.3335 18.0007C11.3335 21.6825 14.3183 24.6673 18.0002 24.6673Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M18 14V18L20.6667 19.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
 
 function StepConfirmedIcon({ isActive }: { isActive: boolean }) {
+    const iStroke = isActive ? "white" : undefined
+    const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-[rgba(255,255,255,0.1)]"} />
-            <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
 
 function StepReadyIcon({ isActive }: { isActive: boolean }) {
+    const iStroke = isActive ? "white" : undefined
+    const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-[rgba(255,255,255,0.1)]"} />
-            <path d="M17.3333 24.486C17.536 24.603 17.766 24.6646 18 24.6646C18.234 24.6646 18.464 24.603 18.6667 24.486L23.3333 21.8193C23.5358 21.7024 23.704 21.5343 23.821 21.3318C23.938 21.1294 23.9998 20.8998 24 20.666V15.3326C23.9998 15.0988 23.938 14.8692 23.821 14.6667C23.704 14.4643 23.5358 14.2962 23.3333 14.1793L18.6667 11.5126C18.464 11.3956 18.234 11.334 18 11.334C17.766 11.334 17.536 11.3956 17.3333 11.5126L12.6667 14.1793C12.4642 14.2962 12.296 14.4643 12.179 14.6667C12.062 14.8692 12.0002 15.0988 12 15.3326V20.666C12.0002 20.8998 12.062 21.1294 12.179 21.3318C12.296 21.5343 12.4642 21.7024 12.6667 21.8193L17.3333 24.486Z" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M18 24.6667V18" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M12.1934 14.666L18 17.9993L23.8067 14.666" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M15 12.8457L21 16.279" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M17.3333 24.486C17.536 24.603 17.766 24.6646 18 24.6646C18.234 24.6646 18.464 24.603 18.6667 24.486L23.3333 21.8193C23.5358 21.7024 23.704 21.5343 23.821 21.3318C23.938 21.1294 23.9998 20.8998 24 20.666V15.3326C23.9998 15.0988 23.938 14.8692 23.821 14.6667C23.704 14.4643 23.5358 14.2962 23.3333 14.1793L18.6667 11.5126C18.464 11.3956 18.234 11.334 18 11.334C17.766 11.334 17.536 11.3956 17.3333 11.5126L12.6667 14.1793C12.4642 14.2962 12.296 14.4643 12.179 14.6667C12.062 14.8692 12.0002 15.0988 12 15.3326V20.666C12.0002 20.8998 12.062 21.1294 12.179 21.3318C12.296 21.5343 12.4642 21.7024 12.6667 21.8193L17.3333 24.486Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M18 24.6667V18" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12.1934 14.666L18 17.9993L23.8067 14.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M15 12.8457L21 16.279" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
 
 function StepShippedIcon({ isActive }: { isActive: boolean }) {
+    const iStroke = isActive ? "white" : undefined
+    const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-[rgba(255,255,255,0.1)]"} />
-            <path d="M19.3333 21.9993V13.9993C19.3333 13.6457 19.1928 13.3066 18.9427 13.0565C18.6927 12.8065 18.3535 12.666 17.9999 12.666H12.6666C12.313 12.666 11.9738 12.8065 11.7238 13.0565C11.4737 13.3066 11.3333 13.6457 11.3333 13.9993V21.3327C11.3333 21.5095 11.4035 21.6791 11.5285 21.8041C11.6535 21.9291 11.8231 21.9993 11.9999 21.9993H13.3333" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M20 22H16" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M22.6666 22.0007H23.9999C24.1767 22.0007 24.3463 21.9304 24.4713 21.8054C24.5963 21.6804 24.6666 21.5108 24.6666 21.334V18.9007C24.6663 18.7494 24.6146 18.6027 24.5199 18.4847L22.1999 15.5847C22.1376 15.5066 22.0585 15.4435 21.9685 15.4001C21.8784 15.3567 21.7798 15.3341 21.6799 15.334H19.3333" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M21.3333 23.3327C22.0697 23.3327 22.6667 22.7357 22.6667 21.9993C22.6667 21.263 22.0697 20.666 21.3333 20.666C20.597 20.666 20 21.263 20 21.9993C20 22.7357 20.597 23.3327 21.3333 23.3327Z" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M14.6666 23.3327C15.403 23.3327 15.9999 22.7357 15.9999 21.9993C15.9999 21.263 15.403 20.666 14.6666 20.666C13.9302 20.666 13.3333 21.263 13.3333 21.9993C13.3333 22.7357 13.9302 23.3327 14.6666 23.3327Z" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M19.3333 21.9993V13.9993C19.3333 13.6457 19.1928 13.3066 18.9427 13.0565C18.6927 12.8065 18.3535 12.666 17.9999 12.666H12.6666C12.313 12.666 11.9738 12.8065 11.7238 13.0565C11.4737 13.3066 11.3333 13.6457 11.3333 13.9993V21.3327C11.3333 21.5095 11.4035 21.6791 11.5285 21.8041C11.6535 21.9291 11.8231 21.9993 11.9999 21.9993H13.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M20 22H16" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M22.6666 22.0007H23.9999C24.1767 22.0007 24.3463 21.9304 24.4713 21.8054C24.5963 21.6804 24.6666 21.5108 24.6666 21.334V18.9007C24.6663 18.7494 24.6146 18.6027 24.5199 18.4847L22.1999 15.5847C22.1376 15.5066 22.0585 15.4435 21.9685 15.4001C21.8784 15.3567 21.7798 15.3341 21.6799 15.334H19.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M21.3333 23.3327C22.0697 23.3327 22.6667 22.7357 22.6667 21.9993C22.6667 21.263 22.0697 20.666 21.3333 20.666C20.597 20.666 20 21.263 20 21.9993C20 22.7357 20.597 23.3327 21.3333 23.3327Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M14.6666 23.3327C15.403 23.3327 15.9999 22.7357 15.9999 21.9993C15.9999 21.263 15.403 20.666 14.6666 20.666C13.9302 20.666 13.3333 21.263 13.3333 21.9993C13.3333 22.7357 13.9302 23.3327 14.6666 23.3327Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
 
 function StepCompletedIcon({ isActive }: { isActive: boolean }) {
+    const iStroke = isActive ? "white" : undefined
+    const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-[rgba(255,255,255,0.1)]"} />
-            <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke="white" strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     )
 }
@@ -294,11 +311,12 @@ function OrderProgress({ status }: { status: OrderStatus }) {
     const STEPS = getProgressSteps(progressLabels)
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
+        new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
         confirmed: 1,
         ready_to_ship: 2,
         shipped: 3,
         completed: 4,
-        cancelled: -1, // No progress if cancelled
+        cancelled: -1,
         refunded: -1,
         paid: 1,
         payment_failed: -1,
@@ -308,10 +326,10 @@ function OrderProgress({ status }: { status: OrderStatus }) {
 
     return (
         <div
-            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(30,41,59,0.60)] h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
+            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-dash-border bg-dash-surface h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
         >
             {/* Section label */}
-            <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-[rgba(248,250,252,0.6)] leading-[1.333em]">
+            <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-dash-text-muted leading-[1.333em]">
                 {d.orderProgress}
             </span>
 
@@ -331,7 +349,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
 
                                 {/* Step label text */}
                                 <span
-                                    className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-normal md:font-semibold text-[rgba(248,250,252,0.6)] md:text-[#F8FAFC]' : 'font-normal text-[rgba(248,250,252,0.6)]'} text-[12px] md:text-[10px] leading-[1.25em]`}
+                                    className={`font-inter text-center whitespace-nowrap ${isActive ? 'font-normal md:font-semibold text-dash-text-muted md:text-dash-text' : 'font-normal text-dash-text-muted'} text-[12px] md:text-[10px] leading-[1.25em]`}
                                 >
                                     {step.label}
                                 </span>
@@ -344,7 +362,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: (i + 1) <= currentStep ? '#10B981' : 'rgba(255, 255, 255, 0.1)',
+                                        background: i <= currentStep ? '#10B981' : 'var(--dash-border)',
                                     }}
                                 />
                             )}
@@ -378,8 +396,8 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
                 gap: 12,
                 alignSelf: 'stretch',
                 borderRadius: 16,
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                background: 'rgba(30, 41, 59, 0.60)',
+                border: '1px solid var(--dash-border)',
+                background: 'var(--dash-secondary-bg)',
             }}
         >
             <span
@@ -390,7 +408,7 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
                     lineHeight: '1.3333333333333333em',
                     letterSpacing: '2.500000099341075%',
                     textTransform: 'uppercase',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {d.customerInfo}
@@ -433,13 +451,13 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
             )
         }
     } else if (order.status === 'cancelled' || order.status === 'refunded') {
-        statusColor = '#FB2C36' // Red
+        statusColor = 'var(--dash-error)'
         statusBg = 'rgba(251, 44, 54, 0.1)'
         StatusIcon = function CancelledIcon() {
             return (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="8" cy="8" r="6.666" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M6 6L10 10M10 6L6 10" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="8" cy="8" r="6.666" stroke="var(--dash-error)" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 6L10 10M10 6L6 10" stroke="var(--dash-error)" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             )
         }
@@ -456,8 +474,8 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 gap: 12,
                 alignSelf: 'stretch',
                 borderRadius: 16,
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                background: 'rgba(30, 41, 59, 0.60)',
+                border: '1px solid var(--dash-border)',
+                background: 'var(--dash-secondary-bg)',
             }}
         >
             <span
@@ -468,7 +486,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     lineHeight: '1.3333333333333333em',
                     letterSpacing: '0.025em',
                     textTransform: 'uppercase',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {d.paymentInfo}
@@ -484,10 +502,10 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     </div>
                     {/* Text container */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'var(--dash-text-muted)' }}>
                             {d.method}
                         </span>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                             {order.paymentMethod}
                         </span>
                     </div>
@@ -501,7 +519,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     </div>
                     {/* Text container */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'var(--dash-text-muted)' }}>
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
@@ -511,12 +529,12 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 </div>
 
                 {/* Payment Receipt Image: explicitly height 160 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid var(--dash-border)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                     {order.paymentProofImage ? (
                         <Image src={typeof order.paymentProofImage === 'string' ? order.paymentProofImage : order.paymentProofImage?.url || ''} alt="Payment Receipt" fill className="object-cover" />
                     ) : (
-                        <div className="w-full flex items-center justify-center h-full text-center p-4" style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 15 }}>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <div className="w-full flex items-center justify-center h-full text-center p-4" style={{ background: 'var(--dash-surface-hover)', borderRadius: 15 }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'var(--dash-text-muted)' }}>
                                 No Payment Receipt Provided
                             </span>
                         </div>
@@ -555,7 +573,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                         fontWeight: 500,
                                         fontSize: 14,
                                         lineHeight: '20px',
-                                        color: '#F8FAFC',
+                                        color: 'var(--dash-text)',
                                     }}
                                 >
                                     {item.productName}
@@ -566,7 +584,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                         fontWeight: 400,
                                         fontSize: 12,
                                         lineHeight: '16px',
-                                        color: 'rgba(248, 250, 252, 0.5)',
+                                        color: 'var(--dash-text-muted)',
                                     }}
                                 >
                                     {item.variant ? `${item.variant} × ${item.quantity}` : `${d.qty}: ${item.quantity}`}
@@ -579,7 +597,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                     fontWeight: 600,
                                     fontSize: 14,
                                     lineHeight: '20px',
-                                    color: '#F8FAFC',
+                                    color: 'var(--dash-text)',
                                 }}
                             >
                                 {order.currency} {(item.unitPrice * item.quantity).toFixed(2)}
@@ -615,28 +633,28 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                     <div style={{ gap: 8, display: 'flex', flexDirection: 'column' }}>
                         {/* Subtotal */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.subtotal}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.subtotal?.toFixed(2) || '0.00'}
                             </span>
                         </div>
                         {/* Shipping Fee */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.shippingFee}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.shippingFee?.toFixed(2) || '0.00'}
                             </span>
                         </div>
                         {/* Tax */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.tax}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.tax?.toFixed(2) || '0.00'}
                             </span>
                         </div>
@@ -645,7 +663,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                     {/* Grand Total — separated by margin 12, border top, padding 13 */}
                     <div
                         className="flex items-center justify-between"
-                        style={{ marginTop: 12, paddingTop: 13, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                        style={{ marginTop: 12, paddingTop: 13, borderTop: '1px solid var(--dash-border)' }}
                     >
                         <span
                             style={{
@@ -653,7 +671,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 fontWeight: 700,
                                 fontSize: 16,
                                 lineHeight: '24px',
-                                color: '#F8FAFC',
+                                color: 'var(--dash-text)',
                             }}
                         >
                             {d.total}
@@ -681,19 +699,23 @@ function OrderSummary({ order }: { order: OrderDetail }) {
 function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
     const { t } = useI18n()
     const a = t.dashboard.orders.actions
+    const p = t.dashboard.orders.progress
     const [isLoading, setIsLoading] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+    const [isShipModalOpen, setIsShipModalOpen] = useState(false)
     const { status, id, orderNumber } = order
 
     const isTerminalStatus = status === 'completed' || status === 'cancelled' || status === 'refunded'
 
-    const handleAction = async (newStatus: OrderStatus) => {
+    const handleAction = async (newStatus: OrderStatus, trackingNumber?: string) => {
         setIsLoading(true)
         try {
+            const body: Record<string, string> = { status: newStatus }
+            if (trackingNumber) body.trackingNumber = trackingNumber
             const res = await fetch(`/api/orders/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify(body),
             })
             if (!res.ok) {
                 const data = await res.json()
@@ -704,6 +726,25 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             onUpdate()
         } catch (error: unknown) {
             console.error('Order action error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleRefund = async () => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${id}/refund`, { method: 'POST' })
+            if (!res.ok) {
+                const data = await res.json()
+                console.error('Failed to refund order:', data.error)
+                throw new Error('API_ERROR')
+            }
+            toast.success(t.dashboard.orders.toast.updated)
+            onUpdate()
+        } catch (error: unknown) {
+            console.error('Refund order error:', error)
             toast.error(t.dashboard.orders.toast.updateFailed)
         } finally {
             setIsLoading(false)
@@ -739,11 +780,14 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
-                    const isTerminal = ['cancelled', 'refunded', 'completed', 'shipped'].includes(status)
+                    const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const primaryDisabled = isLoading || isTerminal
                     return (
                         <button
-                            onClick={() => handleAction(status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
+                            onClick={() => {
+                                if (status === 'ready_to_ship') { setIsShipModalOpen(true); return }
+                                handleAction(status === 'shipped' ? 'completed' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')
+                            }}
                             disabled={primaryDisabled}
                             className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
                             style={{
@@ -765,7 +809,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 }}
                             >
                                 {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                                {status === 'completed' ? p.completed : status === 'shipped' ? p.completed : status === 'ready_to_ship' ? p.shipped : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
                             </span>
                         </button>
                     )
@@ -774,8 +818,8 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Bottom Row — layout_BH1FFS: row, gap 12px */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || isTerminal || !['shipped', 'completed'].includes(status)
+                    const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
+                    const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}
@@ -786,7 +830,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 style={{
                                     height: 50,
                                     borderRadius: 16,
-                                    border: '1px solid rgba(251, 44, 54, 0.3)',
+                                    border: '1px solid rgba(251, 44, 54, 0.3)', /* dash-error/30 */
                                 }}
                             >
                                 <span
@@ -804,13 +848,13 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
 
                             {/* Refund Button */}
                             <button
-                                onClick={() => handleAction('refunded')}
+                                onClick={handleRefund}
                                 disabled={refundDisabled}
                                 className={`flex-1 flex items-center justify-center gap-2 font-bold transition-opacity ${refundDisabled ? 'cursor-not-allowed opacity-30' : 'hover:opacity-80'}`}
                                 style={{
                                     height: 50,
                                     borderRadius: 16,
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid var(--dash-border)',
                                 }}
                             >
                                 <IconRefund />
@@ -820,7 +864,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                         fontWeight: 600,
                                         fontSize: 16,
                                         lineHeight: '1.5em',
-                                        color: '#F8FAFC',
+                                        color: 'var(--dash-text)',
                                     }}
                                 >
                                     {a.refund}
@@ -830,6 +874,14 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                     )
                 })()}
             </div>
+
+            <ShipOrderModal
+                orderNumber={orderNumber}
+                isOpen={isShipModalOpen}
+                isLoading={isLoading}
+                onBack={() => setIsShipModalOpen(false)}
+                onConfirm={(trackingNumber) => { setIsShipModalOpen(false); handleAction('shipped', trackingNumber) }}
+            />
 
             <CancelOrderModal
                 orderNumber={orderNumber}
@@ -904,7 +956,7 @@ export function OrderDetailPanel({
                         fontWeight: 700,
                         fontSize: 20,
                         lineHeight: '1.4em',
-                        color: '#F8FAFC',
+                        color: 'var(--dash-text)',
                     }}
                 >
                     {d.title} #{order?.orderNumber || orderId}
@@ -912,7 +964,7 @@ export function OrderDetailPanel({
 
                 {/* Close button — layout_HCW45V: 36×36, padding 8px 8px 0 */}
                 <button
-                    className="flex items-start justify-center hover:opacity-70 transition-opacity"
+                    className="flex items-start justify-center text-dash-text-muted hover:opacity-70 transition-opacity"
                     style={{
                         width: 36,
                         height: 36,
@@ -923,7 +975,7 @@ export function OrderDetailPanel({
                     onClick={onClose}
                 >
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 5L15 15M15 5L5 15" stroke="rgba(248,250,252,0.6)" strokeWidth="1.67" strokeLinecap="round" />
+                        <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" />
                     </svg>
                 </button>
             </div>
@@ -941,6 +993,14 @@ export function OrderDetailPanel({
                     <div className="z-20 md:static md:p-0 md:m-0 md:bg-transparent">
                         <ActionButtons order={order} onUpdate={() => { fetchOrder(); onUpdate?.(); }} />
                     </div>
+
+                    {/* BT Verification Block */}
+                    {(order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending_verification') || (order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'paid') ? (
+                        <ManualPaymentVerificationBlock
+                            order={order}
+                            onUpdate={() => { fetchOrder(); onUpdate?.(); }}
+                        />
+                    ) : null}
 
                     {/* Customer Information */}
                     <CustomerInformation order={order} />

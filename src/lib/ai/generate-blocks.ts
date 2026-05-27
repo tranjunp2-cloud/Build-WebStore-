@@ -494,7 +494,7 @@ const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'testimonials', 'faq', 
 const INDUSTRY_BLOCKS_FALLBACK: Record<BusinessIntent['type'], string[]> = {
     business: [],
     ecommerce: ['products-grid', 'review-cards'],
-    restaurant: ['menu-display', /* 'booking-widget', */ 'review-cards'], // feat/fix-broken-block-variants: temporarily hidden
+    restaurant: ['menu-food', /* 'booking-widget', */ 'review-cards'], // GH-1024: menu-display hidden — use menu-food
     portfolio: ['portfolio-grid'],
     blog: ['blog-list'],
 }
@@ -634,36 +634,33 @@ function buildMiddleBlock(
             }
 
         // ── Industry-aware blocks ────────────────────────────────────────
-        case 'menu-display':
+        case 'menu-food':
             return {
-                blockType: 'menu-display',
-                variant: variant === 'simple' ? 'tabs' : variant,
+                blockType: 'menu-food',
+                variant: variant === 'simple' ? 'classic' : (variant as 'classic' | 'cards' | 'minimal'),
                 headline: 'Our Menu',
-                subheadline: 'Crafted with the freshest ingredients',
-                currency: 'RM',
-                showDietaryIcons: true,
                 categories: [
                     {
                         name: 'Starters',
                         items: [
-                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: 12, dietaryTags: ['vegetarian'] },
-                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: 18, dietaryTags: ['spicy'] },
-                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: 22, dietaryTags: ['halal'] },
+                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: 'RM 12', tag: 'vegetarian' },
+                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: 'RM 18', tag: 'spicy' },
+                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: 'RM 22', tag: 'halal' },
                         ],
                     },
                     {
                         name: 'Mains',
                         items: [
-                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: 28, dietaryTags: ['halal', 'spicy'], isPopular: true },
-                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: 24 },
-                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: 22, dietaryTags: ['vegan', 'gluten-free'] },
+                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: 'RM 28', tag: 'halal' },
+                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: 'RM 24' },
+                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: 'RM 22', tag: 'vegan' },
                         ],
                     },
                     {
                         name: 'Desserts',
                         items: [
-                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: 14, dietaryTags: ['vegetarian', 'gluten-free'] },
-                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: 12, dietaryTags: ['vegetarian'] },
+                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: 'RM 14', tag: 'vegetarian' },
+                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: 'RM 12', tag: 'vegetarian' },
                         ],
                     },
                 ],

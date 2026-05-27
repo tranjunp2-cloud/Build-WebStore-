@@ -7,7 +7,7 @@ import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { cn } from '@/lib/utils'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
+import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 
 const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText', 'tagline'])
 
@@ -244,6 +245,10 @@ function PreviewFrameInner({
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
+    const isCartLocked = useMemo(
+        () => blocks.some(b => COMMERCE_BLOCK_TYPES.has((b as Record<string, unknown>).blockType as string ?? '')),
+        [blocks],
+    )
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
     const blocksRef = useRef(blocks)
@@ -1266,7 +1271,7 @@ function PreviewFrameInner({
                 <div
                     ref={setScrollContainerElement}
                     className={cn(
-                        'flex h-full items-start overflow-auto border border-white/10 bg-[#0F172A]',
+                        'flex h-full items-stretch overflow-auto border border-white/10 bg-[#0F172A]',
                         isExpanded
                             ? cn('rounded-none', isMobile && 'justify-center')
                             : 'justify-center rounded-[28px] p-4',
@@ -1274,7 +1279,7 @@ function PreviewFrameInner({
                 >
                     <div
                         ref={setCanvasElement}
-                        className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
+                        className="relative overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                         style={{
                             width: isMobile ? 'min(390px, 100%)' : '100%',
                             maxWidth: isMobile ? 390 : isExpanded ? undefined : 1280,
@@ -1351,8 +1356,8 @@ function PreviewFrameInner({
                                     <BlockActionBar
                                         blockIndex={selectedLayout.blockIndex}
                                         blockType={selectedLayout.blockType}
-                                        blockVariant={(blocks[selectedLayout.blockIndex] as Record<string, unknown>)?.variant as string | undefined}
-                                        blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
+                                        blockVariant={selectedLayout.blockIndex >= 0 ? (blocks[selectedLayout.blockIndex] as Record<string, unknown>)?.variant as string | undefined : undefined}
+                                        blockName={selectedLayout.blockIndex >= 0 ? (blocks[selectedLayout.blockIndex]?.blockType || 'block') : selectedLayout.blockType}
                                         totalBlocks={editableLayouts.length}
                                         isMobile={viewport === 'mobile'}
                                         onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
@@ -1365,6 +1370,8 @@ function PreviewFrameInner({
                                             onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
                                         }}
                                         onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
+                                        deleteDisabled={selectedLayout.blockType === 'cartWidget' && isCartLocked}
+                                        deleteDisabledTitle={t.editor.settings.cartDeleteLocked}
                                         onDragStart={disableDragDrop ? undefined : (event) => {
                                             const frameRect = frameElement?.getBoundingClientRect()
                                             if (!frameRect) return
@@ -1633,28 +1640,42 @@ function PreviewFrameInner({
             </div>
 
             {/* Delete block confirmation modal */}
-            <DeleteBlockConfirm
-                open={deleteConfirmIndex !== null}
-                blockName={deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType || 'block') : ''}
-                onConfirm={() => {
-                    if (deleteConfirmIndex === null) return
-                    const blockName = blocks[deleteConfirmIndex]?.blockType || 'block'
-                    onDeleteBlock?.(deleteConfirmIndex)
-                    onBlockSelect?.(null)
-                    setDeleteConfirmIndex(null)
-                    toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
-                        duration: 5000,
-                        action: {
-                            label: 'Undo',
-                            onClick: () => {
-                                const { undo: storeUndo } = useEditorStore.getState()
-                                storeUndo()
-                            },
-                        },
-                    })
-                }}
-                onCancel={() => setDeleteConfirmIndex(null)}
-            />
+            {(() => {
+                // Floating global blocks use negative indices (-1=cartWidget, -2=whatsapp-button, -3=socialWidget)
+                const isGlobalDelete = deleteConfirmIndex !== null && deleteConfirmIndex < 0
+                const deleteBlockType = isGlobalDelete
+                    ? (blockLayouts.find(l => l.blockIndex === deleteConfirmIndex)?.blockType ?? 'block')
+                    : (deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType ?? 'block') : 'block')
+                return (
+                    <DeleteBlockConfirm
+                        open={deleteConfirmIndex !== null}
+                        blockName={deleteBlockType}
+                        scope={isGlobalDelete ? 'global' : 'page'}
+                        onConfirm={() => {
+                            if (deleteConfirmIndex === null) return
+                            if (isGlobalDelete) {
+                                const key = BLOCK_TYPE_TO_KEY[deleteBlockType]
+                                if (key) useEditorStore.getState().deleteGlobalBlock(key)
+                            } else {
+                                onDeleteBlock?.(deleteConfirmIndex)
+                            }
+                            onBlockSelect?.(null)
+                            setDeleteConfirmIndex(null)
+                            toast.success(`Deleted ${deleteBlockType.replace(/-/g, ' ')}`, {
+                                duration: 5000,
+                                action: {
+                                    label: 'Undo',
+                                    onClick: () => {
+                                        const { undo: storeUndo } = useEditorStore.getState()
+                                        storeUndo()
+                                    },
+                                },
+                            })
+                        }}
+                        onCancel={() => setDeleteConfirmIndex(null)}
+                    />
+                )
+            })()}
         </>
     )
 }

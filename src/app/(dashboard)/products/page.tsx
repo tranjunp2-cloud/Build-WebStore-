@@ -20,6 +20,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { useI18n } from '@/i18n'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
+import { getDisplayPrice } from '@/lib/products/display-price'
 
 type ProductImage = {
     url?: string
@@ -35,6 +36,7 @@ type Category = {
 type Variant = {
     id?: string
     name: string
+    sku?: string
     price: number
     stock: number
     status?: string
@@ -57,6 +59,7 @@ type Product = {
     createdAt: string
     hasVariants?: boolean
     variants?: Variant[]
+    attributes?: Array<{ key: string; value: string }>
     descText?: string
 }
 
@@ -199,9 +202,9 @@ export default function ProductsPage() {
                 case 'Oldest':
                     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
                 case 'Price: Low > High':
-                    return (a.price || 0) - (b.price || 0)
+                    return getDisplayPrice(a).value - getDisplayPrice(b).value
                 case 'Price: High > Low':
-                    return (b.price || 0) - (a.price || 0)
+                    return getDisplayPrice(b).value - getDisplayPrice(a).value
                 case 'Inventory: Low > High':
                     return (a.inventory || 0) - (b.inventory || 0)
                 default:
@@ -439,7 +442,7 @@ export default function ProductsPage() {
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
                         <div className="relative w-full h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" alt="Search" />
+                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -459,7 +462,7 @@ export default function ProductsPage() {
                                 )}
                             >
                                 <span>{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" />
+                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-20">
@@ -484,7 +487,7 @@ export default function ProductsPage() {
                                 isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC]"
                             )}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" />
+                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             <span>
                                 {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
                                     ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
@@ -497,7 +500,7 @@ export default function ProductsPage() {
                     <div className="hidden md:flex items-center gap-[17px] w-full">
                         {/* Search Input */}
                         <div className="relative flex-1 h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" alt="Search" />
+                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -517,11 +520,11 @@ export default function ProductsPage() {
                                 )}
                             >
                                 <span className="text-[16px] font-medium">{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" />
+                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 w-[189px] z-20">
-                                    <div className="absolute left-[32px] -top-[6px] w-0 h-0" style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #1F2937' }} />
+                                    <div className="absolute left-[32px] -top-[6px] w-0 h-0" style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--dash-secondary-bg)' }} />
                                     <div className="bg-[#1F2937] rounded-[2px] shadow-[0_8px_24px_rgba(25,32,56,0.1)] flex flex-col py-2">
                                         {SORT_OPTIONS.map((option) => (
                                             <button key={option} onClick={() => { setSortBy(option); setIsDropdownOpen(false) }}
@@ -543,7 +546,7 @@ export default function ProductsPage() {
                                 isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC] hover:bg-white/5"
                             )}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" />
+                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             {t.dashboard.products.list.filterBtn}
                         </button>
                     </div>
@@ -621,7 +624,7 @@ export default function ProductsPage() {
                                                             <circle cx="10" cy="10" r="5" fill="#2DD4BF" />
                                                         </>
                                                     ) : (
-                                                        <circle cx="10" cy="10" r="9" fill="transparent" stroke="#374151" strokeWidth="2" className="group-hover:stroke-[#2DD4BF]/50 transition-colors" />
+                                                        <circle cx="10" cy="10" r="9" fill="transparent" stroke="var(--dash-border)" strokeWidth="2" className="group-hover:stroke-[#2DD4BF]/50 transition-colors" />
                                                     )}
                                                 </svg>
                                                 <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-[#F8FAFC]" : "text-[#F8FAFC]/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
@@ -640,7 +643,7 @@ export default function ProductsPage() {
                                     <div
                                         onClick={(e) => { e.preventDefault(); setShowLowStock(!showLowStock); }}
                                         className={cn("rounded-[16px] h-[50px] flex items-center justify-between px-[17px] transition-colors cursor-pointer", showLowStock ? "bg-[#FF8904]/10" : "bg-[#0B1120]")}
-                                        style={{ border: showLowStock ? '1px solid rgba(255, 137, 4, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)' }}
+                                        style={{ border: showLowStock ? '1px solid rgba(255, 137, 4, 0.3)' : '1px solid var(--dash-border)' }}
                                     >
                                         <div className="flex items-center gap-[8px]">
                                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -718,8 +721,9 @@ export default function ProductsPage() {
                                 {paginatedProducts.map(product => {
                                     const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                     const isOutOfStock = product.inventory <= 0
-                                    const priceDisplay = formatPrice(product.price, product.currency)
-                                    const weightDisplay = product.weight ? `${product.weight} kg` : '0.5 kg'
+                                    const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
+                                    const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
+                                    const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                     
                                     return (
                                         <div key={product.id} onClick={() => setQuickViewProduct(product as DetailedProduct)} className="group grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors">
@@ -788,7 +792,7 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "border-transparent" : "bg-[#1E293B]"
                                                     )}
                                                     style={{
-                                                        border: product.status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
+                                                        border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #3989F3 7%, #378FEF 14%, #3596EC 21%, #339CE9 29%, #32A2E5 36%, #30A8E1 43%, #2FAEDE 50%, #2EB3DA 57%, #2DB9D6 64%, #2DBFD1 71%, #2CC4CD 79%, #2CC9C9 86%, #2DCFC4 93%, #2DD4BF 100%)" : undefined,
                                                         boxShadow: product.status === 'active' ? "0px 0px 12px 0px rgba(59, 130, 246, 0.4)" : undefined
                                                     }}
@@ -831,7 +835,8 @@ export default function ProductsPage() {
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
-                                const priceDisplay = formatPrice(product.price, product.currency)
+                                const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
+                                const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
 
                                 return (
                                     <div
@@ -902,8 +907,8 @@ export default function ProductsPage() {
                                                     onClick={(e) => handleUpdateStatus(product, e)}
                                                     className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
                                                     style={{
-                                                        border: product.status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
-                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)" : "#1E293B",
+                                                        border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
+                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)" : "var(--dash-secondary-bg)",
                                                         boxShadow: product.status === 'active' ? "0px 0px 10px 0px rgba(59, 130, 246, 0.35)" : undefined
                                                     }}
                                                 >

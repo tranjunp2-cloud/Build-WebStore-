@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock Stripe before importing anything ────────────────────────────
 const mockCheckoutSessionCreate = vi.fn()
-const mockAccountCreate = vi.fn()
 const mockAccountLinkCreate = vi.fn()
 const mockAccountRetrieve = vi.fn()
+const mockAccountCreate = vi.fn()
 const mockConstructEvent = vi.fn()
+const mockOAuthToken = vi.fn()
 
 vi.mock('stripe', () => {
     return {
@@ -14,14 +15,17 @@ vi.mock('stripe', () => {
                 sessions: { create: mockCheckoutSessionCreate },
             },
             accounts: {
-                create: mockAccountCreate,
                 retrieve: mockAccountRetrieve,
+                create: mockAccountCreate,
             },
             accountLinks: {
                 create: mockAccountLinkCreate,
             },
             webhooks: {
                 constructEvent: mockConstructEvent,
+            },
+            oauth: {
+                token: mockOAuthToken,
             },
         })),
     }
@@ -30,8 +34,9 @@ vi.mock('stripe', () => {
 // Import AFTER mocking
 import {
     getStripeClient,
-    createConnectedAccount,
-    createAccountLink,
+    getStripeOAuthUrl,
+    verifyOAuthState,
+    exchangeOAuthCode,
     getConnectedAccountStatus,
     createStripeCheckoutSession,
     verifyStripeWebhook,
@@ -60,38 +65,61 @@ describe('Stripe Client', () => {
     })
 })
 
-describe('Stripe Connect', () => {
+
+describe('getStripeOAuthUrl [TC-F13.122, TC-F13.123]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('[TC-F13.122] generates OAuth authorize URL with required params', () => {
+        vi.stubEnv('STRIPE_CLIENT_ID', 'ca_test_clientid')
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
+
+        const url = getStripeOAuthUrl('tenant-1')
+        const parsed = new URL(url)
+
+        expect(parsed.origin + parsed.pathname).toBe('https://connect.stripe.com/oauth/authorize')
+        expect(parsed.searchParams.get('client_id')).toBe('ca_test_clientid')
+        // State is HMAC-signed — verify it decodes back to the tenantId
+        expect(verifyOAuthState(parsed.searchParams.get('state')!)).toBe('tenant-1')
+        expect(parsed.searchParams.get('scope')).toBe('read_write')
+        expect(parsed.searchParams.get('response_type')).toBe('code')
+        expect(parsed.searchParams.get('prompt')).toBe('login')
+    })
+
+    it('[TC-F13.123] throws when STRIPE_CLIENT_ID is not set', () => {
+        vi.stubEnv('STRIPE_CLIENT_ID', '')
+
+        expect(() => getStripeOAuthUrl('tenant-1')).toThrow('STRIPE_CLIENT_ID is not set')
+    })
+})
+
+describe('exchangeOAuthCode', () => {
     beforeEach(() => {
         vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
         vi.clearAllMocks()
     })
 
-    it('createConnectedAccount creates Standard account for Malaysia', async () => {
-        mockAccountCreate.mockResolvedValue({ id: 'acct_test_123' })
+    it('exchanges authorization code for stripeUserId', async () => {
+        mockOAuthToken.mockResolvedValue({ stripe_user_id: 'acct_test_123', access_token: 'sk_live_xxx' })
 
-        const accountId = await createConnectedAccount('merchant@example.com', 'Kedai Kopi')
+        const result = await exchangeOAuthCode('auth_code_xyz')
 
-        expect(accountId).toBe('acct_test_123')
-        expect(mockAccountCreate).toHaveBeenCalledWith({
-            type: 'standard',
-            email: 'merchant@example.com',
-            country: 'MY',
-            business_profile: { name: 'Kedai Kopi' },
-        })
+        expect(result).toEqual({ stripeUserId: 'acct_test_123' })
+        expect(mockOAuthToken).toHaveBeenCalledWith({ grant_type: 'authorization_code', code: 'auth_code_xyz' })
     })
 
-    it('createAccountLink returns onboarding URL', async () => {
-        mockAccountLinkCreate.mockResolvedValue({ url: 'https://connect.stripe.com/setup/xxx' })
+    it('throws when stripe_user_id missing in response', async () => {
+        mockOAuthToken.mockResolvedValue({ stripe_user_id: null })
 
-        const url = await createAccountLink('acct_test_123', '/refresh', '/return')
+        await expect(exchangeOAuthCode('bad_code')).rejects.toThrow('Stripe OAuth response missing stripe_user_id')
+    })
+})
 
-        expect(url).toBe('https://connect.stripe.com/setup/xxx')
-        expect(mockAccountLinkCreate).toHaveBeenCalledWith({
-            account: 'acct_test_123',
-            refresh_url: '/refresh',
-            return_url: '/return',
-            type: 'account_onboarding',
-        })
+describe('Stripe Connect — getConnectedAccountStatus', () => {
+    beforeEach(() => {
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
+        vi.clearAllMocks()
     })
 
     it('getConnectedAccountStatus reports charges/payouts/details', async () => {
@@ -234,14 +262,14 @@ describe('normalizeStripeEvent', () => {
         expect(event.connectedAccountId).toBeUndefined()
     })
 
-    it('throws on unknown/unhandled event types', () => {
-        expect(() =>
-            normalizeStripeEvent({
-                id: 'evt_unknown',
-                type: 'some.unknown.event',
-                data: { object: { id: 'obj_123' } },
-            } as any),
-        ).toThrow('Unhandled Stripe event type: some.unknown.event')
+    it('[TC-F13.65] returns null for unknown/unhandled event types (RT-8 fix — not throw)', () => {
+        const result = normalizeStripeEvent({
+            id: 'evt_unknown',
+            type: 'some.unknown.event',
+            data: { object: { id: 'obj_123' } },
+        } as any)
+
+        expect(result).toBeNull()
     })
 })
 
@@ -265,6 +293,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_1',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(result.sessionId).toBe('cs_test_1')
@@ -281,7 +310,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
         )
     })
 
-    it('calculates 3% application_fee', async () => {
+    it('no application_fee_amount — full payment to merchant', async () => {
         mockCheckoutSessionCreate.mockResolvedValue({
             id: 'cs_test_2',
             url: 'https://checkout.stripe.com/pay/cs_test_2',
@@ -289,51 +318,25 @@ describe('createStripeCheckoutSession (Connect)', () => {
 
         await createStripeCheckoutSession({
             orderId: 'order_456',
-            items: [{ name: 'Item', price: 10000, quantity: 1 }], // RM 100
-            currency: 'MYR',
-            customerEmail: 'test@example.com',
-            successUrl: 'https://example.com/success',
-            cancelUrl: 'https://example.com/cancel',
-            stripeAccountId: 'acct_merchant_2',
-        })
-
-        expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                payment_intent_data: {
-                    application_fee_amount: 300, // 3% of 10000 sen
-                    metadata: { orderId: 'order_456' },
-                },
-            }),
-            expect.any(Object),
-        )
-    })
-
-    it('uses custom applicationFeePercent', async () => {
-        mockCheckoutSessionCreate.mockResolvedValue({
-            id: 'cs_test_3',
-            url: 'https://checkout.stripe.com/pay/cs_test_3',
-        })
-
-        await createStripeCheckoutSession({
-            orderId: 'order_789',
             items: [{ name: 'Item', price: 10000, quantity: 1 }],
             currency: 'MYR',
             customerEmail: 'test@example.com',
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
-            stripeAccountId: 'acct_merchant_3',
-            applicationFeePercent: 5,
+            stripeAccountId: 'acct_merchant_2',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
             expect.objectContaining({
-                payment_intent_data: {
-                    application_fee_amount: 500, // 5% of 10000
-                    metadata: { orderId: 'order_789' },
-                },
+                payment_intent_data: expect.objectContaining({
+                    metadata: { orderId: 'order_456' },
+                }),
             }),
             expect.any(Object),
         )
+        const args = mockCheckoutSessionCreate.mock.calls[0][0]
+        expect(args.payment_intent_data.application_fee_amount).toBeUndefined()
     })
 
     it('still uses card + fpx', async () => {
@@ -350,6 +353,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_4',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
@@ -374,6 +378,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_5',
+            paymentMethodTypes: ['card'],
         })).rejects.toThrow('Stripe did not return a checkout session URL')
     })
 })

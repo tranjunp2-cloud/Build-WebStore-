@@ -1,8 +1,9 @@
 "use client"
 
-import { Gift, Info } from 'lucide-react'
+import { Gift, Info, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 
 type Props = {
     freeEnabled: boolean
@@ -10,9 +11,11 @@ type Props = {
     freeAboveError?: string
     onToggle: (v: boolean) => void
     onAmountChange: (v: string) => void
+    onAmountBlur: (raw?: string) => void
+    freeAboveWarning?: string
 }
 
-export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onToggle, onAmountChange }: Props) {
+export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onToggle, onAmountChange, onAmountBlur, freeAboveWarning }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
     const parsedAmount = parseFloat(freeAboveRm)
@@ -33,6 +36,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                 </div>
                 {/* Cyan toggle */}
                 <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-1">
+                    <span className="sr-only">{s.freeTitle}</span>
                     <input
                         type="checkbox"
                         className="peer sr-only"
@@ -41,30 +45,30 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                     />
                     <div className={cn(
                         "h-[28px] w-[50px] rounded-full border transition-all",
-                        "after:absolute after:left-[3px] after:top-[3px] after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:transition-all after:content-['']",
+                        "after:absolute after:left-[3px] after:top-[3px] after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:transition-all after:content-[''] after:shadow-[0_0_0_1.5px_rgba(0,0,0,0.12)]",
                         "peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50",
-                        "peer-checked:after:translate-x-[22px] after:shadow-sm",
+                        "peer-checked:after:translate-x-[22px]",
                         freeEnabled
                             ? "bg-gradient-to-r from-cyan-500 to-teal-400 border-transparent shadow-[0_0_10px_rgba(6,182,212,0.35)]"
-                            : "bg-[#0B1120] border-white/[0.12]"
+                            : "bg-slate-300 dark:bg-[#0B1120] border-slate-400 dark:border-white/[0.12]"
                     )} />
                 </label>
             </div>
 
             {/* Input section */}
             <div className={cn("flex flex-col gap-2 px-6 py-5 transition-opacity", !freeEnabled && "opacity-40")}>
-                <label className="text-[14px] font-semibold text-slate-200">{s.freeMinLabel}</label>
+                <label htmlFor="ship-free-threshold" className="text-[14px] font-semibold text-slate-200">{s.freeMinLabel}</label>
                 <div className="relative w-full">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">
                         RM
                     </span>
                     <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        max="100000"
+                        id="ship-free-threshold"
+                        type="text"
                         inputMode="decimal"
                         disabled={!freeEnabled}
+                        aria-invalid={freeAboveError ? true : undefined}
+                        aria-describedby={freeAboveError ? 'ship-free-threshold-err' : undefined}
                         className={cn(
                             "min-h-[44px] w-full rounded-[10px] border bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-slate-50 placeholder:text-slate-50/30 focus:outline-none focus:ring-1 disabled:cursor-not-allowed",
                             freeAboveError
@@ -73,11 +77,30 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                         )}
                         placeholder="100.00"
                         value={freeAboveRm}
-                        onChange={e => onAmountChange(e.target.value)}
+                        onChange={e => {
+                            const v = e.target.value
+                            if (v === '' || INPUT_FILTER.test(v)) onAmountChange(v)
+                        }}
+                        onBlur={() => onAmountBlur()}
+                        onPaste={e => {
+                            e.preventDefault()
+                            const raw = e.clipboardData.getData('text').trim()
+                            // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
+                            const stripped = raw.replace(/^RM\s*/i, '')
+                            const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                            onAmountChange(filtered)
+                            onAmountBlur(filtered)
+                        }}
                     />
                 </div>
                 {freeAboveError && (
-                    <p className="mt-1 text-xs text-destructive">{freeAboveError}</p>
+                    <p id="ship-free-threshold-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        {freeAboveError}
+                    </p>
+                )}
+                {freeAboveWarning && !freeAboveError && (
+                    <p role="status" className="mt-1 text-xs text-amber-400">{freeAboveWarning}</p>
                 )}
                 {showHelper && !freeAboveError && (
                     <p className="flex items-center gap-1.5 text-[13px] text-slate-400">

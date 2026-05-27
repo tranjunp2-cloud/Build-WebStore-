@@ -278,9 +278,9 @@ describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
 
 // ─── TC-F09.24: Phone Format Validation ─────────────────────────────────────
 describe('[TC-F09.24] Phone Format Validation (validatePhone)', () => {
-    it('TC-F09.24: returns null for empty phone (phone is optional)', () => {
-        expect(validatePhone('')).toBeNull()
-        expect(validatePhone('   ')).toBeNull()
+    it('TC-F09.24: returns error for empty phone (phone is required)', () => {
+        expect(validatePhone('')).toBe('Phone number is required')
+        expect(validatePhone('   ')).toBe('Phone number is required')
     })
 
     it('TC-F09.24: accepts local mobile format (012-3456789)', () => {
@@ -367,7 +367,7 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBeNull()
     })
 
-    it('TC-F09.188: rejects file exceeding 2 MB limit', () => {
+    it('TC-F09.188: rejects file exceeding 5 MB limit', () => {
         // Arrange — 1 byte over limit
         const file = { type: 'image/jpeg', size: PROOF_MAX_SIZE_BYTES + 1 }
 
@@ -375,7 +375,7 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
     })
 
-    it('TC-F09.188: accepts file exactly at 2 MB boundary (inclusive)', () => {
+    it('TC-F09.188: accepts file exactly at 5 MB boundary (inclusive)', () => {
         // Arrange — exactly at limit
         const file = { type: 'image/png', size: PROOF_MAX_SIZE_BYTES }
 
@@ -383,12 +383,20 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBeNull()
     })
 
-    it('TC-F09.188: rejects PDF (unsupported type)', () => {
-        // Arrange
+    it('TC-F09.188: accepts PDF file within size limit', () => {
+        // Arrange — PDF now supported per DoD update
         const file = { type: 'application/pdf', size: 500 * 1024 }
 
         // Act + Assert
-        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: accepts image/jpg (non-standard MIME used by some mobile browsers)', () => {
+        // Arrange — iOS Safari / Samsung Internet may report image/jpg instead of image/jpeg
+        const file = { type: 'image/jpg', size: 1 * 1024 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
     })
 
     it('TC-F09.188: rejects GIF (unsupported type)', () => {
@@ -401,10 +409,18 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
 
     it('TC-F09.188: INVALID_TYPE takes precedence over FILE_TOO_LARGE', () => {
         // Arrange — wrong type AND oversized
-        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+        const file = { type: 'image/gif', size: PROOF_MAX_SIZE_BYTES + 1 }
 
         // Act + Assert — type checked first
         expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: rejects oversized PDF', () => {
+        // Arrange — PDF valid type but over 5 MB
+        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
     })
 })
 

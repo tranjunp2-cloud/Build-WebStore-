@@ -541,7 +541,7 @@ export default function BlogEditorPage() {
                                 </clipPath>
                             </defs>
                         </svg>
-                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.editor.aiAssistant}</span>
+                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.aiAssistant}</span>
                     </button>
 
                     {/* Save Draft Button — icon-only on mobile per Figma */}
@@ -551,9 +551,9 @@ export default function BlogEditorPage() {
                         className="flex flex-row items-center justify-center h-[46px] xl:h-[50px] w-[70px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] bg-[#1E293B] panel-outline hover:bg-[#1E293B]/80 transition-colors disabled:opacity-50"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12.6667 2.5C13.1063 2.50626 13.5256 2.68598 13.8333 3L17 6.16667C17.314 6.47438 17.4937 6.89372 17.5 7.33333V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H12.6667Z" stroke="#F8FAFC" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M14.1666 17.5007V11.6673C14.1666 11.4463 14.0788 11.2343 13.9225 11.0781C13.7662 10.9218 13.5543 10.834 13.3333 10.834H6.66659C6.44557 10.834 6.23361 10.9218 6.07733 11.0781C5.92105 11.2343 5.83325 11.4463 5.83325 11.6673V17.5007" stroke="#F8FAFC" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M5.83325 2.5V5.83333C5.83325 6.05435 5.92105 6.26631 6.07733 6.42259C6.23361 6.57887 6.44557 6.66667 6.66659 6.66667H12.4999" stroke="#F8FAFC" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M12.6667 2.5C13.1063 2.50626 13.5256 2.68598 13.8333 3L17 6.16667C17.314 6.47438 17.4937 6.89372 17.5 7.33333V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H12.6667Z" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M14.1666 17.5007V11.6673C14.1666 11.4463 14.0788 11.2343 13.9225 11.0781C13.7662 10.9218 13.5543 10.834 13.3333 10.834H6.66659C6.44557 10.834 6.23361 10.9218 6.07733 11.0781C5.92105 11.2343 5.83325 11.4463 5.83325 11.6673V17.5007" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M5.83325 2.5V5.83333C5.83325 6.05435 5.92105 6.26631 6.07733 6.42259C6.23361 6.57887 6.44557 6.66667 6.66659 6.66667H12.4999" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#F8FAFC]">{t.dashboard.blog.editor.saveDraft}</span>
                     </button>
@@ -580,7 +580,7 @@ export default function BlogEditorPage() {
                                 </defs>
                             </svg>
                         )}
-                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.editor.publish}</span>
+                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.publish}</span>
                     </button>
                 </div>
             </div>
@@ -613,7 +613,7 @@ export default function BlogEditorPage() {
 
                     <style jsx global>{`
                         .panel-outline {
-                            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                            border: 1px solid var(--dash-border) !important;
                         }
                     `}</style>
 
@@ -753,10 +753,13 @@ export default function BlogEditorPage() {
                                         <ChevronDown className="w-[16px] h-[16px] text-[#9F9FA9] shrink-0" />
                                     </div>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1.5 bg-[#1E293B] border-[rgba(255,255,255,0.08)] rounded-xl relative shadow-xl" style={{ minWidth: 'var(--radix-popover-trigger-width)' }} align="start">
-                                    <div className="flex flex-col max-h-[250px] overflow-y-auto px-0.5 gap-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1.5 rounded-xl relative shadow-xl" style={{ minWidth: 'var(--radix-popover-trigger-width)', backgroundColor: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }} align="start">
+                                    <div className="flex flex-col max-h-[250px] overflow-y-auto px-0.5 gap-0.5 scrollbar-thin scrollbar-track-transparent" style={{ scrollbarColor: 'var(--dash-border) transparent' }}>
                                         <button
-                                            className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] hover:bg-white/5 rounded-lg text-left transition-colors", !form.category ? "bg-white/5 text-white font-[500]" : "text-[rgba(248,250,252,0.8)] font-[400]")}
+                                            className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] rounded-lg text-left transition-colors", !form.category ? "font-[500]" : "font-[400]")}
+                                            style={{ backgroundColor: !form.category ? 'var(--dash-surface-hover)' : undefined, color: 'var(--dash-text)' }}
+                                            onMouseEnter={e => { if (form.category) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
+                                            onMouseLeave={e => { if (form.category) (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
                                             onClick={() => { updateField('category', ''); setIsCategoryDropdownOpen(false); }}
                                         >
                                             <span className="truncate w-full">{t.dashboard.blog.editor.noCategory}</span>
@@ -764,17 +767,22 @@ export default function BlogEditorPage() {
                                         {categories.map((cat) => (
                                             <button
                                                 key={cat.id}
-                                                className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] hover:bg-white/5 rounded-lg text-left transition-colors", String(form.category) === String(cat.id) ? "bg-white/5 text-white font-[500]" : "text-[rgba(248,250,252,0.8)] font-[400]")}
+                                                className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] rounded-lg text-left transition-colors", String(form.category) === String(cat.id) ? "font-[500]" : "font-[400]")}
+                                                style={{ backgroundColor: String(form.category) === String(cat.id) ? 'var(--dash-surface-hover)' : undefined, color: 'var(--dash-text)' }}
+                                                onMouseEnter={e => { if (String(form.category) !== String(cat.id)) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
+                                                onMouseLeave={e => { if (String(form.category) !== String(cat.id)) (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
                                                 onClick={() => { updateField('category', String(cat.id)); setIsCategoryDropdownOpen(false); }}
                                             >
                                                 <span className="truncate w-full">{cat.name}</span>
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="h-px bg-[rgba(255,255,255,0.08)] my-1.5 mx-1" />
+                                    <div className="h-px my-1.5 mx-1" style={{ backgroundColor: 'var(--dash-border)' }} />
                                     <button
                                         onClick={() => { setIsCategoryDropdownOpen(false); setIsCategoryModalOpen(true); }}
-                                        className="flex w-full items-center gap-2 px-3 py-[10px] text-[14px] font-[500] font-['Inter'] leading-[1.4285714285714286em] text-cyan-400 hover:bg-white/5 hover:text-cyan-300 rounded-lg transition-colors"
+                                        className="flex w-full items-center gap-2 px-3 py-[10px] text-[14px] font-[500] font-['Inter'] leading-[1.4285714285714286em] text-cyan-400 hover:text-cyan-300 rounded-lg transition-colors"
+                                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
+                                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
                                     >
                                         <Settings2 className="w-4 h-4 shrink-0" />
                                         <span>{t.dashboard.blog.editor.manageCategories}</span>
@@ -811,7 +819,7 @@ export default function BlogEditorPage() {
                                         </span>
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-[#0B1120] border-[rgba(255,255,255,0.08)] text-[#F8FAFC]" align="start">
+                                <PopoverContent className="dash-shell w-auto p-0 border-[rgba(255,255,255,0.08)] text-[#F8FAFC]" align="start" style={{ backgroundColor: 'var(--dash-bg)' }}>
                                     <CalendarUI
                                         mode="single"
                                         selected={publishDate}
@@ -839,8 +847,8 @@ export default function BlogEditorPage() {
                                 className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
                                 style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
                             >
-                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-[#FFFFFF]" strokeWidth={1.5} />}
-                                <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-[#FFFFFF]">{t.dashboard.blog.editor.generateSeo}</span>
+                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-white" strokeWidth={1.5} />}
+                                <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-white">{t.dashboard.blog.editor.generateSeo}</span>
                             </button>
                         </div>
 
@@ -890,7 +898,7 @@ export default function BlogEditorPage() {
 
             {/* AI Generator Modal */}
             {showAIGenerator && typeof document !== 'undefined' && createPortal(
-                <div className="fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
+                <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
                     <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[#1E293B] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[rgba(255,255,255,0.08)] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
                         {/* Mobile drag handle */}
                         <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
@@ -899,7 +907,7 @@ export default function BlogEditorPage() {
                         {/* Header — mobile: compact 77px / desktop: 97px */}
                         <div
                             className="flex flex-row justify-between items-center w-full px-[24px] h-[77px] xl:h-[97px] flex-shrink-0"
-                            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
+                            style={{ borderBottom: '1px solid var(--dash-border)' }}
                         >
                             <div className="flex flex-row items-center gap-[12px]">
                                 <div className="flex flex-row justify-center items-center w-[40px] h-[40px] rounded-[16px] shrink-0" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(45, 212, 191, 1) 100%)' }}>
@@ -955,8 +963,8 @@ export default function BlogEditorPage() {
                                                 background: 'rgba(59, 130, 246, 0.10)',
                                                 boxShadow: '0 0 20px 0 rgba(59, 130, 246, 0.30)'
                                             } : {
-                                                border: '1px solid rgba(255, 255, 255, 0.08)',
-                                                background: '#0B1120'
+                                                border: '1px solid var(--dash-border)',
+                                                background: 'var(--dash-surface)'
                                             }}
                                         >
                                             <span className="text-[24px] xl:text-[18px] leading-[32px] shrink-0">{tone.emoji}</span>
@@ -1032,7 +1040,7 @@ export default function BlogEditorPage() {
                         {(!isGenerating && generatedAiContent) && (
                             <div
                                 className="flex flex-col xl:flex-row justify-end items-stretch xl:items-center self-stretch gap-[12px] p-[24px] xl:h-[101px] xl:pr-[24px] rounded-b-[16px] animate-in fade-in slide-in-from-bottom-2 duration-300 flex-shrink-0"
-                                style={{ background: 'rgba(11, 17, 32, 0.5)', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                                style={{ background: 'var(--dash-bg)', borderTop: '1px solid var(--dash-border)' }}
                             >
                                 <button
                                     onClick={handleGenerateWithAI}

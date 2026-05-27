@@ -172,6 +172,64 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+### GH-1024: F08 Layout & Render Fixes — Phase 01 (5 Cases)
+
+> **Commit:** feat(BUG-F08-1024) layout/render fixes on pricing-table, menu-food, product-quick-view, menu-display, property-card
+> **TS Check:** 0 errors | **All tests:** 7165/7168 PASS (3 DB connection failures unrelated to code)
+
+| ID | Block | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F08-LAYOUT-PRICING-01** | pricing-table | `Render` | PlanCTA fullWidth centered | 1. Render PlanCTA với `fullWidth={true}`.<br>2. Kiểm tra alignment. | - Nút hiển thị full width AND centered (không bị trái).<br>- Flex context giữ nguyên: `flex w-full items-center justify-center`. | High | [x] |
+| **TC-F08-LAYOUT-MENUFOOD-01** | menu-food | `Render` | Menu item tên/mô tả RichText | 1. Render menu-food với `classic` hoặc `card` variant, item.name có `<strong>Spicy</strong>` markup.<br>2. Kiểm tra hiển thị. | - RichText parse HTML markup, hiển thị bold `<strong>` không phải text nguyên bản.<br>- Classic + Card variants đều render `<RichText />` (consistent với minimal). | High | [x] |
+| **TC-F08-LAYOUT-PQV-01** | product-quick-view | `Render` | Carousel ≤4 items centered grid | 1. Render PQV với 3 sản phẩm (hoặc 1, 2, 4).<br>2. Kiểm tra layout. | - Grid responsive: 1 col → 2 col (sm+) → 3 col (lg+).<br>- Items centered, không snap-left overflow.<br>- ≥5 items: chuyển carousel (snap-mandatory). | High | [x] |
+| **TC-F08-LAYOUT-MENUDISP-01** | menu-display | `Render` | Photo-grid text center-aligned | 1. Render menu-display với `photo-grid` variant, category có 2–3 items.<br>2. Kiểm tra alignment. | - Item name, price, badges center-aligned trong card (`text-center`, `flex-wrap`, `justify-center`).<br>- Không left-align, không overflow. | High | [x] |
+| **TC-F08-LAYOUT-PROP-01** | property-card | `Render` | Image numeric ID fallback placeholder | 1. Render PropertyCard với `property.image = 123` (numeric ID, not populated).<br>2. Render với missing image. | - Hiển thị placeholder icon (📷), không lỗi TypeError `Cannot read property 'url'`.<br>- Guard check: `typeof image === 'number' \|\| !image`. | High | [x] |
+
+---
+
+### GH-1024: F08 SettingsPanel CRUD — Phase 02 (11 Cases)
+
+> **Commit:** feat(BUG-F08-1024) SettingsPanel CRUD for pricing-table, property-card, product-quick-view, feature-comparison
+> **TS Check:** 0 errors | **All tests:** PASS (DB integration tests excluded — no local DB)
+
+| ID | Block | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F08-CRUD-PRICING-ADD** | pricing-table | `Unit` | Add Plan appends default plan | 1. Render SettingsPanel với `pricing-table` block (plans=[plan1]).<br>2. Click `+ Add Plan`. | `onBlockUpdate` called với plans=[plan1, defaultPlan]. | High | [x] |
+| **TC-F08-CRUD-PRICING-EDIT** | pricing-table | `Unit` | Edit plan name via onBlur | 1. Render với plans=[{name:'Starter',...}].<br>2. Blur name input với value 'Pro'. | `onBlockUpdate` called với plans=[{...plan, name:'Pro'}]. | High | [x] |
+| **TC-F08-CRUD-PRICING-REMOVE** | pricing-table | `Unit` | Remove plan empties array | 1. Render với plans=[plan1].<br>2. Click `Remove plan 1`. | `onBlockUpdate` called với `{plans:[]}`. | High | [x] |
+| **TC-F08-CRUD-PROPERTY-ADD** | property-card | `Unit` | Add Property appends default property | 1. Render với properties=[prop1].<br>2. Click `+ Add Property`. | `onBlockUpdate` called với properties=[prop1, defaultProp]. | High | [x] |
+| **TC-F08-CRUD-PROPERTY-EDIT** | property-card | `Unit` | Edit property title via onBlur | 1. Render với properties=[{title:'Cozy Villa',...}].<br>2. Blur title input với value 'Luxury Penthouse'. | `onBlockUpdate` called với properties=[{...prop, title:'Luxury Penthouse'}]. | High | [x] |
+| **TC-F08-CRUD-PROPERTY-REMOVE** | property-card | `Unit` | Remove property empties array | 1. Render với properties=[prop1].<br>2. Click `Remove property 1`. | `onBlockUpdate` called với `{properties:[]}`. | High | [x] |
+| **TC-F08-CRUD-PQV-ADD** | product-quick-view | `Unit` | Add Item appends default product | 1. Render với products=[prod1].<br>2. Click `+ Add Item`. | `onBlockUpdate` called với products=[prod1, defaultProd]. | High | [x] |
+| **TC-F08-CRUD-PQV-EDIT** | product-quick-view | `Unit` | Edit product name via onBlur | 1. Render với products=[{name:'Wireless Earbuds',...}].<br>2. Blur name input với value 'BT Headphones'. | `onBlockUpdate` called với products=[{...prod, name:'BT Headphones'}]. | High | [x] |
+| **TC-F08-CRUD-PQV-REMOVE** | product-quick-view | `Unit` | Remove product empties array | 1. Render với products=[prod1].<br>2. Click `Remove product 1`. | `onBlockUpdate` called với `{products:[]}`. | High | [x] |
+| **TC-F08-CRUD-FEATCMP-ADD-PRODUCT-SYNC** | feature-comparison | `Unit` | Add product extends features.values | 1. Render với products=[P1], features=[{name:'Storage',values:[true]}].<br>2. Click `+ Add Item` (products section). | `onBlockUpdate` called với products=[P1,P2], features=[{name:'Storage',values:[true,false]}]. | High | [x] |
+| **TC-F08-CRUD-FEATCMP-REMOVE-PRODUCT-SYNC** | feature-comparison | `Unit` | Remove product trims features.values | 1. Render với products=[P1,P2], features=[{name:'Storage',values:[true,false]}].<br>2. Click `Remove product 1`. | `onBlockUpdate` called với products=[P2], features=[{name:'Storage',values:[false]}]. | High | [x] |
+| **TC-F08-CRUD-PROPERTY-IMAGE** | property-card | `Unit` | Edit image URL updates property image | 1. Render với properties=[{...prop, image:'https://old.jpg'}].<br>2. Blur image URL input với 'https://new.jpg'. | `onBlockUpdate` called với image:'https://new.jpg'. | High | [x] |
+| **TC-F08-CRUD-PQV-EDIT-ORIGINAL-PRICE-ZERO** | product-quick-view | `Unit` | originalPrice=0 stored as 0 not undefined | 1. Render với products=[{originalPrice:129,...}].<br>2. Blur originalPrice input với '0'. | `onBlockUpdate` called với originalPrice:0 (not undefined). | High | [x] |
+
+---
+
+### GH-1024: F08 SettingsPanel CRUD — Phase 03 (10 Cases)
+
+> **Commit:** feat(BUG-F08-1024) SettingsPanel CRUD for menu-display + menu-food nested arrays
+> **TS Check:** 0 errors | **All tests:** PASS (39/39)
+
+| ID | Block | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F08-CRUD-MENUDISP-CAT-ADD** | menu-display | `Unit` | Add Category appends default category | 1. Render SettingsPanel với `menu-display` block (categories=[cat1]).<br>2. Click `+ Add Category`. | `onBlockUpdate` called với categories=[cat1, {name:'New Category',description:'',icon:'',items:[]}]. | High | [x] |
+| **TC-F08-CRUD-MENUDISP-CAT-REMOVE** | menu-display | `Unit` | Remove category removes it | 1. Render với categories=[{name:'Mains',items:[]}].<br>2. Click `✕` (category remove). | `onBlockUpdate` called với `{categories:[]}`. | High | [x] |
+| **TC-F08-CRUD-MENUDISP-ITEM-ADD** | menu-display | `Unit` | Add Item appends nested menu item | 1. Render với categories=[{...cat, items:[item1]}].<br>2. Click `+ Add Item`. | `onBlockUpdate` called với categories=[{...cat, items:[item1, defaultItem]}]. | High | [x] |
+| **TC-F08-CRUD-MENUDISP-ITEM-EDIT** | menu-display | `Unit` | Edit item name via onBlur updates nested item | 1. Render với categories=[{items:[{name:'Nasi Lemak',...}]}].<br>2. Blur name input với value 'Roti Canai'. | `onBlockUpdate` called với categories=[{...cat, items:[{...item, name:'Roti Canai'}]}]. | High | [x] |
+| **TC-F08-CRUD-MENUDISP-ITEM-REMOVE** | menu-display | `Unit` | Remove item removes from category items | 1. Render với categories=[{items:[item1]}].<br>2. Click ✕ (item remove — second ✕ button). | `onBlockUpdate` called với categories=[{...cat, items:[]}]. | High | [x] |
+| **TC-F08-CRUD-MENUFOOD-CAT-ADD** | menu-food | `Unit` | Add Category appends default category | 1. Render SettingsPanel với `menu-food` block (categories=[cat1]).<br>2. Click `+ Add Category`. | `onBlockUpdate` called với categories=[cat1, {name:'New Category',items:[]}]. | High | [x] |
+| **TC-F08-CRUD-MENUFOOD-CAT-REMOVE** | menu-food | `Unit` | Remove category removes it | 1. Render với categories=[{name:'Burgers',items:[]}].<br>2. Click `✕` (category remove). | `onBlockUpdate` called với `{categories:[]}`. | High | [x] |
+| **TC-F08-CRUD-MENUFOOD-ITEM-ADD** | menu-food | `Unit` | Add Item appends nested menu item | 1. Render với categories=[{...cat, items:[item1]}].<br>2. Click `+ Add Item`. | `onBlockUpdate` called với categories=[{...cat, items:[item1, {name:'New Item',price:'',currency:'RM',...}]}]. | High | [x] |
+| **TC-F08-CRUD-MENUFOOD-ITEM-EDIT** | menu-food | `Unit` | Edit item name via onBlur updates nested item | 1. Render với categories=[{items:[{name:'Burger',...}]}].<br>2. Blur name input với value 'Double Burger'. | `onBlockUpdate` called với categories=[{...cat, items:[{...item, name:'Double Burger'}]}]. | High | [x] |
+| **TC-F08-CRUD-MENUFOOD-ITEM-REMOVE** | menu-food | `Unit` | Remove item removes from category items | 1. Render với categories=[{items:[item1]}].<br>2. Click ✕ (item remove — second ✕ button). | `onBlockUpdate` called với categories=[{...cat, items:[]}]. | High | [x] |
+
+---
+
 ### US-831 — Storefront API: site param validation (9 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
@@ -347,4 +405,75 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08.175** | Empty images array accepted (placeholder fallback FR-11) | success=true (UI renders crate-carton) | FR-11, TC-F08-04-04 |
 | **TC-F08.176** | 6 images → rejected (max 5 per FR-09) | success=false | FR-09, TC-F08-01-14 |
 | **TC-F08.177** | i18n: BM product name `Baju Kurung Tradisional Melayu` Unicode preserved | success=true, name intact | TC-F08-01-21, TC-F08-G-02 |
+
+---
+
+## E) Bug #1032 regression guards [TC-F08-VAR-UTILS-*, TC-F08-bug-1032-*]
+
+Added in phase-05 to lock in the P0 fixes from GH-1032.
+
+### isNonEmptyTier — AND logic (Bug #1032-02/03)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-VAR-UTILS-01** | Tier with empty name + empty options | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-02** | Tier with whitespace-only name + whitespace options | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-03** | Tier with name but no options (AND fix) | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-04** | Tier with options but no name (AND fix) | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-05** | Tier with name AND valid options | `true` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-06** | Undefined options — name alone is insufficient | `false` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03a** | name='Color', options=[''] (empty string) → false | `false` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03b** | name='Color', options=['red'] → true | `true` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03c** | name='', options=['red'] → false | `false` | products-variant-utils.test.ts |
+
+### buildVariantMatrix — preserve logic (Bug #1032-04)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-bug-1032-04a** | User-customized price (≠ prevBase) → row preserved | price unchanged | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04b** | Row at prevBase price → replaced with new basePrice | price = new base | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04c** | No existing row → new row at base price | price = base | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04d** | prevBasePrice=null + existing variants → all preserved (no-regen guard) | price = existing (preserved) | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04e** | Preserved row with missing id → UUID generated | id truthy | products-variant-utils.test.ts |
+
+### getDisplayPrice — min variant price (Bug #1032-06)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-bug-1032-06a** | Variant product, variants=[10,5,20] → min=5, isVariant=true | {value:5, isVariant:true} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06b** | Variant product, variants=[] → fallback root price, isVariant=false | {value:p.price, isVariant:false} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06c** | Non-variant product → root price, isVariant=false | {value:p.price, isVariant:false} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06d** | Variant with price=0 → value=0 (zero-cost variant, null-check guard) | {value:0, isVariant:true} | products-display-price.test.ts |
+
+### Schema contract — variant price/SKU round-trip (Bug #1032-01)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-01-20 (variant)** | basePrice=0 + hasVariants=true → schema accepts | success=true | products-crud.test.tsx |
+| **TC-F08-bug-1032-01** | hasVariants=true + baseSku='' → schema rejects (SKU always required) | success=false | products-crud.test.tsx |
+
+### SKU global uniqueness (Bug #1032 — server-side dedup)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-SKU-GLOBAL-01** | baseSku conflicts with active product → structured FIELD_ERRORS on baseSku | `fieldErrors.baseSku.code = 'SKU_ALREADY_IN_USE'` | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-02** | variant sku conflicts → FIELD_ERRORS on variants.0.skuCode | `fieldErrors['variants.0.skuCode'].code = 'SKU_ALREADY_IN_USE'` | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-03** | sku conflicts with soft-deleted product → allowed (no throw) | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-04** | update own product, same SKU → allowed (self-excluded) | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-05** | no sku provided → check skipped | resolves without error, mockFind not called | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-06** | different tenant SKU → no conflict | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-07** | both baseSku AND variant conflict → both paths in fieldErrors | both keys present | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-08** | case-insensitive: input 'sku-001', DB 'SKU-001' → field error | `fieldErrors.baseSku` present | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-09** | totalDocs (150) > docs.length (100) → plain verification error (not JSON) | `message` contains 'Cannot verify SKU uniqueness', not JSON-parseable | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-10** | WHERE clause shape-lock: both `sku` and `variants.sku` OR-branches present with correct IN values | `orBranch.or` contains both branches | save-product-action.test.ts |
+
+### Code review round-2 follow-ups (Bug #1032)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-H1-01** | Open legacy product (basePrice=0, hasVariants=true) → warning banner visible | banner shown above ProductForm | Manual / e2e |
+| **TC-F08-M1-01** | All variant compareAtPrice cleared → auto-fill → root compareAtPrice set to undefined | root compareAtPrice = undefined | Manual / integration |
+| **TC-F08-L1-01** | Sort "Price: Low > High" — legacy variant product (price=0, min-variant=50) vs non-variant (price=10) | variant product sorts above non-variant | Manual |
+| **TC-F08-L2-01** | Variant row with price=undefined mid-edit → derivedMinPrice | treats undefined as 0 (null-check guard) | Manual |
+| **TC-F08-L3-01** | Save variant row with compareAtPrice=0 | DB receives undefined (filtered by \|\| undefined) | Manual / integration |
 

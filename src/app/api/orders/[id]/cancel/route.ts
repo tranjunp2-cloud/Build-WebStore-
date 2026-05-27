@@ -4,8 +4,8 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCancelSchema } from '@/lib/validations/orders'
-import { sendEmail } from '@/lib/email/send'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -38,6 +38,11 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
                 { status: 404 }
             )
+        }
+
+        // Idempotency: already cancelled → treat as success (prevents double restock on concurrent requests)
+        if ((order.status as string) === 'cancelled') {
+            return NextResponse.json({ success: true, data: order, restock: [] })
         }
 
         // Validate that cancellation is allowed
@@ -112,22 +117,53 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         }
 
         // Send cancellation email to customer
-        try {
-            const customerEmail = (updated as any).customerEmail
-            if (customerEmail) {
-                await sendEmail({
-                    to: customerEmail,
-                    subject: `[Order Cancelled] Your Order #${(updated as any).orderNumber || updated.id} has been cancelled`,
-                    html: `
-                        <p>Hi ${(updated as any).customerName || 'Customer'},</p>
-                        <p>Your order <strong>#${(updated as any).orderNumber || updated.id}</strong> has been cancelled by the store administrator.</p>
-                        <p><strong>Reason:</strong> ${reason}</p>
-                        <p>If you have any questions, please contact our support team.</p>
-                    `
+        const customerEmail = (updated as any).customerEmail
+        if (customerEmail) {
+            try {
+                const tenantId = typeof (updated as any).tenant === 'object'
+                    ? (updated as any).tenant.id
+                    : (updated as any).tenant
+                const tenant = tenantId
+                    ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
+                    : null
+                const shopName = (tenant as any)?.name ?? ''
+                const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
+                const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
+                const shopUrl = `${baseUrl}/sites/${shopSlug}`
+                const siteLocale = typeof (updated as any).site === 'object'
+                    ? ((updated as any).site?.locale ?? 'ms')
+                    : 'ms'
+
+                const cancelEmail = orderCancelledEmail({
+                    shopName,
+                    orderNumber: (updated as any).orderNumber ?? String(updated.id),
+                    customerName: (updated as any).customerName ?? '',
+                    customerEmail,
+                    customerPhone: (updated as any).customerPhone ?? null,
+                    customerAddress: (updated as any).shippingAddress ?? null,
+                    items: ((updated as any).items ?? []).map((item: any) => ({
+                        name: item.productName,
+                        variant: item.variant || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    })),
+                    subtotal: (updated as any).subtotal ?? 0,
+                    shippingFee: (updated as any).shippingFee ?? 0,
+                    total: (updated as any).total ?? 0,
+                    paymentMethod: (updated as any).paymentMethod ?? 'cod',
+                    orderDate: (updated as any).createdAt,
+                    cancellationDate: new Date().toISOString(),
+                    cancellationNote: reason ?? null,
+                    shopUrl,
+                    currency: (updated as any).currency ?? 'MYR',
+                    locale: siteLocale,
                 })
+                payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
+                    .catch((err: unknown) => console.warn('[Order Cancel] Failed to send email:', err))
+            } catch (emailErr) {
+                console.warn('[Order Cancel] Failed to build email:', emailErr)
             }
-        } catch (emailErr) {
-            console.warn('[Order Cancel] Failed to send email:', emailErr)
         }
 
         return NextResponse.json({

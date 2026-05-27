@@ -46,9 +46,9 @@ export function NotificationBell() {
                 aria-label={unreadCount > 0 ? ti(t.notifications.ariaUnread, { count: unreadCount }) : t.notifications.ariaDefault}
                 aria-expanded={isDropdownOpen}
                 onClick={() => setDropdownOpen(!isDropdownOpen)}
-                className="relative flex h-10 w-10 items-center justify-center rounded-[16px] bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors"
+                className="relative flex h-10 w-10 items-center justify-center rounded-[16px] bg-transparent border-none outline-none hover:bg-dash-surface-hover cursor-pointer transition-colors"
             >
-                <Bell className="h-5 w-5 text-[#F8FAFC]" />
+                <Bell className="h-5 w-5 text-dash-text-muted" />
                 <UnreadBadge count={unreadCount} />
             </button>
             <NotificationDropdown />
