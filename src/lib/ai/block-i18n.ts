@@ -417,6 +417,8 @@ export interface SectionLabels {
     clientLogos: string
     blogList: string
     contactSubmitLabel: string
+    /** Localized prefix for "About [Business]" headlines — replaces English "About " */
+    aboutHeadlinePrefix: string
 }
 
 const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
@@ -435,6 +437,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         clientLogos: 'お客様・パートナー',
         blogList: 'ブログ・最新情報',
         contactSubmitLabel: '送信する',
+        aboutHeadlinePrefix: '',
     },
     zh: {
         about: '关于我们',
@@ -451,6 +454,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         clientLogos: '合作客户',
         blogList: '博客资讯',
         contactSubmitLabel: '发送消息',
+        aboutHeadlinePrefix: '关于',
     },
     ko: {
         about: '회사 소개',
@@ -467,6 +471,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         clientLogos: '파트너 & 고객사',
         blogList: '블로그',
         contactSubmitLabel: '메시지 보내기',
+        aboutHeadlinePrefix: '',
     },
     ar: {
         about: 'من نحن',
@@ -483,6 +488,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         clientLogos: 'شركاؤنا وعملاؤنا',
         blogList: 'المدونة',
         contactSubmitLabel: 'إرسال الرسالة',
+        aboutHeadlinePrefix: 'عن',
     },
     th: {
         about: 'เกี่ยวกับเรา',
@@ -499,6 +505,7 @@ const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
         clientLogos: 'ลูกค้าและพันธมิตร',
         blogList: 'บทความและข่าวสาร',
         contactSubmitLabel: 'ส่งข้อความ',
+        aboutHeadlinePrefix: 'เกี่ยวกับ',
     },
 }
 

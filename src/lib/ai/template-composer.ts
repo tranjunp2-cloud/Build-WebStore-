@@ -14,7 +14,7 @@ function resolveFontNames(pairingId: string | undefined): { heading?: string; bo
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
-import { getBlockStrings } from './block-i18n'
+import { getBlockStrings, getSectionLabels } from './block-i18n'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
 import { pickLogosByCategory } from './content/client-logos-library'
@@ -706,13 +706,16 @@ export function buildCTA(
 
 export function buildAbout(biz: BusinessSample, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
+  const sectionLabels = getSectionLabels(language)
+  const aboutPrefix = sectionLabels?.aboutHeadlinePrefix ?? i18n.about.headlinePrefix
+  const sectionLabel = sectionLabels?.about ?? i18n.footer.aboutUs
   return {
     blockType: 'about',
     variant: 'split',
-    headline: `${i18n.about.headlinePrefix} ${biz.name}`,
+    headline: aboutPrefix ? `${aboutPrefix} ${biz.name}` : biz.name,
     body: biz.description,
     layout: 'image-right',
-    sectionLabel: i18n.footer.aboutUs,
+    sectionLabel,
   }
 }
 

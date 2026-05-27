@@ -205,6 +205,29 @@ function normalizeSectionLabels(
     })
 }
 
+/**
+ * Fix GPT/composer training bias for "About [Business]" headlines.
+ * GPT defaults to "About XYZ" even for non-English sites. For languages
+ * with an aboutHeadlinePrefix, replaces the English prefix.
+ * Empty prefix (ja/ko) → drops "About " entirely, leaving just the business name.
+ */
+function normalizeAboutHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const labels = getSectionLabels(language)
+    if (!labels) return blocks
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'about') return block
+        const headline = typeof block.headline === 'string' ? block.headline : ''
+        if (!/^About\s+/i.test(headline)) return block
+        const bizPart = headline.replace(/^About\s+/i, '')
+        const prefix = labels.aboutHeadlinePrefix
+        return { ...block, headline: prefix ? `${prefix} ${bizPart}` : bizPart }
+    })
+}
+
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'hero',
@@ -379,14 +402,17 @@ export function postAISwapStep(
     // get correct sectionLabels from the seed lookup. en/ms/vi are excluded from
     // SECTION_LABELS_SEED and handled by the full STRINGS chain below.
     const sectioned = normalizeSectionLabels(nav, language)
+    // About headline: replace GPT/composer "About XYZ" English prefix with
+    // the localized equivalent (e.g. "关于 重庆火锅" for Chinese).
+    const aboutFixed = normalizeAboutHeadline(sectioned, language)
 
     // Full structural string chain (contact labels, logos, features headline, etc.)
     // only runs for languages with dedicated BlockStrings (en/ms/vi). For other
     // languages, GPT generates these strings correctly — trust its output rather
     // than overwriting with English fallback strings.
-    if (!hasDedicatedStrings(language)) return { blocks: sectioned, telemetry }
+    if (!hasDedicatedStrings(language)) return { blocks: aboutFixed, telemetry }
 
-    const contact = normalizeContactLabels(sectioned, language)
+    const contact = normalizeContactLabels(aboutFixed, language)
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, biz.name)
     const testimonials = normalizeTestimonialsSubheadline(features, language)
