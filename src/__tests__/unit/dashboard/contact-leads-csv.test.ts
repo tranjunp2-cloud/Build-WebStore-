@@ -2,8 +2,8 @@
  * CSV Exporter — TC-CUST-11 through TC-CUST-15
  */
 import { describe, it, expect } from 'vitest'
-import { toCsv } from '@/app/(dashboard)/customers/_lib/csv-exporter'
-import type { CustomerRecord } from '@/app/(dashboard)/customers/_lib/customer-record'
+import { toCsv } from '@/app/(dashboard)/contact-leads/_lib/csv-exporter'
+import type { CustomerRecord } from '@/app/(dashboard)/contact-leads/_lib/customer-record'
 
 const makeRecord = (overrides: Partial<CustomerRecord> = {}): CustomerRecord => ({
     id: 'contact-form:1',

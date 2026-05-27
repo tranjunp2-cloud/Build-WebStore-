@@ -1,7 +1,7 @@
+import { ShopCustomersClientLayout } from './_components/customers-client-layout'
+
 export const dynamic = 'force-dynamic'
 
-import { CustomersClientLayout } from './_components/customers-client-layout'
-
-export default async function CustomersPage() {
-    return <CustomersClientLayout />
+export default function CustomersPage() {
+    return <ShopCustomersClientLayout />
 }

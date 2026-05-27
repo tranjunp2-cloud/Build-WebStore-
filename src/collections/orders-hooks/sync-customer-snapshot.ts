@@ -1,4 +1,5 @@
 import type { CollectionAfterChangeHook } from 'payload'
+import { normalizePhone } from '@/lib/normalize-phone'
 
 /**
  * afterChange hook — keep Customer.name / Customer.phone in sync with the latest order snapshot.
@@ -27,17 +28,33 @@ export const syncCustomerSnapshot: CollectionAfterChangeHook = async ({
         const changed =
             operation === 'create' ||
             doc.customerName !== previousDoc?.customerName ||
-            doc.customerPhone !== previousDoc?.customerPhone
+            doc.customerPhone !== previousDoc?.customerPhone ||
+            doc.customerEmail !== previousDoc?.customerEmail
 
         if (!changed) return doc
+
+        const normPhone = normalizePhone(doc.customerPhone)
+
+        // Build update payload conservatively:
+        // - name: only set when non-empty (guard against clearing customer name via blank order field)
+        // - phone: only set when non-null (guard against wiping identity key via phone-less order update)
+        const updateData: Record<string, unknown> = {}
+        if (doc.customerName) updateData.name = doc.customerName
+        if (normPhone !== null) updateData.phone = normPhone
+
+        // Sync email if present and valid format
+        const rawEmail = String(doc.customerEmail ?? '').trim().toLowerCase()
+        if (rawEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+            updateData.email = rawEmail
+        }
+
+        // Only set latestOrderAt on create — editing an old order would regress the date backwards
+        if (doc.createdAt && operation === 'create') updateData.latestOrderAt = doc.createdAt
 
         await req.payload.update({
             collection: 'customers',
             id: customerId as string,
-            data: {
-                name: doc.customerName,
-                phone: doc.customerPhone ?? null,
-            },
+            data: updateData,
             overrideAccess: true,
             depth: 0,
         })

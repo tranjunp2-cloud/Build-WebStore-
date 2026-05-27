@@ -62,7 +62,7 @@ type TestimonialsHeaderProps = {
 /** Section header used by all 8 variants — h2 + optional subtitle. */
 function TestimonialsHeader({
     headline,
-    subtitle = TESTIMONIALS_DEFAULT_SUBTITLE,
+    subtitle,
     showSubtitle = false,
     className = 'text-center max-w-2xl mx-auto mb-16',
 }: TestimonialsHeaderProps) {
@@ -71,7 +71,7 @@ function TestimonialsHeader({
             <Heading level={2} className="mb-4">
                 {headline || TESTIMONIALS_DEFAULT_HEADLINE}
             </Heading>
-            {showSubtitle && (
+            {showSubtitle && subtitle && (
                 <Body size="lg" className="opacity-40">{subtitle}</Body>
             )}
         </div>
@@ -217,7 +217,7 @@ function CarouselArrow({ direction, onClick, className = '' }: CarouselArrowProp
 }
 
 export function TestimonialsBlock({ block, theme, site }: BlockProps<TestimonialsConfig>) {
-    const { headline, testimonials = [] } = block
+    const { headline, subheadline, testimonials = [] } = block
     const variant = block.variant || 'cards'
     const category = (site?.siteType as string) || 'business'
     const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
@@ -234,7 +234,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     if (variant === 'masonry') {
         return (
             <TestimonialsSection decorative={<NoiseTexture opacity={0.06} />}>
-                <TestimonialsHeader headline={headline} showSubtitle />
+                <TestimonialsHeader headline={headline} subtitle={subheadline} showSubtitle />
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                     {testimonials.map((t, i) => (
                         <motion.div
@@ -344,7 +344,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── carousel variant ───────────────────────────────────────────────
     if (variant === 'carousel') {
-        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
+        return <TestimonialsCarousel headline={headline} subheadline={subheadline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── simple variant ───────────────────────────────────────────────────
@@ -381,7 +381,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     if (variant === 'grid') {
         return (
             <TestimonialsSection decorative={<GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={350} opacity={0.05} />}>
-                <TestimonialsHeader headline={headline} showSubtitle />
+                <TestimonialsHeader headline={headline} subtitle={subheadline} showSubtitle />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {testimonials.map((t, i) => (
                         <motion.div
@@ -434,7 +434,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     // ── Default: cards variant ────────────────────────────────────────────
     return (
         <TestimonialsSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.1} />}>
-            <TestimonialsHeader headline={headline} showSubtitle />
+            <TestimonialsHeader headline={headline} subtitle={subheadline} showSubtitle />
             <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {testimonials.map((t, i) => (
                     <StaggerItem key={`${t.name || 'testimonial'}-${i}`}>
@@ -678,11 +678,13 @@ function TestimonialsMinimalQuote({
 // ── Carousel sub-component (auto-rotate, arrows, dots, fade) ────────────
 function TestimonialsCarousel({
     headline,
+    subheadline,
     testimonials,
     category,
     s3Map,
 }: {
     headline?: string
+    subheadline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
@@ -773,7 +775,7 @@ function TestimonialsCarousel({
 
     return (
         <TestimonialsSection>
-            <TestimonialsHeader headline={headline} showSubtitle />
+            <TestimonialsHeader headline={headline} subtitle={subheadline} showSubtitle />
             {/* Plan 260415 Lỗi D + E — aria-live="polite" announce slide changes + pause on hover/focus */}
             {/* BUG-TEST-019 — non-passive touch listeners on carouselRef prevent page scroll on horizontal swipe */}
             <div

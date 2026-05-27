@@ -18,6 +18,10 @@ export type TestimonialSample = {
   company?: string
   rating: number
   quote: string
+  /** Malay-language version of quote — used when blockLang === 'ms' */
+  quote_ms?: string
+  /** Vietnamese-language version of quote — used when blockLang === 'vi' */
+  quote_vi?: string
 }
 
 export type FAQSample = {

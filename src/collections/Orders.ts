@@ -324,6 +324,9 @@ export const Orders: CollectionConfig = {
         {
             name: 'customerPhone',
             type: 'text',
+            admin: {
+                description: 'Phone is required to auto-link this order to a customer record. Leave empty only for orders that should stay unlinked.',
+            },
         },
         {
             name: 'customer',
@@ -331,7 +334,7 @@ export const Orders: CollectionConfig = {
             relationTo: 'customers',
             index: true,
             admin: {
-                description: 'Auto-linked customer record (matched by email + tenant).',
+                description: 'Auto-linked customer record (matched by phone + tenant).',
                 readOnly: true,
             },
         },
