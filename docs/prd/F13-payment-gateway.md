@@ -1,8 +1,9 @@
 # PRD: Payment Gateway — Malaysia (F13)
-> **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
-> **Priority:** P1 | **Sprint:** Wave 6 | **Size:** L
+> **Version:** 1.2 | **Updated:** 2026-05-27 | **Agent:** `docs-manager`
+> **Priority:** P1 | **Sprint:** Wave 6.5 | **Size:** L
 > **Depends on:** F09 Storefront Commerce ✅, Stripe account ✅
 > **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §4 Payment Landscape
+> **Plan:** [F13 — Stripe Flow Hardening](../../plans/260527-1410-f13-stripe-flow-hardening/plan.md)
 
 ---
 
@@ -24,6 +25,8 @@
 | US-F13-02 | Seller Payment Settings | [F13-payment-gateway-stories.md](../stories/F13-payment-gateway-stories.md) | Draft |
 | US-F13-03 | Mobile Web UX — Seamless Mobile Payment Flow | [F13-payment-gateway-stories.md](../stories/F13-payment-gateway-stories.md) | Ready |
 | US-F13-04 | Connect Stripe Onboarding Flow | [F13-payment-gateway-stories.md](../stories/F13-payment-gateway-stories.md) | Draft |
+| US-F13-05 | Khôi phục thanh toán dở dang (Wave 6.5) | [F13-payment-gateway-stories.md](../stories/F13-payment-gateway-stories.md) | Ready |
+| US-F13-06 | Xác nhận thanh toán đáng tin cậy (Wave 6.5) | [F13-payment-gateway-stories.md](../stories/F13-payment-gateway-stories.md) | Ready |
 
 ---
 
@@ -42,9 +45,10 @@ PrimeWeb chỉ hỗ trợ card payments via Stripe. Ở Malaysia, **FPX online b
 
 ## 3. Solution Overview
 
-Thêm Card + FPX via **Stripe Checkout Session HOSTED** (Wave 6 P0). Dùng **Stripe Connect Standard accounts + Direct Charges** — payment vào account merchant đã onboard, PrimeWeb thu **3% application_fee_amount**. E-wallets (TnG, GrabPay) via Stripe (Wave 7 P1). Seller payment settings để enable/disable Card + FPX riêng (backend pass dynamic `payment_method_types` vào Checkout Session).
+Thêm Card + FPX via **Stripe Checkout Session HOSTED** (Wave 6 P0). Dùng **Stripe Connect Standard accounts + Direct Charges** — payment vào account merchant đã onboard. **Wave 6 dùng Zero Application Fee (0%)**; 3% platform fee deferredto Wave 7 when cross-border limitations lift. E-wallets (TnG, GrabPay) via Stripe (Wave 7 P1). Seller payment settings để enable/disable Card + FPX riêng (backend pass dynamic `payment_method_types` vào Checkout Session).
 
 > **Decision §8.6 (design doc):** Wave 6 dùng Stripe Checkout Session hosted (redirect → `checkout.stripe.com`) thay vì Payment Element inline. Lý do: code đã implement Checkout Session + Connect Direct Charges; KISS — Stripe handle Card form + FPX bank picker + 3D Secure + receipt.
+> **Wave 6.5 correction (2026-05-27):** Direct Charges + cross-border (US → MY) prohibit application_fee_amount on Stripe; platform fee = 0. Revisit for same-country or destination charges Wave 7+.
 
 ---
 
@@ -52,10 +56,19 @@ Thêm Card + FPX via **Stripe Checkout Session HOSTED** (Wave 6 P0). Dùng **Str
 
 ### In Scope (Wave 6 P0)
 - Card + FPX via **Stripe Checkout Session HOSTED** (US-F13-01)
-- **Stripe Connect Standard + Direct Charges** + 3% application fee (already implemented, F13 wires Settings UI)
+- **Stripe Connect Standard + Direct Charges** (Wave 6 fee=0; 3% platform fee deferred Wave 7)
 - Seller payment settings: enable/disable Card, FPX riêng (US-F13-02)
 - Connect Stripe onboarding flow + return handler (US-F13-04)
 - Mobile UX optimization 54px hitbox (US-F13-03)
+
+### In Scope (Wave 6.5 — Flow Hardening)
+- Atomic webhook success: order `status='new'` AND `paymentStatus='paid'` in single update (US-F13-06)
+- Atomic stock decrement; oversell flag + seller manual refund (US-F13-06)
+- Accurate payment method detection (card vs FPX) from PaymentIntent (US-F13-06)
+- Cart preserved on cancel; cleared only after confirmed success (US-F13-05)
+- Confirm page polling + self-heal against late webhooks (US-F13-05, US-F13-06)
+- "Pay Now" retry on pending/payment_failed orders (US-F13-05)
+- Cron reconcile + stale-order cleanup (US-F13-06)
 
 ### Out of Scope (Wave 7+)
 - Touch 'n Go, GrabPay, Boost (via Stripe/Ipay88)
@@ -91,6 +104,8 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 
 ## 7. Functional Requirements
 
+### Wave 6 (Core)
+
 | FR-ID | Requirement | Story Ref | Priority | Notes |
 |-------|-------------|-----------|----------|-------|
 | FR-01 | Card + FPX payment via **Stripe Checkout Session HOSTED** (redirect ra `checkout.stripe.com`) | US-F13-01 | P0 | Wave 6 |
@@ -99,7 +114,7 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-04 | Payment fail: BM toast "Pembayaran gagal. Sila cuba lagi." | US-F13-01 | P0 | |
 | FR-05 | Cart preserved nếu payment fail | US-F13-01 | P0 | |
 | FR-06 | Seller payment settings: enable/disable Card + FPX riêng | US-F13-02 | P0 | Backend pass dynamic `payment_method_types` |
-| FR-07 | Webhook `checkout.session.completed` → order status update | US-F13-01 | P0 | |
+| FR-07 | Webhook `checkout.session.completed` → order status='new' + paymentStatus='paid' atomically | US-F13-01 | P0 | Fixed Wave 6.5 |
 | FR-08 | **[Mobile]** Method picker stack vertical, hitbox ≥ 54px | US-F13-03 | P1 | Anti-mis-tap |
 | FR-09 | **[Mobile]** Native bank picker / Bottom Sheet | US-F13-03 | P1 | Satisfied tự động bởi Stripe Checkout hosted page |
 | FR-10 | Connect Stripe CTA → POST `/api/stripe/connect/onboard` → redirect Stripe-hosted KYC | US-F13-04 | P0 | Pre-condition cho FR-06 |
@@ -107,7 +122,20 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-12 | Return handler `?stripe=refresh` → toast warning + retry CTA | US-F13-04 | P0 | |
 | FR-13 | Stripe row label dynamic theo settings (Card·FPX / Card / FPX); hidden khi cả 2 OFF | US-F13-02 | P0 | Design §8.7 |
 | FR-14 | Toggles Card+FPX Disabled+Lock+Tooltip khi `stripeOnboardingComplete = false` | US-F13-02 | P0 | Design §8.5 / D-03 |
-| FR-15 | Backend `/api/orders/create` reject 422 `NO_PAYMENT_METHODS` nếu cả Card+FPX OFF | US-F13-02 | P0 | Defense-in-depth (UI ẩn row khi both-OFF, nhưng backend vẫn validate) |
+| FR-15 | Backend `/api/orders/stripe-checkout` reject 422 `NO_PAYMENT_METHODS` nếu cả Card+FPX OFF | US-F13-02 | P0 | Defense-in-depth (UI ẩn row khi both-OFF, nhưng backend vẫn validate) |
+
+### Wave 6.5 (Flow Hardening)
+
+| FR-ID | Requirement | Story Ref | Priority | Phase | Notes |
+|-------|-------------|-----------|----------|-------|-------|
+| FR-16 | Webhook success sets `status='new'` AND `paymentStatus='paid'` atomically (single SQL) | US-F13-06 | P0 | 01 | Fixes bug where Stripe-paid orders never showed paid |
+| FR-17 | Stock decrement MUST be atomic; concurrent orders never drive inventory negative | US-F13-06 | P0 | 02 | `UPDATE ... WHERE inventory >= qty` |
+| FR-18 | Oversell after capture → flag `oversellReview=true`, order stays paid/new, notify seller | US-F13-06 | P0 | 02, 07 | No auto-refund; manual seller handling |
+| FR-19 | Record actual payment method (card vs fpx) from PaymentIntent on connected account | US-F13-06 | P1 | 03 | Not defaulting 'card' for multi-method tenants |
+| FR-20 | Do NOT clear cart before Stripe redirect; clear only on confirmed success at Confirm page | US-F13-05 | P0 | 04 | On cancel: keep cart + show toast |
+| FR-21 | Confirm page: processing state, polling, self-heal against Stripe, explicit payment_failed state | US-F13-05, US-F13-06 | P0 | 05 | Active reconcile endpoint |
+| FR-22 | "Pay Now" CTA on order detail for pending/payment_failed → new Stripe session, re-validate stock | US-F13-05 | P0 | 06 | No buyer order-list page |
+| FR-23 | Cron reconciles pending orders >15min, expires stale, syncs with Stripe session lookup | US-F13-06 | P1 | 07 | Self-heal late webhooks |
 
 ---
 
@@ -116,12 +144,14 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 - **BR-01:** Currency phải là MYR để FPX available (Stripe auto-detect)
 - **BR-02:** Payment method hiện theo seller settings (không hardcode)
 - **BR-03:** Order status stays 'pending' nếu payment fail (không xóa)
+- **BR-04:** Cart cleared ONLY after confirmed payment success at Confirm page; cancel/retry preserve cart
+- **BR-05:** Oversell (stock gone when webhook decrements) handled manually by seller via admin "Refund customer" button; NO auto-refund Wave 6.5
 
 ---
 
 ## 9. User Flow
 
-### 9.1. Checkout flow (Buyer)
+### 9.1. Checkout flow (Buyer) — Wave 6
 
 ```
 Checkout → "Choose payment method" (RadioGroup: Stripe / COD / QR)
@@ -133,10 +163,26 @@ Checkout → "Choose payment method" (RadioGroup: Stripe / COD / QR)
         ├── FPX: redirect to bank (3D Secure) → return
         └── Card: submit inline → return
               ├── Success: Stripe redirect success_url → confirmation page
-              │   AND webhook `checkout.session.completed` → order 'new'
+              │   AND webhook `checkout.session.completed` → order 'new' + 'paid'
               └── Cancel: Stripe redirect cancel_url
                   AND BM toast "Pembayaran gagal. Sila cuba lagi."
-                  AND cart preserved
+                  AND cart preserved (NOT cleared until confirmed success)
+```
+
+### 9.1a. Confirm & Retry Flow (Wave 6.5)
+
+```
+Confirmation Page → polling `/api/orders/[id]/payment-status`
+  ├── Status = 'new'/'paid': show success, clear cart exactly once
+  ├── Status = 'pending': show skeleton + polling (webhook delayed)
+  │   └── If Stripe says paid: self-heal via active reconcile
+  ├── Status = 'payment_failed': show failed state + "Retry" CTA
+  │   └── Click "Retry" → POST `/api/orders/[id]/retry-payment`
+  │       → new Stripe session, re-validate stock
+  └── Timeout (>15min): show manual help message
+
+Order Detail (for pending/payment_failed):
+  └── "Pay Now" CTA → retry-payment flow (same as Confirm "Retry")
 ```
 
 ### 9.2. Seller onboarding flow (one-time)
@@ -186,8 +232,10 @@ Settings > Payments → Card + FPX toggles Locked (Stripe chưa connect)
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Loading State:** Nút "Place Order" hiển thị Spinner + text "Processing...". Sau click → full-page Dialog overlay "Redirecting to Stripe Checkout. Please don't close this window." (chống user đóng tab). FPX flow: sau khi vào Stripe page, Stripe tự handle redirect to bank.
-- **Error State / Edge Cases:** Toast đỏ BM: "Pembayaran gagal. Sila cuba lagi." khi return cancel_url. Cart preserved (FR-05). "Try Again" CTA → re-submit Stripe Checkout Session.
-- **Success State:** Stripe redirect success_url → Order Confirmation Page (F10 scope). Order status `pending → new` qua webhook.
+- **Error State / Edge Cases:** Toast đỏ BM: "Pembayaran gagal. Sila cuba lagi." khi return cancel_url. Cart preserved (FR-05, BR-04). "Try Again" CTA → re-submit Stripe Checkout Session.
+- **Success State:** Stripe redirect success_url → Order Confirmation Page (F10 scope). Order status `pending → new` + `paymentStatus='paid'` qua webhook.
+- **Confirm Processing State (Wave 6.5):** Skeleton loader + polling spinner; BM message "Verifying your payment...". Flips to success when `paymentStatus=paid`.
+- **Confirm Failed State (Wave 6.5):** Destructive alert "Payment declined. Try again or contact support."; "Pay Now" CTA wired to retry-payment endpoint.
 - **Settings — Loading:** Skeleton 2 method rows khi fetch initial settings.
 - **Settings — Not onboarded:** Destructive Alert + Connect Stripe CTA + toggles Disabled+Lock+Tooltip.
 - **Settings — Return-from-Stripe:** Toast success/warning + refetch status (FR-11, FR-12).
@@ -224,9 +272,11 @@ THEN  error: "Pembayaran gagal. Sila cuba lagi."
 
 ---
 
-## 13. Technical Architecture
+## 13. Technical Architecture — Endpoint & Fee Model
 
-**Approach:** Stripe Checkout Session HOSTED + Stripe Connect Standard accounts + Direct Charges. Buyer redirect ra `checkout.stripe.com/...`; Stripe-hosted page render Card form + FPX bank picker. PrimeWeb thu 3% application_fee_amount.
+**Approach:** Stripe Checkout Session HOSTED + Stripe Connect Standard accounts + Direct Charges. Buyer redirect ra `checkout.stripe.com/...`; Stripe-hosted page render Card form + FPX bank picker. Wave 6: **Zero application fee (0%)** due to cross-border limitation (US platform → MY seller). **Wave 7+**: revisit 3% when same-country or destination charges available.
+
+**Endpoint:** `POST /api/orders/stripe-checkout` (NOT `/api/orders/create` — endpoint name corrected Wave 6.5)
 
 ```typescript
 // Stripe Checkout Session — Direct Charges on connected account
@@ -239,10 +289,11 @@ const session = await stripe.checkout.sessions.create(
     line_items: items.map(...),
     client_reference_id: orderId,
     customer_email: customer.email,
-    success_url: `${baseUrl}/sites/[slug]/orders/[id]/confirmation`,
+    success_url: `${baseUrl}/sites/[slug]/order/${orderId}/confirm?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl}/sites/[slug]/checkout?stripe_cancelled=1`,
+    // Wave 6: NO application_fee_amount (fee=0 due to cross-border)
+    // Wave 7+: add application_fee_amount when destination charges enabled
     payment_intent_data: {
-      application_fee_amount: Math.round(totalAmount * 0.03), // 3% platform fee
       metadata: { orderId },
     },
   },
@@ -277,6 +328,21 @@ function buildPaymentMethodTypes(tenant): StripePaymentMethod[] {
 | F09 Storefront | ✅ | — |
 | F10 Orders | ✅ | — |
 | Stripe Malaysia account | ✅ | Enable FPX in dashboard |
+
+---
+
+## 16. Known Limitations & Wave 7+ Work
+
+| Item | Wave | Reason |
+|------|------|--------|
+| 3% Platform Fee (application_fee_amount) | Wave 7+ | Cross-border (US → MY) Stripe limitation in Wave 6; revisit destination charges or same-country model |
+| Inline Payment Element | Wave 7+ | KISS — Checkout Session hosted handles UI |
+| Stripe Idempotency Key API param | Wave 7+ | Order status check sufficient for Wave 6 volume |
+| TnG, GrabPay, Boost | Wave 7+ | Stripe MY not yet GA |
+| Saved cards / tokenized re-purchase | Wave 7+ | Requires buyer accounts |
+| Refund UI in order detail | Wave 7+ (F10 scope) | Wave 6.5 manual seller "Refund customer" button on oversell |
+| Stripe Connect Express/Custom | Wave 8+ | Standard accounts sufficient for marketplace launch |
+| Multi-currency support | Wave 8+ | Malaysia focus, MYR-only Wave 6 |
 
 ---
 
