@@ -269,7 +269,8 @@ export async function POST(request: Request) {
                     }
                 }
                 // Delete the just-created order to keep DB consistent
-                await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => {})
+                await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true })
+                    .catch((e: unknown) => console.error(`[Stock Decrement] Failed to delete orphaned order ${order.id} after CAS failure — manual cleanup required:`, e))
                 return NextResponse.json(
                     {
                         success: false,

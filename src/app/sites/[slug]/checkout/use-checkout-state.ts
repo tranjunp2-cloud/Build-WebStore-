@@ -45,7 +45,7 @@ export function useCheckoutState({
     initialFontBody,
     initialSiteData,
 }: UseCheckoutStateArgs) {
-    const { t: _t } = { t: { storefront: { checkout: {} as Record<string, string> } } }
+
     const router = useRouter()
     const { items, subtotal, clearCart } = useCartStore()
 
