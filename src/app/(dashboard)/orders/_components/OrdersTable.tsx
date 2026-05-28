@@ -268,7 +268,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                 <div className="flex flex-col flex-1 gap-[8px]">
                                     <div className="flex items-center justify-between w-full">
                                         <span className="text-[14px] font-semibold leading-[1.4285714285714286em] text-slate-50 tracking-tight">
-                                            #{order.orderNumber}
+                                            {order.orderNumber}
                                         </span>
                                         <StatusBadge status={order.status} label={getStatusLabel(order.status, statusLabels)} />
                                     </div>
@@ -385,7 +385,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 color: 'var(--dash-text)',
                                             }}
                                         >
-                                            #{order.orderNumber}
+                                            {order.orderNumber}
                                         </span>
                                     </td>
                                     <td style={{ padding: `${textPadY}px 24px` }}>
