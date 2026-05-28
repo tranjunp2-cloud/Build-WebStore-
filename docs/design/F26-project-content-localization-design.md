@@ -4,7 +4,7 @@
 > **Feature Code:** F26
 > **Version:** 1.0 — Initial design
 > **Updated:** 2026-05-26
-> **Claude Design (interactive):** TBD
+> **Claude Design (interactive):** [F26 Project Content Localization](https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=f26%2FF26%20Project%20Content%20Localization.html&present=1)
 > **Figma Design:** TBD
 > **Decisions:** [PRD F26](../prd/F26-project-content-localization.md) · [Stories](../stories/F26-project-content-localization-stories.md) · related [F21 Localization](../prd/F21-localization.md) (CMS chrome i18n — reuse switcher pattern)
 
