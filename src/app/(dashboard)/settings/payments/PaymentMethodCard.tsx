@@ -3,6 +3,7 @@
 import React from 'react';
 import { Lock, Check, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 
 type IconTone = 'brand' | 'purple' | 'amber' | 'teal' | '';
 
@@ -33,6 +34,8 @@ export function PaymentMethodCard({
     icon, iconTone = '', title, feePill, desc,
     on, locked, lockTip, onChange, highlight, statusExtra, children,
 }: Props) {
+    const { t } = useI18n();
+    const pt = t.dashboard.settings.payments;
     const isActive = on && !locked;
 
     return (
@@ -113,15 +116,15 @@ export function PaymentMethodCard({
                     <div className="flex items-center gap-2 mt-[14px] flex-wrap">
                         {locked ? (
                             <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-amber-500/[0.08] border-amber-500/[0.22] text-amber-400">
-                                <Lock className="w-3 h-3" /> Locked
+                                <Lock className="w-3 h-3" /> {pt.statusLocked}
                             </span>
                         ) : isActive ? (
                             <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
-                                <Check className="w-3 h-3" /> Active
+                                <Check className="w-3 h-3" /> {pt.active}
                             </span>
                         ) : (
                             <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-white/[0.03] border-white/[0.08] text-slate-500">
-                                <Circle className="w-3 h-3" /> Inactive
+                                <Circle className="w-3 h-3" /> {pt.inactive}
                             </span>
                         )}
                         {statusExtra && (
