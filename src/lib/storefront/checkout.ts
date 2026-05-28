@@ -16,8 +16,8 @@ export interface CheckoutForm {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Matches Malaysian mobile (01X) and landline (02-09) with optional +60 prefix, separators allowed
-const MY_PHONE_REGEX = /^(\+?60[\s-]?|0)(1[0-9]|[2-9]\d?)[\s-]?\d{3,4}[\s-]?\d{4}$/
+// Matches Malaysian mobile only (01X-XXXXXXX/XXXXXXXX) with optional +60 prefix, separators allowed
+const MY_PHONE_REGEX = /^(\+?60[\s-]?|0)(1[0-9])[\s-]?\d{3,4}[\s-]?\d{4}$/
 
 /** Validates email format; returns null if valid, error string if invalid. Empty string → null (required checked separately). */
 export function validateEmail(email: string): string | null {
