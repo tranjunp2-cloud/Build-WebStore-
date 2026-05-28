@@ -897,6 +897,20 @@
         "confirm": "Sahkan Pembatalan",
         "confirming": "Membatalkan..."
       },
+      "paymentVerification": {
+        "title": "Pengesahan Pembayaran",
+        "referenceCode": "Kod Rujukan",
+        "paymentReceipt": "Resit Pembayaran",
+        "noReceipt": "Tiada resit dimuat naik",
+        "amountExpected": "Jumlah Dijangka",
+        "buyer": "Pembeli",
+        "approve": "Luluskan Pembayaran",
+        "approving": "Meluluskan...",
+        "reject": "Tolak Pembayaran",
+        "verified": "Pembayaran Disahkan",
+        "verifiedAt": "Disahkan Pada",
+        "verifiedBy": "Disahkan Oleh"
+      },
       "rejectPayment": {
         "title": "Tolak Pembayaran",
         "reasonLabel": "Sebab penolakan (wajib)",

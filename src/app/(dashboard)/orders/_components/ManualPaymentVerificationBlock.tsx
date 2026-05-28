@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, X, ZoomIn } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 import { RejectPaymentModal } from './RejectPaymentModal'
 
 function ProofLightbox({ url, onClose }: { url: string; onClose: () => void }) {
@@ -71,10 +72,10 @@ function getProofUrl(img: string | { url?: string } | null | undefined): string 
     return img.url ?? null
 }
 
-function ProofImageThumbnail({ url, onOpen, labelStyle }: { url: string; onOpen: () => void; labelStyle: React.CSSProperties }) {
+function ProofImageThumbnail({ url, onOpen, labelStyle, label }: { url: string; onOpen: () => void; labelStyle: React.CSSProperties; label: string }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
+            <span style={{ ...labelStyle, fontSize: 11 }}>{label}</span>
             <div style={{ position: 'relative', cursor: 'pointer' }} onClick={onOpen}>
                 <img
                     src={url}
@@ -106,6 +107,8 @@ function ProofImageThumbnail({ url, onOpen, labelStyle }: { url: string; onOpen:
 }
 
 export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymentVerificationBlockProps) {
+    const { t } = useI18n()
+    const pv = t.dashboard.orders.paymentVerification
     const [isApproving, setIsApproving] = useState(false)
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -160,12 +163,12 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
         return (
             <>
                 <div style={cardStyle}>
-                    <span style={labelStyle}>Payment Verification</span>
+                    <span style={labelStyle}>{pv.title}</span>
 
                     {/* Reference code */}
                     {order.paymentReference && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span style={{ ...labelStyle, fontSize: 11 }}>Reference Code</span>
+                            <span style={{ ...labelStyle, fontSize: 11 }}>{pv.referenceCode}</span>
                             <span
                                 style={{
                                     fontFamily: 'monospace',
@@ -185,17 +188,17 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
 
                     {/* Proof image */}
                     {proofUrl ? (
-                        <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />
+                        <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} label={pv.paymentReceipt} />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
+                            <span style={{ ...labelStyle, fontSize: 11 }}>{pv.paymentReceipt}</span>
                             <div style={{
                                 height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 background: 'var(--dash-secondary-bg)', borderRadius: 10,
                                 border: '1px solid var(--dash-border)',
                             }}>
                                 <span style={{ ...valueStyle, color: 'var(--dash-text-muted)', fontSize: 12 }}>
-                                    No receipt uploaded
+                                    {pv.noReceipt}
                                 </span>
                             </div>
                         </div>
@@ -204,13 +207,13 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                     {/* Amount + buyer */}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ ...labelStyle, fontSize: 11 }}>Amount Expected</span>
+                            <span style={{ ...labelStyle, fontSize: 11 }}>{pv.amountExpected}</span>
                             <span style={{ ...valueStyle, fontWeight: 700, color: '#2DD4BF', fontSize: 16 }}>
                                 {formatCurrency(order.total, order.currency)}
                             </span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'right' }}>
-                            <span style={{ ...labelStyle, fontSize: 11 }}>Buyer</span>
+                            <span style={{ ...labelStyle, fontSize: 11 }}>{pv.buyer}</span>
                             <span style={valueStyle}>{order.customerName}</span>
                         </div>
                     </div>
@@ -235,7 +238,7 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                         }}
                     >
                         {isApproving && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isApproving ? 'Approving...' : 'Approve Payment'}
+                        {isApproving ? pv.approving : pv.approve}
                     </button>
 
                     <button
@@ -256,7 +259,7 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                             opacity: isApproving ? 0.4 : 1,
                         }}
                     >
-                        Reject Payment
+                        {pv.reject}
                     </button>
                 </div>
 
@@ -287,7 +290,7 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
 
         return (
             <div style={cardStyle}>
-                <span style={labelStyle}>Payment Verification</span>
+                <span style={labelStyle}>{pv.title}</span>
 
                 {/* Green badge */}
                 <div
@@ -307,25 +310,25 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                         <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: '#10B981' }}>
-                        Payment Verified
+                        {pv.verified}
                     </span>
                 </div>
 
                 {verifiedDate && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ ...labelStyle, fontSize: 11 }}>Verified At</span>
+                        <span style={{ ...labelStyle, fontSize: 11 }}>{pv.verifiedAt}</span>
                         <span style={valueStyle}>{verifiedDate}</span>
                     </div>
                 )}
 
                 {verifierEmail && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ ...labelStyle, fontSize: 11 }}>Verified By</span>
+                        <span style={{ ...labelStyle, fontSize: 11 }}>{pv.verifiedBy}</span>
                         <span style={valueStyle}>{verifierEmail}</span>
                     </div>
                 )}
 
-                {proofUrl && <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />}
+                {proofUrl && <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} label={pv.paymentReceipt} />}
 
                 {lightboxOpen && proofUrl && (
                     <ProofLightbox url={proofUrl} onClose={() => setLightboxOpen(false)} />
@@ -338,8 +341,8 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
     if (proofUrl) {
         return (
             <div style={cardStyle}>
-                <span style={labelStyle}>Payment Verification</span>
-                <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />
+                <span style={labelStyle}>{pv.title}</span>
+                <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} label={pv.paymentReceipt} />
                 {lightboxOpen && (
                     <ProofLightbox url={proofUrl} onClose={() => setLightboxOpen(false)} />
                 )}

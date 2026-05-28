@@ -897,6 +897,20 @@
         "confirm": "Confirm Cancel",
         "confirming": "Cancelling..."
       },
+      "paymentVerification": {
+        "title": "Payment Verification",
+        "referenceCode": "Reference Code",
+        "paymentReceipt": "Payment Receipt",
+        "noReceipt": "No receipt uploaded",
+        "amountExpected": "Amount Expected",
+        "buyer": "Buyer",
+        "approve": "Approve Payment",
+        "approving": "Approving...",
+        "reject": "Reject Payment",
+        "verified": "Payment Verified",
+        "verifiedAt": "Verified At",
+        "verifiedBy": "Verified By"
+      },
       "rejectPayment": {
         "title": "Reject Payment",
         "reasonLabel": "Rejection reason (required)",
