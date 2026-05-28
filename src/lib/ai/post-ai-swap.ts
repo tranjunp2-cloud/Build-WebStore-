@@ -49,6 +49,193 @@ import {
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
+import { getBlockStrings, hasDedicatedStrings, getNavLabels, getSectionLabels } from './block-i18n'
+
+/**
+ * Replace nav link labels for known URL slugs with i18n equivalents.
+ * Uses the focused NAV_LABELS lookup (5 strings/lang) which covers languages
+ * where GPT has training bias toward English nav labels. Returns blocks
+ * unchanged when no nav labels are found for the language.
+ */
+function normalizeNavLinks(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const navLabels = getNavLabels(language)
+    if (!navLabels) return blocks
+    const urlToLabel: Record<string, string> = {
+        '/': navLabels.home,
+        '/about': navLabels.about,
+        '/services': navLabels.services,
+        '/contact': navLabels.contact,
+    }
+    return blocks.map((block) => {
+        if (block.blockType !== 'navigation') return block
+        const links = Array.isArray(block.links) ? block.links : []
+        const normalizedLinks = links.map((link: unknown) => {
+            const l = link as Record<string, unknown>
+            const url = typeof l.url === 'string' ? l.url : ''
+            const translated = urlToLabel[url]
+            return translated ? { ...l, label: translated } : l
+        })
+        return { ...block, links: normalizedLinks }
+    })
+}
+
+/** Patch contact block labels from i18n without replacing user-supplied data. */
+function normalizeContactLabels(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'contact') return block
+        return {
+            ...block,
+            submitLabel: i18n.contact.submitLabel,
+            phoneLabel: i18n.contact.phoneLabel,
+            addressLabel: i18n.contact.addressLabel,
+            emailLabel: i18n.contact.emailLabel,
+        }
+    })
+}
+
+/** Patch client-logos headline from i18n without replacing logo data. */
+function normalizeClientLogosHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'client-logos' && block.blockType !== 'logo-cloud') return block
+        return { ...block, headline: i18n.clientLogos.headline }
+    })
+}
+
+/** Patch about block sectionLabel — GPT defaults to English "About Us" even for non-English sites. */
+function normalizeAboutSectionLabel(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    // Skip if normalizeSectionLabels already patched via SECTION_LABELS_SEED — its values
+    // are the authoritative section labels; BlockStrings.footer.aboutUs can diverge.
+    if (getSectionLabels(language)) return blocks
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'about') return block
+        return { ...block, sectionLabel: i18n.footer.aboutUs }
+    })
+}
+
+/** Patch contact block sectionLabel — only for languages without a SECTION_LABELS_SEED entry. */
+function normalizeContactSectionLabel(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    // Skip if normalizeSectionLabels already patched — navigation.contact is the short nav form
+    // and can differ from the section label (e.g. ms: 'Hubungi' nav vs 'Hubungi Kami' section).
+    if (getSectionLabels(language)) return blocks
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'contact') return block
+        return { ...block, sectionLabel: i18n.navigation.contact }
+    })
+}
+
+/**
+ * Patch features headline on ALL features blocks regardless of swap status.
+ * Needed because non-generic GPT features are kept (not swapped) but still
+ * have the English "Why Choose X" prefix from GPT's training default.
+ */
+function normalizeFeaturesHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+    bizName: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'features') return block
+        return { ...block, headline: i18n.features.headlineWhyChoose(bizName) }
+    })
+}
+
+/** Patch testimonials subheadline on non-swapped testimonials blocks. */
+function normalizeTestimonialsSubheadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'testimonials') return block
+        return { ...block, subheadline: i18n.testimonials.subheadline }
+    })
+}
+
+/**
+ * Patch sectionLabel on all blocks using the SECTION_LABELS_SEED lookup.
+ * Runs before the hasDedicatedStrings guard so non-Latin-script languages
+ * (ja/zh/ko/ar/th) get correct sectionLabels without a full BlockStrings entry.
+ * en/ms/vi are excluded — their sectionLabels come from the STRINGS chain below.
+ */
+function normalizeSectionLabels(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const labels = getSectionLabels(language)
+    if (!labels) return blocks
+
+    const blockTypeToLabel: Record<string, string> = {
+        'about': labels.about,
+        'gallery': labels.gallery,
+        'contact': labels.contact,
+        'features': labels.features,
+        'testimonials': labels.testimonials,
+        'faq': labels.faq,
+        'team': labels.team,
+        'service-cards': labels.serviceCards,
+        'stats': labels.stats,
+        'pricing': labels.pricing,
+        'newsletter': labels.newsletter,
+        'client-logos': labels.clientLogos,
+        'logo-cloud': labels.clientLogos,
+        'blog-list': labels.blogList,
+    }
+
+    return blocks.map((block) => {
+        const bt = typeof block.blockType === 'string' ? block.blockType : ''
+        const label = blockTypeToLabel[bt]
+        if (!label) return block
+        // Contact block: also patch submitLabel which GPT keeps as "Send Message"
+        const extra = bt === 'contact' ? { submitLabel: labels.contactSubmitLabel } : {}
+        return { ...block, sectionLabel: label, ...extra }
+    })
+}
+
+/**
+ * Fix GPT/composer training bias for "About [Business]" headlines.
+ * GPT defaults to "About XYZ" even for non-English sites. For languages
+ * with an aboutHeadlinePrefix, replaces the English prefix.
+ * Empty prefix (ja/ko) → drops "About " entirely, leaving just the business name.
+ */
+function normalizeAboutHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    // Prefer SectionLabels seed (has aboutHeadlinePrefix); fall back to BlockStrings if available.
+    const labels = getSectionLabels(language)
+    const i18nPrefix = hasDedicatedStrings(language) ? getBlockStrings(language).about.headlinePrefix : null
+    const prefix = labels?.aboutHeadlinePrefix ?? i18nPrefix
+    // No localized prefix found — nothing to replace.
+    if (prefix === null) return blocks
+
+    return blocks.map((block) => {
+        if (block.blockType !== 'about') return block
+        const headline = typeof block.headline === 'string' ? block.headline : ''
+        if (!/^About\s+/i.test(headline)) return block
+        const bizPart = headline.replace(/^About\s+/i, '')
+        return { ...block, headline: prefix ? `${prefix} ${bizPart}` : bizPart }
+    })
+}
 
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
@@ -60,10 +247,22 @@ export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'cta',
 ])
 
+/**
+ * Content-heavy blocks where item copy (testimonial quotes, feature
+ * titles/descriptions, FAQ Q&A) should come from GPT for non-English sites.
+ * The English-only library would discard GPT's language-specific output.
+ * Structural strings are still patched by the i18n normalize chain.
+ */
+export const GPT_CONTENT_BLOCKS: ReadonlySet<string> = new Set([
+    'testimonials',
+    'features',
+    'faq',
+])
+
 /** One telemetry entry emitted per swap decision (swap OR skip-with-reason). */
 export interface SwapTelemetry {
     blockType: string
-    action: 'swapped' | 'kept-user-data' | 'kept-not-generic' | 'kept-no-composer' | 'kept-composer-error'
+    action: 'swapped' | 'kept-user-data' | 'kept-not-generic' | 'kept-no-composer' | 'kept-composer-error' | 'kept-lang-dynamic'
     reason: string | null
     matchedPhrases?: string[]
 }
@@ -83,20 +282,21 @@ function callComposerBuilder(
     category: string,
     content: CategoryContent | null,
     mood?: ThemeMood,
+    language?: string,
 ): Record<string, unknown> | null {
     switch (blockType) {
         case 'hero':
             return composerBuildHero(biz, category, 0, mood)
         case 'features':
-            return composerBuildFeatures(biz, category)
+            return composerBuildFeatures(biz, category, language)
         case 'testimonials':
-            return content ? composerBuildTestimonials(content, biz.name) : null
+            return content ? composerBuildTestimonials(content, biz.name, language) : null
         case 'faq':
-            return content ? composerBuildFAQ(content, biz.name) : null
+            return content ? composerBuildFAQ(content, biz.name, language) : null
         case 'about':
-            return composerBuildAbout(biz)
+            return composerBuildAbout(biz, language)
         case 'cta':
-            return composerBuildCTA(biz, category, mood)
+            return composerBuildCTA(biz, category, mood, language)
         default:
             return null
     }
@@ -114,6 +314,7 @@ export function postAISwapStep(
     category: string,
     mood?: ThemeMood,
     seed: number = 0,
+    language?: string,
 ): PostAISwapResult {
     const telemetry: SwapTelemetry[] = []
     const content = getCategoryContent(category) ?? null
@@ -134,6 +335,18 @@ export function postAISwapStep(
             return block
         }
 
+        // Guard 1b: dynamic language trust — for non-English generation, GPT
+        // already wrote content in the user's language. Swapping with an English
+        // library block would discard GPT's language-specific copy. Structural
+        // strings (headline, subheadline, sectionLabel) are patched by the i18n
+        // normalize chain below regardless.
+        // Covers content-heavy blocks where item copy (quotes, feature titles,
+        // FAQ Q&A) must come from GPT, not the English-only library.
+        if (language && language !== 'en' && GPT_CONTENT_BLOCKS.has(bt)) {
+            telemetry.push({ blockType: bt, action: 'kept-lang-dynamic', reason: `lang:${language}` })
+            return block
+        }
+
         // Guard 2: quality bar — only swap genuinely generic blocks
         const genericCheck = isGenericContent(block)
         if (!genericCheck.generic) {
@@ -149,7 +362,7 @@ export function postAISwapStep(
         // Composer dispatch
         let composed: Record<string, unknown> | null = null
         try {
-            composed = callComposerBuilder(bt, biz, category, content, mood)
+            composed = callComposerBuilder(bt, biz, category, content, mood, language)
         } catch (err) {
             console.warn(`[post-ai-swap] ${bt} composer threw, keeping AI block:`, err)
             telemetry.push({
@@ -187,7 +400,34 @@ export function postAISwapStep(
         return { ...composed, ...preservedVariant }
     })
 
-    return { blocks: swapped, telemetry }
+    if (!language) return { blocks: swapped, telemetry }
+
+    // Nav labels: always normalize using the focused NAV_LABELS lookup.
+    // GPT has an insurmountable training bias toward English nav labels — even
+    // explicit system-prompt instructions are ignored. NAV_LABELS covers
+    // en/ms/vi/ja/zh/ko/ar/th; for other languages normalizeNavLinks is a no-op.
+    const nav = normalizeNavLinks(swapped, language)
+    // Section labels: patch before hasDedicatedStrings guard so ja/zh/ko/ar/th
+    // get correct sectionLabels from the seed lookup. en/ms/vi are excluded from
+    // SECTION_LABELS_SEED and handled by the full STRINGS chain below.
+    const sectioned = normalizeSectionLabels(nav, language)
+    // About headline: replace GPT/composer "About XYZ" English prefix with
+    // the localized equivalent (e.g. "关于 重庆火锅" for Chinese).
+    const aboutFixed = normalizeAboutHeadline(sectioned, language)
+
+    // Full structural string chain (contact labels, logos, features headline, etc.)
+    // only runs for languages with dedicated BlockStrings (en/ms/vi). For other
+    // languages, GPT generates these strings correctly — trust its output rather
+    // than overwriting with English fallback strings.
+    if (!hasDedicatedStrings(language)) return { blocks: aboutFixed, telemetry }
+
+    const contact = normalizeContactLabels(aboutFixed, language)
+    const logos = normalizeClientLogosHeadline(contact, language)
+    const features = normalizeFeaturesHeadline(logos, language, biz.name)
+    const testimonials = normalizeTestimonialsSubheadline(features, language)
+    const about = normalizeAboutSectionLabel(testimonials, language)
+    const final = normalizeContactSectionLabel(about, language)
+    return { blocks: final, telemetry }
 }
 
 /**

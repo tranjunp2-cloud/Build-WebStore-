@@ -19,11 +19,12 @@ export const GET = withAuth(async (user) => {
             return res.totalDocs
         }
 
-        const [pending, readyToShip, confirmed, shipped] = await Promise.all([
+        const [pending, readyToShip, confirmed, shipped, cancelled] = await Promise.all([
             countStatus('pending'),
             countStatus('ready_to_ship'),
             countStatus('confirmed'),
             countStatus('shipped'),
+            countStatus('cancelled'),
         ])
 
         return NextResponse.json({
@@ -33,6 +34,7 @@ export const GET = withAuth(async (user) => {
                 readyToShip,
                 confirmed,
                 shipped,
+                cancelled,
             }
         })
     } catch (error: any) {

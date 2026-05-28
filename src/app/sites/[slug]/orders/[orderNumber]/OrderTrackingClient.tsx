@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
     CalendarClock, Navigation, LifeBuoy, Mail, ChevronDown,
-    RefreshCw, Store, Star, ChevronRight,
+    RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw,
 } from 'lucide-react'
 
-type TrackingStatus = 'processing' | 'in-transit' | 'delivered'
+type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
 
 type OrderItem = {
     productName: string
@@ -49,9 +49,15 @@ type OrderData = {
 
 type Props = { order: OrderData; slug: string }
 
-function getTrackingStatus(status: string): TrackingStatus {
+const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
+
+
+function getTrackingStatus(status: string, paymentStatus?: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
     if (status === 'completed') return 'delivered'
+    if (status === 'refunded') return 'refunded'
+    if (status === 'cancelled' && paymentStatus === 'payment_failed') return 'payment_failed'
+    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
     return 'processing'
 }
 
@@ -70,7 +76,7 @@ function formatTime(iso: string) {
 const STAGES = [
     { key: 'placed', label: 'Order Placed', Icon: ShoppingBag },
     { key: 'processing', label: 'Processing', Icon: Package },
-    { key: 'shipped', label: 'Shipped', Icon: Truck },
+    { key: 'shipped', label: 'Shipping', Icon: Truck },
     { key: 'delivered', label: 'Delivered', Icon: PackageCheck },
 ] as const
 
@@ -87,18 +93,27 @@ function getStageStates(trackingStatus: TrackingStatus) {
 function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const isPaid = order.paymentStatus === 'paid'
+    const isPaymentFailed = order.paymentStatus === 'payment_failed'
 
     const STATUS_META = {
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
         'in-transit': { cls: 'in-transit', Icon: Truck, eyebrow: 'Current Status', title: 'In Transit' },
         'delivered': { cls: 'delivered', Icon: PackageCheck, eyebrow: 'Order Status', title: 'Delivered' },
+        'cancelled': { cls: 'cancelled', Icon: XCircle, eyebrow: 'Order Status', title: 'Cancelled' },
+        'refunded': { cls: 'refunded', Icon: RotateCcw, eyebrow: 'Order Status', title: 'Refunded' },
+        'payment_failed': { cls: 'cancelled', Icon: XCircle, eyebrow: 'Order Status', title: 'Payment Failed' },
     }
     const s = STATUS_META[trackingStatus]
 
-    const paymentLabel = isPaid ? 'Paid' : (() => {
-        const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'COD', ewallet: 'e-Wallet' }
-        return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
-    })()
+    const paymentLabel = isPaid
+        ? 'Paid'
+        : isPaymentFailed
+            ? 'Payment Failed'
+            : (() => {
+                const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'COD', ewallet: 'e-Wallet' }
+                return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
+            })()
+    const chipClass = isPaid ? 'paid' : isPaymentFailed ? 'failed' : 'pending'
 
     const handleCopy = () => {
         navigator.clipboard?.writeText(order.orderNumber)
@@ -111,11 +126,11 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
             <div className="ot-oh-left">
                 <span className="ot-oh-eyebrow"><ReceiptText size={12} /> Order Details</span>
                 <div className="ot-oh-id-row">
-                    <span className="ot-oh-id"><span className="hash">#</span>{order.orderNumber}</span>
+                    <span className="ot-oh-id">{order.orderNumber}</span>
                     <button className="ot-oh-copy" onClick={handleCopy} title="Copy order ID">
                         {copied ? <Check size={13} /> : <Copy size={13} />}
                     </button>
-                    <span className={`ot-payment-chip ${isPaid ? 'paid' : 'pending'}`}>
+                    <span className={`ot-payment-chip ${chipClass}`}>
                         <span className="dot" />
                         {paymentLabel}
                     </span>
@@ -138,6 +153,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
 }
 
 function OtStageTracker({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
+    if (trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed') return null
     const states = getStageStates(trackingStatus)
     const placedDate = formatDate(order.createdAt)
     const etaText = trackingStatus === 'delivered'
@@ -254,7 +270,7 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     type Entry = { state: 'latest' | 'completed'; Icon: React.ElementType; title: string; meta?: string; date: string; time: string }
     const entries: Entry[] = []
 
-    entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received #${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
+    entries.push({ state: 'completed', Icon: ShoppingBag, title: 'Order placed', meta: `Order received ${order.orderNumber}`, date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     if (order.paymentStatus === 'paid') {
         entries.push({ state: 'completed', Icon: CreditCard, title: 'Payment confirmed', meta: formatMoney(order.total, order.currency), date: formatDate(order.createdAt), time: formatTime(order.createdAt) })
     }
@@ -266,6 +282,12 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     }
     if (trackingStatus === 'delivered') {
         entries.push({ state: 'latest', Icon: PackageCheck, title: 'Parcel delivered', meta: 'Received by recipient', date: '', time: '' })
+    }
+    if (trackingStatus === 'cancelled') {
+        entries.push({ state: 'latest', Icon: XCircle, title: 'Order cancelled', meta: 'This order has been cancelled', date: '', time: '' })
+    }
+    if (trackingStatus === 'refunded') {
+        entries.push({ state: 'latest', Icon: RotateCcw, title: 'Order refunded', meta: 'A refund has been processed for this order', date: '', time: '' })
     }
 
     return (
@@ -401,8 +423,50 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
 }
 
 export default function OrderTrackingClient({ order, slug }: Props) {
-    const trackingStatus = getTrackingStatus(order.status)
+    const [liveOrder, setLiveOrder] = useState(order)
+    const statusRef = useRef(order.status)
+
+    useEffect(() => {
+        if (TERMINAL_STATUSES.has(statusRef.current)) return
+
+        const url = `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
+        const es = new EventSource(url)
+        let errorCount = 0
+        const MAX_ERRORS = 5
+
+        es.onmessage = (e) => {
+            errorCount = 0
+            try {
+                const data = JSON.parse(e.data)
+                if (data.status !== statusRef.current) {
+                    statusRef.current = data.status
+                    setLiveOrder(prev => ({
+                        ...prev,
+                        status: data.status,
+                        paymentStatus: data.paymentStatus,
+                        trackingNumber: data.trackingNumber,
+                    }))
+                    if (data.terminal) es.close()
+                }
+            } catch {
+                // ignore malformed events
+            }
+        }
+
+        es.onerror = () => {
+            if (TERMINAL_STATUSES.has(statusRef.current)) { es.close(); return }
+            // Stop reconnecting after repeated failures (e.g. persistent 404/500)
+            errorCount++
+            if (errorCount >= MAX_ERRORS) es.close()
+        }
+
+        return () => es.close()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const trackingStatus = getTrackingStatus(liveOrder.status, liveOrder.paymentStatus)
     const isDelivered = trackingStatus === 'delivered'
+    const isNegativeTerminal = trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed'
 
     return (
         <div className={`ot-page${isDelivered ? ' is-delivered' : ''}`}>
@@ -411,7 +475,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                 <div className="crumbs">
                     <span>My Orders</span>
                     <ChevronRight size={14} />
-                    <strong>#{order.orderNumber}</strong>
+                    <strong>{liveOrder.orderNumber}</strong>
                 </div>
                 <Link href={`/sites/${slug}/products`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
@@ -420,15 +484,15 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
             <div className="ck-shell">
                 <div className="ck-form-col">
-                    {isDelivered && <OtDeliveredBanner order={order} />}
-                    <OtOrderHead order={order} trackingStatus={trackingStatus} />
-                    <OtStageTracker order={order} trackingStatus={trackingStatus} />
-                    <OtShippingCard order={order} trackingStatus={trackingStatus} />
-                    <OtTimeline order={order} trackingStatus={trackingStatus} />
-                    <OtItems order={order} />
+                    {isDelivered && <OtDeliveredBanner order={liveOrder} />}
+                    <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
+                    {!isNegativeTerminal && <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />}
+                    <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtItems order={liveOrder} />
                 </div>
                 <div className="ck-summary-col">
-                    <OtSide order={order} slug={slug} />
+                    <OtSide order={liveOrder} slug={slug} />
                 </div>
             </div>
         </div>

@@ -5,8 +5,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { AddToCartButton } from '@/components/storefront/AddToCartButton'
-import { ProductVariantSelector } from '@/components/storefront/ProductVariantSelector'
+import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 import { getCurrentUser } from '@/lib/auth'
@@ -276,16 +275,9 @@ export default async function ProductDetailPage({ params }: Props) {
                         {p.name}
                     </h1>
 
-                    {/* Price + Variants/Stock — US-F08-02: selector owns price display for variant products */}
-                    {p.hasVariants && p.variants && p.variants.length > 0 ? (
-                        <ProductVariantSelector
-                            variants={p.variants}
-                            currency={p.currency || 'MYR'}
-                            primaryColor={primaryColor}
-                            basePrice={p.price}
-                            baseCompareAtPrice={p.compareAtPrice ?? null}
-                        />
-                    ) : (
+                    {/* Price + Stock — server-rendered for non-variant products only.
+                        Variant products: price display is inside ProductVariantSelector (client-side, updates on selection). */}
+                    {(!p.hasVariants || !p.variants?.length) && (
                         <>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                                 <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
@@ -311,7 +303,8 @@ export default async function ProductDetailPage({ params }: Props) {
                         </>
                     )}
 
-                    <AddToCartButton
+                    {/* Client wrapper: holds selectedVariant state, renders Selector (variant only) + AddToCartButton */}
+                    <ProductAddToCartSection
                         product={{
                             id: String(p.id),
                             slug: p.slug,
@@ -321,6 +314,8 @@ export default async function ProductDetailPage({ params }: Props) {
                             currency: p.currency || 'MYR',
                             imageUrl: images[0]?.image?.url,
                             inventory: p.inventory ?? 0,
+                            hasVariants: p.hasVariants,
+                            variants: p.variants,
                         }}
                         primaryColor={primaryColor}
                         siteSlug={slug}

@@ -97,7 +97,6 @@ interface Props {
     onLocaleChange: (locale: 'en' | 'ms') => void
     onFieldChange: (locale: 'en' | 'ms', field: keyof ContentFields, value: string) => void
     onEnabledChange: (val: boolean) => void
-    onSave: () => void
 }
 
 export function EmailTemplateFormCard({
@@ -110,7 +109,6 @@ export function EmailTemplateFormCard({
     onLocaleChange,
     onFieldChange,
     onEnabledChange,
-    onSave,
 }: Props) {
     const cur = locale === 'en' ? draft.contentEn : (draft.contentMs ?? {})
     const vars = EMAIL_TEMPLATE_VARIABLES[templateType] ?? []
@@ -207,19 +205,11 @@ export function EmailTemplateFormCard({
                 onChange={(v) => onFieldChange(locale, 'closing', v)}
             />
 
-            {/* Save row */}
-            <div className="flex items-center justify-between border-t border-white/[0.06] pt-4">
+            {/* Status */}
+            <div className="border-t border-white/[0.06] pt-4">
                 <span className="text-xs text-slate-400">
                     {isDirty ? 'Unsaved changes' : 'All changes saved'}
                 </span>
-                <button
-                    type="button"
-                    onClick={onSave}
-                    disabled={!isDirty || isSaving}
-                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isSaving ? '...' : '✓'} Save Changes
-                </button>
             </div>
         </div>
     )

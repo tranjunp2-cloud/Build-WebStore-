@@ -278,9 +278,9 @@ describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
 
 // ─── TC-F09.24: Phone Format Validation ─────────────────────────────────────
 describe('[TC-F09.24] Phone Format Validation (validatePhone)', () => {
-    it('TC-F09.24: returns null for empty phone (phone is optional)', () => {
-        expect(validatePhone('')).toBeNull()
-        expect(validatePhone('   ')).toBeNull()
+    it('TC-F09.24: returns error for empty phone (phone is required)', () => {
+        expect(validatePhone('')).toBe('Phone number is required')
+        expect(validatePhone('   ')).toBe('Phone number is required')
     })
 
     it('TC-F09.24: accepts local mobile format (012-3456789)', () => {

@@ -1,14 +1,14 @@
 import type { CollectionConfig } from 'payload'
+import { normalizePhone } from '@/lib/normalize-phone'
 
 export const Customers: CollectionConfig = {
     slug: 'customers',
     admin: {
-        useAsTitle: 'email',
+        useAsTitle: 'name',
         description: 'Shop customers (buyers). Auto-created from orders; addresses + rank editable.',
-        defaultColumns: ['email', 'name', 'rank', 'phone', 'createdAt'],
-        // Payload 3.79 admin.listSearchableFields — enables search by name in list view
-        // (email is already covered by useAsTitle)
-        listSearchableFields: ['email', 'name'],
+        defaultColumns: ['name', 'phone', 'email', 'rank', 'createdAt'],
+        // Payload 3.79 admin.listSearchableFields — enables search by name/email/phone in list view
+        listSearchableFields: ['email', 'name', 'phone'],
         components: {
             views: {
                 edit: {
@@ -61,6 +61,11 @@ export const Customers: CollectionConfig = {
                 if (typeof data.email === 'string') {
                     data.email = data.email.trim().toLowerCase()
                 }
+                // Normalize phone via shared util (src/lib/normalize-phone.ts) so admin-entered
+                // phones always match the order-derived lookup key and the DB unique index.
+                if (typeof data.phone === 'string') {
+                    data.phone = normalizePhone(data.phone)
+                }
                 return data
             },
         ],
@@ -77,7 +82,6 @@ export const Customers: CollectionConfig = {
         {
             name: 'email',
             type: 'email',
-            required: true,
             index: true,
         },
         {
@@ -89,6 +93,7 @@ export const Customers: CollectionConfig = {
         {
             name: 'phone',
             type: 'text',
+            index: true,
         },
         {
             name: 'rank',
@@ -151,6 +156,11 @@ export const Customers: CollectionConfig = {
             name: 'firstOrderAt',
             type: 'date',
             admin: { readOnly: true, description: 'Set automatically when first order is linked' },
+        },
+        {
+            name: 'latestOrderAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'Updated automatically to the most recent order date' },
         },
     ],
     timestamps: true,

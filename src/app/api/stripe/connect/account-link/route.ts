@@ -61,12 +61,14 @@ export const POST = withAuth(async (user, request) => {
         }
 
         const stripe = getStripeClient()
-        const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+        const origin = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
         const accountLink = await stripe.accountLinks.create({
             account: stripeAccountId,
             type: 'account_onboarding',
             return_url: `${origin}/settings/payments?stripe=verified`,
             refresh_url: `${origin}/settings/payments?stripe=refresh`,
+            // Only collect fields that are currently required — skips optional steps like Stripe Climate pledge
+            collection_options: { fields: 'currently_due' },
         })
 
         return NextResponse.json({

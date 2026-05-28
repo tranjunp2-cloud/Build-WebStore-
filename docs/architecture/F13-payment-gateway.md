@@ -1,13 +1,13 @@
 # F13 Payment Gateway — Architecture
 
-> **Feature:** F13 — Payment Gateway (Malaysia, Wave 6 P0)
-> **Version:** 1.0 | **Created:** 2026-05-13 | **Owner:** Backend Dev
+> **Feature:** F13 — Payment Gateway (Malaysia, Wave 6–6.5)
+> **Version:** 2.0 | **Updated:** 2026-05-27 | **Owner:** Backend Dev + docs-manager
 > **Links:**
 > - PRD: [`docs/prd/F13-payment-gateway.md`](../prd/F13-payment-gateway.md)
 > - Design: [`docs/design/F13-payment-gateway-design.md`](../design/F13-payment-gateway-design.md)
 > - Stories: [`docs/stories/F13-payment-gateway-stories.md`](../stories/F13-payment-gateway-stories.md)
 > - QA: [`docs/qa/F13-payment-gateway.md`](../qa/F13-payment-gateway.md)
-> - Plan: [`plans/260513-1614-f13-payment-stripe-card-fpx/`](../../plans/260513-1614-f13-payment-stripe-card-fpx/)
+> - Plan (Wave 6.5 Hardening): [`plans/260527-1410-f13-stripe-flow-hardening/`](../../plans/260527-1410-f13-stripe-flow-hardening/)
 
 ---
 
@@ -17,8 +17,10 @@
 
 - Buyer redirect ra `checkout.stripe.com/...` — Stripe-hosted page handle Card/FPX/3D Secure
 - Payment vào account merchant (`tenant.stripeAccountId`) qua Direct Charge
-- PrimeWeb thu **3% application_fee_amount** (configurable per-checkout-call)
-- Webhook `checkout.session.completed` → order status `pending → new`
+- **Wave 6: Zero application_fee** (cross-border limitation: US platform → MY seller prohibits fee on Stripe side)
+- **Wave 7+: Revisit 3% platform fee** when destination charges or same-country model available
+- Webhook `checkout.session.completed` → order `status='new'` **AND** `paymentStatus='paid'` atomically (v2.0 correction)
+- Confirm page polling + cron reconcile for late webhooks (v2.0 addition)
 
 **Decision reference:** Design §8.6 — Checkout Session vs Payment Element → chốt Checkout Session vì code đã implement + KISS.
 
@@ -26,39 +28,42 @@
 
 ## 2. Data Flow
 
-### 2.1. Buyer checkout (happy path)
+### 2.1. Buyer checkout (happy path) — Wave 6
 
 ```
 Buyer (Storefront)
   ↓ Click "Pay with Stripe" + "Place Order"
-Client POST /api/orders/create
+Client POST /api/orders/stripe-checkout (corrected endpoint name, Wave 6.5)
   ↓ withAuth=false (guest checkout)
 Backend
   ├── Validate tenant.payment_card OR tenant.payment_fpx (FR-15)
   ├── buildPaymentMethodTypes(tenant) → ['card'] | ['fpx'] | ['card','fpx']
+  ├── Check stock, prevent oversell at checkout time
   ├── createStripeCheckoutSession({
   │     paymentMethodTypes,
   │     stripeAccountId: tenant.stripeAccountId,
-  │     applicationFeePercent: 3,
+  │     // Wave 6: NO application_fee (fee=0)
+  │     // Wave 7+: add applicationFeePercent: 3 when cross-border lifted
   │     successUrl, cancelUrl,
   │   })
   ↓ Stripe API (Direct Charge on connected account)
 Stripe creates Session
   ↓ Returns { sessionId, url }
-Backend returns { url } to client
+Backend saves stripeSessionId on order, returns { url } to client
   ↓ Client: window.location.href = url
 Stripe Checkout (hosted page)
   ├── Card flow: input card → submit → 3D Secure → return success_url
   └── FPX flow: select bank → redirect bank login → authorize → return success_url
 
 Success path:
-  Stripe → success_url → /sites/[slug]/orders/[id]/confirmation
-  Stripe → webhook checkout.session.completed → backend update order pending→new
+  Stripe → success_url → /sites/[slug]/order/[id]/confirm?session_id={...}
+  Stripe → webhook checkout.session.completed → backend reconcileOrderPaid()
+    (atomic: status='new', paymentStatus='paid', decrement stock, send emails)
 
 Cancel path:
   Stripe → cancel_url → /sites/[slug]/checkout?stripe_cancelled=1
-  Frontend → toast BM "Pembayaran gagal" + cart preserved
-  Order status stays 'pending' (BR-03)
+  Frontend → toast BM "Pembayaran gagal" + cart preserved (NOT cleared, BR-04)
+  Order status stays 'pending'
 ```
 
 ### 2.2. Seller onboarding
@@ -92,7 +97,7 @@ Return paths:
         Frontend handler: toast warning + retry CTA visible
 ```
 
-### 2.3. Webhook event processing
+### 2.3. Webhook event processing (v2.0 rewrite)
 
 ```
 Stripe webhook → POST /api/webhooks/stripe
@@ -106,33 +111,120 @@ Backend
   │       checkout.session.completed → 'payment_success'
   │       payment_intent.payment_failed → 'payment_failed'
   │       account.updated → 'account_updated'
+  │       account.application.deauthorized → 'account_deauthorized'
+  │       subscription.updated → 'subscription_updated'
   └── Process event:
-        ├── payment_success → find order by client_reference_id → update status 'pending → new'
-        ├── payment_failed → log + notify merchant (out of scope handler)
-        └── account_updated → sync tenant.stripeOnboardingComplete với account.charges_enabled
+        ├── payment_success → reconcileOrderPaid() [see §2.4]
+        │   (IDOR check, atomic status+paymentStatus, stock decrement+oversell, emails, notifications)
+        ├── payment_failed → find order, set paymentStatus='payment_failed', notify merchant
+        ├── account.deauthorized → find tenant, lock stripeOnboardingComplete=false, toggle disable
+        ├── account_updated → sync tenant.stripeOnboardingComplete ← account.charges_enabled
+        ├── subscription.updated → placeholder (Wave 7+)
+        └── Other events (charge.refunded, etc) → graceful skip, log info, return 200
+```
+
+### 2.4. Reconcile Shared Artifact (v2.0 — single source of truth)
+
+**File:** `src/lib/payment/reconcile-order.ts`
+
+Called by: webhook (§2.3), Confirm polling (§2.5), cron (§2.7). Atomic operation:
+
+```
+reconcileOrderPaid(payload, orderId, context='webhook'|'poll'|'cron'):
+  ├── IDOR guard: verify connected account owns order's tenant (fail-closed)
+  ├── Atomic transition: UPDATE orders SET status='new', payment_status='paid'
+  │   WHERE id=? AND status='pending' [only first wins]
+  ├── Decrement stock: UPDATE products SET inventory = GREATEST(0, inventory - qty)
+  │   WHERE id=? AND inventory >= qty (atomic per-product)
+  │   → if qty > available: flag order oversellReview=true [see §2.4a]
+  ├── Resolve tenant for emails (shop name, site slug)
+  ├── Retrieve PaymentIntent (optional, Wave 6.5+): read from connected account
+  │   to get actual method (card vs fpx) — update order.paymentMethod
+  ├── Send emails: orderConfirmation (buyer) + newOrderSeller (merchant)
+  ├── Fire ORDER_NEW notification (merchant dashboard)
+  └── Return success flag
+
+2.4a. Oversell handling (Wave 6.5):
+  ├── If stock goes negative on any product after decrement:
+  │   ├── Set order.oversellReview=true (boolean flag)
+  │   ├── Send SYSTEM_ALERT to merchant: "Order #123 flagged for review — stock went negative"
+  │   ├── Admin UI shows "Refund customer" button → calls existing POST /api/orders/[id]/refund
+  │   └── Order stays status='new' + paymentStatus='paid' (paid, not auto-refunded)
+```
+
+### 2.5. Confirm Polling + Self-Heal (v2.0 — Wave 6.5)
+
+```
+Buyer at /sites/[slug]/order/[id]/confirm
+  ↓ Page mounted, order.status='pending'
+Frontend
+  └── polling loop every 2s:
+        GET /api/orders/[id]/payment-status (auth via ct_{orderId} cookie)
+              ├── Returns { status, paymentStatus, stripeSessionId }
+              ├── If paymentStatus='paid': exit loop, show success
+              └── If still 'pending' + stripeSessionId set:
+                  └── Active reconcile: GET Stripe session on connected account
+                      ├── Check session.payment_status (paid/processing/requires_payment_method)
+                      ├── If Stripe says 'paid' but DB says 'pending':
+                      │   → Call reconcileOrderPaid() to self-heal
+                      └── Update display state
+        ↓ Loop exits after 15min timeout or success
+```
+
+### 2.6. Retry Payment Endpoint (v2.0 — Wave 6.5)
+
+```
+Buyer on order detail page (order.status='pending' or 'payment_failed')
+  ↓ Click "Pay Now" CTA
+Client POST /api/orders/[id]/retry-payment
+  ├── Guard: only if status='pending' or 'payment_failed' (locked decision: no order-list page)
+  ├── Re-validate stock (hard reject if out)
+  ├── Re-validate tenant Stripe readiness (not suspended, still onboarded)
+  └── Create NEW Stripe session (don't reuse old, might be expired)
+        ├── Generate new stripeSessionId
+        ├── Return { sessionUrl } → client redirects
+```
+
+### 2.7. Cron Reconcile + Cleanup (v2.0 — Wave 6.5)
+
+```
+GET /api/cron/reconcile-orders (called by Vercel cron, auth: CRON_SECRET header)
+  ├── Find pending orders > 15 minutes old
+  ├── For each:
+  │   ├── Look up Stripe session on connected account
+  │   ├── If Stripe.status='paid': reconcileOrderPaid('cron') [self-heal]
+  │   └── If still 'unpaid' after 15min: mark as 'expired' (buyer must retry)
+  ├── Log reconciled count + any errors
+  └── Return { reconciled: N, expired: M }
 ```
 
 ---
 
-## 3. Components Map
+## 3. Components Map (v2.0)
 
 | Component | File | Role |
 |-----------|------|------|
 | Stripe client + helpers | `src/lib/payment/stripe.ts` | Singleton client, Connect helpers, Checkout Session, webhook verify |
 | Payment types | `src/lib/payment/types.ts` | `CheckoutParams`, `ConnectAccountStatus`, `PaymentWebhookEvent` |
-| Method builder (NEW Phase 03) | `src/lib/payment/method-builder.ts` | `buildPaymentMethodTypes(tenant)` pure function |
+| Method builder | `src/lib/payment/method-builder.ts` | `buildPaymentMethodTypes(tenant)` pure function |
+| **Reconcile (shared, v2.0 NEW)** | **`src/lib/payment/reconcile-order.ts`** | **Atomic order-paid transition + stock + emails + oversell handling** |
 | Onboard endpoint | `src/app/api/stripe/connect/onboard/route.ts` | POST creates Connect account + returns onboardingUrl |
 | Status endpoint | `src/app/api/stripe/connect/status/route.ts` | GET returns chargesEnabled/payoutsEnabled |
-| Order create | `src/app/api/orders/create/route.ts` | POST creates order + Stripe Checkout Session |
-| Webhook handler | `src/app/api/webhooks/stripe/route.ts` | Process Stripe events |
+| Stripe checkout endpoint | `src/app/api/orders/stripe-checkout/route.ts` | POST creates order + Stripe Checkout Session |
+| **Payment status endpoint (v2.0 NEW)** | **`src/app/api/orders/[id]/payment-status/route.ts`** | **GET auth cookie, return status; optional active reconcile** |
+| **Retry payment endpoint (v2.0 NEW)** | **`src/app/api/orders/[id]/retry-payment/route.ts`** | **POST re-validate stock + new Stripe session** |
+| **Cron reconcile endpoint (v2.0 NEW)** | **`src/app/api/cron/reconcile-orders/route.ts`** | **GET CRON_SECRET auth; reconcile pending >15min + expire stale** |
+| Webhook handler | `src/app/api/webhooks/stripe/route.ts` | Process Stripe events + call reconcile |
+| Webhook handlers (sub) | `src/app/api/webhooks/stripe/handlers/*.ts` | checkout-completed, payment-failed, account-updated, etc. |
 | Settings actions | `src/app/(dashboard)/settings/payments/actions.ts` | `getPaymentSettings`, `updatePaymentSettings` |
-| Settings UI (extended Phase 02) | `src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx` | Container |
-| Stripe toggles wrapper (NEW Phase 02) | `src/app/(dashboard)/settings/payments/stripe-payment-toggles.tsx` | Card + FPX toggles + Connect CTA + return handler |
-| Tenants schema | `src/collections/Tenants.ts` | `stripeAccountId`, `stripeOnboardingComplete`, `payment_card`, `payment_fpx`, `payment_cod`, `payment_qr` |
+| Settings UI | `src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx` | Container |
+| Stripe toggles wrapper | `src/app/(dashboard)/settings/payments/stripe-payment-toggles.tsx` | Card + FPX toggles + Connect CTA + return handler |
+| Tenants schema | `src/collections/Tenants.ts` | `stripeAccountId`, `stripeOnboardingComplete`, `payment_card`, `payment_fpx`, `oversellReview` (NEW) |
+| Orders schema | `src/collections/Orders.ts` | `status`, `paymentStatus`, `stripeSessionId`, `stripePaymentIntentId`, `paymentMethod`, `oversellReview` (NEW) |
 
 ---
 
-## 4. Schema
+## 4. Schema (v2.0)
 
 ### 4.1. Tenant payment fields
 
@@ -145,7 +237,7 @@ Backend
   stripeCustomerId: string | null,         // platform-level customer (subscription)
   stripeSubscriptionId: string | null,
 
-  // F13 NEW (Phase 01)
+  // F13 Wave 6 (Phase 01)
   payment_card: boolean,                   // enable Card via Stripe Checkout
   payment_fpx: boolean,                    // enable FPX via Stripe Checkout
 
@@ -156,20 +248,49 @@ Backend
 }
 ```
 
-### 4.2. Migration (Phase 01)
+### 4.2. Order payment fields (v2.0)
+
+```typescript
+// src/collections/Orders.ts
+{
+  // Existing (Wave 6)
+  status: 'pending' | 'new' | 'confirmed' | 'shipped' | 'cancelled' | 'payment_failed',
+  paymentMethod: 'stripe' | 'card' | 'fpx' | 'cod' | 'qr' | 'free',
+
+  // NEW Wave 6.5 (Phase 01 + 02 + 07)
+  paymentStatus: 'pending' | 'paid' | 'payment_failed' | 'refunded' | null,  // Atomic with status='new'
+  stripeSessionId: string | null,          // Stripe checkout session ID (for idempotency)
+  stripePaymentIntentId: string | null,    // Stripe payment intent ID (for reconcile)
+  oversellReview: boolean = false,         // Flag if stock went negative; needs seller manual refund
+}
+```
+
+### 4.3. Migration (v2.0)
+
+**Per `.claude/rules/database-schema.md` convention:**
 
 ```sql
--- 1. Add columns
+-- 1. Add Wave 6 columns (if not done Phase 01)
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payment_card BOOLEAN DEFAULT false;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payment_fpx BOOLEAN DEFAULT false;
 
--- 2. Backfill (D-02 — preserve hardcode behavior)
+-- 2. Add Wave 6.5 columns (Phase 01 setup)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status VARCHAR DEFAULT 'pending';  -- 'pending'|'paid'|'payment_failed'|'refunded'
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR UNIQUE;  -- Idempotency key
+
+-- 3. Add Wave 6.5 columns (Phase 02 setup)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR;
+
+-- 4. Backfill Wave 6 (D-02 — preserve hardcode behavior)
 UPDATE tenants
 SET payment_card = true
 WHERE stripe_onboarding_complete = true AND payment_card = false;
 ```
 
-### 4.3. Payload hooks
+**Migration entry:** Add entries to `scripts/db-setup.js` `MIGRATIONS` array per convention.
+
+### 4.4. Payload hooks
 
 `beforeChange` validation: auto-disable `payment_card`/`payment_fpx` nếu `stripeOnboardingComplete = false`:
 
@@ -186,20 +307,21 @@ hooks: {
 
 ---
 
-## 5. Environment Variables
+## 5. Environment Variables (v2.0)
 
-| Variable | Used by | Required |
-|----------|---------|----------|
-| `STRIPE_SECRET_KEY` | `getStripeClient()` — Stripe API auth | ✅ Required (sk_test_* on staging, sk_live_* on production) |
-| `STRIPE_WEBHOOK_SECRET` | `verifyStripeWebhook(body, sig, false)` — main webhook | ✅ Required cho main webhook endpoint |
-| `STRIPE_CONNECT_WEBHOOK_SECRET` | `verifyStripeWebhook(body, sig, true)` — Connect events | ✅ Required cho Connect webhook endpoint (separate) |
-| `NEXT_PUBLIC_SERVER_URL` | Onboard route — build success/refresh URLs | ✅ Required (`https://staging-domain.com`) |
+| Variable | Used by | Required | Notes |
+|----------|---------|----------|-------|
+| `STRIPE_SECRET_KEY` | `getStripeClient()` — Stripe API auth | ✅ Required | sk_test_* staging, sk_live_* production |
+| `STRIPE_WEBHOOK_SECRET` | `verifyStripeWebhook(body, sig, false)` — main webhook | ✅ Required | Main endpoint: checkout, payment_intent |
+| `STRIPE_CONNECT_WEBHOOK_SECRET` | `verifyStripeWebhook(body, sig, true)` — Connect events | ✅ Required | Separate endpoint: account.updated, etc. |
+| `NEXT_PUBLIC_SERVER_URL` | Onboard route — build success/refresh URLs | ✅ Required | `https://staging-domain.com` |
+| **`CRON_SECRET`** (v2.0 NEW) | **`GET /api/cron/reconcile-orders` auth header** | **✅ Required Wave 6.5** | **Vercel cron → bearer token; prevent public abuse** |
 
 **Critical:** 2 webhook secrets riêng cho 2 webhook endpoints khác trong Stripe Dashboard:
 - Main webhook: events từ platform (checkout.session.completed, payment_intent.*)
-- Connect webhook: events từ connected accounts (account.updated)
+- Connect webhook: events từ connected accounts (account.updated, account.deauthorized)
 
-Per `.claude/rules/env-vars.md` — source of truth ở Vercel Dashboard. GitHub Secrets chỉ chứa CI tooling tokens.
+**Per `.claude/rules/env-vars.md`:** source of truth ở Vercel Dashboard. GitHub Secrets chỉ chứa CI tooling tokens.
 
 ---
 
@@ -211,7 +333,7 @@ Per `.claude/rules/env-vars.md` — source of truth ở Vercel Dashboard. GitHub
 
 - Stripe Stripe API tự không detect duplicate `client_reference_id`, nhưng:
 - Order status check: nếu order đã `new` (success từ webhook lần đầu), client side fetch order → biết đã paid → KHÔNG gọi lại
-- Risk: nếu client retry POST `/api/orders/create` cho cùng `orderId` → tạo 2 Stripe sessions, buyer có thể pay 2 lần
+- Risk: nếu client retry POST `/api/orders/stripe-checkout` cho cùng `orderId` → tạo 2 Stripe sessions, buyer có thể pay 2 lần
 
 **Mitigation (recommended Wave 6):**
 - Frontend: disable "Place Order" button sau click + full-page overlay → prevent double-click
@@ -225,42 +347,82 @@ stripe.checkout.sessions.create(params, {
 })
 ```
 
-### 6.2. Webhook event processing
+### 6.2. Webhook event processing (v2.0 — Implemented)
 
-**Current approach:** Order status check (state machine guard).
+**Wave 6.5 approach:** Atomic `UPDATE WHERE status='pending'` (IMPLEMENTED, not recommended but DONE).
 
-- Webhook handler: load order → if order.status === 'new' → SKIP (đã processed lần trước)
-- IF order.status === 'pending' → update → 'new'
-- Stripe automatically retries webhook delivery up to 3 days với exponential backoff → idempotency cần thiết
-
-**Risk:** Race condition khi 2 webhook events arrive concurrently (rare nhưng possible với retry storm).
-
-**Mitigation (recommended):**
-- Wrap update trong transaction với `UPDATE WHERE status = 'pending'` (atomic check-and-update)
-- Log Stripe event ID → check Redis/DB dedup table (defer Wave 7+ nếu volume thấp)
-
-**Reference TC:** QA TC-F13.14 (Idempotent webhook processing) — currently `[ ]` not run; verify với `stripe listen` retry simulation.
-
----
-
-## 7. Application Fee Calculation
-
-```typescript
-// src/lib/payment/stripe.ts:117
-const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-const applicationFeeAmount = Math.round(totalAmount * (feePercent / 100))
+```sql
+-- Handler: reconcileOrderPaid() in webhook checkout-completed
+UPDATE orders SET status='new', payment_status='paid'
+WHERE id=? AND status='pending'
+RETURNING id
 ```
 
-- `totalAmount`: integer sen (RM × 100)
-- `feePercent`: default 3 (configurable via `params.applicationFeePercent`)
-- Rounding: `Math.round()` — banker's rounding NOT used (Stripe accepts integer)
-- Edge case: tổng RM 33.33 (3333 sen) × 3% = 99.99 → round 100 sen (RM 1.00); merchant nhận 3233 sen (RM 32.33)
+- Atomic operation: only the first webhook wins (UPDATE returns 1 row)
+- Subsequent retries: WHERE clause fails (status already 'new'), no updates, handler logs skip
+- Stock decrement, emails, notifications only fire once (guarded by return count)
+- Stripe retries webhook delivery up to 3 days với exponential backoff → idempotency essential
 
-**Test coverage:** QA TC-F13.03, TC-F13.20.
+**Tradeoff:** Raw SQL bypasses Payload hooks. Verify no product/order hook side-effect is lost (e.g., low-stock alerts) per `.claude/rules/database-schema.md` constraint.
+
+**Test coverage:** QA TC-F13.83 (critical — webhook DB outage), TC-F13.85 (concurrent/out-of-order events), TC-F13.143 (reconcile idempotency).
 
 ---
 
-## 8. Connected Account State Machine
+## 7. Application Fee Model (v2.0 Corrected)
+
+**Wave 6:** Zero application fee (0%). Cross-border limitation: US platform + MY connected account prohibit `application_fee_amount` on Stripe side.
+
+**Wave 7+:** Revisit 3% platform fee when:
+- Destination charges enabled (same account type)
+- Same-country model available (US seller → US platform)
+- Stripe policy update
+
+```typescript
+// Wave 6 (current):
+// NO application_fee_amount in payment_intent_data
+payment_intent_data: { metadata: { orderId } }
+
+// Wave 7+ (future):
+// const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+// const applicationFeeAmount = Math.round(totalAmount * (feePercent / 100))  // 3%
+// - Rounding: Math.round() (banker's rounding NOT used; Stripe accepts integer)
+// - Edge case: RM 33.33 (3333 sen) × 3% = 99.99 → round 100 sen; merchant nets 3233 sen
+```
+
+**Reference:** Plan §3 — Platform Fee Deferred to Wave 7+. Not in scope Wave 6.5.
+
+---
+
+## 8. Vercel Cron Configuration (v2.0 — Wave 6.5)
+
+**Endpoint:** `GET /api/cron/reconcile-orders` (§2.7)
+
+**Configuration in `vercel.json`:**
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/reconcile-orders",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+```
+
+**Security:**
+- Auth via `CRON_SECRET` header (bearer token)
+- Endpoint validates `Authorization: Bearer ${CRON_SECRET}`
+- Reject 401 if missing or invalid
+
+**Per `.claude/rules/vercel-deploy.md`:**
+- Do NOT change `git.deploymentEnabled` (must remain false)
+- Editing `crons[]` is safe (does not require disabling deployments)
+- Test schedule on staging with `vercel cron list` before production
+
+---
+
+## 9. Connected Account State Machine
 
 ```
 [null]
@@ -284,7 +446,7 @@ const applicationFeeAmount = Math.round(totalAmount * (feePercent / 100))
 
 ---
 
-## 9. Stripe API Version Pin
+## 10. Stripe API Version Pin
 
 **Current:** Code uses Stripe SDK default API version.
 
@@ -300,7 +462,7 @@ new Stripe(key, {
 
 ---
 
-## 10. Error Handling Matrix
+## 11. Error Handling Matrix
 
 | Scenario | Backend response | Frontend UX |
 |----------|------------------|-------------|
@@ -315,18 +477,19 @@ new Stripe(key, {
 
 ---
 
-## 11. Security Considerations
+## 12. Security Considerations
 
-- **PCI-DSS SAQ A**: Zero card data server-side (Stripe Checkout hosted) — QA TC-F13.23
-- **CSRF**: Next.js App Router default CSRF protection (Same-Origin policy on POST). Verify `/api/orders/create` không có CORS wildcard.
-- **Tenant ownership**: `/api/stripe/connect/onboard` verifies user owns tenantId (line 33-41 onboard route). Same pattern required cho future endpoints.
+- **PCI-DSS SAQ A**: Zero card data server-side (Stripe Checkout hosted) — QA TC-F13.38
+- **CSRF**: Next.js App Router default CSRF protection (Same-Origin policy on POST). Verify `/api/orders/stripe-checkout` không có CORS wildcard.
+- **Tenant ownership**: `/api/stripe/connect/onboard` verifies user owns tenantId (line 33-41 onboard route). Same pattern required cho future endpoints (retry-payment, payment-status).
+- **IDOR guard (webhook)**: `handleCheckoutCompleted` calls `verifyConnectedAccountOwnership()` before any DB writes (fail-closed).
 - **Webhook secret rotation**: Document rotation procedure (rotate via Stripe Dashboard → update Vercel env → redeploy). Test với `stripe listen` on staging trước rotate production.
 - **3D Secure**: Stripe Checkout enables 3DS automatically theo card BIN. Không cần config.
 - **Replay attack protection**: Stripe SDK validates timestamp (≤ 5 minutes default). KHÔNG cần custom check.
 
 ---
 
-## 12. Performance Targets
+## 13. Performance Targets
 
 | Metric | Target | Measured |
 |--------|--------|----------|
@@ -337,75 +500,90 @@ new Stripe(key, {
 
 ---
 
-## 13. Dependencies
+## 14. Dependencies
 
-| Dependency | Version | Status |
-|-----------|---------|--------|
-| `stripe` (Node SDK) | latest | ✅ Installed |
-| `@stripe/stripe-js` (client SDK) | — | ❌ NOT needed (Checkout Session hosted, no client SDK) |
-| Stripe MY account | Standard accounts enabled | ✅ Done |
-| F09 Storefront checkout page | Phase 04 modifies | ⏳ Dependency cho Phase 04 |
-| F19 Settings > Payments page | Phase 02 extends | ✅ Existing |
-| F02 Auth (`withAuth`) | Onboard route uses | ✅ Existing |
-| F10 Orders confirmation page | Receives `success_url` callback | ✅ Existing (verify session_id parsing) |
+| Dependency | Version | Status | Notes |
+|-----------|---------|--------|-------|
+| `stripe` (Node SDK) | latest | ✅ Installed | Checkout + Connect support |
+| `@stripe/stripe-js` (client SDK) | — | ❌ NOT needed | Checkout Session hosted, no inline |
+| Stripe MY account | Standard accounts enabled | ✅ Done | Direct Charges, FPX enabled |
+| F09 Storefront checkout | Phase 04 modifies | ⏳ Wave 6.5 dep | Cart preserved, Confirm page |
+| F19 Settings > Payments | Phase 02 extends | ✅ Existing | Card/FPX toggles, Connect CTA |
+| F02 Auth (`withAuth`) | Onboard route uses | ✅ Existing | Tenant ownership verify |
+| F10 Orders confirmation | Receives `success_url` callback | ✅ Existing | Polling + self-heal (Wave 6.5 new) |
+| Vercel Cron | `reconcile-orders` job | ✅ Configurable | 10min schedule (Wave 6.5) |
 
 ---
 
-## 14. Testing Strategy
+## 15. Testing Strategy
 
-### 14.1. Unit tests (Phase 02 + 03)
+### 15.1. Unit tests (Phase 01–03, 06)
 - `buildPaymentMethodTypes` (4 cases)
+- `reconcileOrderPaid` (idempotency, oversell flag, stock decrement)
 - `createStripeCheckoutSession` với dynamic methods (3 cases)
 - `updatePaymentSettings` hooks (auto-disable nếu not onboarded)
 - StripePaymentToggles component (7 cases)
+- Retry payment validation (state guard, stock check)
 
-### 14.2. Integration tests (Phase 03)
-- `/api/orders/create` với tenant card-only / fpx-only / both-off
-- Webhook handler `checkout.session.completed` → order update
+### 15.2. Integration tests (Phase 01–03, 05–07)
+- `/api/orders/stripe-checkout` với tenant card-only / fpx-only / both-off
+- Webhook handler `checkout.session.completed` → reconcile → order + stock + notifications
+- Webhook `payment_intent.payment_failed` → order paymentStatus='payment_failed'
+- Webhook `account.application.deauthorized` → lock toggles
+- Confirm polling `/api/orders/[id]/payment-status` → active reconcile
+- Retry payment `/api/orders/[id]/retry-payment` → new session, stock re-validate
+- Cron reconcile `/api/cron/reconcile-orders` → heal late webhooks
 
-### 14.3. E2E tests (Phase 04 + post-merge)
-- Stripe sandbox happy path: Card 4242 → success
-- Stripe sandbox happy path: FPX test bank → success
-- Cancel cycle: cart preserved + BM toast
+### 15.3. E2E tests (Phase 04 + 05 + post-merge)
+- Stripe sandbox happy path: Card 4242 → success → Confirm polls → cleared
+- Stripe sandbox happy path: FPX test bank → success → emails sent
+- Cancel cycle: cart preserved + BM toast, "Try Again" creates new session
+- Payment failed: Confirm shows retry state, "Pay Now" button works
 - Connect cycle: onboard → return complete → toggles unlock
+- Race: webhook arrives before browser redirect → Confirm sees paid immediately
 
-### 14.4. Manual QA (sandbox)
-- Full TC suite từ `docs/qa/F13-payment-gateway.md` v1.1
-- Stripe Dashboard verify: application fee 3% appears
-- Bank Reconciliation: merchant receives net amount
-
----
-
-## 15. Rollout Strategy
-
-### Phase A (this week — ~10-13h)
-1. Phase 01: schema + migrations
-2. Phase 02 + 03: parallel — Settings UI + Checkout API
-3. Deploy staging → QC test với sandbox
-
-### Phase B (HOLD)
-4. Phase 04: storefront integration (sau COD/QR merge)
-5. E2E sandbox test
-6. Production rollout pilot (1-2 tenants)
-7. Monitor 1 tuần → general availability
+### 15.4. Manual QA (sandbox)
+- Full TC suite từ `docs/qa/F13-payment-gateway.md` v1.6 (157 TCs)
+- Stripe Dashboard verify: no application_fee_amount (Wave 6), charge on connected account
+- Bank Reconciliation: merchant receives full amount (no platform fee Wave 6)
 
 ---
 
-## 16. Known limitations + Future work
+## 16. Rollout Strategy
+
+### Phase A (Sprint 1 — Blocker fixes, ~10-13h)
+1. Phase 01: Fix paymentStatus + extract `reconcileOrderPaid()`
+2. Phase 02: Atomic stock + oversell flag + seller notify
+3. Phase 03: Accurate payment method detection
+4. Phase 04: Cart handling + cancel toast
+5. Deploy staging → preliminary QC test
+
+### Phase B (Sprint 2 — UX + Reconciliation)
+6. Phase 05: Confirm polling + self-heal
+7. Phase 06: "Pay Now" retry endpoint
+8. Phase 07: Cron reconcile + cleanup
+9. Full E2E sandbox test
+10. Production rollout pilot (1-2 tenants)
+11. Monitor 1 tuần → general availability
+
+---
+
+## 17. Known Limitations & Wave 7+ Work
 
 | Item | Wave | Reason |
 |------|------|--------|
-| Inline Payment Element | Wave 7+ | KISS — Checkout Session hosted handle UI |
-| Stripe Idempotency Key API param | Wave 7+ | Order status check đủ cho volume Wave 6 |
-| TnG, GrabPay, Boost | Wave 7+ | Stripe MY chưa GA TnG/GrabPay |
-| Saved cards / tokenized re-purchase | Wave 7+ | Requires buyer accounts |
-| Refund UI | Wave 7+ (F10 scope) | Use Stripe Dashboard manual for now |
-| Stripe Connect Express/Custom | Wave 8+ | Standard accounts đủ cho marketplace launch |
-| Multi-currency support | Wave 8+ | MY focus, MYR-only Wave 6 |
+| 3% Platform Fee | Wave 7+ | Cross-border (US → MY) Stripe limitation in Wave 6 |
+| Inline Payment Element | Wave 7+ | Checkout Session hosted sufficient for Wave 6 |
+| Stripe Idempotency Key | Wave 7+ | Atomic status='pending' guard sufficient Wave 6 volume |
+| TnG, GrabPay, Boost | Wave 7+ | Not yet GA on Stripe MY |
+| Saved cards / Re-purchase | Wave 7+ | Requires buyer accounts (no-auth model conflict) |
+| Refund UI in order detail | Wave 7+ (F10) | Wave 6.5 manual seller "Refund customer" on oversell flag |
+| Express/Custom Connect | Wave 8+ | Standard accounts sufficient |
+| Multi-currency | Wave 8+ | Malaysia focus, MYR-only |
 
 ---
 
-## 17. References
+## 18. References
 
 - Stripe Connect Direct Charges: https://stripe.com/docs/connect/direct-charges
 - Stripe Checkout Sessions: https://stripe.com/docs/api/checkout/sessions

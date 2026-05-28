@@ -10,6 +10,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import React from 'react'
+import { I18nProvider } from '@/i18n'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,9 @@ function makeBlock(variant: string) {
 
 function renderNav(variant: string) {
     const { container } = render(
-        <NavigationBlock block={makeBlock(variant)} theme={{}} site={site} page={{}} />,
+        <I18nProvider defaultLocale="en">
+            <NavigationBlock block={makeBlock(variant)} theme={{}} site={site} page={{}} />
+        </I18nProvider>,
     )
     return container.innerHTML
 }
@@ -108,10 +111,14 @@ describe('TC-NAV-11 — seed row with variant "simple" renders identical to vari
 
         // Act
         const { container: legacyContainer } = render(
-            <NavigationBlock block={legacyRow} theme={{}} site={site} page={{}} />,
+            <I18nProvider defaultLocale="en">
+                <NavigationBlock block={legacyRow} theme={{}} site={site} page={{}} />
+            </I18nProvider>,
         )
         const { container: canonicalContainer } = render(
-            <NavigationBlock block={canonicalRow} theme={{}} site={site} page={{}} />,
+            <I18nProvider defaultLocale="en">
+                <NavigationBlock block={canonicalRow} theme={{}} site={site} page={{}} />
+            </I18nProvider>,
         )
 
         // Assert

@@ -37,6 +37,10 @@ import {
     MIN_BLOCKS_PER_PAGE,
     type ContentLang,
 } from './content-rules'
+import { detectLanguage } from './lang-detect'
+import { getNavLabels, hasDedicatedStrings } from './block-i18n'
+import { prefetchNavLabels } from './nav-label-translator'
+import { prefetchBlockStrings } from './block-strings-translator'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -57,45 +61,11 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
-// Vietnamese-exclusive diacritical marks — not present in Malay, English, French, Spanish, or Portuguese.
-// Characters like é/à/â shared with Romance languages are excluded intentionally.
-const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
-
-// Malay function words and common nouns — reliable indicators of Malay input.
-// Includes both grammar words (high precision, low recall) and common business
-// nouns (kedai, makanan, etc.) to catch short noun-only inputs from SMB operators.
-const MALAY_WORDS = new Set([
-    // grammar/function words
-    'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
-    'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
-    'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
-    // common business/noun words distinctive to Malay
-    'kedai', 'makanan', 'perniagaan', 'jualan', 'pelanggan', 'warung',
-    'restoran', 'butik', 'klinik', 'syarikat', 'tempatan', 'harga',
-    'murah', 'berkualiti', 'jenama', 'produk', 'terbaik', 'segar',
-])
-
-/**
- * Detect language from user's business info input text.
- * Used to route 'auto' language requests: if input is Malay or Vietnamese,
- * skip template-first (English-only templates) and use AI-first instead.
- */
-function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
-    const text = [info.businessName, info.shortDescription, info.products, info.industry]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-    // Vietnamese-exclusive diacritical marks — not shared with Romance languages
-    if (VI_DIACRITICS_RE.test(text)) return 'vi'
-
-    // Count distinct Malay words (not repetitions) to avoid false positives from
-    // a single repeated word. Require 2+ distinct matches.
-    const tokens = new Set(text.split(/\W+/).filter(Boolean))
-    const malayMatches = [...tokens].filter(t => MALAY_WORDS.has(t)).length
-    if (malayMatches >= 2) return 'ms'
-
-    return 'en'
+// Language names for explicit user selections (not 'auto').
+const EXPLICIT_LANG_NAMES: Record<string, string> = {
+    en: 'English',
+    ms: 'Malay (Bahasa Melayu)',
+    vi: 'Vietnamese',
 }
 
 /**
@@ -166,8 +136,12 @@ export async function generateSiteWithAI(
     // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
     // Skip it for explicit non-English languages and for 'auto' when user's input text
     // is detected as Malay/Vietnamese so AI-first generates fully localized content.
-    const detectedLang = language === 'auto' ? guessLanguageFromInput(businessInfo) : language
-    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
+    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
+        .filter(Boolean).join(' ')
+    const { contentLang: detectedLang, gpLang, blockLang } = language === 'auto'
+        ? detectLanguage(inputText)
+        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English', blockLang: language }
+    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en' && blockLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
@@ -193,6 +167,19 @@ export async function generateSiteWithAI(
     try {
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
+        // For non-English languages not yet in the nav label cache, fire a GPT
+        // micro-call (gpt-4.1-nano, ~50 tokens) to translate the 5 nav labels.
+        // Fire-and-forget: this request keeps GPT output; next warm request uses
+        // the cached translated labels. See nav-label-translator.ts for details.
+        if (gpLang && gpLang !== 'English' && !getNavLabels(blockLang)) {
+            prefetchNavLabels(gpLang, blockLang, openai)
+        }
+        // Same pattern for full block strings (structural labels, form labels, footer text).
+        // Covers long-tail languages not in the static STRINGS seed (en/ms/vi/ja/zh/ko/ar/th).
+        if (gpLang && gpLang !== 'English' && !hasDedicatedStrings(blockLang)) {
+            prefetchBlockStrings(gpLang, blockLang, openai)
+        }
+
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.
         // Precedence downstream: URL extraction visualStyle (route.ts) > this preset > AI output.
@@ -214,7 +201,7 @@ export async function generateSiteWithAI(
             `[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}, recipe=${layoutRecipe.id}) for category=${presetCategory} (seed=${themeSeed})`,
         )
 
-        const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
+        const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory, gpLang })
         // Map stored override shape { [slug]: { prompt, updatedAt } } → { [slug]: { prompt } }
         // as expected by buildUserPrompt. Empty-string prompts are filtered out inside buildUserPrompt.
         const aiFirstOverrides = blockPromptOverrides
@@ -230,6 +217,7 @@ export async function generateSiteWithAI(
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
             language: detectedLang,
+            gpLang,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
@@ -421,6 +409,7 @@ export async function generateSiteWithAI(
                 // when GPT output is thin and needs padding.
                 userBiz: enforcerBizOverride,
                 mood: themeMood,
+                language: blockLang,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -433,13 +422,18 @@ export async function generateSiteWithAI(
                 // copy gets replaced with curated MY content when AI hits the
                 // generic blacklist. Safe on sub-pages because no block is
                 // injected; missing blocks stay missing.
-                if (postSwapEnabled && detectedCategory) {
+                // Always run postAISwapStep when enabled — normalization (contact labels,
+                // client-logos headline, features headline, testimonials subheadline) must
+                // run even when GPT omits the category field (detectedCategory undefined).
+                // Pass 'business' as fallback so hydrateBiz always has a valid pack.
+                if (postSwapEnabled) {
                     const swapResult = postAISwapStep(
                         pageBlocks as Record<string, unknown>[],
                         enforcerBizOverride,
-                        detectedCategory,
+                        detectedCategory ?? 'business',
                         themeMood,
                         themeSeed,
+                        blockLang,
                     )
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
@@ -547,13 +541,14 @@ export async function generateSiteWithAI(
             validBlocks = validateBlocks(rawBlocks)
 
             // Plan 260415 Phase 04 — post-AI swap on single-page path too.
-            if (postSwapEnabled && detectedCategory) {
+            if (postSwapEnabled) {
                 const swapResult = postAISwapStep(
                     validBlocks as Record<string, unknown>[],
                     enforcerBizOverride,
-                    detectedCategory,
+                    detectedCategory ?? 'business',
                     themeMood,
                     themeSeed,
+                    blockLang,
                 )
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)
@@ -568,6 +563,7 @@ export async function generateSiteWithAI(
                     // Plan 07 — same userBiz + mood threading as the multi-page branch.
                     userBiz: enforcerBizOverride,
                     mood: themeMood,
+                    language: blockLang,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],
@@ -619,6 +615,7 @@ export async function generateSiteWithAI(
             pages: generatedPages,
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
+            blockLang,
             theme,
             // Plan 260415 Phase 04 — swap telemetry surfaced for Phase 07 harness.
             postAISwap: {

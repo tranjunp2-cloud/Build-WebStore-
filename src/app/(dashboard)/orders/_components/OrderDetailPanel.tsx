@@ -12,7 +12,7 @@ import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
 // ─── TYPES & MOCKS ───
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface OrderDetail {
     id: string | number
@@ -311,11 +311,12 @@ function OrderProgress({ status }: { status: OrderStatus }) {
     const STEPS = getProgressSteps(progressLabels)
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
+        new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
         confirmed: 1,
         ready_to_ship: 2,
         shipped: 3,
         completed: 4,
-        cancelled: -1, // No progress if cancelled
+        cancelled: -1,
         refunded: -1,
         paid: 1,
         payment_failed: -1,
@@ -424,6 +425,14 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
     )
 }
 
+function fmtPaymentMethod(m: string | null | undefined, labels: Record<string, string>) {
+    return labels[m ?? ''] ?? m ?? '—'
+}
+
+function fmtPaymentStatus(s: string | null | undefined, labels: Record<string, string>) {
+    return labels[s ?? ''] ?? s ?? '—'
+}
+
 // ─── PAYMENT INFORMATION ───
 // layout_ODZ12A: column, gap 12px, padding 17px 17px 1px, height 318
 // Method row — icon fill_RKVNRG rgba(59,130,246,0.1)
@@ -433,6 +442,8 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
 function PaymentInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
+    const methodLabels = (d as any).paymentMethods as Record<string, string>
+    const statusLabels = (d as any).paymentStatuses as Record<string, string>
 
     let statusColor = '#FF8904'
     let statusBg = 'rgba(255, 105, 0, 0.1)'
@@ -505,7 +516,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.method}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                            {order.paymentMethod}
+                            {fmtPaymentMethod(order.paymentMethod, methodLabels)}
                         </span>
                     </div>
                 </div>
@@ -522,7 +533,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
-                            {order.paymentStatus}
+                            {fmtPaymentStatus(order.paymentStatus, statusLabels)}
                         </span>
                     </div>
                 </div>
@@ -731,6 +742,25 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
         }
     }
 
+    const handleRefund = async () => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${id}/refund`, { method: 'POST' })
+            if (!res.ok) {
+                const data = await res.json()
+                console.error('Failed to refund order:', data.error)
+                throw new Error('API_ERROR')
+            }
+            toast.success(t.dashboard.orders.toast.updated)
+            onUpdate()
+        } catch (error: unknown) {
+            console.error('Refund order error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const handleCancel = async (reason: string) => {
         setIsLoading(true)
         try {
@@ -761,7 +791,8 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const primaryDisabled = isLoading || isTerminal
+                    const isAwaitingBtPayment = order.paymentMethod === 'bank_transfer' && order.paymentStatus !== 'paid' && ['pending', 'new'].includes(status)
+                    const primaryDisabled = isLoading || isTerminal || isAwaitingBtPayment
                     return (
                         <button
                             onClick={() => {
@@ -798,7 +829,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Bottom Row — layout_BH1FFS: row, gap 12px */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
+                    const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
                     const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
@@ -828,7 +859,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
 
                             {/* Refund Button */}
                             <button
-                                onClick={() => handleAction('refunded')}
+                                onClick={handleRefund}
                                 disabled={refundDisabled}
                                 className={`flex-1 flex items-center justify-center gap-2 font-bold transition-opacity ${refundDisabled ? 'cursor-not-allowed opacity-30' : 'hover:opacity-80'}`}
                                 style={{

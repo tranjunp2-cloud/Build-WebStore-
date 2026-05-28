@@ -1,217 +1,167 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
-import { CustomersActionBar } from './customers-action-bar'
-import { CustomersTable } from './customers-table'
-import { CustomersCardList } from './customers-card-list'
-import { CustomerDetailPanel } from './customer-detail-panel'
-import {
-    getCustomersAction,
-    deleteCustomerAction,
-    exportCustomersCsvAction,
-} from '../actions'
-import type { CustomerRecord } from '../_lib/customer-record'
+import { CustomersListToolbar } from './customers-list-toolbar'
+import { CustomersListTable } from './customers-list-table'
+import { getShopCustomersAction, exportShopCustomersCsvAction } from '../actions'
+import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
+import type { RankFilter, DateFilter } from './customers-list-toolbar'
+import type { SortKey } from './customers-list-table'
 
-const LIMIT = 10
+function toDateRange(f: DateFilter, customFrom?: string, customTo?: string): { dateFrom?: string; dateTo?: string } {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    if (f === 'today')       return { dateFrom: today.toISOString(), dateTo: now.toISOString() }
+    if (f === 'last7d')      return { dateFrom: new Date(today.getTime() - 6 * 86400000).toISOString() }
+    if (f === 'last30d')     return { dateFrom: new Date(today.getTime() - 29 * 86400000).toISOString() }
+    if (f === 'last90d')     return { dateFrom: new Date(today.getTime() - 89 * 86400000).toISOString() }
+    if (f === 'thisYear')    return { dateFrom: new Date(today.getFullYear(), 0, 1).toISOString() }
+    if (f === 'customRange' && customFrom && customTo) {
+        // Use explicit UTC end-of-day so the range is consistent across timezones
+        return { dateFrom: new Date(customFrom + 'T00:00:00.000Z').toISOString(), dateTo: new Date(customTo + 'T23:59:59.999Z').toISOString() }
+    }
+    return {}
+}
 
-export function CustomersClientLayout() {
-    const { t } = useI18n()
-    const c = t.dashboard.customers
-    const [records, setRecords] = useState<CustomerRecord[]>([])
-    const [total, setTotal] = useState(0)
-    const [page, setPage] = useState(1)
-    const [status, setStatus] = useState('')
-    const [source, setSource] = useState('')
-    const [search, setSearch] = useState('')
-    const [loading, setLoading] = useState(true)
+export function ShopCustomersClientLayout() {
+    const router = useRouter()
+    const { t, ti } = useI18n()
+    const c = t.dashboard.shopCustomers
+
+    const [records, setRecords]     = useState<ShopCustomerRecord[]>([])
+    const [total, setTotal]         = useState(0)
+    const [page, setPage]           = useState(1)
+    const [limit, setLimit]         = useState(25)
+    const [search, setSearch]       = useState('')
+    const [rankFilter, setRankFilter]   = useState<RankFilter>('all')
+    const [dateFilter, setDateFilter]   = useState<DateFilter>('any')
+    const [sortBy, setSortBy]       = useState<SortKey>('latestOrderAt')
+    const [sortDir, setSortDir]     = useState<'asc' | 'desc'>('desc')
+    const [customFrom, setCustomFrom] = useState('')
+    const [customTo, setCustomTo]     = useState('')
+    const [loading, setLoading]     = useState(true)
     const [exporting, setExporting] = useState(false)
-    const [selected, setSelected] = useState<CustomerRecord | null>(null)
-    const [pendingDelete, setPendingDelete] = useState<CustomerRecord | null>(null)
+
+    // genRef tracks the "generation" of the latest fetch. Each load() call increments it;
+    // a resolved response is discarded if its generation no longer matches the current one.
+    // Using a ref (not state) avoids extra renders and dep-array churn on load.
+    const genRef = useRef(0)
+
+    // Extract translation string so useCallback dep-array can capture it
+    // (c is stable per locale, but ESLint cannot verify property access on outer objects)
+    const loadFailedMsg = c.loadFailed
 
     const load = useCallback(async () => {
+        const gen = ++genRef.current
         setLoading(true)
         try {
-            const res = await getCustomersAction({ search, status, source, page, limit: LIMIT })
+            const { dateFrom, dateTo } = toDateRange(dateFilter, customFrom, customTo)
+            const res = await getShopCustomersAction({
+                search: search || undefined,
+                rank: rankFilter,
+                dateFrom,
+                dateTo,
+                page,
+                limit,
+            })
+            // Discard stale responses — only the latest fetch wins
+            if (gen !== genRef.current) return
             setRecords(res.data)
             setTotal(res.meta.total)
         } catch {
-            toast.error(c.loadFailed)
+            if (gen !== genRef.current) return
+            toast.error(loadFailedMsg)
         } finally {
-            setLoading(false)
+            // Only the latest call clears the loading spinner
+            if (gen === genRef.current) setLoading(false)
         }
-    }, [search, status, source, page, c])
+    }, [search, rankFilter, dateFilter, customFrom, customTo, page, limit, loadFailedMsg])
 
-    useEffect(() => { setPage(1) }, [status, source, search])
     useEffect(() => { load() }, [load])
 
-    async function confirmDelete() {
-        if (!pendingDelete) return
-        const record = pendingDelete
-        setPendingDelete(null)
-        setRecords(prev => prev.filter(r => r.id !== record.id))
-        setTotal(n => n - 1)
-        if (selected?.id === record.id) setSelected(null)
-        try {
-            await deleteCustomerAction(record.rawId, record.source)
-            toast.success(c.deleteSuccess)
-        } catch {
-            load()
-            toast.error(c.deleteFailed)
-        }
-    }
+    // Stable handler refs via useCallback([], []) — state setters have stable identity per React.
+    // Prevents child re-renders and debounce reset on every parent render.
+    const handleSearchChange       = useCallback((q: string)                  => { setSearch(q);                  setPage(1) }, [])
+    const handleRankFilterChange   = useCallback((r: RankFilter)              => { setRankFilter(r);              setPage(1) }, [])
+    const handleDateFilterChange   = useCallback((d: DateFilter)              => { setDateFilter(d);              setPage(1) }, [])
+    const handleCustomRangeApply   = useCallback((from: string, to: string)   => { setCustomFrom(from); setCustomTo(to); setPage(1) }, [])
 
     async function handleExport() {
         setExporting(true)
         try {
-            const csv = await exportCustomersCsvAction({ search, status, source })
-            const bom = new Uint8Array([0xEF, 0xBB, 0xBF])
-            const encoder = new TextEncoder()
-            // strip Unicode BOM char if csv-exporter prepended it — avoid double BOM
-            const csvBody = csv.startsWith('﻿') ? csv.slice(1) : csv
-            const blob = new Blob([bom, encoder.encode(csvBody)], { type: 'text/csv;charset=utf-8;' })
+            const { dateFrom, dateTo } = toDateRange(dateFilter, customFrom, customTo)
+            const result = await exportShopCustomersCsvAction({
+                search: search || undefined,
+                rank: rankFilter,
+                dateFrom,
+                dateTo,
+            })
+            if (result.truncated) {
+                toast.warning(ti(c.exportLimited, { total: result.total }))
+            }
+            // Blob URL approach: browser encodes the JS string as UTF-8, preserving
+            // the ﻿ BOM that toCsv prepends. The `download` attribute is reliably
+            // respected on all platforms (including Linux/Chromium) with Blob URLs.
+            const filename = `customers-${new Date().toISOString().slice(0, 10)}.csv`
+            const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8;' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`
+            a.setAttribute('download', filename)
+            document.body.appendChild(a)
             a.click()
+            document.body.removeChild(a)
             setTimeout(() => URL.revokeObjectURL(url), 100)
-        } catch {
+        } catch (err) {
+            console.error('[exportShopCustomers]', err)
             toast.error(c.exportFailed)
         } finally {
             setExporting(false)
         }
     }
 
-    function handleSelect(record: CustomerRecord) {
-        setSelected(prev => prev?.id === record.id ? null : record)
-    }
-
-    function handleStatusUpdateFromPanel(record: CustomerRecord, newStatus: string) {
-        setRecords(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus as CustomerRecord['status'] } : r))
-        setSelected(prev => prev?.id === record.id ? { ...prev, status: newStatus as CustomerRecord['status'] } : prev)
-    }
-
-    const deleteDisplayName = pendingDelete
-        ? pendingDelete.source === 'newsletter'
-            ? (pendingDelete.name ?? 'Guest') + ' (Newsletter)'
-            : (pendingDelete.name ?? pendingDelete.email)
-        : ''
+    const hasFilters = !!(search || rankFilter !== 'all' || dateFilter !== 'any')
 
     return (
-        <div className="space-y-6 pb-20">
-            {/* Header */}
+        <div className="space-y-5 pb-20">
             <div>
                 <h1 className="text-[24px] font-bold text-[#F8FAFC]">{c.title}</h1>
                 <p className="text-[14px] text-white/60 mt-1">{c.subtitle}</p>
             </div>
 
-            <CustomersActionBar
-                status={status}
-                source={source}
-                exporting={exporting}
-                onSearch={setSearch}
-                onStatusChange={setStatus}
-                onSourceChange={(s: string) => {
-                    setSource(s)
-                    // Reset incompatible status when switching sources
-                    if (s === 'newsletter' && status !== '' && status !== 'subscribed') setStatus('')
-                    if (s === 'contact-form' && status === 'subscribed') setStatus('')
-                }}
+            <CustomersListToolbar
+                search={search}
+                onSearch={handleSearchChange}
+                rankFilter={rankFilter}
+                onRankFilterChange={handleRankFilterChange}
+                dateFilter={dateFilter}
+                onDateFilterChange={handleDateFilterChange}
+                customFrom={customFrom}
+                customTo={customTo}
+                onCustomRangeApply={handleCustomRangeApply}
                 onExport={handleExport}
+                exporting={exporting}
+                records={records}
             />
 
-            {loading ? (
-                <div className="py-16 text-center text-[14px] text-white/30">{c.loading}</div>
-            ) : (
-                <>
-                    {/* Mobile: card list */}
-                    <div className="md:hidden">
-                        <CustomersCardList
-                            records={records}
-                            total={total}
-                            page={page}
-                            limit={LIMIT}
-                            onSelect={handleSelect}
-                            onDelete={setPendingDelete}
-                            onPageChange={setPage}
-                        />
-                    </div>
-                    {/* Desktop: table */}
-                    <div className="hidden md:block">
-                        <CustomersTable
-                            records={records}
-                            total={total}
-                            page={page}
-                            limit={LIMIT}
-                            selectedId={selected?.id ?? null}
-                            onSelect={handleSelect}
-                            onDelete={setPendingDelete}
-                            onPageChange={setPage}
-                        />
-                    </div>
-                </>
-            )}
-
-            <CustomerDetailPanel
-                record={selected}
-                onClose={() => setSelected(null)}
-                onStatusUpdate={handleStatusUpdateFromPanel}
+            <CustomersListTable
+                records={records}
+                loading={loading}
+                total={total}
+                page={page}
+                setPage={setPage}
+                limit={limit}
+                setLimit={setLimit}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                sortDir={sortDir}
+                setSortDir={setSortDir}
+                onRowClick={id => router.push(`/customers/${id}`)}
+                hasFilters={hasFilters}
             />
-
-            {/* Delete confirmation dialog */}
-            <Dialog open={!!pendingDelete} onOpenChange={open => { if (!open) setPendingDelete(null) }}>
-                <DialogContent
-                    className="max-w-[360px] rounded-[20px] p-6 gap-0"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-                >
-                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal */}
-                    <div className="dash-shell">
-                    <DialogHeader className="mb-3">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                                <Trash2 className="w-5 h-5 text-red-400" />
-                            </div>
-                            <DialogTitle className="text-[18px] font-bold text-[#f8fafc]">
-                                {c.deleteTitle}
-                            </DialogTitle>
-                        </div>
-                    </DialogHeader>
-
-                    <p className="text-[14px] text-white/60 leading-relaxed mb-6">
-                        {c.deleteConfirmPre}{' '}
-                        <span className="text-white font-medium">{deleteDisplayName}</span>
-                        {' '}{c.deleteConfirmPost}
-                    </p>
-
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setPendingDelete(null)}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white/70 border border-white/[0.08] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
-                        >
-                            {c.cancel}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={confirmDelete}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
-                            style={{ background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' }}
-                        >
-                            {c.deleteButton}
-                        </button>
-                    </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }

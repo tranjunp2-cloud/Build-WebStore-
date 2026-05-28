@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import {
     mapContactSubmission,
     mapSubscriber,
-} from '@/app/(dashboard)/customers/_lib/customer-record'
+} from '@/app/(dashboard)/contact-leads/_lib/customer-record'
 
 describe('[TC-CUST-01..07] mapContactSubmission', () => {
     const base = {

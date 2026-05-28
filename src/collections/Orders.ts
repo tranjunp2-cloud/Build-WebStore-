@@ -204,6 +204,7 @@ export const Orders: CollectionConfig = {
                 { label: 'Pending Verification', value: 'pending_verification' },
                 { label: 'Paid', value: 'paid' },
                 { label: 'Failed', value: 'failed' },
+                { label: 'Payment Failed', value: 'payment_failed' },
                 { label: 'Refunded', value: 'refunded' },
                 { label: 'Cancelled', value: 'cancelled' },
             ],
@@ -324,6 +325,9 @@ export const Orders: CollectionConfig = {
         {
             name: 'customerPhone',
             type: 'text',
+            admin: {
+                description: 'Phone is required to auto-link this order to a customer record. Leave empty only for orders that should stay unlinked.',
+            },
         },
         {
             name: 'customer',
@@ -331,7 +335,7 @@ export const Orders: CollectionConfig = {
             relationTo: 'customers',
             index: true,
             admin: {
-                description: 'Auto-linked customer record (matched by email + tenant).',
+                description: 'Auto-linked customer record (matched by phone + tenant).',
                 readOnly: true,
             },
         },

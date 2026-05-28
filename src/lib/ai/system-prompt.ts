@@ -15,6 +15,10 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 export type ThemePromptContext = {
   preset: ThemePreset
   category: string
+  /** Human-readable language name (e.g. "Japanese", "Korean") — injected into
+   *  LANGUAGE DETECTION to override the default English fallback for languages
+   *  not in the en/ms/vi trio. */
+  gpLang?: string
 }
 
 /**
@@ -76,6 +80,8 @@ export function buildSystemPrompt(
   // Unused locale parameter placeholder — suppress TS lint without affecting runtime.
   void language
 
+  const sysGpLang = themeContext?.gpLang
+
   const themeSection = themeContext
     ? (() => {
         const { preset, category } = themeContext
@@ -98,6 +104,13 @@ Write hero headlines, section titles, and CTA copy that reinforces this mood. Do
 Spacing: "${preset.spacingPreset}" — apply this consistently across ALL pages. When "relaxed", sections should feel open and airy; when "compact", sections should feel tight and dense; when "default", use standard spacing. NEVER mix spacing styles within the same website.
 `
       })()
+    : ''
+
+  // When a non-English language is detected (Japanese, Korean, Arabic, etc.), inject an
+  // OVERRIDE rule at the top of LANGUAGE DETECTION so GPT does not fall back to English.
+  // This overrides the generic "unsupported language → English" training prior.
+  const langOverrideRule = sysGpLang && sysGpLang !== 'English'
+    ? `- **LANGUAGE OVERRIDE (HIGHEST PRIORITY)**: The site language is ${sysGpLang}. Generate EVERY word in ${sysGpLang}. NAVIGATION LABELS (most common mistake): translate "Home", "About", "Services", "Contact", "Get Started" to ${sysGpLang} — never leave them in English. All headlines, descriptions, buttons, form labels, and footer text must also be in ${sysGpLang}. The "unsupported language → fallback to English" rule below does NOT apply.\n`
     : ''
 
   // NOTE: 'video-showcase' removed from VARIETY RULES #6 — temporarily hidden (aiVisible: false, archived). Re-add when block is production-ready.
@@ -173,12 +186,13 @@ ${blockList}
 9. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
 
 ## LANGUAGE DETECTION
-- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
+${langOverrideRule}- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
 - Vietnamese input → ALL text in professional Vietnamese (\`"language": "vi"\`)
 - English/Manglish input → ALL text in English (\`"language": "en"\`)
-- Unsupported language (Tamil, Mandarin) → fallback to English
+- Other languages (e.g. Tamil, Mandarin) → if a LANGUAGE OVERRIDE rule is present above, follow it; otherwise fallback to English
 - Vietnamese slang/abbreviations → interpret and generate professional Vietnamese
   Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery
+- CRITICAL for non-English: EVERY piece of item-level text must be in the target language — feature card titles and descriptions, testimonial quotes, FAQ questions and answers, CTA button labels. NEVER output English placeholder phrases like "Authentic Recipes", "Fast Delivery", "Learn More" for non-English sites.
 
 ## PROFESSIONAL DESIGN RULES (CRITICAL — these make websites look hand-designed, not AI-generated)
 
@@ -278,7 +292,7 @@ export type BusinessInfoInput = {
 
 import type { ThemeMood } from './theme-moods'
 import type { CategoryRecipe } from './category-recipes'
-import { SUGGESTED_CTA_BY_CATEGORY } from './suggested-cta-by-category'
+import { getCTAsByLang } from './suggested-cta-by-category'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -302,6 +316,12 @@ export type BuildUserPromptOptions = {
    */
   blockPromptOverrides?: Record<string, { prompt: string }>
   /**
+   * Human-readable language name for GPT instruction (e.g. "Chinese (Mandarin)", "Arabic").
+   * When provided, overrides the language-enum-derived instruction so GPT generates
+   * content in any language beyond the vi/ms/en pipeline trio.
+   */
+  gpLang?: string
+  /**
    * Plan 260429-1032 Phase 5 — resolved composer category (e.g. "restaurant",
    * "education"). When provided, injects preferred CTA labels for this category
    * so GPT avoids generic fallbacks like "Xem thêm" or "Learn More".
@@ -322,6 +342,7 @@ export function buildUserPrompt(
   let recipe: CategoryRecipe | undefined
   let blockPromptOverrides: Record<string, { prompt: string }> | undefined
   let category: string | undefined
+  let gpLang: string | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
@@ -330,6 +351,7 @@ export function buildUserPrompt(
     recipe = extraInstructionsOrOptions.recipe
     blockPromptOverrides = extraInstructionsOrOptions.blockPromptOverrides
     category = extraInstructionsOrOptions.category
+    gpLang = extraInstructionsOrOptions.gpLang
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -402,8 +424,9 @@ export function buildUserPrompt(
   // industry-specific CTAs instead of generic "Xem thêm" / "Learn More".
   // Skipped for reference-prompt path (recreation mode uses source content).
   if (!referencePrompt && category) {
-    const suggestedCtaList = SUGGESTED_CTA_BY_CATEGORY[category]
-    if (suggestedCtaList && suggestedCtaList.length > 0) {
+    const ctaLang = (language === 'ms' || language === 'vi') ? language : 'en'
+    const suggestedCtaList = getCTAsByLang(category, ctaLang)
+    if (suggestedCtaList.length > 0) {
       parts.push(
         `\nPREFERRED CTA LABELS for ${category} (use these in hero, navigation, and CTA blocks):\n${suggestedCtaList.map((c) => `  - "${c}"`).join('\n')}\nAvoid generic labels like: learn more, read more, click here, xem thêm, tìm hiểu thêm, đọc thêm`,
       )
@@ -416,11 +439,23 @@ export function buildUserPrompt(
     parts.push('\nIMPORTANT: Use the EXACT text from the REFERENCE CONTENT above. Do NOT invent new content or paraphrase. This is a recreation of an existing website.')
   }
 
-  const langInstruction = language === 'auto'
-    ? "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
-    : `Generate in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : 'English'}.`
+  const resolvedLangName = gpLang
+    ?? (language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : language === 'auto' ? null : 'English')
+  let langInstruction: string
+  if (!resolvedLangName) {
+    langInstruction = "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
+  } else if (resolvedLangName === 'English') {
+    langInstruction = "Generate ALL content in English."
+  } else {
+    langInstruction = `LANGUAGE REQUIREMENT — CRITICAL:
+Generate EVERY word of this website in ${resolvedLangName}. Absolutely no English words anywhere in the output.
 
-  parts.push(`\n${langInstruction} Make it look premium and professional.`)
+NAVIGATION LABELS (most common mistake): The navigation block link labels MUST be in ${resolvedLangName}. Never output "Home", "About", "Services", "Contact", or "Get Started" as navigation labels — translate each of these to their natural ${resolvedLangName} equivalents.
+
+ALL other content must also be in ${resolvedLangName}: headlines, descriptions, testimonials, FAQ questions and answers, feature card titles, button labels, form labels, footer links, section titles — every single piece of text.`
+  }
+
+  parts.push(`\n${langInstruction}\n\nMake it look premium and professional.`)
 
   return parts.join('\n')
 }

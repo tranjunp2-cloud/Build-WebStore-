@@ -93,6 +93,10 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'Customers', ms: 'Pelanggan' },
         icon: Users,
         href: '/customers',
+        children: [
+            { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers' },
+            { label: { en: 'Contact Leads', ms: 'Kenalan' }, href: '/contact-leads' },
+        ],
     },
     {
         label: { en: 'Settings', ms: 'Tetapan' },

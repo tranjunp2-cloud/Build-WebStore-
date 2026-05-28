@@ -13,7 +13,6 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
-import { useAddToCart } from '@/lib/storefront/use-add-to-cart'
 import type { ThemeConfig } from '../types'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
@@ -41,19 +40,12 @@ function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
     )
 }
 
-function HeroProductView({ product, block, theme, siteBasePath, siteSlug, siteId }: {
+function HeroProductView({ product, block, theme, siteBasePath }: {
     product: FeaturedProduct
     block: { sectionLabel?: string }
     theme: ThemeConfig
     siteBasePath: string
-    siteSlug: string
-    siteId: string
 }) {
-    const { handleAddToCart, isOutOfStock } = useAddToCart(
-        { ...product, imageUrl: product.image ?? undefined },
-        siteSlug,
-        siteId,
-    )
     const isFallback = product.isFallback ?? false
 
     return (
@@ -99,23 +91,9 @@ function HeroProductView({ product, block, theme, siteBasePath, siteSlug, siteId
                         </Body>
                     )}
 
+                    {/* Design decision (GH-1084): "Add to Cart" removed from hero block.
+                        Purchase flow starts on PDP to enforce variant selection. */}
                     <div className="flex flex-col sm:flex-row gap-4">
-                        {!isFallback && (
-                            <button
-                                type="button"
-                                disabled={isOutOfStock}
-                                className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
-                                style={{
-                                    backgroundColor: 'var(--brand-primary)',
-                                    color: theme.colorMode === 'dark' ? '#000' : '#fff',
-                                    opacity: isOutOfStock ? 0.5 : 1,
-                                    cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                                }}
-                                onClick={handleAddToCart}
-                            >
-                                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
-                            </button>
-                        )}
                         {product.slug && (
                             <Link
                                 href={`${siteBasePath}/products/${product.slug}`}
@@ -311,8 +289,6 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
             block={block}
             theme={theme}
             siteBasePath={siteBasePath}
-            siteSlug={String(siteRec?.tenantSlug || '')}
-            siteId={site?.id != null ? String(site.id) : ''}
         />
     )
 }

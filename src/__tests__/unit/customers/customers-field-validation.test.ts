@@ -91,14 +91,15 @@ describe('Customers Collection Field Validation (TC-F25-009..010)', () => {
     })
 
     describe('Core customer fields', () => {
-        it('Should have email field (required, indexed)', () => {
+        it('Should have email field (optional, indexed)', () => {
             // Arrange
+            // Email is supplementary since phone-primary pivot — no longer required
             const emailField = Customers.fields.find((f: any) => f.name === 'email') as any
 
             // Assert
             expect(emailField).toBeDefined()
             expect(emailField.type).toBe('email')
-            expect(emailField.required).toBe(true)
+            expect(emailField.required).not.toBe(true)
             expect(emailField.index).toBe(true)
         })
 
@@ -136,8 +137,9 @@ describe('Customers Collection Field Validation (TC-F25-009..010)', () => {
     })
 
     describe('Admin UI configuration', () => {
-        it('Should use email as title in admin UI', () => {
-            expect(Customers.admin?.useAsTitle).toBe('email')
+        it('Should use name as title in admin UI', () => {
+            // Phone-primary pivot: name is the display title; email is optional/supplementary
+            expect(Customers.admin?.useAsTitle).toBe('name')
         })
 
         it('Should have listSearchableFields configured', () => {
@@ -152,5 +154,30 @@ describe('Customers Collection Field Validation (TC-F25-009..010)', () => {
             expect(Customers.admin?.defaultColumns).toContain('name')
             expect(Customers.admin?.defaultColumns).toContain('rank')
         })
+    })
+})
+
+// ── normalizePhone — length guard (CQ-02 defence-in-depth) ───────────────────
+import { normalizePhone } from '../../../lib/normalize-phone'
+
+describe('normalizePhone — length guard', () => {
+    it('returns null for input that normalizes to > 20 chars (garbage/attack input)', () => {
+        // 21+ digits after stripping — should be treated as invalid, not stored
+        expect(normalizePhone('123456789012345678901')).toBeNull()
+        // This one has 22 chars after stripping: 1-234-567-890-1234-5678-9 = 1+234+567+890+1234+5678+9
+        expect(normalizePhone('+1 (234) 567-890-1234-5678-9012')).toBeNull()
+    })
+
+    it('accepts valid E.164 phones (≤ 15 digits after stripping)', () => {
+        // E.164 max = 15 digits; normalizePhone strips +, spaces, dashes
+        expect(normalizePhone('+60123456789')).toBe('60123456789')
+        expect(normalizePhone('+1 800 555 0123')).toBe('18005550123')
+    })
+
+    it('returns null for empty / whitespace-only input (unchanged behavior)', () => {
+        expect(normalizePhone('')).toBeNull()
+        expect(normalizePhone('   ')).toBeNull()
+        expect(normalizePhone(null)).toBeNull()
+        expect(normalizePhone(undefined)).toBeNull()
     })
 })
