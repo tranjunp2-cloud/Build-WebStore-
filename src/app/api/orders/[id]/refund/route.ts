@@ -101,21 +101,21 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
     }
 
-    // Bank transfer / COD — manual refund, no Stripe call needed
+    // Bank transfer / COD — manual refund, no Stripe call needed.
+    // No webhook race for non-Stripe orders, so payload.update() is safe here.
     if (['bank_transfer', 'cod'].includes(order.paymentMethod)) {
+        if (order.status === 'refunded') {
+            return NextResponse.json(
+                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+                { status: 400 },
+            )
+        }
         try {
-            const casResult = await (payload.db.drizzle as any).execute(sql`
-                UPDATE orders SET status = 'refunded', payment_status = 'refunded'
-                WHERE id = ${order.id}
-                AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
-                RETURNING id
-            `)
-            if (!casResult.rows?.length) {
-                return NextResponse.json(
-                    { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
-                    { status: 400 },
-                )
-            }
+            await payload.update({
+                collection: 'orders',
+                id,
+                data: { status: 'refunded', paymentStatus: 'refunded' } as any,
+            })
             console.log(`[Refund] Order ${id} refunded manually (${order.paymentMethod})`)
             fireRefundEmail()
             return NextResponse.json({ success: true, data: { refundId: null } })
