@@ -113,7 +113,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                                     onChange={(e) => { if (e.target.checked) { setReason(r.value); setDetailError('') } }}
                                     disabled={isLoading}
                                     className="accent-red-500"
-                                    style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+                                    style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0, appearance: 'auto' }}
                                 />
                                 <label
                                     htmlFor={inputId}
