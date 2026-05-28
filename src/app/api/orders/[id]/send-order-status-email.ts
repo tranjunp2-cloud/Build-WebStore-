@@ -7,6 +7,7 @@ import { orderStatusEmail } from '@/lib/email/templates/order-status'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { orderShippedEmail } from '@/lib/email/templates/order-shipped'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 
 interface SendEmailOptions {
     notes?: string
@@ -53,80 +54,105 @@ export async function sendOrderStatusEmail(
         )
 
         if (newStatus === 'confirmed' || newStatus === 'completed') {
-            const richEmail = orderConfirmationEmail({
-                shopName,
-                orderNumber,
-                customerName: (order as any).customerName ?? '',
-                customerEmail,
-                customerPhone: (order as any).customerPhone ?? null,
-                customerAddress: (order as any).shippingAddress ?? null,
-                items: orderItems,
-                subtotal: (order as any).subtotal ?? 0,
-                shippingFee: (order as any).shippingFee ?? 0,
-                total: (order as any).total ?? 0,
-                paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
-                orderDate: (order as any).createdAt,
-                orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
-                currency: (order as any).currency ?? 'MYR',
-                locale: siteLocale,
-                event: newStatus as 'confirmed' | 'completed',
-            })
-            payload.sendEmail({ to: customerEmail, subject: richEmail.subject, html: richEmail.html })
-                .catch((err: unknown) => console.error(`[Email ${newStatus} notify]`, err))
+            const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer')
+            if (cmsConfig?.enabled === false) {
+                console.log(`[Email] suppressed (disabled): order-confirmation (${newStatus})`)
+            } else {
+                const richEmail = orderConfirmationEmail({
+                    shopName,
+                    orderNumber,
+                    customerName: (order as any).customerName ?? '',
+                    customerEmail,
+                    customerPhone: (order as any).customerPhone ?? null,
+                    customerAddress: (order as any).shippingAddress ?? null,
+                    items: orderItems,
+                    subtotal: (order as any).subtotal ?? 0,
+                    shippingFee: (order as any).shippingFee ?? 0,
+                    total: (order as any).total ?? 0,
+                    paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
+                    orderDate: (order as any).createdAt,
+                    orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                    currency: (order as any).currency ?? 'MYR',
+                    locale: siteLocale,
+                    event: newStatus as 'confirmed' | 'completed',
+                }, cmsConfig ?? undefined)
+                payload.sendEmail({ to: customerEmail, subject: richEmail.subject, html: richEmail.html })
+                    .catch((err: unknown) => console.error(`[Email ${newStatus} notify]`, err))
+            }
         } else if (newStatus === 'cancelled') {
-            const cancelEmail = orderCancelledEmail({
-                shopName,
-                orderNumber,
-                customerName: (order as any).customerName ?? '',
-                customerEmail,
-                customerPhone: (order as any).customerPhone ?? null,
-                customerAddress: (order as any).shippingAddress ?? null,
-                items: orderItems,
-                subtotal: (order as any).subtotal ?? 0,
-                shippingFee: (order as any).shippingFee ?? 0,
-                total: (order as any).total ?? 0,
-                paymentMethod: (order as any).paymentMethod ?? 'cod',
-                orderDate: (order as any).createdAt,
-                cancellationDate: new Date().toISOString(),
-                cancellationNote: notes ?? (order as any).cancelReason ?? null,
-                shopUrl: `${baseUrl}/sites/${shopSlug}`,
-                currency: (order as any).currency ?? 'MYR',
-                locale: siteLocale,
-            })
-            payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
-                .catch((err: unknown) => console.error('[Email cancel notify]', err))
+            const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer')
+            if (cmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): order-cancelled')
+            } else {
+                const cancelEmail = orderCancelledEmail({
+                    shopName,
+                    orderNumber,
+                    customerName: (order as any).customerName ?? '',
+                    customerEmail,
+                    customerPhone: (order as any).customerPhone ?? null,
+                    customerAddress: (order as any).shippingAddress ?? null,
+                    items: orderItems,
+                    subtotal: (order as any).subtotal ?? 0,
+                    shippingFee: (order as any).shippingFee ?? 0,
+                    total: (order as any).total ?? 0,
+                    paymentMethod: (order as any).paymentMethod ?? 'cod',
+                    orderDate: (order as any).createdAt,
+                    cancellationDate: new Date().toISOString(),
+                    cancellationNote: notes ?? (order as any).cancelReason ?? null,
+                    shopUrl: `${baseUrl}/sites/${shopSlug}`,
+                    currency: (order as any).currency ?? 'MYR',
+                    locale: siteLocale,
+                }, cmsConfig ?? undefined)
+                payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
+                    .catch((err: unknown) => console.error('[Email cancel notify]', err))
+            }
         } else {
             // newStatus === 'shipped'
-            const shippedEmail = orderShippedEmail({
-                shopName,
-                orderNumber,
-                customerName: (order as any).customerName ?? '',
-                customerEmail,
-                customerPhone: (order as any).customerPhone ?? null,
-                customerAddress: (order as any).shippingAddress ?? null,
-                items: orderItems,
-                subtotal: (order as any).subtotal ?? 0,
-                shippingFee: (order as any).shippingFee ?? 0,
-                total: (order as any).total ?? 0,
-                paymentMethod: (order as any).paymentMethod ?? 'cod',
-                shippingProvider: (order as any).shippingProvider ?? null,
-                orderDate: (order as any).createdAt,
-                shippedDate: new Date().toISOString(),
-                orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
-                currency: (order as any).currency ?? 'MYR',
-                locale: siteLocale,
-            })
-            payload.sendEmail({ to: customerEmail, subject: shippedEmail.subject, html: shippedEmail.html })
-                .catch((err: unknown) => console.error('[Email shipped notify]', err))
+            const cmsConfig = await getTemplateConfig(tenantId, 'order-shipped', 'buyer')
+            if (cmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): order-shipped')
+            } else {
+                const shippedEmail = orderShippedEmail({
+                    shopName,
+                    orderNumber,
+                    customerName: (order as any).customerName ?? '',
+                    customerEmail,
+                    customerPhone: (order as any).customerPhone ?? null,
+                    customerAddress: (order as any).shippingAddress ?? null,
+                    items: orderItems,
+                    subtotal: (order as any).subtotal ?? 0,
+                    shippingFee: (order as any).shippingFee ?? 0,
+                    total: (order as any).total ?? 0,
+                    paymentMethod: (order as any).paymentMethod ?? 'cod',
+                    shippingProvider: (order as any).shippingProvider ?? null,
+                    orderDate: (order as any).createdAt,
+                    shippedDate: new Date().toISOString(),
+                    orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                    currency: (order as any).currency ?? 'MYR',
+                    locale: siteLocale,
+                }, cmsConfig ?? undefined)
+                payload.sendEmail({ to: customerEmail, subject: shippedEmail.subject, html: shippedEmail.html })
+                    .catch((err: unknown) => console.error('[Email shipped notify]', err))
+            }
         }
     } else {
-        const statusEmailData = orderStatusEmail({
-            customerName: (order as any).customerName ?? '',
-            orderNumber,
-            status: newStatus as any,
-            trackingNumber: trackingNumber ?? (order as any).trackingNumber ?? undefined,
-        })
-        payload.sendEmail({ to: customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
-            .catch((err: unknown) => console.error('[Email status notify]', err))
+        const tenantId = typeof (order as any).tenant === 'object'
+            ? (order as any).tenant.id
+            : (order as any).tenant
+        const cmsConfig = tenantId
+            ? await getTemplateConfig(tenantId, 'order-status', 'buyer')
+            : null
+        if (cmsConfig?.enabled === false) {
+            console.log('[Email] suppressed (disabled): order-status')
+        } else {
+            const statusEmailData = orderStatusEmail({
+                customerName: (order as any).customerName ?? '',
+                orderNumber,
+                status: newStatus as any,
+                trackingNumber: trackingNumber ?? (order as any).trackingNumber ?? undefined,
+            }, cmsConfig ?? undefined)
+            payload.sendEmail({ to: customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
+                .catch((err: unknown) => console.error('[Email status notify]', err))
+        }
     }
 }

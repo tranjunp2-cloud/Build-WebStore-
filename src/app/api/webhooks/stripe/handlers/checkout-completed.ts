@@ -4,6 +4,7 @@ import { sendEmail } from '@/lib/email/send'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 
@@ -165,58 +166,71 @@ export async function handleCheckoutCompleted(
 
         // Buyer: order confirmation
         try {
-            const emailData = orderConfirmationEmail({
-                shopName,
-                orderNumber: order.orderNumber,
-                customerName: order.customerName,
-                customerEmail: order.customerEmail,
-                customerPhone: order.customerPhone ?? null,
-                customerAddress: order.shippingAddress ?? null,
-                items: (order.items || []).map((item) => ({
-                    name: item.productName,
-                    variant: item.variant ?? null,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    lineTotal: item.quantity * item.unitPrice,
-                })),
-                subtotal: order.subtotal,
-                shippingFee: order.shippingFee ?? 0,
-                total: order.total,
-                paymentMethod: 'stripe',
-                orderDate: order.createdAt ?? new Date().toISOString(),
-                orderPageUrl,
-                currency: order.currency || 'MYR',
-                buyerNote: order.notes ?? null,
-                locale: siteLocale,
-            })
+            const [buyerCmsConfig, sellerCmsConfig] = await Promise.all([
+                getTemplateConfig(tenantId, 'order-confirmation', 'buyer'),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+            ])
 
-            const sent = await sendEmail({
-                to: order.customerEmail,
-                subject: emailData.subject,
-                html: emailData.html,
-            })
-
-            if (sent) {
-                console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+            if (buyerCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): order-confirmation (Stripe)')
             } else {
-                console.warn(`[Stripe Webhook] Confirmation email failed (sendEmail returned false) for ${order.customerEmail}`)
+                const emailData = orderConfirmationEmail({
+                    shopName,
+                    orderNumber: order.orderNumber,
+                    customerName: order.customerName,
+                    customerEmail: order.customerEmail,
+                    customerPhone: order.customerPhone ?? null,
+                    customerAddress: order.shippingAddress ?? null,
+                    items: (order.items || []).map((item) => ({
+                        name: item.productName,
+                        variant: item.variant ?? null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    })),
+                    subtotal: order.subtotal,
+                    shippingFee: order.shippingFee ?? 0,
+                    total: order.total,
+                    paymentMethod: 'stripe',
+                    orderDate: order.createdAt ?? new Date().toISOString(),
+                    orderPageUrl,
+                    currency: order.currency || 'MYR',
+                    buyerNote: order.notes ?? null,
+                    locale: siteLocale,
+                }, buyerCmsConfig ?? undefined)
+
+                const sent = await sendEmail({
+                    to: order.customerEmail,
+                    subject: emailData.subject,
+                    html: emailData.html,
+                })
+
+                if (sent) {
+                    console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+                } else {
+                    console.warn(`[Stripe Webhook] Confirmation email failed (sendEmail returned false) for ${order.customerEmail}`)
+                }
+            }
+
+            // Sellers: new order notification
+            if (sellerCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): new-order-seller (Stripe)')
+            } else {
+                getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                    const seller = newOrderSellerEmail({
+                        shopName,
+                        orderNumber: order.orderNumber,
+                        customerName: order.customerName,
+                        orderPageUrl: dashboardOrderUrl,
+                    }, sellerCmsConfig ?? undefined)
+                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                        .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
+                }).catch((err: unknown) => console.error('[Stripe Webhook] getTenantOwnerEmails failed', err))
             }
         } catch (emailErr) {
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)
             // Don't fail the webhook — email is non-critical
         }
-
-        // Sellers: new order notification
-        getTenantOwnerEmails(payload, tenantId).then((emails) => {
-            const seller = newOrderSellerEmail({
-                shopName,
-                orderNumber: order.orderNumber,
-                customerName: order.customerName,
-                orderPageUrl: dashboardOrderUrl,
-            })
-            emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
-        }).catch((err: unknown) => console.error('[Stripe Webhook] getTenantOwnerEmails failed', err))
 
         // Fire-and-forget: ORDER_NEW in-app notification for merchant (Stripe flow)
         import('@/lib/notifications/notify-tenant-owners')

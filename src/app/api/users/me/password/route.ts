@@ -6,6 +6,7 @@ import { passwordChangeSchema } from '@/lib/profile/schemas'
 import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { passwordChangedEmail } from '@/lib/email/templates'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import type { PlatformUser } from '@/types/user'
 
 export const runtime = 'nodejs'
@@ -64,9 +65,24 @@ export async function POST(req: NextRequest) {
         const userName = [u.firstName, u.lastName].filter(Boolean).join(' ') || user.email
         const locale = u.prefer_lang ?? 'en'
 
-        const { subject, html } = passwordChangedEmail({ userName, locale })
-        payload.sendEmail({ to: user.email, subject, html })
-            .catch((err: unknown) => payload.logger.error({ err }, '[users/me/password] notify email failed'))
+        // Resolve tenantId from the user's first active tenant membership for CMS config lookup
+        const tenants = (u as any).tenants ?? []
+        const activeTenant = tenants.find((t: any) => t.status === 'active') ?? tenants[0]
+        const tenantId = activeTenant
+            ? (typeof activeTenant.tenant === 'object' ? activeTenant.tenant.id : activeTenant.tenant)
+            : null
+
+        const cmsConfig = tenantId
+            ? await getTemplateConfig(tenantId, 'password-changed', 'buyer')
+            : null
+
+        if (cmsConfig?.enabled === false) {
+            console.log('[Email] suppressed (disabled): password-changed')
+        } else {
+            const { subject, html } = passwordChangedEmail({ userName, locale }, cmsConfig ?? undefined)
+            payload.sendEmail({ to: user.email, subject, html })
+                .catch((err: unknown) => payload.logger.error({ err }, '[users/me/password] notify email failed'))
+        }
 
         return NextResponse.json({ success: true })
     } catch (err) {

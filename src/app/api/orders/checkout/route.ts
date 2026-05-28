@@ -13,6 +13,7 @@ import { bankTransferInstructionsEmail } from '@/lib/email/templates/bank-transf
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 
 export const maxDuration = 60
 
@@ -325,38 +326,51 @@ export async function POST(request: Request) {
 
         // COD: confirmation to buyer + new-order notification to seller(s)
         if (paymentMethod === 'cod') {
-            const codEmail = orderConfirmationEmail({
-                shopName,
-                orderNumber: orderNumber,
-                customerName: customer.name,
-                customerEmail: customer.email,
-                customerPhone: customer.phone ?? null,
-                customerAddress: customer.address ?? null,
-                items: orderItems.map((item) => ({
-                    name: item.productName,
-                    variant: item.variant || null,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    lineTotal: item.quantity * item.unitPrice,
-                })),
-                subtotal,
-                shippingFee,
-                total,
-                paymentMethod: 'cod',
-                orderDate: new Date().toISOString(),
-                orderPageUrl,
-                currency,
-                buyerNote: (order as any).notes ?? null,
-                locale: siteLocale,
-            })
-            payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
-                .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+            const [codCmsConfig, sellerCmsConfig] = await Promise.all([
+                getTemplateConfig(tenantId, 'order-confirmation', 'buyer'),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+            ])
 
-            getTenantOwnerEmails(payload, tenantId).then((emails) => {
-                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
-                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                    .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
-            }).catch(() => {})
+            if (codCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): order-confirmation (COD)')
+            } else {
+                const codEmail = orderConfirmationEmail({
+                    shopName,
+                    orderNumber: orderNumber,
+                    customerName: customer.name,
+                    customerEmail: customer.email,
+                    customerPhone: customer.phone ?? null,
+                    customerAddress: customer.address ?? null,
+                    items: orderItems.map((item) => ({
+                        name: item.productName,
+                        variant: item.variant || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    })),
+                    subtotal,
+                    shippingFee,
+                    total,
+                    paymentMethod: 'cod',
+                    orderDate: new Date().toISOString(),
+                    orderPageUrl,
+                    currency,
+                    buyerNote: (order as any).notes ?? null,
+                    locale: siteLocale,
+                }, codCmsConfig ?? undefined)
+                payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
+                    .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+            }
+
+            if (sellerCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): new-order-seller (COD)')
+            } else {
+                getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                    const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, sellerCmsConfig ?? undefined)
+                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                        .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
+                }).catch(() => {})
+            }
         }
 
         // bank_transfer: instructions to buyer + new-order notification to seller(s) + magic link for proof upload
@@ -373,44 +387,57 @@ export async function POST(request: Request) {
             const plainUploadUrl = redirectUrl
 
             const pcConfig = (site as any).paymentConfig
-            const btEmail = bankTransferInstructionsEmail({
-                shopName,
-                orderNumber: order.orderNumber,
-                customerName: customer.name,
-                customerEmail: customer.email,
-                customerPhone: customer.phone ?? null,
-                customerAddress: customer.address ?? null,
-                items: orderItems.map((item) => ({
-                    name: item.productName,
-                    variant: item.variant || null,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    lineTotal: item.quantity * item.unitPrice,
-                })),
-                subtotal,
-                shippingFee,
-                total: order.total,
-                currency: order.currency ?? 'MYR',
-                buyerNote: (order as any).notes ?? null,
-                orderDate: new Date().toISOString(),
-                paymentReference: paymentReference!,
-                magicLinkUrl: redirectUrl,
-                plainUploadUrl,
-                expiresAtIso: paymentExpiresAt.toISOString(),
-                bankName: pcConfig?.bankName ?? null,
-                bankAccountNo: pcConfig?.bankAccountNo ?? null,
-                bankAccountHolder: pcConfig?.bankAccountHolder ?? null,
-                merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
-                locale: siteLocale,
-            })
-            payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
-                .catch((err: unknown) => console.error('[Email BT instructions]', err))
+            const [btCmsConfig, btSellerCmsConfig] = await Promise.all([
+                getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer'),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+            ])
 
-            getTenantOwnerEmails(payload, tenantId).then((emails) => {
-                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
-                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                    .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
-            }).catch(() => {})
+            if (btCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): bank-transfer-instructions')
+            } else {
+                const btEmail = bankTransferInstructionsEmail({
+                    shopName,
+                    orderNumber: order.orderNumber,
+                    customerName: customer.name,
+                    customerEmail: customer.email,
+                    customerPhone: customer.phone ?? null,
+                    customerAddress: customer.address ?? null,
+                    items: orderItems.map((item) => ({
+                        name: item.productName,
+                        variant: item.variant || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    })),
+                    subtotal,
+                    shippingFee,
+                    total: order.total,
+                    currency: order.currency ?? 'MYR',
+                    buyerNote: (order as any).notes ?? null,
+                    orderDate: new Date().toISOString(),
+                    paymentReference: paymentReference!,
+                    magicLinkUrl: redirectUrl,
+                    plainUploadUrl,
+                    expiresAtIso: paymentExpiresAt.toISOString(),
+                    bankName: pcConfig?.bankName ?? null,
+                    bankAccountNo: pcConfig?.bankAccountNo ?? null,
+                    bankAccountHolder: pcConfig?.bankAccountHolder ?? null,
+                    merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
+                    locale: siteLocale,
+                }, btCmsConfig ?? undefined)
+                payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
+                    .catch((err: unknown) => console.error('[Email BT instructions]', err))
+            }
+
+            if (btSellerCmsConfig?.enabled === false) {
+                console.log('[Email] suppressed (disabled): new-order-seller (BT)')
+            } else {
+                getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                    const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, btSellerCmsConfig ?? undefined)
+                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                        .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
+                }).catch(() => {})
+            }
         }
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
