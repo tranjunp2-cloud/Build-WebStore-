@@ -55,7 +55,7 @@ const PAID_ORDER = {
         id: 'tenant-1',
         stripeAccountId: 'acct_test_stripe',
     },
-    status: 'paid',
+    status: 'shipped', // refund gate now requires shipped or completed
     stripePaymentIntentId: 'pi_test_intent_123',
     stripeChargeId: 'ch_test_charge_123',
     total: 15000,
@@ -284,7 +284,7 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         // Arrange — tenant field is an expanded object (depth: 1)
         const orderWithExpandedTenant = {
             id: 'order-123',
-            status: 'paid',
+            status: 'shipped', // refund gate now requires shipped or completed
             stripePaymentIntentId: 'pi_test',
             tenant: {
                 id: 'tenant-1',

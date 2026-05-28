@@ -49,6 +49,7 @@ vi.mock('lucide-react', () => ({
     Truck: () => <span data-testid="icon-truck" />,
     CheckCircle: () => <span data-testid="icon-checkcircle" />,
     CheckCircle2: () => <span data-testid="icon-checkcircle2" />,
+    XCircle: () => <span data-testid="icon-xcircle" />,
 }))
 
 // ── Mock next/image ──────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ describe('TC-F10.i18n.04 — OrdersMetrics renders i18n labels (EN)', () => {
             ok: true,
             json: async () => ({
                 success: true,
-                data: { pending: 5, readyToShip: 3, confirmed: 2, shipped: 1 }
+                data: { pending: 5, readyToShip: 3, confirmed: 2, shipped: 1, cancelled: 0 }
             }),
         } as Response)
     })
@@ -386,7 +387,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
         expect(enOrders.status.pending).toBe('Pending')
         expect(enOrders.status.confirmed).toBe('Confirmed')
         expect(enOrders.status.readyToShip).toBe('Ready to Ship')
-        expect(enOrders.status.shipped).toBe('Shipped')
+        expect(enOrders.status.shipped).toBe('Shipping') // renamed from 'Shipped' (bug #22)
         expect(enOrders.status.completed).toBe('Completed')
         expect(enOrders.status.cancelled).toBe('Cancelled')
         expect(enOrders.status.refunded).toBe('Refunded')
@@ -396,7 +397,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
         expect(msOrders.status.pending).toBe('Menunggu')
         expect(msOrders.status.confirmed).toBe('Disahkan')
         expect(msOrders.status.readyToShip).toBe('Sedia untuk Dihantar')
-        expect(msOrders.status.shipped).toBe('Telah Dihantar')
+        expect(msOrders.status.shipped).toBe('Sedang Dihantar') // renamed from 'Telah Dihantar' (bug #22)
         expect(msOrders.status.completed).toBe('Selesai')
         expect(msOrders.status.cancelled).toBe('Dibatalkan')
         expect(msOrders.status.refunded).toBe('Dikembalikan')
@@ -452,7 +453,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
         expect(enOrders.progress.pending).toBe('Pending')
         expect(enOrders.progress.confirmed).toBe('Confirmed')
         expect(enOrders.progress.ready).toBe('Ready')
-        expect(enOrders.progress.shipped).toBe('Shipped')
+        expect(enOrders.progress.shipped).toBe('Shipping') // renamed from 'Shipped' (bug #22)
         expect(enOrders.progress.completed).toBe('Completed')
     })
 
@@ -460,7 +461,7 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
         expect(msOrders.progress.pending).toBe('Menunggu')
         expect(msOrders.progress.confirmed).toBe('Disahkan')
         expect(msOrders.progress.ready).toBe('Sedia')
-        expect(msOrders.progress.shipped).toBe('Dihantar')
+        expect(msOrders.progress.shipped).toBe('Sedang Dihantar') // renamed from 'Dihantar' (bug #22)
         expect(msOrders.progress.completed).toBe('Selesai')
     })
 
