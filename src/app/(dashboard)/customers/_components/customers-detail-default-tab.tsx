@@ -6,9 +6,9 @@ import { useI18n } from '@/i18n'
 import type { ShopCustomerRecord, AddressRecord } from '../_lib/shop-customer-record'
 import type { EditableFields } from './customers-detail'
 
-const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.08] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full'
+const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full'
 const INPUT_READONLY_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] font-mono text-white/40 w-full flex items-center select-all cursor-default'
-const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-white/[0.08] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full resize-none'
+const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full resize-none'
 const LABEL_CLS = 'text-[12px] font-semibold text-white/55'
 const HELP_CLS = 'text-[11px] text-white/35'
 const ERROR_CLS = 'text-[11px] text-red-400 flex items-center gap-1'
@@ -55,18 +55,18 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
         <TooltipProvider delayDuration={200}>
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
             {/* Left: form card */}
-            <div className="rounded-[16px] border border-white/[0.06] p-6" style={{ background: 'var(--cus-surface-card)' }}>
+            <div className="rounded-[16px] p-6" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
                 <div className="grid gap-x-6 gap-y-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
 
                     {/* Email — read-only identity (col 1) */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldEmail} <span style={{ color: '#dc2626' }}>*</span></label>
                         <div className={INPUT_READONLY_CLS}>{draft.email}</div>
                         <span className={HELP_CLS}>{cd.fieldEmailHelp}</span>
                     </div>
 
                     {/* Name (col 2) */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldName} <span style={{ color: '#dc2626' }}>*</span></label>
                         <input
                             type="text"
@@ -79,14 +79,14 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                     </div>
 
                     {/* Phone — read-only, synced from latest order */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldPhone}</label>
                         <div className={INPUT_READONLY_CLS}>{draft.phone || '—'}</div>
                         <span className={HELP_CLS}>{cd.fieldPhoneHelp}</span>
                     </div>
 
                     {/* Rank */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldRank}</label>
                         <div className="relative">
                             <select
@@ -103,7 +103,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                     </div>
 
                     {/* Address — read-only, synced from order shippingAddress */}
-                    <div className="flex flex-col gap-1.5" style={{ gridColumn: '1 / -1' }}>
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldAddress}</label>
                         <div
                             className="px-3 py-2.5 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] text-white/40 w-full min-h-[42px]"
@@ -115,7 +115,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                     </div>
 
                     {/* Notes */}
-                    <div className="flex flex-col gap-1.5" style={{ gridColumn: '1 / -1' }}>
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>
                             {cd.fieldNotes}{' '}
                             <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--cus-text-faint)' }}>{cd.fieldNotesInternal}</span>
@@ -130,7 +130,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                     </div>
 
                     {/* Read-only date + ID fields */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS + ' flex items-center gap-1'}>
                             {cd.fieldLatestOrder}
                             <Tooltip>
@@ -143,7 +143,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                         <div className={INPUT_READONLY_CLS}>{fmtDateTime(original.latestOrderAt)}</div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS + ' flex items-center gap-1'}>
                             {cd.fieldOldestOrder}
                             <Tooltip>
@@ -172,7 +172,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
             {/* Right: stats rail */}
             <div className="flex flex-col gap-4 sticky top-4">
                 {/* Stats card */}
-                <div className="rounded-[14px] border border-white/[0.06] overflow-hidden" style={{ background: 'var(--cus-surface-card)' }}>
+                <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
                     {[
                         { k: cd.statTotalOrder,    v: String(original.orderCount) },
                         { k: cd.statTotalSpending, v: fmtCurrency(original.lifetime) },
@@ -191,7 +191,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                 </div>
 
                 {/* Auto-link info box */}
-                <div className="rounded-[14px] border border-white/[0.06] px-4 py-3" style={{ background: 'var(--cus-surface-info)' }}>
+                <div className="rounded-[14px] px-4 py-3" style={{ background: 'var(--cus-surface-info)', border: '1px solid var(--cus-border-medium)' }}>
                     <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/45 mb-2">
                         <Info className="w-3.5 h-3.5 shrink-0" style={{ color: '#3b82f6' }} />
                         {cd.autoLinkTitle}

@@ -1549,8 +1549,7 @@
         "statusRefunded": "Dikembalikan",
         "statusPaid": "Dibayar",
         "statusPaymentFailed": "Pembayaran Gagal",
-        "statusProcessing": "Diproses",
-        "totalOrders": "{total} pesanan"
+        "statusProcessing": "Diproses"
       }
     },
     "settings": {
