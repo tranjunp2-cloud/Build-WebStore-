@@ -58,6 +58,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
         enabled: boolean
     }>({ contentEn: { ...EMPTY_CONTENT }, contentMs: { ...EMPTY_CONTENT }, enabled: true })
     const [isDirty, setIsDirty] = useState(false)
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [isSaving, startSaving] = useTransition()
 
     const findRow = (type: EmailTemplateType, recipient: EmailRecipient): TemplateRow | undefined =>
@@ -74,6 +75,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             enabled: row ? row.enabled : true,
         })
         setIsDirty(false)
+        setSaveError(null)
     }
 
     function handleBack() {
@@ -106,6 +108,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             enabled: row ? row.enabled : true,
         })
         setIsDirty(false)
+        setSaveError(null)
     }
 
     function handleSave() {
@@ -120,6 +123,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             })
             if (result.success) {
                 const now = new Date().toISOString()
+                setSaveError(null)
                 setRows((prev) => {
                     const existing = prev.find(
                         (r) => r.templateType === selectedTemplateId && r.recipient === selectedRecipient
@@ -144,6 +148,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 })
                 setIsDirty(false)
             } else {
+                setSaveError(result.error ?? 'Failed to save. Please try again.')
                 console.error('[EmailTemplatesClient] save failed:', result.error)
             }
         })
@@ -231,6 +236,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 draft={draft}
                 isDirty={isDirty}
                 isSaving={isSaving}
+                saveError={saveError}
                 onBack={handleBack}
                 onLocaleChange={setLocale}
                 onFieldChange={handleFieldChange}

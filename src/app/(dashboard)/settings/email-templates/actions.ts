@@ -37,6 +37,7 @@ export async function getEmailTemplateSettings(): Promise<{ success: boolean; ro
             where: { tenant: { equals: tenantId } },
             limit: 100,
             depth: 0,
+            overrideAccess: true,
         })
 
         return { success: true, rows: result.docs }
@@ -99,6 +100,7 @@ export async function saveEmailTemplateConfig(
             },
             limit: 1,
             depth: 0,
+            overrideAccess: true,
         })
 
         const data = {
@@ -115,11 +117,13 @@ export async function saveEmailTemplateConfig(
                 collection: 'email-template-settings',
                 id: existing.docs[0].id,
                 data,
+                overrideAccess: true,
             })
         } else {
             await payload.create({
                 collection: 'email-template-settings',
                 data,
+                overrideAccess: true,
             })
         }
 
@@ -153,12 +157,14 @@ export async function resetEmailTemplateConfig(
             },
             limit: 1,
             depth: 0,
+            overrideAccess: true,
         })
 
         if (existing.docs.length > 0) {
             await payload.delete({
                 collection: 'email-template-settings',
                 id: existing.docs[0].id,
+                overrideAccess: true,
             })
         }
         // If row doesn't exist, it's already at hardcoded default — no-op
