@@ -25,7 +25,9 @@ type InitialSiteData = {
     shippingConfig: ShippingConfig | null
     cardEnabled: boolean
     fpxEnabled: boolean
+    stripeConnected: boolean
     stripeEnabled: boolean
+    hasPaymentMethods: boolean
 }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -104,10 +106,15 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                 // Layer 1 — tenant master flags (default false: must be explicitly enabled)
                 const tenantCardEnabled = tenantPayments.payment_card === true
                 const tenantFpxEnabled = tenantPayments.payment_fpx === true
+                const tenantCodEnabled = tenantPayments.payment_cod === true
+                const tenantQrEnabled = tenantPayments.payment_qr === true
 
                 // Layer 2 — site-level guard (default true: permissive opt-out)
                 const siteCardEnabled = paymentConfig?.cardEnabled !== false
                 const siteFpxEnabled = paymentConfig?.fpxEnabled !== false
+
+                const codEnabled = tenantCodEnabled && (paymentConfig?.enableCod ?? true)
+                const qrEnabled = tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true)
 
                 initialSiteData = {
                     siteId: String(site.id),
@@ -115,15 +122,22 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                     merchantQrCodeUrl: merchantQrCode && typeof merchantQrCode === 'object'
                         ? (merchantQrCode.url ?? null)
                         : null,
-                    enableCod: paymentConfig?.enableCod ?? true,
-                    enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+                    enableCod: codEnabled,
+                    enableQrBanking: qrEnabled,
                     bankName: paymentConfig?.bankName ?? null,
                     bankAccountNo: paymentConfig?.bankAccountNo ?? null,
                     bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
                     shippingConfig: (site as any).shippingConfig ?? null,
                     cardEnabled: tenantCardEnabled && siteCardEnabled,
                     fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
-                    stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true,
+                    stripeConnected: !!((tenantFull as any)?.stripeAccountId),
+                    stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
+                    hasPaymentMethods: !!(
+                        codEnabled ||
+                        qrEnabled ||
+                        // Only count Stripe if it can actually accept payments
+                        ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled))
+                    ),
                 }
             }
         }

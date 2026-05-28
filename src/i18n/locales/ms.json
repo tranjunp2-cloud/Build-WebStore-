@@ -1641,7 +1641,13 @@
         "failVerifyStripe": "Pengesahan gagal. Sila cuba lagi.",
         "stripeVerifyPending": "Akaun Stripe anda masih dalam semakan. Sila semak semula tidak lama lagi.",
         "saving": "Menyimpan...",
-        "saveChanges": "Simpan perubahan"
+        "saveChanges": "Simpan perubahan",
+        "noCardMethodsTitle": "Tiada kaedah pembayaran kad aktif",
+        "noCardMethodsDesc": "Kedai anda sedang aktif, tetapi Kad dan FPX kedua-duanya dimatikan. Pembeli hanya boleh bayar melalui COD atau pindahan bank. Aktifkan sekurang-kurangnya satu kaedah Stripe untuk pembayaran lebih lancar.",
+        "required": "Diperlukan",
+        "unsavedChanges": "Perubahan belum disimpan",
+        "noMethodsWarningTitle": "Tiada kaedah pembayaran aktif",
+        "noMethodsWarningDesc": "Pembeli tidak dapat membuat pembayaran. Aktifkan sekurang-kurangnya satu kaedah pembayaran."
       },
       "shipping": {
         "pageTitle": "Penghantaran",
@@ -3430,7 +3436,23 @@
       "paymentCancelled": "Pembayaran dibatalkan. Troli anda dikekalkan — sila cuba lagi.",
       "paymentFailed": "Pembayaran tidak dapat dimulakan. Sila cuba lagi.",
       "redirectingTitle": "Mengarahkan ke Stripe Checkout",
-      "redirectingDesc": "Sila jangan tutup tetingkap ini. Anda akan kembali ke sini selepas pembayaran."
+      "redirectingDesc": "Sila jangan tutup tetingkap ini. Anda akan kembali ke sini selepas pembayaran.",
+      "stripeSecure": "Selamat",
+      "stripePoweredBy": "Dikuasakan oleh Stripe",
+      "codDetail": "Bayar tunai apabila kurier tiba. Penjual mengesahkan penerimaan.",
+      "noExtraFee": "Tiada caj tambahan",
+      "westMalaysiaOnly": "Malaysia Barat sahaja",
+      "bankTransferName": "Pindahan Bank / DuitNow QR",
+      "bankTransferDetail": "Pindah ke bank penjual atau imbas DuitNow QR. Resit disahkan secara manual.",
+      "sellerVerified": "Disahkan penjual",
+      "encrypted": "Disulitkan",
+      "stripeUnderMaintenance": "DALAM PENYELENGGARAAN",
+      "stripeTemporarilyUnavailable": "Tidak tersedia buat sementara",
+      "stripeUnavailableTitle": "Kaedah pembayaran tidak tersedia",
+      "stripeUnavailableDesc": "Kaedah pembayaran ini sedang dalam penyelenggaraan atau belum bersedia. Sila pilih kaedah lain.",
+      "stripeChooseAnother": "Pilih kaedah lain",
+      "checkoutUnavailableTitle": "Pembayaran tidak tersedia",
+      "checkoutUnavailableDesc": "Kedai ini tidak dapat menerima pembayaran buat sementara. Sila cuba lagi kemudian."
     },
     "confirmPage": {
       "leaveWarningBanner": "Tindakan Diperlukan — Resit Belum Dimuat Naik",

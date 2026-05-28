@@ -1641,7 +1641,13 @@
         "failVerifyStripe": "Verification failed. Please try again.",
         "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon.",
         "saving": "Saving...",
-        "saveChanges": "Save changes"
+        "saveChanges": "Save changes",
+        "noCardMethodsTitle": "No card payment methods active",
+        "noCardMethodsDesc": "Your storefront is live, but Card and FPX are both off. Buyers can only pay by COD or bank transfer. Enable at least one Stripe method for the smoothest checkout.",
+        "required": "Required",
+        "unsavedChanges": "Unsaved changes",
+        "noMethodsWarningTitle": "No payment methods active",
+        "noMethodsWarningDesc": "Buyers won't be able to checkout. Enable at least one payment method."
       },
       "shipping": {
         "pageTitle": "Shipping",
@@ -3430,7 +3436,23 @@
       "paymentCancelled": "Payment was cancelled. Your cart is preserved — please try again.",
       "paymentFailed": "Payment could not be started. Please try again.",
       "redirectingTitle": "Redirecting to Stripe Checkout",
-      "redirectingDesc": "Please don't close this window. You'll be returned here after payment."
+      "redirectingDesc": "Please don't close this window. You'll be returned here after payment.",
+      "stripeSecure": "Secure",
+      "stripePoweredBy": "Powered by Stripe",
+      "codDetail": "Pay in cash when the courier delivers. Seller confirms receipt.",
+      "noExtraFee": "No extra fee",
+      "westMalaysiaOnly": "West Malaysia only",
+      "bankTransferName": "Bank Transfer / DuitNow QR",
+      "bankTransferDetail": "Transfer to seller's bank or scan a DuitNow QR. Receipt verified manually.",
+      "sellerVerified": "Seller-verified",
+      "encrypted": "Encrypted",
+      "stripeUnderMaintenance": "UNDER MAINTENANCE",
+      "stripeTemporarilyUnavailable": "Temporarily unavailable",
+      "stripeUnavailableTitle": "Payment method unavailable",
+      "stripeUnavailableDesc": "This payment method is under maintenance or not yet ready. Please choose another method.",
+      "stripeChooseAnother": "Choose another method",
+      "checkoutUnavailableTitle": "Checkout unavailable",
+      "checkoutUnavailableDesc": "This store is temporarily unable to accept payments. Please try again later."
     },
     "confirmPage": {
       "leaveWarningBanner": "Action Required — Receipt Not Uploaded",
