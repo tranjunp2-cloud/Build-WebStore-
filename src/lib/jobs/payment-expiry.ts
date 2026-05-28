@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
 
@@ -23,21 +24,21 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
 
     for (const order of result.docs as any[]) {
         try {
-            // Guard: skip if already processed (e.g. concurrent cron invocation)
-            if (!['awaiting_payment', 'pending_verification'].includes(order.paymentStatus) ||
-                !['pending', 'new'].includes(order.status)) {
-                continue
+            // Atomic guard: only the first concurrent invocation wins.
+            // status is a Postgres enum — cast explicitly; payment_status is varchar.
+            const updateResult = await (payload.db.drizzle as any).execute(sql`
+                UPDATE orders
+                SET status = 'cancelled'::enum_orders_status,
+                    payment_status = 'payment_failed',
+                    cancel_reason = 'Auto-cancelled: payment not received within 24h'
+                WHERE id = ${order.id}
+                AND payment_status IN ('awaiting_payment', 'pending_verification')
+                AND status::text IN ('pending', 'new')
+                RETURNING id
+            `)
+            if (!updateResult.rows?.length) {
+                continue  // already processed by a concurrent cron invocation
             }
-            await payload.update({
-                collection: 'orders',
-                id: order.id,
-                data: {
-                    status: 'cancelled',
-                    paymentStatus: 'payment_failed',
-                    cancelReason: 'Auto-cancelled: payment not received within 24h',
-                } as any,
-                overrideAccess: true,
-            })
 
             // Slug lives on the tenant, not the site — sites collection has no slug field
             const siteObj = typeof order.site === 'object' ? order.site : null
