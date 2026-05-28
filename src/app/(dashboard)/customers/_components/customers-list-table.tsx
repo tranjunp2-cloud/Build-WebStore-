@@ -38,7 +38,7 @@ function relativeDate(iso: string, today: string, yesterday: string): string {
 
 function SkeletonRow() {
     return (
-        <tr className="border-b border-white/[0.04]">
+        <tr style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
             <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-white/[0.06] animate-pulse shrink-0" />
@@ -127,7 +127,7 @@ function TableFooter({
     }, [totalPages, page])
 
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-white/[0.06]" style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ fontSize: 12, color: 'var(--cus-text-muted)', borderTop: '1px solid var(--cus-border-medium)' }}>
             <div className="flex items-center gap-4 flex-wrap">
                 <span>
                     {tb.showing}{' '}
@@ -247,7 +247,7 @@ export function CustomersListTable({
 
     if (!loading && records.length === 0) {
         return !hasFilters ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center rounded-[16px] border border-white/[0.06]" style={{ background: 'var(--cus-surface-card)' }}>
+            <div className="flex flex-col items-center justify-center py-24 text-center rounded-[16px]" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
                 <div className="w-12 h-12 rounded-full mb-4 flex items-center justify-center" style={{ background: 'rgba(148,163,184,0.08)' }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/30">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -260,7 +260,7 @@ export function CustomersListTable({
                 <p className="text-[13px] text-white/40">{tb.emptySubtitle}</p>
             </div>
         ) : (
-            <div className="flex flex-col items-center justify-center py-24 text-center rounded-[16px] border border-white/[0.06]" style={{ background: 'var(--cus-surface-card)' }}>
+            <div className="flex flex-col items-center justify-center py-24 text-center rounded-[16px]" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
                 <p className="text-[16px] font-semibold text-white/70 mb-1">{tb.filteredTitle}</p>
                 <p className="text-[13px] text-white/40">{tb.filteredSubtitle}</p>
             </div>
@@ -268,11 +268,11 @@ export function CustomersListTable({
     }
 
     return (
-        <div className="w-full rounded-[16px] border border-white/[0.06] overflow-hidden" style={{ background: 'var(--cus-surface-card)' }}>
+        <div className="w-full rounded-[16px] overflow-hidden" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
             <div className="overflow-x-auto">
                 <table className="w-full border-collapse min-w-[680px]">
                     <thead>
-                        <tr className="border-b border-white/[0.06]" style={{ background: 'var(--cus-surface-header)' }}>
+                        <tr style={{ background: 'var(--cus-surface-header)', borderBottom: '1px solid var(--cus-border-medium)' }}>
                             <SortableTh label={tb.colEmail}   sortKey="email"      {...thProps} />
                             <SortableTh label={tb.colName}    sortKey="name"       {...thProps} />
                             <SortableTh label={tb.colRank}    sortKey="rank"       {...thProps} />
@@ -284,11 +284,12 @@ export function CustomersListTable({
                     <tbody>
                         {loading
                             ? Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)
-                            : sorted.map(c => (
+                            : sorted.map((c, idx) => (
                                 <tr
                                     key={c.id}
                                     onClick={() => onRowClick(c.id)}
-                                    className="border-b border-white/[0.04] cursor-pointer transition-colors hover:bg-white/[0.03]"
+                                    style={idx < sorted.length - 1 ? { borderBottom: '1px solid var(--cus-border-medium)' } : undefined}
+                                    className="cursor-pointer transition-colors hover:bg-white/[0.03]"
                                 >
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2 min-w-0">

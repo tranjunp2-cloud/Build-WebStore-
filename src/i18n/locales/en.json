@@ -1549,8 +1549,7 @@
         "statusRefunded": "Refunded",
         "statusPaid": "Paid",
         "statusPaymentFailed": "Payment failed",
-        "statusProcessing": "Processing",
-        "totalOrders": "{total} orders"
+        "statusProcessing": "Processing"
       }
     },
     "settings": {
