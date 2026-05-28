@@ -15,6 +15,50 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### GH-1084 — Add-to-Cart Variant Selection + Stock Fix (F09 Phase 03)
+
+**Bug → Feature:** Checkout flow failed silently when products with variants were added without explicit variant selection, or when variant pricing was stale. Root cause: `buildOrderItems` function was embedded in stripe-checkout route, duplicating logic and making testing difficult. Eligibility guards were missing (draft/deleted products accepted), and OOS logic used per-variant `stock` field which is never decremented (causing stale reads).
+
+**Implementation:**
+- **New module:** `src/app/api/orders/stripe-checkout/build-order-items.ts` — extracted `buildOrderItems()` function (92 LOC) with comprehensive guards:
+  - **Eligibility guard** — rejects draft products (`status !== 'active'`) + soft-deleted products (`deletedAt` set) before attempting variant/stock resolution
+  - **Variant guards** — `VARIANT_REQUIRED` (hasVariants product missing variant field), `VARIANT_NOT_FOUND` (variant name doesn't exist on product)
+  - **IDOR guard** — cross-tenant rejection when `tenantId` mismatch
+  - **OOS guard** — uses aggregate `p.inventory` (decrement via stock-CAS in COD flow), NOT per-variant `variant.stock` (never decremented, permanently stale)
+  - **Pricing:** variant.price used when variant selected; base product.price otherwise
+  - **Stripe format:** line items include variant name in display ("Shirt (Red)"), prices in sen (smallest unit: 100 sen = RM 1)
+- **Route integration:** `src/app/api/orders/stripe-checkout/route.ts` — imports `buildOrderItems()`, eliminates duplicated logic
+- **Direct unit tests:** `src/__tests__/api/build-order-items.test.ts` (7 tests, TC-F09.230–236) — covers eligibility, variant, pricing, OOS, non-variant paths. All pass.
+- **TypeScript:** `OrderItemRow`, `CheckoutItemRow`, `BuildResult` interfaces exported from module for reuse.
+
+**Guard order (defensive depth):**
+1. Product not found (NULL check)
+2. Eligibility (status + deletedAt)
+3. IDOR (tenant mismatch)
+4. Variant required (if hasVariants)
+5. Variant resolution (name lookup)
+6. OOS (aggregate inventory)
+
+**Code review fixes (post-merge):**
+- Removed orphaned `useAddToCart` hook (`use-add-to-cart.ts`) — dead code superseded by `AddToCartButton` inline logic
+- Fixed inventory source-of-truth in `ProductAddToCartSection`: was using `selectedVariant.stock` (stale), now uses `product.inventory` (aggregate, CAS-decremented)
+
+**Breaking change:** None. New module is extraction + consolidation; stripe-checkout route behavior unchanged. Old tests for route now test module directly.
+
+**Impact:**
+- Checkout now rejects draft products and correctly identifies missing/stale variants before Stripe API call
+- OOS logic now uses authoritative aggregate inventory (not stale per-variant stock)
+- Future per-variant stock decrement (US-1084 Phase 04) will extend variant.stock logic; today aggregate only
+
+**UX Design Decision — Listing pages route to PDP, not direct add-to-cart:**
+- `products-grid` block: all products (variant or not) show **"View Detail"** → navigate to PDP. Rationale: PDP is the authoritative purchase entry point; enforces correct variant selection and stock display before cart.
+- `products-featured` hero block: **"Add to Cart" button removed**. Only "View Details" link remains.
+- `product-quick-view` modal (live products): CTA changed from direct add-to-cart to **"View Product"** → navigate to PDP. Applies regardless of OOS state — PDP handles stock display.
+
+This is intentional — not a regression. `useAddToCart` is still used on PDP via `ProductAddToCartSection`.
+
+**Related:** GH-1084 Phase 01 (client-side variant picker), Phase 02 (eligibility guards), Phase 03 (extraction + direct testing), Phase 04 (per-variant stock — pending)
+
 ### F25 Code Review Gap Fixes (Phase 1 — CQ-01 to CQ-04)
 
 **4 important issues fixed post-implementation review:**

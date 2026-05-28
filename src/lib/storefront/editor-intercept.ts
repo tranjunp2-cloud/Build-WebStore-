@@ -4,7 +4,7 @@ import type React from 'react'
  * GH-960: In editor iframe, intercept cart/nav clicks and show preview toast.
  *
  * Shared by products-featured, products-grid, product-quick-view blocks,
- * AddToCartButton, and useAddToCart hook.
+ * and AddToCartButton.
  */
 
 // Contract: editor host must pass ?editor=1 or ?builder=1 in the iframe URL.

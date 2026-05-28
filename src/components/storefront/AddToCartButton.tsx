@@ -17,19 +17,25 @@ type AddToCartButtonProps = {
         imageUrl?: string
         inventory: number
     }
+    /** Variant name to add to cart; null/undefined when no variant selected */
+    variantName?: string | null
+    /** When true, button is disabled until a variant is chosen */
+    requireVariant?: boolean
     primaryColor: string
     siteSlug: string
     siteId?: string
 }
 
-export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
+export function AddToCartButton({ product, variantName, requireVariant, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
     const { addItem, setSiteSlug } = useCartStore()
     const isOwner = useIsOwner()
     const { t } = useI18n()
     const isOutOfStock = product.inventory <= 0
+    const needsVariant = Boolean(requireVariant) && !variantName
+    const isDisabled = isOutOfStock || needsVariant
 
     const handleClick = () => {
-        if (isOutOfStock) return
+        if (isDisabled) return
         // GH-960: In editor iframe show preview toast; real cart logic ships in #961.
         if (isInEditorPreview()) {
             window.parent.postMessage(
@@ -48,21 +54,28 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
             currency: product.currency || 'MYR',
             imageUrl: product.imageUrl,
             inventory: product.inventory,
+            variantName: variantName ?? undefined,
         })
         if (siteId) {
             trackEvent({
                 siteId,
                 event: 'add_to_cart',
-                metadata: { productId: product.id, productSlug: product.slug, price: product.price },
+                metadata: { productId: product.id, productSlug: product.slug, price: product.price, variant: variantName },
                 isOwner,
             })
         }
     }
 
+    const label = needsVariant
+        ? t.storefront.products.selectVariant
+        : isOutOfStock
+            ? t.storefront.products.outOfStock
+            : t.storefront.products.addToCart
+
     return (
         <button
             onClick={handleClick}
-            disabled={isOutOfStock}
+            disabled={isDisabled}
             style={{
                 background: primaryColor,
                 color: 'white',
@@ -71,14 +84,14 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
                 padding: '14px 32px',
                 fontSize: '16px',
                 fontWeight: 600,
-                cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
                 width: '100%',
                 marginBottom: '24px',
-                opacity: isOutOfStock ? 0.5 : 1,
+                opacity: isDisabled ? 0.5 : 1,
                 transition: 'opacity 0.2s',
             }}
         >
-            {isOutOfStock ? t.storefront.products.outOfStock : t.storefront.products.addToCart}
+            {label}
         </button>
     )
 }

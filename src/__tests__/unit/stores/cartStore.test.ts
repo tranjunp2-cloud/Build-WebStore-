@@ -145,4 +145,176 @@ describe('CartStore', () => {
             expect(useCartStore.getState().siteSlug).toBe('bella-bakery')
         })
     })
+
+    // ─── TC-F09.223: Variant dedup and cart operations ─────────────────────
+
+    describe('variants — composite key (productId + variantName)', () => {
+        it('[TC-F09.223] addItem with variantName carries variant price', () => {
+            // Arrange: product with variant Red @ RM 59.90
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90, // variant overrides base price
+                variantName: 'Red',
+            }
+
+            // Act: add variant item to cart
+            useCartStore.getState().addItem(redVariant)
+
+            // Assert: cart line preserves variant price and name
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(1)
+            expect(items[0].price).toBe(59.90)
+            expect(items[0].variantName).toBe('Red')
+        })
+
+        it('[TC-F09.224] two variants of same product = 2 cart lines', () => {
+            // Arrange: same product, different variants
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+            const blueVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 64.90,
+                variantName: 'Blue',
+            }
+
+            // Act: add both variants
+            useCartStore.getState().addItem(redVariant)
+            useCartStore.getState().addItem(blueVariant)
+
+            // Assert: two separate cart lines
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(2)
+            expect(items[0].variantName).toBe('Red')
+            expect(items[0].price).toBe(59.90)
+            expect(items[1].variantName).toBe('Blue')
+            expect(items[1].price).toBe(64.90)
+        })
+
+        it('[TC-F09.224] removeItem targets only matching variant line', () => {
+            // Arrange: cart with Red and Blue variants
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+            const blueVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 64.90,
+                variantName: 'Blue',
+            }
+            useCartStore.getState().addItem(redVariant)
+            useCartStore.getState().addItem(blueVariant)
+
+            // Act: remove only Red variant
+            useCartStore.getState().removeItem('prod-1', 'Red')
+
+            // Assert: only Blue remains
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(1)
+            expect(items[0].variantName).toBe('Blue')
+        })
+
+        it('[TC-F09.224b] updateQuantity targets only matching variant line', () => {
+            // Arrange: cart with Red variant
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+            useCartStore.getState().addItem(redVariant)
+            useCartStore.getState().addItem(redVariant)
+            expect(useCartStore.getState().items[0].quantity).toBe(2)
+
+            // Act: update quantity for Red variant only
+            useCartStore.getState().updateQuantity('prod-1', 5, 'Red')
+
+            // Assert: quantity updated for Red variant
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(1)
+            expect(items[0].quantity).toBe(5)
+            expect(items[0].variantName).toBe('Red')
+        })
+
+        it('[TC-F09.224c] adding same variant twice increments quantity', () => {
+            // Arrange: variant item
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+
+            // Act: add twice
+            useCartStore.getState().addItem(redVariant)
+            useCartStore.getState().addItem(redVariant)
+
+            // Assert: single line with quantity=2
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(1)
+            expect(items[0].quantity).toBe(2)
+            expect(items[0].variantName).toBe('Red')
+        })
+
+        it('[TC-F09.224b] removing variant with updateQuantity(0) removes line', () => {
+            // Arrange: variant in cart
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+            useCartStore.getState().addItem(redVariant)
+
+            // Act: update quantity to 0
+            useCartStore.getState().updateQuantity('prod-1', 0, 'Red')
+
+            // Assert: item removed
+            expect(useCartStore.getState().items).toHaveLength(0)
+        })
+
+        it('[TC-F09.224e] same product without variant and with variant are separate lines', () => {
+            // Arrange: product with and without variant
+            const baseItem: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 49.90,
+                // no variantName
+            }
+            const variantItem: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+
+            // Act: add both
+            useCartStore.getState().addItem(baseItem)
+            useCartStore.getState().addItem(variantItem)
+
+            // Assert: two separate lines
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(2)
+            expect(items[0].variantName).toBeUndefined()
+            expect(items[0].price).toBe(49.90)
+            expect(items[1].variantName).toBe('Red')
+            expect(items[1].price).toBe(59.90)
+        })
+
+        it('[TC-F09.224d] localStorage persists variant data', () => {
+            // Arrange: variant item
+            const redVariant: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                price: 59.90,
+                variantName: 'Red',
+            }
+
+            // Act: add to cart
+            useCartStore.getState().addItem(redVariant)
+
+            // Assert: localStorage contains variant
+            const stored = JSON.parse(localStorageMock.getItem('primeweb-cart') || '[]')
+            expect(stored).toHaveLength(1)
+            expect(stored[0].variantName).toBe('Red')
+            expect(stored[0].price).toBe(59.90)
+        })
+    })
 })

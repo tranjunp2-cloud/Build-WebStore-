@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ProductQuickViewConfig, QuickViewProduct } from './config'
@@ -15,13 +16,12 @@ import {
     CARD_PADDING,
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
-import { handleCartClick } from '@/lib/storefront/editor-intercept'
-import { useAddToCart } from '@/lib/storefront/use-add-to-cart'
+import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 type QuickViewProductWithCurrency = QuickViewProduct & {
     _currency?: string
-    _currencyCode?: string  // raw ISO code (MYR/USD) — needed by useAddToCart
+    _currencyCode?: string  // raw ISO code (MYR/USD)
     _id?: string            // Payload doc id (live API only)
     _inventory?: number     // stock count (live API only)
     _compareAtPrice?: number
@@ -79,30 +79,19 @@ function QuickViewModal({
     onClose,
     siteSlug,
     siteId,
+    siteBasePath,
 }: {
     product: QuickViewProductWithCurrency
     currency: string
     onClose: () => void
     siteSlug: string
     siteId?: string
+    siteBasePath: string
 }) {
+    const router = useRouter()
     const [selectedImage, setSelectedImage] = useState(0)
     const images = product.imageUrls.length > 0 ? product.imageUrls : []
     const hasLiveData = Boolean(product._id)
-    const { handleAddToCart, isOutOfStock } = useAddToCart(
-        {
-            id: product._id ?? '',
-            slug: product.slug ?? '',
-            name: product.name,
-            priceRaw: product.price,
-            compareAtPrice: product._compareAtPrice,
-            currency: product._currencyCode ?? 'MYR',
-            imageUrl: product.imageUrls[0],
-            inventory: product._inventory ?? 0,
-        },
-        siteSlug,
-        siteId,
-    )
 
     return (
         <motion.div
@@ -121,7 +110,7 @@ function QuickViewModal({
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl"
-                style={{ background: 'var(--brand-surface, #fff)', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
+                style={{ background: 'var(--surface-card)', color: 'var(--text)', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
             >
                 <div className="grid grid-cols-1 md:grid-cols-2">
                     {/* Images */}
@@ -221,15 +210,21 @@ function QuickViewModal({
                                 {product.ctaLabel || 'Add to Cart'}
                             </a>
                         ) : hasLiveData ? (
-                            // (B) live product → real cart action
+                            // (B) live product → navigate to PDP (design decision GH-1084: add-to-cart
+                            // is on PDP only; "View Product" shown regardless of OOS state)
                             <button
                                 type="button"
-                                disabled={isOutOfStock}
-                                className={`w-full py-3 rounded-xl font-semibold text-white ${TOUCH_TARGET.min} ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'transition-opacity hover:opacity-90'}`}
+                                className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
-                                onClick={handleAddToCart}
+                                onClick={(e) => {
+                                    if (isInEditorPreview()) { handleCartClick(e); return }
+                                    if (product.slug) {
+                                        router.push(`${siteBasePath}/products/${product.slug}`)
+                                        onClose()
+                                    }
+                                }}
                             >
-                                {isOutOfStock ? 'Out of Stock' : (product.ctaLabel || 'Add to Cart')}
+                                {product.ctaLabel || 'View Product'}
                             </button>
                         ) : (
                             // (C) static CMS product — no live data; editor toast / no-op in production
@@ -331,6 +326,9 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
     const siteId = site?.id ? String(site.id) : null
     const siteRec = site as Record<string, unknown> | undefined
     const siteSlug = String(siteRec?.tenantSlug || '')
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? siteRec.siteBasePath
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
 
     useEffect(() => {
         if (!siteId) return
@@ -518,6 +516,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                         onClose={() => setQuickViewProduct(null)}
                         siteSlug={siteSlug}
                         siteId={siteId ?? undefined}
+                        siteBasePath={siteBasePath}
                     />
                 )}
             </AnimatePresence>

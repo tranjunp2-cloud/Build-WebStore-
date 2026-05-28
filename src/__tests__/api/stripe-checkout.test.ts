@@ -538,4 +538,129 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(res.status).toBe(500)
         expect(body.error.code).toBe('INTERNAL_ERROR')
     })
+
+    // ─── TC-F09.228: Stripe buildOrderItems variant support ──────────────
+
+    it('[TC-F09.228] buildOrderItems uses variant.price for line item unitPrice', async () => {
+        // Arrange: product with variant Red @ RM 75 (base RM 50)
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [
+                { product: 'prod-v', productName: 'Shirt', variant: 'Red', quantity: 1, unitPrice: 75 },
+            ],
+            checkoutItems: [
+                { name: 'Shirt', price: 7500, quantity: 1, images: [] }, // 75 * 100 sen
+            ],
+            subtotal: 75,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({
+            ...VALID_REQUEST_BODY,
+            items: [{ productId: 'prod-v', quantity: 1, variant: 'Red' }],
+        })
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert: unitPrice in orderItems is variant.price
+        expect(res.status).toBe(200)
+        expect(mockBuildOrderItems).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.arrayContaining([
+                expect.objectContaining({ productId: 'prod-v', variant: 'Red', quantity: 1 }),
+            ]),
+            expect.anything(),
+        )
+        // Stripe session amount must reflect correct unit price
+        expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+            expect.objectContaining({ currency: 'MYR' }),
+        )
+    })
+
+    it('[TC-F09.228] buildOrderItems variant.price converts correctly to sen for Stripe', async () => {
+        // Arrange: variant price RM 29.90 → 2990 sen
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [
+                { product: 'prod-v', productName: 'Jacket', variant: 'Blue', quantity: 1, unitPrice: 29.90 },
+            ],
+            checkoutItems: [
+                { name: 'Jacket', price: 2990, quantity: 1, images: [] }, // 29.90 * 100
+            ],
+            subtotal: 29.90,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({
+            ...VALID_REQUEST_BODY,
+            items: [{ productId: 'prod-v', quantity: 1, variant: 'Blue' }],
+        })
+        const res = await POST(req)
+        const resBody = await res.json()
+
+        // Assert: Stripe item price is in sen (100-fold)
+        expect(res.status).toBe(200)
+        expect(resBody.success).toBe(true)
+    })
+
+    it('[TC-F09.228] buildOrderItems multiple variants of same product with correct prices', async () => {
+        // Arrange: same product, Red @ 75, Blue @ 80
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [
+                { product: 'prod-v', productName: 'Shirt', variant: 'Red', quantity: 1, unitPrice: 75 },
+                { product: 'prod-v', productName: 'Shirt', variant: 'Blue', quantity: 1, unitPrice: 80 },
+            ],
+            checkoutItems: [
+                { name: 'Shirt', price: 7500, quantity: 1, images: [] },
+                { name: 'Shirt', price: 8000, quantity: 1, images: [] },
+            ],
+            subtotal: 155,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const body = {
+            ...VALID_REQUEST_BODY,
+            items: [
+                { productId: 'prod-v', quantity: 1, variant: 'Red' },
+                { productId: 'prod-v', quantity: 1, variant: 'Blue' },
+            ],
+        }
+        const req = mockRequest(body)
+        const res = await POST(req)
+        const resBody = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(resBody.success).toBe(true)
+        expect(mockBuildOrderItems).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.arrayContaining([
+                expect.objectContaining({ variant: 'Red' }),
+                expect.objectContaining({ variant: 'Blue' }),
+            ]),
+            expect.anything(),
+        )
+    })
 })

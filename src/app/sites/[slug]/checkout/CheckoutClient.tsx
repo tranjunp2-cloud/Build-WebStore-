@@ -307,7 +307,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             if (paymentMethod === 'stripe') {
                 const stripePayload = {
                     siteId,
-                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity, variant: i.variantName })),
                     customer: {
                         name: form.name, email: form.email, phone: form.phone,
                         address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
@@ -331,7 +331,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             // bank_transfer / COD: no pre-checkout upload — proof submitted post-order via magic link
             const checkoutPayload: Record<string, unknown> = {
                 siteId,
-                items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                items: items.map(i => ({ productId: i.productId, quantity: i.quantity, variant: i.variantName })),
                 customer: {
                     name: form.name, email: form.email, phone: form.phone,
                     address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
@@ -615,7 +615,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                             <ul className="sum-items">
                                 {items.map(item => (
-                                    <li key={item.productId} className="sum-item">
+                                    <li key={`${item.productId}:${item.variantName ?? ''}`} className="sum-item">
                                         <div className="s-th">
                                             {item.imageUrl
                                                 // eslint-disable-next-line @next/next/no-img-element
@@ -624,6 +624,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                         </div>
                                         <div className="s-info" data-tooltip={item.name}>
                                             <p className="s-nm">{item.name}</p>
+                                            {item.variantName && (
+                                                <p style={{ fontSize: '11px', color: 'var(--f3)', margin: '1px 0 0' }}>{item.variantName}</p>
+                                            )}
                                             <p className="s-mt"><span className="s-qty">×{item.quantity}</span> {formatPrice(item.price, item.currency)}</p>
                                         </div>
                                         <span className="s-pr">{formatPrice(item.price * item.quantity, item.currency)}</span>

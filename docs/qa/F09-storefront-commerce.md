@@ -135,7 +135,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.61** | `UI` | `State` | **[Positive]** Nút Chat nằm dưới Cart Drawer | 1. Mở Cart Drawer (đè lên nút Chat). | - Nút Chat có Z-index thấp hơn Drawer, không che khuất giỏ hàng. | Low | [ ] |
 | **TC-F09.62** | `Final` | `Check` | **[Positive]** 9-Point Checklist Institutional Pass | 1. Rà soát toàn bộ Feature theo Corporate Standards. | - Mọi tiêu chí về LCP, Accessibility, Security, Business Logic đạt điểm tối đa. | Blocker | [x] |
 | **TC-F09.63** | `FR-03` | `UI` | **[Positive]** Image Gallery tương tác trên PDP | 1. Vào PDP có nhiều ảnh.<br>2. Click thumbnail nhỏ phía dưới.<br>3. Vuốt trái/phải trên Mobile. | - Ảnh chính thay đổi đúng theo Click/Touch.<br>- Không vỡ Layout. | High | [ ] |
-| **TC-F09.64** | `FR-04` | `Func` | **[Negative]** Bắt buộc chọn Variants trước khi Add Cart | 1. Vào SP có Biến thể (Size, Color).<br>2. Không chọn Size, nhấn "Add to Cart". | - Ô chọn Size rung lắc + viền đỏ.<br>- Toast "Vui lòng chọn Size".<br>- Không push variant null vào API. | Blocker | [ ] |
+| **TC-F09.64** | `FR-04` | `Func` | **[Negative]** Bắt buộc chọn Variants trước khi Add Cart | 1. Vào SP có Biến thể (Size, Color).<br>2. Không chọn Size, nhấn "Add to Cart". | - Ô chọn Size rung lắc + viền đỏ.<br>- Toast "Vui lòng chọn Size".<br>- Không push variant null vào API. | Blocker | [x] |
 | **TC-F09.65** | `FR-03` | `Data` | **[Positive]** Bảng Attributes mở rộng ở PDP | 1. Cuộn xuống phần dưới trang PDP. | - Hiển thị bảng thuộc tính (vd: Thương hiệu: OEM, Xuất xứ: MY).<br>- Đóng khung bảng chuẩn, không mất viền Border. | Medium | [ ] |
 | **TC-F09.66** | `NFR` | `SEO` | **[Positive]** JSON-LD Rich Snippet Product Schema | 1. Mở DevTools (F12), xem phần `<head>` của PDP. | - Tồn tại `<script type="application/ld+json">` chứa `@type: Product`.<br>- Điền đúng Giá, Kho, Tên, Ảnh. | Blocker | [x] |
 | **TC-F09.67** | `AC-1` | `UI` | **[Positive]** Hiển thị Variant trong Cart Drawer | 1. Add "Áo khoác" phân loại "Xanh, Size M" vào giỏ. | - Line-item trong Drawer hiện 2 dòng: Tên chính + Sub-title mờ "Phân loại: Xanh, Size M". | High | [ ] |
@@ -483,3 +483,58 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
 |:---|:---|:---|:---|:---|:---|
 | **TC-F10-GBL-040** | Unit | High | site with globalBlocks:null + legacy pages[] → same nextBlocks as pre-change baseline | BC fallback produces identical output | GH-1023 Phase05 |
+
+---
+
+## Variant Cart & Checkout Fixes (GH-1084)
+
+> **File test nguồn:** `src/__tests__/unit/stores/cartStore.test.ts` + `src/__tests__/api/orders-checkout.test.ts` + `src/__tests__/api/stripe-checkout.test.ts` + `src/__tests__/unit/storefront/product-add-to-cart-section.test.tsx`
+
+### TC-F09.223–224: CartStore variant support
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.223** | Unit | High | addItem(variantName='Red') carries variant price RM 59.90 | Cart line preserves variant price + name | GH-1084 Phase02 | [x] |
+| **TC-F09.224** | Unit | Critical | Two variants of same product = 2 separate cart lines (composite key) | removeItem('prod-1', 'Red') removes only Red, Blue stays | GH-1084 Phase02 | [x] |
+| **TC-F09.224b** | Unit | High | updateQuantity('prod-1', qty, variantName) targets matching line only | Variant-aware quantity update; same product + different variants independent | GH-1084 Phase02 | [x] |
+| **TC-F09.224c** | Unit | High | Same variant added twice increments quantity (no duplicate line) | Cart line qty += 1 per add | GH-1084 Phase02 | [x] |
+| **TC-F09.224d** | Unit | High | localStorage persists variant data across refresh | Reload browser → variantName restored | GH-1084 Phase02 | [x] |
+| **TC-F09.224e** | Unit | Medium | Non-variant + variant of same product stored as 2 lines | No variant (baseItem) vs variant='Red' separate entries | GH-1084 Phase02 | [x] |
+
+### TC-F09.226–228: Checkout variant support
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.226** | Integration | Critical | Variant product: order unitPrice = variant.price (RM 75) not base price (RM 50) | Order item.unitPrice=75, not 50 | GH-1084 Phase03 | [x] |
+| **TC-F09.226b** | Integration | Critical | Stale variant name → 422 VARIANT_NOT_FOUND | Request variant='Purple' (doesn't exist) rejected | GH-1084 Phase03 | [x] |
+| **TC-F09.226c** | Integration | High | Multiple variants of same product → correct unitPrice per variant | Red variant unitPrice=75, Blue=80 | GH-1084 Phase03 | [x] |
+| **TC-F09.227** | Integration | Critical | Variant OOS check uses aggregate p.inventory (not stale variant.stock) | inventory=1 + variant.stock=5 → qty=2 rejected (1 < 2) | GH-1084 Phase03 | [x] |
+| **TC-F09.228** | Integration | High | buildOrderItems uses variant.price for line item unitPrice in Stripe | Stripe session uses variant.price*100 sen | GH-1084 Phase03 | [x] |
+| **TC-F09.228b** | Integration | Medium | Variant price RM 29.90 → 2990 sen for Stripe | Correctly scaled to smallest unit | GH-1084 Phase03 | [x] |
+| **TC-F09.228c** | Integration | High | Multiple variants in Stripe checkout → correct prices per variant | Line1=Red 7500 sen, Line2=Blue 8000 sen | GH-1084 Phase03 | [x] |
+| **TC-F09.229** | Integration | Critical | hasVariants product with no variant field → 422 VARIANT_REQUIRED | Direct API bypass attempt rejected before price/stock logic | GH-1084 Phase03 | [x] |
+
+### TC-F09.230–236: buildOrderItems direct unit coverage
+
+> **File test nguồn:** `src/__tests__/api/build-order-items.test.ts`
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.230** | Unit | High | Eligibility guard: `status='draft'` → 404 PRODUCT_NOT_FOUND | buildOrderItems rejects draft product before variant/stock logic | GH-1084 Phase03 | [x] |
+| **TC-F09.231** | Unit | High | Eligibility guard: `deletedAt` set → 404 PRODUCT_NOT_FOUND | buildOrderItems rejects soft-deleted product | GH-1084 Phase03 | [x] |
+| **TC-F09.232** | Unit | Critical | VARIANT_REQUIRED: hasVariants product without variant field → 422 | buildOrderItems rejects before price resolution | GH-1084 Phase03 | [x] |
+| **TC-F09.233** | Unit | Critical | VARIANT_NOT_FOUND: variant name does not exist on product → 422 | Prevents silent base-price fallback exploit | GH-1084 Phase03 | [x] |
+| **TC-F09.234** | Unit | High | variant.price used as unitPrice — not base product.price | orderItems[0].unitPrice = variant.price; checkoutItems price in sen | GH-1084 Phase03 | [x] |
+| **TC-F09.235** | Unit | Critical | OOS guard uses aggregate p.inventory — variant.stock ignored | inventory=0 + variant.stock=10 → 422 OUT_OF_STOCK | GH-1084 Phase03 | [x] |
+| **TC-F09.236** | Unit | High | Non-variant product: base price, no variant guards — happy path | unitPrice=base, variant='', displayName=productName, Stripe price in sen | GH-1084 Phase03 | [x] |
+
+### TC-F09.64: Product component variant guard
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.64** | Unit | Blocker | Variant product: AddToCart button disabled until variant selected | requireVariant=true → disabled until onSelect | GH-1084 Phase01 | [x] |
+| **TC-F09.64b** | Unit | High | ProductVariantSelector rendered only when hasVariants=true | No selector for non-variant products | GH-1084 Phase01 | [x] |
+| **TC-F09.64c** | Unit | High | Variant compareAtPrice & stock passed through component | Price & inventory props use variant data when selected | GH-1084 Phase01 | [x] |
+| **TC-F09.64d** | Unit | High | Switching variants updates button state reactively | Click Red → Blue updates title & passes variantName | GH-1084 Phase01 | [x] |
+| **TC-F09.64e** | Unit | Medium | Out-of-stock variant button disabled | stock=0 → disabled, click ignored | GH-1084 Phase01 | [x] |
+| **TC-F09.64f** | Unit | Medium | Empty/undefined variants handled gracefully | hasVariants=true + variants=[] → no selector | GH-1084 Phase01 | [x] |
