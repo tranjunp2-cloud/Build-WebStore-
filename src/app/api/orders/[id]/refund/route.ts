@@ -65,7 +65,62 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
     }
 
-    // Resolve merchant's connected Stripe account
+    // Helper: build and fire refund confirmation email (fire-and-forget)
+    function fireRefundEmail() {
+        if (!order.customerEmail) return
+        const tenant = typeof order.tenant === 'object' ? order.tenant : null
+        const shopName = tenant?.name ?? 'Shop'
+        const siteSlug = tenant?.slug ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
+        const email = orderRefundedEmail({
+            shopName,
+            orderNumber: order.orderNumber,
+            customerName: order.customerName ?? '',
+            customerEmail: order.customerEmail,
+            customerPhone: order.customerPhone ?? null,
+            customerAddress: order.shippingAddress ?? null,
+            items: (order.items ?? []).map((item: any) => ({
+                name: item.productName ?? item.name ?? '',
+                variant: item.variantName ?? null,
+                quantity: item.quantity ?? 1,
+                unitPrice: item.unitPrice ?? 0,
+                lineTotal: item.lineTotal ?? 0,
+            })),
+            subtotal: order.subtotal ?? 0,
+            shippingFee: order.shippingFee ?? 0,
+            total: order.total ?? 0,
+            refundAmount: order.total ?? 0,
+            paymentMethod: order.paymentMethod ?? 'stripe',
+            orderDate: order.createdAt,
+            refundDate: new Date().toISOString(),
+            shopUrl: `${baseUrl}/sites/${siteSlug}`,
+            currency: order.currency ?? 'MYR',
+            locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
+        })
+        payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
+            .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
+    }
+
+    // Bank transfer / COD — manual refund, no Stripe call needed
+    if (['bank_transfer', 'cod'].includes(order.paymentMethod)) {
+        const casResult = await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET status = 'refunded', payment_status = 'refunded'
+            WHERE id = ${order.id}
+            AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
+            RETURNING id
+        `)
+        if (!casResult.rows?.length) {
+            return NextResponse.json(
+                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+                { status: 400 },
+            )
+        }
+        console.log(`[Refund] Order ${id} refunded manually (${order.paymentMethod})`)
+        fireRefundEmail()
+        return NextResponse.json({ success: true, data: { refundId: null } })
+    }
+
+    // Stripe orders — resolve connected account
     const stripeAccountId =
         typeof order.tenant === 'object' ? order.tenant.stripeAccountId : undefined
     if (!stripeAccountId) {
@@ -139,41 +194,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
 
         console.log(`[Refund] Order ${id} refunded — Stripe refund ${refund.id}`)
-
-        // Fire-and-forget refund confirmation email to buyer
-        if (order.customerEmail) {
-            const tenant = typeof order.tenant === 'object' ? order.tenant : null
-            const shopName = tenant?.name ?? 'Shop'
-            const siteSlug = tenant?.slug ?? ''
-            const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
-            const email = orderRefundedEmail({
-                shopName,
-                orderNumber: order.orderNumber,
-                customerName: order.customerName ?? '',
-                customerEmail: order.customerEmail,
-                customerPhone: order.customerPhone ?? null,
-                customerAddress: order.shippingAddress ?? null,
-                items: (order.items ?? []).map((item: any) => ({
-                    name: item.productName ?? item.name ?? '',
-                    variant: item.variantName ?? null,
-                    quantity: item.quantity ?? 1,
-                    unitPrice: item.unitPrice ?? 0,
-                    lineTotal: item.lineTotal ?? 0,
-                })),
-                subtotal: order.subtotal ?? 0,
-                shippingFee: order.shippingFee ?? 0,
-                total: order.total ?? 0,
-                refundAmount: order.total ?? 0,
-                paymentMethod: order.paymentMethod ?? 'stripe',
-                orderDate: order.createdAt,
-                refundDate: new Date().toISOString(),
-                shopUrl: `${baseUrl}/sites/${siteSlug}`,
-                currency: order.currency ?? 'MYR',
-                locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
-            })
-            payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
-                .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
-        }
+        fireRefundEmail()
 
         return NextResponse.json({ success: true, data: { refundId: refund.id } })
     } catch (err: any) {
