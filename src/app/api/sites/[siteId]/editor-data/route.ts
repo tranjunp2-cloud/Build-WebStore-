@@ -132,6 +132,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
                 locale: site.locale || 'ms',
+                generationLocale: ((site as Record<string, unknown>).generationLocale as string) || site.locale || 'ms',
                 pendingLocaleConfirm: (site as Record<string, unknown>).pendingLocaleConfirm === true,
                 contactInfo: site.contactInfo || {},
                 socialLinks: site.socialLinks || {},

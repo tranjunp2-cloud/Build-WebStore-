@@ -1,148 +1,122 @@
 /**
- * F26-01: Language confirm after AI generate — unit tests
- * TC-IDs: F26-01-01 → F26-01-05
+ * F26-01: Language confirm modal — pre-generation language recommendation
+ * TC-IDs: F26-01-01 → F26-01-07
+ *
+ * Modal shows when detected locale is outside EN/BM.
+ * Interaction: click radio card to select → click Continue to confirm.
+ * Cancel → dismiss. Default selected = English.
  *
  * Covers:
- *   AC-1: Dialog renders with detected locale pre-selected
- *   AC-2: confirm → locale unchanged, pendingLocaleConfirm = false
- *   AC-3: switch  → locale changes to alternate, pendingLocaleConfirm = false
- *   AC-4: dismiss → locale unchanged, pendingLocaleConfirm = false
- *   AC-5: Dialog does not re-appear after action
+ *   AC-1: Modal renders detected locale in title
+ *   AC-2: English card selected + Continue → onAction("switch", "en")
+ *   AC-3: Malay card selected + Continue → onAction("switch", "ms")
+ *   AC-4: Detected locale card selected + Continue → onAction("confirm", detectedLocale)
+ *   AC-5: Cancel → onAction("dismiss", detectedLocale)
+ *   AC-6: Modal not rendered when isOpen = false
+ *   AC-7: Unknown locale shows raw code + flag fallback
  */
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { LanguageConfirmDialog } from '@/components/editor/LanguageConfirmDialog'
+import { LanguageConfirmBanner } from '@/components/editor/LanguageConfirmBanner'
 
 vi.mock('next/font/google', () => ({
     Inter: () => ({ className: 'inter' }),
 }))
 
-// ── AC-1: Dialog renders with detected locale ─────────────────────────────────
+// ── AC-1: Modal renders detected locale in title ──────────────────────────────
 
-describe('TC-F26-01-01: dialog renders detected locale label', () => {
-    it('shows "Bahasa Melayu" for ms locale', () => {
+describe('TC-F26-01-01: modal renders detected locale label', () => {
+    it('shows "Thai language detected" title for Thai locale', () => {
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="ms"
-                onAction={vi.fn()}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={vi.fn()} />,
         )
-        // At least one element contains the locale label
-        expect(screen.getAllByText(/Bahasa Melayu/).length).toBeGreaterThan(0)
+        expect(screen.getByText(/Thai language detected/i)).toBeTruthy()
     })
 
-    it('shows "English" as alternate switch option for ms locale', () => {
+    it('always shows English and Malay as recommended options', () => {
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="ms"
-                onAction={vi.fn()}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={vi.fn()} />,
         )
-        expect(screen.getByText(/switch to English/i)).toBeTruthy()
+        expect(screen.getAllByText('English').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Malay').length).toBeGreaterThan(0)
     })
 })
 
-// ── AC-2: confirm action ──────────────────────────────────────────────────────
+// ── AC-2: English selected (default) + Continue ───────────────────────────────
 
-describe('TC-F26-01-02: confirm → calls onAction("confirm", detectedLocale)', () => {
-    it('fires confirm with ms locale', () => {
+describe('TC-F26-01-02: English default selected + Continue → onAction("switch", "en")', () => {
+    it('fires switch with en when Continue is clicked with English selected (default)', () => {
         const onAction = vi.fn()
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="ms"
-                onAction={onAction}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={onAction} />,
         )
-        fireEvent.click(screen.getByText(/Yes, continue in Bahasa Melayu/i))
-        expect(onAction).toHaveBeenCalledWith('confirm', 'ms')
-    })
-})
-
-// ── AC-3: switch action ───────────────────────────────────────────────────────
-
-describe('TC-F26-01-03: switch → calls onAction("switch", alternateLocale)', () => {
-    it('fires switch with "en" when detected was "ms"', () => {
-        const onAction = vi.fn()
-        render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="ms"
-                onAction={onAction}
-            />,
-        )
-        fireEvent.click(screen.getByText(/No, switch to English/i))
+        // English is selected by default — click Continue directly
+        fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
         expect(onAction).toHaveBeenCalledWith('switch', 'en')
     })
+})
 
-    it('fires switch with "ms" when detected was "en"', () => {
+// ── AC-3: Malay card selected + Continue ──────────────────────────────────────
+
+describe('TC-F26-01-03: Malay selected + Continue → onAction("switch", "ms")', () => {
+    it('fires switch with ms when Malay card is selected then Continue clicked', () => {
         const onAction = vi.fn()
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="en"
-                onAction={onAction}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={onAction} />,
         )
-        fireEvent.click(screen.getByText(/No, switch to Bahasa Melayu/i))
+        fireEvent.click(screen.getByRole('button', { name: /Malay/i }))
+        fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
         expect(onAction).toHaveBeenCalledWith('switch', 'ms')
     })
 })
 
-// ── AC-4: dismiss action ──────────────────────────────────────────────────────
+// ── AC-4: Detected locale card selected + Continue ────────────────────────────
 
-describe('TC-F26-01-04: dismiss → calls onAction("dismiss", detectedLocale)', () => {
-    it('fires dismiss with original locale intact', () => {
+describe('TC-F26-01-04: Keep Thai selected + Continue → onAction("confirm", "th")', () => {
+    it('fires confirm with th when Keep Thai card is selected then Continue clicked', () => {
         const onAction = vi.fn()
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="ms"
-                onAction={onAction}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={onAction} />,
         )
-        fireEvent.click(screen.getByText(/Dismiss/i))
-        expect(onAction).toHaveBeenCalledWith('dismiss', 'ms')
+        fireEvent.click(screen.getByRole('button', { name: /Keep Thai/i }))
+        fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
+        expect(onAction).toHaveBeenCalledWith('confirm', 'th')
     })
 })
 
-// ── AC-5: dialog does not render when isOpen = false ─────────────────────────
+// ── AC-5: Cancel → dismiss ────────────────────────────────────────────────────
 
-describe('TC-F26-01-05: dialog not visible when isOpen = false', () => {
-    it('does not render dialog content', () => {
+describe('TC-F26-01-05: Cancel → onAction("dismiss", detectedLocale)', () => {
+    it('fires dismiss with th when Cancel is clicked', () => {
+        const onAction = vi.fn()
         render(
-            <LanguageConfirmDialog
-                isOpen={false}
-                detectedLocale="ms"
-                onAction={vi.fn()}
-            />,
+            <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={onAction} />,
         )
-        expect(screen.queryByText(/Language Detected/)).toBeNull()
+        fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))
+        expect(onAction).toHaveBeenCalledWith('dismiss', 'th')
     })
 })
 
-// ── AC-6: unknown locale fallback ─────────────────────────────────────────────
+// ── AC-6: Modal not visible when isOpen = false ───────────────────────────────
 
-describe('TC-F26-01-06: unknown locale fallback', () => {
-    it('shows raw locale code when locale not in LOCALE_LABELS map', () => {
-        // Arrange — 'fr' is not in LOCALE_LABELS (only 'ms' and 'en' are mapped)
+describe('TC-F26-01-06: modal not visible when isOpen = false', () => {
+    it('does not render modal content', () => {
         render(
-            <LanguageConfirmDialog
-                isOpen={true}
-                detectedLocale="fr"
-                onAction={vi.fn()}
-            />,
+            <LanguageConfirmBanner isOpen={false} detectedLocale="th" onAction={vi.fn()} />,
         )
+        expect(screen.queryByText(/language detected/i)).toBeNull()
+    })
+})
 
-        // Assert — raw locale code 'fr' appears in the description span
-        // The component uses: LOCALE_LABELS[detectedLocale] ?? detectedLocale
-        // getAllByText is correct here — 'fr' appears in both the <span> and the button text
-        expect(screen.getAllByText(/fr/).length).toBeGreaterThan(0)
+// ── AC-7: Unknown locale fallback ─────────────────────────────────────────────
 
-        // Assert — confirm button uses raw code as label fallback (exact button text)
-        expect(screen.getByText(/Yes, continue in fr/i)).toBeTruthy()
+describe('TC-F26-01-07: unknown locale shows raw code fallback', () => {
+    it('shows "{locale} language detected" and "Keep {locale}" for unknown locale', () => {
+        render(
+            <LanguageConfirmBanner isOpen={true} detectedLocale="fr" onAction={vi.fn()} />,
+        )
+        expect(screen.getByText(/French language detected/i)).toBeTruthy()
+        expect(screen.getByRole('button', { name: /Keep French/i })).toBeTruthy()
     })
 })

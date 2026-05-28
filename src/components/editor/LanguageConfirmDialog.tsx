@@ -19,8 +19,8 @@ interface LanguageConfirmDialogProps {
 }
 
 /**
- * F26-01: Shown once after AI site generation when locale is non-English.
- * Lets user confirm AI-detected locale or switch to English before editing.
+ * F26-01: Shown once after AI site generation to confirm the detected locale.
+ * Lets user confirm or switch to the alternate language before editing.
  * Follows editor-portal light/dark pattern (globals.css .editor-portal).
  */
 export function LanguageConfirmDialog({

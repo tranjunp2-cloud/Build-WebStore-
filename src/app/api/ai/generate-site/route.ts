@@ -593,10 +593,12 @@ export async function POST(req: NextRequest) {
             return resolveSiteType(resolveComposerCategory(businessInfo.industry))
         })()
 
-        // F26-01: Set pendingLocaleConfirm when AI generates non-English site
-        // so user can confirm or correct the detected locale in editor.
+        // F26-01: Always show confirm dialog after AI generation so user can verify or correct detected locale.
         const detectedLocale = ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en'
-        const pendingLocaleConfirm = detectedLocale === 'ms'
+        const pendingLocaleConfirm = true
+        // F26: generationLocale is immutable — tracks which locale flat blocks are stored in.
+        // locale (Sites.locale) can be changed by user; generationLocale never changes after gen.
+        const generationLocale = detectedLocale
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
@@ -609,6 +611,7 @@ export async function POST(req: NextRequest) {
                     generationStatus: 'generating',
                     siteType: safeSiteType,
                     locale: detectedLocale,
+                    generationLocale,
                     pendingLocaleConfirm,
                     theme: resolvedTheme,
                     seo: {
@@ -650,6 +653,7 @@ export async function POST(req: NextRequest) {
                     generationStatus: 'generating',
                     siteType: safeSiteType,
                     locale: detectedLocale,
+                    generationLocale,
                     pendingLocaleConfirm,
                     theme: resolvedTheme,
                     seo: {

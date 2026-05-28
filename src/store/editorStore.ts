@@ -786,6 +786,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     getDisplayBlock: (block) => {
         const { activeLocale, siteLocale, localeOverrides, siteName } = get()
 
+        // Header/footer blocks store locale content embedded as _localeContent
+        // (keyed by locale, populated by auto-translate on locale switch)
+        const embedded = (block as Record<string, unknown>)._localeContent as
+            | Record<string, Record<string, unknown>>
+            | undefined
+        if (embedded?.[activeLocale] && Object.keys(embedded[activeLocale]).length > 0) {
+            return { ...block, ...embedded[activeLocale] }
+        }
+
         // Blocks without id (pre-save new blocks) fall through to locale resolver
         if (!block.id) {
             // Flat block is in siteLocale — return as-is when viewing that locale

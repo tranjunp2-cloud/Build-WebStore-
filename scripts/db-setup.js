@@ -4122,6 +4122,11 @@ const MIGRATIONS = [
     name: 'sites.pending_locale_confirm',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_locale_confirm boolean DEFAULT false;`,
   },
+  // ── F26: Generation locale — immutable locale AI used for flat blocks ──
+  {
+    name: 'sites.generation_locale',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_locale varchar DEFAULT 'ms';`,
+  },
 ];
 
 async function runMigrations(pool) {

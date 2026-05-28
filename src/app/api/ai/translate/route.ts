@@ -16,7 +16,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { getCachedTranslation, setCachedTranslation } from '@/lib/ai/translate-cache'
 
 // Allowlisted locales — prevents prompt injection via user-supplied locale strings
-const SUPPORTED_TARGET_LOCALES = ['ms', 'zh', 'th', 'id'] as const
+const SUPPORTED_TARGET_LOCALES = ['en', 'ms', 'zh', 'th', 'id'] as const
 
 const translateSchema = z.object({
     blockType: z.string().min(1).max(64),
@@ -30,6 +30,7 @@ const translateSchema = z.object({
 })
 
 const LOCALE_NAMES: Record<string, string> = {
+    en: 'English',
     ms: 'Bahasa Malaysia (Malaysian Malay)',
     zh: 'Simplified Chinese',
     th: 'Thai',
@@ -77,9 +78,13 @@ export const POST = withAuth(async (user, req) => {
         // targetLocale is enum-validated — always present in LOCALE_NAMES
         const localeName = LOCALE_NAMES[targetLocale]!
 
+        const translationInstruction = targetLocale === 'en'
+            ? `Translate ALL string values in the given JSON into natural, idiomatic ${localeName}. The source may be in any language.`
+            : `Translate ALL string values in the given JSON from English to ${localeName}.`
+
         const systemPrompt = [
             `You are a professional translator specializing in marketing and e-commerce copy.`,
-            `Translate ALL string values in the given JSON from English to ${localeName}.`,
+            translationInstruction,
             `Rules:`,
             `- Return ONLY valid JSON with exactly the same structure and keys.`,
             `- Translate only string leaf values. Preserve numbers, booleans, nulls, and object/array shapes.`,

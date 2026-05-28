@@ -65,10 +65,6 @@ interface BlockLibraryPanelProps {
     onBlockSelect: (index: number) => void
     onAIAction: (action: AIAction) => Promise<void> | void
     onEditGlobalBlock?: (blockType: string) => void
-    /** F26-07: Whether language switcher is already added to the nav header */
-    navShowLanguageSwitcher?: boolean
-    /** F26-07: Called when user adds/removes language switcher from header */
-    onNavLanguageSwitcherChange?: (show: boolean) => void
     /** F26-04: Called when user clicks "✨ AI" auto-translate button for a block type */
     onAutoTranslate?: (blockType: string) => Promise<void>
 }
@@ -78,8 +74,6 @@ export function BlockLibraryPanel({
     selectedBlock,
     onAIAction,
     onEditGlobalBlock,
-    navShowLanguageSwitcher = false,
-    onNavLanguageSwitcherChange,
     onAutoTranslate,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
@@ -174,11 +168,6 @@ export function BlockLibraryPanel({
     const globalBlocks = useEditorStore(state => state.globalBlocks)
     const updateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
 
-    // F26-07: Language Switcher search index — mirrors category item filter logic
-    // Includes all searchable terms so "language", "switcher", "BM", "nav", etc. surface the block
-    const navLangSwitcherSearchable = 'language switcher en bm toggle nav bar header navigation bahasa melayu'
-    const navMatchesSearch = !query.trim() || navLangSwitcherSearchable.includes(query.trim().toLowerCase())
-
     const handleAddBlock = (blockType: string, variant: string) => {
         const key = BLOCK_TYPE_TO_KEY[blockType]
         if (variant === 'floating' && key) {
@@ -212,76 +201,6 @@ export function BlockLibraryPanel({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
                 <div className="space-y-1">
-                    {/* ── Navigation header-locked components ──────────────── */}
-                    {navMatchesSearch && (
-                    <section>
-                        <button
-                            type="button"
-                            onClick={() => setExpandedCategory(prev => (prev === 'nav' ? prev : 'nav'))}
-                            className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
-                        >
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm leading-none">🌐</span>
-                                {/* TODO(F27): i18n this string */}
-                                <span className="text-[13px] font-medium text-slate-200">Navigation</span>
-                                <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">1</span>
-                            </div>
-                            {(expandedCategory === 'nav' || !!query.trim()) ? (
-                                <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-                            ) : (
-                                <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
-                            )}
-                        </button>
-                        {(expandedCategory === 'nav' || !!query.trim()) && (
-                        <div className="mt-1 space-y-1 pb-2">
-                            <Tooltip>
-                            <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                onClick={() => onNavLanguageSwitcherChange?.(!navShowLanguageSwitcher)}
-                                className={cn(
-                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left transition-all",
-                                    navShowLanguageSwitcher
-                                        ? "bg-cyan-500/[0.08] border-cyan-500/20 hover:bg-cyan-500/[0.12]"
-                                        : "bg-white/[0.02] hover:border-white/[0.08] hover:bg-white/[0.06]",
-                                )}
-                            >
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
-                                    🌏
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5">
-                                        {/* TODO(F27): i18n this string */}
-                                        <p className="truncate text-[13px] font-medium text-slate-200">Language Switcher</p>
-                                        <span
-                                            className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                            style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
-                                        >
-                                            🔒 Header
-                                        </span>
-                                    </div>
-                                    {/* TODO(F27): i18n this string */}
-                                    <p className="truncate text-[11px] text-slate-500">EN | BM toggle in nav bar</p>
-                                </div>
-                                <span className={cn(
-                                    "shrink-0 text-[10px] font-medium transition-colors",
-                                    navShowLanguageSwitcher ? "text-cyan-400" : "text-slate-600 opacity-0 group-hover:opacity-100",
-                                )}>
-                                    {navShowLanguageSwitcher ? 'Added ✓' : 'Add'}
-                                </span>
-                            </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                                {navShowLanguageSwitcher
-                                    ? 'Click to remove language switcher from header'
-                                    : 'Adds EN | BM toggle directly into the navigation bar'}
-                            </TooltipContent>
-                            </Tooltip>
-                        </div>
-                        )}
-                    </section>
-                    )}
-
                     {categories.map(category => {
                         const isExpanded = category.id === expandedCategory
 

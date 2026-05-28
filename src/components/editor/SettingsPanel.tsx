@@ -9,6 +9,7 @@ import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
+import { NavMultilingualPanel } from './nav-multilingual-panel'
 import { LogoEditor } from './LogoEditor'
 import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
@@ -258,6 +259,12 @@ interface SettingsPanelProps {
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
     requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
+    // F26: Multilingual panel in Menu settings
+    siteLocale?: string
+    activeLocale?: string
+    navShowLanguageSwitcher?: boolean
+    onNavLanguageSwitcherChange?: (show: boolean) => void
+    onLocaleSwitch?: (locale: string) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -266,6 +273,8 @@ function SettingsPanelInner({
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     requestedTab,
+    siteLocale = 'en', activeLocale = 'en',
+    navShowLanguageSwitcher = false, onNavLanguageSwitcherChange, onLocaleSwitch,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -897,6 +906,20 @@ function SettingsPanelInner({
                         links={resolvedNavLinks}
                         onUpdate={(links) => onHeaderUpdate?.({ links })}
                         pages={pages}
+                    />
+                </div>
+
+                {/* 3.5 Quick Language — multilingual toggle */}
+                <div className={sectionCls}>
+                    <NavMultilingualPanel
+                        siteLocale={siteLocale}
+                        activeLocale={activeLocale}
+                        enabled={navShowLanguageSwitcher}
+                        onToggle={(on) => {
+                            onNavLanguageSwitcherChange?.(on)
+                            if (!on && onLocaleSwitch) onLocaleSwitch(siteLocale)
+                        }}
+                        onLocaleSwitch={(locale) => onLocaleSwitch?.(locale)}
                     />
                 </div>
 
