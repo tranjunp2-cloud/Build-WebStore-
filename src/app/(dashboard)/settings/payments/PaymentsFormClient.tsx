@@ -82,6 +82,7 @@ export function PaymentsFormClient({
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
+    const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { t } = useI18n();
@@ -348,16 +349,26 @@ export function PaymentsFormClient({
                 </div>
             </div>
 
-            {isChargesEnabled && isVerified && !cardEnabled && !fpxEnabled && (
+            {/* P0 warning: no payment method at all — buyers can't checkout */}
+            {!paymentCod && !paymentQr && !cardEnabled && !fpxEnabled && (
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-red-500/[0.30] bg-red-500/[0.07]">
+                    <div className="w-10 h-10 rounded-[10px] bg-red-500/[0.12] border border-red-500/[0.28] text-red-400 grid place-items-center shrink-0">
+                        <AlertTriangle className="w-[18px] h-[18px]" />
+                    </div>
+                    <div>
+                        <h4 className="text-[14px] font-semibold text-slate-100 m-0 mb-[3px]">{pt.noMethodsWarningTitle}</h4>
+                        <p className="text-[13px] text-slate-400 m-0 leading-[1.55]">{pt.noMethodsWarningDesc}</p>
+                    </div>
+                </div>
+            )}
+            {isChargesEnabled && isVerified && !cardEnabled && !fpxEnabled && (paymentCod || paymentQr) && (
                 <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
                     <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
                     <div>
-                        <h4 className="text-[14px] font-semibold text-slate-100 m-0 mb-[3px]">No card payment methods active</h4>
-                        <p className="text-[13px] text-slate-400 m-0 leading-[1.55]">
-                            Your storefront is live, but Card and FPX are both off. Buyers can only pay by COD or bank transfer. Enable at least one Stripe method for the smoothest checkout.
-                        </p>
+                        <h4 className="text-[14px] font-semibold text-slate-100 m-0 mb-[3px]">{pt.noCardMethodsTitle}</h4>
+                        <p className="text-[13px] text-slate-400 m-0 leading-[1.55]">{pt.noCardMethodsDesc}</p>
                     </div>
                 </div>
             )}
@@ -446,15 +457,19 @@ export function PaymentsFormClient({
                             >
                                 {fpxEnabled && (
                                     <div className="flex flex-wrap gap-[6px] mt-[14px]">
-                                        {FPX_BANKS.slice(0, 10).map(b => (
+                                        {(showAllBanks ? FPX_BANKS : FPX_BANKS.slice(0, 10)).map(b => (
                                             <span key={b} className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400">
                                                 {b}
                                             </span>
                                         ))}
                                         {FPX_BANKS.length > 10 && (
-                                            <span className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400">
-                                                +{FPX_BANKS.length - 10} more
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllBanks(v => !v)}
+                                                className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-sky-400 hover:bg-sky-500/[0.12] hover:border-sky-500/[0.24] transition-all cursor-pointer"
+                                            >
+                                                {showAllBanks ? '−' : `+${FPX_BANKS.length - 10}`} {showAllBanks ? 'Show less' : 'more'}
+                                            </button>
                                         )}
                                     </div>
                                 )}
@@ -565,7 +580,7 @@ export function PaymentsFormClient({
                                 <div className="flex flex-col gap-[6px] mt-[16px]">
                                     <label className="flex items-center text-[13px] font-semibold text-slate-300">
                                         {pt.accountHolderNameLabel}
-                                        <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
+                                        <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">{pt.required}</span>
                                     </label>
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
@@ -644,16 +659,16 @@ export function PaymentsFormClient({
                 </div>
             </section>
 
-            {/* Save bar */}
+            {/* Save bar — sticky bottom so it sticks at viewport bottom when scrolling */}
             <div
-                className="sticky bottom-4 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                className="sticky bottom-4 z-40 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
                 style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
             >
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>
                             <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
-                            <span className="text-amber-300 font-medium">Unsaved changes</span>
+                            <span className="text-amber-300 font-medium">{pt.unsavedChanges}</span>
                         </>
                     ) : (
                         <>
@@ -665,11 +680,11 @@ export function PaymentsFormClient({
                 <div className="flex gap-2">
                     <button
                         type="button"
-                        className="inline-flex items-center gap-[6px] h-[34px] px-[12px] rounded-[8px] text-[13px] font-semibold text-dash-text-muted border border-dash-border hover:bg-dash-surface-hover hover:text-dash-text transition-all"
+                        className="inline-flex items-center justify-center h-[34px] w-[34px] rounded-[8px] text-dash-text-muted border border-dash-border hover:bg-dash-surface-hover hover:text-dash-text transition-all"
                         onClick={() => toast.info(pt.infoDesc)}
+                        title={pt.previewCheckout}
                     >
                         <ExternalLink className="w-[13px] h-[13px]" />
-                        {pt.previewCheckout}
                     </button>
                     <button
                         type="button"

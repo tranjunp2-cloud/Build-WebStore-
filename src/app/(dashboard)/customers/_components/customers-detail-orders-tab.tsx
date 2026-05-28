@@ -113,7 +113,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                 <button
                     type="button"
                     onClick={() => fetchOrders(page)}
-                    className="flex items-center gap-2 h-9 px-4 rounded-[8px] text-[13px] text-white/70 border border-white/[0.08] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
+                    className="flex items-center gap-2 h-9 px-4 rounded-[8px] text-[13px] text-white/70 border border-[var(--cus-border-strong)] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" /> {ot.retry}
                 </button>
@@ -132,16 +132,14 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
 
     return (
         <div className="space-y-3">
-            <p className="text-[13px] text-white/40">{ti(ot.totalOrders, { total })}</p>
-
             <div
-                className="rounded-[16px] border border-white/[0.06] overflow-hidden"
-                style={{ background: 'var(--cus-surface-card)' }}
+                className="rounded-[16px] overflow-hidden"
+                style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}
             >
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse min-w-[540px]">
                         <thead>
-                            <tr className="border-b border-white/[0.06]" style={{ background: 'var(--cus-surface-header)' }}>
+                            <tr style={{ background: 'var(--cus-surface-header)', borderBottom: '1px solid var(--cus-border-medium)' }}>
                                 {[ot.colOrderNumber, ot.colStatus, ot.colTotal, ot.colPayment, ot.colDate, ''].map((h, i) => (
                                     <th key={i} className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-white/45 whitespace-nowrap ${i === 2 ? 'text-right' : 'text-left'}`}>
                                         {h}
@@ -150,11 +148,12 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.map(o => (
+                            {orders.map((o, idx) => (
                                 <tr
                                     key={o.id}
                                     onClick={() => router.push(`/orders?order=${o.id}`)}
-                                    className="border-b border-white/[0.04] cursor-pointer hover:bg-white/[0.03] transition-colors"
+                                    style={idx < orders.length - 1 ? { borderBottom: '1px solid var(--cus-border-medium)' } : undefined}
+                                    className="cursor-pointer hover:bg-white/[0.03] transition-colors"
                                 >
                                     <td className="px-4 py-3">
                                         <code className="text-[13px] font-mono text-white/75 bg-white/[0.05] px-1.5 py-0.5 rounded">
@@ -184,7 +183,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                     </table>
                 </div>
 
-                <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06]">
+                <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid var(--cus-border-medium)' }}>
                         <p className="text-[12px] text-white/40">
                             {ot.showing}{' '}
                             <strong className="text-white/60">{total === 0 ? 0 : Math.min((page - 1) * 25 + 1, total)}–{Math.min(page * 25, total)}</strong>
@@ -197,7 +196,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                                 type="button"
                                 disabled={page <= 1}
                                 onClick={() => setPage(p => p - 1)}
-                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-white/[0.08] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
+                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-[var(--cus-border-strong)] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
                             >
                                 {ot.prev}
                             </button>
@@ -208,7 +207,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
                                 type="button"
                                 disabled={page >= totalPages}
                                 onClick={() => setPage(p => p + 1)}
-                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-white/[0.08] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
+                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-[var(--cus-border-strong)] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
                             >
                                 {ot.next}
                             </button>

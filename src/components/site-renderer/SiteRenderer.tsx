@@ -182,7 +182,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         ...block,
         __editorBlockIndex: block.__editorBlockIndex ?? index,
     }))
-    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages).map(b => {
+    const _preprocessedBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages)
+    // Detect cart: true when cartWidget block was injected (site has commerce enabled)
+    const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget')
+    const rawBlocks = _preprocessedBlocks.map(b => {
+        if (b.blockType === 'navigation') {
+            return { ...b, _hasCart }
+        }
         if (b.blockType !== 'breadcrumb') return b
         // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
         // Runtime check required: Payload may store slug as null; type cast alone doesn't guard this

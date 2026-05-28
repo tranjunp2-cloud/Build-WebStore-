@@ -425,6 +425,14 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
     )
 }
 
+function fmtPaymentMethod(m: string | null | undefined, labels: Record<string, string>) {
+    return labels[m ?? ''] ?? m ?? '—'
+}
+
+function fmtPaymentStatus(s: string | null | undefined, labels: Record<string, string>) {
+    return labels[s ?? ''] ?? s ?? '—'
+}
+
 // ─── PAYMENT INFORMATION ───
 // layout_ODZ12A: column, gap 12px, padding 17px 17px 1px, height 318
 // Method row — icon fill_RKVNRG rgba(59,130,246,0.1)
@@ -434,6 +442,8 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
 function PaymentInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
+    const methodLabels = (d as any).paymentMethods as Record<string, string>
+    const statusLabels = (d as any).paymentStatuses as Record<string, string>
 
     let statusColor = '#FF8904'
     let statusBg = 'rgba(255, 105, 0, 0.1)'
@@ -506,7 +516,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.method}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                            {order.paymentMethod}
+                            {fmtPaymentMethod(order.paymentMethod, methodLabels)}
                         </span>
                     </div>
                 </div>
@@ -523,7 +533,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
-                            {order.paymentStatus}
+                            {fmtPaymentStatus(order.paymentStatus, statusLabels)}
                         </span>
                     </div>
                 </div>
@@ -781,7 +791,8 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const primaryDisabled = isLoading || isTerminal
+                    const isAwaitingBtPayment = order.paymentMethod === 'bank_transfer' && order.paymentStatus !== 'paid' && ['pending', 'new'].includes(status)
+                    const primaryDisabled = isLoading || isTerminal || isAwaitingBtPayment
                     return (
                         <button
                             onClick={() => {
@@ -819,7 +830,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
+                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}

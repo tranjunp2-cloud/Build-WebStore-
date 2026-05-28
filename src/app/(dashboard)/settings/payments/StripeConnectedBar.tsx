@@ -57,8 +57,8 @@ export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                     <div className="flex items-center gap-[6px] text-[12px] text-slate-400">
                         <ShieldCheck className="w-[11px] h-[11px]" />
                         {accountEmail
-                            ? <>{accountEmail} · PCI DSS Level 1</>
-                            : <>PCI DSS Level 1 · Funds settle to your linked bank</>
+                            ? <>{accountEmail}</>
+                            : <>{pt.stripeTrust}</>
                         }
                     </div>
                 </div>

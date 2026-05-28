@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { exchangeOAuthCode, getConnectedAccountStatus, verifyOAuthState } from '@/lib/payment/stripe'
+import { exchangeOAuthCode, verifyOAuthState } from '@/lib/payment/stripe'
 
 /**
  * GET /api/stripe/connect/callback?code=xxx&state=tenantId
  *
  * Stripe OAuth callback — exchanges authorization code for stripe_user_id,
- * auto-detects if account is already verified, saves status to tenant,
- * then redirects: ?stripe=verified (already verified) or ?stripe=complete (pending Verify click).
+ * saves account ID with onboarding reset, then redirects to ?stripe=complete
+ * so user must complete the account-link info form.
  */
 export async function GET(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
@@ -30,29 +30,19 @@ export async function GET(request: Request) {
     try {
         const { stripeUserId } = await exchangeOAuthCode(code)
 
-        // Auto-detect if connected account is already fully verified (existing Stripe account).
-        // Non-fatal: if this fails, merchant can always click Verify manually.
-        let onboardingComplete = false
-        try {
-            const status = await getConnectedAccountStatus(stripeUserId)
-            onboardingComplete = status.chargesEnabled && status.detailsSubmitted
-        } catch {
-            // non-fatal — falls back to manual Verify flow
-        }
-
+        // Always reset onboarding state on (re)connect — forces user through the
+        // account-link info form even if they previously had a verified account.
         const payload = await getPayload({ config })
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            // Payload update data type is overly strict; cast required until generated types exist
             data: {
                 stripeAccountId: stripeUserId,
-                stripeOnboardingComplete: onboardingComplete,
+                stripeOnboardingComplete: false,
             } as Record<string, unknown>,
         })
 
-        const redirectParam = onboardingComplete ? 'verified' : 'complete'
-        return NextResponse.redirect(`${paymentsUrl}?stripe=${redirectParam}`)
+        return NextResponse.redirect(`${paymentsUrl}?stripe=complete`)
     } catch (err) {
         console.error('[Stripe OAuth Callback Error]', err)
         return NextResponse.redirect(`${paymentsUrl}?stripe=refresh`)
