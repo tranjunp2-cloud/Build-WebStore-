@@ -104,7 +104,7 @@ export async function saveEmailTemplateConfig(
         })
 
         const data = {
-            tenant: tenantId,
+            tenant: Number(tenantId),
             templateType: input.templateType,
             recipient: input.recipient,
             enabled: input.enabled,
