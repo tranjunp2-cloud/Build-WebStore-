@@ -53,6 +53,14 @@ function mockProduct(product: object) {
 // Simulates payload.find() returning no results (not found / filtered out)
 const EMPTY_FIND = { docs: [], totalDocs: 0 }
 
+// Default tenant mock with all manual payment methods enabled
+const MOCK_TENANT = {
+    id: 'tenant-1',
+    name: 'Test Shop',
+    slug: 'test-shop',
+    payments: { payment_cod: true, payment_qr: true },
+}
+
 const validBody = {
     siteId: 'site-1',
     items: [{ productId: 'prod-1', quantity: 2 }],
@@ -83,7 +91,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('creates order with valid input', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })   // site
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 })         // restock check
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant (payment check + email)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product 1', price: 25, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
@@ -114,7 +122,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('returns 404 when product not found', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(EMPTY_FIND)
 
         const res = await POST(mockReq(validBody))
@@ -125,7 +135,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('returns 422 when out of stock', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 1 })) // only 1 left
 
         const res = await POST(mockReq(validBody)) // requesting 2
@@ -138,7 +150,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('calculates SST 6% tax', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
@@ -152,7 +164,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('[TC-F14.02 integration] Sabah → east rate RM 15 applied to order total', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site — no shippingConfig, uses defaults
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 })      // restock check
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
@@ -176,7 +188,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         }
         mockFindByID
             .mockResolvedValueOnce(siteWithConfig) // product price=100 → subtotal=10000 sen ≥ freeAbove
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
@@ -213,7 +225,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('[TC-F14.04] missing state (undefined) returns 422 VALIDATION_ERROR', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
         const { state: _s, ...addressWithoutState } = validBody.customer.address
         const body = {
@@ -229,7 +243,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
     it('[TC-F10-06-01 security] cross-tenant product returns 404', async () => {
         // find() query filters by site=site-1, so a product from site-2 is not returned
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(EMPTY_FIND)
 
         const res = await POST(mockReq(validBody))
@@ -240,7 +256,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('[TC-F10-06-02 security] duplicate productIds aggregated — stock bypass prevented', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 3 })) // inventory=3
 
         const body = {
@@ -260,7 +278,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('[TC-F10-06-03 security] duplicate productIds create one aggregated order line', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
@@ -307,7 +325,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     // ─── RF-01 regression: product eligibility via find() filter ─────
 
     it('[TC-F14-RF01.01 RF-01] inactive product (status≠active) returns 404 — find() where clause verified', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(EMPTY_FIND) // status filter excludes draft/archived products
 
         const res = await POST(mockReq(validBody))
@@ -331,6 +351,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // Arrange — bank_transfer: no proof upload, paymentReference uniqueness check via find()
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind
             .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 50, inventory: 10 })) // product lookup
             .mockResolvedValueOnce({ docs: [], totalDocs: 0 }) // paymentReference uniqueness check
@@ -378,7 +399,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('[TC-F14-RF01.02 RF-01] soft-deleted product (deletedAt set) returns 404 — find() where clause verified', async () => {
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(EMPTY_FIND) // deletedAt filter excludes soft-deleted products
 
         const res = await POST(mockReq(validBody))
@@ -404,6 +427,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // Arrange: product with Red variant @ RM 75 (base price RM 50)
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })   // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
         mockFind.mockResolvedValueOnce(mockProduct({
             id: 'prod-v', name: 'Shirt', price: 50,  // base price — must NOT be used
             currency: 'MYR', inventory: 10,
@@ -436,7 +460,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('[TC-F09.227] variant OOS check uses aggregate p.inventory (not per-variant stock)', async () => {
         // Arrange: variant product with aggregate inventory=1 and variant.stock=5 (stale).
         // OOS guard must fire based on p.inventory (the field CAS decrements), not variant.stock.
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({
             id: 'prod-v', name: 'Shirt', price: 50, inventory: 1, // aggregate: only 1 left
             hasVariants: true,
@@ -464,7 +490,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
     it('[TC-F09.226b] stale variant name returns 422 VARIANT_NOT_FOUND', async () => {
         // Arrange: product with Red variant, request Purple (doesn't exist)
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({
             id: 'prod-v', name: 'Shirt', price: 50, inventory: 10,
             hasVariants: true,
@@ -489,7 +517,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
     it('[TC-F09.226c] variant product with multiple variants — correct unitPrice per variant', async () => {
         // Arrange: product with 2 variants, add both to order
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)
         // Need 2 find() calls: one for Red, one for Blue
         const shirtProduct = {
             id: 'prod-v', name: 'Shirt', price: 50,
@@ -531,7 +561,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
     it('[TC-F09.229] hasVariants product without variant field returns 422 VARIANT_REQUIRED', async () => {
         // Arrange: variant product sent without variant name (direct API bypass attempt)
-        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
         mockFind.mockResolvedValueOnce(mockProduct({
             id: 'prod-v', name: 'Shirt', price: 50, inventory: 100,
             hasVariants: true,

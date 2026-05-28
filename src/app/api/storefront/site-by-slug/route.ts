@@ -111,8 +111,8 @@ export async function GET(req: Request) {
             stripeConnected: !!((tenantFull as any)?.stripeAccountId),
             stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
             hasPaymentMethods: !!(
-                tenantCodEnabled && (paymentConfig?.enableCod ?? true) ||
-                tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true) ||
+                (tenantCodEnabled && (paymentConfig?.enableCod ?? true)) ||
+                (tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true)) ||
                 ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled))
             ),
         })

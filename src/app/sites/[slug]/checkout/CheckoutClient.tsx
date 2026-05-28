@@ -91,7 +91,14 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [selectedDistrictId, setSelectedDistrictId] = useState('')
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer' | 'stripe'>('cod')
+    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer' | 'stripe'>(() => {
+        // Auto-select first available method from SSR data to avoid invalid default
+        if (initialSiteData?.enableCod === false) {
+            if (initialSiteData?.enableQrBanking) return 'bank_transfer'
+            if (initialSiteData?.stripeEnabled) return 'stripe'
+        }
+        return 'cod'
+    })
     const [proofFile, setProofFile] = useState<File | null>(null)
     const [proofPreview, setProofPreview] = useState<string | null>(null)
     const [proofError, setProofError] = useState<string | null>(null)
@@ -111,6 +118,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [fontBody, setFontBody] = useState(initialFontBody)
 
     useEffect(() => { setMounted(true) }, [])
+
+    // Cleanup tooltip timer on unmount to prevent setState on unmounted component
+    useEffect(() => {
+        return () => { if (stripeTooltipTimer.current) clearTimeout(stripeTooltipTimer.current) }
+    }, [])
 
     useEffect(() => {
         fetch('/api/geo/states')
@@ -160,7 +172,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 }
                 if (data.stripeConnected === true) setStripeConnected(true)
                 if (data.stripeEnabled === true) setShowStripe(true)
-                if (data.hasPaymentMethods === false) setHasPaymentMethods(false)
+                if (data.hasPaymentMethods != null) setHasPaymentMethods(data.hasPaymentMethods)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
                     if (data.theme.fontBody) setFontBody(data.theme.fontBody)
