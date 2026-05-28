@@ -76,6 +76,9 @@ export async function GET(req: Request) {
         // Layer 1 — tenant master flags (default false: must be explicitly enabled)
         const tenantCardEnabled = tenantPayments.payment_card === true
         const tenantFpxEnabled = tenantPayments.payment_fpx === true
+        // COD/QR: tenant master flag (false = explicitly disabled by seller in dashboard)
+        const tenantCodEnabled = tenantPayments.payment_cod === true
+        const tenantQrEnabled = tenantPayments.payment_qr === true
 
         // Layer 2 — site-level guard (default true: permissive opt-out)
         const siteCardEnabled = paymentConfig.cardEnabled !== false
@@ -85,8 +88,8 @@ export async function GET(req: Request) {
             siteId: site.id,
             tenantId: tenant.id,
             merchantQrCodeUrl,
-            enableCod: paymentConfig?.enableCod ?? true,
-            enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+            enableCod: tenantCodEnabled && (paymentConfig?.enableCod ?? true),
+            enableQrBanking: tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true),
             bankName: paymentConfig?.bankName ?? null,
             bankAccountNo: paymentConfig?.bankAccountNo ?? null,
             bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
@@ -105,7 +108,13 @@ export async function GET(req: Request) {
             cardEnabled: tenantCardEnabled && siteCardEnabled,
             fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
 
-            stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true,
+            stripeConnected: !!((tenantFull as any)?.stripeAccountId),
+            stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled),
+            hasPaymentMethods: !!(
+                (tenantCodEnabled && (paymentConfig?.enableCod ?? true)) ||
+                (tenantQrEnabled && (paymentConfig?.enableQrBanking ?? true)) ||
+                ((tenantFull as any)?.stripeOnboardingComplete === true && (tenantCardEnabled || tenantFpxEnabled))
+            ),
         })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)

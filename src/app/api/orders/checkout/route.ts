@@ -57,15 +57,21 @@ export async function POST(request: Request) {
 
         const tenantId = typeof site.tenant === 'object' ? (site.tenant as any).id : site.tenant
 
-        // Enforce per-site payment method configuration
+        // Fetch tenant early — needed for both payment validation and email generation below
+        const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
+        const tenantPayments = (tenantForSlug as any)?.payments ?? {}
+
+        // Enforce payment method availability: tenant master flag (dashboard toggle) AND site-level guard
+        // site.paymentConfig.enableCod/enableQrBanking is a site-level opt-out (default true)
+        // tenant.payments.payment_cod/payment_qr is the seller's explicit enable in Payment Settings (default false)
         const pc = (site as any).paymentConfig
-        if (paymentMethod === 'cod' && pc?.enableCod === false) {
+        if (paymentMethod === 'cod' && (tenantPayments.payment_cod !== true || pc?.enableCod === false)) {
             return NextResponse.json(
                 { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'COD is not available for this store' } },
                 { status: 422 }
             )
         }
-        if (paymentMethod === 'bank_transfer' && pc?.enableQrBanking === false) {
+        if (paymentMethod === 'bank_transfer' && (tenantPayments.payment_qr !== true || pc?.enableQrBanking === false)) {
             return NextResponse.json(
                 { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'Bank Transfer is not available for this store' } },
                 { status: 422 }
@@ -391,9 +397,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // Resolve tenant slug + name once — used in both COD and bank_transfer email blocks
-        // Slug lives on the tenant, not the site — sites collection has no slug field
-        const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
+        // Resolve tenant slug + name — tenantForSlug already fetched above for payment validation
         const shopName = (tenantForSlug as any)?.name ?? ''
         const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''

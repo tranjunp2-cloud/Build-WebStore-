@@ -23,6 +23,7 @@ export type InitialSiteData = {
     enableCod: boolean
     enableQrBanking: boolean
     shippingConfig: ShippingConfig | null
+    stripeConnected: boolean
     stripeEnabled: boolean
 }
 
@@ -60,6 +61,7 @@ export function useCheckoutState({
     const [freeAboveRM, setFreeAboveRM] = useState<number | null>(
         sc?.freeAbove != null ? sc.freeAbove / 100 : null
     )
+    const [stripeConnected, setStripeConnected] = useState(initialSiteData?.stripeConnected ?? false)
     const [showStripe, setShowStripe] = useState(initialSiteData?.stripeEnabled ?? false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -135,6 +137,7 @@ export function useCheckoutState({
                     if (s.eastRate != null) setShippingEastRM(s.eastRate / 100)
                     setFreeAboveRM(s.freeAbove != null ? s.freeAbove / 100 : null)
                 }
+                if (data.stripeConnected === true) setStripeConnected(true)
                 if (data.stripeEnabled === true) setShowStripe(true)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
@@ -339,7 +342,7 @@ export function useCheckoutState({
         // form
         form, fieldErrors, contactVerified, canPlaceOrder,
         // payment
-        paymentMethod, setPaymentMethod, showStripe, enableCod, enableQrBanking,
+        paymentMethod, setPaymentMethod, stripeConnected, showStripe, enableCod, enableQrBanking,
         // address
         states, statesLoading, selectedStateId, districts, districtsLoading,
         selectedDistrictId, postcodeOpts, postcodesLoading,

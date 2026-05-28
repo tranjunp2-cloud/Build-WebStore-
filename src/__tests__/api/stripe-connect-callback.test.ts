@@ -18,20 +18,9 @@ vi.mock('@/lib/payment/stripe', () => ({
     // Returns the raw state string as tenantId — tests pass plain 'tenant_1' (not HMAC-signed)
     verifyOAuthState: vi.fn((state: string) => state || null),
     exchangeOAuthCode: vi.fn().mockResolvedValue({ stripeUserId: 'acct_test_123' }),
-    getConnectedAccountStatus: vi.fn().mockResolvedValue({
-        accountId: 'acct_test_123',
-        chargesEnabled: false,
-        payoutsEnabled: false,
-        detailsSubmitted: false,
-        country: 'MY',
-        email: 'merchant@test.com',
-    }),
 }))
 
 import { GET as callbackGET } from '@/app/api/stripe/connect/callback/route'
-import { getConnectedAccountStatus } from '@/lib/payment/stripe'
-
-const mockGetStatus = getConnectedAccountStatus as ReturnType<typeof vi.fn>
 
 // ─── Tests ────────────────────────────────────────────────────────────
 
@@ -56,26 +45,18 @@ describe('GET /api/stripe/connect/callback', () => {
         }))
     })
 
-    it('[TC-F13.142] redirects ?stripe=verified when existing account is already fully verified', async () => {
-        // Arrange: existing fully-verified Stripe account
-        mockGetStatus.mockResolvedValueOnce({
-            accountId: 'acct_test_123',
-            chargesEnabled: true,
-            payoutsEnabled: true,
-            detailsSubmitted: true,
-            country: 'MY',
-            email: 'merchant@test.com',
-        })
+    it('[TC-F13.142] always redirects ?stripe=complete even for previously verified accounts (force re-onboard)', async () => {
+        // Arrange: reconnecting — should always reset onboarding to force user through info form
         const req = new Request('https://app.test/api/stripe/connect/callback?code=test_code&state=tenant_1')
 
         // Act
         const res = await callbackGET(req)
 
-        // Assert
+        // Assert: always ?stripe=complete with onboarding reset, never auto-verified
         expect(res.status).toBe(307)
-        expect(res.headers.get('location')).toContain('?stripe=verified')
+        expect(res.headers.get('location')).toContain('?stripe=complete')
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({ stripeOnboardingComplete: true }),
+            data: expect.objectContaining({ stripeOnboardingComplete: false }),
         }))
     })
 
@@ -133,19 +114,18 @@ describe('GET /api/stripe/connect/callback', () => {
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
-    it('falls back to ?stripe=complete when getConnectedAccountStatus throws', async () => {
-        // Arrange: status check fails (non-fatal) — should not block the connect flow
-        mockGetStatus.mockRejectedValueOnce(new Error('Stripe API unavailable'))
+    it('saves account and redirects ?stripe=complete on successful connect', async () => {
+        // Arrange
         const req = new Request('https://app.test/api/stripe/connect/callback?code=test_code&state=tenant_1')
 
         // Act
         const res = await callbackGET(req)
 
-        // Assert: graceful fallback — account saved, redirect to complete (manual Verify)
+        // Assert: account saved with onboarding reset, redirect to complete
         expect(res.status).toBe(307)
         expect(res.headers.get('location')).toContain('?stripe=complete')
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            data: expect.objectContaining({ stripeOnboardingComplete: false }),
+            data: expect.objectContaining({ stripeAccountId: 'acct_test_123', stripeOnboardingComplete: false }),
         }))
     })
 })
