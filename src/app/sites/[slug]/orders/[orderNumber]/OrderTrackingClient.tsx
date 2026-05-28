@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
@@ -48,6 +48,9 @@ type OrderData = {
 }
 
 type Props = { order: OrderData; slug: string }
+
+const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
+
 
 function getTrackingStatus(status: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
@@ -401,7 +404,48 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
 }
 
 export default function OrderTrackingClient({ order, slug }: Props) {
-    const trackingStatus = getTrackingStatus(order.status)
+    const [liveOrder, setLiveOrder] = useState(order)
+    const statusRef = useRef(order.status)
+
+    useEffect(() => {
+        if (TERMINAL_STATUSES.has(statusRef.current)) return
+
+        const url = `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
+        const es = new EventSource(url)
+        let errorCount = 0
+        const MAX_ERRORS = 5
+
+        es.onmessage = (e) => {
+            errorCount = 0
+            try {
+                const data = JSON.parse(e.data)
+                if (data.status !== statusRef.current) {
+                    statusRef.current = data.status
+                    setLiveOrder(prev => ({
+                        ...prev,
+                        status: data.status,
+                        paymentStatus: data.paymentStatus,
+                        trackingNumber: data.trackingNumber,
+                    }))
+                    if (data.terminal) es.close()
+                }
+            } catch {
+                // ignore malformed events
+            }
+        }
+
+        es.onerror = () => {
+            if (TERMINAL_STATUSES.has(statusRef.current)) { es.close(); return }
+            // Stop reconnecting after repeated failures (e.g. persistent 404/500)
+            errorCount++
+            if (errorCount >= MAX_ERRORS) es.close()
+        }
+
+        return () => es.close()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const trackingStatus = getTrackingStatus(liveOrder.status)
     const isDelivered = trackingStatus === 'delivered'
 
     return (
@@ -411,7 +455,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                 <div className="crumbs">
                     <span>My Orders</span>
                     <ChevronRight size={14} />
-                    <strong>#{order.orderNumber}</strong>
+                    <strong>#{liveOrder.orderNumber}</strong>
                 </div>
                 <Link href={`/sites/${slug}/products`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
@@ -420,15 +464,15 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
             <div className="ck-shell">
                 <div className="ck-form-col">
-                    {isDelivered && <OtDeliveredBanner order={order} />}
-                    <OtOrderHead order={order} trackingStatus={trackingStatus} />
-                    <OtStageTracker order={order} trackingStatus={trackingStatus} />
-                    <OtShippingCard order={order} trackingStatus={trackingStatus} />
-                    <OtTimeline order={order} trackingStatus={trackingStatus} />
-                    <OtItems order={order} />
+                    {isDelivered && <OtDeliveredBanner order={liveOrder} />}
+                    <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtItems order={liveOrder} />
                 </div>
                 <div className="ck-summary-col">
-                    <OtSide order={order} slug={slug} />
+                    <OtSide order={liveOrder} slug={slug} />
                 </div>
             </div>
         </div>

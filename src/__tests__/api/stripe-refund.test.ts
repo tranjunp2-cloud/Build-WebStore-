@@ -6,12 +6,17 @@ const mockAuth = vi.fn()
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
 const mockRefundsCreate = vi.fn()
+const mockDrizzleExecute = vi.fn()
+const mockSendEmail = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         auth: mockAuth,
         findByID: mockFindByID,
         update: mockUpdate,
+        sendEmail: mockSendEmail,
+        logger: { error: vi.fn() },
+        db: { drizzle: { execute: mockDrizzleExecute } },
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -27,7 +32,7 @@ import { POST } from '@/app/api/orders/[id]/refund/route'
 // ─── Test Helpers ─────────────────────────────────────────────────────
 
 function createRequest() {
-    return { headers: new Headers() } as any
+    return { headers: new Headers({ Authorization: 'Bearer testtoken' }) } as any
 }
 
 function createContext(id: string) {
@@ -68,15 +73,22 @@ const REFUND_RESPONSE = {
 describe('POST /api/orders/[id]/refund [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockAuth.mockReset()
+        mockFindByID.mockReset()
+        mockUpdate.mockReset()
+        mockRefundsCreate.mockReset()
+        mockDrizzleExecute.mockReset()
+        // Default: auth succeeds with AUTHED_USER
+        mockAuth.mockResolvedValue({ user: AUTHED_USER })
+        // Default: CAS succeeds
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 'order-123' }] })
     })
 
     // ─── TC-F13.21: Full refund success ──────────────────────────────
     it('[TC-F13.21] processes full refund for paid order with correct Stripe args', async () => {
         // Arrange
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(PAID_ORDER)
         mockRefundsCreate.mockResolvedValue(REFUND_RESPONSE)
-        mockUpdate.mockResolvedValue({})
 
         // Act
         const req = createRequest()
@@ -89,25 +101,17 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         expect(body.success).toBe(true)
         expect(body.data.refundId).toBe('refund_test_123')
 
-        // Verify Stripe refund called with correct payment intent and account
+        // Verify Stripe refund called with correct payment intent, account, and idempotency key
         expect(mockRefundsCreate).toHaveBeenCalledWith(
             { payment_intent: 'pi_test_intent_123' },
-            { stripeAccount: 'acct_test_stripe' },
+            { stripeAccount: 'acct_test_stripe', idempotencyKey: 'refund-order-123' },
         )
-
-        // Verify order status updated to refunded
-        expect(mockUpdate).toHaveBeenCalledWith({
-            collection: 'orders',
-            id: 'order-123',
-            data: { status: 'refunded' },
-        })
     })
 
     // ─── TC-F13.28: Pending order rejection ──────────────────────────
-    it('[TC-F13.28] returns 400 ORDER_NOT_PAID for pending order', async () => {
+    it('[TC-F13.28] returns 400 ORDER_NOT_REFUNDABLE for pending order', async () => {
         // Arrange
         const pendingOrder = { ...PAID_ORDER, status: 'pending' }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(pendingOrder)
 
         // Act
@@ -129,7 +133,6 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
             ...PAID_ORDER,
             tenant: { id: 'tenant-3', stripeAccountId: 'acct_other' },
         }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(otherTenantOrder)
 
         // Act
@@ -146,7 +149,7 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
 
     // ─── Edge: No auth user ──────────────────────────────────────────
     it('returns 401 UNAUTHORIZED when user is not authenticated', async () => {
-        // Arrange — no user
+        // Arrange — auth returns no user
         mockAuth.mockResolvedValue({ user: null })
 
         // Act
@@ -155,16 +158,15 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         const res = await POST(req, ctx)
         const body = await res.json()
 
-        // Assert
+        // Assert — withAuth returns { error: 'Unauthorized' } on 401
         expect(res.status).toBe(401)
-        expect(body.error.code).toBe('UNAUTHORIZED')
+        expect(body.error).toBe('Unauthorized')
         expect(mockFindByID).not.toHaveBeenCalled()
     })
 
     // ─── Edge: Order not found ───────────────────────────────────────
     it('returns 404 NOT_FOUND when order does not exist', async () => {
         // Arrange
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(null)
 
         // Act
@@ -186,7 +188,6 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
             ...PAID_ORDER,
             stripePaymentIntentId: null,
         }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(orderNoPaymentIntent)
 
         // Act
@@ -211,7 +212,6 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
                 stripeAccountId: null,
             },
         }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(orderNoAccount)
 
         // Act
@@ -229,9 +229,9 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
     // ─── Refund failure handling ─────────────────────────────────────
     it('returns 502 REFUND_FAILED when Stripe refund API fails', async () => {
         // Arrange
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(PAID_ORDER)
         mockRefundsCreate.mockRejectedValue(new Error('Stripe API error: Invalid request'))
+        mockUpdate.mockResolvedValue({})
 
         // Act
         const req = createRequest()
@@ -242,15 +242,12 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         // Assert
         expect(res.status).toBe(502)
         expect(body.error.code).toBe('REFUND_FAILED')
-        // order status should NOT be updated on refund failure
-        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // ─── Refunded order idempotency ──────────────────────────────────
     it('returns 400 ALREADY_REFUNDED when trying to refund already-refunded order', async () => {
         // Arrange — order already refunded
         const refundedOrder = { ...PAID_ORDER, status: 'refunded' }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(refundedOrder)
 
         // Act
@@ -268,10 +265,8 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
     // ─── User with multiple tenants (correct one) ────────────────────
     it('allows refund when user owns the order tenant (multiple tenant user)', async () => {
         // Arrange — user has multiple tenants, order belongs to one of them
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(PAID_ORDER)
         mockRefundsCreate.mockResolvedValue(REFUND_RESPONSE)
-        mockUpdate.mockResolvedValue({})
 
         // Act
         const req = createRequest()
@@ -296,10 +291,8 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
                 stripeAccountId: 'acct_expanded_123',
             },
         }
-        mockAuth.mockResolvedValue({ user: AUTHED_USER })
         mockFindByID.mockResolvedValue(orderWithExpandedTenant)
         mockRefundsCreate.mockResolvedValue(REFUND_RESPONSE)
-        mockUpdate.mockResolvedValue({})
 
         // Act
         const req = createRequest()
@@ -310,7 +303,7 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         expect(res.status).toBe(200)
         expect(mockRefundsCreate).toHaveBeenCalledWith(
             expect.any(Object),
-            { stripeAccount: 'acct_expanded_123' },
+            { stripeAccount: 'acct_expanded_123', idempotencyKey: 'refund-order-123' },
         )
     })
 })

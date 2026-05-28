@@ -9,7 +9,7 @@ import {
     updateContactStatusAction,
     deleteCustomerAction,
     exportCustomersCsvAction,
-} from '@/app/(dashboard)/customers/actions'
+} from '@/app/(dashboard)/contact-leads/actions'
 
 vi.mock('@/lib/auth', () => ({ getCurrentTenantId: vi.fn() }))
 vi.mock('payload', () => ({ getPayload: vi.fn() }))

@@ -77,8 +77,9 @@ describe('TC-F01-V.03: buildUserPrompt — Vietnamese language', () => {
   it('should contain "Vietnamese" instruction when language = vi', () => {
     const prompt = buildUserPrompt(businessInfo, undefined, 'vi')
     expect(prompt).toContain('Vietnamese')
-    // Language instruction should mention Vietnamese specifically
-    expect(prompt).toContain('Generate in Vietnamese')
+    // Language instruction uses the multi-line LANGUAGE REQUIREMENT block for non-English languages
+    expect(prompt).toContain('LANGUAGE REQUIREMENT — CRITICAL:')
+    expect(prompt).toContain('Generate EVERY word of this website in Vietnamese')
   })
 })
 

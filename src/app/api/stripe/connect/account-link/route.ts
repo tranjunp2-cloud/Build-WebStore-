@@ -61,7 +61,7 @@ export const POST = withAuth(async (user, request) => {
         }
 
         const stripe = getStripeClient()
-        const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+        const origin = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
         const accountLink = await stripe.accountLinks.create({
             account: stripeAccountId,
             type: 'account_onboarding',

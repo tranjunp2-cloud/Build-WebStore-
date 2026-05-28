@@ -3957,6 +3957,28 @@ const MIGRATIONS = [
   },
   { name: 'pages_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_contact.add_i18n_labels', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS submit_label varchar DEFAULT 'Send Message', ADD COLUMN IF NOT EXISTS phone_label varchar DEFAULT 'Phone', ADD COLUMN IF NOT EXISTS address_label varchar DEFAULT 'Address', ADD COLUMN IF NOT EXISTS email_label varchar DEFAULT 'Email';` },
+  { name: '_pages_v_blocks_contact.add_i18n_labels', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS submit_label varchar DEFAULT 'Send Message', ADD COLUMN IF NOT EXISTS phone_label varchar DEFAULT 'Phone', ADD COLUMN IF NOT EXISTS address_label varchar DEFAULT 'Address', ADD COLUMN IF NOT EXISTS email_label varchar DEFAULT 'Email';` },
+  { name: 'pages_blocks_testimonials.add_subheadline', sql: `ALTER TABLE "pages_blocks_testimonials" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
+  { name: '_pages_v_blocks_testimonials.add_subheadline', sql: `ALTER TABLE "_pages_v_blocks_testimonials" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
+  { name: 'pages_blocks_contact.add_section_label', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_contact.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_gallery.add_section_label', sql: `ALTER TABLE "pages_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_gallery.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_gallery" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_stats.add_section_label', sql: `ALTER TABLE "pages_blocks_stats" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_stats.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_stats" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_pricing.add_section_label', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_pricing.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_team.add_section_label', sql: `ALTER TABLE "pages_blocks_team" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_team.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_team" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_newsletter.add_section_label', sql: `ALTER TABLE "pages_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_newsletter.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_blog_list.add_section_label', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_blog_list.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_service_cards.add_section_label', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_service_cards.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: 'pages_blocks_client_logos.add_section_label', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_client_logos.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_client_logos" ADD COLUMN IF NOT EXISTS section_label varchar;` },
 
   // GH-1004: F10 v2.2 Bank Transfer verification schema fields
   { name: 'orders.payment_reference_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_reference_idx ON orders (payment_reference);` },
@@ -4043,6 +4065,53 @@ const MIGRATIONS = [
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
   { name: 'orders.customer_id_index',
     sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
+  // CQ-01: FK constraint — ON DELETE SET NULL preserves order history if a customer row is ever removed
+  { name: 'orders.customer_id_fk',
+    sql: `DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'orders_customer_id_fk'
+      ) THEN
+        ALTER TABLE orders ADD CONSTRAINT orders_customer_id_fk
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
+      END IF;
+    END $$;` },
+  // ── F25 phase-04: Phone as primary identity key ──
+  { name: 'customers.email_not_null_drop',
+    sql: `ALTER TABLE customers ALTER COLUMN email DROP NOT NULL;` },
+  { name: 'customers.drop_email_unique_index',
+    sql: `DROP INDEX IF EXISTS customers_tenant_email_lower_uniq;` },
+  // Normalize existing phone values to match application normalizePhone() before dedup + unique index.
+  // Strips: spaces, dashes, parentheses, '+', dots — then lowercases. Idempotent on already-normalized values.
+  // Must run BEFORE dedup so that '+601234' and '601234' collapse to the same key and are deduped correctly.
+  { name: 'customers.normalize_existing_phones',
+    sql: `UPDATE customers
+          SET phone = LOWER(REGEXP_REPLACE(phone, '[-[:space:]()+.]', '', 'g'))
+          WHERE phone IS NOT NULL AND TRIM(phone) != '';` },
+  // Dedup before creating phone unique index — keeps oldest row per (tenant, phone), nullifies phone on duplicates
+  { name: 'customers.dedup_by_phone',
+    sql: `UPDATE customers SET phone = NULL
+          WHERE id NOT IN (
+            SELECT DISTINCT ON (tenant_id, LOWER(TRIM(phone))) id
+            FROM customers
+            WHERE phone IS NOT NULL AND TRIM(phone) != ''
+            ORDER BY tenant_id, LOWER(TRIM(phone)), created_at ASC, id ASC
+          ) AND phone IS NOT NULL AND TRIM(phone) != '';` },
+  { name: 'customers.tenant_phone_partial_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS customers_tenant_phone_uniq
+          ON customers (tenant_id, LOWER(TRIM(phone)))
+          WHERE phone IS NOT NULL AND TRIM(phone) != '';` },
+  // ── F25 phase-06: latestOrderAt column ──
+  { name: 'customers.latest_order_at',
+    sql: `ALTER TABLE customers ADD COLUMN IF NOT EXISTS latest_order_at timestamptz;` },
+  { name: 'customers.backfill_latest_order_at',
+    sql: `UPDATE customers c SET latest_order_at = (
+            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
+          ) WHERE latest_order_at IS NULL AND id IN (
+            SELECT DISTINCT customer_id FROM orders WHERE customer_id IS NOT NULL
+          );` },
+  // CQ-02: Align DB column type with spec (varchar(20)); safe — normalized phones are always ≤ 15 chars
+  { name: 'customers.phone_type_varchar20',
+    sql: `ALTER TABLE customers ALTER COLUMN phone TYPE varchar(20);` },
   // ── F26: Per-locale content storage for multilingual editor ──
   {
     name: 'pages.locale_content',

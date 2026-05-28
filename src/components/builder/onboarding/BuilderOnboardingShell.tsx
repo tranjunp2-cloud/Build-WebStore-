@@ -5,6 +5,7 @@ interface BuilderOnboardingShellProps {
     left: ReactNode
     right?: ReactNode
     className?: string
+    gridClassName?: string
     rightPaneClassName?: string
     rightContentClassName?: string
 }
@@ -13,6 +14,7 @@ export function BuilderOnboardingShell({
     left,
     right,
     className,
+    gridClassName,
     rightPaneClassName,
     rightContentClassName,
 }: BuilderOnboardingShellProps) {
@@ -23,7 +25,7 @@ export function BuilderOnboardingShell({
                 className,
             )}
         >
-            <div className="grid min-h-screen w-full lg:grid-cols-2">
+            <div className={cn("grid min-h-screen w-full lg:grid-cols-2", gridClassName)}>
                 <div className="overflow-y-auto">{left}</div>
                 <div
                     className={cn(

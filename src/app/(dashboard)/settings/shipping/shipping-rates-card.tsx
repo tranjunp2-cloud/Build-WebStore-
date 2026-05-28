@@ -79,7 +79,7 @@ export function ShippingRatesCard({
                                     {s.westBadge}
                                 </span>
                             </TooltipTrigger>
-                            <TooltipContent>{s.westBadgeTooltip}</TooltipContent>
+                            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{s.westBadgeTooltip}</TooltipContent>
                         </Tooltip>
                     </div>
                     <div className="relative">
@@ -150,7 +150,7 @@ export function ShippingRatesCard({
                                     {s.eastBadge}
                                 </span>
                             </TooltipTrigger>
-                            <TooltipContent>{s.eastBadgeTooltip}</TooltipContent>
+                            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{s.eastBadgeTooltip}</TooltipContent>
                         </Tooltip>
                     </div>
                     <div className="relative">

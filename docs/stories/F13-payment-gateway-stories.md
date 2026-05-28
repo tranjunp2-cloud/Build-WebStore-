@@ -226,3 +226,161 @@ THEN  success_url = `${baseUrl}/dashboard/settings/payments?stripe=complete`
 - [ ] i18n strings (en + ms) cho 4 messages: connectStripeSuccess, stripeKycPending, stripeOnboardingIncomplete, connecting
 - [ ] Manual QA: tenant ownership verify (user không thuộc tenant → 403)
 
+---
+
+## US-F13-05: Khôi phục thanh toán dở dang (Wave 6.5)
+
+**Wave 6.5** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   buyer who didn't finish paying
+I want to resume payment from my order link without re-adding items
+So that I can complete my purchase even if I cancelled or my session expired
+```
+
+### Acceptance Criteria
+
+#### AC-1: Cancel preserves cart + shows toast
+```gherkin
+GIVEN buyer at Stripe Checkout
+WHEN  they click Back or Cancel
+THEN  cart items PRESERVED in storefront checkout (not cleared)
+  AND BM toast "Pembayaran gagal. Sila cuba lagi."
+  AND "Try Again" CTA triggers new Stripe session (existing stripeSessionId may be expired)
+```
+
+#### AC-2: Confirm page polling + processing state
+```gherkin
+GIVEN buyer redirected from Stripe success_url to /sites/[slug]/order/[id]/confirm
+  AND order.status='pending' (webhook may be delayed)
+WHEN  Confirm page loads
+THEN  show skeleton/spinner "Verifying your payment..."
+  AND poll `/api/orders/[id]/payment-status` every 2 seconds (auth via ct_ cookie)
+  AND auto-flip to success when paymentStatus='paid'
+  AND no white screen; no "awaiting payment" ambiguity
+```
+
+#### AC-3: Pay Now on order detail (for pending/payment_failed)
+```gherkin
+GIVEN buyer has order status='pending' or 'payment_failed'
+WHEN  buyer access order detail page (via email magic link, no login required)
+THEN  "Pay Now" CTA visible
+  AND click "Pay Now" → POST `/api/orders/[id]/retry-payment`
+  AND re-validate stock (reject if out)
+  AND return new Stripe session URL
+  AND create NEW stripeSessionId (don't reuse expired one)
+  AND buyer redirected to Stripe Checkout (repeat cycle)
+```
+
+#### AC-4: Cart cleared ONLY after confirmed success
+```gherkin
+GIVEN order.paymentStatus='paid' (confirmed via webhook or active reconcile)
+WHEN  Confirm page shows success state
+THEN  clear cart from session/localStorage exactly once
+  AND NOT before Stripe redirect (BR-04)
+  AND NOT on cancel (cart preserved)
+  AND only after confirmed success at Confirm page
+```
+
+### Definition of Done
+- [ ] Cancel keeps cart + BM toast tested E2E
+- [ ] Confirm page polling works with delayed webhook (mock 5s+)
+- [ ] Pay Now endpoint re-validates stock and rejects out-of-stock
+- [ ] Cart cleared only on final success, not before
+- [ ] i18n strings (en + ms) for "Verifying...", "Payment declined", "Pay Now"
+
+---
+
+## US-F13-06: Xác nhận thanh toán đáng tin cậy (Wave 6.5)
+
+**Wave 6.5** | **P0** | **L** | **Status:** Ready
+
+### Story
+
+```
+As a   buyer
+I want successful payment to reliably show as paid even if the webhook is delayed
+And the system to never oversell or mis-record my payment method
+So that I trust my order was processed correctly
+```
+
+### Acceptance Criteria
+
+#### AC-1: Webhook success sets status + paymentStatus atomically
+```gherkin
+GIVEN Stripe webhook `checkout.session.completed` arrives for order
+WHEN  backend processes webhook
+THEN  UPDATE orders SET status='new', payment_status='paid'
+       WHERE id=? AND status='pending' (atomic, single-winner)
+  AND ONLY the first webhook invocation wins (concurrent retries skip)
+  AND stock decrements exactly once (guarded by atomic transition)
+  AND buyer/seller emails sent once
+  AND ORDER_NEW notification fired once
+```
+
+#### AC-2: Atomic stock decrement
+```gherkin
+GIVEN N concurrent paid orders on product inventory=M
+WHEN  N webhooks decrement stock simultaneously
+THEN  UPDATE products SET inventory = GREATEST(0, inventory - qty)
+      WHERE id=? AND inventory >= qty (atomic per-product)
+  AND inventory never goes <0 (safe for concurrent payment)
+  AND if qty > available: set order.oversellReview=true [see AC-3]
+```
+
+#### AC-3: Oversell after capture → manual seller refund (NO auto-refund)
+```gherkin
+GIVEN stock ran out AFTER payment captured (concurrent webhooks)
+WHEN  2nd webhook detects inventory<qty
+THEN  set order.oversellReview=true (flag, NOT a status)
+  AND order stays status='new', paymentStatus='paid' (paid, not reversed)
+  AND send SYSTEM_ALERT to seller: "Order #123 flagged for review — stock went negative"
+  AND admin panel shows "Refund customer" button (wired to POST /api/orders/[id]/refund)
+  AND NO auto-refund; seller decides amount + method manually (locked decision Wave 6.5)
+```
+
+#### AC-4: Accurate payment method detection
+```gherkin
+GIVEN tenant supports both Card + FPX
+WHEN  buyer pays via FPX
+THEN  webhook queries Stripe PaymentIntent on connected account
+  AND detect payment_method='fpx'
+  AND set order.paymentMethod='fpx' (not default 'card' for multi-method tenant)
+```
+
+#### AC-5: Active reconcile on Confirm polling
+```gherkin
+GIVEN order pending, Confirm page querying `/api/orders/[id]/payment-status` every 2s
+WHEN  webhook hasn't arrived yet but Stripe session.status='paid'
+THEN  active reconcile endpoint:
+  └── retrieve Stripe session on connected account
+  └── if session.status='paid' AND order.status='pending':
+      └── call reconcileOrderPaid() [same as webhook, single source of truth]
+      └── order auto-heals to paid immediately
+  AND Confirm page shows success within next poll cycle (no manual intervention)
+```
+
+#### AC-6: Cron reconciles late/missing webhooks
+```gherkin
+GIVEN order pending > 15 minutes
+  AND webhook never arrived (or was lost)
+WHEN  cron job `GET /api/cron/reconcile-orders` runs (every 10 min)
+THEN  cron queries Stripe session on connected account
+  └── if session.status='paid' → call reconcileOrderPaid()
+  └── order heals to paid, emails re-sent (idempotent)
+  AND stale pending >24h marked 'expired' (buyer notified separately)
+  AND cron rejects request without valid CRON_SECRET header (security)
+```
+
+### Definition of Done
+- [ ] Atomic `UPDATE WHERE status='pending'` tested (idempotent on retry)
+- [ ] Stock decrement with GREATEST(0, ...) prevents negative
+- [ ] Oversell flag (boolean `oversellReview`) tested; admin refund button wired
+- [ ] PaymentIntent read from connected account; fpx method recorded correctly
+- [ ] Confirm polling + active reconcile tested with delayed webhook (5+ min)
+- [ ] Cron reconcile tested; stale orders expired; CRON_SECRET auth verified
+- [ ] Schema migration `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN` passes check-migrations
+- [ ] i18n (en + ms) for oversell alert, system notification, and cron message
+

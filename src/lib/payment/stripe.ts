@@ -14,23 +14,9 @@ import type {
     PaymentWebhookEvent,
     PaymentEventType,
 } from './types'
-
-// ── Singleton ────────────────────────────────────────────────────────
-
-let stripeInstance: Stripe | null = null
-
-export function getStripeClient(): Stripe {
-    if (stripeInstance) return stripeInstance
-
-    const key = process.env.STRIPE_SECRET_KEY
-    if (!key) throw new Error('STRIPE_SECRET_KEY is not set')
-
-    stripeInstance = new Stripe(key, {
-        typescript: true,
-    })
-
-    return stripeInstance
-}
+// Re-export the canonical singleton — prevents two separate Stripe instances at runtime
+export { getStripeClient } from './stripe-client'
+import { getStripeClient } from './stripe-client'
 
 // ── Connect Account Management ───────────────────────────────────────
 
@@ -240,6 +226,7 @@ export function normalizeStripeEvent(
         'customer.subscription.updated': 'subscription_updated',
         'account.updated': 'account_updated',
         'account.application.deauthorized': 'account_deauthorized',
+        'charge.refunded': 'refund_completed',
     }
 
     const normalizedType = typeMap[event.type]

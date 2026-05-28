@@ -38,6 +38,7 @@ import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { getNavLabels } from '@/lib/ai/block-i18n'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -738,10 +739,28 @@ export async function POST(req: NextRequest) {
         // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
         // aiPageLinks (derived above from result.pages) still carries raw AI slugs like /book-trial;
         // rawPageDefinitions has already run canonicalizePageSlug so slugs are /contact, /about, etc.
-        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => ({
-            label: p.title,
-            url: p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`,
-        }))
+        // Use i18n nav labels for known slugs so the force-replace step (ensureNavigationBlocks)
+        // does not overwrite postAISwap-corrected nav labels with English page titles.
+        // Prefer blockLang (franc-detected, reliable) > explicit language input > GPT-returned language.
+        // result.language is GPT-returned and may default to 'en' even for non-English input.
+        //
+        // getNavLabels covers en/ms/vi/ja/zh/ko/ar/th (NAV_LABELS_SEED) + runtime GPT-translated
+        // entries. For unknown languages (French, German, etc.), falls back to p.title from GPT
+        // page definitions — GPT generates page titles in the correct language for Latin-script langs.
+        const siteNavLang = String(result.blockLang || (language !== 'auto' ? language : result.language) || 'en')
+        const seedNavLabels = getNavLabels(siteNavLang)
+        const SLUG_NAV_LABELS: Record<string, string> | null = seedNavLabels
+            ? {
+                '/': seedNavLabels.home,
+                '/about': seedNavLabels.about,
+                '/services': seedNavLabels.services,
+                '/contact': seedNavLabels.contact,
+            }
+            : null
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => {
+            const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
+            return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
+        })
 
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)

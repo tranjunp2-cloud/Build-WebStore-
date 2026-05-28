@@ -33,11 +33,11 @@ function GallerySection({ children }: GallerySectionProps) {
 }
 
 /** Section header used by all 6 variants. SectionLabel + Heading. */
-function GalleryHeader({ headline }: { headline?: string }) {
+function GalleryHeader({ headline, sectionLabel }: { headline?: string; sectionLabel?: string }) {
     if (!headline) return null
     return (
         <div className="text-center mb-14">
-            <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
+            <SectionLabel color={CSS_VARS.primary}>{sectionLabel || 'Gallery'}</SectionLabel>
             <Heading level={2}>
                 <RichText text={headline} as="span" />
             </Heading>
@@ -152,7 +152,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
 }
 
 export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) {
-    const { headline, images: rawImages = [], variant = 'grid' } = block
+    const { headline, sectionLabel, images: rawImages = [], variant = 'grid' } = block
     const category = (site?.siteType as string) || 'business'
 
     // Per-slot fallback: slots with a real image show it; null slots show the Unsplash fallback
@@ -173,33 +173,33 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
 
     // ── Lightbox variant ──────────────────────────────────────────────────
     if (variant === 'lightbox') {
-        return <LightboxGallery headline={headline} images={images} theme={theme} />
+        return <LightboxGallery headline={headline} sectionLabel={sectionLabel} images={images} theme={theme} />
     }
 
     // ── Filmstrip variant ─────────────────────────────────────────────────
     if (variant === 'filmstrip') {
-        return <FilmstripGallery headline={headline} images={images} theme={theme} />
+        return <FilmstripGallery headline={headline} sectionLabel={sectionLabel} images={images} theme={theme} />
     }
 
     // ── Justified variant ─────────────────────────────────────────────────
     if (variant === 'justified') {
-        return <JustifiedGallery headline={headline} images={images} theme={theme} />
+        return <JustifiedGallery headline={headline} sectionLabel={sectionLabel} images={images} theme={theme} />
     }
 
     // ── Masonry variant ────────────────────────────────────────────────────
     if (variant === 'masonry') {
-        return <MasonryGallery headline={headline} images={images} theme={theme} />
+        return <MasonryGallery headline={headline} sectionLabel={sectionLabel} images={images} theme={theme} />
     }
 
     // ── Carousel variant ─────────────────────────────────────────────────
     if (variant === 'carousel') {
-        return <CarouselGallery headline={headline} images={images} theme={theme} />
+        return <CarouselGallery headline={headline} sectionLabel={sectionLabel} images={images} theme={theme} />
     }
 
     // ── Default: grid ────────────────────────────────────────────────────
     return (
         <GallerySection>
-            <GalleryHeader headline={headline} />
+            <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
             {/* flex+justify-center so the last incomplete row is centered, not left-aligned */}
             <StaggerGrid className="flex flex-wrap justify-center gap-4">
                 {images.map((item, i) => (
@@ -214,11 +214,11 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
 
 // ── Masonry Gallery ─────────────────────────────────────────────────────────
 
-function MasonryGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function MasonryGallery({ headline, sectionLabel, images, theme: _theme }: { headline?: string; sectionLabel?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     return (
         <GallerySection>
-            <GalleryHeader headline={headline} />
+            <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
             {/* True masonry: CSS columns fill vertically — images have natural heights creating the brick-wall effect */}
             <div className="max-w-5xl mx-auto columns-2 md:columns-3 gap-4">
                 {images.map((item, i) => (
@@ -235,7 +235,7 @@ function MasonryGallery({ headline, images, theme: _theme }: { headline?: string
 
 const CAROUSEL_ITEMS_PER_SLIDE = 3
 
-function CarouselGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function CarouselGallery({ headline, sectionLabel, images, theme: _theme }: { headline?: string; sectionLabel?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     const [currentSlide, setCurrentSlide] = useState(0)
     const [isAutoPlaying, setIsAutoPlaying] = useState(true)
@@ -267,7 +267,7 @@ function CarouselGallery({ headline, images, theme: _theme }: { headline?: strin
 
     return (
         <GallerySection>
-            <GalleryHeader headline={headline} />
+            <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
 
             <div className="relative max-w-6xl mx-auto">
                 {/* Track: each slide is full-width, shows 3 images side by side */}
@@ -347,7 +347,7 @@ function CarouselGallery({ headline, images, theme: _theme }: { headline?: strin
 
 // ── Lightbox Gallery ─────────────────────────────────────────────────────────
 
-function LightboxGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function LightboxGallery({ headline, sectionLabel, images, theme: _theme }: { headline?: string; sectionLabel?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
     /* Plan 260415 Lỗi A (P1 CRITICAL) — refs cho focus trap + restore */
@@ -430,7 +430,7 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
     return (
         <>
             <GallerySection>
-                <GalleryHeader headline={headline} />
+                <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
                 <StaggerGrid className="flex flex-wrap justify-center gap-4">
                     {images.map((item, i) => (
                         <StaggerItem key={i} className="group cursor-pointer shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]" onClick={() => setSelectedIndex(i)}>
@@ -520,13 +520,13 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
 
 // ── Filmstrip Gallery ────────────────────────────────────────────────────────
 
-function FilmstripGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function FilmstripGallery({ headline, sectionLabel, images, theme: _theme }: { headline?: string; sectionLabel?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     const [activeIndex, setActiveIndex] = useState(0)
 
     return (
         <GallerySection>
-            <GalleryHeader headline={headline} />
+            <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
 
             {/* Main image */}
             <div className="relative aspect-video rounded-xl overflow-hidden mb-4 max-w-4xl mx-auto">
@@ -614,11 +614,11 @@ function FilmstripGallery({ headline, images, theme: _theme }: { headline?: stri
 
 // ── Justified Gallery ────────────────────────────────────────────────────────
 
-function JustifiedGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function JustifiedGallery({ headline, sectionLabel, images, theme: _theme }: { headline?: string; sectionLabel?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     return (
         <GallerySection>
-            <GalleryHeader headline={headline} />
+            <GalleryHeader headline={headline} sectionLabel={sectionLabel} />
             <StaggerGrid className="flex flex-wrap gap-[2px]">
                 {images.map((item, i) => {
                     // Vary aspect ratios for visual interest

@@ -6,8 +6,8 @@ import { render, screen } from '@testing-library/react'
 import React from 'react'
 import { I18nProvider } from '@/i18n'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { CustomerStatusBadge } from '@/app/(dashboard)/customers/_components/customer-status-badge'
-import { CustomerSourceBadge } from '@/app/(dashboard)/customers/_components/customer-source-badge'
+import { CustomerStatusBadge } from '@/app/(dashboard)/contact-leads/_components/customer-status-badge'
+import { CustomerSourceBadge } from '@/app/(dashboard)/contact-leads/_components/customer-source-badge'
 
 function withI18n(ui: React.ReactElement) {
     return render(
