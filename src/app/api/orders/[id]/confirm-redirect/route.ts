@@ -66,11 +66,17 @@ export async function GET(
         const confirmToken = generateConfirmToken(order.id, order.orderNumber)
         const confirmUrl = `/sites/${slug}/order/${order.id}/confirm`
         const response = NextResponse.redirect(new URL(confirmUrl, url.origin))
+        // TTL = remaining time until payment expires (max 24h), minimum 1h as fallback.
+        // Avoids cutting the buyer's upload window shorter than the payment deadline.
+        const ttl = order.paymentExpiresAt
+            ? Math.max(Math.floor((new Date(order.paymentExpiresAt).getTime() - Date.now()) / 1000), 3600)
+            : 86400
         response.cookies.set(`ct_${order.id}`, confirmToken, {
             httpOnly: true,
             path: '/',
-            maxAge: 3600, // 1 hour
+            maxAge: ttl,
             sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
         })
         return response
     } catch {

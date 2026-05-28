@@ -47,14 +47,14 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
     }
 
-    // Only paid orders can be refunded
+    // Only shipped/completed orders can be refunded — mirrors the dashboard UI gate
     if (order.status === 'refunded') {
         return NextResponse.json(
             { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
             { status: 400 },
         )
     }
-    const refundableStatuses = ['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed']
+    const refundableStatuses = ['shipped', 'completed']
     if (!refundableStatuses.includes(order.status)) {
         return NextResponse.json(
             {
@@ -184,7 +184,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     const casResult = await (payload.db.drizzle as any).execute(sql`
         UPDATE orders SET status = 'refunded', payment_status = 'refunded'
         WHERE id = ${order.id}
-        AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
+        AND status = ANY(ARRAY['shipped','completed'])
         RETURNING id
     `)
     if (!casResult.rows?.length) {
