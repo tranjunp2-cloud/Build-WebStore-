@@ -231,7 +231,7 @@ So that I can instantly fix a page that ended up mixing English and Malay
 ```gherkin
 GIVEN the user is editing a site
 WHEN  they look at the editor toolbar
-THEN  they see the current site language with a switcher (BM / EN)
+THEN  they see the current site language displayed in a language dropdown (shows active locale name, e.g. EN or BM)
 ```
 
 #### AC-2: One-click re-language
@@ -245,6 +245,7 @@ THEN  blocks still holding default/untouched content re-render in the new locale
 ```
 
 ### Additional Criteria
+- [ ] Implemented as a **dropdown** (not a toggle/flag), scalable for future locales (ZH, TH, ID). F26: options = [EN, BM] hardcoded.
 - [ ] Distinguish user-edited content vs untouched defaults so a switch never destroys manual edits.
 - [ ] Reuses the locale default bundles from US-F26-02.
 
@@ -296,3 +297,101 @@ THEN  every block reachable by AI generation + content-injection has BM content
 - [ ] Coverage matrix documented; all generation-path blocks have BM content
 - [ ] No regression in `fix/ai-gen-locale-ms` work
 - [ ] TypeScript clean (`tsc --noEmit`)
+
+---
+
+## US-F26-07: Language Switcher — header-locked block
+
+**Wave 2** | **P2** | **S** | Status: Ready
+
+### Story
+
+```
+As a   store owner
+I want to add a Language Switcher from the block library and have it lock into my header automatically
+So that I can add/remove it like any other block, but it always lives in the nav bar — never floating on the page
+```
+
+### Context
+
+Language Switcher is added via Block Library (category: Navigation) — feels like a normal block to the owner. When added, it locks into the Navigation block (header), not the page's `blocks[]` array. Owner can remove it like any block. Under the hood: `NavigationConfig.showLanguageSwitcher = true/false`.
+
+F26 scope: add/remove UX + static dropdown placeholder (`EN ▾`). F27 scope: live switching logic.
+
+**Layout rule (no overflow):**
+- Desktop (≥ md): placeholder inline inside right-side flex group, next to CTA
+- Mobile (< md): hidden top bar, shown in drawer above CTA — mirrors `ctaButton` pattern
+- Sidebar variant: above CTA at bottom of drawer
+
+### Acceptance Criteria
+
+#### AC-1: Block visible in library under Navigation category
+
+```gherkin
+GIVEN the owner opens the Block Library
+WHEN  they browse or search
+THEN  "Language Switcher" appears under the Navigation category
+  AND it shows a preview of "EN ▾" dropdown shape inline in a nav bar
+```
+
+#### AC-2: Add → locks into header, not page body
+
+```gherkin
+GIVEN the owner clicks "Add" on Language Switcher block
+WHEN  the block is added
+THEN  it appears inside the Navigation/header area
+  AND it does NOT appear as a floating block in the page body
+  AND NavigationConfig.showLanguageSwitcher = true is set
+```
+
+#### AC-3: Remove → disappears from header
+
+```gherkin
+GIVEN the Language Switcher is active in the header
+WHEN  the owner removes/deletes it
+THEN  it disappears from the nav bar
+  AND NavigationConfig.showLanguageSwitcher = false
+```
+
+#### AC-4: Desktop — placeholder inline, no overflow
+
+```gherkin
+GIVEN Language Switcher is added
+WHEN  the nav renders on desktop (≥ md)
+THEN  "EN ▾" dropdown placeholder appears inline next to CTA, no layout overflow
+  AND all 6 variants render without crash
+```
+
+#### AC-5: Mobile — drawer only, not top bar
+
+```gherkin
+GIVEN Language Switcher is added
+WHEN  the nav renders on mobile (< md)
+THEN  placeholder is NOT in the top nav bar
+  AND it IS shown inside the drawer above the CTA button
+```
+
+#### AC-6: Persists in NavigationConfig
+
+```gherkin
+GIVEN owner adds Language Switcher and saves
+WHEN  the page reloads
+THEN  NavigationConfig.showLanguageSwitcher = true persists
+  AND F27's renderer can read it to activate live switching
+```
+
+### Additional Criteria
+- [ ] Extend `NavigationConfig` + `NavigationConfigSchema` with `showLanguageSwitcher?: boolean`.
+- [ ] Block Library entry: category `nav`, preview shows `EN ▾` dropdown inline in nav.
+- [ ] Placeholder style: dropdown shape `EN ▾` (active locale text + ChevronDown icon). Mirrors F27 live dropdown UI. No `onClick` in F26.
+- [ ] No `onClick` in F26 — visual only (F27 adds switching logic).
+- [ ] Add/remove via Block Library sets `NavigationConfig.showLanguageSwitcher` — does NOT push to `page.blocks[]`.
+
+### Definition of Done
+- [ ] Block visible in library under Navigation category
+- [ ] Add → locks to header (not page body), `showLanguageSwitcher = true`
+- [ ] Remove → clears from header, `showLanguageSwitcher = false`
+- [ ] Desktop: inline next to CTA, no overflow, 6 variants pass
+- [ ] Mobile: hidden top bar, visible in drawer
+- [ ] Persists after save, no regression when not added
+- [ ] `tsc --noEmit` clean

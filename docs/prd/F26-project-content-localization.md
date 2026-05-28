@@ -26,6 +26,7 @@
 | US-F26-04 | AI on-the-fly translation fallback | P1 | M | [stories](../stories/F26-project-content-localization-stories.md) |
 | US-F26-05 | Quick Language Switcher in editor toolbar | P1 | M | [stories](../stories/F26-project-content-localization-stories.md) |
 | US-F26-06 | Complete block content-injection locale coverage | P1 | M | [stories](../stories/F26-project-content-localization-stories.md) |
+| US-F26-07 | Language Switcher — header-locked block (prep F27) | P2 | S | [stories](../stories/F26-project-content-localization-stories.md) |
 
 ---
 
@@ -50,7 +51,7 @@ Làm cho **nội dung dự án và thư viện block/template** nhận biết ng
 2. **Block thêm mới render default content theo `Sites.locale`** — lõi của feature; cần bộ default content EN+BM cho từng block (US-F26-02).
 3. **Smart Component Adder** — preview block trong sidebar bằng ngôn ngữ site + icon auto-translate (US-F26-03).
 4. **AI dịch on-the-fly fallback** — khi block chưa có bản dịch tay (US-F26-04).
-5. **Quick Language Switcher trên toolbar editor** — 1-click đổi cả trang, giữ nguyên nội dung user đã sửa (US-F26-05).
+5. **Quick Language Switcher trên toolbar editor** — 1-click đổi cả trang, giữ nguyên nội dung user đã sửa (dùng dropdown — scale tự nhiên cho 3+ locales) (US-F26-05).
 6. **Audit + hoàn tất locale coverage** cho content-injection pipeline (US-F26-06).
 
 ---
@@ -93,9 +94,11 @@ Làm cho **nội dung dự án và thư viện block/template** nhận biết ng
 | FR-04 | Fallback EN + cờ "needs translation" khi thiếu bundle BM | US-F26-02 | P0 |
 | FR-05 | Block Library preview theo ngôn ngữ site + icon auto-translate | US-F26-03 | P1 |
 | FR-06 | AI translate server-side cho block thiếu bản dịch, có cache | US-F26-04 | P1 |
-| FR-07 | Quick language switcher trên toolbar editor, 1-click re-language | US-F26-05 | P1 |
+| FR-07 | Language dropdown trên toolbar editor, 1-click re-language (dropdown scale tự nhiên khi mở rộng ZH/TH/ID) | US-F26-05 | P1 |
 | FR-08 | Re-language giữ nguyên nội dung user đã sửa, chỉ swap default chưa động tới | US-F26-05 | P0 |
 | FR-09 | Audit coverage block × {EN, BM}, đóng gap trong content-injection | US-F26-06 | P1 |
+| FR-10 | Language Switcher block trong Block Library → lock vào header nav, không vào page.blocks[] | US-F26-07 | P2 |
+| FR-11 | Dropdown placeholder `EN ▾` trong nav — static F26, F27 wires live switching | US-F26-07 | P2 |
 
 ---
 
@@ -107,6 +110,24 @@ Làm cho **nội dung dự án và thư viện block/template** nhận biết ng
 - **BR-04:** Khi đổi ngôn ngữ (US-F26-05), nội dung user đã chỉnh **không bị ghi đè** — chỉ default chưa động tới mới swap.
 - **BR-05:** Auto-translate fail → fallback EN default + thông báo non-blocking. Không bao giờ để trang vỡ.
 - **BR-06:** Phase 1 chỉ EN + BM. Kiến trúc bundle phải mở rộng được cho ngôn ngữ khác sau này.
+- **BR-07:** LanguageSwitcher dùng dropdown (không phải toggle/flag) — scalable khi thêm locale mới (ZH, TH, ID...) mà không cần đổi UI. F26: options = [EN, BM]; F27/F28+: đọc từ `site.supportedLocales[]`.
+
+---
+
+## 7b. Content Classification
+
+Phân biệt 2 loại nội dung để tránh sửa nhầm — **template content** (per-locale) vs **business data** (giữ nguyên):
+
+| Template content (per-locale, swapped on switch) | Business data (GIỮ NGUYÊN) |
+|---|---|
+| Headline mặc định | Tên shop |
+| CTA buttons ("Get Started") | Địa chỉ, SĐT, email |
+| FAQ default questions | Tên sản phẩm, giá, mô tả |
+| Features description mặc định | Logo, hình ảnh upload |
+| Testimonial placeholders | Tên nhân viên/team |
+| Section titles mặc định | Menu items (tên món, giá), Blog content |
+
+**Rule:** merchant tự nhập = business data (giữ nguyên) | hệ thống inject hoặc user edit trong editor = template content (per-locale).
 
 ---
 
@@ -123,15 +144,20 @@ Làm cho **nội dung dự án và thư viện block/template** nhận biết ng
 | Component adder UI | `src/components/editor/BlockLibraryPanel.tsx` | ⚠️ Đã dùng `useI18n` cho label chrome; cần preview theo `Sites.locale` |
 | Content-injection | `src/lib/ai/content/*.ts`, `content-injection.ts` | ⚠️ Một phần đã localize trong branch `fix/ai-gen-locale-ms` |
 | i18n infra (F21) | `src/i18n/index.tsx`, `src/i18n/server.ts` | ✅ Tái dùng |
+| Per-locale storage | `pages.locale_content jsonb DEFAULT '{}'` | ✅ Migration added (F26-05) |
+| LanguageSwitcher component | `src/components/editor/LanguageSwitcher.tsx` | ⚠️ Tạo mới (F26-05) — dropdown pattern |
 
 > ⚠️ **Coordination:** Branch `fix/ai-gen-locale-ms` (20+ commits) đang localize testimonials/features/contact/nav. **Merge/rebase trước** khi làm US-F26-02 / US-F26-06 để tránh xung đột.
 
-> **Schema rule:** F26 không thêm column nên không cần entry mới trong `scripts/db-setup.js`. Nếu phát sinh bảng cache translation (US-F26-04) thì phải thêm migration theo `.claude/rules/database-schema.md`.
+> **Schema rule:** F26 thêm 1 column: `pages.locale_content jsonb` (migration trong scripts/db-setup.js). Cache translation (US-F26-04) nếu dùng bảng riêng thì cần migration thêm.
 
 ---
 
-## 9. Open Questions
+## 9. Decisions Log (was: Open Questions)
 
-- US-F26-05: Cơ chế phân biệt "nội dung user đã sửa" vs "default chưa động tới" — cần chốt cách track (dirty flag per field?) ở phase design kỹ thuật.
-- US-F26-04: Dùng AI provider nào cho translate (OpenAI hiện có vs Google Translate API) — quyết ở planning.
-- Mức độ ưu tiên giữa hand-translate toàn bộ (US-F26-02/06) vs dựa AI translate (US-F26-04) — ảnh hưởng effort & cost.
+| Question | Decision |
+|----------|----------|
+| US-F26-05: Track "user-edited" vs "default" content | Per-locale JSONB storage (`pages.locale_content`). Không dirty flag per field. Locales lưu riêng slot; switch chỉ swap slot chưa có override. |
+| US-F26-04: AI provider | OpenAI — consistent với các AI feature hiện có. |
+| Priority: hand-translate toàn bộ vs AI fallback | Hand-author ~15 blocks traffic cao (hero/faq/features/…). AI translate fallback cho ~42 blocks còn lại. |
+| US-F26-05: Switcher UI pattern | Dropdown (không toggle/flag) — scalable cho 3+ locales. F26: EN + BM; F27/F28+: thêm option, không đổi UI. |
