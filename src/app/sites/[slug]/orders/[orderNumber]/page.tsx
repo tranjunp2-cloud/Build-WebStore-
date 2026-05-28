@@ -89,9 +89,11 @@ export default async function OrderTrackingPage({
     )
 
     // Bank transfer pending payment — show upload interface or resend form
+    // Exclude cancelled/refunded orders even if paymentStatus wasn't updated (data inconsistency guard)
     const isBtPending =
         order.paymentMethod === 'bank_transfer' &&
-        UPLOAD_STATUSES.has(order.paymentStatus ?? '')
+        UPLOAD_STATUSES.has(order.paymentStatus ?? '') &&
+        !['cancelled', 'refunded'].includes(order.status ?? '')
 
     if (isBtPending) {
         // Backward-compat: old emails still land here with ?token=; validate and forward
