@@ -743,7 +743,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "readyToShip": "Sedia untuk Dihantar",
-        "shipped": "Telah Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai",
         "cancelled": "Dibatalkan",
         "refunded": "Dikembalikan"
@@ -787,7 +787,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "readyToShip": "Sedia untuk Dihantar",
-        "shipped": "Telah Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai",
         "cancelled": "Dibatalkan",
         "refunded": "Dikembalikan",
@@ -806,13 +806,16 @@
       "metrics": {
         "pending": "Menunggu",
         "readyToShip": "Sedia Dihantar",
-        "shipped": "Dihantar",
-        "completed": "Selesai"
+        "shipped": "Sedang Dihantar",
+        "completed": "Selesai",
+        "cancelled": "Dibatalkan"
       },
       "tableHeaders": {
         "orderNumber": "Pesanan #",
         "customer": "Pelanggan",
         "total": "Jumlah",
+        "paymentMethod": "Pembayaran",
+        "orderDate": "Tarikh",
         "status": "Status",
         "loading": "Memuatkan pesanan...",
         "noOrders": "Tiada pesanan dijumpai",
@@ -843,7 +846,20 @@
         "tax": "Cukai (SST 6%)",
         "total": "Jumlah Besar",
         "free": "Percuma",
-        "noItems": "Tiada barangan"
+        "noItems": "Tiada barangan",
+        "paymentMethods": {
+          "bank_transfer": "Pindahan Bank",
+          "card": "Kad Kredit",
+          "cod": "Bayar Semasa Terima",
+          "ewallet": "e-Dompet"
+        },
+        "paymentStatuses": {
+          "awaiting_payment": "Menunggu Pembayaran",
+          "pending_verification": "Pengesahan Tertunda",
+          "paid": "Dibayar",
+          "payment_failed": "Pembayaran Gagal",
+          "refunded": "Dikembalikan"
+        }
       },
       "actions": {
         "confirmOrder": "Sahkan Pesanan",
@@ -857,7 +873,7 @@
         "pending": "Menunggu",
         "confirmed": "Disahkan",
         "ready": "Sedia",
-        "shipped": "Dihantar",
+        "shipped": "Sedang Dihantar",
         "completed": "Selesai"
       },
       "ship": {
@@ -881,6 +897,36 @@
         "confirmCancellation": "Sahkan Pembatalan",
         "confirm": "Sahkan Pembatalan",
         "confirming": "Membatalkan..."
+      },
+      "paymentVerification": {
+        "title": "Pengesahan Pembayaran",
+        "referenceCode": "Kod Rujukan",
+        "paymentReceipt": "Resit Pembayaran",
+        "noReceipt": "Tiada resit dimuat naik",
+        "amountExpected": "Jumlah Dijangka",
+        "buyer": "Pembeli",
+        "approve": "Luluskan Pembayaran",
+        "approving": "Meluluskan...",
+        "reject": "Tolak Pembayaran",
+        "verified": "Pembayaran Disahkan",
+        "verifiedAt": "Disahkan Pada",
+        "verifiedBy": "Disahkan Oleh"
+      },
+      "rejectPayment": {
+        "title": "Tolak Pembayaran",
+        "reasonLabel": "Sebab penolakan (wajib)",
+        "reasons": {
+          "imageBlurry": "Resit tidak jelas",
+          "wrongAmount": "Jumlah salah",
+          "duplicateOrder": "Pesanan pendua",
+          "other": "Sebab lain"
+        },
+        "detailLabel": "Butiran",
+        "detailPlaceholder": "Huraikan masalah (min 10 aksara)...",
+        "detailError": "Butiran mestilah sekurang-kurangnya 10 aksara",
+        "back": "Batal",
+        "submit": "Tolak Pembayaran",
+        "submitting": "Menolak..."
       },
       "filterDates": {
         "allDates": "Semua Tarikh",
@@ -3405,6 +3451,17 @@
       "sending": "Menghantar…",
       "sendLink": "Hantar pautan muat naik",
       "errorMessage": "Sesuatu telah berlaku. Sila cuba lagi."
+    },
+    "orderLookup": {
+      "title": "Jejak Pesanan Anda",
+      "subtitle": "Masukkan nombor pesanan anda untuk semak status pesanan",
+      "label": "Nombor Pesanan",
+      "placeholder": "cth. ORD-00001",
+      "submit": "Jejak",
+      "required": "Sila masukkan nombor pesanan anda",
+      "navPlaceholder": "Nombor pesanan…",
+      "navTitle": "Jejak pesanan anda",
+      "navLabel": "Jejak"
     },
     "notFound": {
       "code": "404",
