@@ -75,7 +75,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const siteSlug = tenantObj?.slug ?? ''
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const magicLinkUrl = `${baseUrl}/api/orders/${order.id}/confirm-redirect?slug=${siteSlug}&token=${token}`
-        const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
+        const plainUploadUrl = magicLinkUrl
 
         const emailPayload = paymentRejectedEmail({
             orderNumber: order.orderNumber as string,

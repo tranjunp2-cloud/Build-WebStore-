@@ -341,7 +341,7 @@ export async function POST(request: Request) {
                 expSec,
             })
             redirectUrl = `${baseUrl}/api/orders/${order.id}/confirm-redirect?slug=${siteSlug}&token=${token}`
-            const plainUploadUrl = orderPageUrl
+            const plainUploadUrl = redirectUrl
 
             const pcConfig = (site as any).paymentConfig
             const btEmail = bankTransferInstructionsEmail({
