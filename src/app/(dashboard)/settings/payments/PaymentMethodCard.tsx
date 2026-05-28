@@ -90,7 +90,7 @@ export function PaymentMethodCard({
                                 disabled={locked}
                             >
                                 <span className={cn(
-                                    'absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200',
+                                    'absolute top-1/2 -translate-y-1/2 left-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200',
                                     isActive && 'translate-x-[20px]',
                                 )} />
                             </button>
