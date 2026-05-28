@@ -1,13 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Clock, CheckCircle2, Package, Truck } from 'lucide-react'
+import { Clock, CheckCircle2, Package, Truck, XCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number }) {
     const { t } = useI18n()
     const o = t.dashboard.orders
-    const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0 })
+    const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0, cancelled: 0 })
 
     const fetchMetrics = useCallback(async () => {
         try {
@@ -63,10 +63,16 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
             icon: <Truck className="w-5 h-5 text-[#05DF72]" />,
             iconBg: 'bg-[rgba(0,201,80,0.1)]',
         },
+        {
+            label: o.metrics.cancelled,
+            value: counts.cancelled,
+            icon: <XCircle className="w-5 h-5 text-[#FF6467]" />,
+            iconBg: 'bg-[rgba(251,44,54,0.1)]',
+        },
     ]
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-[22px] w-full">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-[22px] w-full">
             {metrics.map((item, index) => (
                 <div
                     key={index}

@@ -807,7 +807,8 @@
         "pending": "Pending",
         "readyToShip": "Ready to Ship",
         "shipped": "Shipping",
-        "completed": "Completed"
+        "completed": "Completed",
+        "cancelled": "Cancelled"
       },
       "tableHeaders": {
         "orderNumber": "Order #",

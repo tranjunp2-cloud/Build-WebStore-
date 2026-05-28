@@ -807,7 +807,8 @@
         "pending": "Menunggu",
         "readyToShip": "Sedia Dihantar",
         "shipped": "Sedang Dihantar",
-        "completed": "Selesai"
+        "completed": "Selesai",
+        "cancelled": "Dibatalkan"
       },
       "tableHeaders": {
         "orderNumber": "Pesanan #",
