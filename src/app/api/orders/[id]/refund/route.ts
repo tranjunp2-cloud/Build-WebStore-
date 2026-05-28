@@ -103,21 +103,29 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
     // Bank transfer / COD — manual refund, no Stripe call needed
     if (['bank_transfer', 'cod'].includes(order.paymentMethod)) {
-        const casResult = await (payload.db.drizzle as any).execute(sql`
-            UPDATE orders SET status = 'refunded', payment_status = 'refunded'
-            WHERE id = ${order.id}
-            AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
-            RETURNING id
-        `)
-        if (!casResult.rows?.length) {
+        try {
+            const casResult = await (payload.db.drizzle as any).execute(sql`
+                UPDATE orders SET status = 'refunded', payment_status = 'refunded'
+                WHERE id = ${order.id}
+                AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
+                RETURNING id
+            `)
+            if (!casResult.rows?.length) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+                    { status: 400 },
+                )
+            }
+            console.log(`[Refund] Order ${id} refunded manually (${order.paymentMethod})`)
+            fireRefundEmail()
+            return NextResponse.json({ success: true, data: { refundId: null } })
+        } catch (err: any) {
+            console.error('[Refund] Manual refund failed:', err?.message ?? err)
             return NextResponse.json(
-                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
-                { status: 400 },
+                { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
+                { status: 502 },
             )
         }
-        console.log(`[Refund] Order ${id} refunded manually (${order.paymentMethod})`)
-        fireRefundEmail()
-        return NextResponse.json({ success: true, data: { refundId: null } })
     }
 
     // Stripe orders — resolve connected account
