@@ -101,3 +101,33 @@ OrdersPage (/orders)
 | Product out of stock during checkout | Show "Out of stock" before payment |
 | Email send failure | Retry 3x via queue, log failure |
 | Status update conflict | Optimistic lock via updatedAt check |
+
+## 6. Approval Path (Bank Transfer)
+
+Bank transfer orders (QR banking, QRIS, etc.) set `paymentStatus = 'paid'` when merchant approves payment offline (not via webhook). `approve-payment/route.ts` now runs per-variant stock decrement via `decrementVariantStock()` on approval (same atomic CAS as COD checkout), ensuring variant inventory is correctly decremented at the moment payment is confirmed. This enables proper restock on cancel (previously ignored because variants were never decremented after initial COD checkout).
+
+## 7. Error Codes & Semantics
+
+| Code | Condition | HTTP | Behavior |
+|---|---|---|---|
+| `OUT_OF_STOCK` | Insufficient inventory (valid product, stock < quantity) | 422 | Order deleted, no restock needed |
+| `PRODUCT_NOT_FOUND` | Product missing or variant deleted mid-checkout | 422 | Order deleted, compensation restock skipped (safe) |
+| `STOCK_UPDATE_FAILED` | Transient write failure (not OOS, not missing) | 422 | Order deleted, restock compensation executed |
+
+**Variant-specific:** When `decrementVariantStock()` performs CAS on `products_variants` table:
+- If CAS returns 0 rows: diagnostic check determines root cause (variant_not_found → maps to PRODUCT_NOT_FOUND for UX)
+- Prevents confusion: "Product no longer available" (clear) vs. "Stock update failed" (transient retry signal)
+
+## 8. Concurrency & Atomicity
+
+**Variant stock decrement (atomic as of GH-1082 repost-merge fix):**
+- Uses raw SQL `UPDATE products_variants SET stock = stock - ? WHERE _parent_id = ? AND name = ? AND stock >= ? RETURNING id` (PostgreSQL CAS)
+- UNIQUE INDEX constraint: `products_variants_name_parent_uniq` on `(_parent_id, lower(name))` prevents duplicate variant names within product, eliminating double-decrement race
+- No concurrent oversell possible; exactly N successful decrements from stock=N
+
+**Non-variant stock decrement (atomic, unchanged):**
+- Uses SQL `UPDATE products SET inventory = inventory + ? WHERE inventory >= ? RETURNING id` (SQL CAS)
+
+**Inventory aggregate recomputation:**
+- Both paths recompute `products.inventory = SUM(products_variants.stock)` post-write (isolated: write is committed first, recompute failure is non-critical).
+- Payload's `beforeChange` hook does NOT fire on raw SQL writes, so manual recompute is required.

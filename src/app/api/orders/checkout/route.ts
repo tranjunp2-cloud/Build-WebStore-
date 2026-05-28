@@ -13,6 +13,7 @@ import { bankTransferInstructionsEmail } from '@/lib/email/templates/bank-transf
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { decrementVariantStock, restockItem } from '../lib/stock-utils'
 
 export const maxDuration = 60
 
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
 
         // Validate products, check stock, and calculate totals
         const orderItems = []
+        const hasVariantsMap = new Map<string, boolean>()
         let subtotal = 0
         let currency = 'MYR'
 
@@ -132,10 +134,12 @@ export async function POST(request: Request) {
             }
 
             const unitPrice = variant ? variant.price : p.price
-            // Advisory OOS guard: use aggregate p.inventory (decremented by COD CAS in stock-cas.ts).
-            // Per-variant stock decrement (products_variants.stock) is a follow-up task — variant.stock
-            // is never decremented today, so reading it would give a permanently stale value.
-            const stockAvail = p.inventory ?? Infinity
+            hasVariantsMap.set(String(productLookupId), !!p.hasVariants)
+
+            // Variant-aware availability: per-variant stock for variant products, aggregate otherwise
+            const stockAvail = (p.hasVariants && variant)
+                ? (variant.stock ?? 0)
+                : (p.inventory ?? Infinity)
 
             if (stockAvail < item.quantity) {
                 return NextResponse.json(
@@ -143,9 +147,12 @@ export async function POST(request: Request) {
                         success: false,
                         error: {
                             code: 'OUT_OF_STOCK',
-                            message: `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
+                            message: p.hasVariants
+                                ? `"${p.name}" (${item.variant}) has only ${stockAvail} left`
+                                : `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
                             product: p.name,
-                            available: p.inventory ?? 0,
+                            ...(p.hasVariants ? { variant: item.variant } : {}),
+                            available: stockAvail,
                             requested: item.quantity,
                         },
                     },
@@ -259,55 +266,130 @@ export async function POST(request: Request) {
         // Compensation: if any item fails the CAS, re-increment all already-decremented items
         // and delete the order so the buyer sees a clear out-of-stock error.
         if (paymentMethod === 'cod') {
-            const decremented: Array<{ productId: number | string; quantity: number }> = []
+            const decremented: Array<{ productId: number | string; quantity: number; variantName?: string; kind: 'variant' | 'aggregate' }> = []
             let failedItem: string | undefined
+            let failedVariant: string | undefined
+            let failedReason: 'insufficient_stock' | 'product_not_found' | 'write_failed' | undefined
 
             for (const item of aggregatedItems) {
                 const productId = typeof item.productId === 'string' && !isNaN(Number(item.productId))
                     ? Number(item.productId) : item.productId
-                try {
-                    const result = await (payload.db.drizzle as any).execute(sql`
-                        UPDATE products
-                        SET inventory = inventory - ${item.quantity}
-                        WHERE id = ${productId}
-                        AND inventory IS NOT NULL
-                        AND inventory >= ${item.quantity}
-                        RETURNING id
-                    `)
-                    if (result.rows?.length) {
-                        decremented.push({ productId, quantity: item.quantity })
-                    } else {
+                const isVariant = !!(hasVariantsMap.get(String(productId)) && item.variant)
+
+                if (isVariant) {
+                    const res = await decrementVariantStock(payload, productId, item.variant!, item.quantity)
+                    if (!res.ok) {
                         failedItem = String(item.productId)
+                        failedVariant = item.variant
+                        if (res.reason === 'variant_not_found') {
+                            // ORM/DB inconsistency: variant passed validation but missing from products_variants
+                            console.error('[Stock Decrement] variant_not_found — data integrity issue', {
+                                productId: String(productId),
+                                variant: item.variant,
+                            })
+                        }
+                        switch (res.reason) {
+                            case 'insufficient_stock': failedReason = 'insufficient_stock'; break
+                            case 'null_inventory':      failedReason = 'insufficient_stock'; break
+                            case 'product_not_found':   failedReason = 'product_not_found'; break
+                            case 'variant_not_found':   failedReason = 'product_not_found'; break
+                            default:                    failedReason = 'write_failed'
+                        }
                         break
                     }
-                } catch (err) {
-                    console.warn(`[Stock Decrement] CAS failed for product ${item.productId}:`, err)
-                    failedItem = String(item.productId)
-                    break
+                    decremented.push({ productId, quantity: item.quantity, variantName: item.variant, kind: 'variant' })
+                } else {
+                    try {
+                        const result = await (payload.db.drizzle as any).execute(sql`
+                            UPDATE products
+                            SET inventory = inventory - ${item.quantity}
+                            WHERE id = ${productId}
+                            AND inventory IS NOT NULL
+                            AND inventory >= ${item.quantity}
+                            RETURNING id
+                        `)
+                        if (result.rows?.length) {
+                            decremented.push({ productId, quantity: item.quantity, kind: 'aggregate' })
+                        } else {
+                            failedItem = String(item.productId)
+                            // Distinguish deleted product from genuine OOS — mirrors decrementVariantStock behaviour
+                            const exists = await (payload.db.drizzle as any).execute(sql`
+                                SELECT id FROM products WHERE id = ${productId} LIMIT 1
+                            `)
+                            failedReason = exists.rows?.length ? 'insufficient_stock' : 'product_not_found'
+                            break
+                        }
+                    } catch (err) {
+                        console.warn(`[Stock Decrement] CAS failed for product ${item.productId}:`, err)
+                        failedItem = String(item.productId)
+                        failedReason = 'write_failed'
+                        break
+                    }
                 }
             }
 
-            if (failedItem) {
+            if (failedReason) {
                 // Compensate: re-increment all previously decremented items
-                for (const p of decremented) {
-                    try {
-                        await (payload.db.drizzle as any).execute(sql`
-                            UPDATE products SET inventory = inventory + ${p.quantity}
-                            WHERE id = ${p.productId} AND inventory IS NOT NULL
-                        `)
-                    } catch (e) {
-                        console.error(`[Stock Decrement] Compensation re-increment failed for product ${p.productId}:`, e)
+                for (const d of decremented) {
+                    if (d.kind === 'variant' && d.variantName) {
+                        const comp = await restockItem(payload, d.productId, d.variantName, d.quantity)
+                        if (comp.skipped) {
+                            console.error('[Stock Compensation] Variant re-increment failed — manual inventory reconciliation required', {
+                                orderId: order.id,
+                                productId: d.productId,
+                                variantName: d.variantName,
+                                reason: comp.reason,
+                            })
+                        }
+                    } else {
+                        try {
+                            const compResult = await (payload.db.drizzle as any).execute(sql`
+                                UPDATE products SET inventory = inventory + ${d.quantity}
+                                WHERE id = ${d.productId} AND inventory IS NOT NULL
+                                RETURNING id
+                            `)
+                            if (!compResult.rows?.length) {
+                                console.error(`[Stock Decrement] Compensation re-increment returned 0 rows for product ${d.productId} — manual inventory reconciliation required`, {
+                                    orderId: order.id,
+                                    productId: d.productId,
+                                })
+                            }
+                        } catch (e) {
+                            console.error(`[Stock Decrement] Compensation re-increment failed for product ${d.productId}:`, e)
+                        }
                     }
                 }
+                // Sentinel: mark cancelled before delete so any concurrent/future cancel call
+                // returns idempotent success (shouldRestock=false) rather than re-incrementing
+                // already-compensated stock when delete fails (FK constraint, transient error).
+                await payload.update({
+                    collection: 'orders',
+                    id: order.id,
+                    data: { status: 'cancelled' } as any,
+                    overrideAccess: true,
+                }).catch((e: unknown) => console.error(
+                    `[Stock Decrement] Failed to mark orphaned order ${order.id} cancelled before delete:`, e
+                ))
                 // Delete the just-created order to keep DB consistent
                 await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true })
                     .catch((e: unknown) => console.error(`[Stock Decrement] Failed to delete orphaned order ${order.id} after CAS failure — manual cleanup required:`, e))
+                const failedMessages: Record<NonNullable<typeof failedReason>, string> = {
+                    insufficient_stock: `Product ${failedItem} ran out of stock — please reduce quantity and try again`,
+                    product_not_found:  `Product ${failedItem} is no longer available — please remove it from your cart and try again`,
+                    write_failed:       `Stock update failed for product ${failedItem} — please try again`,
+                }
+                const errorCode = failedReason === 'write_failed'
+                    ? 'STOCK_UPDATE_FAILED'
+                    : failedReason === 'product_not_found'
+                    ? 'PRODUCT_NOT_FOUND'
+                    : 'OUT_OF_STOCK'
                 return NextResponse.json(
                     {
                         success: false,
                         error: {
-                            code: 'OUT_OF_STOCK',
-                            message: `Product ${failedItem} ran out of stock — please reduce quantity and try again`,
+                            code: errorCode,
+                            message: failedMessages[failedReason],
+                            ...(failedVariant ? { variant: failedVariant } : {}),
                         },
                     },
                     { status: 422 },
