@@ -99,29 +99,39 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                 </p>
 
                 {/* Reason radios */}
-                <div className="flex flex-col gap-3 mb-4">
+                <div className="flex flex-col gap-2 mb-4">
                     {REASONS.map(r => {
-                        const inputId = `reject-reason-${r.value}`
+                        const isSelected = reason === r.value
                         return (
-                            <div key={r.value} className="flex items-center gap-3">
-                                <input
-                                    type="radio"
-                                    id={inputId}
-                                    name="rejection-reason"
-                                    value={r.value}
-                                    checked={reason === r.value}
-                                    onChange={(e) => { if (e.target.checked) { setReason(r.value); setDetailError('') } }}
-                                    disabled={isLoading}
-                                    className="accent-red-500"
-                                    style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0, appearance: 'auto' }}
-                                />
-                                <label
-                                    htmlFor={inputId}
-                                    style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)', cursor: 'pointer' }}
+                            <button
+                                key={r.value}
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => { setReason(r.value); setDetailError('') }}
+                                className="flex items-center gap-3 w-full text-left transition-all"
+                                style={{
+                                    padding: '10px 14px',
+                                    borderRadius: 10,
+                                    border: `1px solid ${isSelected ? 'rgba(251,44,54,0.4)' : 'var(--dash-border)'}`,
+                                    background: isSelected ? 'rgba(251,44,54,0.06)' : 'transparent',
+                                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                                }}
+                            >
+                                <div
+                                    className="flex shrink-0 items-center justify-center rounded-full transition-all"
+                                    style={{
+                                        width: 18, height: 18,
+                                        border: `2px solid ${isSelected ? '#FB2C36' : 'var(--dash-text-muted)'}`,
+                                    }}
                                 >
+                                    {isSelected && (
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#FB2C36' }} />
+                                    )}
+                                </div>
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)' }}>
                                     {r.label}
-                                </label>
-                            </div>
+                                </span>
+                            </button>
                         )
                     })}
                 </div>
