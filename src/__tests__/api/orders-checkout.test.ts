@@ -29,6 +29,10 @@ vi.mock('@/lib/email/templates/new-order-seller', () => ({
 vi.mock('@/lib/email/get-tenant-owner-emails', () => ({
     getTenantOwnerEmails: vi.fn(() => Promise.resolve([])),
 }))
+vi.mock('@/lib/email/get-template-config', () => ({
+    getTemplateConfig: vi.fn(() => Promise.resolve(null)),
+    invalidateTemplateConfigCache: vi.fn(() => Promise.resolve()),
+}))
 vi.mock('@/lib/orders/upload-token', () => ({
     generateUploadToken: vi.fn(() => 'mock-upload-token'),
     verifyUploadToken: vi.fn(() => true),

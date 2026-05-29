@@ -47,7 +47,8 @@ describe('getTemplateConfig [TC-F32]', () => {
         const tenantId = 'tenant-001'
         const type = 'welcome'
         const recipient = 'buyer'
-        const cacheKey = templateConfigCacheKey(tenantId, type, recipient)
+        // cache key includes locale suffix — default locale is 'en'
+        const cacheKey = `${templateConfigCacheKey(tenantId, type, recipient)}:en`
 
         const cachedConfig: EmailTemplateConfig = {
             enabled: true,
@@ -73,7 +74,8 @@ describe('getTemplateConfig [TC-F32]', () => {
         const tenantId = 'tenant-001'
         const type = 'otp-verification'
         const recipient = 'buyer'
-        const cacheKey = templateConfigCacheKey(tenantId, type, recipient)
+        // cache key includes locale suffix — default locale is 'en'
+        const cacheKey = `${templateConfigCacheKey(tenantId, type, recipient)}:en`
 
         mockRedisGet.mockResolvedValue(null)
 
@@ -93,7 +95,7 @@ describe('getTemplateConfig [TC-F32]', () => {
         // Act
         const result = await getTemplateConfig(tenantId, type, recipient)
 
-        // Assert
+        // Assert — overrideAccess:true required for server-side lookups (webhook/hook contexts)
         expect(mockFind).toHaveBeenCalledWith({
             collection: 'email-template-settings',
             where: {
@@ -103,6 +105,7 @@ describe('getTemplateConfig [TC-F32]', () => {
             },
             limit: 1,
             depth: 0,
+            overrideAccess: true,
         })
 
         expect(result).toEqual({
@@ -177,20 +180,22 @@ describe('getTemplateConfig [TC-F32]', () => {
 
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC: F32-U-05] invalidateTemplateConfigCache: deletes cache key', async () => {
+    it('[TC: F32-U-05] invalidateTemplateConfigCache: deletes both locale cache keys', async () => {
         // Arrange
         const tenantId = 'tenant-001'
         const type = 'payment-confirmed'
         const recipient = 'buyer'
-        const cacheKey = templateConfigCacheKey(tenantId, type, recipient)
+        const base = templateConfigCacheKey(tenantId, type, recipient)
 
         mockRedisDel.mockResolvedValue(1)
 
         // Act
         await invalidateTemplateConfigCache(tenantId, type, recipient)
 
-        // Assert
-        expect(mockRedisDel).toHaveBeenCalledWith(cacheKey)
+        // Assert — both :en and :ms locale keys must be deleted atomically
+        expect(mockRedisDel).toHaveBeenCalledWith(`${base}:en`)
+        expect(mockRedisDel).toHaveBeenCalledWith(`${base}:ms`)
+        expect(mockRedisDel).toHaveBeenCalledTimes(2)
     })
 
     // ──────────────────────────────────────────────────────────────────
