@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
             : null
 
         const cmsConfig = tenantId
-            ? await getTemplateConfig(tenantId, 'password-changed', 'buyer')
+            ? await getTemplateConfig(tenantId, 'password-changed', 'seller')
             : null
 
         if (cmsConfig?.enabled === false) {
