@@ -74,12 +74,18 @@ type EditorState = {
     currentPageId: string | null
 
     // F-26: Multilingual locale state
-    /** Active editing locale. Defaults to site's generation locale. */
-    activeLocale: SiteLocale
-    /** The locale used when the site was AI-generated (flat blocks are in this language). */
+    /** Active display locale. Any ISO 639-1 code — e.g. 'en', 'ms', 'vi', 'el'. */
+    activeLocale: string
+    /** Translation slot — EN/MS only (Sites.locale). */
     siteLocale: SiteLocale
+    /** Actual ISO 639-1 code the site was generated in — may be non-EN/MS (e.g. 'el', 'th'). */
+    generationLocale: string
+    /** User-chosen primary display locale (Make Default). Defaults to generationLocale. */
+    primaryLocale: string
+    /** Locale currently being translated (after [Add] click). null when idle. */
+    pendingLocale: string | null
     /** Per-block locale overrides: localeOverrides[blockId][locale] = { field: value } */
-    localeOverrides: Record<string, Record<SiteLocale, Record<string, unknown>>>
+    localeOverrides: Record<string, Record<string, Record<string, unknown>>>
 
     // History (F-06 / F-11)
     history: EditorSnapshot[]
@@ -165,10 +171,12 @@ type EditorActions = {
     flipBlockVariant: (blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => void
 
     // F-26: Multilingual locale actions
-    setActiveLocale: (locale: SiteLocale) => void
-    /** Set the site's generation locale — called once on data load, resets on init/reset. */
+    setActiveLocale: (locale: string) => void
     setSiteLocale: (locale: SiteLocale) => void
-    setLocaleOverride: (blockId: string, locale: SiteLocale, fields: Record<string, unknown>) => void
+    setGenerationLocale: (locale: string) => void
+    setPrimaryLocale: (locale: string) => void
+    setPendingLocale: (locale: string | null) => void
+    setLocaleOverride: (blockId: string, locale: string, fields: Record<string, unknown>) => void
     initLocaleFromBlock: (blockId: string, localeInit: { en: Record<string, unknown>; ms: Record<string, unknown> }) => void
     /**
      * Merge localeOverrides[block.id][activeLocale] onto block for rendering.
@@ -267,6 +275,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // F-26: Multilingual
     activeLocale: 'en',
     siteLocale: 'en',
+    generationLocale: 'en',
+    primaryLocale: 'en',
+    pendingLocale: null,
     localeOverrides: {},
 
     init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null) => {
@@ -301,8 +312,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             isAIStreaming: false,
             // M1 fix: reset locale state on every page switch so stale overrides never bleed.
             // The loadData caller sets siteLocale + activeLocale + localeOverrides after init().
+            // F26-04: also reset pendingLocale + primaryLocale so navigation between sites
+            // doesn't carry over translation state from previous site.
             activeLocale: 'en',
             siteLocale: 'en',
+            generationLocale: 'en',
+            primaryLocale: 'en',
+            pendingLocale: null,
             localeOverrides: {},
         })
     },
@@ -746,6 +762,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── F-26: Multilingual locale actions ───────────────────────────────
 
     setActiveLocale: (locale) => set({ activeLocale: locale }),
+    setGenerationLocale: (locale) => set({ generationLocale: locale }),
+    setPrimaryLocale: (locale) => set({ primaryLocale: locale }),
+    setPendingLocale: (locale) => set({ pendingLocale: locale }),
 
     setSiteLocale: (locale) => set({ siteLocale: locale }),
 
@@ -784,10 +803,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     getDisplayBlock: (block) => {
-        const { activeLocale, siteLocale, localeOverrides, siteName } = get()
+        const { activeLocale, siteLocale, generationLocale, localeOverrides, siteName } = get()
 
-        // Header/footer blocks store locale content embedded as _localeContent
-        // (keyed by locale, populated by auto-translate on locale switch)
+        // 1. User override wins for any locale (custom edit takes priority).
+        const override = block.id ? localeOverrides[block.id as string]?.[activeLocale] : null
+        if (override && Object.keys(override).length > 0) {
+            return { ...block, ...override }
+        }
+
+        // 2. Embedded translation (header/footer with _localeContent[locale]).
         const embedded = (block as Record<string, unknown>)._localeContent as
             | Record<string, Record<string, unknown>>
             | undefined
@@ -795,27 +819,23 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             return { ...block, ...embedded[activeLocale] }
         }
 
-        // Blocks without id (pre-save new blocks) fall through to locale resolver
+        // 3. Native view — viewing the actual language base blocks were authored in.
+        //    For non-standard sites (vi, el), generationLocale is the source. For standard,
+        //    generationLocale === siteLocale so check still holds.
+        const baseLocale = generationLocale || siteLocale
+        if (activeLocale === baseLocale) return block
+
+        // 4. Blocks without id (pre-save new blocks) fall through to locale resolver.
         if (!block.id) {
-            // Flat block is in siteLocale — return as-is when viewing that locale
-            if (activeLocale === siteLocale) return block
-            const resolved = resolveBlockContent(block.blockType, activeLocale, siteName || 'Your Brand')
+            const resolveLocale = (activeLocale === 'ms' ? 'ms' : 'en') as 'en' | 'ms'
+            const resolved = resolveBlockContent(block.blockType, resolveLocale, siteName || 'Your Brand')
             return resolved.content && Object.keys(resolved.content).length > 0 ? { ...block, ...resolved.content } : block
         }
 
-        // User override wins for any locale
-        const override = localeOverrides[block.id as string]?.[activeLocale]
-        if (override && Object.keys(override).length > 0) {
-            return { ...block, ...override }
-        }
-
-        // Viewing the site's generation locale with no override → flat block is authoritative
-        // (flat block is in siteLocale, so this only short-circuits when locales match)
-        if (activeLocale === siteLocale) return block
-
         // Alternate locale with no override → resolve locale defaults
         // (e.g. EN switch on MS site, or MS preview on EN site)
-        const resolved = resolveBlockContent(block.blockType, activeLocale, siteName || 'Your Brand')
+        const resolveLocale2 = (activeLocale === 'ms' ? 'ms' : 'en') as 'en' | 'ms'
+        const resolved = resolveBlockContent(block.blockType, resolveLocale2, siteName || 'Your Brand')
         if (resolved.content && Object.keys(resolved.content).length > 0) {
             return { ...block, ...resolved.content }
         }
@@ -842,8 +862,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
+            // F26-04: reset all locale-related state (was leaking across site navigations).
             activeLocale: 'en',
             siteLocale: 'en',
+            generationLocale: 'en',
+            primaryLocale: 'en',
+            pendingLocale: null,
             localeOverrides: {},
         })
     },

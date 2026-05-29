@@ -148,9 +148,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         const hasFooter = Boolean(existingFooter)
 
         if (!hasNav || !hasFooter) {
-            // Check site-level headerBlock/footerBlock first
-            const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
-            const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
+            // F26-04: prefer pending (draft) header/footer for /preview so owner sees latest edits
+            // including locale switches that haven't been published yet.
+            const pendingHb = (site as Record<string, unknown>).pendingHeaderBlock as Record<string, unknown> | null
+            const pendingFb = (site as Record<string, unknown>).pendingFooterBlock as Record<string, unknown> | null
+            const siteHeaderBlock = pendingHb ?? (site.headerBlock as Record<string, unknown> | null)
+            const siteFooterBlock = pendingFb ?? (site.footerBlock as Record<string, unknown> | null)
 
             let navBlock: PreviewLayoutBlock | null = siteHeaderBlock
                 ? { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
@@ -236,8 +239,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     <PreviewSiteRenderer
                         site={{
                             ...site,
-                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
-                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            // F26-04: override headerBlock / footerBlock / globalBlocks with the
+                            // DRAFT (pending) versions so /preview reflects the latest editor save,
+                            // including locale switches that haven't been published yet.
+                            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
+                            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
+                            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',

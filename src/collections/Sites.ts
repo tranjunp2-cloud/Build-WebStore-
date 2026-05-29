@@ -119,12 +119,9 @@ export const Sites: CollectionConfig = {
             // F26: Locale the AI generated flat blocks in — immutable after generation.
             // Differs from `locale` which the user can change. Used by editor to determine
             // which language flat blocks are stored in (siteLocale in editorStore).
+            // Text field (not select) to support any ISO 639-1 code e.g. 'el', 'th', 'zh'.
             name: 'generationLocale',
-            type: 'select',
-            options: [
-                { label: 'Bahasa Melayu', value: 'ms' },
-                { label: 'English', value: 'en' },
-            ],
+            type: 'text',
             defaultValue: 'ms',
             admin: { description: 'Locale AI used to generate flat blocks — do not change' },
         },

@@ -222,47 +222,43 @@ describe('TC-F26-05-11: EN user edit wins over initLocaleFromBlock seeded defaul
 // Regression: before fix, siteLocale was set from Sites.locale (user-changeable),
 // causing flat blocks (stored in generation locale) to show as-is in wrong locale.
 
-describe('TC-F26-05-12: reload after locale switch uses generationLocale as siteLocale', () => {
-    it('getDisplayBlock returns EN defaults when siteLocale=ms, activeLocale=en, no override', () => {
-        // Simulate reload after: gen BM → user switched to EN
-        // editor sets siteLocale = generationLocale ('ms'), activeLocale = Sites.locale ('en')
-        const { setSiteLocale, setActiveLocale, getDisplayBlock } = useEditorStore.getState()
+describe('TC-F26-05-12: reload after locale switch uses generationLocale as baseLocale', () => {
+    it('getDisplayBlock returns EN defaults when generationLocale=ms, activeLocale=en, no override', () => {
+        // F26 update: native check now uses generationLocale (immutable), not siteLocale.
+        const { setSiteLocale, setActiveLocale, setGenerationLocale, getDisplayBlock } = useEditorStore.getState()
         setSiteLocale('ms')
+        setGenerationLocale('ms')
         setActiveLocale('en')
 
-        // Flat block has BM content (as stored by AI generation)
         const flatBlock = { id: 'block-r1', blockType: 'hero', headline: 'Selamat datang' } as unknown as BlockData
-
         const display = getDisplayBlock(flatBlock) as Record<string, unknown>
 
-        // Must NOT return BM flat content — activeLocale differs from siteLocale
-        // so getDisplayBlock resolves EN locale defaults instead
+        // activeLocale !== generationLocale → resolves EN template defaults
         expect(display['headline']).not.toBe('Selamat datang')
     })
 
-    it('getDisplayBlock returns flat BM block when siteLocale=ms, activeLocale=ms', () => {
-        // Confirm: BM stays correct when user confirms BM (no switch)
-        const { setSiteLocale, setActiveLocale, getDisplayBlock } = useEditorStore.getState()
+    it('getDisplayBlock returns flat BM block when generationLocale=ms, activeLocale=ms', () => {
+        const { setSiteLocale, setActiveLocale, setGenerationLocale, getDisplayBlock } = useEditorStore.getState()
         setSiteLocale('ms')
+        setGenerationLocale('ms')
         setActiveLocale('ms')
 
         const flatBlock = { id: 'block-r2', blockType: 'hero', headline: 'Selamat datang' } as unknown as BlockData
         const display = getDisplayBlock(flatBlock) as Record<string, unknown>
 
-        // activeLocale === siteLocale → flat block returned as-is
+        // activeLocale === generationLocale → native view → flat block returned as-is
         expect(display['headline']).toBe('Selamat datang')
     })
 
-    it('getDisplayBlock returns BM defaults when siteLocale=en, activeLocale=ms, no override', () => {
-        // Simulate: gen EN → user switched to BM
-        const { setSiteLocale, setActiveLocale, getDisplayBlock } = useEditorStore.getState()
+    it('getDisplayBlock returns BM defaults when generationLocale=en, activeLocale=ms, no override', () => {
+        const { setSiteLocale, setActiveLocale, setGenerationLocale, getDisplayBlock } = useEditorStore.getState()
         setSiteLocale('en')
+        setGenerationLocale('en')
         setActiveLocale('ms')
 
         const flatBlock = { id: 'block-r3', blockType: 'hero', headline: 'Welcome to Your Brand' } as unknown as BlockData
         const display = getDisplayBlock(flatBlock) as Record<string, unknown>
 
-        // Must NOT return EN flat content
         expect(display['headline']).not.toBe('Welcome to Your Brand')
     })
 })

@@ -709,11 +709,10 @@ function PreviewFrameInner({
                 }
                 onFooterEditStopRef.current?.()
             } else if (e.data?.type === 'SWITCH_LOCALE') {
-                // F26-07: Language switcher block in preview requests a locale change
+                // F26-07: Language switcher block in preview requests a locale change.
+                // Accept any locale code (en, ms, or non-standard like 'vi', 'el').
                 const locale = e.data.locale as string
-                if (locale === 'en' || locale === 'ms') {
-                    onLocaleSwitch?.(locale)
-                }
+                if (locale) onLocaleSwitch?.(locale)
             }
         }
         window.addEventListener('message', handleMessage)

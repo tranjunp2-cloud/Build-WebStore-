@@ -1,41 +1,51 @@
 // F26-07: Language switcher dropdown in nav header.
-// Visual style matches the editor toolbar LanguageSwitcher (pill + dark dropdown).
+// Opens on hover. Adapts to site Color Mode (dark: variants).
 // Sends SWITCH_LOCALE postMessage to parent editor on selection.
-// Scales to 3+ locales — F27 wires full locale list.
+// Dynamically reflects the site's actual language pair (generationLocale + activeLocale).
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
+import { getLocaleLabel } from '@/lib/locale-labels'
 
 type NavLangSwitcherPlaceholderProps = {
     className?: string
 }
 
-const LOCALES = [
-    { code: 'en', flag: '🇬🇧', label: 'EN' },
-    { code: 'ms', flag: '🇲🇾', label: 'BM' },
-] as const
-
 export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPlaceholderProps) {
-    const activeLocale = useEditorStore(state => state.activeLocale)
-    const [open, setOpen] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
+    const generationLocale = useEditorStore(state => state.generationLocale)
+    const siteLocale       = useEditorStore(state => state.siteLocale)
+    const activeLocale     = useEditorStore(state => state.activeLocale)
+    const [open, setOpen]  = useState(false)
+    const closeTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        if (!open) return
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                setOpen(false)
-            }
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [open])
+    const handleEnter = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current)
+        setOpen(true)
+    }
 
-    const active = LOCALES.find(l => l.code === activeLocale) ?? LOCALES[0]
+    const handleLeave = () => {
+        closeTimer.current = setTimeout(() => setOpen(false), 120)
+    }
+
+    const isNonStandard = !['en', 'ms'].includes(generationLocale)
+
+    // For non-standard sites: show generationLocale as native option + EN + MS
+    // For standard sites: show EN + MS (the only options)
+    const locales = isNonStandard
+        ? [
+            { code: generationLocale, visual: getLocaleLabel(generationLocale) },
+            { code: 'en',             visual: getLocaleLabel('en') },
+            { code: 'ms',             visual: getLocaleLabel('ms') },
+          ]
+        : [
+            { code: 'en', visual: getLocaleLabel('en') },
+            { code: 'ms', visual: getLocaleLabel('ms') },
+          ]
+
+    const active = locales.find(l => l.code === activeLocale) ?? locales[0]
 
     const handleSelect = (code: string) => {
         setOpen(false)
@@ -47,30 +57,33 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
 
     return (
         <div
-            ref={ref}
             className={`relative flex items-center select-none ${className}`.trim()}
             aria-label="Language switcher"
+            onMouseEnter={handleEnter}
+            onMouseLeave={handleLeave}
         >
-            {/* Trigger — pill style matches editor toolbar LanguageSwitcher */}
+            {/* Trigger pill */}
             <button
                 type="button"
-                onClick={() => setOpen(prev => !prev)}
                 className="inline-flex h-7 items-center gap-1 rounded-full border border-current/20 bg-white/10 px-2.5 text-[11px] font-semibold transition-all hover:bg-white/20"
                 aria-haspopup="listbox"
                 aria-expanded={open}
             >
-                <span className="text-sm leading-none">{active.flag}</span>
-                <ChevronDown className={`h-3 w-3 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <span className="text-sm leading-none">{active.visual.flag}</span>
+                <span className="leading-none">{active.visual.short}</span>
+                <ChevronDown className={`h-3 w-3 shrink-0 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Dropdown — dark neutral, works on both light and dark navs */}
+            {/* Dropdown — light: white card, dark: dark card */}
             {open && (
                 <div
                     role="listbox"
-                    className="absolute top-full right-0 mt-1.5 min-w-[130px] rounded-lg border border-white/10 bg-gray-900 shadow-xl z-50 p-1"
+                    className="absolute top-full right-0 mt-1 min-w-[150px] rounded-lg border shadow-lg z-50 p-1
+                               bg-white border-black/10
+                               dark:bg-[#1E293B] dark:border-white/10"
                 >
-                    {LOCALES.map(({ code, flag, label }) => {
-                        const isActive = activeLocale === code
+                    {locales.map(({ code, visual }) => {
+                        const isActive = code === activeLocale
                         return (
                             <button
                                 key={code}
@@ -79,15 +92,15 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
                                 aria-selected={isActive}
                                 onClick={() => handleSelect(code)}
                                 className={[
-                                    'flex items-center gap-2 w-full px-3 py-1.5 text-[11px] text-left rounded-md transition-colors',
+                                    'flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-left rounded-md transition-colors font-medium',
                                     isActive
-                                        ? 'bg-white/10 text-white font-semibold'
-                                        : 'text-white/60 hover:bg-white/[0.06] font-medium',
+                                        ? 'bg-black/5 text-slate-900 font-semibold dark:bg-white/10 dark:text-white'
+                                        : 'text-slate-500 hover:bg-black/5 hover:text-slate-800 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/90',
                                 ].join(' ')}
                             >
-                                <span className="text-base leading-none">{flag}</span>
-                                <span className="text-white/40">{label}</span>
-                                {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-400 shrink-0" />}
+                                <span className="text-base leading-none shrink-0">{visual.flag}</span>
+                                <span className="truncate">{visual.full}</span>
+                                {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />}
                             </button>
                         )
                     })}

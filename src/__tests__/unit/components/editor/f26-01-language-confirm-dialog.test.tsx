@@ -79,7 +79,7 @@ describe('TC-F26-01-04: Keep Thai selected + Continue → onAction("confirm", "t
         render(
             <LanguageConfirmBanner isOpen={true} detectedLocale="th" onAction={onAction} />,
         )
-        fireEvent.click(screen.getByRole('button', { name: /Keep Thai/i }))
+        fireEvent.click(screen.getByRole('button', { name: /Thai/i }))
         fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
         expect(onAction).toHaveBeenCalledWith('confirm', 'th')
     })
@@ -117,6 +117,6 @@ describe('TC-F26-01-07: unknown locale shows raw code fallback', () => {
             <LanguageConfirmBanner isOpen={true} detectedLocale="fr" onAction={vi.fn()} />,
         )
         expect(screen.getByText(/French language detected/i)).toBeTruthy()
-        expect(screen.getByRole('button', { name: /Keep French/i })).toBeTruthy()
+        expect(screen.getByRole('button', { name: /French/i })).toBeTruthy()
     })
 })

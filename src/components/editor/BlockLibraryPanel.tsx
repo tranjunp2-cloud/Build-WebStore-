@@ -301,38 +301,6 @@ export function BlockLibraryPanel({
                                                 </TooltipContent>
                                             )}
                                             </Tooltip>
-                                            {/* F26-04: auto-translate affordance — shows when BM not authored + not yet AI-translated */}
-                                            {item.needsTranslation && !translatedTypes.has(item.type) && (
-                                                <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <button
-                                                        type="button"
-                                                        disabled={pendingTranslateTypes.has(item.type)}
-                                                        className="absolute bottom-2 left-[60px] z-10 text-[9px] font-semibold text-amber-400 hover:text-amber-300 disabled:opacity-50 disabled:cursor-wait transition-colors px-1"
-                                                        onClick={async () => {
-                                                            if (!onAutoTranslate || pendingTranslateTypes.has(item.type)) return
-                                                            setPendingTranslateTypes(prev => new Set(prev).add(item.type))
-                                                            try {
-                                                                await onAutoTranslate(item.type)
-                                                                setTranslatedTypes(prev => new Set(prev).add(item.type))
-                                                            } catch {
-                                                                // AC-3: non-blocking error — EN content remains in place
-                                                                toast.error('Auto-translate failed. English content will be used instead.')
-                                                            } finally {
-                                                                setPendingTranslateTypes(prev => {
-                                                                    const next = new Set(prev)
-                                                                    next.delete(item.type)
-                                                                    return next
-                                                                })
-                                                            }
-                                                        }}
-                                                    >{pendingTranslateTypes.has(item.type) ? '⏳' : '✨ AI'}</button>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="right">
-                                                    Auto-translate to Bahasa Melayu
-                                                </TooltipContent>
-                                                </Tooltip>
-                                            )}
                                             </div>
                                             )
                                         })}

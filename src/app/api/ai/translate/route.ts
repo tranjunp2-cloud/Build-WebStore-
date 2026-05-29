@@ -78,9 +78,8 @@ export const POST = withAuth(async (user, req) => {
         // targetLocale is enum-validated — always present in LOCALE_NAMES
         const localeName = LOCALE_NAMES[targetLocale]!
 
-        const translationInstruction = targetLocale === 'en'
-            ? `Translate ALL string values in the given JSON into natural, idiomatic ${localeName}. The source may be in any language.`
-            : `Translate ALL string values in the given JSON from English to ${localeName}.`
+        // Source-agnostic — site content may be in any language (EN, MS, VI, EL, etc.)
+        const translationInstruction = `Translate ALL string values in the given JSON into natural, idiomatic ${localeName}. The source may be in any language — detect and translate automatically.`
 
         const systemPrompt = [
             `You are a professional translator specializing in marketing and e-commerce copy.`,

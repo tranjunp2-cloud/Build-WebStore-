@@ -136,6 +136,9 @@ export default function EditorPage() {
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
     const pendingSaveRef = useRef<SaveOptions | null>(null)
+    // F26-04: AbortController for the currently in-flight locale switch.
+    // Rapid switches (EN→MS→EN) cancel the previous one so partial state never lands.
+    const localeSwitchAbortRef = useRef<AbortController | null>(null)
 
     const { isOnline, isSyncing } = useConnectivity()
     const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
@@ -176,9 +179,14 @@ export default function EditorPage() {
     // F-26: Multilingual locale
     const siteLocale = useEditorStore(state => state.siteLocale)
     const activeLocale = useEditorStore(state => state.activeLocale)
+    const primaryLocale = useEditorStore(state => state.primaryLocale)
+    const generationLocale = useEditorStore(state => state.generationLocale)
+    const pendingLocale = useEditorStore(state => state.pendingLocale)
     const localeOverrides = useEditorStore(state => state.localeOverrides)
     const setActiveLocale = useEditorStore(state => state.setActiveLocale)
     const setSiteLocale = useEditorStore(state => state.setSiteLocale)
+    const setPrimaryLocale = useEditorStore(state => state.setPrimaryLocale)
+    const setPendingLocale = useEditorStore(state => state.setPendingLocale)
     const setLocaleOverride = useEditorStore(state => state.setLocaleOverride)
     const initLocaleFromBlock = useEditorStore(state => state.initLocaleFromBlock)
 
@@ -296,12 +304,23 @@ export default function EditorPage() {
                     : null
                 init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, normalizedGb)
 
-                // F-26: siteLocale = generationLocale (which language flat blocks are stored in, immutable).
-                // activeLocale = Sites.locale (user's preferred locale, can differ after confirm/switch).
-                const siteLocale = (data.site?.generationLocale as SiteLocale) || (data.site?.locale as SiteLocale) || 'en'
-                const activeLocale = (data.site?.locale as SiteLocale) || siteLocale
+                // F-26: siteLocale = EN/MS translation slot (Sites.locale).
+                // generationLocale = actual ISO 639-1 code AI generated in (may be 'vi', 'el', etc.).
+                // activeLocale defaults to native view (generationLocale) so user opens editor in
+                // the language base blocks are authored in — no waiting on translation.
+                const rawGenerationLocale = data.site?.generationLocale || (data.site?.locale as string) || 'en'
+                const siteLocale = (['en', 'ms'] as string[]).includes(rawGenerationLocale)
+                    ? rawGenerationLocale as SiteLocale
+                    : (data.site?.locale as SiteLocale) || 'en'
+                const activeLocale = rawGenerationLocale
                 useEditorStore.getState().setSiteLocale(siteLocale)
                 useEditorStore.getState().setActiveLocale(activeLocale)
+                useEditorStore.getState().setGenerationLocale(rawGenerationLocale)
+                // primaryLocale defaults to source language (gen) — user changes via Make Default
+                useEditorStore.getState().setPrimaryLocale(rawGenerationLocale)
+                // F26-04: force-clear pendingLocale so navigation between sites doesn't carry
+                // over stale translation state from previous editor session.
+                useEditorStore.getState().setPendingLocale(null)
 
                 // F-26: Hydrate localeOverrides from persisted locale_content (always reset to avoid page-switch bleed)
                 const persistedLocaleContent = data.page?.localeContent as Record<string, Record<SiteLocale, Record<string, unknown>>> | undefined
@@ -380,7 +399,7 @@ export default function EditorPage() {
         }
 
         const snapshot = useEditorStore.getState()
-        const currentBlocks = snapshot.blocks
+        const currentBlocks = snapshot.getDisplayBlocks()
         const currentTheme = snapshot.theme
         // Use pageId from store snapshot (not from closure) to prevent race condition
         // when page switch happens during auto-save
@@ -403,9 +422,24 @@ export default function EditorPage() {
                 body: JSON.stringify({
                     blocks: currentBlocks,
                     theme: currentTheme,
-                    headerBlock: snapshot.headerBlock,
-                    footerBlock: snapshot.footerBlock,
-                    ...(snapshot.globalBlocks !== null && { globalBlocks: snapshot.globalBlocks }),
+                    // F26-04: header/footer also serialized in display-locale so public site
+                    // renders the chosen language without needing locale resolution on read.
+                    headerBlock: snapshot.headerBlock ? snapshot.getDisplayBlock(snapshot.headerBlock) : null,
+                    footerBlock: snapshot.footerBlock ? snapshot.getDisplayBlock(snapshot.footerBlock) : null,
+                    // F26-04: global blocks also serialized in display locale
+                    ...(snapshot.globalBlocks !== null && {
+                        globalBlocks: {
+                            cartWidget: snapshot.globalBlocks.cartWidget
+                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.cartWidget)
+                                : null,
+                            whatsappButton: snapshot.globalBlocks.whatsappButton
+                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.whatsappButton)
+                                : null,
+                            socialWidget: snapshot.globalBlocks.socialWidget
+                                ? snapshot.getDisplayBlock(snapshot.globalBlocks.socialWidget)
+                                : null,
+                        },
+                    }),
                     // F-26: Persist locale overrides alongside blocks
                     ...(Object.keys(snapshot.localeOverrides).length > 0 && { localeContent: snapshot.localeOverrides }),
                     // F-26: Persist activeLocale so reload restores the correct locale (only en/ms supported by Sites.locale)
@@ -492,10 +526,27 @@ export default function EditorPage() {
         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_PAGES', pages })
     }, [pages])
 
+    // F26-04: Sync locale state to preview iframe so header language switcher reflects active locale.
+    // generationLocale included in deps — fires after loadData populates the non-EN/MS source code
+    // so the iframe's NavLangSwitcherPlaceholder renders all 3 options (gen + EN + MS).
+    useEffect(() => {
+        previewFrameSendRef.current?.sendToIframe({
+            type: 'UPDATE_LOCALE',
+            activeLocale,
+            generationLocale,
+            siteLocale,
+        })
+    }, [activeLocale, siteLocale, generationLocale])
+
     // Sync globalBlocks changes to preview iframe (covers all mutation paths: add, delete, undo, redo, settings).
     useEffect(() => {
         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks })
     }, [globalBlocks])
+
+    // F26-04: Abort any in-flight locale switch on unmount so its .then() doesn't write to a stale store.
+    useEffect(() => {
+        return () => { localeSwitchAbortRef.current?.abort() }
+    }, [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -644,18 +695,19 @@ export default function EditorPage() {
 
     // F-26: Auto-translate header or footer block into target locale if not already cached.
     // Stores translation in block._localeContent[locale] (no history entry — silent background op).
+    // F26-04: AbortSignal cancels in-flight fetch when caller's switch is superseded.
     const translateGlobalBlock = useCallback(async (
         block: BlockData,
         blockTypeKey: string,
         locale: SiteLocale,
         applyFn: (patch: Record<string, unknown>) => void,
+        signal?: AbortSignal,
     ) => {
         const existing = (block as Record<string, unknown>)._localeContent as
             | Record<string, Record<string, unknown>>
             | undefined
         if (existing?.[locale] && Object.keys(existing[locale]).length > 0) return
 
-        // Extract translatable string fields only — skip structural/config/id fields
         const SKIP = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent'])
         const translatableContent = Object.fromEntries(
             Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
@@ -666,24 +718,95 @@ export default function EditorPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
+                signal,
                 body: JSON.stringify({ blockType: blockTypeKey, targetLocale: locale, content: translatableContent }),
             })
-            if (!res.ok) return
+            if (!res.ok || signal?.aborted) return
             const { translated } = await res.json() as { translated: Record<string, unknown> }
+            // Re-check abort after parse — a newer switch may have superseded this flow.
+            if (signal?.aborted) return
             const newLocaleContent = { ...(existing ?? {}), [locale]: translated }
             applyFn({ _localeContent: newLocaleContent })
         } catch {
-            // Non-fatal — show original content as fallback
+            // AbortError or non-fatal network — show original content as fallback
         }
     }, [])
 
-    // F-26: Handle locale switch — persist Sites.locale immediately (no full save needed)
-    const handleLocaleSwitch = useCallback(async (locale: SiteLocale) => {
+    // F-26: Handle locale switch — accepts any ISO code; only persists/translates for EN/MS.
+    // Switching to generationLocale (native view) bypasses translation since base blocks
+    // are already in that language.
+    const handleLocaleSwitch = useCallback(async (locale: string) => {
         if (!siteId) return
+        const isStandard = locale === 'en' || locale === 'ms'
+
+        // F26-04: Cancel any in-flight switch so rapid clicks (EN→MS→EN) don't race.
+        // Each handleLocaleSwitch call gets its own controller; only the latest one is
+        // allowed to clear pendingLocale or apply translations.
+        localeSwitchAbortRef.current?.abort()
+        const switchController = new AbortController()
+        localeSwitchAbortRef.current = switchController
+
+        // F26-04 fix: Before switching AWAY from native view, snapshot current content
+        // into per-block locale slots so save (which uses getDisplayBlocks merged with
+        // translation) doesn't overwrite the original source language permanently.
+        const preState = useEditorStore.getState()
+        const genLocale = preState.generationLocale || preState.siteLocale
+        if (preState.activeLocale === genLocale && locale !== genLocale) {
+            const SKIP = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', '_localeContent', '__localeInit'])
+            const extractContent = (block: BlockData) =>
+                Object.fromEntries(
+                    Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
+                )
+
+            // Body blocks → localeOverrides[id][gen]
+            preState.blocks.forEach((block) => {
+                if (!block.id) return
+                const existing = preState.localeOverrides[block.id as string]?.[genLocale]
+                if (existing && Object.keys(existing).length > 0) return
+                const content = extractContent(block)
+                if (Object.keys(content).length > 0) {
+                    setLocaleOverride(block.id as string, genLocale, content)
+                }
+            })
+
+            // Header/footer/globals → block._localeContent[gen]
+            const snapshotEmbedded = (block: BlockData) => {
+                const existing = (block as Record<string, unknown>)._localeContent as
+                    | Record<string, Record<string, unknown>> | undefined
+                if (existing?.[genLocale] && Object.keys(existing[genLocale]).length > 0) return null
+                const content = extractContent(block)
+                if (Object.keys(content).length === 0) return null
+                return { ...(existing ?? {}), [genLocale]: content }
+            }
+            if (preState.headerBlock) {
+                const next = snapshotEmbedded(preState.headerBlock)
+                if (next) useEditorStore.getState().updateHeaderBlock({ _localeContent: next })
+            }
+            if (preState.footerBlock) {
+                const next = snapshotEmbedded(preState.footerBlock)
+                if (next) useEditorStore.getState().updateFooterBlock({ _localeContent: next })
+            }
+            if (preState.globalBlocks) {
+                (['cartWidget', 'whatsappButton', 'socialWidget'] as const).forEach((key) => {
+                    const gb = preState.globalBlocks?.[key]
+                    if (!gb) return
+                    const next = snapshotEmbedded(gb)
+                    if (next) useEditorStore.getState().updateGlobalBlock(key, { _localeContent: next })
+                })
+            }
+        }
+
         setActiveLocale(locale)
-        // Re-render preview immediately with whatever locale content is already cached
+        // F26-04: notify iframe of locale change so language switcher flag stays in sync.
+        previewFrameSendRef.current?.sendToIframe({
+            type: 'UPDATE_LOCALE',
+            activeLocale: locale,
+            generationLocale: useEditorStore.getState().generationLocale,
+            siteLocale: useEditorStore.getState().siteLocale,
+        })
+        // Re-render preview iframe with content in the new locale (both standard + native).
         setTimeout(() => {
-            const { blocks: currentBlocks, getDisplayBlock, headerBlock, footerBlock } = useEditorStore.getState()
+            const { blocks: currentBlocks, getDisplayBlock, headerBlock, footerBlock, globalBlocks } = useEditorStore.getState()
             const displayBlocks = currentBlocks.map(b => getDisplayBlock(b))
             previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: displayBlocks })
             if (headerBlock) {
@@ -692,16 +815,34 @@ export default function EditorPage() {
             if (footerBlock) {
                 previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: getDisplayBlock(footerBlock) })
             }
+            if (globalBlocks) {
+                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks })
+            }
         }, 0)
+        // Native locale → base block is already the target language; no translation needed.
+        // Immediate save persists the new active locale's display blocks to DB so
+        // /preview and public sources don't show stale content until next auto-save.
+        if (!isStandard) {
+            useEditorStore.setState({ hasUnsavedChanges: true })
+            void saveWithRetry({ showToast: false, refreshPreview: false })
+            return
+        }
+        // Standard locale: mark pending so UI shows "Adding…" until translation completes.
+        // Preview/Publish buttons remain disabled via pendingLocale → UI guarantees DB consistency
+        // before user can navigate to /preview. Existing Saving indicator covers visual feedback.
+        setPendingLocale(locale)
 
-        // Auto-translate header/footer if locale content not yet cached, then re-send to iframe
+        // Auto-translate header/footer if locale content not yet cached, then re-send to iframe.
+        // Collected as promises so we can await everything before clearing pendingLocale.
         const state = useEditorStore.getState()
+        const translationPromises: Array<Promise<unknown>> = []
         if (state.headerBlock) {
-            void translateGlobalBlock(
+            translationPromises.push(translateGlobalBlock(
                 state.headerBlock,
                 `navigation-${siteId}`,
-                locale,
+                locale as SiteLocale,
                 (patch) => {
+                    if (switchController.signal.aborted) return
                     useEditorStore.getState().updateHeaderBlock(patch)
                     const updated = useEditorStore.getState().headerBlock
                     if (updated) {
@@ -711,14 +852,40 @@ export default function EditorPage() {
                         })
                     }
                 },
-            )
+                switchController.signal,
+            ))
+        }
+        const gb = state.globalBlocks
+        if (gb) {
+            (['cartWidget', 'whatsappButton', 'socialWidget'] as const).forEach((key) => {
+                const block = gb[key]
+                if (!block) return
+                translationPromises.push(translateGlobalBlock(
+                    block,
+                    `${key}-${siteId}`,
+                    locale as SiteLocale,
+                    (patch) => {
+                        if (switchController.signal.aborted) return
+                        useEditorStore.getState().updateGlobalBlock(key, patch)
+                        const updatedGb = useEditorStore.getState().globalBlocks
+                        if (updatedGb) {
+                            previewFrameSendRef.current?.sendToIframe({
+                                type: 'UPDATE_GLOBAL_BLOCKS',
+                                globalBlocks: updatedGb,
+                            })
+                        }
+                    },
+                    switchController.signal,
+                ))
+            })
         }
         if (state.footerBlock) {
-            void translateGlobalBlock(
+            translationPromises.push(translateGlobalBlock(
                 state.footerBlock,
                 `footer-${siteId}`,
-                locale,
+                locale as SiteLocale,
                 (patch) => {
+                    if (switchController.signal.aborted) return
                     useEditorStore.getState().updateFooterBlock(patch)
                     const updated = useEditorStore.getState().footerBlock
                     if (updated) {
@@ -728,10 +895,72 @@ export default function EditorPage() {
                         })
                     }
                 },
-            )
+                switchController.signal,
+            ))
         }
 
-        // Persist the new locale to Sites.locale so AI gen uses the correct locale
+        // F26-04: Auto-translate body blocks that have no localeOverride for the new locale.
+        // Skips blocks already translated (cached in localeOverrides) for instant switch back.
+        const SKIP_FIELDS = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent', '__localeInit'])
+        translationPromises.push(Promise.all(state.blocks.map(async (block) => {
+            if (!block.id) return
+            const existingOverride = state.localeOverrides[block.id as string]?.[locale]
+            if (existingOverride && Object.keys(existingOverride).length > 0) return
+
+            const translatable = Object.fromEntries(
+                Object.entries(block as Record<string, unknown>).filter(([k, v]) =>
+                    !SKIP_FIELDS.has(k) && (typeof v === 'string' || Array.isArray(v) || (v !== null && typeof v === 'object'))
+                ),
+            )
+            if (Object.keys(translatable).length === 0) return
+
+            try {
+                const res = await fetch('/api/ai/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    signal: switchController.signal,
+                    body: JSON.stringify({
+                        blockType: String(block.blockType || ''),
+                        targetLocale: locale,
+                        content: translatable,
+                    }),
+                })
+                if (!res.ok || switchController.signal.aborted) return
+                const { translated } = await res.json() as { translated?: Record<string, unknown> }
+                if (!translated || Object.keys(translated).length === 0) return
+                // F26-04: re-check aborted before persisting — stale flow must not write.
+                if (switchController.signal.aborted) return
+                setLocaleOverride(block.id as string, locale, translated)
+            } catch {
+                // AbortError or non-fatal network — block stays in original language
+            }
+        })))
+
+        // Await all translations (header + footer + global + body), then push refreshed
+        // layout to preview, persist to DB, and clear pending state so UI exits "Adding…".
+        void Promise.all(translationPromises).then(async () => {
+            // F26-04: If a newer switch superseded this one, drop the work — don't ship
+            // partial state from a stale flow. The newer flow will clear pendingLocale.
+            if (switchController.signal.aborted) return
+
+            const { blocks: nb, getDisplayBlock: gd } = useEditorStore.getState()
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_FULL_LAYOUT',
+                bodyBlocks: nb.map(b => gd(b)),
+            })
+            // F26-04: Persist translated state to DB so /preview and /sites/{slug}
+            // render the chosen language on next load.
+            await saveWithRetry({ showToast: false, refreshPreview: false })
+            if (switchController.signal.aborted) return
+            // Only the currently-active switch may clear pending state.
+            if (localeSwitchAbortRef.current === switchController) {
+                setPendingLocale(null)
+            }
+        })
+
+        // Persist new locale to Sites.locale + mark unsaved so flushSavesBeforePublish
+        // calls handleSave (which uses getDisplayBlocks) before promoting to published.
         try {
             await fetch(`/api/sites/${siteId}/save`, {
                 method: 'PATCH',
@@ -742,7 +971,10 @@ export default function EditorPage() {
         } catch {
             // Non-fatal — locale preference stored in memory until next save
         }
-    }, [siteId, setActiveLocale, translateGlobalBlock])
+        // Mark dirty so publish flow re-saves with the new locale's display blocks (fix: Greek site → switch MS → publish → shows MS)
+        useEditorStore.setState({ hasUnsavedChanges: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveWithRetry declared after this; refs are stable
+    }, [siteId, setActiveLocale, setPendingLocale, translateGlobalBlock, setLocaleOverride])
 
     // F-26-04: Translate a specific block instance (called after block drop when needsTranslation)
     const handleAutoTranslateBlock = useCallback(async (blockId: string, blockType: string) => {
@@ -935,7 +1167,9 @@ export default function EditorPage() {
                 siteName: siteName || site?.name || '',
                 theme,
                 requestedType: blockData.blockType,
-                locale: (site?.locale as 'en' | 'ms') ?? 'en',
+                // Block normalized to match the currently-viewed locale; non-standard codes
+                // (e.g. 'vi') fall back to 'en' since template defaults are EN/MS only.
+                locale: activeLocale === 'ms' ? 'ms' : 'en',
             },
             blockData as Record<string, unknown>
         )
@@ -1020,7 +1254,9 @@ export default function EditorPage() {
                         requestedType: String(action.block?.blockType || ''),
                         siteName: siteName || site?.name || '',
                         theme,
-                        locale: (site?.locale as 'en' | 'ms') ?? 'en',
+                        // Block normalized to match the currently-viewed locale; non-standard codes
+                // (e.g. 'vi') fall back to 'en' since template defaults are EN/MS only.
+                locale: activeLocale === 'ms' ? 'ms' : 'en',
                     },
                     action.block,
                 )
@@ -1140,6 +1376,31 @@ export default function EditorPage() {
     // Prevents publish from reading a stale draft when the user clicks Publish
     // immediately after a variant/block change (race: saveWithRetry is async/fire-and-forget).
     const flushSavesBeforePublish = useCallback(async (): Promise<boolean> => {
+        // F26-04: Wait for in-flight locale translation/save before publishing — otherwise
+        // partial _localeContent / localeOverrides ship and public site renders stale content.
+        const wasPending = !!useEditorStore.getState().pendingLocale
+        if (wasPending) {
+            const ok = await new Promise<boolean>((resolve) => {
+                const deadline = Date.now() + 30_000
+                const check = setInterval(() => {
+                    if (!useEditorStore.getState().pendingLocale) {
+                        clearInterval(check)
+                        resolve(true)
+                    } else if (Date.now() > deadline) {
+                        clearInterval(check)
+                        resolve(false)
+                    }
+                }, 100)
+            })
+            // Timeout → block publish, don't silently ship partial state.
+            if (!ok) {
+                toast.error('Translation in progress. Please wait and try again.')
+                return false
+            }
+            // Force re-save with fully-translated state to guarantee header/footer/globals
+            // hit DB in the chosen language before publish reads them.
+            useEditorStore.setState({ hasUnsavedChanges: true })
+        }
         // Poll until in-flight save finishes (max 10s)
         if (isSavingRef.current) {
             await new Promise<void>((resolve) => {
@@ -1172,6 +1433,11 @@ export default function EditorPage() {
 
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
+        // F26-04: Block publish while translation in flight to prevent shipping mixed-language content.
+        if (useEditorStore.getState().pendingLocale) {
+            toast.error('Translation in progress. Please wait until "Adding…" completes before publishing.')
+            return
+        }
 
         setIsPublishing(true)
         const currentlyPublished = site?.status === 'published'
@@ -1185,13 +1451,26 @@ export default function EditorPage() {
 
             // Send current store state so publish route uses authoritative client values
             // rather than relying on pending DB reads (unreliable if migration missing).
-            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
+            // F26-04: serialize header/footer in current display locale so published page
+            // renders in the chosen language (not the base/source language).
+            const snap = useEditorStore.getState()
+            const headerForPublish = snap.headerBlock ? snap.getDisplayBlock(snap.headerBlock) : null
+            const footerForPublish = snap.footerBlock ? snap.getDisplayBlock(snap.footerBlock) : null
+            const globalBlocksForPublish = snap.globalBlocks ? {
+                cartWidget: snap.globalBlocks.cartWidget ? snap.getDisplayBlock(snap.globalBlocks.cartWidget) : null,
+                whatsappButton: snap.globalBlocks.whatsappButton ? snap.getDisplayBlock(snap.globalBlocks.whatsappButton) : null,
+                socialWidget: snap.globalBlocks.socialWidget ? snap.getDisplayBlock(snap.globalBlocks.socialWidget) : null,
+            } : null
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: currentlyPublished ? 'DELETE' : 'PATCH',
                 credentials: 'include',
                 ...(currentlyPublished ? {} : {
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap }),
+                    body: JSON.stringify({
+                        globalBlocks: globalBlocksForPublish,
+                        headerBlock: headerForPublish,
+                        footerBlock: footerForPublish,
+                    }),
                 }),
             })
 
@@ -1287,6 +1566,11 @@ export default function EditorPage() {
     // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
     const handleRepublish = useCallback(async () => {
         if (!siteId || isPublishing) return
+        // F26-04: Block re-publish while translation in flight (same guard as handlePublish).
+        if (useEditorStore.getState().pendingLocale) {
+            toast.error('Translation in progress. Please wait until "Adding…" completes before publishing.')
+            return
+        }
 
         setIsPublishing(true)
         try {
@@ -1569,6 +1853,7 @@ export default function EditorPage() {
                 onPublish={() => setIsPublishModalOpen(true)}
                 onRepublish={handleRepublish}
                 onUnpublish={() => setIsUnpublishModalOpen(true)}
+                pendingLocale={pendingLocale}
                 onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
                 onCopyLink={() => {
                     if (siteUrl) {
@@ -1642,15 +1927,53 @@ export default function EditorPage() {
                                     currentPageId={currentPageId}
                                     siteLocale={siteLocale}
                                     activeLocale={activeLocale}
+                                    generationLocale={site?.generationLocale ?? siteLocale}
+                                    primaryLocale={primaryLocale}
+                            pendingLocale={pendingLocale}
                                     navShowLanguageSwitcher={Boolean((headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher)}
                                     onNavLanguageSwitcherChange={(show) => {
-                                        updateHeaderBlock({ showLanguageSwitcher: show })
-                                        const updatedHeader = useEditorStore.getState().headerBlock
-                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
-                                        if (!show) void handleLocaleSwitch(siteLocale as SiteLocale)
+                                        // Strip showLanguageSwitcher from any cached _localeContent slot
+                                        // so merged display reflects the current toggle (not stale snapshot).
+                                        const currentHeader = useEditorStore.getState().headerBlock as Record<string, unknown> | null
+                                        const lc = currentHeader?._localeContent as Record<string, Record<string, unknown>> | undefined
+                                        let cleanedLc: typeof lc | undefined = lc
+                                        if (lc) {
+                                            cleanedLc = Object.fromEntries(
+                                                Object.entries(lc).map(([k, v]) => {
+                                                    const copy = { ...v }
+                                                    delete copy.showLanguageSwitcher
+                                                    return [k, copy]
+                                                }),
+                                            )
+                                        }
+                                        updateHeaderBlock({
+                                            showLanguageSwitcher: show,
+                                            ...(cleanedLc !== undefined && { _localeContent: cleanedLc }),
+                                        })
+                                        const refreshHeader = () => {
+                                            const h = useEditorStore.getState().headerBlock
+                                            if (h) previewFrameSendRef.current?.sendToIframe({
+                                                type: 'UPDATE_HEADER_BLOCK',
+                                                blockData: useEditorStore.getState().getDisplayBlock(h),
+                                            })
+                                        }
+                                        refreshHeader()
+                                        if (!show) {
+                                            void handleLocaleSwitch(siteLocale as SiteLocale)
+                                            setTimeout(refreshHeader, 50)
+                                        }
                                         void saveWithRetry({ showToast: false, refreshPreview: false })
                                     }}
                                     onLocaleSwitch={(locale) => { void handleLocaleSwitch(locale as SiteLocale) }}
+                                    onMakePrimary={(locale) => {
+                                        setPrimaryLocale(locale)
+                                        if (locale === 'en' || locale === 'ms') {
+                                            setSiteLocale(locale as SiteLocale)
+                                        }
+                                        // Always switch active display so preview reflects the new primary,
+                                        // including non-standard locales (vi, el, etc.) which return base content.
+                                        void handleLocaleSwitch(locale)
+                                    }}
                                     onThemeChange={handleThemeChange}
                                     onBlockFieldChange={handleBlockFieldChange}
                                     onBlockUpdate={handleBlockUpdate}
@@ -1779,7 +2102,19 @@ export default function EditorPage() {
                                 }
                                 if (hadPending) void saveWithRetry({ showToast: false, refreshPreview: false })
                             }}
-                            onHandleReady={(handle) => { previewFrameSendRef.current = handle }}
+                            onHandleReady={(handle) => {
+                                previewFrameSendRef.current = handle
+                                // F26-04: sync locale on iframe ready so header switcher matches site language immediately
+                                if (handle) {
+                                    const s = useEditorStore.getState()
+                                    handle.sendToIframe({
+                                        type: 'UPDATE_LOCALE',
+                                        activeLocale: s.activeLocale,
+                                        generationLocale: s.generationLocale,
+                                        siteLocale: s.siteLocale,
+                                    })
+                                }
+                            }}
                             onLocaleSwitch={(locale) => { void handleLocaleSwitch(locale as SiteLocale) }}
                         />
                     </div>
@@ -1804,15 +2139,48 @@ export default function EditorPage() {
                             currentPageId={currentPageId}
                             siteLocale={siteLocale}
                             activeLocale={activeLocale}
+                            generationLocale={site?.generationLocale ?? siteLocale}
+                            primaryLocale={primaryLocale}
                             navShowLanguageSwitcher={Boolean((headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher)}
                             onNavLanguageSwitcherChange={(show) => {
-                                updateHeaderBlock({ showLanguageSwitcher: show })
-                                const updatedHeader = useEditorStore.getState().headerBlock
-                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
-                                if (!show) void handleLocaleSwitch(siteLocale as SiteLocale)
+                                const currentHeader = useEditorStore.getState().headerBlock as Record<string, unknown> | null
+                                const lc = currentHeader?._localeContent as Record<string, Record<string, unknown>> | undefined
+                                let cleanedLc: typeof lc | undefined = lc
+                                if (lc) {
+                                    cleanedLc = Object.fromEntries(
+                                        Object.entries(lc).map(([k, v]) => {
+                                            const copy = { ...v }
+                                            delete copy.showLanguageSwitcher
+                                            return [k, copy]
+                                        }),
+                                    )
+                                }
+                                updateHeaderBlock({
+                                    showLanguageSwitcher: show,
+                                    ...(cleanedLc !== undefined && { _localeContent: cleanedLc }),
+                                })
+                                const refreshHeader = () => {
+                                    const h = useEditorStore.getState().headerBlock
+                                    if (h) previewFrameSendRef.current?.sendToIframe({
+                                        type: 'UPDATE_HEADER_BLOCK',
+                                        blockData: useEditorStore.getState().getDisplayBlock(h),
+                                    })
+                                }
+                                refreshHeader()
+                                if (!show) {
+                                    void handleLocaleSwitch(siteLocale as SiteLocale)
+                                    setTimeout(refreshHeader, 50)
+                                }
                                 void saveWithRetry({ showToast: false, refreshPreview: false })
                             }}
                             onLocaleSwitch={(locale) => { void handleLocaleSwitch(locale as SiteLocale) }}
+                            onMakePrimary={(locale) => {
+                                setPrimaryLocale(locale)
+                                if (locale === 'en' || locale === 'ms') {
+                                    setSiteLocale(locale as SiteLocale)
+                                }
+                                void handleLocaleSwitch(locale)
+                            }}
                             onThemeChange={handleThemeChange}
                             onBlockFieldChange={handleBlockFieldChange}
                             onBlockUpdate={handleBlockUpdate}

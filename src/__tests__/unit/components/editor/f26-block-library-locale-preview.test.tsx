@@ -190,7 +190,9 @@ describe('[TC-F26-03] Block Library Locale-Aware Preview', () => {
 	// TC-F26-03-02: activeLocale='ms', block WITHOUT BM content
 	// ────────────────────────────────────────────────────────────────────────
 
-	it('TC-F26-03-02: shows needsTranslation badge when activeLocale=ms but block missing BM content', () => {
+	it('TC-F26-03-02: ✨ AI badge removed — auto-translate now silent on block drop', () => {
+		// F26 update: yellow "✨ AI" badge removed from BlockLibraryPanel.
+		// Auto-translate now happens silently when block is added (no user opt-in).
 		// Arrange
 		mockActiveLocale = 'ms'
 		vi.mocked(addSectionContent.hasLocaleContent).mockImplementation(
@@ -207,11 +209,9 @@ describe('[TC-F26-03] Block Library Locale-Aware Preview', () => {
 			/>
 		)
 
-		// Assert
-		// custom-html block should have needsTranslation=true when locale='ms'
+		// Assert — no badge present anymore
 		const aiButtons = screen.queryAllByText(/✨ AI/)
-		// custom-html should trigger needsTranslation badge
-		expect(aiButtons.length).toBeGreaterThan(0)
+		expect(aiButtons.length).toBe(0)
 	})
 
 	// ────────────────────────────────────────────────────────────────────────
@@ -287,10 +287,12 @@ describe('[TC-F26-03] Block Library Locale-Aware Preview', () => {
 	})
 
 	// ────────────────────────────────────────────────────────────────────────
-	// TC-F26-03-05: ✨ AI button stopPropagation (block not added)
+	// TC-F26-03-05: ✨ AI button removed — no in-library translation affordance
 	// ────────────────────────────────────────────────────────────────────────
 
-	it('TC-F26-03-05: AI translation button calls stopPropagation and does not add block', () => {
+	it('TC-F26-03-05: ✨ AI button no longer rendered (auto-translate is silent)', () => {
+		// F26 update: removed user-facing translate button in BlockLibraryPanel.
+		// Translation now happens automatically when block is dropped.
 		// Arrange
 		mockActiveLocale = 'ms'
 		vi.mocked(addSectionContent.hasLocaleContent).mockImplementation(
@@ -307,21 +309,9 @@ describe('[TC-F26-03] Block Library Locale-Aware Preview', () => {
 			/>
 		)
 
-		// Find and click the AI button
+		// Assert — button is gone
 		const aiButtons = screen.queryAllByText(/✨ AI/)
-		expect(aiButtons.length).toBeGreaterThan(0)
-
-		// Click the AI button and verify stopPropagation was called
-		const clickEvent = new MouseEvent('click', { bubbles: true })
-		const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation')
-		if (aiButtons.length > 0) {
-			fireEvent.click(aiButtons[0])
-		}
-
-		// Assert
-		// onAIAction should NOT be called when AI button is clicked
-		// (because stopPropagation prevents the parent button click)
-		expect(mockOnAIAction).not.toHaveBeenCalled()
+		expect(aiButtons.length).toBe(0)
 	})
 
 	// ────────────────────────────────────────────────────────────────────────
@@ -436,12 +426,10 @@ describe('[TC-F26-03] Block Library Locale-Aware Preview', () => {
 			/>
 		)
 
-		// Assert
-		// Should still show EN description as fallback
+		// Assert — EN fallback shown; ✨ AI badge removed (F26 update)
 		expect(screen.getByText(/Custom HTML block/)).toBeInTheDocument()
-		// Should mark as needing translation
 		const aiButtons = screen.queryAllByText(/✨ AI/)
-		expect(aiButtons.length).toBeGreaterThan(0)
+		expect(aiButtons.length).toBe(0)
 	})
 
 	// ────────────────────────────────────────────────────────────────────────

@@ -119,20 +119,17 @@ describe('POST /api/ai/translate', () => {
         })
     })
 
-    // TC-F26-04-08: Invalid targetLocale 'en'
-    describe('TC-F26-04-08: invalid targetLocale "en" → 400 validation error', () => {
-        it('returns 400 VALIDATION_ERROR when targetLocale is "en" (not in enum)', async () => {
+    // TC-F26-04-08: targetLocale 'en' accepted (F26 multilingual — translating non-EN site to EN)
+    describe('TC-F26-04-08: targetLocale "en" accepted as valid translation target', () => {
+        it('accepts targetLocale "en" since EN sites can now be source for VI/EL/etc.', async () => {
             // Arrange
             const req = makeRequest({ ...VALID_BODY, targetLocale: 'en' })
 
             // Act
             const res = await TranslatePOST(req)
-            const body = await res.json()
 
-            // Assert
-            expect(res.status).toBe(400)
-            expect(body.error.code).toBe('VALIDATION_ERROR')
-            expect(body.error.details.fieldErrors).toHaveProperty('targetLocale')
+            // Assert — not rejected as validation error
+            expect(res.status).not.toBe(400)
         })
     })
 

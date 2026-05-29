@@ -46,11 +46,11 @@ describe('NavLangSwitcherPlaceholder', () => {
         expect(trigger).toHaveAttribute('aria-expanded', 'false')
     })
 
-    it('opens dropdown on trigger click', () => {
-        // TC-ID: F26-07-01-open-on-click
+    it('opens dropdown on hover', () => {
+        // TC-ID: F26-07-01-open-on-hover
         render(<NavLangSwitcherPlaceholder />)
 
-        fireEvent.click(screen.getByRole('button'))
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher'))
 
         expect(screen.getByRole('listbox')).toBeInTheDocument()
         expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
@@ -59,7 +59,7 @@ describe('NavLangSwitcherPlaceholder', () => {
     it('shows both locale flag options inside dropdown', () => {
         // TC-ID: F26-07-01-dropdown-options
         render(<NavLangSwitcherPlaceholder />)
-        fireEvent.click(screen.getByRole('button'))
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher'))
 
         const options = screen.getAllByRole('option')
         expect(options).toHaveLength(2)
@@ -71,7 +71,7 @@ describe('NavLangSwitcherPlaceholder', () => {
         // TC-ID: F26-07-01-active-aria-selected
         useEditorStore.getState().setActiveLocale('en')
         render(<NavLangSwitcherPlaceholder />)
-        fireEvent.click(screen.getByRole('button'))
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher'))
 
         const options = screen.getAllByRole('option')
         expect(options[0]).toHaveAttribute('aria-selected', 'true')   // EN
@@ -85,8 +85,8 @@ describe('NavLangSwitcherPlaceholder', () => {
         window.parent.postMessage = (msg: unknown) => messages.push(msg)
 
         render(<NavLangSwitcherPlaceholder />)
-        fireEvent.click(screen.getByRole('button'))          // open
-        fireEvent.click(screen.getAllByRole('option')[1])    // click BM
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher')) // hover open
+        fireEvent.click(screen.getAllByRole('option')[1])                 // click BM
 
         expect(messages).toContainEqual({ type: 'SWITCH_LOCALE', locale: 'ms' })
         expect(screen.queryByRole('listbox')).not.toBeInTheDocument() // closed

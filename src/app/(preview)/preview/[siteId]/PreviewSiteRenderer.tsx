@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
+import { useEditorStore } from '@/store/editorStore'
 
 interface Props {
     site: SiteRendererProps['site']
@@ -93,6 +94,18 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             } else if (e.data?.type === 'UPDATE_GLOBAL_BLOCKS') {
                 const { globalBlocks } = e.data
                 setSiteState(prev => ({ ...prev, globalBlocks: globalBlocks ?? null }))
+            } else if (e.data?.type === 'UPDATE_LOCALE') {
+                // F26-04: sync iframe's editorStore so language switcher flag/state matches parent.
+                // Synchronous apply (no dynamic import) to avoid back-to-back UPDATE_LOCALE
+                // messages resolving out of order via Promise queue.
+                const { activeLocale, generationLocale, siteLocale } = e.data as {
+                    activeLocale?: string; generationLocale?: string; siteLocale?: string
+                }
+                if (typeof activeLocale === 'string') useEditorStore.getState().setActiveLocale(activeLocale)
+                if (typeof generationLocale === 'string') useEditorStore.getState().setGenerationLocale(generationLocale)
+                if (typeof siteLocale === 'string' && (siteLocale === 'en' || siteLocale === 'ms')) {
+                    useEditorStore.getState().setSiteLocale(siteLocale)
+                }
             }
         }
         window.addEventListener('message', onMessage)

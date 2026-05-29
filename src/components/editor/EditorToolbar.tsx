@@ -202,6 +202,8 @@ interface EditorToolbarProps {
     onViewportChange: (viewport: 'desktop' | 'mobile') => void
     /** F-26: Optional language switcher rendered near workspace controls */
     languageSwitcherSlot?: React.ReactNode
+    /** F26-04: When set, translation is in flight — disable Preview/Publish until null. */
+    pendingLocale?: string | null
 }
 
 export function EditorToolbar({
@@ -236,9 +238,19 @@ export function EditorToolbar({
     wasPublished,
     onViewportChange,
     languageSwitcherSlot,
+    pendingLocale,
 }: EditorToolbarProps) {
     const { t } = useI18n()
     const et = t.editor.toolbar
+
+    // F26-04: Preview/Publish disabled while translation or save in flight so users can't
+    // open a tab against stale DB state. Once everything settles, buttons re-enable.
+    const previewDisabled = !!pendingLocale || isSaving || hasUnsavedChanges
+    const previewDisabledTitle = pendingLocale
+        ? `Translating to ${pendingLocale === 'ms' ? 'Malay' : 'English'}… Preview will be available when complete.`
+        : (isSaving || hasUnsavedChanges)
+            ? 'Saving changes… Preview will be available when complete.'
+            : et.preview
     const vm = t.editor.viewLiveMenu
     const mt = t.editor.maintenance
     const selectablePages = pages.filter(page => !page.deletedAt)
@@ -285,16 +297,28 @@ export function EditorToolbar({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white">
-                        <a
-                            href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={et.preview}
+                    {previewDisabled ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled
+                            title={previewDisabledTitle}
+                            className="h-8 w-8 rounded-lg text-slate-500 cursor-not-allowed opacity-50"
                         >
                             <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        </a>
-                    </Button>
+                        </Button>
+                    ) : (
+                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white">
+                            <a
+                                href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={et.preview}
+                            >
+                                <SquareArrowOutUpRight className="h-3.5 w-3.5" />
+                            </a>
+                        </Button>
+                    )}
 
                     {isPublished && siteUrl ? (
                         <>
@@ -486,17 +510,30 @@ export function EditorToolbar({
                     )
                 })()}
 
-                <Button variant="ghost" size="sm" asChild className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-300 transition-all hover:bg-white/[0.06] hover:text-white min-[1366px]:px-3">
-                    <a
-                        href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={et.preview}
+                {previewDisabled ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled
+                        title={previewDisabledTitle}
+                        className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-500 cursor-not-allowed opacity-50 min-[1366px]:px-3"
                     >
                         <SquareArrowOutUpRight className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden min-[1366px]:inline">{et.preview}</span>
-                    </a>
-                </Button>
+                    </Button>
+                ) : (
+                    <Button variant="ghost" size="sm" asChild className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-300 transition-all hover:bg-white/[0.06] hover:text-white min-[1366px]:px-3">
+                        <a
+                            href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={et.preview}
+                        >
+                            <SquareArrowOutUpRight className="h-3.5 w-3.5 shrink-0" />
+                            <span className="hidden min-[1366px]:inline">{et.preview}</span>
+                        </a>
+                    </Button>
+                )}
 
                 {isPublished && siteUrl ? (
                     <>
