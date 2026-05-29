@@ -41,12 +41,16 @@ export const POST = withAuth(async (user: User, req: Request) => {
         return NextResponse.json({ error: 'No email address on your account' }, { status: 400 })
     }
 
-    // Rate limit: 5 sends per user per 60s — prevents SES abuse
+    // Rate limit: 5 sends per user per 60s — prevents SES abuse.
+    // Pipeline ensures NX+EX is atomic (no orphaned keys if server crashes after incr).
     if (redis) {
         try {
             const rlKey = `send-test-rl:${(user as any).id}`
-            const count = await redis.incr(rlKey)
-            if (count === 1) await redis.expire(rlKey, SEND_TEST_WINDOW_SECONDS)
+            const pipeline = redis.pipeline()
+            pipeline.set(rlKey, 0, { nx: true, ex: SEND_TEST_WINDOW_SECONDS })
+            pipeline.incr(rlKey)
+            const results = await pipeline.exec()
+            const count = results[1] as number
             if (count > SEND_TEST_RATE_LIMIT) {
                 return NextResponse.json({ error: 'Too many requests. Try again in a minute.' }, { status: 429 })
             }
