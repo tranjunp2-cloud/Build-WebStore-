@@ -32,52 +32,21 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
 
     describe('TC-F25-015: getShopCustomersAction — returns tenant customers', () => {
         it('TC-F25-015: Should return paginated customer list for current tenant', async () => {
-            // Arrange: mock getCurrentTenantId and getPayload
-            const tenantId = 'tenant-123'
+            // Arrange: default sort = latestOrderAt DESC → SQL path (Payload ORM cannot express NULLS LAST)
+            const tenantId = '123'
             mockedGetCurrentTenantId.mockResolvedValue(tenantId)
 
-            const mockCustomerDocs = [
-                {
-                    id: 1,
-                    email: 'customer1@example.com',
-                    name: 'Customer 1',
-                    phone: '+60111',
-                    rank: 'gold',
-                    notes: null,
-                    addresses: [],
-                    firstOrderAt: '2026-01-01T00:00:00Z',
-                    createdAt: '2026-01-01T00:00:00Z',
-                    updatedAt: '2026-05-20T00:00:00Z',
-                    tenant: tenantId,
-                },
-                {
-                    id: 2,
-                    email: 'customer2@example.com',
-                    name: 'Customer 2',
-                    phone: null,
-                    rank: 'silver',
-                    notes: null,
-                    addresses: [],
-                    firstOrderAt: '2026-02-01T00:00:00Z',
-                    createdAt: '2026-02-01T00:00:00Z',
-                    updatedAt: '2026-05-20T00:00:00Z',
-                    tenant: tenantId,
-                },
+            const customerRows = [
+                { id: 1, email: 'customer1@example.com', name: 'Customer 1', phone: '+60111', rank: 'gold', notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-05-20T00:00:00Z', latest_order_at: null, first_order_at: null },
+                { id: 2, email: 'customer2@example.com', name: 'Customer 2', phone: null, rank: 'silver', notes: null, created_at: '2026-02-01T00:00:00Z', updated_at: '2026-05-20T00:00:00Z', latest_order_at: null, first_order_at: null },
             ]
 
             const mockPayload = {
-                find: vi.fn()
-                    .mockResolvedValueOnce({
-                        // First call for customers
-                        docs: mockCustomerDocs,
-                        totalDocs: 2,
-                        totalPages: 1,
-                    })
-                    .mockResolvedValueOnce({
-                        // Second call for orders (stats)
-                        docs: [],
-                        totalDocs: 0,
-                    }),
+                db: { drizzle: { execute: vi.fn()
+                    .mockResolvedValueOnce({ rows: customerRows })    // data query
+                    .mockResolvedValueOnce({ rows: [{ total: 2 }] }) // count query
+                }},
+                find: vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 }), // fetchOrderStats
             }
 
             mockedGetPayload.mockResolvedValue(mockPayload)
@@ -85,23 +54,11 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
             // Act
             const result = await getShopCustomersAction({})
 
-            // Assert: correct structure and tenant filtering
+            // Assert: correct structure and data returned
             expect(result.data).toHaveLength(2)
             expect(result.meta.total).toBe(2)
             expect(result.data[0].email).toBe('customer1@example.com')
             expect(result.data[1].email).toBe('customer2@example.com')
-
-            // Assert: payload.find called with tenant filter
-            expect(mockPayload.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    collection: 'customers',
-                    where: expect.objectContaining({
-                        and: expect.arrayContaining([
-                            { tenant: { equals: tenantId } },
-                        ]),
-                    }),
-                })
-            )
         })
     })
 
@@ -142,8 +99,8 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
 
             mockedGetPayload.mockResolvedValue(mockPayload)
 
-            // Act
-            await getShopCustomersAction({ search: searchQuery })
+            // Act: explicit sortBy forces native Payload ORM path where WHERE assertions apply
+            await getShopCustomersAction({ search: searchQuery, sortBy: 'email' })
 
             // Assert: search filter in where clause
             expect(mockPayload.find).toHaveBeenCalledWith(
@@ -201,8 +158,8 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
 
             mockedGetPayload.mockResolvedValue(mockPayload)
 
-            // Act
-            await getShopCustomersAction({ rank: rankFilter })
+            // Act: explicit sortBy forces native Payload ORM path where WHERE assertions apply
+            await getShopCustomersAction({ rank: rankFilter, sortBy: 'email' })
 
             // Assert: rank filter in where clause
             expect(mockPayload.find).toHaveBeenCalledWith(
@@ -390,29 +347,64 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
         })
     })
 
+    describe('TC-F25-023: getShopCustomersAction — orderCount sort path', () => {
+        it('TC-F25-023: Should sort by order count via SQL JOIN (no fetchOrderStats call)', async () => {
+            // Arrange: sortBy='orderCount' → SQL LEFT JOIN path; stats computed inline, no payload.find
+            const tenantId = '1'
+            mockedGetCurrentTenantId.mockResolvedValue(tenantId)
+
+            const customerRows = [
+                { id: 2, email: 'top@test.com', name: 'Top Buyer', phone: null, rank: 'gold', notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', latest_order_at: '2026-05-01T00:00:00Z', first_order_at: null, order_count: 5, lifetime: 500, completed_count: 4, cancelled_count: 0 },
+                { id: 1, email: 'low@test.com', name: 'Low Buyer', phone: null, rank: null, notes: null, created_at: '2026-02-01T00:00:00Z', updated_at: '2026-02-01T00:00:00Z', latest_order_at: null, first_order_at: null, order_count: 1, lifetime: 100, completed_count: 1, cancelled_count: 0 },
+            ]
+
+            const mockPayload = {
+                db: { drizzle: { execute: vi.fn()
+                    .mockResolvedValueOnce({ rows: customerRows })   // data query
+                    .mockResolvedValueOnce({ rows: [{ total: 2 }] }) // count query
+                }},
+                find: vi.fn(),
+            }
+
+            mockedGetPayload.mockResolvedValue(mockPayload)
+
+            // Act
+            const result = await getShopCustomersAction({ sortBy: 'orderCount', sortDir: 'desc' })
+
+            // Assert: correct structure and inline stats
+            expect(result.data).toHaveLength(2)
+            expect(result.meta.total).toBe(2)
+            expect(result.data[0].email).toBe('top@test.com')
+            expect(result.data[0].orderCount).toBe(5)
+            expect(result.data[0].completedRate).toBe(80)   // 4/5
+            expect(result.data[0].failedRate).toBe(0)
+            expect(result.data[1].orderCount).toBe(1)
+            // Assert: payload.find NOT called — stats come from SQL JOIN, not fetchOrderStats
+            expect(mockPayload.find).not.toHaveBeenCalled()
+        })
+    })
+
     describe('TC-F25-022: rate formula — 2-decimal rounding + zero fallback', () => {
         it('TC-F25-022: Should compute completedRate and failedRate to 2 decimal places', async () => {
             // Arrange: 1 completed + 1 cancelled + 1 pending = 3 orders → 33.33%
-            const tenantId = 'tenant-rate'
+            // Default sort = latestOrderAt DESC → SQL path; fetchOrderStats via payload.find
+            const tenantId = '1'
             mockedGetCurrentTenantId.mockResolvedValue(tenantId)
 
-            const customerDoc = {
-                id: 1, email: 'rate@test.com', name: 'Rate Test',
-                phone: null, rank: null, notes: null, addresses: [],
-                firstOrderAt: null, createdAt: '2026-01-01T00:00:00Z',
-                updatedAt: '2026-01-01T00:00:00Z', tenant: tenantId,
-            }
+            const customerRow = { id: 1, email: 'rate@test.com', name: 'Rate Test', phone: null, rank: null, notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', latest_order_at: null, first_order_at: null }
             const mockPayload = {
-                find: vi.fn()
-                    .mockResolvedValueOnce({ docs: [customerDoc], totalDocs: 1, totalPages: 1 })
-                    .mockResolvedValueOnce({
-                        docs: [
-                            { customer: 1, status: 'completed', total: 100 },
-                            { customer: 1, status: 'cancelled', total: 100 },
-                            { customer: 1, status: 'pending',   total: 100 },
-                        ],
-                        totalDocs: 3,
-                    }),
+                db: { drizzle: { execute: vi.fn()
+                    .mockResolvedValueOnce({ rows: [customerRow] })   // data query
+                    .mockResolvedValueOnce({ rows: [{ total: 1 }] }) // count query
+                }},
+                find: vi.fn().mockResolvedValue({
+                    docs: [
+                        { customer: 1, status: 'completed', total: 100 },
+                        { customer: 1, status: 'cancelled', total: 100 },
+                        { customer: 1, status: 'pending',   total: 100 },
+                    ],
+                    totalDocs: 3,
+                }),
             }
             mockedGetPayload.mockResolvedValue(mockPayload)
 
@@ -425,20 +417,17 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
         })
 
         it('TC-F25-022: Should return 0 for both rates when customer has no orders', async () => {
-            // Arrange
-            const tenantId = 'tenant-rate'
+            // Arrange: default sort = latestOrderAt DESC → SQL path
+            const tenantId = '1'
             mockedGetCurrentTenantId.mockResolvedValue(tenantId)
 
-            const customerDoc = {
-                id: 2, email: 'zero@test.com', name: 'Zero Orders',
-                phone: null, rank: null, notes: null, addresses: [],
-                firstOrderAt: null, createdAt: '2026-01-01T00:00:00Z',
-                updatedAt: '2026-01-01T00:00:00Z', tenant: tenantId,
-            }
+            const customerRow = { id: 2, email: 'zero@test.com', name: 'Zero Orders', phone: null, rank: null, notes: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', latest_order_at: null, first_order_at: null }
             const mockPayload = {
-                find: vi.fn()
-                    .mockResolvedValueOnce({ docs: [customerDoc], totalDocs: 1, totalPages: 1 })
-                    .mockResolvedValueOnce({ docs: [], totalDocs: 0 }),
+                db: { drizzle: { execute: vi.fn()
+                    .mockResolvedValueOnce({ rows: [customerRow] })   // data query
+                    .mockResolvedValueOnce({ rows: [{ total: 1 }] }) // count query
+                }},
+                find: vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 }),
             }
             mockedGetPayload.mockResolvedValue(mockPayload)
 
@@ -448,6 +437,23 @@ describe('Shop Customer Actions (TC-F25-015..021)', () => {
             // Assert: zero orders → 0 (not null)
             expect(result.data[0].completedRate).toBe(0)
             expect(result.data[0].failedRate).toBe(0)
+        })
+    })
+
+    describe('TC-F25-024: SQL paths — reject non-integer tenantId', () => {
+        it('TC-F25-024: Should throw Invalid tenantId when tenant is not an integer string', async () => {
+            // Arrange: non-integer tenantId must be rejected before any SQL is issued
+            mockedGetCurrentTenantId.mockResolvedValue('not-an-integer')
+            const mockPayload = {
+                db: { drizzle: { execute: vi.fn() } },
+                find: vi.fn(),
+            }
+            mockedGetPayload.mockResolvedValue(mockPayload)
+
+            // Act & Assert: default sort = latestOrderAt → SQL path → parseInt throws
+            await expect(getShopCustomersAction({})).rejects.toThrow('Invalid tenantId')
+            // Guard fires before SQL — no DB calls
+            expect(mockPayload.db.drizzle.execute).not.toHaveBeenCalled()
         })
     })
 })
