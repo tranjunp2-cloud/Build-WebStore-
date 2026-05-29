@@ -555,7 +555,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 {/* Payment Receipt Image: explicitly height 160 */}
                 <div
                     style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid var(--dash-border)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative', cursor: proofUrl ? 'pointer' : 'default' }}
-                    onClick={() => proofUrl && setLightboxOpen(true)}
+                    onClick={() => { if (proofUrl) { setProofHovered(false); setLightboxOpen(true) } }}
                     onMouseEnter={() => setProofHovered(true)}
                     onMouseLeave={() => setProofHovered(false)}
                 >
@@ -576,10 +576,14 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 </div>
                 {lightboxOpen && proofUrl && createPortal(
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Payment proof full view"
                         onClick={() => setLightboxOpen(false)}
                         style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                         <button
+                            aria-label="Close"
                             onClick={() => setLightboxOpen(false)}
                             style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
