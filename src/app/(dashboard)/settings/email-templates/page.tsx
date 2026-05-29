@@ -7,7 +7,6 @@ export default async function EmailTemplatesPage() {
     const tenantId = await getCurrentTenantId()
     const payload = await getPayload({ config })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let rows: any[] = []
     if (tenantId) {
         const result = await payload.find({

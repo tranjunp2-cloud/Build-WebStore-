@@ -24,12 +24,10 @@ export interface TemplateRow {
 
 export interface EmailTemplatesClientProps {
     tenantId?: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     initialRows: any[]
 }
 
 function normalizeRows(raw: any[]): TemplateRow[] {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return raw.map((r: any) => ({
         id: r.id,
         templateType: r.templateType as EmailTemplateType,
