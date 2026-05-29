@@ -1,6 +1,8 @@
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
 import type { EmailLocale } from './welcome'
+import type { EmailTemplateConfig } from '../types'
 
 const locales = { en: en.email, ms: ms.email } as Record<string, typeof en.email>
 
@@ -18,9 +20,15 @@ interface PasswordChangedEmailData {
     locale?: EmailLocale
 }
 
-export function passwordChangedEmail(data: PasswordChangedEmailData): { subject: string; html: string } {
+export function passwordChangedEmail(data: PasswordChangedEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const { userName, locale = 'en' } = data
-    const t = (locales[locale] || locales.en).passwordChanged
+    const base = (locales[locale] || locales.en).passwordChanged
+    const vars = { userName }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        closing: 'footer',
+    })
     const safeUserName = escapeHtml(userName)
 
     return {
@@ -41,7 +49,7 @@ export function passwordChangedEmail(data: PasswordChangedEmailData): { subject:
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 16px;">${t.greeting} <strong>${safeUserName}</strong>,</p>
+                <p style="font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 16px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #555555; line-height: 1.7; margin: 0 0 24px;">${t.body}</p>
 
                 <!-- Warning -->

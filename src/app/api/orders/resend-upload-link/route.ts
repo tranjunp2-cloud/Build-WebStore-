@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateUploadToken } from '@/lib/orders/upload-token'
 import { resendUploadLinkEmail } from '@/lib/email/templates/resend-upload-link'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 
 /** Minimal shape of a bank-transfer order document for resend-upload-link flow. */
 interface BtOrderDoc {
@@ -85,19 +86,27 @@ export async function POST(req: Request) {
         const shopName = tenantTyped?.name ?? ''
         const siteLocale = typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms'
 
-        const emailData = resendUploadLinkEmail({
-            shopName,
-            orderNumber,
-            customerName: order.customerName ?? '',
-            resumeUrl,
-            locale: siteLocale,
-        })
+        const cmsConfig = tenantId
+            ? await getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', siteLocale as 'en' | 'ms')
+            : null
 
-        await payload.sendEmail({
-            to: order.customerEmail,
-            subject: emailData.subject,
-            html: emailData.html,
-        }).catch((err: unknown) => payload.logger.error({ err, orderNumber }, '[resend-upload-link] email failed'))
+        if (cmsConfig?.enabled === false) {
+            console.log('[Email] suppressed (disabled): resend-upload-link')
+        } else {
+            const emailData = resendUploadLinkEmail({
+                shopName,
+                orderNumber,
+                customerName: order.customerName ?? '',
+                resumeUrl,
+                locale: siteLocale,
+            }, cmsConfig ?? undefined)
+
+            await payload.sendEmail({
+                to: order.customerEmail,
+                subject: emailData.subject,
+                html: emailData.html,
+            }).catch((err: unknown) => payload.logger.error({ err, orderNumber }, '[resend-upload-link] email failed'))
+        }
 
     } catch (err) {
         // Swallow errors — always return success to avoid enumeration

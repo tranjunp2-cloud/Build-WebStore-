@@ -8,7 +8,9 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
 import type { EmailLocale } from './welcome'
+import type { EmailTemplateConfig } from '../types'
 
 const locales = { en: en.email, ms: ms.email } as Record<string, typeof en.email>
 
@@ -18,8 +20,8 @@ interface OTPEmailOptions {
     locale?: EmailLocale
 }
 
-export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEmailOptions) {
-    const t = (locales[locale] || locales.en).otp || {
+export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEmailOptions, config?: EmailTemplateConfig) {
+    const base = (locales[locale] || locales.en).otp || {
         subject: 'Your PrimeWeb verification code 🔐',
         heading: 'Email Verification',
         subheading: 'Verify your identity to continue',
@@ -30,6 +32,12 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
         footer: 'Powered by PrimeWeb — AI Website Builder for Malaysian SMEs',
         copyright: `© ${new Date().getFullYear()} PrimeWeb · Kuala Lumpur, Malaysia`,
     }
+    const vars = { userName, otpCode }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        closing: 'footer',
+    })
 
     const subject = t.subject || 'Your PrimeWeb verification code 🔐'
 
@@ -52,7 +60,7 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 16px;">${t.greeting} <strong>${userName}</strong>,</p>
+                <p style="font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 16px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #555555; line-height: 1.7; margin: 0 0 24px;">
                     ${t.body}
                 </p>

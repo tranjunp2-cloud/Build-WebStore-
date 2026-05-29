@@ -5,6 +5,9 @@
  * Related: TC-F10-06-19, PRD FR-21, AC-9
  */
 
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
+
 export interface PaymentConfirmedData {
     orderNumber: string
     customerName: string
@@ -25,9 +28,27 @@ function formatPrice(amount: number, currency: string): string {
 
 export function paymentConfirmedEmail(
     data: PaymentConfirmedData,
+    config?: EmailTemplateConfig,
 ): { subject: string; html: string } {
-    return {
+    const base = {
         subject: `Payment confirmed — Order #${data.orderNumber}`,
+        greeting: 'Hi {customerName}',
+        cta: 'View Order',
+        footer: 'Thank you for shopping with us. If you have questions, please contact our support team.',
+    }
+    const vars = {
+        customerName: data.customerName,
+        orderNumber: data.orderNumber,
+        orderTotal: formatPrice(data.total, data.currency),
+    }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'footer',
+    })
+    return {
+        subject: t.subject,
         html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +64,7 @@ export function paymentConfirmedEmail(
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
+                <p style="font-size: 16px; margin: 0 0 4px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #666; margin: 0 0 24px;">
                     Great news! We have successfully verified your payment. Your order is now confirmed and being processed.
                 </p>
@@ -66,13 +87,13 @@ export function paymentConfirmedEmail(
 
                 <!-- CTA Button -->
                 <div style="text-align: center; margin-top: 28px;">
-                    <a href="${data.orderPageUrl}" style="display: inline-block; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.02em;">View Order</a>
+                    <a href="${data.orderPageUrl}" style="display: inline-block; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.02em;">${t.cta}</a>
                 </div>
             </div>
 
             <!-- Footer -->
             <div style="background: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #eee;">
-                <p style="font-size: 12px; color: #999; margin: 0;">Thank you for shopping with us. If you have questions, please contact our support team.</p>
+                <p style="font-size: 12px; color: #999; margin: 0;">${t.footer}</p>
             </div>
         </div>
     </div>

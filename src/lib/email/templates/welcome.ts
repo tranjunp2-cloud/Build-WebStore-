@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 export type EmailLocale = 'en' | 'ms'
 
@@ -17,9 +19,16 @@ interface WelcomeEmailData {
     locale?: EmailLocale
 }
 
-export function welcomeEmail(data: WelcomeEmailData): { subject: string; html: string } {
+export function welcomeEmail(data: WelcomeEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const { userName, dashboardUrl = 'https://primeweb.app/dashboard', locale = 'en' } = data
-    const t = (locales[locale] || locales.en).welcome
+    const base = (locales[locale] || locales.en).welcome
+    const vars = { userName, dashboardUrl }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'footer',
+    })
 
     return {
         subject: t.subject,
@@ -38,7 +47,7 @@ export function welcomeEmail(data: WelcomeEmailData): { subject: string; html: s
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 16px;">${t.greeting} <strong>${userName}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 16px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
                     ${t.body}
                 </p>

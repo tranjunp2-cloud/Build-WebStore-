@@ -4121,6 +4121,67 @@ const MIGRATIONS = [
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_variants_name_parent_uniq
           ON products_variants (_parent_id, lower(name))
           WHERE name IS NOT NULL;` },
+  // ── F32: Email Template Settings ──
+  {
+    name: 'email_template_settings.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS email_template_settings (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      template_type varchar NOT NULL,
+      recipient varchar NOT NULL,
+      enabled boolean NOT NULL DEFAULT true,
+      content_en_subject varchar(200),
+      content_en_greeting text,
+      content_en_cta_label varchar(100),
+      content_en_closing text,
+      content_ms_subject varchar(200),
+      content_ms_greeting text,
+      content_ms_cta_label varchar(100),
+      content_ms_closing text,
+      updated_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  },
+  {
+    name: 'email_template_settings.unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS email_template_settings_tenant_type_recipient_uniq
+      ON email_template_settings (tenant_id, template_type, recipient)`,
+  },
+  {
+    name: 'email_template_settings.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS email_template_settings_tenant_idx
+      ON email_template_settings (tenant_id)`,
+  },
+  {
+    name: 'email_template_settings.alter_columns',
+    sql: `
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS template_type varchar;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS recipient varchar;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_subject varchar(200);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_greeting text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_cta_label varchar(100);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_closing text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_subject varchar(200);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_greeting text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_cta_label varchar(100);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_closing text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS updated_by_id integer REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
+  // ── F32: payload_locked_documents_rels FK column for email-template-settings ──
+  {
+    name: 'payload_locked_documents_rels.email_template_settings_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "email_template_settings_id" integer REFERENCES "public"."email_template_settings"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.email_template_settings_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_email_template_settings_id_idx" ON "payload_locked_documents_rels" ("email_template_settings_id");`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4156,6 +4217,7 @@ const COLLECTION_SLUGS = [
   'content_packs',
   'template_versions',
   'customers',
+  'email-template-settings',
 ];
 
 /**
