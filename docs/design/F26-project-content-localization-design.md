@@ -35,7 +35,7 @@ Tài liệu cung cấp wireframe + spec UI cho **F26** — làm cho **nội dung
 
 ## 1. Post-Generate Language Confirmation (US-F26-01)
 
-*Surface: AI builder, ngay sau khi generate xong site. File mục tiêu: `src/app/(builder)/builder/new/AIBuilderPageClient.tsx`. Tận dụng `guessLanguageFromInput()` đã có.*
+*Surface: AI builder, ngay sau khi generate xong site. File mục tiêu: `src/app/(builder)/builder/new/AIBuilderPageClient.tsx`. Tận dụng `detectLanguage()` (`src/lib/ai/lang-detect.ts`) đã có.*
 
 ### 1.1. Pattern lựa chọn: **inline confirm banner** (không modal chặn)
 Lý do: sau generate user đang hứng khởi xem kết quả — modal chặn gây khó chịu. Banner nhẹ ở đầu canvas, auto-dismiss khi user thao tác, pre-select ngôn ngữ đã detect.
