@@ -9,11 +9,11 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
-import { orderStatusEmail } from '@/lib/email/templates/order-status'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { orderShippedEmail } from '@/lib/email/templates/order-shipped'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 
 // Statuses that trigger a buyer notification email
 const BUYER_EMAIL_STATUSES = new Set(['confirmed', 'shipped', 'completed', 'cancelled', 'refunded'])
@@ -106,6 +106,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : null
                     const shopName = (tenant as any)?.name ?? ''
+                    const ownerEmails = await getTenantOwnerEmails(payload, tenantId ?? '')
+                    const supportEmail = ownerEmails[0] ?? ''
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
                     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
                     const siteLocale = typeof (order as any).site === 'object'
@@ -121,12 +123,13 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                     }))
 
                     if (newStatus === 'confirmed' || newStatus === 'completed') {
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer')
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log(`[Email] suppressed (disabled): order-confirmation (${newStatus})`)
                         } else {
                             const richEmail = orderConfirmationEmail({
                                 shopName,
+                                supportEmail,
                                 orderNumber,
                                 customerName: (order as any).customerName ?? '',
                                 customerEmail,
@@ -147,12 +150,13 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                                 .catch((err: unknown) => console.error(`[Email ${newStatus} notify]`, err))
                         }
                     } else if (newStatus === 'cancelled') {
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer')
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log('[Email] suppressed (disabled): order-cancelled')
                         } else {
                             const cancelEmail = orderCancelledEmail({
                                 shopName,
+                                supportEmail,
                                 orderNumber,
                                 customerName: (order as any).customerName ?? '',
                                 customerEmail,
@@ -175,12 +179,13 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         }
                     } else {
                         // newStatus === 'shipped'
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-shipped', 'buyer')
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-shipped', 'buyer', siteLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log('[Email] suppressed (disabled): order-shipped')
                         } else {
                             const shippedEmail = orderShippedEmail({
                                 shopName,
+                                supportEmail,
                                 orderNumber,
                                 customerName: (order as any).customerName ?? '',
                                 customerEmail,
@@ -201,20 +206,6 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                             payload.sendEmail({ to: customerEmail, subject: shippedEmail.subject, html: shippedEmail.html })
                                 .catch((err: unknown) => console.error('[Email shipped notify]', err))
                         }
-                    }
-                } else {
-                    const cmsConfig = await getTemplateConfig(tenantId, 'order-status', 'buyer')
-                    if (cmsConfig?.enabled === false) {
-                        console.log('[Email] suppressed (disabled): order-status')
-                    } else {
-                        const statusEmailData = orderStatusEmail({
-                            customerName: (order as any).customerName ?? '',
-                            orderNumber,
-                            status: newStatus as any,
-                            trackingNumber: trackingNumber ?? (order as any).trackingNumber ?? undefined,
-                        }, cmsConfig ?? undefined)
-                        payload.sendEmail({ to: customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
-                            .catch((err: unknown) => console.error('[Email status notify]', err))
                     }
                 }
             } catch (emailErr) {

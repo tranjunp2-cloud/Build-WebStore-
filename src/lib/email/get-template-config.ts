@@ -25,8 +25,9 @@ export async function getTemplateConfig(
     tenantId: string | number,
     type: EmailTemplateType,
     recipient: EmailRecipient,
+    locale: 'en' | 'ms' = 'en',
 ): Promise<EmailTemplateConfig | null> {
-    const cacheKey = templateConfigCacheKey(tenantId, type, recipient)
+    const cacheKey = `${templateConfigCacheKey(tenantId, type, recipient)}:${locale}`
 
     // 1. Try Redis cache
     if (redis) {
@@ -56,19 +57,18 @@ export async function getTemplateConfig(
     const row = result.docs[0]
     if (!row) return null
 
-    const contentEn = row.contentEn as {
-        subject?: string
-        greeting?: string
-        ctaLabel?: string
-        closing?: string
-    } | undefined
+    type ContentFields = { subject?: string; greeting?: string; ctaLabel?: string; closing?: string }
+    const contentEn = row.contentEn as ContentFields | undefined
+    const contentMs = row.contentMs as ContentFields | undefined
+    // Use locale-specific content; fall back to EN if MS fields are empty
+    const content = locale === 'ms' ? (contentMs ?? contentEn) : contentEn
 
     const templateConfig: EmailTemplateConfig = {
         enabled: (row.enabled as boolean | undefined) ?? true,
-        subject: contentEn?.subject ?? undefined,
-        greeting: contentEn?.greeting ?? undefined,
-        ctaLabel: contentEn?.ctaLabel ?? undefined,
-        closing: contentEn?.closing ?? undefined,
+        subject: content?.subject ?? undefined,
+        greeting: content?.greeting ?? undefined,
+        ctaLabel: content?.ctaLabel ?? undefined,
+        closing: content?.closing ?? undefined,
     }
 
     // 3. Store in Redis (only on hit — do not cache null)

@@ -11,7 +11,6 @@ import {
   forgotPasswordEmail,
   passwordChangedEmail,
   orderConfirmationEmail,
-  orderStatusEmail,
   orderCancelledEmail,
   orderShippedEmail,
   orderExpiredEmail,
@@ -19,8 +18,8 @@ import {
   bankTransferInstructionsEmail,
   paymentConfirmedEmail,
   paymentRejectedEmail,
-  resendUploadLinkEmail,
   staffInvitationEmail,
+  orderRefundedEmail,
 } from './templates'
 
 export type TemplateFn = (
@@ -48,10 +47,6 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
   'order-confirmation': (fixture, config) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     orderConfirmationEmail(fixture as any, config),
-
-  'order-status': (fixture, config) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    orderStatusEmail(fixture as any, config),
 
   'order-cancelled': (fixture, config) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,11 +76,11 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     paymentRejectedEmail(fixture as any, config),
 
-  'resend-upload-link': (fixture, config) =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resendUploadLinkEmail(fixture as any, config),
-
   'staff-invitation': (fixture, config) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     staffInvitationEmail(fixture as any, config),
+
+  'order-refunded': (fixture, config) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    orderRefundedEmail(fixture as any, config),
 }

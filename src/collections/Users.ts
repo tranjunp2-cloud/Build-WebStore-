@@ -112,7 +112,7 @@ export const Users: CollectionConfig = {
                     ? String(typeof rawTenantId === 'object' ? rawTenantId.id : rawTenantId)
                     : null
                 const cmsConfig = tenantId
-                    ? await getTemplateConfig(tenantId, 'forgot-password', 'buyer').catch(() => null)
+                    ? await getTemplateConfig(tenantId, 'forgot-password', 'seller').catch(() => null)
                     : null
                 if (cmsConfig?.enabled === false) return ''
                 const { html } = forgotPasswordEmail({ userName, resetUrl }, cmsConfig ?? undefined)
@@ -303,7 +303,7 @@ export const Users: CollectionConfig = {
                     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
                     const loginUrl = `${serverUrl}/login`
 
-                    const staffCmsConfig = await getTemplateConfig(String(tenantId), 'staff-invitation', 'buyer').catch(() => null)
+                    const staffCmsConfig = await getTemplateConfig(String(tenantId), 'staff-invitation', 'seller').catch(() => null)
 
                     let emailSent = true
                     if (staffCmsConfig?.enabled === false) {
@@ -774,7 +774,7 @@ export const Users: CollectionConfig = {
                             ? String(typeof rawTenantId === 'object' ? rawTenantId.id : rawTenantId)
                             : null
                         const cmsConfig = tenantId
-                            ? await getTemplateConfig(tenantId, 'otp-verification', 'buyer').catch(() => null)
+                            ? await getTemplateConfig(tenantId, 'otp-verification', 'seller').catch(() => null)
                             : null
                         if (cmsConfig?.enabled === false) {
                             emailSent = false

@@ -157,6 +157,8 @@ export async function handleCheckoutCompleted(
         const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
         const tenantTyped = tenantDoc as unknown as TenantDoc | null
         const shopName = tenantTyped?.name ?? ''
+        const ownerEmails = await getTenantOwnerEmails(payload, tenantId)
+        const supportEmail = ownerEmails[0] ?? ''
         const siteSlug = tenantTyped?.slug ?? ''
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
@@ -176,6 +178,7 @@ export async function handleCheckoutCompleted(
             } else {
                 const emailData = orderConfirmationEmail({
                     shopName,
+                    supportEmail,
                     orderNumber: order.orderNumber,
                     customerName: order.customerName,
                     customerEmail: order.customerEmail,
@@ -216,16 +219,14 @@ export async function handleCheckoutCompleted(
             if (sellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (Stripe)')
             } else {
-                getTenantOwnerEmails(payload, tenantId).then((emails) => {
-                    const seller = newOrderSellerEmail({
-                        shopName,
-                        orderNumber: order.orderNumber,
-                        customerName: order.customerName,
-                        orderPageUrl: dashboardOrderUrl,
-                    }, sellerCmsConfig ?? undefined)
-                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                        .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
-                }).catch((err: unknown) => console.error('[Stripe Webhook] getTenantOwnerEmails failed', err))
+                const seller = newOrderSellerEmail({
+                    shopName,
+                    orderNumber: order.orderNumber,
+                    customerName: order.customerName,
+                    orderPageUrl: dashboardOrderUrl,
+                }, sellerCmsConfig ?? undefined)
+                ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
             }
         } catch (emailErr) {
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)

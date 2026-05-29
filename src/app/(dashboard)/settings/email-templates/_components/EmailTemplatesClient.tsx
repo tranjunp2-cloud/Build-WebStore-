@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
+import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 import {
     saveEmailTemplateConfig,
@@ -47,6 +49,8 @@ const EMPTY_CONTENT: ContentFields = {
 }
 
 export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps) {
+    const { t, ti } = useI18n()
+    const et = t.dashboard.settings.emailTemplates
     const [rows, setRows] = useState<TemplateRow[]>(() => normalizeRows(initialRows))
     const [audienceTab, setAudienceTab] = useState<'buyer' | 'seller'>('buyer')
     const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateType | null>(null)
@@ -60,6 +64,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
     const [isDirty, setIsDirty] = useState(false)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [isSaving, startSaving] = useTransition()
+    const [isSendingTest, setIsSendingTest] = useState(false)
 
     const findRow = (type: EmailTemplateType, recipient: EmailRecipient): TemplateRow | undefined =>
         rows.find((r) => r.templateType === type && r.recipient === recipient)
@@ -147,8 +152,10 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                     return [...prev, updated]
                 })
                 setIsDirty(false)
+                toast.success(et.toast.saved)
             } else {
-                setSaveError(result.error ?? 'Failed to save. Please try again.')
+                setSaveError(result.error ?? et.toast.saveFailed)
+                toast.error(result.error ?? et.toast.saveFailed)
                 console.error('[EmailTemplatesClient] save failed:', result.error)
             }
         })
@@ -166,11 +173,67 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 )
                 setDraft({ contentEn: { ...EMPTY_CONTENT }, contentMs: { ...EMPTY_CONTENT }, enabled: true })
                 setIsDirty(false)
+                toast.success(et.toast.reset)
             } else {
+                toast.error(et.toast.resetFailed)
                 console.error('[EmailTemplatesClient] reset failed:', result.error)
             }
         })
     }
+
+    const handleSendTest = useCallback(async () => {
+        if (!selectedTemplateId || !selectedRecipient || isSendingTest) return
+        setIsSendingTest(true)
+        try {
+            const draftConfig = {
+                enabled: draft.enabled,
+                ...(locale === 'en' ? draft.contentEn : (draft.contentMs ?? draft.contentEn)),
+            }
+            const res = await fetch('/api/email-templates/send-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ templateType: selectedTemplateId, locale, draftConfig }),
+            })
+            if (res.ok) {
+                const json = await res.json().catch(() => ({}))
+                toast.success(ti(et.toast.testSent, { email: json.sentTo ?? '' }))
+            } else {
+                const json = await res.json().catch(() => ({}))
+                toast.error(json.error ?? et.toast.testFailed)
+                console.error('[SendTest] failed:', json)
+            }
+        } catch (err) {
+            toast.error(et.toast.testFailed)
+            console.error('[SendTest] error:', err)
+        } finally {
+            setIsSendingTest(false)
+        }
+    }, [selectedTemplateId, selectedRecipient, isSendingTest, draft, locale])
+
+    const handleOpenInNewTab = useCallback(async () => {
+        if (!selectedTemplateId) return
+        try {
+            const draftConfig = {
+                enabled: draft.enabled,
+                ...(locale === 'en' ? draft.contentEn : (draft.contentMs ?? draft.contentEn)),
+            }
+            const res = await fetch('/api/email-preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ templateType: selectedTemplateId, locale, draftConfig }),
+            })
+            if (!res.ok) return
+            const { subject, html } = await res.json()
+            const win = window.open('', '_blank')
+            if (win) {
+                win.document.open()
+                win.document.write(`<!DOCTYPE html><html><head><title>${subject ?? 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${subject ?? ''}</span></div>${html}</body></html>`)
+                win.document.close()
+            }
+        } catch (err) {
+            console.error('[OpenInNewTab] error:', err)
+        }
+    }, [selectedTemplateId, draft, locale])
 
     function handleListToggle(
         templateType: EmailTemplateType,
@@ -210,7 +273,9 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             contentEn: row?.contentEn ?? EMPTY_CONTENT,
             contentMs: row?.contentMs,
         }).then((result) => {
-            if (!result.success) {
+            if (result.success) {
+                toast.success(enabled ? et.toast.enabled : et.toast.disabled)
+            } else {
                 // Revert optimistic update on failure
                 setRows((prev) =>
                     prev.map((r) =>
@@ -219,9 +284,11 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                             : r
                     )
                 )
+                toast.error(result.error ?? et.toast.updateFailed)
                 console.error('[EmailTemplatesClient] toggle failed:', result.error)
             }
         }).catch((err: unknown) => {
+            toast.error(et.toast.updateFailed)
             console.error('[EmailTemplatesClient] toggle error:', err)
         })
     }
@@ -236,6 +303,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 draft={draft}
                 isDirty={isDirty}
                 isSaving={isSaving}
+                isSendingTest={isSendingTest}
                 saveError={saveError}
                 onBack={handleBack}
                 onLocaleChange={setLocale}
@@ -244,6 +312,8 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 onSave={handleSave}
                 onRevert={handleRevert}
                 onReset={handleReset}
+                onSendTest={handleSendTest}
+                onOpenInNewTab={handleOpenInNewTab}
             />
         )
     }

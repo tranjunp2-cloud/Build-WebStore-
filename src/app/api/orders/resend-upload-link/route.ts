@@ -87,7 +87,7 @@ export async function POST(req: Request) {
         const siteLocale = typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms'
 
         const cmsConfig = tenantId
-            ? await getTemplateConfig(tenantId, 'resend-upload-link', 'buyer')
+            ? await getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', siteLocale as 'en' | 'ms')
             : null
 
         if (cmsConfig?.enabled === false) {

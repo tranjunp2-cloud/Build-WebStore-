@@ -6,20 +6,24 @@
 export type EmailRecipient = 'buyer' | 'seller'
 
 export const EMAIL_TEMPLATE_TYPES = [
+  // Account & Security
   'welcome',
   'otp-verification',
   'forgot-password',
   'password-changed',
+  // Order Flow
   'order-confirmation',
-  'order-status',
-  'order-cancelled',
   'order-shipped',
+  'order-cancelled',
   'order-expired',
-  'new-order-seller',
+  'order-refunded',
+  // Payment
   'bank-transfer-instructions',
   'payment-confirmed',
   'payment-rejected',
-  'resend-upload-link',
+  // Operations
+  'new-order-seller',
+  // Team
   'staff-invitation',
 ] as const
 
@@ -38,21 +42,25 @@ export interface EmailTemplateConfig {
  * Used for UI tab gating and seeding default rows.
  */
 export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient[]> = {
-  'welcome':                   ['buyer'],
-  'otp-verification':          ['buyer'],
-  'forgot-password':           ['buyer'],
-  'password-changed':          ['buyer'],
-  'order-confirmation':        ['buyer'],
-  'order-status':              ['buyer'],
-  'order-cancelled':           ['buyer'],
-  'order-shipped':             ['buyer'],
-  'order-expired':             ['buyer'],
-  'new-order-seller':          ['seller'],
+  // Account & Security
+  'welcome':                    ['seller'],
+  'otp-verification':           ['seller'],
+  'forgot-password':            ['seller'],
+  'password-changed':           ['seller'],
+  // Order Flow
+  'order-confirmation':         ['buyer'],
+  'order-shipped':              ['buyer'],
+  'order-cancelled':            ['buyer'],
+  'order-expired':              ['buyer'],
+  'order-refunded':             ['buyer'],
+  // Payment
   'bank-transfer-instructions': ['buyer'],
-  'payment-confirmed':         ['buyer'],
-  'payment-rejected':          ['buyer'],
-  'resend-upload-link':        ['buyer'],
-  'staff-invitation':          ['buyer', 'seller'],
+  'payment-confirmed':          ['buyer'],
+  'payment-rejected':           ['buyer'],
+  // Operations
+  'new-order-seller':           ['seller'],
+  // Team
+  'staff-invitation':           ['seller'],
 }
 
 /**
@@ -61,57 +69,23 @@ export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient
  * they can embed in subject/greeting/ctaLabel/closing fields.
  */
 export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateType, string[]> = {
-  'welcome': [
-    'userName', 'brandName', 'dashboardUrl', 'supportEmail',
-  ],
-  'otp-verification': [
-    'userName', 'otpCode', 'brandName', 'supportEmail',
-  ],
-  'forgot-password': [
-    'userName', 'resetLink', 'brandName', 'supportEmail',
-  ],
-  'password-changed': [
-    'userName', 'brandName', 'supportEmail',
-  ],
-  'order-confirmation': [
-    'customerName', 'orderNumber', 'orderTotal', 'brandName',
-    'dashboardUrl', 'supportEmail',
-  ],
-  'order-status': [
-    'customerName', 'orderNumber', 'orderStatus', 'brandName',
-    'dashboardUrl', 'supportEmail',
-  ],
-  'order-cancelled': [
-    'customerName', 'orderNumber', 'orderTotal', 'brandName',
-    'supportEmail',
-  ],
-  'order-shipped': [
-    'customerName', 'orderNumber', 'trackingNumber', 'brandName',
-    'supportEmail',
-  ],
-  'order-expired': [
-    'customerName', 'orderNumber', 'brandName', 'supportEmail',
-  ],
-  'new-order-seller': [
-    'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl',
-  ],
-  'bank-transfer-instructions': [
-    'customerName', 'orderNumber', 'orderTotal', 'bankName',
-    'bankAccountNo', 'bankAccountHolder', 'brandName', 'supportEmail',
-  ],
-  'payment-confirmed': [
-    'customerName', 'orderNumber', 'orderTotal', 'brandName',
-    'dashboardUrl', 'supportEmail',
-  ],
-  'payment-rejected': [
-    'customerName', 'orderNumber', 'rejectionReason', 'brandName',
-    'supportEmail',
-  ],
-  'resend-upload-link': [
-    'customerName', 'uploadLink', 'brandName', 'supportEmail',
-  ],
-  'staff-invitation': [
-    'inviteeName', 'inviterName', 'brandName', 'dashboardUrl',
-    'supportEmail',
-  ],
+  // Account & Security
+  'welcome':                    ['userName', 'brandName', 'dashboardUrl', 'supportEmail'],
+  'otp-verification':           ['userName', 'otpCode', 'brandName', 'supportEmail'],
+  'forgot-password':            ['userName', 'resetLink', 'brandName', 'supportEmail'],
+  'password-changed':           ['userName', 'brandName', 'supportEmail'],
+  // Order Flow
+  'order-confirmation':         ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl', 'supportEmail'],
+  'order-shipped':              ['customerName', 'orderNumber', 'trackingNumber', 'brandName', 'supportEmail'],
+  'order-cancelled':            ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'supportEmail'],
+  'order-expired':              ['customerName', 'orderNumber', 'brandName', 'supportEmail'],
+  'order-refunded':             ['customerName', 'orderNumber', 'refundAmount', 'brandName', 'supportEmail'],
+  // Payment
+  'bank-transfer-instructions': ['customerName', 'orderNumber', 'orderTotal', 'bankName', 'bankAccountNo', 'bankAccountHolder', 'brandName', 'supportEmail'],
+  'payment-confirmed':          ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl', 'supportEmail'],
+  'payment-rejected':           ['customerName', 'orderNumber', 'rejectionReason', 'brandName', 'supportEmail'],
+  // Operations
+  'new-order-seller':           ['orderNumber', 'orderTotal', 'brandName', 'dashboardUrl'],
+  // Team
+  'staff-invitation':           ['inviteeName', 'inviterName', 'brandName', 'dashboardUrl', 'supportEmail'],
 }

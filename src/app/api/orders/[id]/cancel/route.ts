@@ -151,12 +151,15 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 const tenantId = typeof (updated as any).tenant === 'object'
                     ? (updated as any).tenant.id
                     : (updated as any).tenant
+                const siteLocale: 'en' | 'ms' = typeof (updated as any).site === 'object'
+                    ? ((updated as any).site?.locale ?? 'ms')
+                    : 'ms'
                 const [tenant, cmsConfig] = await Promise.all([
                     tenantId
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : Promise.resolve(null),
                     tenantId
-                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer')
+                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
                         : Promise.resolve(null),
                 ])
 
@@ -167,9 +170,6 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
                     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
                     const shopUrl = `${baseUrl}/sites/${shopSlug}`
-                    const siteLocale = typeof (updated as any).site === 'object'
-                        ? ((updated as any).site?.locale ?? 'ms')
-                        : 'ms'
 
                     const cancelEmail = orderCancelledEmail({
                         shopName,

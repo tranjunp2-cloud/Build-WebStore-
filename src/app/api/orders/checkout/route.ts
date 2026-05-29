@@ -400,6 +400,8 @@ export async function POST(request: Request) {
 
         // Resolve tenant slug + name — tenantForSlug already fetched above for payment validation
         const shopName = (tenantForSlug as any)?.name ?? ''
+        const ownerEmails = await getTenantOwnerEmails(payload, tenantId)
+        const supportEmail = ownerEmails[0] ?? ''
         const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
@@ -409,7 +411,7 @@ export async function POST(request: Request) {
         // COD: confirmation to buyer + new-order notification to seller(s)
         if (paymentMethod === 'cod') {
             const [codCmsConfig, sellerCmsConfig] = await Promise.all([
-                getTemplateConfig(tenantId, 'order-confirmation', 'buyer'),
+                getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale),
                 getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
             ])
 
@@ -418,6 +420,7 @@ export async function POST(request: Request) {
             } else {
                 const codEmail = orderConfirmationEmail({
                     shopName,
+                    supportEmail,
                     orderNumber: orderNumber,
                     customerName: customer.name,
                     customerEmail: customer.email,
@@ -447,11 +450,9 @@ export async function POST(request: Request) {
             if (sellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (COD)')
             } else {
-                getTenantOwnerEmails(payload, tenantId).then((emails) => {
-                    const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, sellerCmsConfig ?? undefined)
-                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                        .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
-                }).catch(() => {})
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, sellerCmsConfig ?? undefined)
+                ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
             }
         }
 
@@ -470,7 +471,7 @@ export async function POST(request: Request) {
 
             const pcConfig = (site as any).paymentConfig
             const [btCmsConfig, btSellerCmsConfig] = await Promise.all([
-                getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer'),
+                getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', siteLocale),
                 getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
             ])
 
@@ -479,6 +480,7 @@ export async function POST(request: Request) {
             } else {
                 const btEmail = bankTransferInstructionsEmail({
                     shopName,
+                    supportEmail,
                     orderNumber: order.orderNumber,
                     customerName: customer.name,
                     customerEmail: customer.email,
@@ -514,11 +516,9 @@ export async function POST(request: Request) {
             if (btSellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (BT)')
             } else {
-                getTenantOwnerEmails(payload, tenantId).then((emails) => {
-                    const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, btSellerCmsConfig ?? undefined)
-                    emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                        .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
-                }).catch(() => {})
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, btSellerCmsConfig ?? undefined)
+                ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
             }
         }
 
