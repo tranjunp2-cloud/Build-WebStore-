@@ -322,7 +322,7 @@
       "subject": "Your PrimeWeb verification code 🔐",
       "heading": "Email Verification",
       "subheading": "Verify your identity to continue",
-      "greeting": "Hi {userName}",
+      "greeting": "Hi <strong>{userName}</strong>",
       "body": "Enter this code to verify your identity:",
       "expiry": "This code expires in 5 minutes",
       "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",

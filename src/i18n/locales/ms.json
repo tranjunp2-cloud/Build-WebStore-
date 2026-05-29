@@ -322,7 +322,7 @@
       "subject": "Kod pengesahan PrimeWeb anda 🔐",
       "heading": "Pengesahan E-mel",
       "subheading": "Sahkan identiti anda untuk meneruskan",
-      "greeting": "Hai {userName}",
+      "greeting": "Hai <strong>{userName}</strong>",
       "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
       "expiry": "Kod ini tamat tempoh dalam 5 minit",
       "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
