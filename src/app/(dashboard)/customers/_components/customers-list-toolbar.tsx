@@ -44,10 +44,10 @@ function FilterChip<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium border transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
-                    background: active ? 'rgba(59,130,246,0.12)' : 'var(--cus-surface-dropdown)',
-                    borderColor: active ? 'rgba(59,130,246,0.4)' : 'var(--cus-border-medium)',
+                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--cus-border-strong)',
                     color: active ? '#60a5fa' : 'var(--cus-text-secondary)',
                 }}
             >
@@ -141,10 +141,10 @@ function DateFilterChip({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium border transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
-                    background: active ? 'rgba(59,130,246,0.12)' : 'var(--cus-surface-dropdown)',
-                    borderColor: active ? 'rgba(59,130,246,0.4)' : 'var(--cus-border-medium)',
+                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--cus-border-strong)',
                     color: active ? '#60a5fa' : 'var(--cus-text-secondary)',
                 }}
             >
