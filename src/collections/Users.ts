@@ -9,6 +9,7 @@ import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -62,7 +63,7 @@ export const Users: CollectionConfig = {
         maxLoginAttempts: 5,
         lockTime: 15 * 60 * 1000, // 15 minutes
         forgotPassword: {
-            generateEmailHTML: (args) => {
+            generateEmailHTML: async (args) => {
                 const token = args?.token || ''
                 const user = args?.user || {}
                 const req = args?.req
@@ -106,7 +107,15 @@ export const Users: CollectionConfig = {
 
                 const resetUrl = `${serverUrl}/reset-password?token=${token}`
                 const userName = user.firstName || user.email?.split('@')[0] || 'there'
-                const { html } = forgotPasswordEmail({ userName, resetUrl })
+                const rawTenantId = user.tenants?.[0]?.tenant
+                const tenantId = rawTenantId
+                    ? String(typeof rawTenantId === 'object' ? rawTenantId.id : rawTenantId)
+                    : null
+                const cmsConfig = tenantId
+                    ? await getTemplateConfig(tenantId, 'forgot-password', 'buyer').catch(() => null)
+                    : null
+                if (cmsConfig?.enabled === false) return ''
+                const { html } = forgotPasswordEmail({ userName, resetUrl }, cmsConfig ?? undefined)
                 return html
             },
             generateEmailSubject: () => {
@@ -294,19 +303,23 @@ export const Users: CollectionConfig = {
                     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
                     const loginUrl = `${serverUrl}/login`
 
-                    const { subject, html } = staffInvitationEmail({
-                        userName: name || targetUser.firstName || email.split('@')[0],
-                        workspaceName: tenant.name as string,
-                        loginUrl,
-                        temporaryPassword: tempPassword || undefined
-                    })
+                    const staffCmsConfig = await getTemplateConfig(String(tenantId), 'staff-invitation', 'buyer').catch(() => null)
 
                     let emailSent = true
+                    if (staffCmsConfig?.enabled === false) {
+                        emailSent = false
+                        console.log(`[StaffInvite] Suppressed by CMS config for tenant ${tenantId}`)
                     // Empty string is also falsy — any non-empty value is trusted as valid transport
-                    if (!process.env.MAIL_HOST) {
+                    } else if (!process.env.MAIL_HOST) {
                         emailSent = false
                         console.error('[StaffInvite] MAIL_HOST not set — email transport is streamTransport, no real email sent')
                     } else {
+                        const { subject, html } = staffInvitationEmail({
+                            userName: name || targetUser.firstName || email.split('@')[0],
+                            workspaceName: tenant.name as string,
+                            loginUrl,
+                            temporaryPassword: tempPassword || undefined
+                        }, staffCmsConfig ?? undefined)
                         try {
                             await req.payload.sendEmail({ to: email, subject, html })
                         } catch (err: unknown) {
@@ -756,13 +769,25 @@ export const Users: CollectionConfig = {
                         console.error('[OTP] MAIL_HOST not set — email transport is streamTransport, no real email sent')
                     } else {
                         // Production: await real email send so we can report failures
-                        const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
-                        try {
-                            await req.payload.sendEmail({ to: email, subject, html })
-                            console.log(`[OTP] Code dispatched for ${maskedEmail}`)
-                        } catch (err: unknown) {
+                        const rawTenantId = user.tenants?.[0]?.tenant
+                        const tenantId = rawTenantId
+                            ? String(typeof rawTenantId === 'object' ? rawTenantId.id : rawTenantId)
+                            : null
+                        const cmsConfig = tenantId
+                            ? await getTemplateConfig(tenantId, 'otp-verification', 'buyer').catch(() => null)
+                            : null
+                        if (cmsConfig?.enabled === false) {
                             emailSent = false
-                            console.error(`[OTP] Email send FAILED for ${maskedEmail}:`, err instanceof Error ? err.message : err)
+                            console.log(`[OTP] Suppressed by CMS config for tenant ${tenantId}`)
+                        } else {
+                            const { subject, html } = otpVerificationEmail({ userName, otpCode: otp }, cmsConfig ?? undefined)
+                            try {
+                                await req.payload.sendEmail({ to: email, subject, html })
+                                console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+                            } catch (err: unknown) {
+                                emailSent = false
+                                console.error(`[OTP] Email send FAILED for ${maskedEmail}:`, err instanceof Error ? err.message : err)
+                            }
                         }
                     }
                     return Response.json({ message: 'If the email exists, an OTP has been sent.', emailSent })

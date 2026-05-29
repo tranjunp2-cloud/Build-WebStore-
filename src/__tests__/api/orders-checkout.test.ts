@@ -86,6 +86,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // CAS stock decrement succeeds by default (COD only)
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
         mockDelete.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({})
     })
 
     it('creates order with valid input', async () => {
@@ -457,23 +458,23 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(createdItem.variant).toBe('Red')
     })
 
-    it('[TC-F09.227] variant OOS check uses aggregate p.inventory (not per-variant stock)', async () => {
-        // Arrange: variant product with aggregate inventory=1 and variant.stock=5 (stale).
-        // OOS guard must fire based on p.inventory (the field CAS decrements), not variant.stock.
+    it('[TC-F09.227] variant OOS check uses per-variant stock (not aggregate inventory)', async () => {
+        // Per-variant stock is now authoritative for variant products.
+        // variant.stock=1, aggregate inventory=10, requested qty=2 → OOS on per-variant check
         mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce(MOCK_TENANT)
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
         mockFind.mockResolvedValueOnce(mockProduct({
-            id: 'prod-v', name: 'Shirt', price: 50, inventory: 1, // aggregate: only 1 left
+            id: 'prod-v', name: 'Shirt', price: 50, inventory: 10, // aggregate: 10 (not the limit)
             hasVariants: true,
             variants: [
-                { name: 'Red', price: 75, stock: 5 },  // variant.stock is stale — NOT used
+                { name: 'Red', price: 75, stock: 1 }, // per-variant: only 1 left
             ],
         }))
 
         const body = {
             siteId: 'site-1',
-            items: [{ productId: 'prod-v', quantity: 2, variant: 'Red' }], // qty=2 > p.inventory=1
+            items: [{ productId: 'prod-v', quantity: 2, variant: 'Red' }], // qty=2 > variant.stock=1
             customer: validBody.customer,
             paymentMethod: 'cod',
         }
@@ -482,10 +483,11 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const res = await POST(mockReq(body))
         const data = await res.json()
 
-        // Assert: rejects because p.inventory (1) < requested qty (2)
+        // Assert: rejects because variant.stock (1) < requested qty (2)
         expect(res.status).toBe(422)
         expect(data.error.code).toBe('OUT_OF_STOCK')
-        expect(data.error.available).toBe(1)
+        expect(data.error.available).toBe(1) // variant.stock value
+        expect(data.error.variant).toBe('Red') // includes variant name
     })
 
     it('[TC-F09.226b] stale variant name returns 422 VARIANT_NOT_FOUND', async () => {
@@ -584,5 +586,555 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // Assert: rejected before stock/price logic; base price not silently used
         expect(res.status).toBe(422)
         expect(data.error.code).toBe('VARIANT_REQUIRED')
+    })
+
+    // ─── TC-F10-02-15 through TC-F10-02-19: Variant stock decrement tests (Bug #1082) ────────
+
+    it('[TC-F10-02-15] COD checkout decrements variants[N].stock for variant product via SQL CAS', async () => {
+        // Arrange: Red-M has stock=5, order qty=2
+        // SQL CAS on products_variants: UPDATE ... WHERE stock >= 2 RETURNING id
+        const variantProd = { id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct(variantProd))
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+        // mockDrizzleExecute default { rows: [{ id: 1 }] } handles: product check + CAS decrement + inventory recompute
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-1', quantity: 2, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(data.success).toBe(true)
+        // SQL CAS called (product check + CAS decrement + inventory recompute)
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        // ORM update NOT called for variant stock (pure SQL path)
+        const variantUpdateCall = mockUpdate.mock.calls.find(c => c[0]?.data?.variants !== undefined)
+        expect(variantUpdateCall).toBeUndefined()
+    })
+
+    it('[TC-F10-02-16] Variant insufficient stock at checkout → 422 OUT_OF_STOCK with variant name', async () => {
+        // Arrange: Red-M has stock=1, order qty=2 → OOS at availability check
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true,
+            variants: [{ name: 'Red - M', stock: 1, price: 25 }], inventory: 1,
+        }))
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-1', quantity: 2, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        expect(data.error.variant).toBe('Red - M')
+        expect(data.error.available).toBe(1)
+        // Order NOT created
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10-02-17] Mixed cart COD: variant uses SQL CAS on products_variants, non-variant uses SQL CAS on products', async () => {
+        // Arrange: 2 items — variant prod-v (Red, stock=5) + non-variant prod-n (inventory=10)
+        // Both paths use SQL CAS via mockDrizzleExecute (default { rows: [{ id: 1 }] } succeeds all calls)
+        const variantProd = { id: 'prod-v', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red', stock: 5, price: 25 }], inventory: 5 }
+        const plainProd = { id: 'prod-n', name: 'Cap', price: 15, hasVariants: false, inventory: 10 }
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct(variantProd))
+            .mockResolvedValueOnce(mockProduct(plainProd))
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-v', quantity: 1, variant: 'Red' },
+                { productId: 'prod-n', quantity: 2 },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        // Both variant (SQL on products_variants) and non-variant (SQL on products) use mockDrizzleExecute
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        // No ORM update for variant stock (SQL path replaces ORM)
+        const variantUpdateCall = mockUpdate.mock.calls.find(c => c[0]?.data?.variants !== undefined)
+        expect(variantUpdateCall).toBeUndefined()
+    })
+
+    it('[TC-F10-02-18] bank_transfer variant order: NO stock decrement at checkout', async () => {
+        // Arrange: variant product, paymentMethod=bank_transfer
+        const variantProd = { id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red', stock: 5, price: 25 }], inventory: 5 }
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct(variantProd))
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 }) // paymentReference uniqueness check
+        mockCreate.mockResolvedValue({
+            id: 'order-bt', orderNumber: 'ORD-BT1', total: 30, currency: 'MYR',
+        })
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-1', quantity: 1, variant: 'Red' }],
+            customer: validBody.customer,
+            paymentMethod: 'bank_transfer',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: order created, but NO stock decrement
+        expect(res.status).toBe(200)
+        expect(data.data.paymentMethod).toBe('bank_transfer')
+        // No variant update (bank_transfer skips decrement)
+        const variantUpdateCall = mockUpdate.mock.calls.find(
+            call => call[0]?.data?.variants !== undefined
+        )
+        expect(variantUpdateCall).toBeUndefined()
+        // No CAS SQL
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10-02-19] Mid-flight variant decrement failure: compensates prior decrements, deletes order, returns 422', async () => {
+        // Arrange: 2 variant items. Item A decrements OK via SQL CAS.
+        // Item B passes OOS check (stock=3) but SQL CAS finds stock=1 < qty=2 → fails.
+        // Compensation: restockItem for A via SQL. Order deleted.
+        const prodA = { id: 'prod-a', name: 'Shirt A', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+        const prodB_atCheck = { id: 'prod-b', name: 'Shirt B', price: 25, hasVariants: true, variants: [{ name: 'Blue - L', stock: 3, price: 25 }], inventory: 3 }
+
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct(prodA))
+            .mockResolvedValueOnce(mockProduct(prodB_atCheck)) // passes OOS check (stock=3)
+        mockCreate.mockResolvedValue({ id: 'order-race-1' })
+
+        // SQL call sequence: prodA decrement (3) + prodB decrement fail (3) + prodA compensation restock (3) = 9
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a' }] })                   // 1. prodA product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-a' }] })                   // 2. prodA CAS decrement → success
+            .mockResolvedValueOnce({ rows: [] })                                    // 3. prodA inventory recompute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-b' }] })                   // 4. prodB product check
+            .mockResolvedValueOnce({ rows: [] })                                    // 5. prodB CAS → fails (stock=1 < qty=2)
+            .mockResolvedValueOnce({ rows: [{ stock: 1 }] })                       // 6. prodB diagnostic → insufficient_stock
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a', has_variants: true }] }) // 7. comp: prodA product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-comp' }] })                // 8. comp: prodA restock SQL
+            .mockResolvedValueOnce({ rows: [] })                                    // 9. comp: prodA inventory recompute
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-a', quantity: 2, variant: 'Red - M' },
+                { productId: 'prod-b', quantity: 2, variant: 'Blue - L' },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: 422 OUT_OF_STOCK
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        // Order deleted
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'orders', id: 'order-race-1', overrideAccess: true })
+        )
+        // Sentinel: order marked cancelled before delete so lingering order cannot be re-restocked
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'orders',
+            id: 'order-race-1',
+            data: { status: 'cancelled' },
+            overrideAccess: true,
+        }))
+        // 9 SQL calls: prodA decrement (3) + prodB fail (3) + prodA compensation (3)
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(9)
+    })
+
+    it('[TC-F10-02-21] Compensation failure: logs console.error when restockItem returns skipped', async () => {
+        // Arrange: 2 variant items. Prod-A decrements OK (SQL CAS). Prod-B fails (CAS OOS).
+        // During compensation, prod-A SQL product check returns empty (product deleted).
+        // restockItem returns { skipped: true, reason: 'product_not_found' }.
+        const prodA = { id: 'prod-a', name: 'Shirt A', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+        const prodB_atCheck = { id: 'prod-b', name: 'Shirt B', price: 25, hasVariants: true, variants: [{ name: 'Blue - L', stock: 3, price: 25 }], inventory: 3 }
+
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct(prodA))
+            .mockResolvedValueOnce(mockProduct(prodB_atCheck))
+        mockCreate.mockResolvedValue({ id: 'order-comp-fail-1' })
+
+        // SQL call sequence (7 calls total)
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a' }] })  // 1. prodA product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid' }] })    // 2. prodA CAS decrement → success
+            .mockResolvedValueOnce({ rows: [] })                   // 3. prodA inventory recompute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-b' }] })  // 4. prodB product check
+            .mockResolvedValueOnce({ rows: [] })                   // 5. prodB CAS → fails
+            .mockResolvedValueOnce({ rows: [{ stock: 1 }] })      // 6. prodB diagnostic → insufficient_stock
+            .mockResolvedValueOnce({ rows: [] })                   // 7. comp: prodA check → deleted → product_not_found
+
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-a', quantity: 2, variant: 'Red - M' },
+                { productId: 'prod-b', quantity: 2, variant: 'Blue - L' },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: still 422 OUT_OF_STOCK
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        // Compensation failure was logged
+        expect(consoleSpy).toHaveBeenCalledWith(
+            '[Stock Compensation] Variant re-increment failed — manual inventory reconciliation required',
+            expect.objectContaining({
+                orderId: 'order-comp-fail-1',
+                productId: expect.anything(),
+                variantName: 'Red - M',
+                reason: 'product_not_found',
+            })
+        )
+        consoleSpy.mockRestore()
+    })
+
+    it('[TC-F10-02-23] Inventory recompute throws after CAS: order created, ok:true, no compensation', async () => {
+        // CAS succeeds (stock decremented), but inventory recompute throws.
+        // decrementVariantStock must return ok:true — recompute is isolated in inner try/catch.
+        // No compensation should run; order must NOT be deleted.
+        const variantProd = { id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct(variantProd))
+        mockCreate.mockResolvedValue({ id: 'order-recompute-1' })
+
+        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] })  // 1. product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-a' }] })  // 2. CAS decrement → success
+            .mockRejectedValueOnce(new Error('Recompute timeout')) // 3. inventory recompute throws
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-1', quantity: 1, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Order created successfully — CAS committed despite recompute failure
+        expect(res.status).toBe(200)
+        expect(data.success).toBe(true)
+        // No compensation: delete not called
+        expect(mockDelete).not.toHaveBeenCalled()
+        // Recompute failure was logged as warning, not thrown
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[Decrement] Inventory recompute failed'),
+            expect.any(Error)
+        )
+        consoleSpy.mockRestore()
+    })
+
+    it('[TC-F10-02-20] Product deleted mid-decrement → 422 OUT_OF_STOCK with "no longer available" message', async () => {
+        // Arrange: variant passes OOS check, but SQL product check returns empty (product deleted between validation and decrement)
+        const prodA = { id: 'prod-a', name: 'Shirt A', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct(prodA))
+        mockCreate.mockResolvedValue({ id: 'order-deleted-1' })
+        // First SQL call (product existence check) returns empty → product_not_found
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-a', quantity: 1, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: 422 with PRODUCT_NOT_FOUND code (not OUT_OF_STOCK) and data-integrity message
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('PRODUCT_NOT_FOUND')
+        expect(data.error.message).toMatch(/no longer available/)
+        // Order deleted (no decremented items to compensate, but order still cleaned up)
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'orders', id: 'order-deleted-1', overrideAccess: true })
+        )
+    })
+
+    it('[TC-F10-02-22] Variant with NULL stock at SQL CAS → 422 OUT_OF_STOCK (null_inventory → insufficient_stock)', async () => {
+        // FINDING-4 fix: NULL stock variant now returns null_inventory reason → insufficient_stock →
+        // OUT_OF_STOCK error code. Previously (incorrectly) mapped to PRODUCT_NOT_FOUND.
+        // variant.stock=5 passes OOS check; SQL CAS hits NULL stock guard → CAS fails
+        // diagnostic: variant row found but stock=null → variant_not_found (not insufficient_stock)
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-null', name: 'Shirt', price: 25, hasVariants: true,
+            variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5,
+        }))
+        mockCreate.mockResolvedValue({ id: 'order-null-1' })
+
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-null' }] })  // product check
+            .mockResolvedValueOnce({ rows: [] })                       // CAS: NULL stock guard fires → 0 rows
+            .mockResolvedValueOnce({ rows: [{ stock: null }] })        // diagnostic: row exists, stock=null
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-null', quantity: 1, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'orders', id: 'order-null-1', overrideAccess: true })
+        )
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(3)
+    })
+
+    it('[TC-F10-02-24] Non-variant product deleted mid-decrement → 422 PRODUCT_NOT_FOUND with "no longer available"', async () => {
+        // Non-variant product passes OOS check (inventory=10). CAS UPDATE returns 0 rows.
+        // Existence SELECT also returns 0 rows → product deleted between validation and CAS.
+        // failedReason = 'product_not_found'; error code = 'PRODUCT_NOT_FOUND'.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-del', name: 'Cap', price: 15, hasVariants: false, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-del-1' })
+
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [] })  // CAS UPDATE → 0 rows (product deleted)
+            .mockResolvedValueOnce({ rows: [] })  // existence SELECT → product not found
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-del', quantity: 2 }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('PRODUCT_NOT_FOUND')
+        expect(data.error.message).toMatch(/no longer available/)
+        // Order deleted (no items decremented before failure)
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'orders', id: 'order-del-1', overrideAccess: true })
+        )
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(2)
+    })
+
+    it('[TC-F10-02-25] Non-variant compensation 0 rows → logs console.error (BUG-5 guard)', async () => {
+        // Race condition: prod-a passes OOS check AND CAS OK. prod-b passes OOS check but CAS
+        // fails (concurrent decrement between validation and SQL write → insufficient_stock).
+        // Compensation for prod-a runs; UPDATE returns 0 rows (prod-a deleted mid-flight).
+        // Verify: console.error logged for 0-row result (observability fix).
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-a', name: 'Hat', price: 10, hasVariants: false, inventory: 5 }))
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-b', name: 'Cap', price: 15, hasVariants: false, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-comp-1' })
+
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a' }] })   // prod-a CAS succeeds
+            .mockResolvedValueOnce({ rows: [] })                     // prod-b CAS fails (concurrent decrement)
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-b' }] })    // existence SELECT → exists → insufficient_stock
+            .mockResolvedValueOnce({ rows: [] })                     // prod-a compensation → 0 rows (deleted mid-flight)
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-a', quantity: 1 },
+                { productId: 'prod-b', quantity: 2 },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+        // Compensation 0-row case logged as error
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Compensation re-increment returned 0 rows'),
+            expect.objectContaining({ productId: 'prod-a' })
+        )
+        consoleSpy.mockRestore()
+    })
+
+    it('[TC-F10-02-26] variant_not_found at CAS → console.error logged with productId + variantName', async () => {
+        // Variant passes ORM check (variant in product.variants), but SQL diagnostic finds
+        // no row in products_variants → variant_not_found (ORM/DB inconsistency).
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind.mockResolvedValueOnce(mockProduct({
+            id: 'prod-v', name: 'Shirt', price: 25, hasVariants: true,
+            variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5,
+        }))
+        mockCreate.mockResolvedValue({ id: 'order-vnf-1' })
+
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-v' }] }) // product check
+            .mockResolvedValueOnce({ rows: [] })                  // CAS: 0 rows
+            .mockResolvedValueOnce({ rows: [] })                  // diagnostic: no row → variant_not_found
+
+        const body = {
+            siteId: 'site-1',
+            items: [{ productId: 'prod-v', quantity: 1, variant: 'Red - M' }],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('PRODUCT_NOT_FOUND') // variant_not_found → product_not_found (H2 fix)
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('variant_not_found'),
+            expect.objectContaining({ productId: 'prod-v', variant: 'Red - M' })
+        )
+        consoleSpy.mockRestore()
+    })
+
+    // ─── TC-F10-02-27: orphaned order sentinel (Bug #3 fix) ──────────────────────
+
+    it('[TC-F10-02-27] Orphaned order: sentinel marks cancelled before delete so future cancel is idempotent', async () => {
+        // Arrange: 2 variant items. A decrements OK. B fails → compensation → sentinel → delete (fails).
+        // If delete fails, the order persists. Without sentinel it would be status='pending',
+        // and a seller cancel would re-restock already-compensated stock (inventory inflation).
+        // With sentinel, order is status='cancelled' → cancel returns idempotent success (shouldRestock=false).
+        const prodA = { id: 'prod-a', name: 'Shirt A', price: 25, hasVariants: true, variants: [{ name: 'Red - M', stock: 5, price: 25 }], inventory: 5 }
+        const prodB = { id: 'prod-b', name: 'Shirt B', price: 25, hasVariants: true, variants: [{ name: 'Blue - L', stock: 3, price: 25 }], inventory: 3 }
+
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
+            .mockResolvedValueOnce(MOCK_TENANT)                              // tenant
+        mockFind
+            .mockResolvedValueOnce(mockProduct(prodA))
+            .mockResolvedValueOnce(mockProduct(prodB))
+        mockCreate.mockResolvedValue({ id: 'order-orphan-1' })
+
+        // SQL: prodA decrement (3) + prodB fail (3) + prodA compensation (3) = 9
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a' }] })                    // 1. prodA product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-a' }] })                    // 2. prodA CAS → success
+            .mockResolvedValueOnce({ rows: [] })                                     // 3. prodA recompute
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-b' }] })                    // 4. prodB product check
+            .mockResolvedValueOnce({ rows: [] })                                     // 5. prodB CAS → fails
+            .mockResolvedValueOnce({ rows: [{ stock: 1 }] })                        // 6. prodB diagnostic
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-a', has_variants: true }] }) // 7. comp: prodA product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-comp' }] })                 // 8. comp: prodA restock
+            .mockResolvedValueOnce({ rows: [] })                                     // 9. comp: prodA recompute
+
+        // Simulate delete failure — orphan order persists
+        mockDelete.mockRejectedValueOnce(new Error('FK constraint violation'))
+
+        const body = {
+            siteId: 'site-1',
+            items: [
+                { productId: 'prod-a', quantity: 2, variant: 'Red - M' },
+                { productId: 'prod-b', quantity: 2, variant: 'Blue - L' },
+            ],
+            customer: validBody.customer,
+            paymentMethod: 'cod',
+        }
+
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert: buyer still gets 422 OUT_OF_STOCK (response shape unchanged)
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+
+        // Sentinel: mockUpdate called with status='cancelled' BEFORE mockDelete
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'orders',
+            id: 'order-orphan-1',
+            data: { status: 'cancelled' },
+            overrideAccess: true,
+        }))
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'orders', id: 'order-orphan-1', overrideAccess: true })
+        )
+        // Sentinel called before delete (invocation order check)
+        const updateOrder = mockUpdate.mock.invocationCallOrder[0]
+        const deleteOrder = mockDelete.mock.invocationCallOrder[0]
+        expect(updateOrder).toBeLessThan(deleteOrder)
+
+        consoleSpy.mockRestore()
     })
 })

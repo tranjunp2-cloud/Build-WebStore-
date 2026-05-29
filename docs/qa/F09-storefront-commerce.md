@@ -508,7 +508,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.226** | Integration | Critical | Variant product: order unitPrice = variant.price (RM 75) not base price (RM 50) | Order item.unitPrice=75, not 50 | GH-1084 Phase03 | [x] |
 | **TC-F09.226b** | Integration | Critical | Stale variant name → 422 VARIANT_NOT_FOUND | Request variant='Purple' (doesn't exist) rejected | GH-1084 Phase03 | [x] |
 | **TC-F09.226c** | Integration | High | Multiple variants of same product → correct unitPrice per variant | Red variant unitPrice=75, Blue=80 | GH-1084 Phase03 | [x] |
-| **TC-F09.227** | Integration | Critical | Variant OOS check uses aggregate p.inventory (not stale variant.stock) | inventory=1 + variant.stock=5 → qty=2 rejected (1 < 2) | GH-1084 Phase03 | [x] |
+| **TC-F09.227** | Integration | Critical | Variant OOS check uses per-variant stock (not aggregate p.inventory) | inventory=10 + variant.stock=1 → qty=2 rejected (1 < 2); error.variant + error.available returned | GH-1084 Phase03 | [x] |
 | **TC-F09.228** | Integration | High | buildOrderItems uses variant.price for line item unitPrice in Stripe | Stripe session uses variant.price*100 sen | GH-1084 Phase03 | [x] |
 | **TC-F09.228b** | Integration | Medium | Variant price RM 29.90 → 2990 sen for Stripe | Correctly scaled to smallest unit | GH-1084 Phase03 | [x] |
 | **TC-F09.228c** | Integration | High | Multiple variants in Stripe checkout → correct prices per variant | Line1=Red 7500 sen, Line2=Blue 8000 sen | GH-1084 Phase03 | [x] |

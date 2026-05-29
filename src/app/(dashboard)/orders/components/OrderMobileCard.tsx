@@ -57,7 +57,7 @@ export function OrderMobileCard({
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(order) } }}
                     >
                         <p className="text-sm font-semibold text-white">
-                            #{order.orderNumber}
+                            {order.orderNumber}
                         </p>
                         <p className="text-xs text-gray-400 truncate mt-0.5">
                             {order.customerName}

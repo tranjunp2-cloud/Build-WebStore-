@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
@@ -7,6 +8,7 @@ import { orderCancelSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { restockItem, type RestockResult } from '../../lib/stock-utils'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -26,7 +28,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const payload = await getPayload({ config })
 
         // Get current order
-        const orderId = isNaN(Number(id)) ? id : Number(id)
+        const orderId = Number.isFinite(Number(id)) ? Number(id) : id
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
@@ -41,12 +43,12 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
-        // Idempotency: already cancelled → treat as success (prevents double restock on concurrent requests)
+        // Sequential retry: already cancelled (first request completed before second arrived)
         if ((order.status as string) === 'cancelled') {
             return NextResponse.json({ success: true, data: order, restock: [] })
         }
 
-        // Validate that cancellation is allowed
+        // Validate that cancellation is allowed from current status
         const currentStatus = order.status as string
         const allowed = ORDER_STATUS_TRANSITIONS[currentStatus] || []
         if (!allowed.includes('cancelled')) {
@@ -65,56 +67,81 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
-        // Cancel the order
-        const updated = await payload.update({
-            collection: 'orders',
-            id: orderId,
-            data: {
-                status: 'cancelled',
-                cancelReason: reason,
-            } as any,
-            user,
-            overrideAccess: false,
-        })
+        // Atomic status transition — prevents concurrent double-restock.
+        // Two concurrent cancel requests both pass the validation above, but only the
+        // one whose CAS succeeds (RETURNING non-empty) proceeds to restock.
+        // The loser sees 0 rows → rechecks order → returns idempotent success without restocking.
+        const db = (payload.db.drizzle as any)
+        const casResult = await db.execute(sql`
+            UPDATE orders
+            SET status = 'cancelled', cancel_reason = ${reason}, updated_at = NOW()
+            WHERE id = ${orderId} AND status = ${currentStatus}
+            RETURNING id
+        `)
 
-        // Auto-restock inventory
-        const restockResults: Array<{ productId: string; restocked: number; skipped?: boolean }> = []
+        if (!casResult.rows?.length) {
+            // CAS missed — status changed between our validation read and this write.
+            // Two sub-cases: already cancelled (concurrent cancel WON) or advanced to
+            // a non-cancellable state (e.g. ready_to_ship/shipped by seller).
+            const recheck = await payload.findByID({
+                collection: 'orders',
+                id: orderId,
+                overrideAccess: true,
+                depth: 0,
+            })
+            if ((recheck as any)?.status === 'cancelled') {
+                return NextResponse.json({ success: true, data: recheck, restock: [] })
+            }
+            // Status advanced to a non-cancellable state between validation and CAS
+            return NextResponse.json(
+                { success: false, error: { code: 'INVALID_TRANSITION', message: 'Order status changed — cancellation no longer valid' } },
+                { status: 422 }
+            )
+        }
+
+        // CAS only wrote status + cancel_reason; all other order fields are unchanged.
+        // Construct updated from the pre-fetched order to avoid an extra DB round trip.
+        const updated = { ...(order as any), status: 'cancelled', cancelReason: reason }
+
+        // Auto-restock inventory (variant-aware).
+        // bank_transfer: stock is decremented at approve-payment (paymentStatus=paid), not checkout.
+        // Pre-approval cancellations (awaiting_payment / pending_verification) must skip restock —
+        // stock was never decremented, so incrementing would create phantom +qty.
+        //
+        // NOTE (pre-#1082 order transition): For variant orders created before this fix,
+        // products_variants.stock was never decremented at checkout. Restocking those orders
+        // will phantom-increment variant stock. A migration to reconcile existing orders is
+        // required before deploying to environments with pre-existing production variant orders.
+        const orderPaymentMethod = (order as any).paymentMethod
+        const orderPaymentStatus = (order as any).paymentStatus
+        const restockResults: RestockResult[] = []
         const items = (order as any).items || []
 
-        for (const item of items) {
-            const rawProductId = typeof item.product === 'object' ? item.product?.id : item.product
-            if (!rawProductId) {
-                restockResults.push({ productId: 'unknown', restocked: 0, skipped: true })
-                continue
-            }
-            const productId = isNaN(Number(rawProductId)) ? rawProductId : Number(rawProductId)
-
-            try {
-                const product = await payload.findByID({
-                    collection: 'products',
-                    id: productId,
-                    depth: 0,
-                })
-
-                if (!product) {
-                    // Product deleted — skip safely (per AC-2 of US-F10-03)
-                    restockResults.push({ productId: String(productId), restocked: item.quantity, skipped: true })
+        const shouldRestock = orderPaymentMethod !== 'bank_transfer' || orderPaymentStatus === 'paid'
+        if (shouldRestock) {
+            for (const item of items) {
+                const rawProductId = typeof item.product === 'object' ? item.product?.id : item.product
+                if (!rawProductId) {
+                    restockResults.push({ productId: 'unknown', restocked: 0, skipped: true, reason: 'product_not_found' })
                     continue
                 }
-
-                const currentStock = (product as any).stock ?? 0
-                await payload.update({
-                    collection: 'products',
-                    id: productId,
-                    data: { stock: currentStock + item.quantity } as any,
-                })
-
-                restockResults.push({ productId: String(productId), restocked: item.quantity })
-            } catch (err) {
-                // If product was deleted between check and update, skip
-                console.warn(`[Restock] Failed for product ${productId}:`, err)
-                restockResults.push({ productId, restocked: 0, skipped: true })
+                const productId = Number.isFinite(Number(rawProductId)) ? Number(rawProductId) : rawProductId
+                const result = await restockItem(payload, productId, item.variant, item.quantity)
+                restockResults.push(result)
             }
+        }
+
+        // Alert ops if any restock item failed — requires manual inventory reconciliation.
+        // write_failed: DB I/O error. product_not_found / variant_not_found: stock was decremented
+        // at checkout/approve but the product/variant no longer exists — data integrity loss.
+        const alertableRestocks = restockResults.filter(r =>
+            r.skipped && (r.reason === 'write_failed' || r.reason === 'product_not_found' || r.reason === 'variant_not_found')
+        )
+        if (alertableRestocks.length > 0) {
+            payload.logger.error(
+                { orderId, failedProducts: alertableRestocks.map(r => ({ id: r.productId, reason: r.reason })) },
+                '[Order Cancel] Restock failed — manual inventory reconciliation required'
+            )
         }
 
         // Send cancellation email to customer

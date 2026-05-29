@@ -229,8 +229,8 @@ export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplate
           <thead>
             <tr style="background:#F3F4F6;">
               <th align="left" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.productName}</th>
-              <th align="center" width="70" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.quantity}</th>
-              <th align="right" width="90" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.unitCost}</th>
+              <th align="center" width="50" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.quantity}</th>
+              <th align="right" width="100" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.unitCost}</th>
               <th align="right" width="100" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${t.amount}</th>
             </tr>
           </thead>

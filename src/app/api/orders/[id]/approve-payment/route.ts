@@ -4,22 +4,24 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { paymentConfirmedEmail } from '@/lib/email/templates/payment-confirmed'
+import { decrementVariantStock } from '../../lib/stock-utils'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
 /**
  * PATCH /api/orders/[id]/approve-payment
  * Seller approves a bank-transfer payment proof.
- * Guards: paymentMethod==='bank_transfer' + paymentStatus==='pending_verification'
+ * Guards: paymentMethod==='bank_transfer' + paymentStatus==='pending_verification' + status !== 'cancelled'
  */
 export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
     try {
         const { id } = await ctx.params
         const payload = await getPayload({ config })
+        const orderId = Number.isFinite(Number(id)) ? Number(id) : id
 
         const order = await payload.findByID({
             collection: 'orders',
-            id,
+            id: orderId,
             depth: 2,
             user,
             overrideAccess: false,
@@ -32,64 +34,112 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             )
         }
 
-        if (order.paymentMethod !== 'bank_transfer' || order.paymentStatus !== 'pending_verification') {
+        if (
+            order.paymentMethod !== 'bank_transfer' ||
+            order.paymentStatus !== 'pending_verification' ||
+            (order.status as string) === 'cancelled'
+        ) {
             return NextResponse.json(
                 { success: false, error: { code: 'INVALID_STATE', message: 'Order is not awaiting payment verification' } },
                 { status: 422 }
             )
         }
 
-        const now = new Date()
-        const newStatus = order.status === 'pending' ? 'confirmed' : order.status
+        const newStatus = (order.status as string) === 'pending' ? 'confirmed' : (order.status as string)
 
-        const updated = await payload.update({
+        // Atomic CAS: prevents concurrent double-approve AND cancel+approve race.
+        // If two sellers click Approve simultaneously, only the first CAS succeeds (one write wins).
+        // If cancel CAS already set status='cancelled', the WHERE clause excludes it → 0 rows → 409.
+        const db = (payload.db.drizzle as any)
+        const casResult = await db.execute(sql`
+            UPDATE orders
+            SET payment_status = 'paid',
+                payment_verified_at = NOW(),
+                payment_verified_by_id = ${user.id},
+                verification_source = 'manual',
+                status = ${newStatus},
+                updated_at = NOW()
+            WHERE id = ${orderId}
+              AND payment_status = 'pending_verification'
+              AND status NOT IN ('cancelled', 'refunded')
+            RETURNING id, status, payment_status
+        `)
+
+        if (!casResult.rows?.length) {
+            // CAS missed — concurrent cancel or double-approve
+            const recheck = await payload.findByID({
+                collection: 'orders',
+                id: orderId,
+                depth: 0,
+                overrideAccess: true,
+            })
+            if ((recheck as any)?.status === 'cancelled') {
+                return NextResponse.json(
+                    { success: false, error: { code: 'CONFLICT', message: 'Order was cancelled before payment could be verified' } },
+                    { status: 409 }
+                )
+            }
+            if ((recheck as any)?.paymentStatus === 'paid') {
+                return NextResponse.json({ success: true, data: recheck })
+            }
+            return NextResponse.json(
+                { success: false, error: { code: 'INVALID_STATE', message: 'Order is not awaiting payment verification' } },
+                { status: 422 }
+            )
+        }
+
+        // Fetch full updated order for email + response (CAS only returns id/status/payment_status)
+        const updated = await payload.findByID({
             collection: 'orders',
-            id,
-            data: {
-                paymentStatus: 'paid',
-                paymentVerifiedAt: now.toISOString(),
-                paymentVerifiedBy: user.id as any,
-                verificationSource: 'manual',
-                status: newStatus as any,
-            },
-            user,
-            overrideAccess: false,
+            id: orderId,
+            depth: 2,
+            overrideAccess: true,
         })
 
-        // Atomic inventory decrement — GREATEST(0, ...) prevents negative stock;
-        // raw SQL avoids read-modify-write race if two concurrent approve-payment calls arrive.
+        // Inventory decrement — variant-aware, best-effort (payment received = must not block approval).
+        // Variant products: atomic CAS on products_variants.stock via decrementVariantStock.
+        // Non-variant products: GREATEST(0, ...) force-decrement on products.inventory (no CAS needed).
         const items = (order.items as any[]) ?? []
         for (const item of items) {
             try {
                 const productId = typeof item.product === 'object' ? item.product?.id : item.product
                 if (!productId) continue
-                await (payload.db.drizzle as any).execute(sql`
-                    UPDATE products
-                    SET inventory = GREATEST(0, inventory - ${item.quantity ?? 0})
-                    WHERE id = ${productId}
-                    AND inventory IS NOT NULL
-                `)
+                const variantName = typeof item.variant === 'string' ? item.variant.trim() : ''
+                if (variantName) {
+                    const result = await decrementVariantStock(payload, productId, variantName, item.quantity ?? 0)
+                    if (!result.ok) {
+                        payload.logger.warn({ productId, variantName, reason: result.reason },
+                            '[approve-payment] variant stock decrement failed (best-effort — order still approved)')
+                    }
+                } else {
+                    await db.execute(sql`
+                        UPDATE products
+                        SET inventory = GREATEST(0, inventory - ${item.quantity ?? 0})
+                        WHERE id = ${productId}
+                        AND inventory IS NOT NULL
+                    `)
+                }
             } catch (err) {
                 payload.logger.error({ err }, '[approve-payment] inventory decrement failed for item')
             }
         }
 
         // Slug lives on the tenant, not the site — sites collection has no slug field
-        const siteObj = typeof order.site === 'object' ? (order.site as any) : null
+        const siteObj = typeof (updated as any)?.site === 'object' ? (updated as any).site : null
         const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
         const siteSlug = tenantObj?.slug ?? ''
-        const orderPageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/sites/${siteSlug}/orders/${order.orderNumber}`
+        const orderPageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/sites/${siteSlug}/orders/${(updated as any)?.orderNumber ?? ''}`
 
         const emailPayload = paymentConfirmedEmail({
-            orderNumber: order.orderNumber as string,
-            customerName: order.customerName as string,
-            total: order.total as number,
-            currency: (order.currency as string) ?? 'MYR',
+            orderNumber: (updated as any)?.orderNumber as string,
+            customerName: (updated as any)?.customerName as string,
+            total: (updated as any)?.total as number,
+            currency: ((updated as any)?.currency as string) ?? 'MYR',
             orderPageUrl,
         })
 
         payload.sendEmail({
-            to: order.customerEmail as string,
+            to: (updated as any)?.customerEmail as string,
             subject: emailPayload.subject,
             html: emailPayload.html,
         }).catch((err) => payload.logger.error({ err }, '[approve-payment] sendEmail failed'))
