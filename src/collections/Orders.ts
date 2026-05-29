@@ -204,6 +204,7 @@ export const Orders: CollectionConfig = {
                 { label: 'Pending Verification', value: 'pending_verification' },
                 { label: 'Paid', value: 'paid' },
                 { label: 'Failed', value: 'failed' },
+                { label: 'Payment Failed', value: 'payment_failed' },
                 { label: 'Refunded', value: 'refunded' },
                 { label: 'Cancelled', value: 'cancelled' },
             ],

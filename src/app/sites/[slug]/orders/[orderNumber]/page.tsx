@@ -1,7 +1,8 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { verifyOrderToken } from '@/lib/auth/order-token'
 import OrderTrackingClient from './OrderTrackingClient'
 import { OT_CSS } from './order-tracking-styles'
 import ResendUploadLinkForm from './ResendUploadLinkForm'
@@ -87,12 +88,23 @@ export default async function OrderTrackingPage({
         </>
     )
 
-    // Bank transfer pending payment — show upload interface
+    // Bank transfer pending payment — show upload interface or resend form
+    // Exclude cancelled/refunded orders even if paymentStatus wasn't updated (data inconsistency guard)
     const isBtPending =
         order.paymentMethod === 'bank_transfer' &&
-        UPLOAD_STATUSES.has(order.paymentStatus ?? '')
+        UPLOAD_STATUSES.has(order.paymentStatus ?? '') &&
+        !['cancelled', 'refunded'].includes(order.status ?? '')
 
     if (isBtPending) {
+        // Backward-compat: old emails still land here with ?token=; validate and forward
+        // to the confirm-redirect API which sets the HttpOnly cookie then sends to confirm page.
+        if (token && order.paymentStatus === 'awaiting_payment' && order.magicLinkSecret) {
+            const verified = await verifyOrderToken({ token, secret: order.magicLinkSecret })
+            if (verified.ok) {
+                redirect(`/api/orders/${order.id}/confirm-redirect?slug=${slug}&token=${encodeURIComponent(token)}`)
+            }
+        }
+        // No token, invalid/expired token, or already pending_verification → resend link form
         return (
             <>
                 {fontLinks}

@@ -34,7 +34,7 @@ export function ShopCustomersClientLayout() {
     const [records, setRecords]     = useState<ShopCustomerRecord[]>([])
     const [total, setTotal]         = useState(0)
     const [page, setPage]           = useState(1)
-    const [limit, setLimit]         = useState(25)
+    const [limit, setLimit]         = useState(10)
     const [search, setSearch]       = useState('')
     const [rankFilter, setRankFilter]   = useState<RankFilter>('all')
     const [dateFilter, setDateFilter]   = useState<DateFilter>('any')

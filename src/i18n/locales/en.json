@@ -743,7 +743,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed",
         "cancelled": "Cancelled",
         "refunded": "Refunded"
@@ -787,7 +787,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed",
         "cancelled": "Cancelled",
         "refunded": "Refunded",
@@ -806,13 +806,16 @@
       "metrics": {
         "pending": "Pending",
         "readyToShip": "Ready to Ship",
-        "shipped": "Shipped",
-        "completed": "Completed"
+        "shipped": "Shipping",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
       },
       "tableHeaders": {
         "orderNumber": "Order #",
         "customer": "Customer",
         "total": "Total",
+        "paymentMethod": "Payment",
+        "orderDate": "Date",
         "status": "Status",
         "loading": "Loading orders...",
         "noOrders": "No orders found",
@@ -843,7 +846,20 @@
         "tax": "Tax (SST 6%)",
         "total": "Total",
         "free": "Free",
-        "noItems": "No items"
+        "noItems": "No items",
+        "paymentMethods": {
+          "bank_transfer": "Bank Transfer",
+          "card": "Credit Card",
+          "cod": "Cash on Delivery",
+          "ewallet": "e-Wallet"
+        },
+        "paymentStatuses": {
+          "awaiting_payment": "Awaiting Payment",
+          "pending_verification": "Pending Verification",
+          "paid": "Paid",
+          "payment_failed": "Payment Failed",
+          "refunded": "Refunded"
+        }
       },
       "actions": {
         "confirmOrder": "Confirm Order",
@@ -857,7 +873,7 @@
         "pending": "Pending",
         "confirmed": "Confirmed",
         "ready": "Ready",
-        "shipped": "Shipped",
+        "shipped": "Shipping",
         "completed": "Completed"
       },
       "ship": {
@@ -881,6 +897,36 @@
         "confirmCancellation": "Confirm Cancellation",
         "confirm": "Confirm Cancel",
         "confirming": "Cancelling..."
+      },
+      "paymentVerification": {
+        "title": "Payment Verification",
+        "referenceCode": "Reference Code",
+        "paymentReceipt": "Payment Receipt",
+        "noReceipt": "No receipt uploaded",
+        "amountExpected": "Amount Expected",
+        "buyer": "Buyer",
+        "approve": "Approve Payment",
+        "approving": "Approving...",
+        "reject": "Reject Payment",
+        "verified": "Payment Verified",
+        "verifiedAt": "Verified At",
+        "verifiedBy": "Verified By"
+      },
+      "rejectPayment": {
+        "title": "Reject Payment",
+        "reasonLabel": "Rejection reason (required)",
+        "reasons": {
+          "imageBlurry": "Receipt unclear",
+          "wrongAmount": "Wrong amount",
+          "duplicateOrder": "Duplicate order",
+          "other": "Other reason"
+        },
+        "detailLabel": "Details",
+        "detailPlaceholder": "Describe the issue (min 10 characters)...",
+        "detailError": "Detail must be at least 10 characters",
+        "back": "Cancel",
+        "submit": "Reject Payment",
+        "submitting": "Rejecting..."
       },
       "filterDates": {
         "allDates": "All Dates",
@@ -1503,8 +1549,7 @@
         "statusRefunded": "Refunded",
         "statusPaid": "Paid",
         "statusPaymentFailed": "Payment failed",
-        "statusProcessing": "Processing",
-        "totalOrders": "{total} orders"
+        "statusProcessing": "Processing"
       }
     },
     "settings": {
@@ -1595,7 +1640,13 @@
         "failVerifyStripe": "Verification failed. Please try again.",
         "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon.",
         "saving": "Saving...",
-        "saveChanges": "Save changes"
+        "saveChanges": "Save changes",
+        "noCardMethodsTitle": "No card payment methods active",
+        "noCardMethodsDesc": "Your storefront is live, but Card and FPX are both off. Buyers can only pay by COD or bank transfer. Enable at least one Stripe method for the smoothest checkout.",
+        "required": "Required",
+        "unsavedChanges": "Unsaved changes",
+        "noMethodsWarningTitle": "No payment methods active",
+        "noMethodsWarningDesc": "Buyers won't be able to checkout. Enable at least one payment method."
       },
       "shipping": {
         "pageTitle": "Shipping",
@@ -3384,7 +3435,23 @@
       "paymentCancelled": "Payment was cancelled. Your cart is preserved — please try again.",
       "paymentFailed": "Payment could not be started. Please try again.",
       "redirectingTitle": "Redirecting to Stripe Checkout",
-      "redirectingDesc": "Please don't close this window. You'll be returned here after payment."
+      "redirectingDesc": "Please don't close this window. You'll be returned here after payment.",
+      "stripeSecure": "Secure",
+      "stripePoweredBy": "Powered by Stripe",
+      "codDetail": "Pay in cash when the courier delivers. Seller confirms receipt.",
+      "noExtraFee": "No extra fee",
+      "westMalaysiaOnly": "West Malaysia only",
+      "bankTransferName": "Bank Transfer / DuitNow QR",
+      "bankTransferDetail": "Transfer to seller's bank or scan a DuitNow QR. Receipt verified manually.",
+      "sellerVerified": "Seller-verified",
+      "encrypted": "Encrypted",
+      "stripeUnderMaintenance": "UNDER MAINTENANCE",
+      "stripeTemporarilyUnavailable": "Temporarily unavailable",
+      "stripeUnavailableTitle": "Payment method unavailable",
+      "stripeUnavailableDesc": "This payment method is under maintenance or not yet ready. Please choose another method.",
+      "stripeChooseAnother": "Choose another method",
+      "checkoutUnavailableTitle": "Checkout unavailable",
+      "checkoutUnavailableDesc": "This store is temporarily unable to accept payments. Please try again later."
     },
     "confirmPage": {
       "leaveWarningBanner": "Action Required — Receipt Not Uploaded",
@@ -3405,6 +3472,17 @@
       "sending": "Sending…",
       "sendLink": "Send upload link",
       "errorMessage": "Something went wrong. Please try again."
+    },
+    "orderLookup": {
+      "title": "Track Your Order",
+      "subtitle": "Enter your order number to check your order status",
+      "label": "Order Number",
+      "placeholder": "e.g. ORD-00001",
+      "submit": "Track",
+      "required": "Please enter your order number",
+      "navPlaceholder": "Order number…",
+      "navTitle": "Track your order",
+      "navLabel": "Track"
     },
     "notFound": {
       "code": "404",

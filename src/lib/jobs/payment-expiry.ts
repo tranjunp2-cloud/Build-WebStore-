@@ -24,15 +24,16 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
 
     for (const order of result.docs as any[]) {
         try {
-            // Atomic guard: only the first concurrent invocation wins — prevents duplicate emails
+            // Atomic guard: only the first concurrent invocation wins.
+            // status is a Postgres enum — cast explicitly; payment_status is varchar.
             const updateResult = await (payload.db.drizzle as any).execute(sql`
                 UPDATE orders
-                SET status = 'cancelled',
-                    payment_status = 'cancelled',
+                SET status = 'cancelled'::enum_orders_status,
+                    payment_status = 'payment_failed',
                     cancel_reason = 'Auto-cancelled: payment not received within 24h'
                 WHERE id = ${order.id}
                 AND payment_status IN ('awaiting_payment', 'pending_verification')
-                AND status IN ('pending', 'new')
+                AND status::text IN ('pending', 'new')
                 RETURNING id
             `)
             if (!updateResult.rows?.length) {

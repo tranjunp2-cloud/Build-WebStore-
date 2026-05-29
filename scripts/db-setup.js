@@ -4127,6 +4127,15 @@ const MIGRATIONS = [
     name: 'sites.generation_locale',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_locale varchar DEFAULT 'ms';`,
   },
+  // BUG-#1082: index for SQL CAS queries on products_variants(_parent_id, name)
+  // used by decrementVariantStock + restockItem on every variant checkout/cancel
+  { name: 'products_variants.parent_name_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_variants_parent_name_idx ON products_variants (_parent_id, name);` },
+  // BUG-#1082 H1: enforce unique variant names per product at DB level; prevents CAS double-decrement
+  { name: 'products_variants.name_parent_uniq_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_variants_name_parent_uniq
+          ON products_variants (_parent_id, lower(name))
+          WHERE name IS NOT NULL;` },
 ];
 
 async function runMigrations(pool) {

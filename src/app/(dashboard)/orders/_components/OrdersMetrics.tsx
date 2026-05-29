@@ -1,28 +1,42 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { Clock, CheckCircle2, Package, Truck } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Clock, CheckCircle2, Package, Truck, XCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number }) {
     const { t } = useI18n()
     const o = t.dashboard.orders
-    const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0 })
+    const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0, cancelled: 0 })
 
+    const fetchMetrics = useCallback(async () => {
+        try {
+            const res = await fetch('/api/orders/metrics')
+            const json = await res.json()
+            if (json.success && json.data) {
+                setCounts(json.data)
+            }
+        } catch (err) {
+            console.error('Failed to load metrics:', err)
+        }
+    }, [])
+
+    // Refresh when parent triggers (bulk actions, order updates)
     useEffect(() => {
-        async function fetchMetrics() {
-            try {
-                const res = await fetch('/api/orders/metrics')
-                const json = await res.json()
-                if (json.success && json.data) {
-                    setCounts(json.data)
-                }
-            } catch (err) {
-                console.error('Failed to load metrics:', err)
+        fetchMetrics()
+    }, [refreshCounter, fetchMetrics])
+
+    // Refresh on real-time order notifications (new order or status update)
+    useEffect(() => {
+        function handleNotification(e: Event) {
+            const detail = (e as CustomEvent).detail
+            if (detail?.type === 'ORDER_NEW' || detail?.type === 'ORDER_UPDATED') {
+                fetchMetrics()
             }
         }
-        fetchMetrics()
-    }, [refreshCounter])
+        window.addEventListener('notification-toast', handleNotification)
+        return () => window.removeEventListener('notification-toast', handleNotification)
+    }, [fetchMetrics])
 
     const metrics = [
         {
@@ -49,10 +63,16 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
             icon: <Truck className="w-5 h-5 text-[#05DF72]" />,
             iconBg: 'bg-[rgba(0,201,80,0.1)]',
         },
+        {
+            label: o.metrics.cancelled,
+            value: counts.cancelled,
+            icon: <XCircle className="w-5 h-5 text-[#FF6467]" />,
+            iconBg: 'bg-[rgba(251,44,54,0.1)]',
+        },
     ]
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-[22px] w-full">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-[22px] w-full">
             {metrics.map((item, index) => (
                 <div
                     key={index}
