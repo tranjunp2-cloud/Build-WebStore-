@@ -9,7 +9,7 @@ import { CustomersListTable } from './customers-list-table'
 import { getShopCustomersAction, exportShopCustomersCsvAction } from '../actions'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 import type { RankFilter, DateFilter } from './customers-list-toolbar'
-import type { SortKey } from './customers-list-table'
+import type { SortKey } from '../_lib/shop-customer-record'
 
 function toDateRange(f: DateFilter, customFrom?: string, customTo?: string): { dateFrom?: string; dateTo?: string } {
     const now = new Date()
@@ -66,6 +66,8 @@ export function ShopCustomersClientLayout() {
                 dateTo,
                 page,
                 limit,
+                sortBy,
+                sortDir,
             })
             // Discard stale responses — only the latest fetch wins
             if (gen !== genRef.current) return
@@ -78,7 +80,7 @@ export function ShopCustomersClientLayout() {
             // Only the latest call clears the loading spinner
             if (gen === genRef.current) setLoading(false)
         }
-    }, [search, rankFilter, dateFilter, customFrom, customTo, page, limit, loadFailedMsg])
+    }, [search, rankFilter, dateFilter, customFrom, customTo, page, limit, sortBy, sortDir, loadFailedMsg])
 
     useEffect(() => { load() }, [load])
 
@@ -88,6 +90,8 @@ export function ShopCustomersClientLayout() {
     const handleRankFilterChange   = useCallback((r: RankFilter)              => { setRankFilter(r);              setPage(1) }, [])
     const handleDateFilterChange   = useCallback((d: DateFilter)              => { setDateFilter(d);              setPage(1) }, [])
     const handleCustomRangeApply   = useCallback((from: string, to: string)   => { setCustomFrom(from); setCustomTo(to); setPage(1) }, [])
+    const handleSetSortBy          = useCallback((key: SortKey)               => { setSortBy(key);     setPage(1) }, [])
+    const handleSetSortDir         = useCallback((dir: 'asc' | 'desc')        => { setSortDir(dir);    setPage(1) }, [])
 
     async function handleExport() {
         setExporting(true)
@@ -128,8 +132,8 @@ export function ShopCustomersClientLayout() {
     return (
         <div className="space-y-5 pb-20">
             <div>
-                <h1 className="text-[24px] font-bold text-[#F8FAFC]">{c.title}</h1>
-                <p className="text-[14px] text-white/60 mt-1">{c.subtitle}</p>
+                <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>{c.title}</h1>
+                <p className="text-[14px] mt-1" style={{ color: 'var(--dash-text-muted)' }}>{c.subtitle}</p>
             </div>
 
             <CustomersListToolbar
@@ -156,9 +160,9 @@ export function ShopCustomersClientLayout() {
                 limit={limit}
                 setLimit={setLimit}
                 sortBy={sortBy}
-                setSortBy={setSortBy}
+                setSortBy={handleSetSortBy}
                 sortDir={sortDir}
-                setSortDir={setSortDir}
+                setSortDir={handleSetSortDir}
                 onRowClick={id => router.push(`/customers/${id}`)}
                 hasFilters={hasFilters}
             />

@@ -142,7 +142,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-12** | `FR-02` | `Edge` | mapCustomer — null fields preserved | 1. Doc with `phone=null, rank=null, notes=null, firstOrderAt=null, addresses=[]`.<br>2. Call `mapCustomer(doc, 0, 0, 0, 0)`. | - All nulls preserved in output.<br>- `addresses` returns empty array (not null).<br>- `orderCount=0`, `lifetime=0`. | High | [x] |
 | **TC-F25-13** | `FR-07` | `Val` | toCsv — headers + rows format | 1. Pass 2 customer records to `toCsv(records)`.<br>2. Parse output by splitting `\n`. | - CSV starts with BOM `﻿`.<br>- Header row with 8 quoted columns: ID, Email, Name, Phone, Rank, Order Count, Lifetime (MYR), Created At.<br>- 2 data rows (7 commas per row).<br>- Total 3 lines (header + 2 rows). | High | [x] |
 | **TC-F25-14** | `FR-07` | `Sec` | toCsv — escapes commas and quotes | 1. Customer with `name='Smith, John "The Boss"'`.<br>2. Call `toCsv([customer])`.<br>3. Inspect raw output. | - Name field wrapped in quotes: `"Smith, John ""The Boss"""`.<br>- Quotes doubled (RFC 4180).<br>- Commas properly escaped inside quotes. | High | [x] |
-| **TC-F25-15** | `FR-04` | `Logic` | getShopCustomersAction — returns tenant customers | 1. Mock `getCurrentTenantId` → 'tenant-123'.<br>2. Mock `payload.find` → 2 customer docs + orders.<br>3. Call action with empty filters. | - Action returns `{ data: [...], meta: { total: 2 } }`.<br>- Both customers have correct fields.<br>- `payload.find` called with `tenant: { equals: 'tenant-123' }`. | High | [x] |
+| **TC-F25-15** | `FR-04` | `Logic` | getShopCustomersAction — returns tenant customers | 1. Mock `getCurrentTenantId` → '123'.<br>2. Mock `drizzle.execute` → 2 SQL rows (data) + count=2.<br>3. Call action with empty filters (default sort = latestOrderAt → SQL path). | - Action returns `{ data: [...], meta: { total: 2 } }`.<br>- Both customers mapped correctly (email, name fields).<br>- `drizzle.execute` called twice (data query + count query). | High | [x] |
 | **TC-F25-16** | `FR-04` (search) | `Logic` | getShopCustomersAction — search filter | 1. Call action with `{ search: 'ali' }`.<br>2. Mock `payload.find` return. | - `payload.find` called with `where` containing:<br>&nbsp;&nbsp;`or: [{ email: { like: 'ali' } }, { name: { like: 'ali' } }, { phone: { like: 'ali' } }]`. | High | [x] |
 | **TC-F25-17** | `FR-04` (filter) | `Logic` | getShopCustomersAction — rank filter | 1. Call action with `{ rank: 'gold' }`.<br>2. Mock payload response. | - `payload.find` called with `where` containing `rank: { equals: 'gold' }`. | High | [x] |
 | **TC-F25-18** | `FR-05` | `Sec` | getShopCustomerDetailAction — IDOR reject different tenant | 1. Mock `getCurrentTenantId` → 'my-tenant'.<br>2. Mock `payload.findByID` return doc with `tenant: { id: 'other-tenant' }`.<br>3. Call action. | - Action throws `Error('Unauthorized')`.<br>- No data leaked. | Blocker | [x] |
@@ -150,6 +150,8 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F25-20** | `FR-05` | `Logic` | updateShopCustomerAction — persists fields | 1. Mock `payload.findByID` return existing doc (matching tenant).<br>2. Mock `payload.update` return updated doc.<br>3. Call action with `{ name, rank, notes }`. | - `payload.update` called with correct `data` object.<br>- name, rank, notes all passed correctly.<br>- Returned record has updated values.<br>- Invalid rank values throw 'Invalid rank value'. | High | [x] |
 | **TC-F25-21** | All actions | `Sec` | requireTenantId — throws when no tenant | 1. Mock `getCurrentTenantId` → null.<br>2. Call any action (list/detail/update). | - All actions throw `Error('Unauthorized')`.<br>- No DB queries made. | Blocker | [x] |
 | **TC-F25-22** | `FR-04` rate formula | `Logic` | rate formula — 2-decimal rounding + zero fallback | 1. Mock orders: 1 completed + 1 cancelled + 1 pending (count=3).<br>2. Call `getShopCustomersAction`.<br>3. Also call with 0 orders. | - `completedRate === 33.33` (not 33).<br>- `failedRate === 33.33` (not 33).<br>- Zero orders → `completedRate === 0`, `failedRate === 0`. | High | [x] |
+| **TC-F25-23** | `FR-04` (sort) | `Logic` | getShopCustomersAction — orderCount sort uses SQL JOIN, skips fetchOrderStats | 1. Mock `getCurrentTenantId` → '1'.<br>2. Mock `drizzle.execute` → 2 rows with inline order stats.<br>3. Call action with `{ sortBy: 'orderCount', sortDir: 'desc' }`. | - Returns 2 customers in correct order.<br>- `completedRate === 80` (4/5 completed).<br>- `payload.find` NOT called (stats computed inline via SQL JOIN). | High | [x] |
+| **TC-F25-24** | `FR-04` (sec) | `Sec` | SQL paths — reject non-integer tenantId before issuing any SQL | 1. Mock `getCurrentTenantId` → `'not-an-integer'`.<br>2. Call `getShopCustomersAction({})` (default sort → SQL path). | - Action throws `Invalid tenantId`.<br>- `drizzle.execute` NOT called (guard fires before SQL). | High | [x] |
 
 ---
 
@@ -171,7 +173,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ## 4. Test Files Locations + Counts
 
-> **Verified:** 2026-05-27 (F25 round-2 review bugs): added `sync-customer-snapshot.test.ts` 9 PASS (TC-F25-03-01..02 + TC-F25-09-01..07). Full suite **79 PASS** + 7 todo.
+> **Verified:** 2026-05-29 (GH-1107 server-side sort): server-side sort + SQL paths for `latestOrderAt`/`orderCount`. `shop-customer-actions.test.ts` updated to 14 PASS (TC-F25-15..24). Full suite **81 PASS** + 7 todo.
 
 | Test File | Location | TC Coverage | Test Count |
 |:---|:---|:---|:---:|
@@ -182,9 +184,9 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | `customers-orders-tab.test.tsx` | `src/__tests__/unit/customers/` | TC-F25-05-03, 07-01..04 | ✅ 16 PASS |
 | `customers-export.test.ts` | `src/__tests__/integration/` | TC-F25-06-01, 05..07 | ✅ 9 PASS |
 | `shop-customer-record.test.ts` | `src/__tests__/unit/customers/` | TC-F25-11..14 | ✅ 5 PASS |
-| `shop-customer-actions.test.ts` | `src/__tests__/unit/customers/` | TC-F25-15..22 | ✅ 12 PASS |
+| `shop-customer-actions.test.ts` | `src/__tests__/unit/customers/` | TC-F25-15..24 | ✅ 14 PASS |
 | `f25-customers.spec.ts` (E2E) | `e2e/` | TC-F25-08-01..09 | 🟡 9 specs compile (needs staging server) |
-| **TOTAL** | — | **TC-F25-01..09-XX, 11..22** | **79 PASS + 7 todo + 9 E2E specs** |
+| **TOTAL** | — | **TC-F25-01..09-XX, 11..24** | **81 PASS + 7 todo + 9 E2E specs** |
 
 **Source modules supporting tests:**
 - `src/lib/customers/csv-helpers.ts` — NEW (2026-05-25): extract `csvField` / `toCsvLine` / `sanitizeFilenameSegment` từ route handler → enable unit testing. `src/app/api/v1/customers/export/route.ts` re-imports từ module này; integration tests 9/9 PASS regression confirmed.
