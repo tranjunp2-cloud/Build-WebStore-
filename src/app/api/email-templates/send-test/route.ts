@@ -12,7 +12,11 @@ import { withAuth } from '@/lib/auth'
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplateType, type EmailTemplateConfig } from '@/lib/email/types'
 import { templateRegistry } from '@/lib/email/template-registry'
 import { EMAIL_PREVIEW_FIXTURES } from '@/lib/email/preview-fixtures'
+import { redis } from '@/lib/redis'
 import type { User } from 'payload'
+
+const SEND_TEST_RATE_LIMIT = 5 // max per window
+const SEND_TEST_WINDOW_SECONDS = 60
 
 export const POST = withAuth(async (user: User, req: Request) => {
     let body: unknown
@@ -35,6 +39,20 @@ export const POST = withAuth(async (user: User, req: Request) => {
     const recipientEmail = (user as any).email
     if (!recipientEmail) {
         return NextResponse.json({ error: 'No email address on your account' }, { status: 400 })
+    }
+
+    // Rate limit: 5 sends per user per 60s — prevents SES abuse
+    if (redis) {
+        try {
+            const rlKey = `send-test-rl:${(user as any).id}`
+            const count = await redis.incr(rlKey)
+            if (count === 1) await redis.expire(rlKey, SEND_TEST_WINDOW_SECONDS)
+            if (count > SEND_TEST_RATE_LIMIT) {
+                return NextResponse.json({ error: 'Too many requests. Try again in a minute.' }, { status: 429 })
+            }
+        } catch {
+            // Redis unavailable — allow through
+        }
     }
 
     const type = templateType as EmailTemplateType

@@ -14,6 +14,7 @@ export default async function EmailTemplatesPage() {
             where: { tenant: { equals: tenantId } },
             limit: 100,
             depth: 0,
+            overrideAccess: true,
         })
         rows = result.docs
     }

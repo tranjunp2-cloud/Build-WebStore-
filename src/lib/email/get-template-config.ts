@@ -41,7 +41,7 @@ export async function getTemplateConfig(
         }
     }
 
-    // 2. Query Payload DB
+    // 2. Query Payload DB — overrideAccess required: called from webhook/hook contexts without user session
     const payload = await getPayload({ config })
     const result = await payload.find({
         collection: 'email-template-settings',
@@ -52,6 +52,7 @@ export async function getTemplateConfig(
         },
         limit: 1,
         depth: 0,
+        overrideAccess: true,
     })
 
     const row = result.docs[0]
@@ -84,8 +85,9 @@ export async function getTemplateConfig(
 }
 
 /**
- * Deletes the Redis cache entry for the given tenant/type/recipient combination.
+ * Deletes all locale-specific Redis cache entries for the given tenant/type/recipient.
  * Called from afterChange and afterDelete hooks on EmailTemplateSettings.
+ * Must delete both :en and :ms variants — the base key is never stored directly.
  */
 export async function invalidateTemplateConfigCache(
     tenantId: string | number,
@@ -93,8 +95,9 @@ export async function invalidateTemplateConfigCache(
     recipient: EmailRecipient,
 ): Promise<void> {
     if (!redis) return
+    const base = templateConfigCacheKey(tenantId, type, recipient)
     try {
-        await redis.del(templateConfigCacheKey(tenantId, type, recipient))
+        await Promise.all([redis.del(`${base}:en`), redis.del(`${base}:ms`)])
     } catch {
         // Non-fatal — stale cache will expire naturally after TTL
     }

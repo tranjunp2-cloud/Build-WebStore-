@@ -120,11 +120,45 @@ export async function saveEmailTemplateConfig(
                 overrideAccess: true,
             })
         } else {
-            await payload.create({
-                collection: 'email-template-settings',
-                data,
-                overrideAccess: true,
-            })
+            try {
+                await payload.create({
+                    collection: 'email-template-settings',
+                    data,
+                    overrideAccess: true,
+                })
+            } catch (createErr: unknown) {
+                // Concurrent save: unique constraint violation — re-fetch and update instead
+                const isConstraintViolation = createErr instanceof Error && (
+                    createErr.message.includes('unique') || createErr.message.includes('duplicate')
+                )
+                if (isConstraintViolation) {
+                    const retry = await payload.find({
+                        collection: 'email-template-settings',
+                        where: {
+                            and: [
+                                { tenant: { equals: tenantId } },
+                                { templateType: { equals: input.templateType } },
+                                { recipient: { equals: input.recipient } },
+                            ],
+                        },
+                        limit: 1,
+                        depth: 0,
+                        overrideAccess: true,
+                    })
+                    if (retry.docs.length > 0) {
+                        await payload.update({
+                            collection: 'email-template-settings',
+                            id: retry.docs[0].id,
+                            data,
+                            overrideAccess: true,
+                        })
+                    } else {
+                        throw createErr
+                    }
+                } else {
+                    throw createErr
+                }
+            }
         }
 
         return { success: true }
