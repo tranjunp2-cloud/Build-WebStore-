@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ZoomIn, X } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
@@ -444,6 +445,19 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
     const d = t.dashboard.orders.detail
     const methodLabels = (d as any).paymentMethods as Record<string, string>
     const statusLabels = (d as any).paymentStatuses as Record<string, string>
+    const [lightboxOpen, setLightboxOpen] = useState(false)
+    const [proofHovered, setProofHovered] = useState(false)
+
+    useEffect(() => {
+        if (!lightboxOpen) return
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxOpen(false) }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+    }, [lightboxOpen])
+
+    const proofUrl = order.paymentProofImage
+        ? (typeof order.paymentProofImage === 'string' ? order.paymentProofImage : order.paymentProofImage?.url || '')
+        : null
 
     let statusColor = '#FF8904'
     let statusBg = 'rgba(255, 105, 0, 0.1)'
@@ -539,9 +553,19 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 </div>
 
                 {/* Payment Receipt Image: explicitly height 160 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid var(--dash-border)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
-                    {order.paymentProofImage ? (
-                        <Image src={typeof order.paymentProofImage === 'string' ? order.paymentProofImage : order.paymentProofImage?.url || ''} alt="Payment Receipt" fill className="object-cover" />
+                <div
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid var(--dash-border)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative', cursor: proofUrl ? 'pointer' : 'default' }}
+                    onClick={() => { if (proofUrl) { setProofHovered(false); setLightboxOpen(true) } }}
+                    onMouseEnter={() => setProofHovered(true)}
+                    onMouseLeave={() => setProofHovered(false)}
+                >
+                    {proofUrl ? (
+                        <>
+                            <Image src={proofUrl} alt="Payment Receipt" fill className="object-cover" />
+                            <div style={{ position: 'absolute', inset: 0, background: proofHovered ? 'rgba(0,0,0,0.35)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
+                                <ZoomIn size={24} color="#fff" style={{ opacity: proofHovered ? 1 : 0, transition: 'opacity 0.15s', pointerEvents: 'none' }} />
+                            </div>
+                        </>
                     ) : (
                         <div className="w-full flex items-center justify-center h-full text-center p-4" style={{ background: 'var(--dash-surface-hover)', borderRadius: 15 }}>
                             <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'var(--dash-text-muted)' }}>
@@ -550,6 +574,30 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                         </div>
                     )}
                 </div>
+                {lightboxOpen && proofUrl && createPortal(
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Payment proof full view"
+                        onClick={() => setLightboxOpen(false)}
+                        style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <button
+                            aria-label="Close"
+                            onClick={() => setLightboxOpen(false)}
+                            style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            <X size={20} />
+                        </button>
+                        <img
+                            src={proofUrl}
+                            alt="Payment proof full view"
+                            onClick={e => e.stopPropagation()}
+                            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 12 }}
+                        />
+                    </div>,
+                    document.body
+                )}
             </div>
         </div>
     )
@@ -970,7 +1018,7 @@ export function OrderDetailPanel({
                         color: 'var(--dash-text)',
                     }}
                 >
-                    {d.title} #{order?.orderNumber || orderId}
+                    {d.title} {order?.orderNumber || orderId}
                 </span>
 
                 {/* Close button — layout_HCW45V: 36×36, padding 8px 8px 0 */}

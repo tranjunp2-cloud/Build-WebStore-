@@ -153,9 +153,9 @@ export function buildOrderItemsTable(
             <td style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;line-height:20px;color:#0F172A;vertical-align:top;">
                 ${esc(item.name)}${item.variant ? `<br><span style="color:#94A3B8;font-size:12.5px;">${esc(item.variant)}</span>` : ''}
             </td>
-            <td align="center" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;">${item.quantity}</td>
-            <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;white-space:nowrap;">${fp(item.unitPrice)}</td>
-            <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;white-space:nowrap;">${fp(item.lineTotal)}</td>
+            <td align="center" width="50" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;">${item.quantity}</td>
+            <td align="right" width="100" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;white-space:nowrap;">${fp(item.unitPrice)}</td>
+            <td align="right" width="100" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;white-space:nowrap;">${fp(item.lineTotal)}</td>
         </tr>`).join('')
 
     const discountRow = opts.discountAmount
@@ -173,8 +173,8 @@ export function buildOrderItemsTable(
           <thead>
             <tr style="background:#F3F4F6;">
               <th align="left" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${labels.productName}</th>
-              <th align="center" width="70" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${labels.quantity}</th>
-              <th align="right" width="90" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;">${labels.unitCost}</th>
+              <th align="center" width="50" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${labels.quantity}</th>
+              <th align="right" width="100" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;">${labels.unitCost}</th>
               <th align="right" width="100" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;white-space:nowrap;">${labels.amount}</th>
             </tr>
           </thead>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, CheckCircle2, ExternalLink, Save, AlertCircle } from 'lucide-react';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, CheckCircle2, Save, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe } from './actions';
 import { useI18n } from '@/i18n';
@@ -678,14 +678,6 @@ export function PaymentsFormClient({
                     )}
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        type="button"
-                        className="inline-flex items-center justify-center h-[34px] w-[34px] rounded-[8px] text-dash-text-muted border border-dash-border hover:bg-dash-surface-hover hover:text-dash-text transition-all"
-                        onClick={() => toast.info(pt.infoDesc)}
-                        title={pt.previewCheckout}
-                    >
-                        <ExternalLink className="w-[13px] h-[13px]" />
-                    </button>
                     <button
                         type="button"
                         onClick={handleSaveAll}
