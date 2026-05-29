@@ -9,8 +9,8 @@ import type { EditableFields } from './customers-detail'
 const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full'
 const INPUT_READONLY_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] font-mono text-white/40 w-full flex items-center select-all cursor-default'
 const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full resize-none'
-const LABEL_CLS = 'text-[12px] font-semibold text-white/55'
-const HELP_CLS = 'text-[11px] text-white/35'
+const LABEL_CLS = 'text-[12px] font-semibold [color:var(--cus-text-secondary)]'
+const HELP_CLS = 'text-[11px] [color:var(--cus-text-muted)]'
 const ERROR_CLS = 'text-[11px] text-red-400 flex items-center gap-1'
 
 type Props = {

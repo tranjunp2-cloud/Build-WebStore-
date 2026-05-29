@@ -5,11 +5,7 @@ import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { RankBadge, CustomerAvatar } from './customers-shared-ui'
-import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
-
-export type SortKey = 'email' | 'name' | 'rank' | 'phone' | 'orderCount' | 'latestOrderAt'
-
-const RANK_ORDER: Record<string, number> = { '': 0, bronze: 1, silver: 2, gold: 3, vip: 4 }
+import type { ShopCustomerRecord, SortKey } from '../_lib/shop-customer-record'
 
 type Props = {
     records: ShopCustomerRecord[]
@@ -217,25 +213,6 @@ export function CustomersListTable({
     onRowClick,
     hasFilters,
 }: Props) {
-    const sorted = useMemo(() => {
-        const copy = [...records]
-        copy.sort((a, b) => {
-            if (sortBy === 'rank') {
-                const av = RANK_ORDER[a.rank ?? ''] ?? 0
-                const bv = RANK_ORDER[b.rank ?? ''] ?? 0
-                return sortDir === 'asc' ? av - bv : bv - av
-            }
-            const av = a[sortBy] ?? ''
-            const bv = b[sortBy] ?? ''
-            const as = typeof av === 'number' ? av : String(av).toLowerCase()
-            const bs = typeof bv === 'number' ? bv : String(bv).toLowerCase()
-            if (as < bs) return sortDir === 'asc' ? -1 : 1
-            if (as > bs) return sortDir === 'asc' ? 1 : -1
-            return 0
-        })
-        return copy
-    }, [records, sortBy, sortDir])
-
     function handleSort(key: SortKey) {
         if (key === sortBy) setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
         else { setSortBy(key); setSortDir('asc') }
@@ -284,11 +261,11 @@ export function CustomersListTable({
                     <tbody>
                         {loading
                             ? Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)
-                            : sorted.map((c, idx) => (
+                            : records.map((c, idx) => (
                                 <tr
                                     key={c.id}
                                     onClick={() => onRowClick(c.id)}
-                                    style={idx < sorted.length - 1 ? { borderBottom: '1px solid var(--cus-border-medium)' } : undefined}
+                                    style={idx < records.length - 1 ? { borderBottom: '1px solid var(--cus-border-medium)' } : undefined}
                                     className="cursor-pointer transition-colors hover:bg-white/[0.03]"
                                 >
                                     <td className="px-4 py-3">
@@ -330,9 +307,6 @@ export function CustomersListTable({
                 <TableFooter total={total} page={page} setPage={setPage} limit={limit} setLimit={setLimit} />
             )}
 
-            {!loading && total > limit && (
-                <p className="text-xs text-muted-foreground mt-1 px-1">{tb.sortPageOnly}</p>
-            )}
         </div>
     )
 }

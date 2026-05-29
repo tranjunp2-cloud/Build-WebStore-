@@ -33,6 +33,8 @@ export type ShopCustomerRecord = {
     updatedAt: string
 }
 
+export type SortKey = 'email' | 'name' | 'rank' | 'phone' | 'orderCount' | 'latestOrderAt'
+
 export type ShopCustomerFilters = {
     search?: string
     rank?: 'all' | 'none' | 'bronze' | 'silver' | 'gold' | 'vip'
@@ -40,6 +42,8 @@ export type ShopCustomerFilters = {
     dateTo?: string      // ISO date string
     page?: number
     limit?: number
+    sortBy?: SortKey
+    sortDir?: 'asc' | 'desc'
 }
 
 export type UpdateCustomerData = {
