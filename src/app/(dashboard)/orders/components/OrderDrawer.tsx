@@ -71,7 +71,7 @@ export function OrderDrawer({
                         <ChevronLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h2 className="text-lg font-bold text-white">Order #{order.orderNumber}</h2>
+                        <h2 className="text-lg font-bold text-white">Order {order.orderNumber}</h2>
                         <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('en-MY')}</p>
                     </div>
                 </div>

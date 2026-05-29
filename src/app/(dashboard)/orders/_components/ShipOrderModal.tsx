@@ -67,7 +67,7 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
                     className="w-full text-center truncate"
                     style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 20, lineHeight: '1.4em', color: 'var(--dash-text)', marginBottom: 8 }}
                 >
-                    {s.title} — #{orderNumber}
+                    {s.title} — {orderNumber}
                 </h2>
 
                 {/* Tracking input */}

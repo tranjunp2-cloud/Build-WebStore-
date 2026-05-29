@@ -129,7 +129,7 @@ describe('OrderMobileCard Component', () => {
             />
         )
         // Check order number and customer
-        expect(screen.getByText('#ORD-123')).toBeInTheDocument()
+        expect(screen.getByText('ORD-123')).toBeInTheDocument()
         expect(screen.getByText('John Doe')).toBeInTheDocument()
 
         // Check total
