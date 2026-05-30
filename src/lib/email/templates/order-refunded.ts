@@ -5,6 +5,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -34,6 +36,7 @@ export interface OrderRefundedData {
     refundNote?: string | null
     shopUrl: string
     currency: string
+    supportEmail?: string
     locale?: EmailLocale
 }
 
@@ -62,10 +65,17 @@ function buildAddress(addr: OrderRefundedData['customerAddress']): string {
         .filter(Boolean).join(', ')
 }
 
-export function orderRefundedEmail(data: OrderRefundedData): { subject: string; html: string } {
+export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
-    const tR = (locales[locale] ?? locales.ms).refundedOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber, brandName: data.shopName, supportEmail: data.supportEmail ?? '' }
+    const t = mergeTemplateConfig((locales[locale] ?? locales.ms).order, config ?? null, vars, {
+        greeting: 'greeting',
+        closing: 'farewell',
+    })
+    const tR = mergeTemplateConfig((locales[locale] ?? locales.ms).refundedOrder, config ?? null, vars, {
+        subject: 'subject',
+        ctaLabel: 'cta',
+    })
 
     const fmtPrice = (n: number) => fp(n, data.currency, locale)
 
@@ -79,7 +89,7 @@ export function orderRefundedEmail(data: OrderRefundedData): { subject: string; 
             <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-size:13.5px;color:#0F172A;vertical-align:top;">${fmtPrice(item.lineTotal)}</td>
         </tr>`).join('')
 
-    const subject = `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
+    const subject = config?.subject ? tR.subject : `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
 
     return {
         subject,
@@ -90,15 +100,15 @@ export function orderRefundedEmail(data: OrderRefundedData): { subject: string; 
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(data.shopName)} - ${esc(tR.subject)} - ${esc(data.orderNumber)}</title>
 <style>
-  body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
-  .page-bg{background:#EEF3F8;padding:48px 16px;}
-  @media(max-width:640px){.page-bg{padding:16px 10px;}.page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}.page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}}
-  @media(max-width:420px){.page-bg{padding:12px 6px;}.page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}}
+  body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
+  .page-bg{background:transparent;padding:0;}
+  @media(max-width:640px){.page-bg{padding:0;}.page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}.page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}}
+  @media(max-width:420px){.page-bg{padding:0;}.page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}}
 </style>
 </head>
 <body>
 <div class="page-bg">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF3F8;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:transparent;">
     <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
 

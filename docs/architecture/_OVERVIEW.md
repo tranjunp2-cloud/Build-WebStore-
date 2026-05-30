@@ -99,6 +99,7 @@ All feature-specific architecture lives in `docs/architecture/F*.md`:
 | F18 | CMS Layout | [F18-cms-layout.md](architecture/F18-cms-layout.md) |
 | F19 | Store Configuration | [F19-store-configuration.md](architecture/F19-store-configuration.md) |
 | F22 | Tracking Analytics | [F22-tracking-analytics.md](architecture/F22-tracking-analytics.md) |
+| F32 | Email Template CMS | [F32-email-template-cms-settings.md](architecture/F32-email-template-cms-settings.md) |
 | F99 | CI/CD Monitoring | [F99-cicd-monitoring.md](architecture/F99-cicd-monitoring.md) |
 
 ## Cross-cutting concerns

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 
 /**
@@ -67,6 +68,9 @@ export async function handleChargeRefunded(
     const siteSlug = tenant?.slug ?? String((tenant as any)?.id ?? '')
     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
+    const cmsConfig = await getTemplateConfig(String(tenantId), 'order-refunded', 'buyer').catch(() => null)
+    if (cmsConfig?.enabled === false) return
+
     const email = orderRefundedEmail({
         shopName,
         orderNumber: order.orderNumber,
@@ -91,7 +95,7 @@ export async function handleChargeRefunded(
         shopUrl: `${baseUrl}/sites/${siteSlug}`,
         currency: order.currency ?? 'MYR',
         locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
-    })
+    }, cmsConfig ?? undefined)
 
     payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
         .catch((err: unknown) => payload.logger.error({ err }, '[charge.refunded] sendEmail failed'))

@@ -1,0 +1,2 @@
+- [Tenant scope & permissions](project_tenant_scope_permissions.md) — per-seller config FKs to tenants (not sites); PermissionId is a closed union
+- [Redis vs in-memory cache](project_redis_caching.md) — distributed cache = Upstash client in rateLimit.ts; cache.ts is in-memory only

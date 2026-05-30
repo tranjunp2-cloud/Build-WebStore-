@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -44,6 +46,7 @@ export interface OrderShippedData {
     orderPageUrl: string
     currency: string
     buyerNote?: string | null
+    supportEmail?: string
     locale?: EmailLocale
 }
 
@@ -85,10 +88,17 @@ function paymentMethodLabel(method: string, locale: EmailLocale): string {
     return locale === 'ms' ? 'Kad / FPX' : 'Card / FPX'
 }
 
-export function orderShippedEmail(data: OrderShippedData): { subject: string; html: string } {
+export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const orderBase = (locales[locale] ?? locales.ms).order
     const tS = (locales[locale] ?? locales.ms).shippedOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber, brandName: data.shopName, supportEmail: data.supportEmail ?? '' }
+    const t = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'farewell',
+    })
+    const tSMerged = mergeTemplateConfig(tS, config ?? null, vars, { subject: 'subject' })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -121,8 +131,8 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
             <td colspan="2"></td>
         </tr>` : ''
 
-    const subject = `${data.shopName} - ${tS.subject} - ${data.orderNumber}`
-    const htmlTitle = `${esc(data.shopName)} - ${tS.subject} - ${esc(data.orderNumber)}`
+    const subject = `${data.shopName} - ${tSMerged.subject} - ${data.orderNumber}`
+    const htmlTitle = `${esc(data.shopName)} - ${tSMerged.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,
@@ -133,25 +143,25 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${htmlTitle}</title>
 <style>
-  body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
+  body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   img{max-width:100%;height:auto;display:block;}
-  .page-bg{background:#EEF3F8;padding:48px 16px;}
+  .page-bg{background:transparent;padding:0;}
   @media(max-width:640px){
-    .page-bg{padding:16px 10px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
     .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
     .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
   }
   @media(max-width:420px){
-    .page-bg{padding:12px 6px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}
   }
 </style>
 </head>
 <body>
 <div class="page-bg">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF3F8;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:transparent;">
     <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
 
@@ -162,7 +172,7 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tS.body}</div>

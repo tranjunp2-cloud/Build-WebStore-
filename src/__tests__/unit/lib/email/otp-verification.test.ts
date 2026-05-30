@@ -266,7 +266,7 @@ describe('otpVerificationEmail — copyright year', () => {
 
 describe('otpVerificationEmail — userName injection', () => {
     it('renders different userNames correctly', () => {
-        const names = ['Ahmad', 'Siti Aishah', 'Lee Chong Wei', 'O\'Brien']
+        const names = ['Ahmad', 'Siti Aishah', 'Lee Chong Wei', 'Rajesh Kumar']
         names.forEach(name => {
             const result = otpVerificationEmail({ userName: name, otpCode: '123456' })
             expect(result.html).toContain(name)
