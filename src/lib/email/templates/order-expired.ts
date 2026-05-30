@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -44,6 +46,7 @@ export interface OrderExpiredData {
     elapsedTime?: string | null
     /** URL to shop/products page for the reorder CTA */
     reorderUrl: string
+    supportEmail?: string
     locale?: EmailLocale
 }
 
@@ -79,10 +82,19 @@ function buildAddress(addr: OrderExpiredData['customerAddress']): string {
         .join(', ')
 }
 
-export function orderExpiredEmail(data: OrderExpiredData): { subject: string; html: string } {
+export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const orderBase = (locales[locale] ?? locales.ms).order
     const tA = (locales[locale] ?? locales.ms).autoCancelledOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber, brandName: data.shopName, supportEmail: data.supportEmail ?? '' }
+    const t = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+        closing: 'farewell',
+    })
+    const tAMerged = mergeTemplateConfig(tA, config ?? null, vars, {
+        subject: 'subject',
+        ctaLabel: 'cta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -110,8 +122,8 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
             <td align="right" style="padding:6px 14px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#EF4444;">-${fp(data.discountAmount)}</td>
         </tr>` : ''
 
-    const subject = `${data.shopName} - ${tA.subject} - ${data.orderNumber}`
-    const htmlTitle = `${esc(data.shopName)} - ${tA.subject} - ${esc(data.orderNumber)}`
+    const subject = `${data.shopName} - ${tAMerged.subject} - ${data.orderNumber}`
+    const htmlTitle = `${esc(data.shopName)} - ${tAMerged.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,
@@ -122,25 +134,25 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${htmlTitle}</title>
 <style>
-  body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
+  body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   img{max-width:100%;height:auto;display:block;}
-  .page-bg{background:#EEF3F8;padding:48px 16px;}
+  .page-bg{background:transparent;padding:0;}
   @media(max-width:640px){
-    .page-bg{padding:16px 10px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
     .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
     .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
   }
   @media(max-width:420px){
-    .page-bg{padding:12px 6px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}
   }
 </style>
 </head>
 <body>
 <div class="page-bg">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF3F8;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:transparent;">
     <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
 
@@ -151,7 +163,7 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#475569;">${tA.body}</div>
@@ -284,7 +296,7 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 
       <!-- CTA -->
       <tr><td align="center" style="padding:22px 40px 8px;">
-        <a href="${data.reorderUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tA.cta}</a>
+        <a href="${data.reorderUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tAMerged.cta}</a>
       </td></tr>
       <tr><td align="center" style="padding:0 40px 6px;">
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:18px;color:#94A3B8;">${tA.ctaSubtitle}</div>

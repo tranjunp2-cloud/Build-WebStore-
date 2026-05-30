@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import type { User } from 'payload'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -66,9 +67,15 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     }
 
     // Helper: build and fire refund confirmation email (fire-and-forget)
-    function fireRefundEmail() {
+    async function fireRefundEmail() {
         if (!order.customerEmail) return
         const tenant = typeof order.tenant === 'object' ? order.tenant : null
+        const tenantId = tenant ? String(typeof tenant === 'object' ? (tenant as any).id : tenant) : null
+        const refundLocale: 'en' | 'ms' = ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms'
+        const cmsConfig = tenantId
+            ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', refundLocale).catch(() => null)
+            : null
+        if (cmsConfig?.enabled === false) return
         const shopName = tenant?.name ?? 'Shop'
         const siteSlug = tenant?.slug ?? ''
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
@@ -96,7 +103,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             shopUrl: `${baseUrl}/sites/${siteSlug}`,
             currency: order.currency ?? 'MYR',
             locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
-        })
+        }, cmsConfig ?? undefined)
         payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
             .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
     }

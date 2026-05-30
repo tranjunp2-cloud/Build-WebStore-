@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 type OrderStatus = 'confirmed' | 'ready_to_ship' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
@@ -55,9 +57,13 @@ const STATUS_EMOJIS: Record<OrderStatus, string> = {
     refunded: '↩️',
 }
 
-export function orderStatusEmail(data: OrderStatusEmailData): { subject: string; html: string } {
+export function orderStatusEmail(data: OrderStatusEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const { customerName, orderNumber, status, trackingNumber, trackingUrl, storeName = 'PrimeWeb', locale = 'en' } = data
-    const t = (locales[locale] || locales.en).status
+    const base = (locales[locale] || locales.en).status
+    const vars = { customerName, orderNumber }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        greeting: 'greeting',
+    })
     const statusT = t[status]
     const emoji = STATUS_EMOJIS[status]
     const color = STATUS_COLORS[status]
@@ -92,7 +98,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${esc(customerName)}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
                     ${statusT.description}
                 </p>

@@ -7,23 +7,13 @@
  * shared state across all instances via REST API (no TCP connection).
  */
 import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
+import { redis } from './redis'
 
 export interface RateLimitResult {
     allowed: boolean
     remaining: number
     resetAt: number
 }
-
-// ── Upstash Redis (distributed) ─────────────────────────────────────────
-const hasUpstash = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-
-const redis = hasUpstash
-    ? new Redis({
-          url: process.env.UPSTASH_REDIS_REST_URL!,
-          token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-      })
-    : null
 
 // Pre-configured limiters for common use cases
 const limiters = new Map<string, Ratelimit>()

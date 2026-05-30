@@ -8,6 +8,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -54,6 +56,7 @@ export interface BankTransferInstructionsData {
     bankAccountNo: string | null
     bankAccountHolder: string | null
     merchantQrUrl?: string | null
+    supportEmail?: string
     locale?: EmailLocale
 }
 
@@ -103,17 +106,37 @@ function buildAddress(addr: BankTransferInstructionsData['customerAddress']): st
 
 export function bankTransferInstructionsEmail(
     data: BankTransferInstructionsData,
+    config?: EmailTemplateConfig,
 ): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const tOrder = (locales[locale] ?? locales.ms).order
-    const tBT = (locales[locale] ?? locales.ms).bankTransfer
+    const orderBase = (locales[locale] ?? locales.ms).order
+    const btBase = (locales[locale] ?? locales.ms).bankTransfer
+    const vars = {
+        customerName: data.customerName,
+        orderNumber: data.orderNumber,
+        orderTotal: data.total.toFixed(2),
+        bankName: data.bankName ?? '',
+        bankAccountNo: data.bankAccountNo ?? '',
+        bankAccountHolder: data.bankAccountHolder ?? '',
+        brandName: data.shopName,
+        supportEmail: data.supportEmail ?? '',
+    }
+    const tOrder = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+        closing: 'farewell',
+    })
+    const tBT = mergeTemplateConfig(btBase, config ?? null, vars, {
+        ctaLabel: 'uploadCta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
 
-    const subject = locale === 'ms'
-        ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
-        : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`
+    const configSubject = config?.subject ? (applyVariables(config.subject, vars) ?? config.subject) : undefined
+    const subject = configSubject
+        ?? (locale === 'ms'
+            ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`)
 
     const itemRows = data.items.map((item) => `
         <tr>
@@ -163,25 +186,25 @@ export function bankTransferInstructionsEmail(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${subject}</title>
 <style>
-  body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
+  body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   img{max-width:100%;height:auto;display:block;}
-  .page-bg{background:#EEF3F8;padding:48px 16px;}
+  .page-bg{background:transparent;padding:0;}
   @media(max-width:640px){
-    .page-bg{padding:16px 10px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
     .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
     .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
   }
   @media(max-width:420px){
-    .page-bg{padding:12px 6px;}
+    .page-bg{padding:0;}
     .page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}
   }
 </style>
 </head>
 <body>
 <div class="page-bg">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF3F8;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:transparent;">
     <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
 
@@ -192,7 +215,7 @@ export function bankTransferInstructionsEmail(
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${tOrder.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${tOrder.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tBT.body}</div>
