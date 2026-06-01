@@ -103,12 +103,17 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
     return blocks.map(block => {
         let b = { ...block }
 
-        // Preserve block-level id when it's a UUID — Payload uses the provided id as the row PK,
-        // so localeContent keys (keyed by block.id) stay stable across save+reload cycles (C1 fix).
-        // Only strip _id (Mongo legacy) and non-UUID ids (which Payload would reject).
+        // Preserve the block-level id Payload uses as the row PK so localeContent keys (keyed by
+        // block.id) stay stable across save+reload (F26). Payload honors a provided id verbatim and
+        // only regenerates when it is absent (verified) — so we keep BOTH the editor's UUIDs AND
+        // Payload's 24-char hex ids. The earlier "UUID-only" guard stripped the hex form, forcing a
+        // new id every save and orphaning every per-locale override (the round-trip locale bug).
         const idVal = typeof b.id === 'string' ? b.id : null
-        const isUUID = idVal !== null && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(idVal)
-        if (!isUUID) delete b.id
+        const isStableId = idVal !== null && (
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(idVal) // editor UUID
+            || /^[0-9a-f]{24}$/.test(idVal)                                              // Payload hex
+        )
+        if (!isStableId) delete b.id
         delete b._id
 
         // Strip __localeInit before DB persist — attached by normalizeAddSectionBlock
