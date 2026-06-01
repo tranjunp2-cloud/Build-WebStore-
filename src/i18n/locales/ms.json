@@ -821,7 +821,7 @@
                 "cancelled": "Dibatalkan"
             },
             "tableHeaders": {
-                "orderNumber": "Pesanan #",
+                "orderNumber": "Pesanan",
                 "customer": "Pelanggan",
                 "total": "Jumlah",
                 "paymentMethod": "Pembayaran",
@@ -860,6 +860,7 @@
                 "paymentMethods": {
                     "bank_transfer": "Pindahan Bank",
                     "card": "Kad Kredit",
+                    "fpx": "FPX",
                     "cod": "Bayar Semasa Terima",
                     "ewallet": "e-Dompet"
                 },

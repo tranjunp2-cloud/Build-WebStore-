@@ -50,7 +50,10 @@ export function getStripeOAuthUrl(tenantId: string): string {
         prompt: 'login',
     })
 
-    return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
+    // Append requested_capabilities[] as literal strings (not via URLSearchParams which encodes
+    // [] to %5B%5D — Stripe's OAuth parser requires the unencoded bracket form)
+    const base = `https://connect.stripe.com/oauth/authorize?${params.toString()}`
+    return `${base}&requested_capabilities[]=card_payments&requested_capabilities[]=fpx_payments&requested_capabilities[]=transfers`
 }
 
 export async function exchangeOAuthCode(
