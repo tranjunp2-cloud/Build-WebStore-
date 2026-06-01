@@ -78,14 +78,23 @@ export async function handleAccountUpdated(
     const wasOnboardingComplete = tenantDoc.stripeOnboardingComplete ?? false
 
     const tenantUpdateData: Record<string, unknown> = { stripeOnboardingComplete: isOnboardingComplete }
-    // Sync payment flags only when onboarding status actually changes (false→true or true→false).
-    // Skipping on no-op events preserves any payment method preferences the merchant set manually.
+    const fpxCapable = (account as any).capabilities?.fpx_payments === 'active'
+
     if (isOnboardingComplete !== wasOnboardingComplete) {
-        // FPX is only available for MY accounts with fpx_payments capability active
-        const fpxCapable = (account as any).capabilities?.fpx_payments === 'active'
+        // Onboarding status changed — sync all payment flags
         tenantUpdateData.payments = isOnboardingComplete
             ? { payment_card: true, payment_fpx: fpxCapable }
             : { payment_card: false, payment_fpx: false }
+    } else if (isOnboardingComplete) {
+        // Onboarding already complete — check if fpx_payments capability changed
+        // (e.g. pending → active on a subsequent account.updated after initial onboarding)
+        const wasFpxEnabled = tenantDoc.payments?.payment_fpx ?? false
+        if (fpxCapable !== wasFpxEnabled) {
+            tenantUpdateData.payments = {
+                payment_card: tenantDoc.payments?.payment_card ?? true,
+                payment_fpx: fpxCapable,
+            }
+        }
     }
 
     await payload.update({
