@@ -1,8 +1,24 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Search } from 'lucide-react'
 import { useI18n } from '@/i18n'
+
+const PAYMENT_METHOD_VALUES: Record<string, string> = {
+    all: 'all',
+    cod: 'cod',
+    qrBanking: 'qr_banking',
+    bankTransfer: 'bank_transfer',
+    card: 'card',
+    fpx: 'fpx',
+    ewallet: 'ewallet',
+}
+
+const SORT_VALUES: Record<string, string> = {
+    dateNewest: '-createdAt',
+    dateOldest: 'createdAt',
+    totalHigh: '-total',
+    totalLow: 'total',
+}
 
 export function OrdersActionBar({
     pendingCount = 0,
@@ -10,7 +26,9 @@ export function OrdersActionBar({
     isConfirming = false,
     onSearch,
     onFilterStatus,
-    onFilterDate
+    onFilterDate,
+    onFilterPaymentMethod,
+    onSort,
 }: {
     pendingCount?: number
     onBulkConfirm?: () => void
@@ -18,6 +36,8 @@ export function OrdersActionBar({
     onSearch?: (val: string) => void
     onFilterStatus?: (val: string) => void
     onFilterDate?: (val: string) => void
+    onFilterPaymentMethod?: (val: string) => void
+    onSort?: (val: string) => void
 }) {
     const { t } = useI18n()
     const o = t.dashboard.orders
@@ -40,6 +60,16 @@ export function OrdersActionBar({
         { value: 'refunded', label: o.status.refunded }
     ], [o])
 
+    const PAYMENT_OPTIONS = useMemo(() => Object.entries(PAYMENT_METHOD_VALUES).map(([key, val]) => ({
+        value: val,
+        label: (o.paymentFilter as any)[key] as string,
+    })), [o])
+
+    const SORT_OPTIONS = useMemo(() => Object.entries(SORT_VALUES).map(([key, val]) => ({
+        value: val,
+        label: (o.sort as any)[key] as string,
+    })), [o])
+
     const [isDatesOpen, setIsDatesOpen] = useState(false)
     const [selectedDateIdx, setSelectedDateIdx] = useState(0)
     const datesRef = useRef<HTMLDivElement>(null)
@@ -48,15 +78,20 @@ export function OrdersActionBar({
     const [selectedStatusIdx, setSelectedStatusIdx] = useState(0)
     const statusRef = useRef<HTMLDivElement>(null)
 
-    // Click outside handler
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false)
+    const [selectedPaymentIdx, setSelectedPaymentIdx] = useState(0)
+    const paymentRef = useRef<HTMLDivElement>(null)
+
+    const [isSortOpen, setIsSortOpen] = useState(false)
+    const [selectedSortIdx, setSelectedSortIdx] = useState(0)
+    const sortRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (datesRef.current && !datesRef.current.contains(event.target as Node)) {
-                setIsDatesOpen(false)
-            }
-            if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
-                setIsStatusOpen(false)
-            }
+            if (datesRef.current && !datesRef.current.contains(event.target as Node)) setIsDatesOpen(false)
+            if (statusRef.current && !statusRef.current.contains(event.target as Node)) setIsStatusOpen(false)
+            if (paymentRef.current && !paymentRef.current.contains(event.target as Node)) setIsPaymentOpen(false)
+            if (sortRef.current && !sortRef.current.contains(event.target as Node)) setIsSortOpen(false)
         }
         document.addEventListener("mousedown", handleClickOutside)
         return () => document.removeEventListener("mousedown", handleClickOutside)
@@ -64,9 +99,9 @@ export function OrdersActionBar({
 
     return (
         <div className="flex flex-col gap-[22px] w-full">
-            {/* Top Row (Responsive: Stack on Mobile, Row on Desktop) */}
+            {/* Row 1: Search + Date + Status */}
             <div className="flex flex-col md:flex-row flex-[1_0_0] items-start md:items-center gap-[12px] self-stretch justify-between w-full">
-                {/* Search Input (30955:5468) */}
+                {/* Search Input */}
                 <div className="relative w-full md:flex-1 h-[50px]">
                     <div className="absolute left-[16px] top-[15px] w-[20px] h-[20px] flex items-center justify-center pointer-events-none">
                         <svg width="20" height="23" viewBox="0 0 20 23" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -83,103 +118,120 @@ export function OrdersActionBar({
                     />
                 </div>
 
-                {/* Dropdowns Container */}
+                {/* Dropdowns Row 1: Date + Status */}
                 <div className="flex items-center gap-[12px] w-full md:w-auto h-[50px]">
-                    {/* Dropdown 1 - All dates */}
-                    <div className="relative flex-1 md:flex-none" ref={datesRef}>
-                        <button
-                            onClick={() => setIsDatesOpen(!isDatesOpen)}
-                            style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center justify-between w-full md:w-[143px] h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0"
-                        >
-                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
-                                {DATES_OPTIONS[selectedDateIdx].label}
-                            </span>
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isDatesOpen ? 'rotate-180' : ''}`}>
-                                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </button>
-
-                        {/* Dropdown Popover (31137:5911) */}
-                        {isDatesOpen && (
-                            <div className="absolute top-[calc(100%+4px)] left-0 z-50 flex flex-col items-stretch w-[143px] py-[4px] drop-shadow-[0px_8px_24px_rgba(25,32,56,0.1)]">
-                                {/* Arrow Top */}
-                                <div className="flex flex-col w-full items-start px-[22px]">
-                                    <svg width="12" height="6" viewBox="16 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="block relative top-[1px] z-10">
-                                        <path d="M28 6L22 0L16 6H28Z" fill="var(--dash-secondary-bg)" />
-                                    </svg>
-                                </div>
-                                {/* List */}
-                                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
-                                    {DATES_OPTIONS.map((option, index) => (
-                                        <button
-                                            key={option.value}
-                                            onClick={() => {
-                                                setSelectedDateIdx(index)
-                                                setIsDatesOpen(false)
-                                                onFilterDate?.(option.value)
-                                            }}
-                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedDateIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
-                                        >
-                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
-                                                {option.label}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Dropdown 2 (30955:5719) - All status */}
-                    <div className="relative flex-1 md:flex-none" ref={statusRef}>
-                        <button
-                            onClick={() => setIsStatusOpen(!isStatusOpen)}
-                            style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center justify-between w-full md:w-[138px] h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0"
-                        >
-                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
-                                {STATUS_OPTIONS[selectedStatusIdx].label}
-                            </span>
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isStatusOpen ? 'rotate-180' : ''}`}>
-                                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </button>
-
-                        {/* Dropdown Popover */}
-                        {isStatusOpen && (
-                            <div className="absolute top-[calc(100%+4px)] left-0 z-50 flex flex-col items-stretch w-[143px] py-[4px] drop-shadow-[0px_8px_24px_rgba(25,32,56,0.1)]">
-                                {/* Arrow Top */}
-                                <div className="flex flex-col w-full items-start px-[22px]">
-                                    <svg width="12" height="6" viewBox="16 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="block relative top-[1px] z-10">
-                                        <path d="M28 6L22 0L16 6H28Z" fill="var(--dash-secondary-bg)" />
-                                    </svg>
-                                </div>
-                                {/* List */}
-                                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
-                                    {STATUS_OPTIONS.map((option, index) => (
-                                        <button
-                                            key={option.value}
-                                            onClick={() => {
-                                                setSelectedStatusIdx(index)
-                                                setIsStatusOpen(false)
-                                                onFilterStatus?.(option.value)
-                                            }}
-                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedStatusIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
-                                        >
-                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
-                                                {option.label}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <FilterDropdown
+                        ref={datesRef}
+                        isOpen={isDatesOpen}
+                        onToggle={() => setIsDatesOpen(!isDatesOpen)}
+                        selectedIdx={selectedDateIdx}
+                        options={DATES_OPTIONS}
+                        onSelect={(idx) => {
+                            setSelectedDateIdx(idx)
+                            setIsDatesOpen(false)
+                            onFilterDate?.(DATES_OPTIONS[idx].value)
+                        }}
+                        width="md:w-[143px]"
+                    />
+                    <FilterDropdown
+                        ref={statusRef}
+                        isOpen={isStatusOpen}
+                        onToggle={() => setIsStatusOpen(!isStatusOpen)}
+                        selectedIdx={selectedStatusIdx}
+                        options={STATUS_OPTIONS}
+                        onSelect={(idx) => {
+                            setSelectedStatusIdx(idx)
+                            setIsStatusOpen(false)
+                            onFilterStatus?.(STATUS_OPTIONS[idx].value)
+                        }}
+                        width="md:w-[138px]"
+                    />
                 </div>
             </div>
 
-            {/* Confirm button hidden temporarily */}
+            {/* Row 2: Payment Method + Sort */}
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-[12px] w-full">
+                <div className="flex items-center gap-[12px] w-full md:w-auto h-[50px]">
+                    <FilterDropdown
+                        ref={paymentRef}
+                        isOpen={isPaymentOpen}
+                        onToggle={() => setIsPaymentOpen(!isPaymentOpen)}
+                        selectedIdx={selectedPaymentIdx}
+                        options={PAYMENT_OPTIONS}
+                        onSelect={(idx) => {
+                            setSelectedPaymentIdx(idx)
+                            setIsPaymentOpen(false)
+                            onFilterPaymentMethod?.(PAYMENT_OPTIONS[idx].value === 'all' ? '' : PAYMENT_OPTIONS[idx].value)
+                        }}
+                        width="md:w-[155px]"
+                        dropdownWidth="w-[155px]"
+                    />
+                    <FilterDropdown
+                        ref={sortRef}
+                        isOpen={isSortOpen}
+                        onToggle={() => setIsSortOpen(!isSortOpen)}
+                        selectedIdx={selectedSortIdx}
+                        options={SORT_OPTIONS}
+                        onSelect={(idx) => {
+                            setSelectedSortIdx(idx)
+                            setIsSortOpen(false)
+                            onSort?.(SORT_OPTIONS[idx].value)
+                        }}
+                        width="md:w-[200px]"
+                        dropdownWidth="w-[200px]"
+                    />
+                </div>
+            </div>
         </div>
     )
 }
+
+// ─── Shared Dropdown Component ───
+const FilterDropdown = React.forwardRef<HTMLDivElement, {
+    isOpen: boolean
+    onToggle: () => void
+    selectedIdx: number
+    options: { value: string; label: string }[]
+    onSelect: (idx: number) => void
+    width?: string
+    dropdownWidth?: string
+}>(({ isOpen, onToggle, selectedIdx, options, onSelect, width = 'md:w-[143px]', dropdownWidth = 'w-[143px]' }, ref) => (
+    <div className={`relative flex-1 md:flex-none`} ref={ref}>
+        <button
+            onClick={onToggle}
+            style={{ border: '1px solid var(--dash-border)' }}
+            className={`flex items-center justify-between w-full ${width} h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0`}
+        >
+            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
+                {options[selectedIdx]?.label}
+            </span>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
+                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </button>
+
+        {isOpen && (
+            <div className={`absolute top-[calc(100%+4px)] left-0 z-50 flex flex-col items-stretch ${dropdownWidth} py-[4px] drop-shadow-[0px_8px_24px_rgba(25,32,56,0.1)]`}>
+                <div className="flex flex-col w-full items-start px-[22px]">
+                    <svg width="12" height="6" viewBox="16 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="block relative top-[1px] z-10">
+                        <path d="M28 6L22 0L16 6H28Z" fill="var(--dash-secondary-bg)" />
+                    </svg>
+                </div>
+                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
+                    {options.map((option, index) => (
+                        <button
+                            key={option.value}
+                            onClick={() => onSelect(index)}
+                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
+                        >
+                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
+                                {option.label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+))
+FilterDropdown.displayName = 'FilterDropdown'
