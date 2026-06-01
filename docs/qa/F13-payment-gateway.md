@@ -328,6 +328,18 @@ Mỗi dòng report phải có: TC-ID, PASS/FAIL/BLOCKED, environment, browser/de
 | **TC-F13.156** | FR-23, US-F13-06 | Cron/Sec | **[High]** Cron expires stale pending >24h; rejects request without valid CRON_SECRET | 1. Order pending > 24h, no stripeSessionId / session expired at Stripe.<br>2. Cron GET `/api/cron/reconcile-orders` with/without CRON_SECRET. | **THEN** cron expires stale, sets status='expired' (buyer notified); reject 401 if CRON_SECRET missing/invalid. | High | [x] |
 | **TC-F13.157** | FR-18 schema, v1.6 | Schema/CI | **[Medium]** `oversell_review` column migration idempotent, check-migrations passes | 1. `scripts/db-setup.js` has entry `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN DEFAULT false`.<br>2. Run `node scripts/check-migrations.js origin/staging`. | **THEN** migration apply idempotent; no errors on replay; schema consistent staging/prod. | Medium | [x] |
 
+#### Nhom Refund API (GH-#1082)
+
+| ID | US/FR Ref | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F13.158** | Security/IDOR | API | **[High]** POST /api/orders/[id]/refund boi user khong thuoc tenant → 403 FORBIDDEN | 1. User A authed.<br>2. Refund order thuoc tenant B. | **THEN** 403 FORBIDDEN; khong refund, khong thay doi status. | High | [x] |
+| **TC-F13.159** | Validation | API | **[Med]** Refund order khong co Stripe payment intent → 400 NO_PAYMENT_INTENT | 1. Order khong co `stripePaymentIntentId`.<br>2. POST refund. | **THEN** 400 NO_PAYMENT_INTENT; khong goi Stripe API. | Med | [x] |
+| **TC-F13.160** | Webhook/Restock | Webhook | **[High]** charge.refunded: CAS success + variant item → restockItem called voi dung args | 1. Webhook charge.refunded arrive.<br>2. Order chua o trang thai refunded.<br>3. Item co variant. | **THEN** restockItem goi voi dung productId, variantName, qty; khong logger.error. | High | [x] |
+| **TC-F13.161** | Webhook/Idempotency | Webhook | **[High]** charge.refunded: CAS miss (order da refunded) → restockItem KHONG goi | 1. Webhook arrive lan 2 (at-least-once).<br>2. CAS tra ve 0 rows. | **THEN** restockItem khong goi; logger.info "already refunded"; handler return som. | High | [x] |
+| **TC-F13.162** | Webhook/DataIntegrity | Webhook | **[High]** charge.refunded: item.product = null → logger.error, restock skip, khong crash | 1. Order item co product = null (data integrity issue).<br>2. Webhook arrive. | **THEN** logger.error voi itemIndex; restockItem khong goi; handler khong throw. | High | [x] |
+| **TC-F13.163** | Webhook/Restock | Webhook | **[Med]** charge.refunded: null_inventory → logger.warn only, KHONG ops error | 1. restockItem tra ve null_inventory.<br>2. Webhook xu ly. | **THEN** logger.warn "inventory tracking disabled"; logger.error khong goi cho restock. | Med | [x] |
+| **TC-F13.164** | Webhook/Restock | Webhook | **[High]** charge.refunded: write_failed → logger.error ops alert | 1. restockItem tra ve write_failed.<br>2. Webhook xu ly. | **THEN** logger.error "manual inventory reconciliation required" voi productId + reason. | High | [x] |
+
 ---
 
 ## 8. Traceability Summary

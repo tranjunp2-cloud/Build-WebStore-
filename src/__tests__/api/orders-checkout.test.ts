@@ -7,10 +7,12 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockSendEmail = vi.fn(() => Promise.resolve())
 const mockDrizzleExecute = vi.fn()
+const mockLogger = { warn: vi.fn(), error: vi.fn(), info: vi.fn() }
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate, delete: mockDelete, sendEmail: mockSendEmail,
         db: { drizzle: { execute: mockDrizzleExecute } },
+        logger: mockLogger,
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -855,8 +857,6 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         mockFind.mockResolvedValueOnce(mockProduct(variantProd))
         mockCreate.mockResolvedValue({ id: 'order-recompute-1' })
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
         mockDrizzleExecute
             .mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] })  // 1. product check
             .mockResolvedValueOnce({ rows: [{ id: 'uuid-a' }] })  // 2. CAS decrement → success
@@ -878,11 +878,10 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // No compensation: delete not called
         expect(mockDelete).not.toHaveBeenCalled()
         // Recompute failure was logged as warning, not thrown
-        expect(consoleSpy).toHaveBeenCalledWith(
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+            expect.objectContaining({ productId: expect.anything() }),
             expect.stringContaining('[Decrement] Inventory recompute failed'),
-            expect.any(Error)
         )
-        consoleSpy.mockRestore()
     })
 
     it('[TC-F10-02-20] Product deleted mid-decrement → 422 OUT_OF_STOCK with "no longer available" message', async () => {
