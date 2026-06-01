@@ -14,9 +14,21 @@ import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCachedTranslation, setCachedTranslation } from '@/lib/ai/translate-cache'
+import { sanitizeText } from '@/utils/sanitize'
 
-// Allowlisted locales — prevents prompt injection via user-supplied locale strings
-const SUPPORTED_TARGET_LOCALES = ['en', 'ms', 'zh', 'th', 'id'] as const
+// Allowlisted locales — F26 Phase 1 is EN + BM only (BR-06). Reject anything else with 400.
+const SUPPORTED_TARGET_LOCALES = ['en', 'ms'] as const
+
+// Recursively strip HTML from every string leaf of the AI-translated output before it is
+// cached / returned / persisted — defence against XSS in model output (TC-F26-04-08).
+function sanitizeTranslated(value: unknown): unknown {
+    if (typeof value === 'string') return sanitizeText(value)
+    if (Array.isArray(value)) return value.map(sanitizeTranslated)
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, sanitizeTranslated(v)]))
+    }
+    return value
+}
 
 const translateSchema = z.object({
     blockType: z.string().min(1).max(64),
@@ -122,6 +134,9 @@ export const POST = withAuth(async (user, req) => {
             // Malformed JSON → safe fallback
             return NextResponse.json({ translated: content, status: 'fallback' })
         }
+
+        // TC-F26-04-08: strip any HTML the model may have injected before it is stored/rendered.
+        translated = sanitizeTranslated(translated) as Record<string, unknown>
 
         // Cache for subsequent calls (same block type + locale)
         setCachedTranslation(blockType, targetLocale, translated)

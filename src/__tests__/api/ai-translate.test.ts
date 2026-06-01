@@ -256,4 +256,44 @@ describe('POST /api/ai/translate', () => {
             expect(body.translated).toEqual(inner)
         })
     })
+
+    // QA TC-F26-04-07: Phase 1 locale allowlist — only en/ms accepted
+    describe('QA TC-F26-04-07: unsupported targetLocale → 400', () => {
+        it('rejects "zh" (and other non en/ms locales) with 400', async () => {
+            // Arrange
+            const req = makeRequest({ ...VALID_BODY, targetLocale: 'zh' })
+
+            // Act
+            const res = await TranslatePOST(req)
+
+            // Assert — zod enum rejects Phase-2 locales
+            expect(res.status).toBe(400)
+        })
+    })
+
+    // QA TC-F26-04-08: AI output is HTML-sanitized before it is cached/returned
+    describe('QA TC-F26-04-08: XSS in AI output stripped before insert', () => {
+        it('removes <script> tags from translated string values', async () => {
+            // Arrange — model returns an XSS payload inside a translated field
+            const prev = process.env.OPENAI_API_KEY
+            process.env.OPENAI_API_KEY = 'test-key'
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as any
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({ headline: "<script>alert('xss')</script>Selamat Datang" }) } }],
+            })
+            const req = makeRequest(VALID_BODY)
+
+            // Act
+            const res = await TranslatePOST(req)
+            const body = await res.json()
+
+            // Assert — script tag stripped, safe text retained
+            expect(res.status).toBe(200)
+            expect(JSON.stringify(body.translated)).not.toContain('<script>')
+            expect(body.translated.headline).toContain('Selamat Datang')
+
+            process.env.OPENAI_API_KEY = prev
+        })
+    })
 })

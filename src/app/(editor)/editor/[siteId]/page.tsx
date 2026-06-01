@@ -998,6 +998,10 @@ export default function EditorPage() {
 
     // F-26-04: Translate a specific block instance (called after block drop when needsTranslation)
     const handleAutoTranslateBlock = useCallback(async (blockId: string, blockType: string) => {
+        // TC-F26-04-03/04: non-blocking notice when auto-translation can't complete. EN default
+        // is already in place (AC-3) so this only informs — never blocks the editor.
+        const notifyFallback = () =>
+            toast.warning('Auto-translation unavailable — using English default for now.')
         try {
             // Send with {brand} token intact so server cache is brand-agnostic (Fix 3)
             const rawContent = resolveBlockContent(blockType, 'en', '{brand}').content
@@ -1007,9 +1011,9 @@ export default function EditorPage() {
                 credentials: 'include',
                 body: JSON.stringify({ blockType, targetLocale: 'ms', content: rawContent }),
             })
-            if (!res.ok) return
+            if (!res.ok) { notifyFallback(); return }
             const json = await res.json() as { translated?: Record<string, unknown>; status?: string }
-            if (json.status === 'fallback' || !json.translated) return
+            if (json.status === 'fallback' || !json.translated) { notifyFallback(); return }
             // Re-apply brand after retrieval (cache stores {brand} tokens)
             const branded = interpolateBrand(json.translated, siteName || 'Your Brand')
             setLocaleOverride(blockId, 'ms', branded)
@@ -1026,7 +1030,8 @@ export default function EditorPage() {
                 }
             }, 0)
         } catch {
-            // AC-3: Non-fatal — EN fallback already in place
+            // AC-3: Non-fatal — EN fallback already in place; inform user (TC-F26-04-04 timeout path).
+            notifyFallback()
         }
     }, [siteId, siteName, setLocaleOverride])
 
