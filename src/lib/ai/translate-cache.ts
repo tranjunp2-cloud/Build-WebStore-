@@ -1,8 +1,15 @@
 /**
  * Server-side in-memory translation cache for F26-04 AI translate fallback.
- * Key: `${blockType}_${locale}` — scoped to process lifetime.
+ * Key: `${blockType}||${locale}` — scoped to process lifetime.
  * Prevents repeated OpenAI calls for the same block type + locale in a session.
  * If the server restarts, the cache is empty and AI calls are made fresh.
+ *
+ * IMPORTANT — content-scoping is the CALLER's responsibility, not this cache's:
+ * - Template defaults (brand-agnostic, `{brand}` token intact) are cached under the bare
+ *   `blockType` on purpose — they are shared across all sites.
+ * - User/site-specific content must pass a content-unique `blockType` (the editor body-translate
+ *   path uses `${blockType}-${block.id}`) so two different blocks never collide on the same key.
+ * Do NOT pass raw user content under a bare `blockType` or it will be served to other blocks.
  */
 
 type BlockContent = Record<string, unknown>
