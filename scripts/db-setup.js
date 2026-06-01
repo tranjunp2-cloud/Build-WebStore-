@@ -4127,6 +4127,21 @@ const MIGRATIONS = [
     name: 'sites.generation_locale',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_locale varchar DEFAULT 'ms';`,
   },
+  // ── F26 fix: the DEFAULT 'ms' above wrongly tagged pre-F26 sites (whose locale is 'en') with
+  // generation_locale='ms'. In the editor that makes activeLocale ('en') != baseLocale ('ms'), so
+  // getDisplayBlock applies generic locale templates over the user's saved content. Backfill only the
+  // rows carrying the default 'ms' whose locale is NOT 'ms' (targeted — never touches a legitimately
+  // non-standard gen locale like 'vi'/'el', which keep locale='ms' as their translation slot).
+  {
+    name: 'sites.generation_locale.backfill_locale',
+    sql: `UPDATE sites SET generation_locale = locale::text WHERE generation_locale = 'ms' AND locale::text IS DISTINCT FROM 'ms';`,
+  },
+  // Drop the misleading default so any future row without an explicit generation_locale stays NULL —
+  // editor-data then falls back to `site.locale` (correct) instead of a hardcoded 'ms'.
+  {
+    name: 'sites.generation_locale.drop_default',
+    sql: `ALTER TABLE sites ALTER COLUMN generation_locale DROP DEFAULT;`,
+  },
   // BUG-#1082: index for SQL CAS queries on products_variants(_parent_id, name)
   // used by decrementVariantStock + restockItem on every variant checkout/cancel
   { name: 'products_variants.parent_name_idx',
