@@ -74,6 +74,10 @@ export const saveSiteSchema = z.object({
         freeAbove: z.number().min(1).max(10_000_000).nullable().optional(),
     }).optional(),
     isDraft: z.boolean().optional(),
+    /** F-26: Per-block locale content map — persisted to pages.locale_content */
+    localeContent: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+    /** F26-01: Clear pendingLocaleConfirm flag after user confirms/dismisses dialog */
+    pendingLocaleConfirm: z.boolean().optional(),
 }).refine(data => data.blocks !== undefined
     || data.theme !== undefined
     || data.locale !== undefined
@@ -86,6 +90,8 @@ export const saveSiteSchema = z.object({
     || data.socialLinks !== undefined
     || data.branding !== undefined
     || data.seo !== undefined
-    || data.isDraft !== undefined, {
+    || data.isDraft !== undefined
+    || data.localeContent !== undefined
+    || data.pendingLocaleConfirm !== undefined, {
     message: 'At least one editable site field must be provided',
 })

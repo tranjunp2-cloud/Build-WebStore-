@@ -31,6 +31,8 @@ export function OrdersClientLayout() {
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [dateFilter, setDateFilter] = useState('all')
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('')
+    const [sortOrder, setSortOrder] = useState('-createdAt')
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -108,6 +110,8 @@ export function OrdersClientLayout() {
                 onSearch={setSearchQuery}
                 onFilterStatus={setStatusFilter}
                 onFilterDate={setDateFilter}
+                onFilterPaymentMethod={setPaymentMethodFilter}
+                onSort={setSortOrder}
             />
             <OrdersTable
                 onSelectOrder={handleSelectOrder}
@@ -120,6 +124,8 @@ export function OrdersClientLayout() {
                 searchQuery={debouncedSearch}
                 statusFilter={statusFilter}
                 dateFilter={dateFilter}
+                paymentMethodFilter={paymentMethodFilter}
+                sortOrder={sortOrder}
             />
 
             {isOpen && (

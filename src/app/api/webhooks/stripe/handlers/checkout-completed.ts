@@ -7,6 +7,7 @@ import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
+import { getStripeClient } from '@/lib/payment/stripe-client'
 
 /** Minimal shape of a tenant document for webhook notification logic. */
 export interface TenantDoc {
@@ -114,12 +115,7 @@ export async function handleCheckoutCompleted(
     }
 
     try {
-        // payment_method_types is the enabled list, not the method buyer actually used.
-        // Accurate only when length === 1 (single-method tenant). Multi-method defaults 'card'
-        // until stripeChargeId expansion is available (Wave 7).
-        const enabledTypes = session.payment_method_types ?? []
-        const paymentMethod: 'card' | 'fpx' =
-            enabledTypes.length === 1 && enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
+        const paymentMethod = await resolveActualPaymentMethod(session, event.connectedAccountId)
 
         // Record Stripe IDs (idempotent — status already set atomically above)
         await payload.update({
@@ -266,5 +262,40 @@ async function decrementStock(
         console.log(`[Stripe Webhook] Stock decremented: product ${productId} -${quantity}`)
     } catch (err) {
         console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
+    }
+}
+
+/** Resolve the actual payment method used by expanding payment_intent.payment_method.
+ *  Falls back to 'card' if expansion fails or method is unrecognized. */
+async function resolveActualPaymentMethod(
+    session: Record<string, any>,
+    connectedAccountId?: string,
+): Promise<'card' | 'fpx'> {
+    const enabledTypes: string[] = session.payment_method_types ?? []
+
+    // Single-method tenant: no ambiguity
+    if (enabledTypes.length === 1) {
+        return enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
+    }
+
+    // Multi-method: expand payment_intent to get the method buyer actually used
+    const paymentIntentId = typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : (session.payment_intent as { id?: string } | null)?.id
+
+    if (!paymentIntentId) return 'card'
+
+    try {
+        const stripe = getStripeClient()
+        const pi = await stripe.paymentIntents.retrieve(
+            paymentIntentId,
+            { expand: ['payment_method'] },
+            connectedAccountId ? { stripeAccount: connectedAccountId } : undefined,
+        )
+        const pmType = (pi.payment_method as { type?: string } | null)?.type
+        return pmType === 'fpx' ? 'fpx' : 'card'
+    } catch (err) {
+        console.warn('[Stripe Webhook] Could not expand payment_intent for method detection, defaulting to card:', err)
+        return 'card'
     }
 }

@@ -2,6 +2,7 @@ import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { getTeamAvatar } from '@/lib/images/industry-images'
 import { dedupSectionLabel } from './dedup-section-label'
+import { resolveBlockContent } from './add-section-content'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -55,11 +56,15 @@ export type SupportedAddSectionType =
     | 'property-card'
     | 'product-quick-view'
 
+export type AddSectionLocale = 'en' | 'ms'
+
 type AddSectionContext = {
     instruction: string
     siteName?: string
     theme?: ThemeData
     requestedType?: string
+    /** Site locale — defaults to 'en' when absent (back-compat). */
+    locale?: AddSectionLocale
 }
 
 const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
@@ -217,115 +222,118 @@ export function createAddSectionBlock({
     instruction,
     siteName,
     requestedType,
+    locale: rawLocale,
 }: AddSectionContext): BlockData | null {
     const sectionType = inferAddSectionType(instruction, requestedType)
     const brandName = siteName?.trim() || 'Your Brand'
+    const locale: AddSectionLocale = rawLocale === 'ms' ? 'ms' : 'en'
 
     switch (sectionType) {
         case 'testimonials': {
             const reviewCount = getRequestedCount(instruction, 3)
+            const r = resolveBlockContent('testimonials', locale, brandName)
+            const c = r.content as {
+                headline: string
+                quoteTemplate: string
+                nameTemplate: string
+                title: string
+            }
             return {
                 blockType: 'testimonials',
                 variant: 'grid',
-                headline: `What customers say about ${brandName}`,
+                headline: c.headline,
                 testimonials: Array.from({ length: reviewCount }, (_, index) => ({
-                    quote: `Placeholder review ${index + 1} for ${brandName}. Replace this with a real customer story.`,
-                    name: `Customer ${index + 1}`,
-                    title: 'Happy Customer',
+                    quote: c.quoteTemplate.replace(/\{n\}/g, String(index + 1)),
+                    name: c.nameTemplate.replace(/\{n\}/g, String(index + 1)),
+                    title: c.title,
                     company: brandName,
                     rating: 5,
                 })),
             }
         }
 
-        case 'faq':
+        case 'faq': {
+            const r = resolveBlockContent('faq', locale, brandName)
+            const c = r.content as { headline: string; items: Array<{ question: string; answer: string }> }
             return {
                 blockType: 'faq',
-                headline: `Frequently asked questions about ${brandName}`,
-                faqs: [
-                    {
-                        question: `What makes ${brandName} different?`,
-                        answer: `${brandName} focuses on clear value, polished delivery, and a better customer experience from the first interaction.`,
-                    },
-                    {
-                        question: 'How quickly can I get started?',
-                        answer: 'Most customers can get started right away after a quick consultation or onboarding step.',
-                    },
-                    {
-                        question: 'Do you offer support after purchase?',
-                        answer: 'Yes. We continue to support customers with guidance, updates, and responsive communication.',
-                    },
-                ],
+                headline: c.headline,
+                faqs: c.items,
             }
+        }
 
-        case 'gallery':
+        case 'gallery': {
+            const r = resolveBlockContent('gallery', locale, brandName)
+            const c = r.content as { headline: string }
             return {
                 blockType: 'gallery',
                 layout: 'grid',
-                headline: `${brandName} in action`,
+                headline: c.headline,
                 images: Array.from({ length: getRequestedCount(instruction, 6) }, (_, index) =>
                     getPlaceholderImage(index),
                 ),
             }
+        }
 
         case 'features': {
-            const headline = `Why customers choose ${brandName}`
+            const r = resolveBlockContent('features', locale, brandName)
+            const c = r.content as {
+                sectionLabelBase: string
+                headline: string
+                subheadline: string
+                items: Array<{ icon: string; title: string; description: string }>
+            }
             return {
                 blockType: 'features',
                 layout: 'grid-3',
-                sectionLabel: dedupSectionLabel('Why Choose Us', headline),
-                headline,
-                subheadline: 'Three strong reasons to trust this offer.',
-                features: [
-                    {
-                        icon: '⚡',
-                        title: 'Fast to understand',
-                        description: 'Explain the offer clearly so visitors know the value right away.',
-                    },
-                    {
-                        icon: '🛡️',
-                        title: 'Built on trust',
-                        description: 'Reassure visitors with consistency, proof, and confident positioning.',
-                    },
-                    {
-                        icon: '🎯',
-                        title: 'Made to convert',
-                        description: 'Guide visitors toward the next step with simple, focused messaging.',
-                    },
-                ],
+                sectionLabel: dedupSectionLabel(c.sectionLabelBase, c.headline),
+                headline: c.headline,
+                subheadline: c.subheadline,
+                features: c.items,
             }
         }
 
-        case 'team':
+        case 'team': {
+            const r = resolveBlockContent('team', locale, brandName)
+            const c = r.content as {
+                headline: string
+                members: Array<{ name: string; role: string; bio: string }>
+            }
             return {
                 blockType: 'team',
-                headline: `Meet the team behind ${brandName}`,
-                members: [
-                    { name: 'Team Member 1', role: 'Founder', bio: 'Add a short founder introduction here.', avatar: { url: getTeamAvatar('business', 0), alt: 'Team Member 1' } },
-                    { name: 'Team Member 2', role: 'Operations Lead', bio: 'Highlight day-to-day operational excellence.', avatar: { url: getTeamAvatar('business', 1), alt: 'Team Member 2' } },
-                    { name: 'Team Member 3', role: 'Customer Success', bio: 'Show the human side of your brand experience.', avatar: { url: getTeamAvatar('business', 2), alt: 'Team Member 3' } },
-                ],
+                headline: c.headline,
+                members: c.members.map((m, i) => ({
+                    ...m,
+                    avatar: { url: getTeamAvatar('business', i), alt: m.name },
+                })),
             }
+        }
 
-        case 'newsletter':
+        case 'newsletter': {
+            const r = resolveBlockContent('newsletter', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; buttonLabel: string; placeholder: string }
             return {
                 blockType: 'newsletter',
                 variant: 'inline',
-                headline: `Stay in the loop with ${brandName}`,
-                subheadline: 'Get updates, offers, and useful tips delivered straight to your inbox.',
-                buttonLabel: 'Subscribe',
-                placeholder: 'Enter your email',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                buttonLabel: c.buttonLabel,
+                placeholder: c.placeholder,
             }
+        }
 
         case 'banner':
-        case 'cta':
+        case 'cta': {
+            const r = resolveBlockContent('cta', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; ctaLabel: string }
             return {
                 blockType: 'hero',
                 variant: 'centered',
-                headline: `Ready to take the next step with ${brandName}?`,
-                subheadline: 'Use this section to highlight your strongest offer or campaign.',
-                ctaButtons: [{ label: 'Get Started', url: '#contact', style: 'primary' }],
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaButtons: [{ label: c.ctaLabel, url: '#contact', style: 'primary' }],
             }
+        }
 
         case 'socialWidget':
             return normalizeSocialWidgetConfig({
@@ -486,17 +494,16 @@ export function createAddSectionBlock({
                 logos: Array.from({ length: 6 }, (_, i) => ({ url: '', alt: `Partner ${i + 1}` })),
             }
 
-        case 'accordion':
+        case 'accordion': {
+            const r = resolveBlockContent('accordion', locale, brandName)
+            const c = r.content as { headline: string; items: Array<{ title: string; content: string }> }
             return {
                 blockType: 'accordion',
                 variant: 'bordered',
-                headline: 'More Information',
-                items: [
-                    { title: 'What services do you offer?', content: `${brandName} provides comprehensive solutions tailored to your needs.` },
-                    { title: 'How can I get started?', content: 'Simply contact us through the form above or give us a call.' },
-                    { title: 'What are your business hours?', content: 'We are open Monday to Friday, 9am to 6pm.' },
-                ],
+                headline: c.headline,
+                items: c.items,
             }
+        }
 
         case 'step-process':
             return {
@@ -548,18 +555,21 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'service-cards':
+        case 'service-cards': {
+            const r = resolveBlockContent('service-cards', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                services: Array<{ title: string; description: string; icon: string; price: string; priceUnit: string }>
+            }
             return {
                 blockType: 'service-cards',
                 variant: 'grid',
-                headline: 'Our Services',
-                subheadline: `What ${brandName} can do for you.`,
-                services: [
-                    { title: 'Web Design', description: 'Beautiful, responsive websites that convert visitors into customers.', icon: '🎨', price: 'From RM 1,500', priceUnit: '/project' },
-                    { title: 'SEO Optimization', description: 'Get found on Google with data-driven SEO strategies.', icon: '🔍', price: 'From RM 500', priceUnit: '/month' },
-                    { title: 'Social Media', description: 'Grow your audience with engaging social content.', icon: '📱', price: 'From RM 800', priceUnit: '/month' },
-                ],
+                headline: c.headline,
+                subheadline: c.subheadline,
+                services: c.services,
             }
+        }
 
         case 'carousel':
             return {
@@ -575,67 +585,76 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'hero':
+        case 'hero': {
+            const r = resolveBlockContent('hero', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                ctaButtons: Array<{ label: string; url: string; style: string }>
+            }
             return {
                 blockType: 'hero',
                 variant: 'centered',
-                headline: `Welcome to ${brandName}`,
-                subheadline: 'We deliver exceptional products and services that help you achieve your goals. Discover what makes us different.',
-                ctaButtons: [
-                    { label: 'Get Started', url: '#contact', style: 'primary' },
-                    { label: 'Learn More', url: '#about', style: 'outline' },
-                ],
-            }
-
-        case 'about': {
-            const aboutHeadline = 'Our Story'
-            return {
-                blockType: 'about',
-                variant: 'simple',
-                sectionLabel: dedupSectionLabel('About Us', aboutHeadline),
-                headline: aboutHeadline,
-                body: `${brandName} was founded with a simple mission: to deliver quality and value to every customer. With years of experience and a passionate team, we continue to grow and innovate.`,
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaButtons: c.ctaButtons,
             }
         }
 
-        case 'contact':
+        case 'about': {
+            const r = resolveBlockContent('about', locale, brandName)
+            const c = r.content as { sectionLabelBase: string; headline: string; body: string }
+            return {
+                blockType: 'about',
+                variant: 'simple',
+                sectionLabel: dedupSectionLabel(c.sectionLabelBase, c.headline),
+                headline: c.headline,
+                body: c.body,
+            }
+        }
+
+        case 'contact': {
+            const r = resolveBlockContent('contact', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subtext: string
+                formFields: Array<{ fieldName: string; label: string; fieldType: string; required: boolean }>
+            }
             return {
                 blockType: 'contact',
-                headline: 'Get in Touch',
-                subtext: `Have a question or want to work together? We'd love to hear from you.`,
+                headline: c.headline,
+                subtext: c.subtext,
                 email: 'hello@example.com',
                 phone: '+1 (555) 123-4567',
                 address: '123 Business Street, Suite 100\nCity, State 10001',
-                formFields: [
-                    { fieldName: 'name', label: 'Your Name', fieldType: 'text', required: true },
-                    { fieldName: 'email', label: 'Email Address', fieldType: 'email', required: true },
-                    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
-                ],
+                formFields: c.formFields,
             }
+        }
 
-        case 'pricing':
+        case 'pricing': {
+            const r = resolveBlockContent('pricing', locale, brandName)
+            const c = r.content as {
+                headline: string
+                subheadline: string
+                plans: Array<Record<string, unknown>>
+            }
             return {
                 blockType: 'pricing',
-                headline: 'Simple, Transparent Pricing',
-                subheadline: 'Choose the plan that works best for you.',
-                plans: [
-                    { name: 'Starter', price: '$9/mo', description: 'Perfect for getting started', features: [{ text: '5 Projects', included: true }, { text: 'Basic Support', included: true }, { text: 'Advanced Features', included: false }], ctaLabel: 'Get Started', ctaUrl: '#' },
-                    { name: 'Pro', price: '$29/mo', description: 'Best for growing businesses', isPopular: true, features: [{ text: 'Unlimited Projects', included: true }, { text: 'Priority Support', included: true }, { text: 'Advanced Features', included: true }], ctaLabel: 'Get Started', ctaUrl: '#' },
-                    { name: 'Enterprise', price: '$99/mo', description: 'For large organizations', features: [{ text: 'Everything in Pro', included: true }, { text: 'Dedicated Manager', included: true }, { text: 'Custom Integrations', included: true }], ctaLabel: 'Contact Us', ctaUrl: '#' },
-                ],
+                headline: c.headline,
+                subheadline: c.subheadline,
+                plans: c.plans,
             }
+        }
 
-        case 'stats':
+        case 'stats': {
+            const r = resolveBlockContent('stats', locale, brandName)
+            const c = r.content as { headline: string; items: Array<{ value: string; label: string }> }
             return {
                 blockType: 'stats',
-                headline: `${brandName} by the Numbers`,
-                stats: [
-                    { value: '10K+', label: 'Happy Customers' },
-                    { value: '50+', label: 'Countries Served' },
-                    { value: '99%', label: 'Satisfaction Rate' },
-                    { value: '24/7', label: 'Support Available' },
-                ],
+                headline: c.headline,
+                stats: c.items,
             }
+        }
 
         case 'video':
             return {
@@ -655,14 +674,17 @@ export function createAddSectionBlock({
                 limit: 3,
             }
 
-        case 'products-grid':
+        case 'products-grid': {
+            const r = resolveBlockContent('products', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string }
             return {
                 blockType: 'products-grid',
                 variant: 'grid-3',
-                headline: 'Our Products',
-                subheadline: 'Explore our curated collection.',
+                headline: c.headline,
+                subheadline: c.subheadline,
                 limit: 6,
             }
+        }
 
         case 'logo-cloud':
             return {
@@ -831,12 +853,14 @@ function createDefaultBlockFromRegistry(blockType: string, brandName: string): B
 
 export function normalizeAddSectionBlock(context: AddSectionContext, block?: Record<string, unknown> | null) {
     const brandName = context.siteName?.trim() || 'Your Brand'
+    const locale: AddSectionLocale = context.locale === 'ms' ? 'ms' : 'en'
     const fallbackBlock =
         createAddSectionBlock({
             instruction: context.instruction,
             siteName: context.siteName,
             theme: context.theme,
             requestedType: context.requestedType || String(block?.blockType || ''),
+            locale,
         }) || undefined
 
     if (!fallbackBlock) {
@@ -846,12 +870,26 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
             brandName,
         )
         if (registryBlock) {
-            return { ...registryBlock, ...(block || {}) } as BlockData
+            const rb = { ...registryBlock, ...(block || {}) } as BlockData
+            const rbKey = String(rb.blockType || '')
+            // Attach locale init slots for registry-backed blocks (AC: 1d coverage)
+            // {n} tokens in testimonials are the caller's responsibility, not resolver's.
+            ;(rb as Record<string, unknown>).__localeInit = {
+                en: resolveBlockContent(rbKey, 'en', brandName).content,
+                ms: resolveBlockContent(rbKey, 'ms', brandName).content,
+            }
+            return rb
         }
         return block as BlockData | undefined
     }
 
     if (!block || typeof block !== 'object') {
+        // Attach locale init slots for the no-block-override path.
+        const fbTypeKey = String(fallbackBlock.blockType || '')
+        ;(fallbackBlock as Record<string, unknown>).__localeInit = {
+            en: resolveBlockContent(fbTypeKey, 'en', brandName).content,
+            ms: resolveBlockContent(fbTypeKey, 'ms', brandName).content,
+        }
         return fallbackBlock
     }
 
@@ -859,6 +897,13 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         ...fallbackBlock,
         ...block,
     } as BlockData
+
+    // Attach locale init slots so every return branch carries them (phase-02 strips before persisting).
+    const blockTypeKey = String(mergedBlock.blockType || '')
+    ;(mergedBlock as Record<string, unknown>).__localeInit = {
+        en: resolveBlockContent(blockTypeKey, 'en', brandName).content,
+        ms: resolveBlockContent(blockTypeKey, 'ms', brandName).content,
+    }
 
     if (mergedBlock.blockType === 'faq') {
         const items = Array.isArray((block as Record<string, unknown>).faqs)

@@ -605,7 +605,8 @@ html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0
 
 /* text-white opacity variants */
 .editor-shell .text-white\/80,
-.editor-shell .text-white\/70 { color: var(--editor-text); }
+.editor-shell .text-white\/70,
+.editor-shell .text-white\/60 { color: var(--editor-text); }
 .editor-shell .text-white\/50,
 .editor-shell .text-white\/40,
 .editor-shell .text-white\/30 { color: var(--editor-text-muted); }

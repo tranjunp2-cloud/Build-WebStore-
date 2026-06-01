@@ -10,6 +10,8 @@ import BuilderCompletionView from '@/components/builder/BuilderCompletionView'
 import BuilderFullPreview from '@/components/builder/BuilderFullPreview'
 import BuilderGenerationView from '@/components/builder/BuilderGenerationView'
 import { CongratsModal } from '@/components/builder/CongratsModal'
+import { LanguageConfirmBanner, type LanguageConfirmAction } from '@/components/editor/LanguageConfirmBanner'
+import { detectLocaleFromText } from '@/lib/detect-locale'
 import { DraftRecoveryDialog } from '@/components/builder/DraftRecoveryDialog'
 import { PaywallCard } from '@/components/builder/PaywallCard'
 import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
@@ -182,6 +184,9 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const sseRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
     const [showDraftDialog, setShowDraftDialog] = useState(false)
     const [showPaywall, setShowPaywall] = useState(false)
+    // F26: pre-generation locale confirm modal state
+    const [preGenModal, setPreGenModal] = useState<{ detectedLocale: string } | null>(null)
+    const pendingGenRef = useRef<{ info: BusinessInfo; briefSnapshot: unknown } | null>(null)
 
     const {
         step,
@@ -630,12 +635,44 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [clearGenerationTimers, handleSSEEvent, setError, setStep, contentBrief])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
-        // Capture contentBrief BEFORE reset() clears it from the store
         const briefSnapshot = useBuilderStore.getState().contentBrief
         sseRetryCountRef.current = 0
         if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
-        prepareGenerationSession(info)
-        void startSSEGeneration(info, undefined, briefSnapshot)
+
+        // F26: detect input language — only intercept when it's not EN or BM
+        const text = [info.businessName, info.shortDescription, info.products].filter(Boolean).join(' ')
+        const detectedLocale = (info.language && info.language !== 'auto')
+            ? info.language
+            : detectLocaleFromText(text)
+
+        if (detectedLocale === 'en' || detectedLocale === 'ms') {
+            // Primary locale — generate immediately, no modal needed
+            prepareGenerationSession(info)
+            void startSSEGeneration(info, undefined, briefSnapshot)
+            return
+        }
+
+        // Non-primary locale — show recommendation modal before generating
+        pendingGenRef.current = { info, briefSnapshot }
+        setPreGenModal({ detectedLocale })
+    }, [prepareGenerationSession, startSSEGeneration])
+
+    const handlePreGenConfirm = useCallback((action: LanguageConfirmAction, locale: string) => {
+        if (action === 'dismiss') {
+            setPreGenModal(null)
+            pendingGenRef.current = null
+            return
+        }
+        setPreGenModal(null)
+        if (!pendingGenRef.current) return
+        const { info, briefSnapshot } = pendingGenRef.current
+        pendingGenRef.current = null
+        // API only accepts 'en'|'ms'|'vi'|'auto' — unsupported locales (ar, zh, etc.) fall back
+        // to 'auto' so the AI infers language from business content.
+        const apiLang = (['en', 'ms', 'vi'] as const).includes(locale as 'en' | 'ms' | 'vi') ? locale : 'auto'
+        const updatedInfo: BusinessInfo = { ...info, language: apiLang }
+        prepareGenerationSession(updatedInfo)
+        void startSSEGeneration(updatedInfo, undefined, briefSnapshot as any)
     }, [prepareGenerationSession, startSSEGeneration])
 
     const handleRetryGeneration = useCallback((info: BusinessInfo) => {
@@ -803,23 +840,30 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
         return (
             <>
-            {showDraftDialog && (
-                <DraftRecoveryDialog
-                    draft={getDraftMeta()}
-                    onContinue={() => setShowDraftDialog(false)}
-                    onDiscard={() => {
-                        useBuilderStore.getState().clearDraft()
-                        setShowDraftDialog(false)
-                    }}
+                {preGenModal && (
+                    <LanguageConfirmBanner
+                        isOpen={true}
+                        detectedLocale={preGenModal.detectedLocale}
+                        onAction={handlePreGenConfirm}
+                    />
+                )}
+                {showDraftDialog && (
+                    <DraftRecoveryDialog
+                        draft={getDraftMeta()}
+                        onContinue={() => setShowDraftDialog(false)}
+                        onDiscard={() => {
+                            useBuilderStore.getState().clearDraft()
+                            setShowDraftDialog(false)
+                        }}
+                    />
+                )}
+                <BusinessInfoForm
+                    errorMessage={status === 'error' ? error?.message || null : null}
+                    initialValues={businessInfo}
+                    isGenerating={status === 'streaming'}
+                    onRetry={status === 'error' && error?.retryable ? handleRetryGeneration : undefined}
+                    onSubmit={handleGenerateStart}
                 />
-            )}
-            <BusinessInfoForm
-                errorMessage={status === 'error' ? error?.message || null : null}
-                initialValues={businessInfo}
-                isGenerating={status === 'streaming'}
-                onRetry={status === 'error' && error?.retryable ? handleRetryGeneration : undefined}
-                onSubmit={handleGenerateStart}
-            />
             </>
         )
     }

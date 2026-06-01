@@ -464,7 +464,9 @@ export function OrdersTable({
     onOrdersLoaded,
     searchQuery = '',
     statusFilter = 'all',
-    dateFilter = 'all'
+    dateFilter = 'all',
+    paymentMethodFilter = '',
+    sortOrder = '-createdAt',
 }: {
     onSelectOrder?: (orderId: string) => void
     selectedOrderId?: string | null
@@ -476,6 +478,8 @@ export function OrdersTable({
     searchQuery?: string
     statusFilter?: string
     dateFilter?: string
+    paymentMethodFilter?: string
+    sortOrder?: string
 }) {
     const [orders, setOrders] = useState<Order[]>([])
     const [loading, setLoading] = useState(true)
@@ -488,20 +492,43 @@ export function OrdersTable({
     const searchQueryRef = useRef(searchQuery)
     const statusFilterRef = useRef(statusFilter)
     const dateFilterRef = useRef(dateFilter)
+    const paymentMethodFilterRef = useRef(paymentMethodFilter)
+    const sortOrderRef = useRef(sortOrder)
     const onOrdersLoadedRef = useRef(onOrdersLoaded)
     useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
     useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
     useEffect(() => { dateFilterRef.current = dateFilter }, [dateFilter])
+    useEffect(() => { paymentMethodFilterRef.current = paymentMethodFilter }, [paymentMethodFilter])
+    useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
     useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
 
+    // Track previous filter values to detect changes and compute effectivePage in one effect,
+    // avoiding the double-fetch race condition that arises from a separate page-reset effect.
+    const prevFiltersRef = useRef({ searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder })
+
     useEffect(() => {
+        const prev = prevFiltersRef.current
+        const filtersChanged =
+            prev.searchQuery !== searchQuery ||
+            prev.statusFilter !== statusFilter ||
+            prev.dateFilter !== dateFilter ||
+            prev.paymentMethodFilter !== paymentMethodFilter ||
+            prev.sortOrder !== sortOrder
+        prevFiltersRef.current = { searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder }
+
+        // When filters change, fetch page 1 immediately — don't wait for setPage(1) re-render.
+        // Also sync the page state for pagination display.
+        const effectivePage = filtersChanged ? 1 : page
+        if (filtersChanged && page !== 1) setPage(1)
+
         async function fetchOrders() {
             try {
                 setLoading(true)
-                let url = `/api/orders?page=${page}&limit=10`
+                let url = `/api/orders?page=${effectivePage}&limit=10&sort=${encodeURIComponent(sortOrder)}`
                 if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
                 if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
                 if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
+                if (paymentMethodFilter) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilter)}`
 
                 const res = await fetch(url)
                 if (!res.ok) throw new Error('Failed to fetch')
@@ -519,7 +546,7 @@ export function OrdersTable({
             }
         }
         fetchOrders()
-    }, [page, refreshCounter, searchQuery, statusFilter, dateFilter])
+    }, [page, refreshCounter, searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
 
     // Silent background merge — only on page 1, no loading spinner, preserves scroll/selection
     useEffect(() => {
@@ -528,11 +555,12 @@ export function OrdersTable({
 
         async function silentFetch() {
             try {
-                let url = `/api/orders?page=1&limit=10`
+                let url = `/api/orders?page=1&limit=10&sort=${encodeURIComponent(sortOrderRef.current)}`
                 // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
                 if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
                 if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
                 if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
+                if (paymentMethodFilterRef.current) url += `&paymentMethod=${encodeURIComponent(paymentMethodFilterRef.current)}`
 
                 const res = await fetch(url)
                 if (!res.ok) return

@@ -13,6 +13,66 @@ describe('EditorStore', () => {
         useEditorStore.getState().reset()
     })
 
+    // F26: structural nav-link edits must sync into _localeContent slots, else getDisplayBlock merges
+    // a stale slot and a deleted link reappears in the rendered header (QC bug).
+    describe('updateHeaderBlock — _localeContent reconcile on link edit', () => {
+        beforeEach(() => {
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
+            useEditorStore.setState({
+                activeLocale: 'ms',
+                headerBlock: {
+                    blockType: 'navigation',
+                    links: [
+                        { url: '/', label: 'Home' },
+                        { url: '/about', label: 'About' },
+                        { url: '/blog', label: 'Blog' },
+                    ],
+                    _localeContent: {
+                        ms: {
+                            links: [
+                                { url: '/', label: 'Utama' },
+                                { url: '/about', label: 'Tentang' },
+                                { url: '/blog', label: 'Berita' },
+                            ],
+                        },
+                    },
+                } as never,
+            })
+        })
+
+        it('deleting a nav link removes it from the ms _localeContent slot too', () => {
+            // Act — user deletes the /blog link (panel sends the remaining top-level links)
+            useEditorStore.getState().updateHeaderBlock({
+                links: [{ url: '/', label: 'Home' }, { url: '/about', label: 'About' }],
+            } as never)
+
+            // Assert — slot no longer contains the deleted link, survivors keep their BM labels
+            const h = useEditorStore.getState().headerBlock as Record<string, unknown>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            expect(msLinks).toHaveLength(2)
+            expect(msLinks.map(l => l.url)).toEqual(['/', '/about'])
+            expect(msLinks.find(l => l.url === '/')?.label).toBe('Utama') // translation preserved
+            expect(msLinks.some(l => l.url === '/blog')).toBe(false)       // deleted link gone
+        })
+
+        it('adding a nav link appends it to the ms slot with the base label', () => {
+            useEditorStore.getState().updateHeaderBlock({
+                links: [
+                    { url: '/', label: 'Home' },
+                    { url: '/about', label: 'About' },
+                    { url: '/blog', label: 'Blog' },
+                    { url: '/contact', label: 'Contact' },
+                ],
+            } as never)
+
+            const h = useEditorStore.getState().headerBlock as Record<string, unknown>
+            const msLinks = (h._localeContent as Record<string, Record<string, unknown>>).ms.links as Array<Record<string, unknown>>
+            expect(msLinks).toHaveLength(4)
+            expect(msLinks.find(l => l.url === '/contact')?.label).toBe('Contact') // new link → base label
+            expect(msLinks.find(l => l.url === '/about')?.label).toBe('Tentang')   // existing translation kept
+        })
+    })
+
     describe('init', () => {
         it('should initialize with data and create first snapshot', () => {
             useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
@@ -55,6 +115,20 @@ describe('EditorStore', () => {
             expect(blocks).toHaveLength(4)
             expect(blocks[0].blockType).toBe('hero')
             expect(blocks[1].blockType).toBe('hero')
+        })
+
+        it('duplicateBlock assigns a fresh id to the copy (no PK collision on save)', () => {
+            // Arrange — original carries a persisted block id (now preserved verbatim on save)
+            useEditorStore.getState().updateBlock(0, { id: '6a1d0bf37593a40039381abc' })
+
+            // Act
+            useEditorStore.getState().duplicateBlock(0)
+
+            // Assert — copy has a distinct, non-empty id so the two rows don't collide on the PK
+            const blocks = useEditorStore.getState().blocks
+            expect(blocks[1].blockType).toBe(blocks[0].blockType)
+            expect(blocks[1].id).toBeTruthy()
+            expect(blocks[1].id).not.toBe(blocks[0].id)
         })
 
         it('reorderBlocks should move block from one position to another', () => {

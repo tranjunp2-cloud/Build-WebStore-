@@ -53,6 +53,8 @@ interface PreviewFrameProps {
     onFooterInlineEdit?: (changes: Record<string, unknown>) => void
     /** Called when footer inline edit session ends (blur/Enter/Escape) — flush debounce + save once. */
     onFooterEditStop?: () => void
+    /** F26-07: Called when the in-preview language switcher block sends SWITCH_LOCALE. */
+    onLocaleSwitch?: (locale: string) => void
 }
 
 type HoverRect = {
@@ -242,6 +244,7 @@ function PreviewFrameInner({
     onFooterUpdate,
     onFooterInlineEdit,
     onFooterEditStop,
+    onLocaleSwitch,
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
@@ -705,6 +708,11 @@ function PreviewFrameInner({
                     onFooterUpdateRef.current?.({ [stopField]: stopValue })
                 }
                 onFooterEditStopRef.current?.()
+            } else if (e.data?.type === 'SWITCH_LOCALE') {
+                // F26-07: Language switcher block in preview requests a locale change.
+                // Accept any locale code (en, ms, or non-standard like 'vi', 'el').
+                const locale = e.data.locale as string
+                if (locale) onLocaleSwitch?.(locale)
             }
         }
         window.addEventListener('message', handleMessage)
@@ -713,7 +721,7 @@ function PreviewFrameInner({
             window.removeEventListener('message', handleMessage)
         }
         // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
-    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
+    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, onLocaleSwitch, setIsEditing, updateBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {

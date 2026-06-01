@@ -4112,6 +4112,36 @@ const MIGRATIONS = [
   // CQ-02: Align DB column type with spec (varchar(20)); safe — normalized phones are always ≤ 15 chars
   { name: 'customers.phone_type_varchar20',
     sql: `ALTER TABLE customers ALTER COLUMN phone TYPE varchar(20);` },
+  // ── F26: Per-locale content storage for multilingual editor ──
+  {
+    name: 'pages.locale_content',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS locale_content jsonb DEFAULT '{}';`,
+  },
+  // ── F26-01: Language confirm flag after AI generation ──
+  {
+    name: 'sites.pending_locale_confirm',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_locale_confirm boolean DEFAULT false;`,
+  },
+  // ── F26: Generation locale — immutable locale AI used for flat blocks ──
+  {
+    name: 'sites.generation_locale',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_locale varchar DEFAULT 'ms';`,
+  },
+  // ── F26 fix: the DEFAULT 'ms' above wrongly tagged pre-F26 sites (whose locale is 'en') with
+  // generation_locale='ms'. In the editor that makes activeLocale ('en') != baseLocale ('ms'), so
+  // getDisplayBlock applies generic locale templates over the user's saved content. Backfill only the
+  // rows carrying the default 'ms' whose locale is NOT 'ms' (targeted — never touches a legitimately
+  // non-standard gen locale like 'vi'/'el', which keep locale='ms' as their translation slot).
+  {
+    name: 'sites.generation_locale.backfill_locale',
+    sql: `UPDATE sites SET generation_locale = locale::text WHERE generation_locale = 'ms' AND locale::text IS DISTINCT FROM 'ms';`,
+  },
+  // Drop the misleading default so any future row without an explicit generation_locale stays NULL —
+  // editor-data then falls back to `site.locale` (correct) instead of a hardcoded 'ms'.
+  {
+    name: 'sites.generation_locale.drop_default',
+    sql: `ALTER TABLE sites ALTER COLUMN generation_locale DROP DEFAULT;`,
+  },
   // BUG-#1082: index for SQL CAS queries on products_variants(_parent_id, name)
   // used by decrementVariantStock + restockItem on every variant checkout/cancel
   { name: 'products_variants.parent_name_idx',
