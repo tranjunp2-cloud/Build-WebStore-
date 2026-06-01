@@ -408,6 +408,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
         if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
+        // F26: block ids are now preserved verbatim on save (they are the row PK). A duplicate must
+        // get a fresh id or the two rows collide on pages_blocks_*_pkey → save 500.
+        blockCopy.id = crypto.randomUUID()
         const insertAt = footerIdx >= 0 ? Math.min(index + 1, footerIdx) : index + 1
         const newBlocks = [...blocks]
         newBlocks.splice(insertAt, 0, blockCopy)

@@ -57,6 +57,20 @@ describe('EditorStore', () => {
             expect(blocks[1].blockType).toBe('hero')
         })
 
+        it('duplicateBlock assigns a fresh id to the copy (no PK collision on save)', () => {
+            // Arrange — original carries a persisted block id (now preserved verbatim on save)
+            useEditorStore.getState().updateBlock(0, { id: '6a1d0bf37593a40039381abc' })
+
+            // Act
+            useEditorStore.getState().duplicateBlock(0)
+
+            // Assert — copy has a distinct, non-empty id so the two rows don't collide on the PK
+            const blocks = useEditorStore.getState().blocks
+            expect(blocks[1].blockType).toBe(blocks[0].blockType)
+            expect(blocks[1].id).toBeTruthy()
+            expect(blocks[1].id).not.toBe(blocks[0].id)
+        })
+
         it('reorderBlocks should move block from one position to another', () => {
             useEditorStore.getState().reorderBlocks(0, 2)
             const blocks = useEditorStore.getState().blocks
