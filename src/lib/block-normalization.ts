@@ -89,7 +89,8 @@ export function stripNestedIds(arr: unknown[]): unknown[] {
  * Normalize all blocks in a layout array before persisting to Payload.
  *
  * Performs the following transformations on each block:
- *   1. Strip block-level id/_id (Payload generates UUIDs for layout blocks)
+ *   1. Preserve UUID-format block id (Payload uses as PK — enables stable localeContent keys);
+ *      strip non-UUID ids and _id (Mongo legacy)
  *   2. Strip id/_id from nested arrays (ctaButtons, items, plans, links, columns…)
  *   3. Normalize upload/media fields to integer IDs
  *   4. Normalize upload fields inside nested array items (e.g. testimonials.avatar)
@@ -102,9 +103,22 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
     return blocks.map(block => {
         let b = { ...block }
 
-        // Strip block-level id/_id — Payload auto-generates valid UUIDs for layout blocks
-        delete b.id
+        // Preserve the block-level id Payload uses as the row PK so localeContent keys (keyed by
+        // block.id) stay stable across save+reload (F26). Payload honors a provided id verbatim and
+        // only regenerates when it is absent (verified) — so we keep BOTH the editor's UUIDs AND
+        // Payload's 24-char hex ids. The earlier "UUID-only" guard stripped the hex form, forcing a
+        // new id every save and orphaning every per-locale override (the round-trip locale bug).
+        const idVal = typeof b.id === 'string' ? b.id : null
+        const isStableId = idVal !== null && (
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(idVal) // editor UUID
+            || /^[0-9a-f]{24}$/.test(idVal)                                              // Payload hex
+        )
+        if (!isStableId) delete b.id
         delete b._id
+
+        // Strip __localeInit before DB persist — attached by normalizeAddSectionBlock
+        // for locale_content hydration. Must not reach Payload.
+        delete b.__localeInit
 
         // Strip ids from all nested arrays (ctaButtons, items, plans, links, columns, etc.)
         for (const [key, val] of Object.entries(b)) {

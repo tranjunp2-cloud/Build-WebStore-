@@ -48,7 +48,7 @@ export function isNavBlock(block: PageBlockShape): boolean {
     return NAVIGATION_BLOCK_TYPES.has(bt)
 }
 
-function isFooterBlock(block: PageBlockShape): boolean {
+export function isFooterBlock(block: PageBlockShape): boolean {
     const bt = typeof block?.blockType === 'string' ? block.blockType.toLowerCase() : ''
     return FOOTER_BLOCK_TYPES.has(bt)
 }

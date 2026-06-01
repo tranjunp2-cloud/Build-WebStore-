@@ -224,6 +224,32 @@ describe('normalizeBlocksForPersistence', () => {
         expect(result[0].blockType).toBe('features')
     })
 
+    // F26: block ID stability — keeping locale_content keys from orphaning across save+reload.
+    // Regression for the round-trip locale bug (TC-F26-05-03 / TC-F26-08-07): stripping a valid id
+    // forced Payload to regenerate it every save, orphaning per-locale overrides.
+    it('TC-F26-block-id-01: Payload 24-char hex id is PRESERVED (not stripped)', () => {
+        // Arrange — id format Payload assigns to block rows / AI-generated blocks
+        const blocks = [{ id: '6a1d0bf37593a40039381abc', _id: 'mongo-legacy', blockType: 'hero', headline: 'Hi' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — hex id kept (stable PK), only _id stripped
+        expect(result[0].id).toBe('6a1d0bf37593a40039381abc')
+        expect(result[0]).not.toHaveProperty('_id')
+    })
+
+    it('TC-F26-block-id-02: editor UUID id is PRESERVED', () => {
+        // Arrange — id format crypto.randomUUID() assigns on block drop
+        const blocks = [{ id: 'd6ebe0c5-15f6-4634-9be0-4229e6a2ba02', blockType: 'faq' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — uuid kept
+        expect(result[0].id).toBe('d6ebe0c5-15f6-4634-9be0-4229e6a2ba02')
+    })
+
     // TC-F05-save-03
     it('TC-F05-save-03: block with headline=undefined → normalized to empty string', () => {
         // Arrange — AI builder sometimes omits headline for optional blocks

@@ -30,7 +30,7 @@ export type BusinessInfo = {
     shortDescription: string
     industry: string
     products: string
-    language?: 'en' | 'ms' | 'vi' | 'auto'
+    language?: string
     businessUrl?: string
     source?: 'form' | 'url'
     slug?: string

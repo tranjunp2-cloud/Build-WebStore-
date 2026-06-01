@@ -1,15 +1,18 @@
 /**
  * Editor Store (Zustand)
  * Manages editor state with undo/redo history and auto-save.
- * Features: F-11 (Undo/Redo) + F-07 (Auto-Save & Draft)
+ * Features: F-11 (Undo/Redo) + F-07 (Auto-Save & Draft) + F-26 (Multilingual)
  */
 
 import { create } from 'zustand'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
+import { resolveBlockContent } from '@/lib/ai/add-section-content'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type BlockData = { blockType: string;[key: string]: unknown }
+
+export type SiteLocale = 'en' | 'ms'
 
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
@@ -69,6 +72,20 @@ type EditorState = {
     // Pages (F-05-02)
     pages: PageData[]
     currentPageId: string | null
+
+    // F-26: Multilingual locale state
+    /** Active display locale. Any ISO 639-1 code — e.g. 'en', 'ms', 'vi', 'el'. */
+    activeLocale: string
+    /** Translation slot — EN/MS only (Sites.locale). */
+    siteLocale: SiteLocale
+    /** Actual ISO 639-1 code the site was generated in — may be non-EN/MS (e.g. 'el', 'th'). */
+    generationLocale: string
+    /** User-chosen primary display locale (Make Default). Defaults to generationLocale. */
+    primaryLocale: string
+    /** Locale currently being translated (after [Add] click). null when idle. */
+    pendingLocale: string | null
+    /** Per-block locale overrides: localeOverrides[blockId][locale] = { field: value } */
+    localeOverrides: Record<string, Record<string, Record<string, unknown>>>
 
     // History (F-06 / F-11)
     history: EditorSnapshot[]
@@ -153,6 +170,25 @@ type EditorActions = {
     deleteGlobalBlock: (type: GlobalBlockKey) => void
     flipBlockVariant: (blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => void
 
+    // F-26: Multilingual locale actions
+    setActiveLocale: (locale: string) => void
+    setSiteLocale: (locale: SiteLocale) => void
+    setGenerationLocale: (locale: string) => void
+    setPrimaryLocale: (locale: string) => void
+    setPendingLocale: (locale: string | null) => void
+    setLocaleOverride: (blockId: string, locale: string, fields: Record<string, unknown>) => void
+    initLocaleFromBlock: (blockId: string, localeInit: { en: Record<string, unknown>; ms: Record<string, unknown> }) => void
+    /**
+     * Merge localeOverrides[block.id][activeLocale] onto block for rendering.
+     * Priority: localeOverride wins → fall back to flat block if same locale → defaults.
+     */
+    getDisplayBlock: (block: BlockData) => BlockData
+    /**
+     * Returns all blocks with locale display applied — use this for every iframe send.
+     * Ensures BM/EN content is always correct regardless of the action (add/delete/undo/redo/reorder).
+     */
+    getDisplayBlocks: () => BlockData[]
+
     // Reset
     reset: () => void
 }
@@ -211,6 +247,69 @@ function syncSystemBlockInLayout(
     return updated ? nextBlocks : blocks
 }
 
+// F26: reconcile each `_localeContent[locale]` slot after a STRUCTURAL edit to header/footer links.
+// getDisplayBlock merges the whole slot over the block, so a slot's stale `links`/`columns` array
+// shadows a top-level edit (e.g. a deleted nav link reappears in the rendered header). We rebuild
+// the slot's structure to mirror the new one — keyed by `url` so surviving links keep their
+// translated label, removed links drop, and new links inherit the base label.
+function reconcileLinksByUrl(
+    slotLinks: unknown,
+    newLinks: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+    const oldByUrl = new Map(
+        (Array.isArray(slotLinks) ? slotLinks : []).map((l) => [String((l as Record<string, unknown>)?.url), l as Record<string, unknown>]),
+    )
+    return newLinks.map((nl) => {
+        const old = oldByUrl.get(String(nl?.url))
+        return old ? { ...nl, label: old.label ?? nl.label } : { ...nl }
+    })
+}
+
+function reconcileLocaleContentStructure(
+    localeContent: unknown,
+    changes: BlockPatch,
+): Record<string, Record<string, unknown>> | undefined {
+    if (!localeContent || typeof localeContent !== 'object') return undefined
+    const lc = localeContent as Record<string, Record<string, unknown>>
+    const ch = changes as Record<string, unknown>
+    const newLinks = Array.isArray(ch.links) ? (ch.links as Array<Record<string, unknown>>) : null
+    const newCols = Array.isArray(ch.columns) ? (ch.columns as Array<Record<string, unknown>>) : null
+    if (!newLinks && !newCols) return undefined
+
+    const out: Record<string, Record<string, unknown>> = {}
+    for (const [loc, slot] of Object.entries(lc)) {
+        let next = slot
+        if (newLinks && Array.isArray(slot?.links)) {
+            next = { ...next, links: reconcileLinksByUrl(slot.links, newLinks) }
+        }
+        if (newCols && Array.isArray(slot?.columns)) {
+            const oldCols = slot.columns as Array<Record<string, unknown>>
+            next = {
+                ...next,
+                columns: newCols.map((nc, i) => {
+                    const oc = oldCols[i]
+                    return {
+                        ...nc,
+                        ...(oc?.title ? { title: oc.title } : {}),
+                        ...(Array.isArray(nc.links) ? { links: reconcileLinksByUrl(oc?.links, nc.links as Array<Record<string, unknown>>) } : {}),
+                    }
+                }),
+            }
+        }
+        out[loc] = next
+    }
+    return out
+}
+
+/** Apply reconcile only for structural link/column edits that aren't themselves a _localeContent write. */
+function withLocaleContentReconcile(block: Record<string, unknown> | null, changes: BlockPatch): BlockPatch {
+    const ch = changes as Record<string, unknown>
+    if ('_localeContent' in ch) return changes // translation write — never reconcile
+    if (!Array.isArray(ch.links) && !Array.isArray(ch.columns)) return changes
+    const reconciled = reconcileLocaleContentStructure(block?._localeContent, changes)
+    return reconciled ? ({ ...changes, _localeContent: reconciled } as BlockPatch) : changes
+}
+
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
     // Initial state
     siteId: null,
@@ -236,6 +335,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
     autoSaveTimer: null,
+    // F-26: Multilingual
+    activeLocale: 'en',
+    siteLocale: 'en',
+    generationLocale: 'en',
+    primaryLocale: 'en',
+    pendingLocale: null,
+    localeOverrides: {},
 
     init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null) => {
         // Clear any pending auto-save timer from previous page to prevent cross-page save
@@ -267,6 +373,16 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             isSaving: false,
             saveStatus: 'idle',
             isAIStreaming: false,
+            // M1 fix: reset locale state on every page switch so stale overrides never bleed.
+            // The loadData caller sets siteLocale + activeLocale + localeOverrides after init().
+            // F26-04: also reset pendingLocale + primaryLocale so navigation between sites
+            // doesn't carry over translation state from previous site.
+            activeLocale: 'en',
+            siteLocale: 'en',
+            generationLocale: 'en',
+            primaryLocale: 'en',
+            pendingLocale: null,
+            localeOverrides: {},
         })
     },
 
@@ -355,6 +471,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
         if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
+        // F26: block ids are now preserved verbatim on save (they are the row PK). A duplicate must
+        // get a fresh id or the two rows collide on pages_blocks_*_pkey → save 500.
+        blockCopy.id = crypto.randomUUID()
         const insertAt = footerIdx >= 0 ? Math.min(index + 1, footerIdx) : index + 1
         const newBlocks = [...blocks]
         newBlocks.splice(insertAt, 0, blockCopy)
@@ -603,8 +722,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
 
-    updateHeaderBlock: (changes) => {
+    updateHeaderBlock: (rawChanges) => {
         const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // F26: keep per-locale slots in sync on structural link edits (deleted/added/reordered nav links).
+        const changes = withLocaleContentReconcile(headerBlock as Record<string, unknown> | null, rawChanges)
         const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'navigation', changes)
 
@@ -620,8 +741,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().handleContentChange()
     },
 
-    updateFooterBlock: (changes) => {
+    updateFooterBlock: (rawChanges) => {
         const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // F26: keep per-locale slots in sync on structural footer column/link edits.
+        const changes = withLocaleContentReconcile(footerBlock as Record<string, unknown> | null, rawChanges)
         const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'footer', changes)
 
@@ -706,6 +829,94 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().handleContentChange()
     },
 
+    // ── F-26: Multilingual locale actions ───────────────────────────────
+
+    setActiveLocale: (locale) => set({ activeLocale: locale }),
+    setGenerationLocale: (locale) => set({ generationLocale: locale }),
+    setPrimaryLocale: (locale) => set({ primaryLocale: locale }),
+    setPendingLocale: (locale) => set({ pendingLocale: locale }),
+
+    setSiteLocale: (locale) => set({ siteLocale: locale }),
+
+    setLocaleOverride: (blockId, locale, fields) => {
+        const { localeOverrides } = get()
+        const existing = localeOverrides[blockId]?.[locale] ?? {}
+        set({
+            localeOverrides: {
+                ...localeOverrides,
+                [blockId]: {
+                    ...(localeOverrides[blockId] ?? { en: {}, ms: {} }),
+                    [locale]: { ...existing, ...fields },
+                },
+            },
+            // Mark dirty so auto-save + nav guard fire for non-EN edits
+            hasUnsavedChanges: true,
+            saveStatus: 'idle',
+        })
+    },
+
+    initLocaleFromBlock: (blockId, localeInit) => {
+        const { localeOverrides } = get()
+        // Seed both EN and MS slots with template defaults — only for blocks that have no user edits yet.
+        // EN edits go through setLocaleOverride (handleBlockFieldChange / handleBlockUpdate paths),
+        // which merges on top of the seeded defaults, so user edits always win.
+        const existing = localeOverrides[blockId]
+        set({
+            localeOverrides: {
+                ...localeOverrides,
+                [blockId]: {
+                    en: existing?.en && Object.keys(existing.en).length > 0 ? existing.en : localeInit.en,
+                    ms: existing?.ms && Object.keys(existing.ms).length > 0 ? existing.ms : localeInit.ms,
+                },
+            },
+        })
+    },
+
+    getDisplayBlock: (block) => {
+        const { activeLocale, siteLocale, generationLocale, localeOverrides, siteName } = get()
+
+        // 1. User override wins for any locale (custom edit takes priority).
+        const override = block.id ? localeOverrides[block.id as string]?.[activeLocale] : null
+        if (override && Object.keys(override).length > 0) {
+            return { ...block, ...override }
+        }
+
+        // 2. Embedded translation (header/footer with _localeContent[locale]).
+        const embedded = (block as Record<string, unknown>)._localeContent as
+            | Record<string, Record<string, unknown>>
+            | undefined
+        if (embedded?.[activeLocale] && Object.keys(embedded[activeLocale]).length > 0) {
+            return { ...block, ...embedded[activeLocale] }
+        }
+
+        // 3. Native view — viewing the actual language base blocks were authored in.
+        //    For non-standard sites (vi, el), generationLocale is the source. For standard,
+        //    generationLocale === siteLocale so check still holds.
+        const baseLocale = generationLocale || siteLocale
+        if (activeLocale === baseLocale) return block
+
+        // 4. Blocks without id (pre-save new blocks) fall through to locale resolver.
+        if (!block.id) {
+            const resolveLocale = (activeLocale === 'ms' ? 'ms' : 'en') as 'en' | 'ms'
+            const resolved = resolveBlockContent(block.blockType, resolveLocale, siteName || 'Your Brand')
+            return resolved.content && Object.keys(resolved.content).length > 0 ? { ...block, ...resolved.content } : block
+        }
+
+        // Alternate locale with no override → resolve locale defaults
+        // (e.g. EN switch on MS site, or MS preview on EN site)
+        const resolveLocale2 = (activeLocale === 'ms' ? 'ms' : 'en') as 'en' | 'ms'
+        const resolved = resolveBlockContent(block.blockType, resolveLocale2, siteName || 'Your Brand')
+        if (resolved.content && Object.keys(resolved.content).length > 0) {
+            return { ...block, ...resolved.content }
+        }
+        return block
+    },
+
+    getDisplayBlocks: () => {
+        const state = get()
+        return state.blocks.map(b => state.getDisplayBlock(b))
+    },
+
     reset: () => {
         // Cancel any pending auto-save/retry timer before clearing state — prevents
         // stale cross-site writes when the user navigates to a different site.
@@ -721,6 +932,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
+            // F26-04: reset all locale-related state (was leaking across site navigations).
+            activeLocale: 'en',
+            siteLocale: 'en',
+            generationLocale: 'en',
+            primaryLocale: 'en',
+            pendingLocale: null,
+            localeOverrides: {},
         })
     },
 }))
