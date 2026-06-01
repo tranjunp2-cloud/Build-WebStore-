@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
@@ -422,8 +423,12 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
     )
 }
 
+const PAY_NOW_STATUSES = new Set(['awaiting_payment', 'payment_failed'])
+const PAID_STATUSES = new Set(['paid', 'cancelled', 'refunded', 'completed'])
+
 export default function OrderTrackingClient({ order, slug }: Props) {
     const [liveOrder, setLiveOrder] = useState(order)
+    const [isRetrying, setIsRetrying] = useState(false)
     const statusRef = useRef(order.status)
 
     useEffect(() => {
@@ -464,6 +469,36 @@ export default function OrderTrackingClient({ order, slug }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    const showPayNow =
+        PAY_NOW_STATUSES.has(liveOrder.paymentStatus) &&
+        !PAID_STATUSES.has(liveOrder.paymentStatus)
+
+    async function handleRetry() {
+        setIsRetrying(true)
+        try {
+            // Read magic-link token from URL if present (no SSR — client-only)
+            const urlToken = typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search).get('token') ?? undefined
+                : undefined
+
+            const res = await fetch(`/api/orders/${liveOrder.id}/retry-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: urlToken }),
+            })
+            const data = await res.json()
+            if (res.ok && data.success && data.data?.sessionUrl) {
+                window.location.href = data.data.sessionUrl
+            } else {
+                toast.error(data.error?.message || 'Could not start payment. Please try again.')
+            }
+        } catch {
+            toast.error('Could not start payment. Please try again.')
+        } finally {
+            setIsRetrying(false)
+        }
+    }
+
     const trackingStatus = getTrackingStatus(liveOrder.status, liveOrder.paymentStatus)
     const isDelivered = trackingStatus === 'delivered'
     const isNegativeTerminal = trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed'
@@ -486,6 +521,27 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                 <div className="ck-form-col">
                     {isDelivered && <OtDeliveredBanner order={liveOrder} />}
                     <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
+                    {showPayNow && (
+                        <div className="ot-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                            <div>
+                                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                    {liveOrder.paymentStatus === 'payment_failed' ? 'Payment failed' : 'Payment pending'}
+                                </div>
+                                <div style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)' }}>
+                                    Complete your payment to confirm the order.
+                                </div>
+                            </div>
+                            <button
+                                className="ot-support-btn primary"
+                                onClick={handleRetry}
+                                disabled={isRetrying}
+                                style={{ whiteSpace: 'nowrap' }}
+                            >
+                                <CreditCard size={13} />
+                                {isRetrying ? 'Redirecting…' : 'Pay Now'}
+                            </button>
+                        </div>
+                    )}
                     <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
                     {!isNegativeTerminal && <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />}
                     <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />

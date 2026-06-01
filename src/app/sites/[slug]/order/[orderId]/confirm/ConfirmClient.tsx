@@ -11,6 +11,7 @@ import {
 import { TY_CSS } from './confirm-styles'
 import { useI18n } from '@/i18n'
 import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
+import { useCartStore } from '@/store/cartStore'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -81,6 +82,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const router = useRouter()
     const { t } = useI18n()
     const cp = t.storefront.confirmPage
+    const { clearCart } = useCartStore()
+    const clearedRef = useRef(false)
+    const [livePay, setLivePay] = useState(order.paymentStatus)
 
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
@@ -121,6 +125,35 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         return () => cleanup.forEach(fn => fn())
     }, [])
 
+    // SSE: poll payment status for Stripe orders not yet paid
+    useEffect(() => {
+        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        if (!isStripeOrder || order.paymentStatus === 'paid') return
+
+        let errorCount = 0
+        const es = new EventSource(
+            `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
+        )
+        es.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data)
+                if (data.paymentStatus) setLivePay(data.paymentStatus)
+                if (data.paymentStatus === 'paid' && !clearedRef.current) {
+                    clearedRef.current = true
+                    clearCart()
+                    es.close()
+                }
+                if (data.terminal) es.close()
+            } catch {}
+        }
+        es.onerror = () => {
+            errorCount++
+            if (errorCount >= 5) es.close()
+        }
+        return () => es.close()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // Intercept browser back button and tab close when BT upload is still pending
     useEffect(() => {
         if (order.paymentMethod !== 'bank_transfer' || uploadStatus === 'success') return
@@ -146,7 +179,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
-    const isPaid = order.paymentStatus === 'paid'
+    const isPaid = livePay === 'paid'
     // Order is "done" from the confirm page POV: payment confirmed or COD placed.
     // Stripe without isPaid means webhook hasn't fired yet — don't clear token prematurely.
     const isOrderSuccess = isPaid || isCod
@@ -486,8 +519,16 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         </div>
                     )}
 
+                    {/* ── Stripe: Verifying payment (webhook not yet received) ── */}
+                    {isStripe && !isPaid && livePay !== 'payment_failed' && (
+                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 600, marginBottom: 8 }}>{cp.verifyingPayment}</p>
+                            <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>{cp.verifyingHint}</p>
+                        </div>
+                    )}
+
                     {/* ── Stripe: Payment Confirmed ── */}
-                    {isStripe && (
+                    {isStripe && isPaid && (
                         <div className="ty-bank-block ty-unified">
                             <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">

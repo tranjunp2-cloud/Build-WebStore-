@@ -119,6 +119,19 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     useEffect(() => { setMounted(true) }, [])
 
+    // Detect Stripe cancel redirect and show BM/EN toast (AC-1)
+    // Uses window.location.search (client-only) to avoid needing Suspense for useSearchParams
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('stripe_cancelled') === '1') {
+            toast.error(ck.paymentCancelled)
+            // Strip the param without reload so cart (localStorage) is preserved
+            const cleanUrl = window.location.pathname
+            window.history.replaceState(null, '', cleanUrl)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // Cleanup tooltip timer on unmount to prevent setState on unmounted component
     useEffect(() => {
         return () => { if (stripeTooltipTimer.current) clearTimeout(stripeTooltipTimer.current) }
@@ -341,7 +354,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 const data = await res.json()
                 dismissOverlay()
                 if (res.ok && data.success && data.data.sessionUrl) {
-                    clearCart()
                     navigatedToConfirm = true
                     window.location.href = data.data.sessionUrl
                 } else {

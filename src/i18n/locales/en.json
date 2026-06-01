@@ -3541,7 +3541,9 @@
             "leaveAnyway": "Leave anyway",
             "stayUpload": "Stay & Upload",
             "sumStatusBtS1": "Action Required — Upload Receipt",
-            "sumStatusBtS2": "We can't ship until your transfer is verified."
+            "sumStatusBtS2": "We can't ship until your transfer is verified.",
+            "verifyingPayment": "Verifying your payment…",
+            "verifyingHint": "This can take a few seconds. You can also check My Orders."
         },
         "resendUpload": {
             "checkEmailTitle": "Check your email",
