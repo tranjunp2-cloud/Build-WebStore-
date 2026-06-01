@@ -247,6 +247,69 @@ function syncSystemBlockInLayout(
     return updated ? nextBlocks : blocks
 }
 
+// F26: reconcile each `_localeContent[locale]` slot after a STRUCTURAL edit to header/footer links.
+// getDisplayBlock merges the whole slot over the block, so a slot's stale `links`/`columns` array
+// shadows a top-level edit (e.g. a deleted nav link reappears in the rendered header). We rebuild
+// the slot's structure to mirror the new one — keyed by `url` so surviving links keep their
+// translated label, removed links drop, and new links inherit the base label.
+function reconcileLinksByUrl(
+    slotLinks: unknown,
+    newLinks: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+    const oldByUrl = new Map(
+        (Array.isArray(slotLinks) ? slotLinks : []).map((l) => [String((l as Record<string, unknown>)?.url), l as Record<string, unknown>]),
+    )
+    return newLinks.map((nl) => {
+        const old = oldByUrl.get(String(nl?.url))
+        return old ? { ...nl, label: old.label ?? nl.label } : { ...nl }
+    })
+}
+
+function reconcileLocaleContentStructure(
+    localeContent: unknown,
+    changes: BlockPatch,
+): Record<string, Record<string, unknown>> | undefined {
+    if (!localeContent || typeof localeContent !== 'object') return undefined
+    const lc = localeContent as Record<string, Record<string, unknown>>
+    const ch = changes as Record<string, unknown>
+    const newLinks = Array.isArray(ch.links) ? (ch.links as Array<Record<string, unknown>>) : null
+    const newCols = Array.isArray(ch.columns) ? (ch.columns as Array<Record<string, unknown>>) : null
+    if (!newLinks && !newCols) return undefined
+
+    const out: Record<string, Record<string, unknown>> = {}
+    for (const [loc, slot] of Object.entries(lc)) {
+        let next = slot
+        if (newLinks && Array.isArray(slot?.links)) {
+            next = { ...next, links: reconcileLinksByUrl(slot.links, newLinks) }
+        }
+        if (newCols && Array.isArray(slot?.columns)) {
+            const oldCols = slot.columns as Array<Record<string, unknown>>
+            next = {
+                ...next,
+                columns: newCols.map((nc, i) => {
+                    const oc = oldCols[i]
+                    return {
+                        ...nc,
+                        ...(oc?.title ? { title: oc.title } : {}),
+                        ...(Array.isArray(nc.links) ? { links: reconcileLinksByUrl(oc?.links, nc.links as Array<Record<string, unknown>>) } : {}),
+                    }
+                }),
+            }
+        }
+        out[loc] = next
+    }
+    return out
+}
+
+/** Apply reconcile only for structural link/column edits that aren't themselves a _localeContent write. */
+function withLocaleContentReconcile(block: Record<string, unknown> | null, changes: BlockPatch): BlockPatch {
+    const ch = changes as Record<string, unknown>
+    if ('_localeContent' in ch) return changes // translation write — never reconcile
+    if (!Array.isArray(ch.links) && !Array.isArray(ch.columns)) return changes
+    const reconciled = reconcileLocaleContentStructure(block?._localeContent, changes)
+    return reconciled ? ({ ...changes, _localeContent: reconciled } as BlockPatch) : changes
+}
+
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
     // Initial state
     siteId: null,
@@ -659,8 +722,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
 
-    updateHeaderBlock: (changes) => {
+    updateHeaderBlock: (rawChanges) => {
         const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // F26: keep per-locale slots in sync on structural link edits (deleted/added/reordered nav links).
+        const changes = withLocaleContentReconcile(headerBlock as Record<string, unknown> | null, rawChanges)
         const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'navigation', changes)
 
@@ -676,8 +741,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().handleContentChange()
     },
 
-    updateFooterBlock: (changes) => {
+    updateFooterBlock: (rawChanges) => {
         const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // F26: keep per-locale slots in sync on structural footer column/link edits.
+        const changes = withLocaleContentReconcile(footerBlock as Record<string, unknown> | null, rawChanges)
         const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
         const newBlocks = syncSystemBlockInLayout(blocks, 'footer', changes)
 
