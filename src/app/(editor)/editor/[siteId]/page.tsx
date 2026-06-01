@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
+import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
@@ -306,13 +307,15 @@ export default function EditorPage() {
 
                 // F-26: siteLocale = EN/MS translation slot (Sites.locale).
                 // generationLocale = actual ISO 639-1 code AI generated in (may be 'vi', 'el', etc.).
-                // activeLocale defaults to native view (generationLocale) so user opens editor in
-                // the language base blocks are authored in — no waiting on translation.
                 const rawGenerationLocale = data.site?.generationLocale || (data.site?.locale as string) || 'en'
-                const siteLocale = (['en', 'ms'] as string[]).includes(rawGenerationLocale)
+                const genIsStandard = (['en', 'ms'] as string[]).includes(rawGenerationLocale)
+                const siteLocale = genIsStandard
                     ? rawGenerationLocale as SiteLocale
                     : (data.site?.locale as SiteLocale) || 'en'
-                const activeLocale = rawGenerationLocale
+                // F-26 FIX: restore the user's last-viewed locale (persisted to site.locale on save)
+                // so reloading an MS-switched page stays in MS instead of snapping back to the base
+                // language. See resolveInitialActiveLocale for the fallback rules.
+                const activeLocale = resolveInitialActiveLocale(rawGenerationLocale, data.site?.locale as string | undefined)
                 useEditorStore.getState().setSiteLocale(siteLocale)
                 useEditorStore.getState().setActiveLocale(activeLocale)
                 useEditorStore.getState().setGenerationLocale(rawGenerationLocale)
@@ -564,8 +567,8 @@ export default function EditorPage() {
                         const redoState = useEditorStore.getState()
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.getDisplayBlocks() })
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
-                        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.headerBlock })
-                        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.footerBlock })
+                        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.getDisplayBlock(redoState.headerBlock) })
+                        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.getDisplayBlock(redoState.footerBlock) })
                     }
                     return
                 }
@@ -575,8 +578,8 @@ export default function EditorPage() {
                     const undoState = useEditorStore.getState()
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.getDisplayBlocks() })
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
-                    if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.headerBlock })
-                    if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.footerBlock })
+                    if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.getDisplayBlock(undoState.headerBlock) })
+                    if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.getDisplayBlock(undoState.footerBlock) })
                 }
             }
 
@@ -678,12 +681,14 @@ export default function EditorPage() {
             setSaveSuccess(true)
             // header/footer update in-place; branding (CSS vars) still needs full reload
             if (changes.headerBlock || changes.name) {
-                const latestHeader = useEditorStore.getState().headerBlock
-                if (latestHeader) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: latestHeader })
+                const s = useEditorStore.getState()
+                const h = s.headerBlock
+                if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
             }
             if (changes.footerBlock) {
-                const latestFooter = useEditorStore.getState().footerBlock
-                if (latestFooter) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: latestFooter })
+                const s = useEditorStore.getState()
+                const f = s.footerBlock
+                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
             }
             if (changes.branding) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
@@ -708,7 +713,8 @@ export default function EditorPage() {
             | undefined
         if (existing?.[locale] && Object.keys(existing[locale]).length > 0) return
 
-        const SKIP = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent'])
+        // F26: skip media/non-text fields (images, urls) — see body-translate loop rationale.
+        const SKIP = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', 'url', 'href', 'src'])
         const translatableContent = Object.fromEntries(
             Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
         )
@@ -722,9 +728,12 @@ export default function EditorPage() {
                 body: JSON.stringify({ blockType: blockTypeKey, targetLocale: locale, content: translatableContent }),
             })
             if (!res.ok || signal?.aborted) return
-            const { translated } = await res.json() as { translated: Record<string, unknown> }
+            const { translated, status } = await res.json() as { translated: Record<string, unknown>; status?: string }
             // Re-check abort after parse — a newer switch may have superseded this flow.
             if (signal?.aborted) return
+            // F26: never persist a fallback (English) result — it poisons the locale slot and the
+            // guard above would then permanently skip re-translation. Leave empty → registry fallback.
+            if (status === 'fallback') return
             const newLocaleContent = { ...(existing ?? {}), [locale]: translated }
             applyFn({ _localeContent: newLocaleContent })
         } catch {
@@ -901,7 +910,9 @@ export default function EditorPage() {
 
         // F26-04: Auto-translate body blocks that have no localeOverride for the new locale.
         // Skips blocks already translated (cached in localeOverrides) for instant switch back.
-        const SKIP_FIELDS = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent', '__localeInit'])
+        // F26: also skip media/non-text fields — translating image objects/URLs bloats the payload,
+        // risks malformed JSON, and wastes tokens. Only marketing copy needs translation.
+        const SKIP_FIELDS = new Set(['id', 'blockType', 'logo', 'variant', 'backgroundColor', 'showLanguageSwitcher', '_localeContent', '__localeInit', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', 'url', 'href', 'src'])
         translationPromises.push(Promise.all(state.blocks.map(async (block) => {
             if (!block.id) return
             const existingOverride = state.localeOverrides[block.id as string]?.[locale]
@@ -914,6 +925,11 @@ export default function EditorPage() {
             )
             if (Object.keys(translatable).length === 0) return
 
+            // F26: cache key = blockType + the block's unique id, so the translate cache is scoped per
+            // block instance. Prevents cross-site AND cross-page collision (e.g. another site's hero,
+            // or a sibling page's hero, leaking in) while still reusing on switch-back for the same block.
+            const cacheBlockType = `${String(block.blockType || '')}-${block.id}`
+
             try {
                 const res = await fetch('/api/ai/translate', {
                     method: 'POST',
@@ -921,13 +937,17 @@ export default function EditorPage() {
                     credentials: 'include',
                     signal: switchController.signal,
                     body: JSON.stringify({
-                        blockType: String(block.blockType || ''),
+                        blockType: cacheBlockType,
                         targetLocale: locale,
                         content: translatable,
                     }),
                 })
                 if (!res.ok || switchController.signal.aborted) return
-                const { translated } = await res.json() as { translated?: Record<string, unknown> }
+                const { translated, status } = await res.json() as { translated?: Record<string, unknown>; status?: string }
+                // F26: never persist a fallback (English) result into the locale slot — that poisons
+                // the slot AND blocks future retries (the existingOverride guard above would skip it).
+                // Leaving it empty lets getDisplayBlock fall back to the registry BM bundle instead.
+                if (status === 'fallback') return
                 if (!translated || Object.keys(translated).length === 0) return
                 // F26-04: re-check aborted before persisting — stale flow must not write.
                 if (switchController.signal.aborted) return
@@ -1580,8 +1600,18 @@ export default function EditorPage() {
                 return
             }
 
-            // Send current store state — same pattern as handlePublish
-            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
+            // Send current store state — same pattern as handlePublish.
+            // F26: serialize header/footer/globals in the current display locale via getDisplayBlock
+            // so re-publish promotes the translated (e.g. Malay) header — NOT the raw base-language
+            // block. Sending raw here was promoting an English header on Update.
+            const snap = useEditorStore.getState()
+            const headerBlockSnap = snap.headerBlock ? snap.getDisplayBlock(snap.headerBlock) : null
+            const footerBlockSnap = snap.footerBlock ? snap.getDisplayBlock(snap.footerBlock) : null
+            const globalBlocksSnap = snap.globalBlocks ? {
+                cartWidget: snap.globalBlocks.cartWidget ? snap.getDisplayBlock(snap.globalBlocks.cartWidget) : null,
+                whatsappButton: snap.globalBlocks.whatsappButton ? snap.getDisplayBlock(snap.globalBlocks.whatsappButton) : null,
+                socialWidget: snap.globalBlocks.socialWidget ? snap.getDisplayBlock(snap.globalBlocks.socialWidget) : null,
+            } : null
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH',
                 credentials: 'include',
@@ -1979,14 +2009,17 @@ export default function EditorPage() {
                                     onBlockUpdate={handleBlockUpdate}
                                     onHeaderUpdate={(changes) => {
                                         updateHeaderBlock(changes)
-                                        const updatedHeader = useEditorStore.getState().headerBlock
-                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                        const s = useEditorStore.getState()
+                                        const h = s.headerBlock
+                                        // F26-04: send display-merged so iframe sees current locale's _localeContent overrides.
+                                        if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
                                         void saveWithRetry({ showToast: false, refreshPreview: false })
                                     }}
                                     onFooterUpdate={(changes) => {
                                         updateFooterBlock(changes)
-                                        const updatedFooter = useEditorStore.getState().footerBlock
-                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                        const s = useEditorStore.getState()
+                                        const f = s.footerBlock
+                                        if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
                                         if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
                                         footerUpdateSaveTimerRef.current = setTimeout(() => {
                                             footerUpdateSaveTimerRef.current = null
@@ -2076,8 +2109,9 @@ export default function EditorPage() {
                             }}
                             onFooterUpdate={(changes) => {
                                 updateFooterBlock(changes)
-                                const updatedFooter = useEditorStore.getState().footerBlock
-                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                const s = useEditorStore.getState()
+                                const f = s.footerBlock
+                                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
                                 if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
                                 footerUpdateSaveTimerRef.current = setTimeout(() => {
                                     footerUpdateSaveTimerRef.current = null
@@ -2186,14 +2220,16 @@ export default function EditorPage() {
                             onBlockUpdate={handleBlockUpdate}
                             onHeaderUpdate={(changes) => {
                                 updateHeaderBlock(changes)
-                                const updatedHeader = useEditorStore.getState().headerBlock
-                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                const s = useEditorStore.getState()
+                                const h = s.headerBlock
+                                if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
                                 void saveWithRetry({ showToast: false, refreshPreview: false })
                             }}
                             onFooterUpdate={(changes) => {
                                 updateFooterBlock(changes)
-                                const updatedFooter = useEditorStore.getState().footerBlock
-                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                const s = useEditorStore.getState()
+                                const f = s.footerBlock
+                                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
                                 if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
                                 footerUpdateSaveTimerRef.current = setTimeout(() => {
                                     footerUpdateSaveTimerRef.current = null

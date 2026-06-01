@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { useEditorStore } from '@/store/editorStore'
+import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 
 interface Props {
     site: SiteRendererProps['site']
@@ -17,6 +18,24 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
     const [page, setPage] = useState(initialPage)
     const [siteState, setSiteState] = useState(site)
     const [pages, setPages] = useState(initialPages)
+
+    // F26 FIX: seed the iframe's locale state from SSR site data on mount so the header
+    // language switcher flag matches the saved locale on first paint. Previously it relied
+    // solely on the parent's UPDATE_LOCALE postMessage, which races the iframe load — when
+    // the message arrives before the iframe is listening, the flag stays stuck on EN (the
+    // store default) even though the content renders in Malay.
+    useEffect(() => {
+        const s = site as Record<string, unknown>
+        const generationLocale = (s.generationLocale as string) || (s.locale as string) || 'en'
+        const persistedLocale = s.locale as string | undefined
+        const activeLocale = resolveInitialActiveLocale(generationLocale, persistedLocale)
+        const store = useEditorStore.getState()
+        store.setGenerationLocale(generationLocale)
+        store.setActiveLocale(activeLocale)
+        if (persistedLocale === 'en' || persistedLocale === 'ms') store.setSiteLocale(persistedLocale)
+        // Mount-only — parent UPDATE_LOCALE messages handle subsequent changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const handleBlockFieldChange = useCallback((blockIndex: number, field: string, value: unknown) => {
         window.parent?.postMessage(

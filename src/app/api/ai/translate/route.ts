@@ -95,7 +95,11 @@ export const POST = withAuth(async (user, req) => {
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             temperature: 0.3,
-            max_tokens: 1024,
+            // F26: content is capped at 10_000 chars (schema). Translated JSON can be larger than the
+            // source, so 1024 truncated big blocks (e.g. hero with badge/cta/image fields) → invalid
+            // JSON → silent English fallback. 4096 comfortably covers the 10KB content ceiling.
+            max_tokens: 4096,
+            response_format: { type: 'json_object' },
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: JSON.stringify(content) },

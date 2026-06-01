@@ -133,3 +133,25 @@ export function detectLocaleFromText(text: string): string {
     const iso = franc(trimmed, { minLength: 10 })
     return FRANC_ISO_TO_LOCALE[iso] ?? 'en'
 }
+
+/**
+ * F-26: Resolve which locale the editor should open in when a site is (re)loaded.
+ *
+ * On save we persist the user's last-viewed locale into `site.locale` (en/ms only).
+ * On load we must restore that view so an MS-switched page does not snap back to the
+ * base language. For non-standard base languages (vi/el, etc.) `site.locale` is only the
+ * translation target slot — not a view preference — so we keep the native generation view.
+ *
+ * @param generationLocale ISO 639-1 the site's base blocks were authored in (en/ms/vi/...)
+ * @param persistedLocale  `site.locale` from the API (the saved last-viewed locale, en/ms)
+ */
+export function resolveInitialActiveLocale(
+    generationLocale: string,
+    persistedLocale: string | undefined,
+): string {
+    const genIsStandard = generationLocale === 'en' || generationLocale === 'ms'
+    if (genIsStandard && (persistedLocale === 'en' || persistedLocale === 'ms')) {
+        return persistedLocale
+    }
+    return generationLocale
+}
