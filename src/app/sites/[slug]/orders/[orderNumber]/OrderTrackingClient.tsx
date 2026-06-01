@@ -110,7 +110,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
         : isPaymentFailed
             ? 'Payment Failed'
             : (() => {
-                const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'COD', ewallet: 'e-Wallet' }
+                const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', fpx: 'FPX', cod: 'COD', ewallet: 'e-Wallet' }
                 return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
             })()
     const chipClass = isPaid ? 'paid' : isPaymentFailed ? 'failed' : 'pending'

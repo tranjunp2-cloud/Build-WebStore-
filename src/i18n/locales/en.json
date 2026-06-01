@@ -856,6 +856,7 @@
         "paymentMethods": {
           "bank_transfer": "Bank Transfer",
           "card": "Credit Card",
+          "fpx": "FPX",
           "cod": "Cash on Delivery",
           "ewallet": "e-Wallet"
         },

@@ -81,8 +81,10 @@ export async function handleAccountUpdated(
     // Sync payment flags only when onboarding status actually changes (false→true or true→false).
     // Skipping on no-op events preserves any payment method preferences the merchant set manually.
     if (isOnboardingComplete !== wasOnboardingComplete) {
+        // FPX is only available for MY accounts with fpx_payments capability active
+        const fpxCapable = (account as any).capabilities?.fpx_payments === 'active'
         tenantUpdateData.payments = isOnboardingComplete
-            ? { payment_card: true, payment_fpx: true }
+            ? { payment_card: true, payment_fpx: fpxCapable }
             : { payment_card: false, payment_fpx: false }
     }
 

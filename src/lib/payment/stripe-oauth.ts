@@ -49,6 +49,10 @@ export function getStripeOAuthUrl(tenantId: string): string {
         state: signOAuthState(tenantId),
         prompt: 'login',
     })
+    // Request FPX + card capabilities upfront so connected account activates them during onboarding
+    params.append('requested_capabilities[]', 'card_payments')
+    params.append('requested_capabilities[]', 'fpx_payments')
+    params.append('requested_capabilities[]', 'transfers')
 
     return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
 }

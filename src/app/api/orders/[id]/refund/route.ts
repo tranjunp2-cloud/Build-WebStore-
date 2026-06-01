@@ -191,7 +191,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     const casResult = await (payload.db.drizzle as any).execute(sql`
         UPDATE orders SET status = 'refunded', payment_status = 'refunded'
         WHERE id = ${order.id}
-        AND status = ANY(ARRAY['shipped','completed'])
+        AND (status = 'shipped' OR status = 'completed')
         RETURNING id
     `)
     if (!casResult.rows?.length) {
