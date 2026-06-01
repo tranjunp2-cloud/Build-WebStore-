@@ -9,6 +9,7 @@ import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
+import { NavMultilingualPanel } from './nav-multilingual-panel'
 import { LogoEditor } from './LogoEditor'
 import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
@@ -258,6 +259,16 @@ interface SettingsPanelProps {
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
     requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
+    // F26: Multilingual panel in Menu settings
+    siteLocale?: string
+    activeLocale?: string
+    navShowLanguageSwitcher?: boolean
+    generationLocale?: string
+    primaryLocale?: string
+    pendingLocale?: string | null
+    onNavLanguageSwitcherChange?: (show: boolean) => void
+    onLocaleSwitch?: (locale: string) => void
+    onMakePrimary?: (locale: string) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -266,6 +277,9 @@ function SettingsPanelInner({
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     requestedTab,
+    siteLocale = 'en', activeLocale = 'en',
+    generationLocale, primaryLocale, pendingLocale,
+    navShowLanguageSwitcher = false, onNavLanguageSwitcherChange, onLocaleSwitch, onMakePrimary,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -834,11 +848,6 @@ function SettingsPanelInner({
     }
 
     const renderMenuContent = () => {
-        const menuHeaderLogoRaw = (headerBlock as Record<string, unknown>)?.logo
-        const menuHeaderLogo =
-            (typeof menuHeaderLogoRaw === 'string'
-                ? menuHeaderLogoRaw
-                : (menuHeaderLogoRaw as { url?: string } | undefined)?.url) || null
         return (
             <div className="space-y-5">
                 {/* 1. Navigation Style */}
@@ -874,29 +883,30 @@ function SettingsPanelInner({
                     </div>
                 </div>
 
-                {/* 2. Logo Editor (Upload image) */}
-                <LogoEditor
-                    currentLogo={menuHeaderLogo}
-                    onLogoChange={(logoUrl, faviconUrl) => {
-                        const changes: Record<string, unknown> = {
-                            logo: logoUrl ? { url: logoUrl, alt: '' } : null,
-                        }
-                        if (faviconUrl) {
-                            changes.favicon = faviconUrl
-                        } else if (!logoUrl) {
-                            changes.favicon = ''
-                        }
-                        onHeaderUpdate?.(changes)
-                        if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
-                    }}
-                />
-
-                {/* 3. Navigation Editor (List menu items) */}
+                {/* 2. Navigation Editor (List menu items) */}
                 <div className={sectionCls} data-coach="menu-settings">
                     <NavigationEditor
                         links={resolvedNavLinks}
                         onUpdate={(links) => onHeaderUpdate?.({ links })}
                         pages={pages}
+                    />
+                </div>
+
+                {/* 3.5 Quick Language — multilingual toggle */}
+                <div className={sectionCls}>
+                    <NavMultilingualPanel
+                        siteLocale={siteLocale}
+                        activeLocale={activeLocale}
+                        enabled={navShowLanguageSwitcher}
+                        onToggle={(on) => {
+                            onNavLanguageSwitcherChange?.(on)
+                            if (!on && onLocaleSwitch) onLocaleSwitch(siteLocale)
+                        }}
+                        generationLocale={generationLocale}
+                        primaryLocale={primaryLocale}
+                        pendingLocale={pendingLocale}
+                        onLocaleSwitch={(locale) => onLocaleSwitch?.(locale)}
+                        onMakePrimary={(locale) => onMakePrimary?.(locale)}
                     />
                 </div>
 

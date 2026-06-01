@@ -13,6 +13,7 @@ import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
+import { NavLangSwitcherPlaceholder } from './language-switcher-placeholder'
 import { NavOrderSearch } from './NavOrderSearch'
 import { useI18n } from '@/i18n'
 
@@ -306,8 +307,8 @@ type NavMobileDrawerProps = {
     onClose: () => void
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    showLanguageSwitcher?: boolean
     background?: string
-    children?: ReactNode
 }
 
 /**
@@ -320,6 +321,7 @@ function NavMobileMenuDrawer({
     onClose,
     links,
     ctaButton,
+    showLanguageSwitcher,
     background = NAV_SURFACE_BG_SOLID,
 }: NavMobileDrawerProps) {
     return (
@@ -341,6 +343,9 @@ function NavMobileMenuDrawer({
                         {links.map((link, i) => (
                             <MobileNavItem key={i} link={link} onNavigate={onClose} />
                         ))}
+                        {showLanguageSwitcher && (
+                            <NavLangSwitcherPlaceholder className="flex px-4 py-2" />
+                        )}
                         {ctaButton?.show && (
                             <NavMobileCTAButton href={ctaButton.url || '#'} label={ctaButton.label} onClick={onClose} />
                         )}
@@ -436,7 +441,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                     ))}
                 </div>
 
-                {/* Desktop CTA + Mobile Menu Button */}
+                {/* Desktop CTA + Language Switcher + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
@@ -445,6 +450,9 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                             label={ctaButton.label}
                             className="hidden sm:inline-flex px-4 py-2 sm:px-5 sm:py-2.5"
                         />
+                    )}
+                    {mergedBlock.showLanguageSwitcher && (
+                        <NavLangSwitcherPlaceholder className="hidden md:flex" />
                     )}
                     <NavHamburgerButton
                         open={mobileMenuOpen}
@@ -458,6 +466,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 onClose={() => setMobileMenuOpen(false)}
                 links={links}
                 ctaButton={ctaButton}
+                showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
             />
         </motion.nav>
     )
@@ -518,11 +527,14 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                     ))}
                 </div>
 
-                {/* CTA + Mobile */}
+                {/* CTA + Language Switcher + Mobile */}
                 <div className="flex items-center gap-3">
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
+                    )}
+                    {mergedBlock.showLanguageSwitcher && (
+                        <NavLangSwitcherPlaceholder className="hidden md:flex" />
                     )}
                     <NavHamburgerButton
                         open={mobileMenuOpen}
@@ -537,6 +549,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                 onClose={() => setMobileMenuOpen(false)}
                 links={links}
                 ctaButton={ctaButton}
+                showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
             />
         </motion.nav>
     )
@@ -645,8 +658,11 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                 ))}
                             </nav>
 
-                            {/* Order search inline form + CTA at bottom */}
+                            {/* Language Switcher + Order search + CTA at bottom */}
                             <div className="px-6 pb-6 flex flex-col gap-3">
+                                {mergedBlock.showLanguageSwitcher && (
+                                    <NavLangSwitcherPlaceholder className="flex" />
+                                )}
                                 {showOrderSearch && slug && (
                                     <div style={{
                                         borderTop: '1px solid color-mix(in srgb, var(--text, #fafafa) 10%, transparent)',
@@ -764,7 +780,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                         </motion.div>
                     </div>
 
-                    {/* Right links + Track + CTA — pushed to far right */}
+                    {/* Right links + Track + CTA + Language Switcher — pushed to far right */}
                     <div className="ml-auto flex items-center gap-1">
                         {rightLinks.map((link, i) => (
                             <DropdownLink key={i} link={link} i={i} />
@@ -776,6 +792,9 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                 label={ctaButton.label}
                                 className="inline-flex shrink-0 ml-2 px-4 py-2"
                             />
+                        )}
+                        {mergedBlock.showLanguageSwitcher && (
+                            <NavLangSwitcherPlaceholder className="hidden md:flex ml-1" />
                         )}
                     </div>
                 </div>
@@ -797,6 +816,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 onClose={() => setMobileMenuOpen(false)}
                 links={links}
                 ctaButton={ctaButton}
+                showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
             />
         </motion.nav>
     )
@@ -886,11 +906,14 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                     ))}
                 </div>
 
-                {/* Desktop CTA + Mobile Menu Button */}
+                {/* Desktop CTA + Language Switcher + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
+                    )}
+                    {mergedBlock.showLanguageSwitcher && (
+                        <NavLangSwitcherPlaceholder className="hidden md:flex" />
                     )}
                     <NavHamburgerButton
                         open={mobileMenuOpen}
@@ -950,6 +973,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 onClose={() => setMobileMenuOpen(false)}
                 links={links}
                 ctaButton={ctaButton}
+                showLanguageSwitcher={mergedBlock.showLanguageSwitcher}
             />
         </motion.nav>
     )
@@ -1002,7 +1026,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                     ))}
                 </div>
 
-                {/* CTA + Mobile */}
+                {/* CTA + Language Switcher + Mobile */}
                 <div className="flex items-center gap-2">
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
@@ -1013,6 +1037,9 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                         >
                             {ctaButton.label}
                         </a>
+                    )}
+                    {mergedBlock.showLanguageSwitcher && (
+                        <NavLangSwitcherPlaceholder className="hidden md:flex" />
                     )}
                     <button
                         type="button"
@@ -1049,6 +1076,9 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                             {links.map((link, i) => (
                                 <MobileNavItem key={i} link={link} onNavigate={() => setMobileMenuOpen(false)} />
                             ))}
+                            {mergedBlock.showLanguageSwitcher && (
+                                <NavLangSwitcherPlaceholder className="flex px-4 py-2" />
+                            )}
                             {ctaButton?.show && (
                                 <a
                                     href={ctaButton.url || '#'}

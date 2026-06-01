@@ -22,7 +22,9 @@ interface BuilderCompletionViewProps {
     onPreviewModeChange: (mode: BuilderPreviewMode) => void
     isPublishing?: boolean
     isNavigating?: boolean
+    isBlocked?: boolean
     siteId?: string | null
+    showBannerPad?: boolean
 }
 
 function getBlockDisplayLabel(block: {
@@ -139,12 +141,14 @@ function CompletionPreviewPanel({
     previewContent,
     onOpenPreview,
     siteId,
+    showBannerPad,
 }: {
     mode: BuilderPreviewMode
     onModeChange: (mode: BuilderPreviewMode) => void
     previewContent: ReactNode
     onOpenPreview: () => void
     siteId?: string | null
+    showBannerPad?: boolean
 }) {
     const { t } = useI18n()
     const c = t.onboarding.completion
@@ -180,7 +184,7 @@ function CompletionPreviewPanel({
                     </div>
                 </div>
 
-                <div className="relative flex-1 overflow-hidden px-6 pb-6 pt-4">
+                <div className={`relative flex-1 overflow-hidden px-6 pt-4 ${showBannerPad ? 'pb-[88px]' : 'pb-6'}`}>
                     <BuilderPreviewSurface mode={mode} variant="panel" siteId={siteId}>
                         {previewContent}
                     </BuilderPreviewSurface>
@@ -206,7 +210,9 @@ export default function BuilderCompletionView({
     onPreviewModeChange,
     isPublishing = false,
     isNavigating = false,
+    isBlocked = false,
     siteId,
+    showBannerPad,
 }: BuilderCompletionViewProps) {
     const { t } = useI18n()
     const c = t.onboarding.completion
@@ -343,7 +349,7 @@ export default function BuilderCompletionView({
             floatingControls={floatingControls}
             gridClassName="lg:grid-cols-[clamp(380px,28vw,460px)_1fr]"
             leftBody={leftBody}
-            leftFooter={leftFooter}
+            leftFooter={isBlocked ? undefined : leftFooter}
             right={(
                 <CompletionPreviewPanel
                     mode={previewMode}
@@ -351,6 +357,7 @@ export default function BuilderCompletionView({
                     onOpenPreview={onOpenPreview}
                     previewContent={previewContent}
                     siteId={siteId}
+                    showBannerPad={showBannerPad}
                 />
             )}
             rightContentClassName="h-full max-w-none px-0 xl:px-0"

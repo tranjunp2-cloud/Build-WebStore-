@@ -10,6 +10,7 @@ import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+import { isNavBlock, isFooterBlock } from '@/lib/ai/ensure-navigation'
 
 type PreviewLayoutBlock = Record<string, unknown> & {
     blockType: string
@@ -142,25 +143,40 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         // A nav block with empty links renders as invisible thin bar.
         const pageLayout = ((page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || [])
             .map((block, index) => ({ ...block, __editorBlockIndex: index })) as PreviewLayoutBlock[]
-        const existingNav = pageLayout.find((b) => b.blockType === 'navigation')
+        const existingNav = pageLayout.find(isNavBlock)
         const hasNav = Boolean(existingNav && Array.isArray(existingNav.links) && existingNav.links.length > 0)
-        const existingFooter = pageLayout.find((b) => b.blockType === 'footer')
+        const existingFooter = pageLayout.find(isFooterBlock)
         const hasFooter = Boolean(existingFooter)
 
-        if (!hasNav || !hasFooter) {
-            // Check site-level headerBlock/footerBlock first
-            const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
-            const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
+        // F26: site-level header/footer are CANONICAL. Per-page nav/footer blocks embedded in a
+        // page's layout are non-canonical artifacts that go stale — only the page open during a
+        // locale switch gets its nav translated, so non-home pages keep an English nav. Always
+        // resolve the single site header/footer and inject it, stripping per-page nav/footer.
+        // Mirrors SiteRenderer.applyGlobalSystemBlocks() so /preview matches the storefront.
+        // Prefer pending (draft) versions so unpublished locale switches show immediately.
+        const pendingHb = (site as Record<string, unknown>).pendingHeaderBlock as Record<string, unknown> | null
+        const pendingFb = (site as Record<string, unknown>).pendingFooterBlock as Record<string, unknown> | null
+        const siteHeaderBlock = pendingHb ?? (site.headerBlock as Record<string, unknown> | null)
+        const siteFooterBlock = pendingFb ?? (site.footerBlock as Record<string, unknown> | null)
 
-            let navBlock: PreviewLayoutBlock | null = siteHeaderBlock
-                ? { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
-                : null
-            let footerBlock: PreviewLayoutBlock | null = siteFooterBlock
-                ? { ...siteFooterBlock, blockType: (siteFooterBlock.blockType as string) || 'footer', __editorBlockIndex: -1 }
-                : null
+        // When a canonical site header/footer exists, strip the page's own and replace it. For
+        // legacy sites with no site-level header, keep the page's nav (or derive a fallback).
+        let navBlock: PreviewLayoutBlock | null = null
+        let stripPerPageNav = false
+        if (siteHeaderBlock) {
+            navBlock = { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
+            stripPerPageNav = true
+        }
+        let footerBlock: PreviewLayoutBlock | null = null
+        let stripPerPageFooter = false
+        if (siteFooterBlock) {
+            footerBlock = { ...siteFooterBlock, blockType: (siteFooterBlock.blockType as string) || 'footer', __editorBlockIndex: -1 }
+            stripPerPageFooter = true
+        }
 
-            // Fallback: extract from homepage layout if current page is not homepage
-            if ((!navBlock || !footerBlock) && !page.isHomepage) {
+        // Legacy fallback (no site-level header/footer): derive from homepage layout, then defaults.
+        if ((!navBlock && !hasNav) || (!footerBlock && !hasFooter)) {
+            if (!page.isHomepage) {
                 const homepageResult = await payload.find({
                     collection: 'pages',
                     where: { site: { equals: siteId }, isHomepage: { equals: true } },
@@ -170,15 +186,17 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 })
                 const homepage = homepageResult.docs[0] as any
                 if (homepage?.layout) {
-                    const homeLayout = homepage.layout as Array<{ blockType: string; [key: string]: unknown }>
-                    if (!navBlock) navBlock = homeLayout.find(b => b.blockType === 'navigation') || null
-                    if (!footerBlock) footerBlock = homeLayout.find(b => b.blockType === 'footer') || null
-                    if (navBlock) navBlock = { ...navBlock, __editorBlockIndex: -1 }
-                    if (footerBlock) footerBlock = { ...footerBlock, __editorBlockIndex: -1 }
+                    const homeLayout = homepage.layout as PreviewLayoutBlock[]
+                    if (!navBlock && !hasNav) {
+                        const hn = homeLayout.find(isNavBlock)
+                        if (hn) navBlock = { ...hn, __editorBlockIndex: -1 }
+                    }
+                    if (!footerBlock && !hasFooter) {
+                        const hf = homeLayout.find(isFooterBlock)
+                        if (hf) footerBlock = { ...hf, __editorBlockIndex: -1 }
+                    }
                 }
             }
-
-            // Last resort: build default nav/footer
             if (!navBlock && !hasNav) {
                 const siteName = (site.name as string) || 'My Website'
                 navBlock = {
@@ -205,20 +223,21 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     columns: [],
                 } as PreviewLayoutBlock
             }
-
-            // Strip broken nav/footer blocks (exist but empty) before injecting working ones
-            const cleanedLayout = pageLayout.filter((b) => {
-                if (b.blockType === 'navigation' && !hasNav) return false
-                return true
-            })
-
-            const injectedLayout = [
-                ...(!hasNav && navBlock ? [navBlock] : []),
-                ...cleanedLayout,
-                ...(!hasFooter && footerBlock ? [footerBlock] : []),
-            ]
-            page = { ...page, layout: injectedLayout }
         }
+
+        // Strip per-page nav/footer when we have a replacement to inject (canonical site header, or a
+        // derived fallback for a page that had none); otherwise keep the page's existing block.
+        const cleanedLayout = pageLayout.filter((b) => {
+            if (isNavBlock(b) && (stripPerPageNav || !hasNav)) return false
+            if (isFooterBlock(b) && (stripPerPageFooter || !hasFooter)) return false
+            return true
+        })
+        const injectedLayout = [
+            ...(navBlock ? [navBlock] : []),
+            ...cleanedLayout,
+            ...(footerBlock ? [footerBlock] : []),
+        ]
+        page = { ...page, layout: injectedLayout }
 
         // Fetch all pages for navigation filtering parity
         const navPagesResult = await payload.find({
@@ -236,8 +255,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     <PreviewSiteRenderer
                         site={{
                             ...site,
-                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
-                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            // F26-04: override headerBlock / footerBlock / globalBlocks with the
+                            // DRAFT (pending) versions so /preview reflects the latest editor save,
+                            // including locale switches that haven't been published yet.
+                            headerBlock: (site as Record<string, unknown>).pendingHeaderBlock ?? site.headerBlock,
+                            footerBlock: (site as Record<string, unknown>).pendingFooterBlock ?? site.footerBlock,
+                            globalBlocks: (site as Record<string, unknown>).pendingGlobalBlocks ?? site.globalBlocks,
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',

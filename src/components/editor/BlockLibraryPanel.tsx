@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { listAllBlocks } from '@/lib/admin/block-registry-reader'
+import { resolveBlockContent, hasLocaleContent } from '@/lib/ai/add-section-content'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 
@@ -63,6 +65,8 @@ interface BlockLibraryPanelProps {
     onBlockSelect: (index: number) => void
     onAIAction: (action: AIAction) => Promise<void> | void
     onEditGlobalBlock?: (blockType: string) => void
+    /** F26-04: Called when user clicks "✨ AI" auto-translate button for a block type */
+    onAutoTranslate?: (blockType: string) => Promise<void>
 }
 
 export function BlockLibraryPanel({
@@ -70,6 +74,7 @@ export function BlockLibraryPanel({
     selectedBlock,
     onAIAction,
     onEditGlobalBlock,
+    onAutoTranslate,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
@@ -77,51 +82,77 @@ export function BlockLibraryPanel({
     const blockTranslations = bl.blocks as Record<string, { name: string; description: string; scopeTooltip?: string }>
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<string>('basics')
+    // F26-04: block types that have been AI-translated this session (icon disappears after translate)
+    const [translatedTypes, setTranslatedTypes] = useState<Set<string>>(new Set())
+    const [pendingTranslateTypes, setPendingTranslateTypes] = useState<Set<string>>(new Set())
 
-    // Build visible categories from registry on every render cycle.
-    // listAllBlocks() is module-level cached (process lifetime), so this is O(n) array work only.
-    const allRegistryBlocks = listAllBlocks()
-    const visibleBlocks = allRegistryBlocks
-        .filter(b => b.aiVisible !== false)
-        .filter(b => !b.isSystem)
-        .filter(b => b.category !== 'archive')
+    // Registry is module-lifetime stable — memo with [] deps to avoid new array ref every render.
+    // categoryLabels comes from i18n (stable ref); included in deps for correctness.
+    const baseCategories = useMemo(() => {
+        const allBlocks = listAllBlocks()
+            .filter(b => b.aiVisible !== false)
+            .filter(b => !b.isSystem)
+            .filter(b => b.category !== 'archive')
+        const byCategory = new Map<string, typeof allBlocks>()
+        for (const b of allBlocks) {
+            const arr = byCategory.get(b.category) ?? []
+            arr.push(b)
+            byCategory.set(b.category, arr)
+        }
+        return CATEGORY_ORDER
+            .filter(cat => byCategory.has(cat))
+            .map(cat => ({
+                id: cat,
+                icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
+                label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
+                blocks: byCategory.get(cat)!,
+            }))
+    }, [categoryLabels])
 
-    // Group by category
-    const registryByCategory = new Map<string, typeof visibleBlocks>()
-    for (const b of visibleBlocks) {
-        const arr = registryByCategory.get(b.category) ?? []
-        arr.push(b)
-        registryByCategory.set(b.category, arr)
-    }
-
-    // Build ordered category list (only categories that have blocks)
-    const baseCategories = CATEGORY_ORDER
-        .filter(cat => registryByCategory.has(cat))
-        .map(cat => ({
-            id: cat,
-            icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
-            // i18n label: prefer translated string from i18n system, fall back to Malay hardcode
-            label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
-            blocks: registryByCategory.get(cat)!,
-        }))
+    // F26-03: read active locale to drive locale-aware block previews
+    const activeLocale = useEditorStore(state => state.activeLocale)
 
     const categories = useMemo(() => {
         const keyword = query.trim().toLowerCase()
 
         return baseCategories.map(category => {
-            const items = category.blocks.map(b => ({
-                type: b.slug,
-                name: blockTranslations?.[b.slug]?.name || b.name,
-                description: blockTranslations?.[b.slug]?.description || b.description,
-                icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
-                defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
-                scope: b.scope ?? 'page',
-                scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
-            })).filter(item => {
+            const items = category.blocks.map(b => {
+                const baseName = blockTranslations?.[b.slug]?.name || b.name
+                const baseDescription = blockTranslations?.[b.slug]?.description || b.description
+
+                // F26-03: locale-aware preview text — show BM headline when locale is 'ms'
+                let previewText = baseDescription
+                let needsTranslation = false
+                if (activeLocale === 'ms') {
+                    if (hasLocaleContent(b.slug, 'ms')) {
+                        const resolved = resolveBlockContent(b.slug, 'ms', '')
+                        const bmPreview = String(
+                            resolved.content?.headline
+                            ?? resolved.content?.sectionLabelBase
+                            ?? ''
+                        )
+                        if (bmPreview) previewText = bmPreview
+                    } else {
+                        needsTranslation = true
+                    }
+                }
+
+                return {
+                    type: b.slug,
+                    name: baseName,
+                    description: baseDescription,
+                    previewText,
+                    needsTranslation,
+                    icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                    defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
+                    scope: b.scope ?? 'page',
+                    scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
+                }
+            }).filter(item => {
                 if (!keyword) return true
                 return (
                     item.name.toLowerCase().includes(keyword)
-                    || item.description.toLowerCase().includes(keyword)
+                    || item.previewText.toLowerCase().includes(keyword)  // F26-03: BM preview searchable
                     || item.type.toLowerCase().includes(keyword)
                 )
             })
@@ -132,7 +163,7 @@ export function BlockLibraryPanel({
                 totalCount: category.blocks.length,
             }
         }).filter(category => category.items.length > 0 || !query.trim())
-    }, [query, baseCategories, blockTranslations])
+    }, [query, baseCategories, blockTranslations, activeLocale])
 
     const globalBlocks = useEditorStore(state => state.globalBlocks)
     const updateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
@@ -199,7 +230,9 @@ export function BlockLibraryPanel({
                                             const isAlreadyGlobal = item.scope === 'global' && item.defaultVariant === 'floating'
                                                 && !!globalKey && !!globalBlocks?.[globalKey]
                                             return (
-                                            <Tooltip key={item.type} open={isAlreadyGlobal ? undefined : false}>
+                                            // F26-03: relative wrapper so ✨ AI button sits as a sibling (not child) of the block button
+                                            <div key={item.type} className="relative">
+                                            <Tooltip open={isAlreadyGlobal ? undefined : false}>
                                             <TooltipTrigger asChild>
                                             <button
                                                 type="button"
@@ -252,7 +285,8 @@ export function BlockLibraryPanel({
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     </div>
-                                                    <p className="truncate text-[11px] text-slate-500">{item.description}</p>
+                                                    {/* F26-03: locale-aware preview text (no interactive children in button) */}
+                                                    <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>
                                                 </div>
                                                 {!isAlreadyGlobal && (
                                                     <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
@@ -267,6 +301,7 @@ export function BlockLibraryPanel({
                                                 </TooltipContent>
                                             )}
                                             </Tooltip>
+                                            </div>
                                             )
                                         })}
                                     </div>

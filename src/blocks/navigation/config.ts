@@ -20,6 +20,8 @@ export type NavigationConfig = {
     ctaButton?: { show: boolean; label: string; url: string }
     /** Accessible label for screen readers. Defaults to "Main navigation" at render time. */
     ariaLabel?: string
+    /** F26-07: Language switcher locked to header. F27 wires live switching. */
+    showLanguageSwitcher?: boolean
 }
 
 const NavLinkSchema: z.ZodType<NavLink> = z.lazy(() =>
@@ -42,6 +44,7 @@ export const NavigationConfigSchema = BaseBlockSchema.extend({
         url: z.string(),
     }).optional(),
     ariaLabel: z.string().optional(),
+    showLanguageSwitcher: z.boolean().optional(),
 })
 
 export const navigationMeta = {
