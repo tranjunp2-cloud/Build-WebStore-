@@ -168,7 +168,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                             <thead>
                                 <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-                                    {['Order #', 'Status', 'Total', 'Payment', 'Date', ''].map((h) => (
+                                    {['Order', 'Status', 'Total', 'Payment', 'Date', ''].map((h) => (
                                         <th
                                             key={h}
                                             style={{

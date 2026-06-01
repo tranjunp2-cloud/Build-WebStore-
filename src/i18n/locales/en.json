@@ -817,7 +817,7 @@
         "cancelled": "Cancelled"
       },
       "tableHeaders": {
-        "orderNumber": "Order #",
+        "orderNumber": "Order",
         "customer": "Customer",
         "total": "Total",
         "paymentMethod": "Payment",
@@ -1534,7 +1534,7 @@
         "loadFailed": "Failed to load orders",
         "retry": "Retry",
         "noOrders": "No orders linked yet",
-        "colOrderNumber": "Order #",
+        "colOrderNumber": "Order",
         "colStatus": "Status",
         "colTotal": "Total",
         "colPayment": "Payment",

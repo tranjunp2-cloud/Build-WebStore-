@@ -817,7 +817,7 @@
         "cancelled": "Dibatalkan"
       },
       "tableHeaders": {
-        "orderNumber": "Pesanan #",
+        "orderNumber": "Pesanan",
         "customer": "Pelanggan",
         "total": "Jumlah",
         "paymentMethod": "Pembayaran",
