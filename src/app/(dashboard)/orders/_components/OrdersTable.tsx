@@ -502,16 +502,29 @@ export function OrdersTable({
     useEffect(() => { sortOrderRef.current = sortOrder }, [sortOrder])
     useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
 
-    // Reset to page 1 whenever any filter changes
-    useEffect(() => {
-        setPage(1)
-    }, [searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
+    // Track previous filter values to detect changes and compute effectivePage in one effect,
+    // avoiding the double-fetch race condition that arises from a separate page-reset effect.
+    const prevFiltersRef = useRef({ searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder })
 
     useEffect(() => {
+        const prev = prevFiltersRef.current
+        const filtersChanged =
+            prev.searchQuery !== searchQuery ||
+            prev.statusFilter !== statusFilter ||
+            prev.dateFilter !== dateFilter ||
+            prev.paymentMethodFilter !== paymentMethodFilter ||
+            prev.sortOrder !== sortOrder
+        prevFiltersRef.current = { searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder }
+
+        // When filters change, fetch page 1 immediately — don't wait for setPage(1) re-render.
+        // Also sync the page state for pagination display.
+        const effectivePage = filtersChanged ? 1 : page
+        if (filtersChanged && page !== 1) setPage(1)
+
         async function fetchOrders() {
             try {
                 setLoading(true)
-                let url = `/api/orders?page=${page}&limit=10&sort=${encodeURIComponent(sortOrder)}`
+                let url = `/api/orders?page=${effectivePage}&limit=10&sort=${encodeURIComponent(sortOrder)}`
                 if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
                 if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
                 if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
