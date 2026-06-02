@@ -151,7 +151,7 @@ export function orderConfirmationEmail(
             <td colspan="3" style="padding:6px 0;color:#94A3B8;">${esc(data.buyerNote)}</td>
         </tr>` : ''
 
-    const subject = isConfirmed
+    const defaultSubject = isConfirmed
         ? (locale === 'ms'
             ? `${esc(data.shopName)} - Pesanan anda telah disahkan - ${esc(data.orderNumber)}`
             : `${esc(data.shopName)} - Your order has been confirmed - ${esc(data.orderNumber)}`)
@@ -162,6 +162,9 @@ export function orderConfirmationEmail(
         : (locale === 'ms'
             ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
             : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`)
+    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(config.subject, vars) ?? defaultSubject)
+        : defaultSubject
 
     return {
         subject,

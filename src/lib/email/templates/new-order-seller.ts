@@ -40,9 +40,12 @@ export function newOrderSellerEmail(data: NewOrderSellerData, config?: EmailTemp
     })
     const esc = escapeHtml
 
-    const subject = locale === 'ms'
+    const defaultSubject = locale === 'ms'
         ? `Anda mempunyai pesanan baharu ${esc(data.orderNumber)}`
         : `You have a new order ${esc(data.orderNumber)}`
+    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(config.subject, vars) ?? defaultSubject)
+        : defaultSubject
 
     const greeting = locale === 'ms'
         ? `Hai <strong>${esc(data.shopName)}</strong>,`
