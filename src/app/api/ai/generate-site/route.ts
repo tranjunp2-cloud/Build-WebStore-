@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
         const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
         if (errorResponse) return errorResponse
 
-        const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', contentBrief: rawContentBrief } = data!
+        const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', generationLocale: requestedGenerationLocale, contentBrief: rawContentBrief } = data!
 
         // Normalize text inputs before sending to AI
         const businessInfo = {
@@ -596,7 +596,9 @@ export async function POST(req: NextRequest) {
         // F26-01: Always show confirm dialog after AI generation so user can verify or correct detected locale.
         // generationLocale = actual language the AI generated in (any locale, e.g. 'el', 'th').
         // detectedLocale = EN/MS only — used for Sites.locale (translation system, Phase 1 EN+MS only).
-        const generationLocale = result.language || language || 'en'
+        // The user-confirmed locale (requestedGenerationLocale) wins: `language` collapses non
+        // en/ms/vi to 'auto' and GPT's result.language often falls back to 'en', losing the real code.
+        const generationLocale = requestedGenerationLocale || result.language || language || 'en'
         const detectedLocale = (['ms', 'en'] as string[]).includes(generationLocale) ? generationLocale : 'en'
         const pendingLocaleConfirm = true
 

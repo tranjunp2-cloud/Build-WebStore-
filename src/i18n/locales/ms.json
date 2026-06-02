@@ -3018,7 +3018,20 @@
             "moveUp": "Alih ke atas",
             "moveDown": "Alih ke bawah",
             "moveLeft": "Alih ke kiri",
-            "makeSubItem": "Jadikan sub-item"
+            "makeSubItem": "Jadikan sub-item",
+            "quickLanguage": {
+                "title": "Bahasa Pantas",
+                "tooltip": "Aktifkan untuk menterjemah dan memaparkan laman web anda dalam pelbagai bahasa untuk pelanggan antarabangsa atau pelbagai etnik.",
+                "enable": "Aktifkan Pelbagai Bahasa",
+                "enabledHint": "Laman menyokong bahasa kedua.",
+                "primary": "Utama",
+                "makeDefault": "Jadikan Lalai",
+                "removeLanguage": "Alih keluar bahasa",
+                "addSecondary": "Tambah bahasa kedua",
+                "adding": "Menambah…",
+                "add": "Tambah",
+                "maxLanguages": "Maksimum 2 bahasa. Alih keluar {name} untuk menukar."
+            }
         },
         "settings": {
             "brandIdentity": "Identiti Jenama",

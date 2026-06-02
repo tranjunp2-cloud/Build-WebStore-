@@ -3018,7 +3018,20 @@
             "moveUp": "Move up",
             "moveDown": "Move down",
             "moveLeft": "Move left",
-            "makeSubItem": "Make sub-item"
+            "makeSubItem": "Make sub-item",
+            "quickLanguage": {
+                "title": "Quick Language",
+                "tooltip": "Enable to translate and display your website in multiple languages for international or multi-ethnic customers.",
+                "enable": "Enable Multi-language",
+                "enabledHint": "Site supports a secondary language.",
+                "primary": "Primary",
+                "makeDefault": "Make Default",
+                "removeLanguage": "Remove language",
+                "addSecondary": "Add a secondary language",
+                "adding": "Adding…",
+                "add": "Add",
+                "maxLanguages": "Max 2 languages. Remove {name} to switch."
+            }
         },
         "settings": {
             "brandIdentity": "Brand Identity",

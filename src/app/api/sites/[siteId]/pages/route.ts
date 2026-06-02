@@ -7,6 +7,7 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { z } from 'zod'
+import { sql } from 'drizzle-orm'
 
 const MAX_PAGES_PER_SITE = 100
 
@@ -74,6 +75,29 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             seo?: { title?: string; description?: string }
             updatedAt: string
             layout?: unknown[]
+            localeContent?: unknown
+        }
+
+        // GH-1136: locale_content is a raw SQL column (not a Payload field), so payload.find
+        // doesn't return it. Fetch it for all pages in one query and map by id, so the Page
+        // Library can show titles in the active locale without loading each page individually.
+        const localeContentById = new Map<string, unknown>()
+        const pageIds = (pages as unknown as PageDoc[]).map(p => p.id).filter(Boolean)
+        if (pageIds.length > 0) {
+            try {
+                const db = payload.db.drizzle as { execute: (q: unknown) => Promise<{ rows: Array<{ id: string | number; locale_content: unknown }> }> }
+                const idList = sql.join(pageIds.map(id => sql`${id}`), sql`, `)
+                const result = await db.execute(sql`
+                    SELECT id, locale_content FROM pages WHERE id IN (${idList})
+                `)
+                for (const row of result.rows ?? []) {
+                    if (row.locale_content && typeof row.locale_content === 'object') {
+                        localeContentById.set(String(row.id), row.locale_content)
+                    }
+                }
+            } catch {
+                // Non-fatal — locale_content is additive; titles fall back to original.
+            }
         }
 
         const formattedPages = (pages as unknown as PageDoc[]).map((p: PageDoc) => ({
@@ -87,6 +111,8 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             seoDescription: p.seo?.description ?? null,
             updatedAt: p.updatedAt,
             blockCount: Array.isArray(p.layout) ? p.layout.length : 0,
+            // GH-1136: per-locale overrides (incl. __pageMeta page-title translations).
+            localeContent: localeContentById.get(String(p.id)) ?? null,
         }))
 
         return NextResponse.json({ pages: formattedPages })

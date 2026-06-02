@@ -29,9 +29,14 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
         const generationLocale = (s.generationLocale as string) || (s.locale as string) || 'en'
         const persistedLocale = s.locale as string | undefined
         const activeLocale = resolveInitialActiveLocale(generationLocale, persistedLocale)
+        // F26: seed the persisted language pair so the header switcher renders exactly
+        // [primary, secondary] on first paint (matches the editor's Quick Language panel).
+        const header = s.headerBlock as { primaryLocale?: string; secondaryLocale?: string } | null | undefined
         const store = useEditorStore.getState()
         store.setGenerationLocale(generationLocale)
         store.setActiveLocale(activeLocale)
+        store.setPrimaryLocale(header?.primaryLocale || generationLocale)
+        store.setSecondaryLocale(header?.secondaryLocale || null)
         if (persistedLocale === 'en' || persistedLocale === 'ms') store.setSiteLocale(persistedLocale)
         // Mount-only — parent UPDATE_LOCALE messages handle subsequent changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -117,14 +122,19 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
                 // F26-04: sync iframe's editorStore so language switcher flag/state matches parent.
                 // Synchronous apply (no dynamic import) to avoid back-to-back UPDATE_LOCALE
                 // messages resolving out of order via Promise queue.
-                const { activeLocale, generationLocale, siteLocale } = e.data as {
+                const data = e.data as {
                     activeLocale?: string; generationLocale?: string; siteLocale?: string
+                    primaryLocale?: string; secondaryLocale?: string | null
                 }
+                const { activeLocale, generationLocale, siteLocale, primaryLocale, secondaryLocale } = data
                 if (typeof activeLocale === 'string') useEditorStore.getState().setActiveLocale(activeLocale)
                 if (typeof generationLocale === 'string') useEditorStore.getState().setGenerationLocale(generationLocale)
                 if (typeof siteLocale === 'string' && (siteLocale === 'en' || siteLocale === 'ms')) {
                     useEditorStore.getState().setSiteLocale(siteLocale)
                 }
+                if (typeof primaryLocale === 'string') useEditorStore.getState().setPrimaryLocale(primaryLocale)
+                // Only touch secondary when the message carries it (clearing sends '' or null).
+                if ('secondaryLocale' in data) useEditorStore.getState().setSecondaryLocale(secondaryLocale || null)
             }
         }
         window.addEventListener('message', onMessage)

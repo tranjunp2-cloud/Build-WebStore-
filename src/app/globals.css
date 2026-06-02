@@ -656,6 +656,7 @@ html:not(.dark) .editor-shell .text-cyan-200\/70 { color: #155e75; }
 html:not(.dark) .editor-shell .text-amber-300 { color: #92400e; }
 html:not(.dark) .editor-shell .text-amber-300\/80 { color: #92400e; }
 html:not(.dark) .editor-shell .text-amber-400 { color: #b45309; }
+html:not(.dark) .editor-shell .text-amber-400\/70 { color: #b45309; }
 html:not(.dark) .editor-shell .text-emerald-400 { color: #15803d; }
 /* Draft badge: pale gray text/bg/border → readable in light mode */
 html:not(.dark) .editor-shell .text-\[\#d1d5dc\] { color: #475569; }

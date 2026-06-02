@@ -337,6 +337,31 @@ describe('AI Streaming APIs', () => {
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationStatus).toBe('generating')
         })
+
+        // TC-F26-01-02 (extension): user-confirmed source locale persists verbatim.
+        // For non en/ms/vi the builder collapses `language` to 'auto' (prompt only supports those),
+        // so the real code is sent separately as `generationLocale` and must win over result.language.
+        it('persists user-confirmed generationLocale verbatim over collapsed language (TC-F26-01-02)', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'すし', industry: 'Food', products: '寿司', shortDescription: '新鮮な寿司' },
+                     language: 'auto',
+                     generationLocale: 'ja',
+                 })
+             })
+             await GenerateSitePOST(req)
+
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+             const siteCreateCall = createCalls.find(
+                 (c: [{ collection: string; data?: { generationLocale?: string } }]) =>
+                     c[0].collection === 'sites'
+             )
+             expect(siteCreateCall).toBeDefined()
+             expect(siteCreateCall![0].data.generationLocale).toBe('ja')
+        })
     })
 
     describe('POST /api/ai/edit-block', () => {

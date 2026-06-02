@@ -55,6 +55,25 @@ export type PageData = {
     deletedAt?: string | null
     updatedAt: string
     blockCount?: number
+    /** F26/GH-1136: per-locale overrides incl. page-title translations under the reserved
+     *  `__pageMeta` key — localeContent['__pageMeta'][locale] = { title }. Block-level overrides
+     *  share this JSON column keyed by block id. */
+    localeContent?: Record<string, Record<string, Record<string, unknown>>>
+}
+
+/** Reserved localeContent key holding page-level (non-block) translations, e.g. the page title. */
+export const PAGE_META_LOCALE_KEY = '__pageMeta'
+
+/**
+ * F26/GH-1136: the page title to display for a given locale.
+ * Falls back to the original `page.title` (generation language) when no translation exists.
+ */
+export function getDisplayPageTitle(
+    page: Pick<PageData, 'title' | 'localeContent'>,
+    locale: string,
+): string {
+    const translated = page.localeContent?.[PAGE_META_LOCALE_KEY]?.[locale]?.title
+    return (typeof translated === 'string' && translated.trim()) ? translated : page.title
 }
 
 type EditorState = {
@@ -82,6 +101,10 @@ type EditorState = {
     generationLocale: string
     /** User-chosen primary display locale (Make Default). Defaults to generationLocale. */
     primaryLocale: string
+    /** The 2nd active language (the one [Add]ed). null = single-language site. Persisted in
+     *  headerBlock.secondaryLocale — single source of truth for both the Quick Language panel
+     *  and the visitor header switcher (which renders exactly [primary, secondary]). */
+    secondaryLocale: string | null
     /** Locale currently being translated (after [Add] click). null when idle. */
     pendingLocale: string | null
     /** Per-block locale overrides: localeOverrides[blockId][locale] = { field: value } */
@@ -175,6 +198,7 @@ type EditorActions = {
     setSiteLocale: (locale: SiteLocale) => void
     setGenerationLocale: (locale: string) => void
     setPrimaryLocale: (locale: string) => void
+    setSecondaryLocale: (locale: string | null) => void
     setPendingLocale: (locale: string | null) => void
     setLocaleOverride: (blockId: string, locale: string, fields: Record<string, unknown>) => void
     initLocaleFromBlock: (blockId: string, localeInit: { en: Record<string, unknown>; ms: Record<string, unknown> }) => void
@@ -340,6 +364,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     siteLocale: 'en',
     generationLocale: 'en',
     primaryLocale: 'en',
+    secondaryLocale: null,
     pendingLocale: null,
     localeOverrides: {},
 
@@ -381,6 +406,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             siteLocale: 'en',
             generationLocale: 'en',
             primaryLocale: 'en',
+            secondaryLocale: null,
             pendingLocale: null,
             localeOverrides: {},
         })
@@ -834,6 +860,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     setActiveLocale: (locale) => set({ activeLocale: locale }),
     setGenerationLocale: (locale) => set({ generationLocale: locale }),
     setPrimaryLocale: (locale) => set({ primaryLocale: locale }),
+    setSecondaryLocale: (locale) => set({ secondaryLocale: locale }),
     setPendingLocale: (locale) => set({ pendingLocale: locale }),
 
     setSiteLocale: (locale) => set({ siteLocale: locale }),
@@ -937,6 +964,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             siteLocale: 'en',
             generationLocale: 'en',
             primaryLocale: 'en',
+            secondaryLocale: null,
             pendingLocale: null,
             localeOverrides: {},
         })

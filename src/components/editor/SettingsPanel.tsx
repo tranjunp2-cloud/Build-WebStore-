@@ -261,13 +261,15 @@ interface SettingsPanelProps {
     requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
     // F26: Multilingual panel in Menu settings
     siteLocale?: string
-    activeLocale?: string
     navShowLanguageSwitcher?: boolean
+    navMultilingualEnabled?: boolean
     generationLocale?: string
     primaryLocale?: string
+    secondaryLocale?: string | null
     pendingLocale?: string | null
     onNavLanguageSwitcherChange?: (show: boolean) => void
-    onLocaleSwitch?: (locale: string) => void
+    onAddLanguage?: (locale: string) => void
+    onRemoveLanguage?: () => void
     onMakePrimary?: (locale: string) => void
 }
 
@@ -277,9 +279,10 @@ function SettingsPanelInner({
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     requestedTab,
-    siteLocale = 'en', activeLocale = 'en',
-    generationLocale, primaryLocale, pendingLocale,
-    navShowLanguageSwitcher = false, onNavLanguageSwitcherChange, onLocaleSwitch, onMakePrimary,
+    siteLocale = 'en',
+    generationLocale, primaryLocale, secondaryLocale, pendingLocale,
+    navShowLanguageSwitcher = false, navMultilingualEnabled = false,
+    onNavLanguageSwitcherChange, onAddLanguage, onRemoveLanguage, onMakePrimary,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -307,17 +310,28 @@ function SettingsPanelInner({
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
+    // GH-1136: locale-aware nav labels — getDisplayBlock merges headerBlock._localeContent[locale]
+    // so the menu editor shows the same labels the visitor nav renders for the active locale.
+    const getDisplayBlock = useEditorStore(state => state.getDisplayBlock)
+    const activeLocale = useEditorStore(state => state.activeLocale)
+    // Per-locale nav editing: in the base language edits write to the base links; in a translated
+    // locale they write to that locale's slot (headerBlock._localeContent[locale]) so each language
+    // is editable independently without clobbering the others. Mirrors how nav translations persist.
+    const baseLocale = generationLocale || siteLocale
+    const isTranslatedNavView = activeLocale !== baseLocale
     // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
     const breadcrumbCfg = (headerBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
         { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
     const resolvedNavLinks = useMemo(() => {
-        const headerLinks = (((headerBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
+        // Display-merge so labels reflect activeLocale (base view → base labels, returned as-is).
+        const displayHeader = headerBlock ? getDisplayBlock(headerBlock as BlockData) as Record<string, unknown> : null
+        const headerLinks = ((displayHeader?.links as Array<Record<string, unknown>>) || [])
         if (headerLinks.length > 0) return normalizeNavLinkItems(headerLinks, pages)
         // Fallback: find navigation block in page layout
         const navBlock = Array.isArray(storeBlocks) ? storeBlocks.find(b => (b as Record<string, unknown>).blockType === 'navigation') : undefined
         const navLinks = (((navBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
         return normalizeNavLinkItems(navLinks, pages)
-    }, [headerBlock, pages, storeBlocks])
+    }, [headerBlock, pages, storeBlocks, getDisplayBlock, activeLocale])
 
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
@@ -885,27 +899,41 @@ function SettingsPanelInner({
 
                 {/* 2. Navigation Editor (List menu items) */}
                 <div className={sectionCls} data-coach="menu-settings">
-                    <NavigationEditor
-                        links={resolvedNavLinks}
-                        onUpdate={(links) => onHeaderUpdate?.({ links })}
-                        pages={pages}
-                    />
+                    <label className={labelCls}>{t.editor.navigation.title}</label>
+                    <div className="mt-2">
+                        <NavigationEditor
+                            links={resolvedNavLinks}
+                            onUpdate={(links) => {
+                                if (isTranslatedNavView) {
+                                    // GH-1136: write into the active locale's slot so editing the
+                                    // translated menu doesn't overwrite the base-language labels.
+                                    const lc = ((headerBlock as Record<string, unknown> | null)?._localeContent
+                                        ?? {}) as Record<string, Record<string, unknown>>
+                                    onHeaderUpdate?.({
+                                        _localeContent: { ...lc, [activeLocale]: { ...(lc[activeLocale] ?? {}), links } },
+                                    })
+                                } else {
+                                    onHeaderUpdate?.({ links })
+                                }
+                            }}
+                            pages={pages}
+                        />
+                    </div>
                 </div>
 
                 {/* 3.5 Quick Language — multilingual toggle */}
                 <div className={sectionCls}>
                     <NavMultilingualPanel
                         siteLocale={siteLocale}
-                        activeLocale={activeLocale}
-                        enabled={navShowLanguageSwitcher}
-                        onToggle={(on) => {
-                            onNavLanguageSwitcherChange?.(on)
-                            if (!on && onLocaleSwitch) onLocaleSwitch(siteLocale)
-                        }}
+                        enabled={navMultilingualEnabled}
+                        switcherVisible={navShowLanguageSwitcher}
+                        onToggle={(on) => onNavLanguageSwitcherChange?.(on)}
                         generationLocale={generationLocale}
                         primaryLocale={primaryLocale}
+                        secondaryLocale={secondaryLocale}
                         pendingLocale={pendingLocale}
-                        onLocaleSwitch={(locale) => onLocaleSwitch?.(locale)}
+                        onAddLanguage={(locale) => onAddLanguage?.(locale)}
+                        onRemoveLanguage={() => onRemoveLanguage?.()}
                         onMakePrimary={(locale) => onMakePrimary?.(locale)}
                     />
                 </div>
