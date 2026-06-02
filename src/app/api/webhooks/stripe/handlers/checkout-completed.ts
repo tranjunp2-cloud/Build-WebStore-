@@ -165,8 +165,8 @@ export async function handleCheckoutCompleted(
         // Buyer: order confirmation
         try {
             const [buyerCmsConfig, sellerCmsConfig] = await Promise.all([
-                getTemplateConfig(tenantId, 'order-confirmation', 'buyer'),
-                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+                getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale),
             ])
 
             if (buyerCmsConfig?.enabled === false) {

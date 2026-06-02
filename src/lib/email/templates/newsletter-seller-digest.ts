@@ -4,7 +4,7 @@
  * Design ref: docs/design/emails-f32/f32.css + edit-view.jsx
  */
 
-import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
+import { mergeTemplateConfig } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'

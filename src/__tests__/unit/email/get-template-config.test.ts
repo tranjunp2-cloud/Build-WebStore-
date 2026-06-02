@@ -223,7 +223,7 @@ describe('getTemplateConfig [TC-F32]', () => {
     it('[TC: F32-U-02.1] handles contentEn with partial fields', async () => {
         // Arrange
         const tenantId = 'tenant-004'
-        const type = 'order-status'
+        const type = 'order-cancelled'
         const recipient = 'buyer'
 
         mockRedisGet.mockResolvedValue(null)

@@ -5,7 +5,7 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
-import { mergeTemplateConfig } from '../merge-template-config'
+import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -104,9 +104,12 @@ export function orderCompletedEmail(data: OrderCompletedData, config?: EmailTemp
 
     const completedLabel = locale === 'ms' ? 'Selesai' : 'Completed'
     const completedDateLabel = locale === 'ms' ? 'Tarikh selesai' : 'Completed date'
-    const subjectLine = locale === 'ms'
-        ? `${data.shopName} - Pesanan anda telah selesai - ${data.orderNumber}`
-        : `${data.shopName} - Your order has been completed - ${data.orderNumber}`
+    const defaultSubject = locale === 'ms'
+        ? `${esc(data.shopName)} - Pesanan anda telah selesai - ${esc(data.orderNumber)}`
+        : `${esc(data.shopName)} - Your order has been completed - ${esc(data.orderNumber)}`
+    const subjectLine = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(escapeHtml(config.subject), vars) ?? defaultSubject)
+        : defaultSubject
     const bodyText = locale === 'ms'
         ? 'Terima kasih atas pembelian anda. Pesanan anda telah selesai dan dihantar. Kami harap anda berpuas hati!'
         : 'Thank you for your purchase. Your order has been completed and delivered. We hope you enjoy it!'

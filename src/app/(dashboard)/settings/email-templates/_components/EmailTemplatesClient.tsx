@@ -240,6 +240,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
         enabled: boolean
     ) {
         const row = findRow(templateType, recipient)
+        const previousEnabled = row?.enabled ?? true  // capture pre-click value for accurate rollback
         // Optimistic update
         setRows((prev) => {
             const existing = prev.find((r) => r.templateType === templateType && r.recipient === recipient)
@@ -275,11 +276,11 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             if (result.success) {
                 toast.success(enabled ? et.toast.enabled : et.toast.disabled)
             } else {
-                // Revert optimistic update on failure
+                // Revert to pre-click value (not !r.enabled which races under rapid toggles)
                 setRows((prev) =>
                     prev.map((r) =>
                         r.templateType === templateType && r.recipient === recipient
-                            ? { ...r, enabled: !r.enabled }
+                            ? { ...r, enabled: previousEnabled }
                             : r
                     )
                 )
