@@ -341,6 +341,65 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
+    // ─── Webhook-failed order (paymentStatus='failed', status='payment_failed') is retryable ──
+    it('[TC-F13.153] retries a webhook-failed order (paymentStatus=failed)', async () => {
+        // Arrange — payment_intent.payment_failed webhook sets status='payment_failed', paymentStatus='failed'
+        const webhookFailedOrder = {
+            ...VALID_PENDING_ORDER,
+            status: 'payment_failed',
+            paymentStatus: 'failed',
+        }
+        mockFindByID.mockResolvedValue(webhookFailedOrder)
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+        mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
+        mockBuildOrderItems.mockResolvedValue({
+            errorResponse: null,
+            checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+        })
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+        const body = await res.json()
+
+        // Assert — retryable + resets to awaiting on the order update
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: 'pending', paymentStatus: 'awaiting_payment' }),
+            }),
+        )
+    })
+
+    // ─── Auto-cancelled order (status='cancelled', paymentStatus='payment_failed') is NOT retryable ──
+    it('[TC-F13.153] rejects an auto-cancelled order despite paymentStatus=payment_failed', async () => {
+        // Arrange — 24h cron sets status='cancelled', paymentStatus='payment_failed'
+        const autoCancelledOrder = {
+            ...VALID_PENDING_ORDER,
+            status: 'cancelled',
+            paymentStatus: 'payment_failed',
+        }
+        mockFindByID.mockResolvedValue(autoCancelledOrder)
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(body.error.code).toBe('NOT_RETRYABLE')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
     // ─── Stripe not connected ─────────────────────────────────────────
     it('[Unlabeled] returns 422 when tenant has no stripeAccountId', async () => {
         // Arrange

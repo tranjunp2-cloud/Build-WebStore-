@@ -57,8 +57,11 @@ function getTrackingStatus(status: string, paymentStatus?: string): TrackingStat
     if (status === 'shipped') return 'in-transit'
     if (status === 'completed') return 'delivered'
     if (status === 'refunded') return 'refunded'
-    if (status === 'cancelled' && paymentStatus === 'payment_failed') return 'payment_failed'
-    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
+    // Auto-cancelled after payment failure → show as payment_failed (retry window may still apply on the order page)
+    if (status === 'cancelled' && (paymentStatus === 'payment_failed' || paymentStatus === 'failed')) return 'payment_failed'
+    // Webhook-failed order (status='payment_failed') is retryable, not cancelled
+    if (status === 'payment_failed') return 'payment_failed'
+    if (status === 'cancelled') return 'cancelled'
     return 'processing'
 }
 
@@ -94,7 +97,7 @@ function getStageStates(trackingStatus: TrackingStatus) {
 function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const isPaid = order.paymentStatus === 'paid'
-    const isPaymentFailed = order.paymentStatus === 'payment_failed'
+    const isPaymentFailed = order.paymentStatus === 'failed' || order.paymentStatus === 'payment_failed'
 
     const STATUS_META = {
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
@@ -423,7 +426,8 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
     )
 }
 
-const PAY_NOW_STATUSES = new Set(['awaiting_payment', 'payment_failed'])
+// Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — accept both.
+const PAY_NOW_STATUSES = new Set(['awaiting_payment', 'failed', 'payment_failed'])
 const PAID_STATUSES = new Set(['paid', 'cancelled', 'refunded', 'completed'])
 
 export default function OrderTrackingClient({ order, slug }: Props) {
@@ -469,7 +473,10 @@ export default function OrderTrackingClient({ order, slug }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    // Pay Now is a Stripe-only retry. BT orders use the receipt-upload flow, not a Stripe session.
+    const isStripeOrder = liveOrder.paymentMethod === 'card' || liveOrder.paymentMethod === 'fpx'
     const showPayNow =
+        isStripeOrder &&
         PAY_NOW_STATUSES.has(liveOrder.paymentStatus) &&
         !PAID_STATUSES.has(liveOrder.paymentStatus)
 
@@ -525,7 +532,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                         <div className="ot-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                             <div>
                                 <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                                    {liveOrder.paymentStatus === 'payment_failed' ? 'Payment failed' : 'Payment pending'}
+                                    {(liveOrder.paymentStatus === 'failed' || liveOrder.paymentStatus === 'payment_failed') ? 'Payment failed' : 'Payment pending'}
                                 </div>
                                 <div style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)' }}>
                                     Complete your payment to confirm the order.

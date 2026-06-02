@@ -16,7 +16,9 @@ import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 
-const RETRYABLE_PAYMENT_STATUSES = new Set(['awaiting_payment', 'payment_failed'])
+// Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
+// 'payment_failed' (24h auto-cancel cron) — accept both so either path can be retried.
+const RETRYABLE_PAYMENT_STATUSES = new Set(['awaiting_payment', 'failed', 'payment_failed'])
 
 /** Minimal tenant shape needed for this flow. */
 interface TenantDoc {
@@ -87,10 +89,16 @@ export async function POST(
             )
         }
 
-        // Step 3: Status guard — only retryable orders proceed
+        // Step 3: Status guard — only unpaid, non-terminal orders proceed.
+        // Excludes auto-cancelled orders (status='cancelled', paymentStatus='payment_failed')
+        // which would otherwise match the paymentStatus set despite being terminal.
+        const TERMINAL_STATUSES = new Set(['cancelled', 'refunded', 'completed', 'shipped', 'new'])
         const isRetryable =
-            order.status === 'pending' ||
-            RETRYABLE_PAYMENT_STATUSES.has(order.paymentStatus)
+            !TERMINAL_STATUSES.has(order.status) &&
+            order.paymentStatus !== 'paid' &&
+            (order.status === 'pending' ||
+                order.status === 'payment_failed' ||
+                RETRYABLE_PAYMENT_STATUSES.has(order.paymentStatus))
         if (!isRetryable) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_RETRYABLE', message: 'This order cannot be retried' } },
@@ -194,12 +202,17 @@ export async function POST(
             )
         }
 
-        // Step 8: Update order with new session ID; reset status if payment_failed; refresh 24h window
+        // Step 8: Update order with new session ID; reset a failed order back to awaiting; refresh 24h window.
+        // Failure paymentStatus is 'failed' (webhook) or 'payment_failed' (cron); status may be 'payment_failed'.
         const updateData: Record<string, unknown> = {
             stripeSessionId: checkout.sessionId,
             paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         }
-        if (order.paymentStatus === 'payment_failed') {
+        if (
+            order.status === 'payment_failed' ||
+            order.paymentStatus === 'failed' ||
+            order.paymentStatus === 'payment_failed'
+        ) {
             updateData.status = 'pending'
             updateData.paymentStatus = 'awaiting_payment'
         }
