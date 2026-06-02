@@ -27,10 +27,13 @@ describe('NavLangSwitcherPlaceholder', () => {
         const container = screen.getByLabelText('Language switcher')
         expect(container).toBeInTheDocument()
 
-        // Trigger button shows flag only (EN by default)
+        // Trigger button shows flag (SVG via country-flag-icons — cross-platform; Windows
+        // lacks emoji flag glyphs) + the locale short code (EN by default). The flag SVG
+        // carries a <title> with the short code; the chevron SVG has none.
         const trigger = screen.getByRole('button')
         expect(trigger).toBeInTheDocument()
-        expect(trigger.textContent).toContain('🇬🇧')
+        expect(screen.getByTitle('EN')).toBeInTheDocument()
+        expect(trigger.textContent).toContain('EN')
 
         // ChevronDown SVG present
         const svg = container.querySelector('svg')
@@ -63,8 +66,11 @@ describe('NavLangSwitcherPlaceholder', () => {
 
         const options = screen.getAllByRole('option')
         expect(options).toHaveLength(2)
-        expect(options[0].textContent).toContain('🇬🇧')
-        expect(options[1].textContent).toContain('🇲🇾')
+        // Each option renders its flag as an SVG (country-flag-icons) + full language name.
+        expect(options[0].querySelector('svg')).toBeInTheDocument()
+        expect(options[1].querySelector('svg')).toBeInTheDocument()
+        expect(options[0].textContent).toContain('English')
+        expect(options[1].textContent).toContain('Malay')
     })
 
     it('active option has aria-selected=true', () => {
@@ -109,5 +115,39 @@ describe('NavLangSwitcherPlaceholder', () => {
         expect(wrapper).toHaveClass('hidden')
         expect(wrapper).toHaveClass('md:flex')
         expect(wrapper).toHaveClass('ml-2')
+    })
+
+    // TC-F26-07-02 — switcher renders exactly the configured [primary, secondary] pair.
+    // Regression: a non-standard (e.g. Japanese) site used to hardcode [gen, EN, MS] = 3 flags,
+    // contradicting the panel's max-2 model and letting visitors switch to an un-added language.
+    it('non-standard site shows exactly 2 flags = [primary, secondary], not 3 (TC-F26-07-02)', () => {
+        const store = useEditorStore.getState()
+        store.setGenerationLocale('ja')
+        store.setPrimaryLocale('ja')
+        store.setSecondaryLocale('ms')
+        store.setActiveLocale('ja')
+
+        render(<NavLangSwitcherPlaceholder />)
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher'))
+
+        const options = screen.getAllByRole('option')
+        expect(options).toHaveLength(2)                       // not 3 — EN is not offered
+        expect(options.map(o => o.textContent).join(' ')).toContain('Japanese')
+        expect(options.map(o => o.textContent).join(' ')).toContain('Malay')
+        expect(options.map(o => o.textContent).join(' ')).not.toContain('English')
+    })
+
+    it('legacy non-standard site (no secondaryLocale) falls back to [primary, EN, MS]', () => {
+        // Backward compat: sites that turned the switcher on before secondaryLocale was persisted.
+        const store = useEditorStore.getState()
+        store.setGenerationLocale('ja')
+        store.setPrimaryLocale('ja')
+        store.setSecondaryLocale(null)
+        store.setActiveLocale('ja')
+
+        render(<NavLangSwitcherPlaceholder />)
+        fireEvent.mouseEnter(screen.getByLabelText('Language switcher'))
+
+        expect(screen.getAllByRole('option')).toHaveLength(3) // ja + en + ms
     })
 })

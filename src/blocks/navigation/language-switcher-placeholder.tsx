@@ -9,6 +9,7 @@ import { useState, useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { getLocaleLabel } from '@/lib/locale-labels'
+import { LocaleFlag } from '@/components/locale-flag'
 
 type NavLangSwitcherPlaceholderProps = {
     className?: string
@@ -16,7 +17,8 @@ type NavLangSwitcherPlaceholderProps = {
 
 export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPlaceholderProps) {
     const generationLocale = useEditorStore(state => state.generationLocale)
-    const siteLocale       = useEditorStore(state => state.siteLocale)
+    const primaryLocale    = useEditorStore(state => state.primaryLocale)
+    const secondaryLocale  = useEditorStore(state => state.secondaryLocale)
     const activeLocale     = useEditorStore(state => state.activeLocale)
     const [open, setOpen]  = useState(false)
     const closeTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -30,20 +32,17 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
         closeTimer.current = setTimeout(() => setOpen(false), 120)
     }
 
-    const isNonStandard = !['en', 'ms'].includes(generationLocale)
+    const effectivePrimary = primaryLocale || generationLocale || 'en'
 
-    // For non-standard sites: show generationLocale as native option + EN + MS
-    // For standard sites: show EN + MS (the only options)
-    const locales = isNonStandard
-        ? [
-            { code: generationLocale, visual: getLocaleLabel(generationLocale) },
-            { code: 'en',             visual: getLocaleLabel('en') },
-            { code: 'ms',             visual: getLocaleLabel('ms') },
-          ]
-        : [
-            { code: 'en', visual: getLocaleLabel('en') },
-            { code: 'ms', visual: getLocaleLabel('ms') },
-          ]
+    // Render exactly the site's configured language pair [primary, secondary] — the single
+    // source of truth shared with the Quick Language panel, so visitor + editor always agree.
+    // Legacy fallback: sites that enabled the switcher before secondaryLocale was persisted
+    // have no stored secondary — keep the old [primary, EN, MS] list so they don't break.
+    const codes = (secondaryLocale
+        ? [effectivePrimary, secondaryLocale]
+        : [effectivePrimary, 'en', 'ms']
+    ).filter((c, i, arr) => !!c && arr.indexOf(c) === i)
+    const locales = codes.map(code => ({ code, visual: getLocaleLabel(code) }))
 
     const active = locales.find(l => l.code === activeLocale) ?? locales[0]
 
@@ -69,7 +68,7 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
                 aria-haspopup="listbox"
                 aria-expanded={open}
             >
-                <span className="text-sm leading-none">{active.visual.flag}</span>
+                <LocaleFlag locale={active.code} className="w-5 shrink-0 rounded-[2px]" />
                 <span className="leading-none">{active.visual.short}</span>
                 <ChevronDown className={`h-3 w-3 shrink-0 opacity-50 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -98,7 +97,7 @@ export function NavLangSwitcherPlaceholder({ className = '' }: NavLangSwitcherPl
                                         : 'text-slate-500 hover:bg-black/5 hover:text-slate-800 dark:text-white/60 dark:hover:bg-white/[0.06] dark:hover:text-white/90',
                                 ].join(' ')}
                             >
-                                <span className="text-base leading-none shrink-0">{visual.flag}</span>
+                                <LocaleFlag locale={code} className="w-5 shrink-0 rounded-[2px]" />
                                 <span className="truncate">{visual.full}</span>
                                 {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500 dark:bg-blue-400 shrink-0" />}
                             </button>

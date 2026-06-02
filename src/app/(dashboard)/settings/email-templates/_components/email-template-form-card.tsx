@@ -1,6 +1,7 @@
 'use client'
 
 import { useI18n } from '@/i18n'
+import { LocaleFlag } from '@/components/locale-flag'
 import { EMAIL_TEMPLATE_VARIABLES, EmailTemplateType } from '@/lib/email/types'
 import type { ContentFields } from '../actions'
 
@@ -161,7 +162,7 @@ export function EmailTemplateFormCard({
                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
-                            <span>{l === 'en' ? '🇬🇧' : '🇲🇾'}</span>
+                            <LocaleFlag locale={l} className="w-4 rounded-[2px]" />
                             {l.toUpperCase()}
                         </button>
                     ))}

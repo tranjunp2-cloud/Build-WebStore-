@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, getDisplayPageTitle, PAGE_META_LOCALE_KEY } from '@/store/editorStore'
 import type { PageData, BlockData } from '@/store/editorStore'
 
 const makeBlock = (type: string): BlockData => ({ blockType: type })
@@ -264,5 +264,38 @@ describe('EditorStore — Save Retry Logic', () => {
         expect(useEditorStore.getState().isSaving).toBe(true)
         useEditorStore.getState().setIsSaving(false)
         expect(useEditorStore.getState().isSaving).toBe(false)
+    })
+})
+
+// GH-1136 — per-locale page titles (Page Library + tab reflect active locale)
+describe('getDisplayPageTitle — locale-aware page title', () => {
+    const page = (localeContent?: PageData['localeContent']): Pick<PageData, 'title' | 'localeContent'> => ({
+        title: 'ホーム', // generation-language (Japanese) original
+        localeContent,
+    })
+
+    it('returns the translated title when present for the locale (GH-1136)', () => {
+        const p = page({ [PAGE_META_LOCALE_KEY]: { en: { title: 'Home' }, ms: { title: 'Laman Utama' } } })
+        expect(getDisplayPageTitle(p, 'en')).toBe('Home')
+        expect(getDisplayPageTitle(p, 'ms')).toBe('Laman Utama')
+    })
+
+    it('falls back to the original title when no translation for the locale', () => {
+        const p = page({ [PAGE_META_LOCALE_KEY]: { en: { title: 'Home' } } })
+        // viewing the generation locale (ja) → no __pageMeta.ja → original
+        expect(getDisplayPageTitle(p, 'ja')).toBe('ホーム')
+        // locale with no slot → original
+        expect(getDisplayPageTitle(p, 'ms')).toBe('ホーム')
+    })
+
+    it('falls back to original when localeContent absent or empty title', () => {
+        expect(getDisplayPageTitle(page(), 'en')).toBe('ホーム')
+        expect(getDisplayPageTitle(page({ [PAGE_META_LOCALE_KEY]: { en: { title: '   ' } } }), 'en')).toBe('ホーム')
+    })
+
+    it('ignores block-level overrides sharing the localeContent map', () => {
+        // a real block id slot must not be mistaken for the page title
+        const p = page({ 'block-123': { en: { headline: 'Hi' } } })
+        expect(getDisplayPageTitle(p, 'en')).toBe('ホーム')
     })
 })

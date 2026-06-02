@@ -173,7 +173,7 @@ function NavLinkRow({
                 <div
                     {...attributes}
                     {...listeners}
-                    className="shrink-0 cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+                    className="shrink-0 cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 transition-colors touch-none"
                     aria-label="Drag to reorder"
                 >
                     <GripVertical className="w-3.5 h-3.5" />

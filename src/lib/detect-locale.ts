@@ -98,9 +98,12 @@ const FRANC_ISO_TO_LOCALE: Record<string, string> = {
 // Using \u escapes to avoid editor encoding issues with multi-byte chars
 function detectByScript(text: string): string | null {
     if (/[฀-๿]/.test(text)) return 'th'   // Thai
-    if (/[一-鿿㐀-䶿]/.test(text)) return 'zh'  // CJK
-    if (/[぀-ヿ]/.test(text)) return 'ja'   // Hiragana/Katakana
-    if (/[가-힯]/.test(text)) return 'ko'   // Hangul
+    // Kana (Japanese) and Hangul (Korean) are script-exclusive — they share the CJK
+    // ideograph block with Chinese via Kanji/Hanja, so check them BEFORE the CJK range
+    // or Japanese/Korean text gets misdetected as Chinese.
+    if (/[぀-ヿ]/.test(text)) return 'ja'   // Hiragana/Katakana → Japanese
+    if (/[가-힯]/.test(text)) return 'ko'   // Hangul → Korean
+    if (/[一-鿿㐀-䶿]/.test(text)) return 'zh'  // CJK ideographs (kanji w/o kana → Chinese)
     if (/[؀-ۿ]/.test(text)) return 'ar'   // Arabic
     if (/[Ѐ-ӿ]/.test(text)) return 'ru'   // Cyrillic
     if (/[ऀ-ॿ]/.test(text)) return 'hi'   // Devanagari

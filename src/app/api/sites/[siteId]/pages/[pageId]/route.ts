@@ -9,6 +9,7 @@ import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { parseRequest } from '@/lib/validations/helpers'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
+import { sql } from 'drizzle-orm'
 
 const updatePageSchema = z.object({
     isVisible: z.boolean().optional(),
@@ -16,6 +17,12 @@ const updatePageSchema = z.object({
     slug: z.string().regex(/^[a-z0-9-\/]+$/, 'Slug must be valid path').optional(),
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
+    // GH-1136: full per-locale overrides map (incl. __pageMeta page-title translations). The
+    // client sends the complete localeContent it loaded for this page; persisted verbatim via
+    // raw SQL (locale_content is not a Payload field — mirrors /save). Capped to 20KB.
+    localeContent: z.record(z.unknown())
+        .refine(obj => JSON.stringify(obj).length <= 20_000, { message: 'localeContent exceeds 20KB' })
+        .optional(),
 })
 
 
@@ -67,7 +74,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const { data, errorResponse } = await parseRequest(request, updatePageSchema)
         if (errorResponse) return errorResponse
 
-        const { isVisible, deletedAt, slug, seoTitle, seoDescription } = data!
+        const { isVisible, deletedAt, slug, seoTitle, seoDescription, localeContent } = data!
 
         const updateData: PageUpdateData = {}
         if (isVisible !== undefined) updateData.isVisible = isVisible
@@ -140,7 +147,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             updateData.slug = normalizedSlug
         }
 
-        if (Object.keys(updateData).length === 0) {
+        if (Object.keys(updateData).length === 0 && localeContent === undefined) {
             return new NextResponse('No fields to update', { status: 400 })
         }
 
@@ -205,6 +212,19 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                 data: contentFields,
                 draft: true,
             })
+        }
+
+        // GH-1136: persist locale_content via raw SQL — not a Payload field (mirrors /save).
+        // Page ownership already verified above. Full-replace: client sends the complete map.
+        if (localeContent !== undefined) {
+            try {
+                const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
+                await db.execute(sql`
+                    UPDATE pages SET locale_content = ${JSON.stringify(localeContent)}::jsonb WHERE id = ${pageId}
+                `)
+            } catch (lcErr) {
+                console.warn('[PATCH pages] locale_content update failed (non-fatal):', lcErr instanceof Error ? lcErr.message : lcErr)
+            }
         }
 
         // Re-read page — use draft:true only when content fields were updated,

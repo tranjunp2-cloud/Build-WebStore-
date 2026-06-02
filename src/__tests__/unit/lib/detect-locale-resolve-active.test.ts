@@ -8,7 +8,26 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { resolveInitialActiveLocale } from '@/lib/detect-locale'
+import { detectLocaleFromText, resolveInitialActiveLocale } from '@/lib/detect-locale'
+
+describe('TC-F26-01-01: detectLocaleFromText distinguishes CJK languages', () => {
+    it('Japanese text (kanji + kana) → ja, not zh (the reported bug)', () => {
+        // Kanji are shared CJK ideographs; only the kana proves it is Japanese.
+        expect(detectLocaleFromText('さくらラーメン 東京の老舗ラーメン店です')).toBe('ja')
+    })
+
+    it('katakana-only product line → ja', () => {
+        expect(detectLocaleFromText('ラーメン、ギョーザ、ビール')).toBe('ja')
+    })
+
+    it('pure Chinese (kanji, no kana) still → zh (regression guard)', () => {
+        expect(detectLocaleFromText('北京烤鸭店 我们提供正宗的中华美食')).toBe('zh')
+    })
+
+    it('Korean (hangul) → ko, not zh', () => {
+        expect(detectLocaleFromText('서울 김치찌개 전문점입니다')).toBe('ko')
+    })
+})
 
 describe('TC-F26-01-02: resolveInitialActiveLocale restores persisted view locale', () => {
     it('EN-base site switched to MS → reload stays MS (the reported bug)', () => {

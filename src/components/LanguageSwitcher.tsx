@@ -3,8 +3,8 @@
 import { useI18n, Locale } from '@/i18n'
 import { Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { LocaleFlag } from '@/components/locale-flag'
 
-const FLAG: Record<Locale, string> = { en: '🇬🇧', ms: '🇲🇾' }
 const LABEL: Record<Locale, string> = { en: 'EN', ms: 'MY' }
 
 export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill' | 'minimal' | 'globe' | 'segmented' }) {
@@ -32,7 +32,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                 className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-white/5"
                 aria-label="Switch language"
             >
-                <span>{FLAG[locale]}</span>
+                <LocaleFlag locale={locale} className="w-5 rounded-[2px]" />
                 <span className="font-medium">{LABEL[locale]}</span>
             </button>
         )
@@ -132,7 +132,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                     )}
                     aria-label={`Switch to ${lang === 'en' ? 'English' : 'Bahasa Melayu'}`}
                 >
-                    <span className="text-base">{FLAG[lang]}</span>
+                    <LocaleFlag locale={lang} className="w-5 rounded-[2px]" />
                     <span>{LABEL[lang]}</span>
                 </button>
             ))}
