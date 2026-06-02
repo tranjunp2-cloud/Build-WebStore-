@@ -523,6 +523,12 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(body.data.status).toBe('paid')
         expect(body.data.sessionUrl).toBeNull()
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+        // Free order must persist paymentStatus='paid' so the confirm page renders it as paid (not "verifying")
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: 'paid', paymentStatus: 'paid', paymentMethod: 'free' }),
+            }),
+        )
     })
 
     // ─── Error handling ──────────────────────────────────────────────

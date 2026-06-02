@@ -377,6 +377,17 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     // from Stripe, bring them to the confirm page (Pay Now) instead of back to checkout.
                     sessionStorage.setItem('pw_stripe_pending', JSON.stringify({ orderId: data.data.orderId, slug }))
                     window.location.href = data.data.sessionUrl
+                } else if (res.ok && data.success && data.data.orderId) {
+                    // Free order (total <= 0, e.g. 100% coupon) — already paid, no Stripe step.
+                    // Skip the redirect and go straight to the confirm page.
+                    navigatedToConfirm = true
+                    clearCart()
+                    const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
+                    if ('startViewTransition' in document) {
+                        document.startViewTransition(() => { router.push(confirmUrl) })
+                    } else {
+                        router.push(confirmUrl)
+                    }
                 } else {
                     toast.error(data.error?.message || 'Failed to initialize payment')
                 }

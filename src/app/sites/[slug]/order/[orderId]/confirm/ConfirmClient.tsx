@@ -240,7 +240,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const shippingFee = order.shippingFee ?? 0
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
-    const isStripe = !isBT && !isCod
+    const isFree = order.paymentMethod === 'free'
+    const isStripe = !isBT && !isCod && !isFree
     const isPaid = livePay === 'paid'
     // Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — match both
     const payFailed = livePay === 'failed' || livePay === 'payment_failed'
@@ -704,6 +705,30 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             <div className="ty-email-note">
                                 <Mail size={14} />
                                 <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Free order (100% coupon / zero total) — no payment required ── */}
+                    {isFree && (
+                        <div className="ty-bank-block ty-unified">
+                            <div className="ty-block-head no-num">
+                                <div className="ty-block-titles">
+                                    <h3>Payment &amp; Order Status</h3>
+                                    <p>No payment was required — your order is confirmed and being prepared for shipment.</p>
+                                </div>
+                                <span className="ty-step-pill done"><Check size={11} /> Confirmed</span>
+                            </div>
+                            <div className="ty-paid-card">
+                                <div className="ty-paid-icon"><Check size={22} strokeWidth={3} /></div>
+                                <div className="ty-paid-body">
+                                    <p className="ty-paid-title">This order is <strong>free</strong> — no charge applied.</p>
+                                    <p className="ty-paid-sub">Your items are reserved and will be dispatched shortly.</p>
+                                </div>
+                            </div>
+                            <div className="ty-email-note">
+                                <Mail size={14} />
+                                <span>A confirmation + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
                             </div>
                         </div>
                     )}

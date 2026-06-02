@@ -198,6 +198,7 @@ export async function POST(request: NextRequest) {
                     total: 0,
                     currency,
                     status: 'paid',
+                    paymentStatus: 'paid',
                     paymentMethod: 'free',
                     customerEmail: customer.email,
                     customerName: customer.name,
