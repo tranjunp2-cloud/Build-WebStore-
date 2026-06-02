@@ -106,6 +106,15 @@ export async function POST(
             )
         }
 
+        // Stripe-only: retry creates a Stripe Checkout session. Bank-transfer/COD orders use their
+        // own flows (receipt upload / cash) — never convert them to a Stripe charge via this endpoint.
+        if (order.paymentMethod !== 'card' && order.paymentMethod !== 'fpx') {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_RETRYABLE', message: 'This payment method cannot be retried online' } },
+                { status: 409 },
+            )
+        }
+
         // Step 4: Resolve tenant + site from populated order (depth:1)
         const tenantDoc = (typeof order.tenant === 'object' ? order.tenant : null) as TenantDoc | null
         const tenantId = tenantDoc?.id ?? order.tenant
@@ -168,7 +177,13 @@ export async function POST(
         const built = await buildOrderItems(payload, rawItems, tenantId)
         if (built.errorResponse) return built.errorResponse
 
-        const { checkoutItems } = built
+        const { checkoutItems, subtotal } = built
+
+        // Re-price at retry time so the Stripe charge matches what we persist — product prices may
+        // have changed since placement. Mirrors stripe-checkout totals (flat shipping + 6% SST).
+        const shippingFee = 10
+        const tax = Math.round(subtotal * 0.06 * 100) / 100
+        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
 
         // Step 7: Create new Stripe Checkout Session
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
@@ -177,8 +192,8 @@ export async function POST(
 
         const allCheckoutItems = [
             ...checkoutItems,
-            ...(order.shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(order.shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(order.tax > 0 ? [{ name: 'SST (6%)', price: Math.round(order.tax * 100), quantity: 1, images: [] }] : []),
+            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
         ]
 
         let checkout: { sessionId: string; url: string }
@@ -207,6 +222,11 @@ export async function POST(
         const updateData: Record<string, unknown> = {
             stripeSessionId: checkout.sessionId,
             paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            // Persist re-priced totals so order.total matches the new Stripe charge (refund/reconcile correctness)
+            subtotal,
+            shippingFee,
+            tax,
+            total,
         }
         if (
             order.status === 'payment_failed' ||

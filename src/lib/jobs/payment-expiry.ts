@@ -34,6 +34,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                 WHERE id = ${order.id}
                 AND payment_status IN ('awaiting_payment', 'pending_verification', 'payment_failed', 'failed')
                 AND status::text IN ('pending', 'new', 'payment_failed')
+                AND payment_expires_at < ${now}
                 RETURNING id
             `)
             if (!updateResult.rows?.length) {

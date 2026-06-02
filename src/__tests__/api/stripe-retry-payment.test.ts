@@ -84,6 +84,7 @@ const VALID_PENDING_ORDER = {
     orderNumber: 'ORD-ABC123',
     status: 'pending',
     paymentStatus: 'awaiting_payment',
+    paymentMethod: 'card',
     tenant: VALID_TENANT,
     site: VALID_SITE,
     customerEmail: 'buyer@example.com',
@@ -608,46 +609,62 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(setCookieHeader).toContain('mock-confirm-token')
     })
 
-    // ─── Shipping and tax included in checkout items ────────────────────
-    it('[Unlabeled] includes shipping fee and tax in checkout items', async () => {
-        // Arrange
-        // Note: shippingFee and tax are in cents (or base units) — route multiplies by 100 for Stripe
-        const orderWithFees = {
-            ...VALID_PENDING_ORDER,
-            shippingFee: 20, // RM 0.20 → 2000 sen
-            tax: 8, // RM 0.08 → 800 sen
-        }
-        mockFindByID.mockResolvedValue(orderWithFees)
+    // ─── Re-priced shipping + tax at retry (recomputed, not stored) ─────
+    it('[TC-F13.158] re-prices shipping (flat) + 6% SST from current subtotal on retry', async () => {
+        // Arrange — retry recomputes totals from current product prices, ignoring stale order fields
+        mockFindByID.mockResolvedValue(VALID_PENDING_ORDER)
         mockCookies.mockResolvedValue({
-            get: vi.fn((key) => {
-                if (key === 'ct_123') return { value: 'valid-token' }
-                return undefined
-            }),
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
         } as any)
         mockVerifyConfirmToken.mockReturnValue(true)
         mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
         mockBuildOrderItems.mockResolvedValue({
             errorResponse: null,
             checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50, // RM 50 → shipping flat RM10, SST 6% = RM3
         })
         mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
         mockUpdate.mockResolvedValue({})
 
         // Act
-        const req = mockRequest({})
-        const res = await POST(req, { params: Promise.resolve({ id: '123' }) })
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
 
-        // Assert
+        // Assert — line items use recomputed flat shipping (1000 sen) + 6% SST (300 sen)
         expect(res.status).toBe(200)
         expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
             expect.objectContaining({
                 items: expect.arrayContaining([
                     expect.objectContaining({ name: 'Product' }),
-                    expect.objectContaining({ name: 'Shipping', price: 2000 }),
-                    expect.objectContaining({ name: 'SST (6%)', price: 800 }),
+                    expect.objectContaining({ name: 'Shipping', price: 1000 }),
+                    expect.objectContaining({ name: 'SST (6%)', price: 300 }),
                 ]),
             }),
         )
+        // And persists the re-priced totals so order.total matches the Stripe charge
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ subtotal: 50, shippingFee: 10, tax: 3, total: 63 }),
+            }),
+        )
+    })
+
+    // ─── Bank-transfer order cannot be retried via Stripe (I1) ──────────
+    it('[TC-F13.158] rejects retry for non-Stripe (bank_transfer) order', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({ ...VALID_PENDING_ORDER, paymentMethod: 'bank_transfer' })
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(body.error.code).toBe('NOT_RETRYABLE')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
     // ─── Numeric order ID (converted to string) ───────────────────────

@@ -181,6 +181,8 @@ export async function POST(request: NextRequest) {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
+        // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
+        const magicLinkSecret = randomBytes(32).toString('hex')
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
         if (total <= 0) {
@@ -234,6 +236,7 @@ export async function POST(request: NextRequest) {
                 // 'awaiting_payment' (not default 'unpaid') so the 24h payment-expiry cron can auto-cancel it
                 paymentStatus: 'awaiting_payment',
                 paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                magicLinkSecret,
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',

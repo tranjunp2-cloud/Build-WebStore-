@@ -57,7 +57,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             payment_status = 'cancelled',
             cancel_reason = 'Cancelled by customer'
         WHERE id = ${order.id}
-        AND status::text IN ('pending', 'new', 'payment_failed')
+        AND status::text IN ('pending', 'payment_failed')
         AND payment_status NOT IN ('paid', 'refunded', 'cancelled')
         RETURNING id
     `)
