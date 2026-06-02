@@ -237,7 +237,6 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                                     style={{
                                                         fontSize: 12,
                                                         color: 'var(--dash-text-muted)',
-                                                        maxWidth: 360,
                                                         overflow: 'hidden',
                                                         display: '-webkit-box',
                                                         WebkitLineClamp: 2,
