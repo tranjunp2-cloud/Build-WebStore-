@@ -119,7 +119,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             </div>
 
             {/* Preview canvas */}
-            <div className="relative flex min-h-[540px] max-h-[720px] overflow-y-auto items-start justify-center bg-slate-100 dark:bg-[#0d1525] p-6">
+            <div className="relative flex min-h-[540px] items-start justify-center bg-slate-100 dark:bg-[#0d1525] p-6">
                 {/* Subtle loading overlay — keeps iframe visible to avoid flash */}
                 {loading && (
                     <div className="absolute inset-0 flex items-start justify-center pt-8 bg-slate-100/70 dark:bg-[#0d1525]/70 z-10 pointer-events-none">
