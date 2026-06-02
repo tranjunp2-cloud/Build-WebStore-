@@ -36,8 +36,17 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'newsletter-seller-digest':   BookOpen,
 }
 
+const TEMPLATE_LABELS: Partial<Record<EmailTemplateType, string>> = {
+    'forgot-password':            'Password Reset',
+    'order-completed':            'Order Delivered',
+    'bank-transfer-instructions': 'Payment Reminder (Bank Transfer)',
+    'new-order-seller':           'New Order Notification',
+    'contact-from-seller':        'Contact Form (Seller)',
+    'newsletter-seller-digest':   'Newsletter (Seller Digest)',
+}
+
 function toLabel(type: EmailTemplateType): string {
-    return type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    return TEMPLATE_LABELS[type] ?? type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
