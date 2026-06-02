@@ -78,7 +78,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(res.status).toBe(400)
     })
 
-    it('[GUARD] returns 404 when order not found', async () => {
+    it('[TC-F10-03-25] returns 404 when order not found', async () => {
         mockFindByID.mockResolvedValue(null)
 
         const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
@@ -135,7 +135,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(mockDrizzleExecute).toHaveBeenCalled()
     })
 
-    it('[TC-F10-03-01] Cancel QR Banking order in pending status succeeds', async () => {
+    it('[TC-F10-03-01b] Cancel QR Banking order in pending status succeeds', async () => {
         mockFindByID
             .mockResolvedValueOnce({
                 id: 'order-3',
@@ -314,8 +314,6 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         // restockItem must return { restocked: qty } — recompute isolated in inner try/catch.
         mockFindByID.mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-v', variant: 'Red - M', quantity: 3 }] })
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
         mockDrizzleExecute
             .mockResolvedValueOnce({ rows: [{ id: 1 }] })                             // CAS succeeds
             .mockResolvedValueOnce({ rows: [{ id: 'prod-v', has_variants: true }] }) // product check
@@ -330,11 +328,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.restock[0].restocked).toBe(3)
         expect(body.restock[0].skipped).toBeUndefined()
         // Recompute failure logged, not propagated
-        expect(consoleSpy).toHaveBeenCalledWith(
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+            expect.objectContaining({ productId: 'prod-v' }),
             expect.stringContaining('[Restock] Inventory recompute failed'),
-            expect.any(Error)
         )
-        consoleSpy.mockRestore()
     })
 
     it('[TC-F10-03-19] Non-variant restock with NULL inventory → skipped with null_inventory', async () => {
@@ -490,8 +487,9 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
 
     // ─── TC-F10-03-24: quantity guard (Bug #3 fix) ────────────────────────────────
 
-    it('[TC-F10-03-24a] Restock with quantity = 0 → skipped, no restock SQL', async () => {
+    it('[TC-F10-03-24a] Restock with quantity = 0 → silent no-op, no restock SQL', async () => {
         // Guard short-circuits before any product-check SQL; only CAS SQL fires.
+        // qty=0 is a silent no-op: restocked=0, no skipped flag (no data-integrity alert needed).
         mockFindByID.mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-1', quantity: 0 }] })
 
         const req = { json: () => Promise.resolve({ reason: 'Test' }) } as unknown as Request
@@ -499,14 +497,13 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         const body = await res.json()
 
         expect(res.status).toBe(200)
-        expect(body.restock[0].skipped).toBe(true)
         expect(body.restock[0].restocked).toBe(0)
+        expect(body.restock[0].skipped).toBeUndefined()
         expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only CAS
     })
 
     it('[TC-F10-03-24b] Restock with negative quantity → write_failed, no restock SQL, logs warn', async () => {
         // Negative qty would silently invert SQL without this guard.
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         mockFindByID.mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-1', quantity: -3 }] })
 
         const req = { json: () => Promise.resolve({ reason: 'Test' }) } as unknown as Request
@@ -518,10 +515,9 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.restock[0].reason).toBe('write_failed')
         expect(body.restock[0].restocked).toBe(0)
         expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only CAS
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[Restock] Invalid quantity'),
+        expect(mockLogger.warn).toHaveBeenCalledWith(
             expect.objectContaining({ quantity: -3 }),
+            expect.stringContaining('[Restock] Invalid quantity'),
         )
-        consoleSpy.mockRestore()
     })
 })

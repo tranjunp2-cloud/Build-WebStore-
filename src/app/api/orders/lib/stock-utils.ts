@@ -31,7 +31,7 @@ export async function decrementVariantStock(
 
   // Guard: negative qty inverts SQL (stock - (-1) = stock + 1). NaN/Infinity also rejected.
   if (!Number.isFinite(quantity) || quantity < 0) {
-    console.warn('[Decrement] Invalid quantity — must be >= 0', { productId: idStr, quantity })
+    payload.logger.warn({ productId: idStr, quantity }, '[Decrement] Invalid quantity — must be >= 0')
     return { ok: false, productId: idStr, reason: 'write_failed' }
   }
   if (quantity === 0) {
@@ -91,12 +91,12 @@ export async function decrementVariantStock(
         WHERE id = ${productId}
       `)
     } catch (recomputeErr) {
-      console.warn(`[Decrement] Inventory recompute failed (non-critical, CAS committed):`, recomputeErr)
+      payload.logger.warn({ productId: idStr, err: recomputeErr }, '[Decrement] Inventory recompute failed (non-critical, CAS committed)')
     }
 
     return { ok: true, productId: idStr, decremented: quantity }
   } catch (err) {
-    console.warn(`[Decrement] SQL CAS failed for product ${idStr}:`, err)
+    payload.logger.warn({ productId: idStr, err }, '[Decrement] SQL CAS failed')
     return { ok: false, productId: idStr, reason: 'write_failed' }
   }
 }
@@ -124,11 +124,11 @@ export async function restockItem(
 
   // Guard: negative qty inverts SQL (stock + (-1) = stock - 1). NaN/Infinity also rejected.
   if (!Number.isFinite(quantity) || quantity < 0) {
-    console.warn('[Restock] Invalid quantity — must be >= 0', { productId: idStr, quantity })
+    payload.logger.warn({ productId: idStr, quantity }, '[Restock] Invalid quantity — must be >= 0')
     return { productId: idStr, restocked: 0, skipped: true, reason: 'write_failed' }
   }
   if (quantity === 0) {
-    return { productId: idStr, restocked: 0, skipped: true }
+    return { productId: idStr, restocked: 0 }
   }
 
   try {
@@ -145,7 +145,7 @@ export async function restockItem(
     if (hasVariants) {
       if (!trimmedVariant) {
         // Variant product but order line has no variant snapshot — data corruption
-        console.warn('[Restock] Variant product but order line has no variant name', { productId: idStr, quantity })
+        payload.logger.warn({ productId: idStr, quantity }, '[Restock] Variant product but order line has no variant name')
         return { productId: idStr, restocked: 0, skipped: true, reason: 'variant_not_found' }
       }
 
@@ -165,16 +165,16 @@ export async function restockItem(
           LIMIT 1
         `)
         if (!check.rows?.length) {
-          console.warn('[Restock] Variant name not found in product', { productId: idStr, variantName: trimmedVariant })
+          payload.logger.warn({ productId: idStr, variantName: trimmedVariant }, '[Restock] Variant name not found in product')
           return { productId: idStr, restocked: 0, skipped: true, reason: 'variant_not_found' }
         }
         if (check.rows[0].stock === null) {
           // NULL stock = per-variant tracking disabled; skip silently (not a data-integrity error).
-          console.warn('[Restock] Variant has NULL stock — tracking disabled, skipped', { productId: idStr, variantName: trimmedVariant })
+          payload.logger.warn({ productId: idStr, variantName: trimmedVariant }, '[Restock] Variant has NULL stock — tracking disabled, skipped')
           return { productId: idStr, restocked: 0, skipped: true, reason: 'null_inventory' }
         }
         // Variant exists with non-NULL stock but UPDATE still missed — defensive fallback.
-        console.warn('[Restock] Variant UPDATE returned 0 rows despite non-NULL stock', { productId: idStr, variantName: trimmedVariant })
+        payload.logger.warn({ productId: idStr, variantName: trimmedVariant }, '[Restock] Variant UPDATE returned 0 rows despite non-NULL stock')
         return { productId: idStr, restocked: 0, skipped: true, reason: 'write_failed' }
       }
 
@@ -188,7 +188,7 @@ export async function restockItem(
           WHERE id = ${productId}
         `)
       } catch (recomputeErr) {
-        console.warn(`[Restock] Inventory recompute failed (non-critical, restock committed):`, recomputeErr)
+        payload.logger.warn({ productId: idStr, err: recomputeErr }, '[Restock] Inventory recompute failed (non-critical, restock committed)')
       }
 
       return { productId: idStr, restocked: quantity }
@@ -202,12 +202,12 @@ export async function restockItem(
     `)
     if (!result.rows?.length) {
       // Product exists (pre-checked above) but inventory IS NULL — tracking disabled, skip safely
-      console.warn('[Restock] Non-variant product has NULL inventory — skipped', { productId: idStr })
+      payload.logger.warn({ productId: idStr }, '[Restock] Non-variant product has NULL inventory — skipped')
       return { productId: idStr, restocked: 0, skipped: true, reason: 'null_inventory' }
     }
     return { productId: idStr, restocked: quantity }
   } catch (err) {
-    console.warn(`[Restock] SQL failed for product ${idStr}:`, err)
+    payload.logger.warn({ productId: idStr, err }, '[Restock] SQL failed for product')
     return { productId: idStr, restocked: 0, skipped: true, reason: 'write_failed' }
   }
 }

@@ -6,6 +6,7 @@ import { withAuth } from '@/lib/auth'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { restockItem, type RestockResult } from '../../lib/stock-utils'
 import type { User } from 'payload'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -13,10 +14,11 @@ type RouteContext = { params: Promise<{ id: string }> }
 /**
  * POST /api/orders/[id]/refund
  *
- * Initiates a full Stripe refund for a paid order.
+ * Initiates a refund for a paid order (Stripe, bank_transfer, or COD).
+ * Updates order status via SQL CAS, restocks inventory (best-effort), and fires a refund email.
  * Auth required — only the tenant owner can refund their own orders (IDOR protection).
  *
- * Returns: { success, data: { refundId } }
+ * Returns: { success, data: { refundId }, restock: RestockResult[] }
  */
 export const POST = withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
@@ -36,11 +38,12 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
     }
 
-    // IDOR: verify the order belongs to the requesting user's tenant
-    const userTenantIds: (string | number)[] = ((user as any).tenants ?? []).map((t: any) =>
-        typeof t.tenant === 'object' ? t.tenant.id : t.tenant,
+    // IDOR: verify the order belongs to the requesting user's tenant.
+    // String() normalises numeric IDs (e.g. 1 vs '1') so includes() uses strict string equality.
+    const userTenantIds: string[] = ((user as any).tenants ?? []).map((t: any) =>
+        String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant),
     )
-    const orderTenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+    const orderTenantId = String(typeof order.tenant === 'object' ? order.tenant.id : order.tenant)
     if (!userTenantIds.includes(orderTenantId)) {
         return NextResponse.json(
             { success: false, error: { code: 'FORBIDDEN' } },
@@ -70,7 +73,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     async function fireRefundEmail() {
         if (!order.customerEmail) return
         const tenant = typeof order.tenant === 'object' ? order.tenant : null
-        const tenantId = tenant ? String(typeof tenant === 'object' ? (tenant as any).id : tenant) : null
+        const tenantId = tenant ? String((tenant as any).id) : null
         const refundLocale: 'en' | 'ms' = ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms'
         const cmsConfig = tenantId
             ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', refundLocale).catch(() => null)
@@ -88,7 +91,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             customerAddress: order.shippingAddress ?? null,
             items: (order.items ?? []).map((item: any) => ({
                 name: item.productName ?? item.name ?? '',
-                variant: item.variantName ?? null,
+                variant: item.variant ?? null,
                 quantity: item.quantity ?? 1,
                 unitPrice: item.unitPrice ?? 0,
                 lineTotal: item.lineTotal ?? 0,
@@ -102,37 +105,70 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             refundDate: new Date().toISOString(),
             shopUrl: `${baseUrl}/sites/${siteSlug}`,
             currency: order.currency ?? 'MYR',
-            locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
+            locale: refundLocale,
         }, cmsConfig ?? undefined)
         payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
             .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
     }
 
-    // Bank transfer / COD — manual refund, no Stripe call needed.
-    // No webhook race for non-Stripe orders, so payload.update() is safe here.
-    if (['bank_transfer', 'cod'].includes(order.paymentMethod)) {
-        if (order.status === 'refunded') {
-            return NextResponse.json(
-                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
-                { status: 400 },
-            )
+    // Helper: restock all order items; logs warn/error for skipped cases.
+    // Never throws — restockItem catches all SQL errors and returns { skipped: true }.
+    async function runRestockForItems(items: any[]): Promise<RestockResult[]> {
+        const results: RestockResult[] = []
+        for (const [index, item] of (items ?? []).entries()) {
+            const rawProductId = typeof item.product === 'object' ? (item.product as any)?.id : item.product
+            if (!rawProductId) {
+                results.push({ productId: `unknown:${index}`, restocked: 0, skipped: true, reason: 'product_not_found' })
+                continue
+            }
+            const productId = Number.isFinite(Number(rawProductId)) ? Number(rawProductId) : rawProductId
+            results.push(await restockItem(payload, productId, (item as any).variant, item.quantity))
         }
+        // write_failed | product_not_found | variant_not_found → error (data integrity)
+        const errorable = results.filter(r =>
+            r.skipped && (r.reason === 'write_failed' || r.reason === 'product_not_found' || r.reason === 'variant_not_found'))
+        if (errorable.length > 0) {
+            payload.logger.error(
+                { orderId: id, failedProducts: errorable.map(r => ({ id: r.productId, reason: r.reason })) },
+                '[Order Refund] Restock failed — manual inventory reconciliation required')
+        }
+        // null_inventory → warn (tracking disabled, not an integrity error)
+        const nullInv = results.filter(r => r.skipped && r.reason === 'null_inventory')
+        if (nullInv.length > 0) {
+            payload.logger.warn(
+                { orderId: id, products: nullInv.map(r => r.productId) },
+                '[Order Refund] Restock skipped — inventory tracking disabled')
+        }
+        return results
+    }
+
+    // Bank transfer / COD — manual refund, no Stripe call needed.
+    // SQL CAS prevents double-restock under concurrent requests.
+    if (['bank_transfer', 'cod'].includes(order.paymentMethod)) {
+        let casResult: { rows?: Array<Record<string, unknown>> }
         try {
-            await payload.update({
-                collection: 'orders',
-                id,
-                data: { status: 'refunded', paymentStatus: 'refunded' } as any,
-            })
-            console.log(`[Refund] Order ${id} refunded manually (${order.paymentMethod})`)
-            fireRefundEmail()
-            return NextResponse.json({ success: true, data: { refundId: null } })
-        } catch (err: any) {
-            console.error('[Refund] Manual refund failed:', err?.message ?? err)
+            casResult = await (payload.db.drizzle as any).execute(sql`
+                UPDATE orders SET status = 'refunded', payment_status = 'refunded', updated_at = NOW()
+                WHERE id = ${order.id}
+                AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
+                RETURNING id
+            `)
+        } catch (err) {
+            payload.logger.error({ err: err instanceof Error ? err.message : String(err), orderId: id }, '[Refund] Manual refund failed')
             return NextResponse.json(
                 { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
                 { status: 502 },
             )
         }
+        if (!casResult.rows?.length) {
+            return NextResponse.json(
+                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+                { status: 400 })
+        }
+        // --- refund financially committed via CAS; restock is best-effort ---
+        const restockResults = await runRestockForItems(order.items)
+        void fireRefundEmail()
+        return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
     }
 
     // Stripe orders — resolve connected account
@@ -167,7 +203,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
                 })
             }
         } catch (err: any) {
-            console.error('[Refund] Failed to retrieve Stripe session:', err.message)
+            payload.logger.error({ err: err.message, orderId: id }, '[Refund] Failed to retrieve Stripe session')
         }
     }
 
@@ -182,18 +218,27 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     }
 
     const originalStatus = order.status
-    const originalPaymentStatus = order.paymentStatus
+    const originalPaymentStatus = (order.paymentStatus as string | undefined) ?? 'paid'
 
     // Atomic CAS: only the first concurrent request wins — prevents double-email if merchant double-clicks.
     // Update DB to 'refunded' BEFORE calling Stripe so the charge.refunded webhook
     // (which fires moments after the Stripe API call) sees the order as already refunded
     // and skips sending a duplicate confirmation email.
-    const casResult = await (payload.db.drizzle as any).execute(sql`
-        UPDATE orders SET status = 'refunded', payment_status = 'refunded'
-        WHERE id = ${order.id}
-        AND (status = 'shipped' OR status = 'completed')
-        RETURNING id
-    `)
+    let casResult: { rows?: Array<Record<string, unknown>> }
+    try {
+        casResult = await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET status = 'refunded', payment_status = 'refunded', updated_at = NOW()
+            WHERE id = ${order.id}
+            AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
+            RETURNING id
+        `)
+    } catch (err) {
+        payload.logger.error({ err: err instanceof Error ? err.message : String(err), orderId: id }, '[Refund] CAS failed')
+        return NextResponse.json(
+            { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
+            { status: 502 },
+        )
+    }
     if (!casResult.rows?.length) {
         return NextResponse.json(
             { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
@@ -208,25 +253,36 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { stripeAccount: stripeAccountId, idempotencyKey: `refund-${id}` },
         )
 
-        console.log(`[Refund] Order ${id} refunded — Stripe refund ${refund.id}`)
-        fireRefundEmail()
-
-        return NextResponse.json({ success: true, data: { refundId: refund.id } })
+        // Restock ONLY after Stripe irreversibly succeeds — retry-safe (CAS blocks 2nd refund).
+        const restockResults = await runRestockForItems(order.items)
+        void fireRefundEmail()
+        return NextResponse.json({ success: true, data: { refundId: refund.id }, restock: restockResults })
     } catch (err: any) {
-        // Before rolling back, re-fetch the order — the charge.refunded webhook may have already
-        // arrived and set status to 'refunded' (network timeout on our side, but Stripe processed it).
-        // Rolling back in that case would silently undo the webhook's state update.
-        const currentOrder = await payload.findByID({ collection: 'orders', id }).catch(() => null) as any
-        if (!currentOrder || currentOrder.status === 'refunded') {
-            console.log('[Refund] Stripe call failed but order already refunded (webhook race) — skipping rollback')
-            return NextResponse.json({ success: true, data: { refundId: null } })
+        // 'charge_already_refunded' means the refund exists on Stripe — idempotent success.
+        // Covers the network-timeout case where Stripe processed the refund but our request timed out.
+        // CAS + idempotencyKey prevent any double-charge.
+        if (err?.code === 'charge_already_refunded') {
+            const restockResults = await runRestockForItems(order.items)
+            void fireRefundEmail()
+            return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
         }
-        await payload.update({
-            collection: 'orders',
-            id,
-            data: { status: originalStatus, paymentStatus: originalPaymentStatus } as any,
-        }).catch(() => {})
-        console.error('[Refund] Stripe refund failed:', err.message)
+        // Genuine Stripe failure — roll back our pre-set status.
+        // Known race: if the charge.refunded webhook arrived WHILE status was already 'refunded'
+        // (from our CAS), that webhook silently skips its own guard (AND status != 'refunded')
+        // and won't fire again. Our rollback then resets to 'shipped' — a false negative.
+        // Full fix requires a schema marker (e.g. refundedAt or stripeRefundId set by the webhook);
+        // this is acceptable for now given the narrow timing window. The `charge_already_refunded`
+        // path above handles the common Stripe-processed-but-we-timed-out case.
+        await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET status = ${originalStatus}::enum_orders_status, payment_status = ${originalPaymentStatus}
+            WHERE id = ${order.id}
+        `).catch((rollbackErr: unknown) => {
+            payload.logger.error(
+                { rollbackErr: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr), orderId: id, originalStatus },
+                '[Refund] Status rollback failed — DB state may be inconsistent'
+            )
+        })
+        payload.logger.error({ err: err.message, orderId: id }, '[Refund] Stripe refund failed — status rolled back')
         return NextResponse.json(
             { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
             { status: 502 },
