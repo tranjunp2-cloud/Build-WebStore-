@@ -222,7 +222,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             })
             if (!res.ok) return
             const { subject, html } = await res.json()
-            const win = window.open('', '_blank')
+            const win = window.open('', '_blank', 'noopener,noreferrer')
             if (win) {
                 const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
                 win.document.open()
