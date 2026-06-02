@@ -119,17 +119,31 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     useEffect(() => { setMounted(true) }, [])
 
-    // Detect Stripe cancel redirect and show BM/EN toast (AC-1)
-    // Uses window.location.search (client-only) to avoid needing Suspense for useSearchParams
+    // Browser Back from Stripe Checkout lands back on this page. We set 'pw_stripe_pending' right
+    // before redirecting to Stripe, so if checkout is shown again WITH that flag, the buyer backed
+    // out → redirect them to the confirm page (Pay Now), matching Stripe's own cancel button.
+    // Works whether checkout returns via bfcache (pageshow persisted) or a fresh load (no-store
+    // disables bfcache) — pageshow fires in both cases. The confirm page clears the flag on the
+    // success path, so a later fresh checkout visit won't false-trigger.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search)
-        if (params.get('stripe_cancelled') === '1') {
-            toast.error(ck.paymentCancelled)
-            // Strip the param without reload so cart (localStorage) is preserved
-            const cleanUrl = window.location.pathname
-            window.history.replaceState(null, '', cleanUrl)
+        const redirectIfPending = () => {
+            const raw = sessionStorage.getItem('pw_stripe_pending')
+            if (!raw) return false
+            sessionStorage.removeItem('pw_stripe_pending')
+            try {
+                const { orderId, slug: s } = JSON.parse(raw)
+                if (orderId && s) {
+                    window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+                    return true
+                }
+            } catch { /* malformed flag — ignore */ }
+            return false
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Fire on mount (fresh load / no-store) and on pageshow (bfcache restore).
+        redirectIfPending()
+        const onPageShow = () => { redirectIfPending() }
+        window.addEventListener('pageshow', onPageShow)
+        return () => window.removeEventListener('pageshow', onPageShow)
     }, [])
 
     // Cleanup tooltip timer on unmount to prevent setState on unmounted component
@@ -355,6 +369,13 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 dismissOverlay()
                 if (res.ok && data.success && data.data.sessionUrl) {
                     navigatedToConfirm = true
+                    // Order is now placed (status=pending) and owns these items — clear the cart so the
+                    // buyer can't accidentally place a duplicate order. Retry happens via the order's
+                    // "Pay Now" CTA (re-validates stock), not by re-checking-out the cart.
+                    clearCart()
+                    // Flag for the pageshow handler: if the buyer presses the browser Back button
+                    // from Stripe, bring them to the confirm page (Pay Now) instead of back to checkout.
+                    sessionStorage.setItem('pw_stripe_pending', JSON.stringify({ orderId: data.data.orderId, slug }))
                     window.location.href = data.data.sessionUrl
                 } else {
                     toast.error(data.error?.message || 'Failed to initialize payment')

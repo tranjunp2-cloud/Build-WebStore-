@@ -194,8 +194,11 @@ export async function POST(
             )
         }
 
-        // Step 8: Update order with new session ID; reset status if payment_failed
-        const updateData: Record<string, unknown> = { stripeSessionId: checkout.sessionId }
+        // Step 8: Update order with new session ID; reset status if payment_failed; refresh 24h window
+        const updateData: Record<string, unknown> = {
+            stripeSessionId: checkout.sessionId,
+            paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        }
         if (order.paymentStatus === 'payment_failed') {
             updateData.status = 'pending'
             updateData.paymentStatus = 'awaiting_payment'

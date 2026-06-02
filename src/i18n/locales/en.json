@@ -3543,7 +3543,14 @@
             "sumStatusBtS1": "Action Required — Upload Receipt",
             "sumStatusBtS2": "We can't ship until your transfer is verified.",
             "verifyingPayment": "Verifying your payment…",
-            "verifyingHint": "This can take a few seconds. You can also check My Orders."
+            "verifyingHint": "This can take a few seconds. You can also check My Orders.",
+            "retryError": "Could not start payment. Please try again.",
+            "cancelConfirmBanner": "Cancel Order",
+            "cancelConfirmTitle": "Cancel this order?",
+            "cancelConfirmBody": "Your order will be cancelled and the reserved items released. This cannot be undone — you'd need to place a new order to buy again.",
+            "cancelConfirmYes": "Yes, cancel order",
+            "cancelKeepOrder": "Keep order",
+            "cancelling": "Cancelling…"
         },
         "resendUpload": {
             "checkEmailTitle": "Check your email",

@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
         // Webhook will update to actual method used when checkout.session.completed fires.
         const orderPaymentMethod = types.length === 1 ? types[0] : 'card'
 
-        // Create order in pending status
+        // Create order in pending status — 24h window matches Stripe Checkout session default expiry
         const order = await payload.create({
             collection: 'orders',
             // Payload collection data type is overly strict; cast required until generated types exist
@@ -230,6 +230,9 @@ export async function POST(request: NextRequest) {
                 currency,
                 status: 'pending',
                 paymentMethod: orderPaymentMethod,
+                // 'awaiting_payment' (not default 'unpaid') so the 24h payment-expiry cron can auto-cancel it
+                paymentStatus: 'awaiting_payment',
+                paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
@@ -265,7 +268,7 @@ export async function POST(request: NextRequest) {
                 currency: currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: customer.email,
                 successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
+                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },

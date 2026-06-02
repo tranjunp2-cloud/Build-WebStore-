@@ -8,8 +8,8 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
         collection: 'orders',
         where: {
             and: [
-                { paymentMethod: { equals: 'bank_transfer' } },
-                { paymentStatus: { in: ['awaiting_payment', 'pending_verification'] } },
+                { paymentMethod: { in: ['bank_transfer', 'card', 'fpx'] } },
+                { paymentStatus: { in: ['awaiting_payment', 'pending_verification', 'payment_failed', 'failed'] } },
                 { paymentExpiresAt: { less_than: now } },
             ],
         },
@@ -32,8 +32,8 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                     payment_status = 'payment_failed',
                     cancel_reason = 'Auto-cancelled: payment not received within 24h'
                 WHERE id = ${order.id}
-                AND payment_status IN ('awaiting_payment', 'pending_verification')
-                AND status::text IN ('pending', 'new')
+                AND payment_status IN ('awaiting_payment', 'pending_verification', 'payment_failed', 'failed')
+                AND status::text IN ('pending', 'new', 'payment_failed')
                 RETURNING id
             `)
             if (!updateResult.rows?.length) {

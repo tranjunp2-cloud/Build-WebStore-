@@ -651,4 +651,45 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(res.status).toBe(500)
         expect(body.error.code).toBe('INTERNAL_ERROR')
     })
+
+    // ─── TC-F13.155: retry refreshes paymentExpiresAt ─────────────────────
+    it('[TC-F13.155] update data includes refreshed paymentExpiresAt ~24h ahead on retry', async () => {
+        // Arrange
+        const before = Date.now()
+        mockFindByID.mockResolvedValue(VALID_PENDING_ORDER)
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => {
+                if (key === 'ct_123') return { value: 'valid-token' }
+                return undefined
+            }),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+        mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
+        mockBuildOrderItems.mockResolvedValue({
+            errorResponse: null,
+            checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+        })
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({})
+        await POST(req, { params: Promise.resolve({ id: '123' }) })
+
+        const after = Date.now()
+
+        // Assert — update must include paymentExpiresAt within the 24h window
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    stripeSessionId: VALID_CHECKOUT_SESSION.sessionId,
+                    paymentExpiresAt: expect.any(String),
+                }),
+            }),
+        )
+        const updateCall = mockUpdate.mock.calls[0][0]
+        const exp = new Date(updateCall.data.paymentExpiresAt).getTime()
+        expect(exp).toBeGreaterThanOrEqual(before + 24 * 60 * 60 * 1000 - 2000)
+        expect(exp).toBeLessThanOrEqual(after + 24 * 60 * 60 * 1000 + 2000)
+    })
 })
