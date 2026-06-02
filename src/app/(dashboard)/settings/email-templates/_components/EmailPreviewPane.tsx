@@ -151,12 +151,17 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                             background: '#fff',
                             boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
                             transition: 'width 0.2s',
+                            overflow: 'hidden',
                         }}
                         onLoad={(e) => {
                             const iframe = e.currentTarget
                             try {
-                                const body = iframe.contentDocument?.body
-                                if (body) iframe.style.height = body.scrollHeight + 'px'
+                                const doc = iframe.contentDocument
+                                if (doc) {
+                                    // Use documentElement.scrollHeight for accuracy with padded wrapper divs
+                                    const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight)
+                                    iframe.style.height = h + 'px'
+                                }
                             } catch {
                                 // sandboxed — ignore cross-origin height
                             }
