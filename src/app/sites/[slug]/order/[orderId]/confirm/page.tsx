@@ -8,10 +8,13 @@ import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
 
 export default async function OrderConfirmPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ slug: string; orderId: string }>
+    searchParams: Promise<{ cancelled?: string }>
 }) {
     const { slug, orderId: rawId } = await params
+    const { cancelled } = await searchParams
     const payload = await getPayload({ config })
     const orderId = isNaN(Number(rawId)) ? rawId : Number(rawId)
 
@@ -95,6 +98,7 @@ export default async function OrderConfirmPage({
                 paymentMethod: raw.paymentMethod,
                 paymentStatus: raw.paymentStatus,
                 paymentReference: raw.paymentReference,
+                paymentExpiresAt: raw.paymentExpiresAt,
                 stripePaymentIntentId: raw.stripePaymentIntentId,
                 customerName: raw.customerName,
                 customerEmail: raw.customerEmail,
@@ -126,6 +130,7 @@ export default async function OrderConfirmPage({
                 bankAccountHolder={bankAccountHolder}
                 merchantQrUrl={merchantQrUrl}
                 uploadToken={uploadToken}
+                cancelled={cancelled === '1'}
             />
         </>
     )

@@ -2,8 +2,10 @@
 
 import { Truck, Check } from 'lucide-react'
 import { type CheckoutForm } from '@/lib/storefront'
-import { type GeoState, type GeoDistrict } from './use-checkout-state'
 import { useI18n } from '@/i18n'
+
+type GeoState = { id: number; name: string; state_code: string; zone: string }
+type GeoDistrict = { id: number; name: string }
 
 type Props = {
     form: CheckoutForm

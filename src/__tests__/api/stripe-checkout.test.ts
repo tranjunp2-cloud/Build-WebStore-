@@ -439,7 +439,7 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
     })
 
     // ─── TC-F13.62: Success/cancel URLs include storefront slug ─────────
-    it('[TC-F13.62] success_url contains site slug and cancel_url has stripe_cancelled param', async () => {
+    it('[TC-F13.62] success_url contains site slug and cancel_url returns to confirm page with cancelled flag', async () => {
         // Arrange
         mockFindByID
             .mockResolvedValueOnce(VALID_SITE)
@@ -459,11 +459,12 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const req = mockRequest(VALID_REQUEST_BODY)
         await POST(req)
 
-        // Assert — URLs must include site slug and required params
+        // Assert — success returns to confirm page; cancel returns to confirm page with cancelled=1
+        // so the buyer sees the order with a "Pay Now" retry CTA instead of a cleared cart.
         expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
             expect.objectContaining({
                 successUrl: expect.stringContaining('/sites/test-store/'),
-                cancelUrl: expect.stringContaining('stripe_cancelled=1'),
+                cancelUrl: expect.stringContaining('/confirm?cancelled=1'),
             }),
         )
     })
@@ -522,6 +523,12 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(body.data.status).toBe('paid')
         expect(body.data.sessionUrl).toBeNull()
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+        // Free order must persist paymentStatus='paid' so the confirm page renders it as paid (not "verifying")
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: 'paid', paymentStatus: 'paid', paymentMethod: 'free' }),
+            }),
+        )
     })
 
     // ─── Error handling ──────────────────────────────────────────────
@@ -662,5 +669,68 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
             ]),
             expect.anything(),
         )
+    })
+
+    // ─── TC-F13.155: paymentExpiresAt set on pending Stripe order ──────────
+    it('[TC-F13.155] sets paymentExpiresAt ~24h ahead when creating pending Stripe order', async () => {
+        // Arrange
+        const before = Date.now()
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ name: 'Widget', price: 5000, quantity: 1, images: [] }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        await POST(req)
+
+        const after = Date.now()
+
+        // Assert — paymentExpiresAt must be present in create data, within 24h window
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    paymentExpiresAt: expect.any(String),
+                }),
+            }),
+        )
+        const createCall = mockCreate.mock.calls[0][0]
+        const exp = new Date(createCall.data.paymentExpiresAt).getTime()
+        expect(exp).toBeGreaterThanOrEqual(before + 24 * 60 * 60 * 1000 - 2000)
+        expect(exp).toBeLessThanOrEqual(after + 24 * 60 * 60 * 1000 + 2000)
+    })
+
+    // ─── TC-F13.155: free order must NOT set paymentExpiresAt ──────────────
+    it('[TC-F13.155] does NOT set paymentExpiresAt for free orders (total <= 0)', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Free Item', quantity: 1, unitPrice: 0 }],
+            checkoutItems: [],
+            subtotal: -10,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue({ id: 'order-free', orderNumber: 'ORD-FREE123' })
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        await POST(req)
+
+        // Assert — free order create data must NOT contain paymentExpiresAt
+        const createCall = mockCreate.mock.calls[0][0]
+        expect(createCall.data.paymentExpiresAt).toBeUndefined()
+        expect(createCall.data.status).toBe('paid')
     })
 })

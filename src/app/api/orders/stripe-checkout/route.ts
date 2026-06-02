@@ -181,6 +181,8 @@ export async function POST(request: NextRequest) {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
+        // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
+        const magicLinkSecret = randomBytes(32).toString('hex')
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
         if (total <= 0) {
@@ -198,6 +200,7 @@ export async function POST(request: NextRequest) {
                     total: 0,
                     currency,
                     status: 'paid',
+                    paymentStatus: 'paid',
                     paymentMethod: 'free',
                     customerEmail: customer.email,
                     customerName: customer.name,
@@ -214,7 +217,7 @@ export async function POST(request: NextRequest) {
         // Webhook will update to actual method used when checkout.session.completed fires.
         const orderPaymentMethod = types.length === 1 ? types[0] : 'card'
 
-        // Create order in pending status
+        // Create order in pending status — 24h window matches Stripe Checkout session default expiry
         const order = await payload.create({
             collection: 'orders',
             // Payload collection data type is overly strict; cast required until generated types exist
@@ -230,6 +233,10 @@ export async function POST(request: NextRequest) {
                 currency,
                 status: 'pending',
                 paymentMethod: orderPaymentMethod,
+                // 'awaiting_payment' (not default 'unpaid') so the 24h payment-expiry cron can auto-cancel it
+                paymentStatus: 'awaiting_payment',
+                paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                magicLinkSecret,
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
@@ -265,7 +272,7 @@ export async function POST(request: NextRequest) {
                 currency: currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: customer.email,
                 successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
+                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },

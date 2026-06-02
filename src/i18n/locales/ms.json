@@ -3513,7 +3513,7 @@
             "stripeCardDesc": "Visa atau Mastercard melalui Stripe",
             "stripeFpx": "Bayar dengan FPX (Perbankan Dalam Talian)",
             "stripeFpxDesc": "Perbankan Dalam Talian Malaysia melalui Stripe",
-            "paymentCancelled": "Pembayaran dibatalkan. Troli anda dikekalkan — sila cuba lagi.",
+            "paymentCancelled": "Pembayaran gagal. Sila cuba lagi.",
             "paymentFailed": "Pembayaran tidak dapat dimulakan. Sila cuba lagi.",
             "redirectingTitle": "Mengarahkan ke Stripe Checkout",
             "redirectingDesc": "Sila jangan tutup tetingkap ini. Anda akan kembali ke sini selepas pembayaran.",
@@ -3541,7 +3541,16 @@
             "leaveAnyway": "Keluar sahaja",
             "stayUpload": "Kekal & Muat Naik",
             "sumStatusBtS1": "Tindakan Diperlukan — Muat Naik Resit",
-            "sumStatusBtS2": "Kami tidak boleh menghantar sehingga pemindahan anda disahkan."
+            "sumStatusBtS2": "Kami tidak boleh menghantar sehingga pemindahan anda disahkan.",
+            "verifyingPayment": "Mengesahkan pembayaran anda…",
+            "verifyingHint": "Ini mungkin mengambil masa beberapa saat. Anda juga boleh semak Pesanan Saya.",
+            "retryError": "Tidak dapat memulakan pembayaran. Sila cuba lagi.",
+            "cancelConfirmBanner": "Batal Pesanan",
+            "cancelConfirmTitle": "Batalkan pesanan ini?",
+            "cancelConfirmBody": "Pesanan anda akan dibatalkan dan item yang ditempah akan dilepaskan. Tindakan ini tidak boleh dibuat asal — anda perlu membuat pesanan baharu untuk membeli semula.",
+            "cancelConfirmYes": "Ya, batalkan pesanan",
+            "cancelKeepOrder": "Kekalkan pesanan",
+            "cancelling": "Membatalkan…"
         },
         "resendUpload": {
             "checkEmailTitle": "Semak e-mel anda",
