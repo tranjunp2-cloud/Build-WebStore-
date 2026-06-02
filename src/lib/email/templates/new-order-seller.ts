@@ -93,9 +93,8 @@ export function newOrderSellerEmail(data: NewOrderSellerData, config?: EmailTemp
         closing: undefined,
     })
 
-    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
-        ? (applyVariables(config.subject, vars) ?? t.subject)
-        : t.subject
+    // t.subject already applies mergeTemplateConfig escaping + CMS override — use directly
+    const subject = t.subject
 
     const orderUrl = esc(data.orderPageUrl)
 

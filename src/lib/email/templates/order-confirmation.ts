@@ -163,7 +163,7 @@ export function orderConfirmationEmail(
             ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
             : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`)
     const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
-        ? (applyVariables(config.subject, vars) ?? defaultSubject)
+        ? (applyVariables(escapeHtml(config.subject), vars) ?? defaultSubject)
         : defaultSubject
 
     return {

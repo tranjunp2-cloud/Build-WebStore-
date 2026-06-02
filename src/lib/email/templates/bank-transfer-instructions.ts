@@ -136,7 +136,7 @@ export function bankTransferInstructionsEmail(
         ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
         : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`
     const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
-        ? (applyVariables(config.subject, vars) ?? defaultSubject)
+        ? (applyVariables(escapeHtml(config.subject), vars) ?? defaultSubject)
         : defaultSubject
 
     const itemRows = data.items.map((item) => `

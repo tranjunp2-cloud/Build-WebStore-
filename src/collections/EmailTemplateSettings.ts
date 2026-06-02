@@ -55,7 +55,7 @@ export const EmailTemplateSettings: CollectionConfig = {
             ({ data }) => {
                 // Security check first (index 0) — must never be skipped by a prior hook failure
                 const isCritical = CRITICAL_TYPES.includes(data.templateType as typeof CRITICAL_TYPES[number])
-                if (isCritical && data.enabled === false) {
+                if (isCritical && !data.enabled) {
                     throw new Error(
                         `Cannot disable security-critical template "${data.templateType}". This template is required for account security flows.`
                     )

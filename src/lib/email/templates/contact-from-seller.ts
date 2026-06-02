@@ -74,9 +74,8 @@ export function contactFromSellerEmail(
         closing: undefined,
     })
 
-    const subject = typeof config?.subject === 'string' && config.subject.length > 0
-        ? (applyVariables(config.subject, vars) ?? t.subject)
-        : t.subject
+    // t.subject already applies mergeTemplateConfig escaping + CMS override — use directly
+    const subject = t.subject
 
     const dashUrl = data.dashboardUrl ? esc(data.dashboardUrl) : '#'
 
