@@ -158,10 +158,11 @@ Dashboard → [My Website] → [CORE OPERATIONS] → [CRM] → [SETTINGS] → (�
 ```text
 ┌── CMS Layout ─────────────────────────────────────────────────────┐
 │ ┌─ Top Header (Fixed, z-index cao nhất) ─────────────────────────┐│
-│ │ [☰/Logo]  PrimeWeb    [BM|EN]              [🔔 3]  [👤 ▼]     ││
-│ │           ↑ Click →                          ↑        ↑        ││
-│ │         /dashboard                     F16 Badge  Avatar       ││
-│ │                                                   Dropdown     ││
+│ │ [⊞] [Logo] PrimeWeb  [BM|EN]          [🔔 3] [👤▼]      [«]   ││
+│ │  ↑    ↑ Click →                          ↑      ↑         ↑    ││
+│ │ App  /dashboard                    F16 Badge  Avatar  Collapse ││
+│ │ Switcher                                      Dropdown Sidebar ││
+│ │ (9 chấm)                                                       ││
 │ └────────────────────────────────────────────────────────────────┘│
 │ ┌── Sidebar (Fixed Left, overflow-y: auto) ─┐ ┌── Main Content ─┐│
 │ │                                           │ │ (overflow-y:auto)││
@@ -197,6 +198,39 @@ Dashboard → [My Website] → [CORE OPERATIONS] → [CRM] → [SETTINGS] → (�
 - Badge: pill số đếm bên phải label (Orders/Products/Discounts/All Customers/Contact Leads); ẩn khi = 0
 - Help Center: neo cố định ở cuối sidebar, phân tách bởi divider
 - `Templates Health`: chỉ render khi không phải Production (Dev-only)
+
+**Header (Desktop/Tablet):**
+- `[⊞]` **App Switcher** (icon lưới 9 chấm): nằm ngoài cùng bên trái, **trước** Logo → mở dropdown launcher (xem §3.7)
+- `[«]` **Collapse/Expand Sidebar** (chevron-double-left): nằm ngoài cùng bên phải Header → thu/mở sidebar (xem §3.8); `hidden md:block` (ẩn trên mobile)
+
+---
+
+### 3.1b. Mini Sidebar — Trạng thái Collapsed (Desktop/Tablet)
+
+```text
+┌─ Top Header ──────────────────────────────────────┐
+│ [⊞] [Logo]  [BM|EN]        [🔔 3] [👤▼]     [»]   │ ◄── icon đổi thành » (expand)
+└────────────────────────────────────────────────────┘
+┌──────┐ ┌── Main Content ───────────────┐
+│ ~64px│ │                               │
+│  📊  │ │   (rộng hơn khi sidebar thu)  │
+│  ──  │ │                               │
+│  🎨  │ │   Hover icon → Tooltip:       │
+│  📝  │ │   ┌──────────┐                │
+│  🖼️  │ │   │ Editor   │ ◄── nhãn EN    │
+│  ──  │ │   └──────────┘                │
+│ 🛒•  │ │   (• = chấm badge thu gọn)    │
+│ 📦•  │ │                               │
+│ 🏷️•  │ │                               │
+│  ⋮   │ │                               │
+│  🎧  │ │                               │
+└──────┘ └───────────────────────────────┘
+```
+
+- Width ~64px, **chỉ icon căn giữa** — ẩn toàn bộ text label + section header (divider giữ lại dạng line mảnh)
+- Hover từng icon → **Tooltip** hiển thị nhãn Tiếng Anh tương ứng (Editor, Orders, …)
+- Badge thu gọn thành **chấm tròn nhỏ** (dot) trên góc icon (không hiện số khi collapsed)
+- Trạng thái lưu `localStorage.sidebar_collapsed` (`true`/`false`) — giữ nguyên qua reload & chuyển module
 
 ---
 
@@ -258,18 +292,18 @@ Khi click ☰ → Sidebar Drawer:
 
 ```text
 Desktop Header:
-┌────────────────────────────────────────────────────────────────┐
-│  [Logo PrimeWeb]     [Tên Website]      [BM|EN]  [🔔 3] [👤▼] │
-│   ↑ Click → /dash     ↑ Context          ↑ Lang   ↑ F16  ↑    │
-│                        display            Switch  Badge  Avatar│
-│                                                         Menu   │
-└────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ [⊞] [Logo PrimeWeb] [Tên Website] [BM|EN]  [🔔 3] [👤▼]        [«]  │
+│  ↑    ↑ Click→/dash   ↑ Context    ↑ Lang   ↑ F16  ↑ Avatar  ↑       │
+│ App                    display      Switch   Badge   Menu  Collapse   │
+│ Switcher                                                    Sidebar   │
+└──────────────────────────────────────────────────────────────────────┘
 
 Mobile Header:
 ┌────────────────────────────────────────┐
-│  [☰]  [Logo]                [🔔 3] [👤]│
-│   ↑ Toggle                             │
-│   Drawer                               │
+│  [☰] [⊞] [Logo]          [🔔 3] [👤]  │
+│   ↑   ↑ App Switcher                   │
+│  Drawer   (« ẩn trên mobile)           │
 └────────────────────────────────────────┘
 ```
 
@@ -338,15 +372,61 @@ Click Bell → Mở F16 Notification Dropdown/Drawer
 
 ---
 
+### 3.7. App Switcher — Dropdown Launcher (SSO)
+
+Nút icon lưới **9 chấm** (`⊞`), nằm **ngoài cùng bên trái Header, trước Logo**. Click → mở dropdown launcher liệt kê các app trong hệ sinh thái SaaS; mỗi item là **direct link** tới URL SSO của app tương ứng.
+
+```text
+[⊞] ← click
+ │
+ ▼
+┌──────────────────────────┐
+│  Switch app              │
+├──────────────────────────┤
+│  🟦  Web Store  (current)│ ◄── app hiện tại, đánh dấu active
+│  🟩  App B               │ ──→ direct link tới URL SSO của App B
+│  🟧  App C               │ ──→ direct link tới URL SSO của App C
+│  …                       │
+└──────────────────────────┘
+```
+
+**Hành vi:**
+- Click item → điều hướng qua **SSO** sang app tương ứng (giữ session qua hệ thống SSO/Workspace chung)
+- App hiện tại (Web Store) đánh dấu active; danh sách app lấy từ cấu hình (env / API workspace)
+- Click outside / ESC → đóng dropdown
+- Hiển thị trên cả Desktop và Mobile (nút SSO điều hướng chung)
+
+---
+
+### 3.8. Collapse / Expand Sidebar
+
+Nút **chevron-double-left** (`«`), nằm **ngoài cùng bên phải Header**. Toggle thu gọn / mở rộng sidebar để tối ưu không gian làm việc.
+
+```text
+Expanded (~240px)          Collapsed (~64px, Mini)
+[«] ← click          →     [»] ← click để mở lại
+🎨  Editor                 🎨   (hover → tooltip "Editor")
+🛒  Orders        [384]    🛒•  (badge thu thành dot)
+```
+
+**Hành vi:**
+- Click `«` → sidebar thu về **Mini (~64px, icon-only)**, icon đổi thành `»`; click `»` → mở lại ~240px (xem wireframe §3.1b)
+- Khi collapsed: ẩn text label + section header; hover icon → **tooltip nhãn EN**; badge → dot
+- **Lưu trạng thái** `localStorage.sidebar_collapsed` (`true`/`false`) — giữ nguyên sau reload & khi chuyển module
+- Responsive: `hidden md:block` — **ẩn hoàn toàn trên Mobile** (< 768px); mobile dùng `☰` + Drawer thay thế
+- Animation thu/mở mượt (< 200ms)
+
+---
+
 ## 4. UI States (Các trạng thái UI)
 
 ### 4.1. Sidebar States
 
 | State | Điều kiện | Mô tả |
 |-------|-----------|-------|
-| **Expanded** | Desktop mặc định | Icon + Text đầy đủ, width ~240px |
-| **Collapsed (Icon-only)** | Tablet / User thu gọn (nếu hỗ trợ) | Chỉ hiện Icon, width ~60px, hover → tooltip text |
-| **Drawer** | Mobile < 768px | Ẩn mặc định, slide-in từ trái khi click ☰ |
+| **Expanded** | Desktop mặc định (`sidebar_collapsed=false`) | Icon + Text đầy đủ, width ~240px |
+| **Collapsed (Mini, Icon-only)** | User click `«` (Desktop/Tablet); lưu `localStorage.sidebar_collapsed=true` | Chỉ hiện Icon căn giữa, width ~64px, ẩn text + section header, hover → tooltip nhãn EN, badge → dot (§3.1b) |
+| **Drawer** | Mobile < 768px | Ẩn mặc định, slide-in từ trái khi click ☰; nút `«` ẩn (`hidden md:block`) |
 
 ### 4.2. Loading State — Route Transition
 
@@ -414,8 +494,9 @@ Khi chưa fetch xong session data (F02 Auth):
 
 ## 6. Accessibility & Interaction Notes
 
-- **ARIA labels**: Sidebar (`nav[aria-label="Main navigation"]`), Bell (`button[aria-label="Notifications"]`), Avatar (`button[aria-label="User menu"]`)
+- **ARIA labels**: Sidebar (`nav[aria-label="Main navigation"]`), Bell (`button[aria-label="Notifications"]`), Avatar (`button[aria-label="User menu"]`), App Switcher (`button[aria-label="Switch app"]`), Collapse (`button[aria-label="Collapse sidebar"]` / `"Expand sidebar"`, `aria-expanded`)
 - **Keyboard**: ESC đóng Dropdown/Drawer, Tab navigation qua menu items
+- **Tooltip (Mini sidebar)**: khi collapsed, mỗi icon có tooltip nhãn EN (`aria-label` / `title`) để screen reader & hover đều đọc được
 - **Touch target**: Min 44×44px cho tất cả interactive elements (fat-finger friendly)
 - **Animation**: Sidebar drawer slide < 200ms, smooth easing
 - **Scroll**: Main Content `overflow-y: auto`, `height: calc(100vh - header-height)`, scroll position reset khi navigate route mới
