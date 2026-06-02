@@ -317,7 +317,11 @@ function SettingsPanelInner({
     // Per-locale nav editing: in the base language edits write to the base links; in a translated
     // locale they write to that locale's slot (headerBlock._localeContent[locale]) so each language
     // is editable independently without clobbering the others. Mirrors how nav translations persist.
-    const baseLocale = generationLocale || siteLocale
+    // Read base locale from the store (same source getDisplayBlock uses) so the editor's base/
+    // translated decision can never disagree with the merge that produces the displayed labels.
+    const storeGenerationLocale = useEditorStore(state => state.generationLocale)
+    const storeSiteLocale = useEditorStore(state => state.siteLocale)
+    const baseLocale = storeGenerationLocale || storeSiteLocale
     const isTranslatedNavView = activeLocale !== baseLocale
     // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
     const breadcrumbCfg = (headerBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as

@@ -21,7 +21,7 @@ export const generateSiteSchema = z.object({
     // F26: user-confirmed source language (any ISO code, e.g. 'ja','zh','th'). Persisted to
     // Sites.generationLocale verbatim — unlike `language` which the AI prompt collapses to 'auto'
     // for non en/ms/vi, losing the real locale. Takes precedence over the GPT-returned language.
-    generationLocale: z.string().max(10).optional(),
+    generationLocale: z.string().max(10).regex(/^[a-zA-Z-]+$/, 'invalid locale code').optional(),
     contentBrief: z.record(z.unknown()).optional(),
 })
 
