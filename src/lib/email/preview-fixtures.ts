@@ -102,9 +102,17 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
   },
   'new-order-seller': {
     shopName: 'Aurora Batik',
+    sellerName: 'Siti Yusoff',
     orderNumber: 'DEMO-001',
     customerName: 'John Doe',
     orderPageUrl: 'https://aurora-batik.my/dashboard/orders/DEMO-001',
+    items: [
+      { name: 'Demo Product A', variant: 'Default', quantity: 2, lineTotal: 199 },
+      { name: 'Demo Product B', variant: 'Large', quantity: 1, lineTotal: 100 },
+    ],
+    orderTotal: 299,
+    shippingFee: 0,
+    currency: 'MYR',
     locale: 'en',
   },
   'bank-transfer-instructions': {

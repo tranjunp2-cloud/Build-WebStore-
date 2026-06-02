@@ -450,7 +450,7 @@ export async function POST(request: Request) {
             if (sellerCmsConfig?.enabled === false) {
                 console.log('[Email] suppressed (disabled): new-order-seller (COD)')
             } else {
-                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl }, sellerCmsConfig ?? undefined)
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl, items: orderItems.map((i) => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })), orderTotal: order.total, shippingFee, currency: order.currency ?? 'MYR', locale: siteLocale }, sellerCmsConfig ?? undefined)
                 ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
                     .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
             }

@@ -220,6 +220,16 @@ export async function handleCheckoutCompleted(
                     orderNumber: order.orderNumber,
                     customerName: order.customerName,
                     orderPageUrl: dashboardOrderUrl,
+                    items: (order.items || []).map((item: any) => ({
+                        name: typeof item.product === 'object' ? (item.product as any).name ?? '' : '',
+                        variant: item.variant || undefined,
+                        quantity: item.quantity,
+                        lineTotal: (item.unitPrice ?? 0) * item.quantity,
+                    })),
+                    orderTotal: order.total,
+                    shippingFee: (order as any).shippingFee ?? 0,
+                    currency: order.currency || 'MYR',
+                    locale: siteLocale,
                 }, sellerCmsConfig ?? undefined)
                 ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
                     .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
