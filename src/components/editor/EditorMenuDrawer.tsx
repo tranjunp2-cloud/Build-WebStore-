@@ -275,9 +275,8 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                     : <span className="text-[12px] font-bold text-white">{userInitial || '?'}</span>
                                 }
                             </div>
-                            {/* Long usernames stay on one line with ellipsis (min-w-0 lets the flex
-                                item shrink); hover shows the full name via styled Tooltip (issue #1137). */}
-                            <TooltipProvider delayDuration={300}>
+                            {/* min-w-0 lets the span shrink inside flex so truncate takes effect */}
+                            <TooltipProvider delayDuration={200}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#F8FAFC]">
