@@ -4060,6 +4060,9 @@ const MIGRATIONS = [
   { name: 'payload_preferences_rels.customers_id',
     sql: `ALTER TABLE payload_preferences_rels
           ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  // ── F13 US-F13-06: oversell review flag (set when stock oversold after payment captured) ──
+  { name: 'orders.oversell_review',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review boolean DEFAULT false;` },
   // ── F25 phase-03: Orders → Customer FK ──
   { name: 'orders.customer',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },

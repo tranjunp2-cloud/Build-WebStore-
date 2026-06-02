@@ -1,0 +1,187 @@
+import { sql } from 'drizzle-orm'
+import type { Payload } from 'payload'
+import { getStripeClient } from '@/lib/payment/stripe-client'
+import { sendOrderPaidEmailsAndNotify, type PaidOrderDoc } from './reconcile-order-paid-emails'
+
+export interface ReconcileContext {
+    orderId: number
+    /** Full Stripe checkout.session object (must include payment_method_types + payment_intent). */
+    session: Record<string, any>
+    connectedAccountId: string
+    source: 'webhook' | 'poll' | 'cron'
+}
+
+export type ReconcileStatus = 'reconciled' | 'already_processed' | 'not_found'
+
+export interface ReconcileResult {
+    status: ReconcileStatus
+    oversell?: boolean
+}
+
+/**
+ * Single source of truth for transitioning a pending order to paid. Called by the Stripe webhook,
+ * the active-reconcile endpoint (confirm polling), and the reconcile cron.
+ *
+ * Idempotency: the atomic `UPDATE ... WHERE status='pending' RETURNING id` is the single-winner
+ * guard. If 0 rows → already processed → returns immediately WITHOUT decrementing stock, emailing,
+ * or notifying. Safe for webhook + poll + cron all firing on the same order.
+ *
+ * IMPORTANT: the caller is responsible for ownership/auth verification (webhook IDOR guard, endpoint
+ * confirm-token, cron secret) BEFORE calling. This function trusts the context is already authorized.
+ */
+export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext): Promise<ReconcileResult> {
+    const { orderId, session, connectedAccountId, source } = ctx
+
+    // Atomic single-winner transition.
+    const transition = await payload.db.drizzle.execute(sql`
+        UPDATE orders SET status = 'new', payment_status = 'paid'
+        WHERE id = ${orderId} AND status = 'pending'
+        RETURNING id
+    `)
+    if (!transition.rows?.length) {
+        console.log(`[Reconcile:${source}] Order ${orderId} already transitioned — skipping`)
+        return { status: 'already_processed' }
+    }
+
+    const targetOrder = await payload.findByID({ collection: 'orders', id: orderId }).catch(() => null)
+    if (!targetOrder) {
+        console.warn(`[Reconcile:${source}] Order ${orderId} not found after transition — unexpected`)
+        return { status: 'not_found' }
+    }
+
+    const paymentMethod = await resolveActualPaymentMethod(session, connectedAccountId)
+
+    // Record Stripe IDs + accurate payment method (status already set atomically above).
+    await payload.update({
+        collection: 'orders',
+        id: orderId,
+        data: {
+            stripeSessionId: session.id,
+            stripePaymentIntentId: typeof session.payment_intent === 'string'
+                ? session.payment_intent
+                : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
+            paymentMethod,
+        },
+    })
+    console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
+
+    const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 }) as unknown as PaidOrderDoc | null
+    if (!order) return { status: 'reconciled' }
+
+    // Decrement stock per item; flag the order for seller review if any product oversold.
+    let oversell = false
+    if (order.items) {
+        for (const item of order.items) {
+            const productId = typeof item.product === 'object' ? item.product.id : item.product
+            const sold = await decrementStock(payload, productId, item.quantity)
+            if (sold.oversold) oversell = true
+        }
+    }
+
+    // AC-3: oversell AFTER capture → flag for manual seller refund (NO auto-refund, order stays paid).
+    if (oversell) {
+        await flagOversell(payload, order)
+    }
+
+    await sendOrderPaidEmailsAndNotify(payload, order)
+
+    return { status: 'reconciled', oversell }
+}
+
+/**
+ * AC-3: mark the (already paid) order for manual seller review and alert the seller.
+ * No auto-refund — the seller decides amount + method via the admin "Refund customer" button.
+ */
+async function flagOversell(payload: Payload, order: PaidOrderDoc): Promise<void> {
+    try {
+        await payload.update({
+            collection: 'orders',
+            id: order.id,
+            data: { oversellReview: true } as Record<string, unknown>,
+        })
+    } catch (err) {
+        console.error(`[Reconcile] Failed to set oversellReview for order ${order.id}:`, err)
+    }
+    const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+    import('@/lib/notifications/notify-tenant-owners')
+        .then(({ notifyTenantOwners }) => notifyTenantOwners(payload, tenantId, {
+            type: 'SYSTEM_ALERT',
+            title: `Order #${order.orderNumber} flagged for review — stock went negative`,
+            message: `Order #${order.orderNumber} was paid but stock ran out. Review and decide on a manual refund.`,
+            actionUrl: '/orders',
+            metadata: { orderNumber: order.orderNumber, oversell: 'true' },
+        }))
+        .catch((err) => console.error('[Notification] oversell SYSTEM_ALERT failed', err))
+}
+
+/**
+ * Atomically decrement product inventory — safe for concurrent deliveries.
+ * Returns oversold=true when the requested quantity exceeded available stock, so the caller can
+ * flag the order for manual seller review. Products with NULL inventory (untracked/unlimited)
+ * never oversell.
+ *
+ * Two atomic statements:
+ *  1. Decrement only if enough stock (`inventory >= qty`). If a row comes back → clean sale.
+ *  2. Otherwise (stock < qty, tracked) → clamp to 0 and report oversell.
+ */
+export async function decrementStock(
+    payload: Payload,
+    productId: number | string,
+    quantity: number,
+): Promise<{ oversold: boolean }> {
+    try {
+        const clean = await (payload.db.drizzle as any).execute(sql`
+            UPDATE products SET inventory = inventory - ${quantity}
+            WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${quantity}
+            RETURNING inventory
+        `)
+        if (clean.rows?.length) {
+            console.log(`[Reconcile] Stock decremented: product ${productId} -${quantity}`)
+            return { oversold: false }
+        }
+
+        // No clean decrement: either untracked (inventory NULL → skip) or oversell (tracked, < qty).
+        const clamped = await (payload.db.drizzle as any).execute(sql`
+            UPDATE products SET inventory = 0
+            WHERE id = ${productId} AND inventory IS NOT NULL AND inventory < ${quantity}
+            RETURNING inventory
+        `)
+        const oversold = (clamped.rows?.length ?? 0) > 0
+        if (oversold) console.warn(`[Reconcile] OVERSELL: product ${productId} requested ${quantity}, clamped to 0`)
+        return { oversold }
+    } catch (err) {
+        console.error(`[Reconcile] Failed to update stock for product ${productId}:`, err)
+        return { oversold: false }
+    }
+}
+
+/** Resolve the actual payment method used by expanding payment_intent.payment_method.
+ *  Falls back to 'card' if expansion fails or method is unrecognized. */
+export async function resolveActualPaymentMethod(
+    session: Record<string, any>,
+    connectedAccountId?: string,
+): Promise<'card' | 'fpx'> {
+    const enabledTypes: string[] = session.payment_method_types ?? []
+    if (enabledTypes.length === 1) {
+        return enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
+    }
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : (session.payment_intent as { id?: string } | null)?.id
+    if (!paymentIntentId) return 'card'
+
+    try {
+        const stripe = getStripeClient()
+        const pi = await stripe.paymentIntents.retrieve(
+            paymentIntentId,
+            { expand: ['payment_method'] },
+            connectedAccountId ? { stripeAccount: connectedAccountId } : undefined,
+        )
+        const pmType = (pi.payment_method as { type?: string } | null)?.type
+        return pmType === 'fpx' ? 'fpx' : 'card'
+    } catch (err) {
+        console.warn('[Reconcile] Could not expand payment_intent for method detection, defaulting to card:', err)
+        return 'card'
+    }
+}

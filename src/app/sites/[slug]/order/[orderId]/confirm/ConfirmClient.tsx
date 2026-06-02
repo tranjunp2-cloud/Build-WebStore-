@@ -185,6 +185,48 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         return () => cleanup.forEach(fn => fn())
     }, [])
 
+    // Active-reconcile: POST payment-status on mount to heal the DB when the Stripe webhook is late.
+    // Only for Stripe orders not yet paid and not cancelled. The existing SSE handles the UI flip +
+    // clearCart once the DB is healed — DO NOT duplicate that logic here.
+    useEffect(() => {
+        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
+
+        let active = true
+        let retryCount = 0
+        const MAX_RETRIES = 2
+        const RETRY_DELAY_MS = 3000
+
+        async function pollOnce() {
+            try {
+                const res = await fetch(`/api/orders/${order.id}/payment-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                })
+                if (!res.ok || !active) return
+                const data = await res.json()
+                // Stop retrying once healed or definitively non-pending
+                if (data.reconciled || data.status !== 'pending') return
+                if (retryCount < MAX_RETRIES) {
+                    retryCount++
+                    retryTimer = setTimeout(pollOnce, RETRY_DELAY_MS)
+                }
+            } catch {
+                // Swallow — SSE + cron are the fallback
+            }
+        }
+
+        let retryTimer: ReturnType<typeof setTimeout>
+        void pollOnce()
+
+        return () => {
+            active = false
+            clearTimeout(retryTimer)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // SSE: poll payment status for Stripe orders not yet paid.
     // Skip when buyer cancelled — order won't become paid via the abandoned session; show Pay Now instead.
     useEffect(() => {
