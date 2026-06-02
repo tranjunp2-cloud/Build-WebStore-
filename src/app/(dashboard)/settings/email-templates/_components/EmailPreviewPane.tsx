@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical } from 'lucide-react'
+import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical, Mail } from 'lucide-react'
 import type { EmailTemplateType } from '@/lib/email/types'
 import type { EmailTemplateConfig } from '@/lib/email/types'
 
@@ -109,12 +109,15 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                 </div>
             </div>
 
-            {/* Mock inbox subject bar */}
-            <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#1a2540] px-4 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 shrink-0">Subject:</span>
-                <span className="text-xs text-slate-300 truncate">
-                    {subject || <span className="text-slate-600 italic">Default subject (type to override)</span>}
-                </span>
+            {/* Mock inbox subject bar — styled as an inbox preview row */}
+            <div className="flex items-center gap-3 border-b border-white/[0.1] bg-[#131d35] px-4 py-2.5">
+                <Mail className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <div className="min-w-0">
+                    <p className="text-[9px] font-medium uppercase tracking-widest text-slate-500 mb-0.5">Inbox Preview</p>
+                    <p className="text-sm font-semibold text-white truncate">
+                        {subject || <span className="font-normal italic text-slate-600">Default subject (type to override)</span>}
+                    </p>
+                </div>
             </div>
 
             {/* Preview canvas — dark background matching dashboard dark mode */}
