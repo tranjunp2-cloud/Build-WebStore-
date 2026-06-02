@@ -12,6 +12,7 @@ import {
     DialogDescription,
     DialogFooter,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     ChevronDown,
     Globe,
@@ -267,14 +268,27 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
                     {/* User info + Notification bell */}
                     <div className="flex items-center gap-3">
-                        <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
+                        <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden bg-[rgba(255,255,255,0.06)]">
                                 {userAvatarUrl
                                     ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="w-full h-full object-cover" />
                                     : <span className="text-[12px] font-bold text-white">{userInitial || '?'}</span>
                                 }
                             </div>
-                            <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || t.editor.menuDrawer.defaultUserName}</span>
+                            {/* Long usernames stay on one line with ellipsis (min-w-0 lets the flex
+                                item shrink); hover shows the full name via styled Tooltip (issue #1137). */}
+                            <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#F8FAFC]">
+                                            {userName || t.editor.menuDrawer.defaultUserName}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="editor-portal">
+                                        {userName || t.editor.menuDrawer.defaultUserName}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </Link>
                         {/* Light/dark theme toggle — matches the dashboard header toggle; sits left of the bell */}
                         <button
