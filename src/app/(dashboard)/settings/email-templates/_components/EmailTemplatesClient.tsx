@@ -224,8 +224,9 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             const { subject, html } = await res.json()
             const win = window.open('', '_blank')
             if (win) {
+                const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
                 win.document.open()
-                win.document.write(`<!DOCTYPE html><html><head><title>${subject ?? 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${subject ?? ''}</span></div>${html}</body></html>`)
+                win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
                 win.document.close()
             }
         } catch (err) {

@@ -20,7 +20,6 @@ export {
 export { orderExpiredEmail, type OrderExpiredData } from './order-expired'
 export { newOrderSellerEmail, type NewOrderSellerData } from './new-order-seller'
 export { orderCancelledEmail, type OrderCancelledData } from './order-cancelled'
-export { orderShippedEmail, type OrderShippedData } from './order-shipped'
 export { orderCompletedEmail, type OrderCompletedData } from './order-completed'
 export { resendUploadLinkEmail } from './resend-upload-link'
 export { staffInvitationEmail, type EmailLocale as StaffEmailLocale } from './staff-invitation'

@@ -151,7 +151,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                             background: '#fff',
                             boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
                             transition: 'width 0.2s',
-                            overflow: 'hidden',
+                            overflow: 'auto',
                         }}
                         onLoad={(e) => {
                             const iframe = e.currentTarget

@@ -110,6 +110,7 @@ describe('getTemplateConfig [TC-F32]', () => {
 
         expect(result).toEqual({
             enabled: true,
+            subject: 'Your OTP Code',
             greeting: 'Hi {customerName}',
             ctaLabel: 'Verify',
             closing: undefined,
@@ -119,6 +120,7 @@ describe('getTemplateConfig [TC-F32]', () => {
             cacheKey,
             JSON.stringify({
                 enabled: true,
+                subject: 'Your OTP Code',
                 greeting: 'Hi {customerName}',
                 ctaLabel: 'Verify',
                 closing: undefined,
@@ -173,6 +175,7 @@ describe('getTemplateConfig [TC-F32]', () => {
         // Assert
         expect(result).toEqual({
             enabled: true,
+            subject: 'Order Confirmation',
             greeting: undefined,
             ctaLabel: undefined,
             closing: undefined,
@@ -205,14 +208,14 @@ describe('getTemplateConfig [TC-F32]', () => {
     it('[TC: F32-U-06] cache key format: returns email_config:tenantId:type:recipient', () => {
         // Arrange
         const tenantId = 'tenant-abc'
-        const type = 'order-shipped'
-        const recipient = 'seller'
+        const type = 'order-completed'
+        const recipient = 'buyer'
 
         // Act
         const key = templateConfigCacheKey(tenantId, type, recipient)
 
         // Assert
-        expect(key).toBe('email_config:tenant-abc:order-shipped:seller')
+        expect(key).toBe('email_config:tenant-abc:order-completed:buyer')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -242,6 +245,7 @@ describe('getTemplateConfig [TC-F32]', () => {
         // Assert
         expect(result).toEqual({
             enabled: false,
+            subject: 'Order Update',
             greeting: undefined,
             ctaLabel: undefined,
             closing: undefined,

@@ -52,19 +52,19 @@ export const EmailTemplateSettings: CollectionConfig = {
     },
     hooks: {
         beforeChange: [
-            ({ data, req }) => {
-                if (req.user?.id) {
-                    data.updatedBy = req.user.id
-                }
-                return data
-            },
             ({ data }) => {
-                // Reject any attempt to disable security-critical templates regardless of call path
+                // Security check first (index 0) — must never be skipped by a prior hook failure
                 const isCritical = CRITICAL_TYPES.includes(data.templateType as typeof CRITICAL_TYPES[number])
                 if (isCritical && data.enabled === false) {
                     throw new Error(
                         `Cannot disable security-critical template "${data.templateType}". This template is required for account security flows.`
                     )
+                }
+                return data
+            },
+            ({ data, req }) => {
+                if (req.user?.id) {
+                    data.updatedBy = req.user.id
                 }
                 return data
             },

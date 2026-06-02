@@ -221,7 +221,7 @@ export async function handleCheckoutCompleted(
                     customerName: order.customerName,
                     orderPageUrl: dashboardOrderUrl,
                     items: (order.items || []).map((item: any) => ({
-                        name: typeof item.product === 'object' ? (item.product as any).name ?? '' : '',
+                        name: item.productName ?? '',  // denormalized at order creation — always present
                         variant: item.variant || undefined,
                         quantity: item.quantity,
                         lineTotal: (item.unitPrice ?? 0) * item.quantity,

@@ -37,6 +37,7 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
 }
 
 const TEMPLATE_LABELS: Partial<Record<EmailTemplateType, string>> = {
+    'otp-verification':           'OTP Verification',
     'forgot-password':            'Password Reset',
     'order-completed':            'Order Delivered',
     'bank-transfer-instructions': 'Payment Reminder (Bank Transfer)',
@@ -276,7 +277,7 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                     {/* Last edited column */}
                                     <td style={{ padding: '14px 20px' }}>
                                         <span style={{ fontSize: 13, color: 'var(--dash-text-muted)', whiteSpace: 'nowrap' as const }}>
-                                            {relTime(row?.updatedAt, et.defaultLabel, et.editedAgo, ti)}
+                                            {relTime(row?.updatedAt, et.neverEdited, et.editedAgo, ti)}
                                         </span>
                                     </td>
 
