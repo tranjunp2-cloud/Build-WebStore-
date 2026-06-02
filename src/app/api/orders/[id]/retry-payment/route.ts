@@ -177,7 +177,7 @@ export async function POST(
         const built = await buildOrderItems(payload, rawItems, tenantId)
         if (built.errorResponse) return built.errorResponse
 
-        const { checkoutItems, subtotal } = built
+        const { checkoutItems, subtotal, orderItems } = built
 
         // Re-price at retry time so the Stripe charge matches what we persist — product prices may
         // have changed since placement. Mirrors stripe-checkout totals (flat shipping + 6% SST).
@@ -222,7 +222,9 @@ export async function POST(
         const updateData: Record<string, unknown> = {
             stripeSessionId: checkout.sessionId,
             paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            // Persist re-priced totals so order.total matches the new Stripe charge (refund/reconcile correctness)
+            // Persist re-priced items + totals so the line items and order.total stay consistent
+            // with the new Stripe charge (refund/reconcile correctness)
+            items: orderItems,
             subtotal,
             shippingFee,
             tax,
