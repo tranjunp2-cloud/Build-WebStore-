@@ -110,18 +110,18 @@ describe('getTemplateConfig [TC-F32]', () => {
 
         expect(result).toEqual({
             enabled: true,
-            subject: 'Your OTP Code',
             greeting: 'Hi {customerName}',
             ctaLabel: 'Verify',
+            closing: undefined,
         })
 
         expect(mockRedisSet).toHaveBeenCalledWith(
             cacheKey,
             JSON.stringify({
                 enabled: true,
-                subject: 'Your OTP Code',
                 greeting: 'Hi {customerName}',
                 ctaLabel: 'Verify',
+                closing: undefined,
             }),
             { ex: 300 },
         )
@@ -173,7 +173,9 @@ describe('getTemplateConfig [TC-F32]', () => {
         // Assert
         expect(result).toEqual({
             enabled: true,
-            subject: 'Order Confirmation',
+            greeting: undefined,
+            ctaLabel: undefined,
+            closing: undefined,
         })
         expect(mockFind).toHaveBeenCalled()
     })
@@ -240,7 +242,6 @@ describe('getTemplateConfig [TC-F32]', () => {
         // Assert
         expect(result).toEqual({
             enabled: false,
-            subject: 'Order Update',
             greeting: undefined,
             ctaLabel: undefined,
             closing: undefined,

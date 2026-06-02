@@ -64,7 +64,7 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     currency: 'MYR',
     locale: 'en',
   },
-  'order-shipped': {
+  'order-completed': {
     shopName: 'Aurora Batik',
     supportEmail: 'support@aurora-batik.my',
     orderNumber: 'DEMO-001',
@@ -77,9 +77,7 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     shippingFee: 10,
     total: 309,
     paymentMethod: 'stripe',
-    shippingProvider: 'J&T Express',
-    orderDate: '2026-05-26T10:00:00.000Z',
-    shippedDate: '2026-05-27T10:00:00.000Z',
+    completedDate: '2026-05-28T10:00:00.000Z',
     orderPageUrl: 'https://aurora-batik.my/orders/DEMO-001',
     currency: 'MYR',
     locale: 'en',
@@ -172,6 +170,19 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     refundNote: 'Item out of stock',
     shopUrl: 'https://aurora-batik.my',
     currency: 'MYR',
+    locale: 'en',
+  },
+  'contact-from-seller': {
+    sellerName: 'Ahmad Seller',
+    brandName: 'Aurora Batik',
+    dashboardUrl: 'https://aurora-batik.my/dashboard',
+    supportEmail: 'support@aurora-batik.my',
+    locale: 'en',
+  },
+  'newsletter-seller-digest': {
+    sellerName: 'Ahmad Seller',
+    brandName: 'Aurora Batik',
+    dashboardUrl: 'https://aurora-batik.my/dashboard',
     locale: 'en',
   },
 }

@@ -12,7 +12,7 @@ import {
   passwordChangedEmail,
   orderConfirmationEmail,
   orderCancelledEmail,
-  orderShippedEmail,
+  orderCompletedEmail,
   orderExpiredEmail,
   newOrderSellerEmail,
   bankTransferInstructionsEmail,
@@ -21,6 +21,13 @@ import {
   staffInvitationEmail,
   orderRefundedEmail,
 } from './templates'
+
+function placeholderTemplate(_fixture: Record<string, unknown>, _config?: EmailTemplateConfig): { subject: string; html: string } {
+  return {
+    subject: 'Template coming soon',
+    html: `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;color:#374151;"><h2>Template coming soon</h2><p>This email template is not yet configured.</p></body></html>`,
+  }
+}
 
 export type TemplateFn = (
   fixture: Record<string, unknown>,
@@ -43,11 +50,11 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
   'order-confirmation': (fixture, config) =>
     orderConfirmationEmail(fixture as any, config),
 
+  'order-completed': (fixture, config) =>
+    orderCompletedEmail(fixture as any, config),
+
   'order-cancelled': (fixture, config) =>
     orderCancelledEmail(fixture as any, config),
-
-  'order-shipped': (fixture, config) =>
-    orderShippedEmail(fixture as any, config),
 
   'order-expired': (fixture, config) =>
     orderExpiredEmail(fixture as any, config),
@@ -69,4 +76,8 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
 
   'order-refunded': (fixture, config) =>
     orderRefundedEmail(fixture as any, config),
+
+  'contact-from-seller': placeholderTemplate,
+
+  'newsletter-seller-digest': placeholderTemplate,
 }

@@ -40,7 +40,6 @@ function normalizeRows(raw: any[]): TemplateRow[] {
 }
 
 const EMPTY_CONTENT: ContentFields = {
-    subject: '',
     greeting: '',
     ctaLabel: '',
     closing: '',

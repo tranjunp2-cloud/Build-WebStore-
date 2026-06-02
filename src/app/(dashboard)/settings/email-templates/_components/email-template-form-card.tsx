@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n'
 import { EMAIL_TEMPLATE_VARIABLES, EmailTemplateType } from '@/lib/email/types'
 import type { ContentFields } from '../actions'
 
-const LIMITS = { subject: 200, greeting: 500, ctaLabel: 100, closing: 2000 }
+const LIMITS = { greeting: 500, ctaLabel: 100, closing: 2000 }
 
 function SimpleToggle({ on, locked, onChange }: { on: boolean; locked?: boolean; onChange: (v: boolean) => void }) {
     return (
@@ -167,18 +167,6 @@ export function EmailTemplateFormCard({
                     ))}
                 </div>
             </div>
-
-            {/* Subject */}
-            <FieldRow
-                label={et.fieldSubject}
-                required
-                hint={et.hintSubject}
-                value={cur.subject ?? ''}
-                limit={LIMITS.subject}
-                variables={vars}
-                insertVarLabel={et.insertVar}
-                onChange={(v) => onFieldChange(locale, 'subject', v)}
-            />
 
             {/* Greeting */}
             <FieldRow

@@ -1727,11 +1727,9 @@
                 "statusCritical": "Kritikal keselamatan — tidak boleh dilumpuhkan",
                 "contentLocale": "Bahasa kandungan",
                 "localeDesc": "Setiap bahasa menyimpan salinannya sendiri. Pelawat mendapat padanan terdekat.",
-                "fieldSubject": "Subjek",
                 "fieldGreeting": "Ucapan",
                 "fieldCtaLabel": "Label CTA",
                 "fieldClosing": "Penutup",
-                "hintSubject": "Ditunjukkan dalam pratonton peti masuk. Hadkan di bawah 60 aksara untuk mudah alih.",
                 "hintCtaLabel": "Teks butang. Gunakan kata kerja yang kukuh — \"Jejak Pesanan\", \"Sahkan\", \"Buka Peti Masuk\".",
                 "unsavedChanges": "Perubahan belum disimpan",
                 "allChangesSaved": "Semua perubahan disimpan",
@@ -1757,7 +1755,7 @@
                     "forgot-password": "Pautan set semula kata laluan, sah selama 30 minit.",
                     "password-changed": "Pengesahan kata laluan telah ditukar dengan berjaya.",
                     "order-confirmation": "Dihantar serta-merta apabila pembayaran pembeli berjaya — resit, item, penghantaran.",
-                    "order-shipped": "Pengesahan penghantaran apabila pesanan dihantar.",
+                    "order-completed": "Maklumkan pembeli apabila pesanan mereka telah selesai dan dihantar.",
                     "order-cancelled": "Maklumkan pembeli apabila pesanan dibatalkan.",
                     "order-expired": "Amaran kepada pembeli apabila pesanan yang belum dibayar telah tamat tempoh.",
                     "order-refunded": "Maklumkan pembeli apabila pesanan telah dibayar balik.",
@@ -1765,7 +1763,9 @@
                     "payment-confirmed": "Pengesahan bahawa pembayaran telah diterima dan pesanan sedang diproses.",
                     "payment-rejected": "Maklumkan pembeli bahawa pembayaran mereka ditolak.",
                     "new-order-seller": "Pemberitahuan pesanan baru untuk papan pemuka penjual.",
-                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka."
+                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka.",
+                    "contact-from-seller": "Pemberitahuan hubungan daripada penjual kepada pembeli.",
+                    "newsletter-seller-digest": "Ringkasan aktiviti penjual dan prestasi kedai."
                 }
             }
         },

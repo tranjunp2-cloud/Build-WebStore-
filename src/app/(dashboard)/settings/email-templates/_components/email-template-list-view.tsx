@@ -2,9 +2,9 @@
 
 import type { ElementType } from 'react'
 import {
-    Mail, Edit2, Info, ShoppingBag, PackageX, Truck, TimerOff,
+    Mail, Edit2, Info, ShoppingBag, PackageX, TimerOff,
     Timer, Key, ShoppingCart, ShieldCheck, BadgeCheck, XCircle,
-    Lock, UserPlus, Users,
+    Lock, UserPlus, Users, CheckCircle, MessageSquare, BookOpen,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import {
@@ -23,7 +23,7 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'forgot-password':            Key,
     'password-changed':           Lock,
     'order-confirmation':         ShoppingBag,
-    'order-shipped':              Truck,
+    'order-completed':            CheckCircle,
     'order-cancelled':            PackageX,
     'order-expired':              TimerOff,
     'order-refunded':             XCircle,
@@ -32,6 +32,8 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'payment-rejected':           XCircle,
     'new-order-seller':           ShoppingCart,
     'staff-invitation':           UserPlus,
+    'contact-from-seller':        MessageSquare,
+    'newsletter-seller-digest':   BookOpen,
 }
 
 function toLabel(type: EmailTemplateType): string {
@@ -232,8 +234,15 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                                     )}
                                                 </div>
                                                 <p
-                                                    className="truncate"
-                                                    style={{ fontSize: 12, color: 'var(--dash-text-muted)', maxWidth: 320 }}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: 'var(--dash-text-muted)',
+                                                        maxWidth: 360,
+                                                        overflow: 'hidden',
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                    }}
                                                 >
                                                     {et.descriptions[type]}
                                                 </p>

@@ -2,6 +2,9 @@ import type { CollectionConfig } from 'payload'
 import { EMAIL_TEMPLATE_TYPES } from '../lib/email/types'
 import { invalidateTemplateConfigCache } from '../lib/email/get-template-config'
 
+// Security-critical templates — disabling via any API path is rejected at collection level
+const CRITICAL_TYPES = ['otp-verification', 'forgot-password', 'password-changed'] as const
+
 export const EmailTemplateSettings: CollectionConfig = {
     slug: 'email-template-settings',
     admin: {
@@ -52,6 +55,16 @@ export const EmailTemplateSettings: CollectionConfig = {
             ({ data, req }) => {
                 if (req.user?.id) {
                     data.updatedBy = req.user.id
+                }
+                return data
+            },
+            ({ data }) => {
+                // Reject any attempt to disable security-critical templates regardless of call path
+                const isCritical = CRITICAL_TYPES.includes(data.templateType as typeof CRITICAL_TYPES[number])
+                if (isCritical && data.enabled === false) {
+                    throw new Error(
+                        `Cannot disable security-critical template "${data.templateType}". This template is required for account security flows.`
+                    )
                 }
                 return data
             },
@@ -120,14 +133,9 @@ export const EmailTemplateSettings: CollectionConfig = {
             label: 'Content (English)',
             fields: [
                 {
-                    name: 'subject',
-                    type: 'text',
-                    maxLength: 200,
-                    admin: { description: 'Email subject line (English).' },
-                },
-                {
                     name: 'greeting',
                     type: 'textarea',
+                    maxLength: 500,
                     admin: { description: 'Opening greeting paragraph (English).' },
                 },
                 {
@@ -139,6 +147,7 @@ export const EmailTemplateSettings: CollectionConfig = {
                 {
                     name: 'closing',
                     type: 'textarea',
+                    maxLength: 2000,
                     admin: { description: 'Closing paragraph / sign-off (English).' },
                 },
             ],
@@ -149,14 +158,9 @@ export const EmailTemplateSettings: CollectionConfig = {
             label: 'Content (Bahasa Malaysia)',
             fields: [
                 {
-                    name: 'subject',
-                    type: 'text',
-                    maxLength: 200,
-                    admin: { description: 'Email subject line (Bahasa Malaysia).' },
-                },
-                {
                     name: 'greeting',
                     type: 'textarea',
+                    maxLength: 500,
                     admin: { description: 'Opening greeting paragraph (Bahasa Malaysia).' },
                 },
                 {
@@ -168,6 +172,7 @@ export const EmailTemplateSettings: CollectionConfig = {
                 {
                     name: 'closing',
                     type: 'textarea',
+                    maxLength: 2000,
                     admin: { description: 'Closing paragraph / sign-off (Bahasa Malaysia).' },
                 },
             ],

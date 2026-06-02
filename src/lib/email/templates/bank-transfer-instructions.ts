@@ -132,11 +132,9 @@ export function bankTransferInstructionsEmail(
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
 
-    const configSubject = config?.subject ? (applyVariables(config.subject, vars) ?? config.subject) : undefined
-    const subject = configSubject
-        ?? (locale === 'ms'
-            ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
-            : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`)
+    const subject = locale === 'ms'
+        ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
+        : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`
 
     const itemRows = data.items.map((item) => `
         <tr>

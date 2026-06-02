@@ -151,19 +151,17 @@ export function orderConfirmationEmail(
             <td colspan="3" style="padding:6px 0;color:#94A3B8;">${esc(data.buyerNote)}</td>
         </tr>` : ''
 
-    const configSubject = config?.subject ? (applyVariables(config.subject, vars) ?? config.subject) : undefined
-    const subject = configSubject
-        ?? (isConfirmed
-            ? (locale === 'ms'
-                ? `${esc(data.shopName)} - Pesanan anda telah disahkan - ${esc(data.orderNumber)}`
-                : `${esc(data.shopName)} - Your order has been confirmed - ${esc(data.orderNumber)}`)
-            : isCompleted
-            ? (locale === 'ms'
-                ? `${esc(data.shopName)} - Pesanan anda telah selesai - ${esc(data.orderNumber)}`
-                : `${esc(data.shopName)} - Your order has been completed - ${esc(data.orderNumber)}`)
-            : (locale === 'ms'
-                ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
-                : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`))
+    const subject = isConfirmed
+        ? (locale === 'ms'
+            ? `${esc(data.shopName)} - Pesanan anda telah disahkan - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been confirmed - ${esc(data.orderNumber)}`)
+        : isCompleted
+        ? (locale === 'ms'
+            ? `${esc(data.shopName)} - Pesanan anda telah selesai - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been completed - ${esc(data.orderNumber)}`)
+        : (locale === 'ms'
+            ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`)
 
     return {
         subject,
