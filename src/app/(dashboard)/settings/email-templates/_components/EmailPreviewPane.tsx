@@ -158,8 +158,8 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                             try {
                                 const doc = iframe.contentDocument
                                 if (doc) {
-                                    // Use documentElement.scrollHeight for accuracy with padded wrapper divs
-                                    const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight)
+                                    // Add 48px buffer for padding-bottom of wrapper divs not captured by scrollHeight
+                                    const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight) + 48
                                     iframe.style.height = h + 'px'
                                 }
                             } catch {
