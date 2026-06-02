@@ -19,15 +19,18 @@ import {
     LayoutDashboard,
     LayoutTemplate,
     LogOut,
+    Moon,
     Package,
     Settings,
     ShoppingCart,
+    Sun,
     Users,
     X,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/dashboard/NotificationBell'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { useTheme } from '@/providers/theme-provider'
 
 type LocaleLabel = { en: string; ms: string }
 
@@ -55,6 +58,8 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
     const pathname = usePathname()
     const router = useRouter()
     const { t, locale, toggleLocale } = useI18n()
+    const { theme, toggle: toggleTheme } = useTheme()
+    const isDark = theme === 'dark'
     const menu = t.editor.menu
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
     const [pendingAction, setPendingAction] = useState<{ href: string } | 'logout' | null>(null)
@@ -271,6 +276,19 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             </div>
                             <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || t.editor.menuDrawer.defaultUserName}</span>
                         </Link>
+                        {/* Light/dark theme toggle — matches the dashboard header toggle; sits left of the bell */}
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] text-[rgba(248,250,252,0.7)] transition-colors hover:bg-white/5 hover:text-[#F8FAFC]"
+                        >
+                            {/* Inline color forces bright amber-400 (#fbbf24) — bypasses the
+                                .editor-shell light-mode remap so the icon stays amber in both themes. */}
+                            {isDark
+                                ? <Sun className="h-5 w-5" style={{ color: '#fbbf24' }} />
+                                : <Moon className="h-5 w-5" style={{ color: '#fbbf24' }} />}
+                        </button>
                         <div className="notification-bell-sidebar">
                             <NotificationBell />
                         </div>
