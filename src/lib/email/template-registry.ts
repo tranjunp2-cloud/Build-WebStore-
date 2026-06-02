@@ -20,14 +20,9 @@ import {
   paymentRejectedEmail,
   staffInvitationEmail,
   orderRefundedEmail,
+  contactFromSellerEmail,
+  newsletterSellerDigestEmail,
 } from './templates'
-
-function placeholderTemplate(_fixture: Record<string, unknown>, _config?: EmailTemplateConfig): { subject: string; html: string } {
-  return {
-    subject: 'Template coming soon',
-    html: `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;color:#374151;"><h2>Template coming soon</h2><p>This email template is not yet configured.</p></body></html>`,
-  }
-}
 
 export type TemplateFn = (
   fixture: Record<string, unknown>,
@@ -77,7 +72,9 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
   'order-refunded': (fixture, config) =>
     orderRefundedEmail(fixture as any, config),
 
-  'contact-from-seller': placeholderTemplate,
+  'contact-from-seller': (fixture, config) =>
+    contactFromSellerEmail(fixture as any, config),
 
-  'newsletter-seller-digest': placeholderTemplate,
+  'newsletter-seller-digest': (fixture, config) =>
+    newsletterSellerDigestEmail(fixture as any, config),
 }

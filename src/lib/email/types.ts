@@ -95,6 +95,6 @@ export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateType, string[]> = {
   // Team
   'staff-invitation':           ['inviteeName', 'inviterName', 'brandName', 'dashboardUrl', 'supportEmail'],
   // Seller Communications
-  'contact-from-seller':        ['sellerName', 'brandName', 'dashboardUrl', 'supportEmail'],
-  'newsletter-seller-digest':   ['sellerName', 'brandName', 'dashboardUrl'],
+  'contact-from-seller':        ['sellerName', 'brandName', 'dashboardUrl', 'visitorName', 'visitorEmail'],
+  'newsletter-seller-digest':   ['sellerName', 'brandName', 'dashboardUrl', 'subscriberEmail'],
 }
