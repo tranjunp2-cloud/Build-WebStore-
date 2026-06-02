@@ -9,6 +9,7 @@ import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
 export interface ContentFields {
+    subject?: string
     greeting?: string
     ctaLabel?: string
     closing?: string
@@ -47,6 +48,9 @@ export async function getEmailTemplateSettings(): Promise<{ success: boolean; ro
 }
 
 function validateContentFields(fields: ContentFields, label: string): string | null {
+    if (fields.subject !== undefined && fields.subject.length > 200) {
+        return `${label} subject exceeds 200 characters`
+    }
     if (fields.greeting !== undefined && fields.greeting.length > 500) {
         return `${label} greeting exceeds 500 characters`
     }

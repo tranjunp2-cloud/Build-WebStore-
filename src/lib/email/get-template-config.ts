@@ -58,12 +58,12 @@ export async function getTemplateConfig(
     const row = result.docs[0]
     if (!row) return null
 
-    type ContentFields = { greeting?: string; ctaLabel?: string; closing?: string }
+    type ContentFields = { subject?: string; greeting?: string; ctaLabel?: string; closing?: string }
     const contentEn = row.contentEn as ContentFields | undefined
     const contentMs = row.contentMs as ContentFields | undefined
     // Check if a content object has at least one non-empty field (empty object {} is falsy for our purposes)
     const hasContent = (c: ContentFields | undefined): boolean =>
-        !!(c?.greeting || c?.ctaLabel || c?.closing)
+        !!(c?.subject || c?.greeting || c?.ctaLabel || c?.closing)
     // Fall back to EN when MS content is empty (actions.ts saves contentMs: {} when not filled)
     const content = locale === 'ms'
         ? (hasContent(contentMs) ? contentMs : contentEn)
@@ -71,6 +71,7 @@ export async function getTemplateConfig(
 
     const templateConfig: EmailTemplateConfig = {
         enabled: (row.enabled as boolean | undefined) ?? true,
+        subject: content?.subject ?? undefined,
         greeting: content?.greeting ?? undefined,
         ctaLabel: content?.ctaLabel ?? undefined,
         closing: content?.closing ?? undefined,

@@ -1727,6 +1727,8 @@
                 "statusCritical": "Kritikal keselamatan — tidak boleh dilumpuhkan",
                 "contentLocale": "Bahasa kandungan",
                 "localeDesc": "Setiap bahasa menyimpan salinannya sendiri. Pelawat mendapat padanan terdekat.",
+                "fieldSubject": "Subjek",
+                "hintSubject": "Dipaparkan dalam pratonton peti masuk. Pastikan di bawah 60 aksara untuk mudah alih.",
                 "fieldGreeting": "Ucapan",
                 "fieldCtaLabel": "Label CTA",
                 "fieldClosing": "Penutup",

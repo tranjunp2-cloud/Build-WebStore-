@@ -34,6 +34,7 @@ export type EmailTemplateType = typeof EMAIL_TEMPLATE_TYPES[number]
 
 export interface EmailTemplateConfig {
   enabled: boolean
+  subject?: string
   greeting?: string
   ctaLabel?: string
   closing?: string

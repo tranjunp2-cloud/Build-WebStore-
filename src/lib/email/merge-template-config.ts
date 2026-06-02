@@ -64,9 +64,7 @@ export function mergeTemplateConfig<T extends Record<string, unknown>>(
 ): T {
     const result = { ...defaults }
 
-    // Note: 'subject' removed from EmailTemplateConfig — CMS no longer overrides subject lines.
-    // The fieldMap still accepts a subject key for defaults-only variable substitution.
-    const configKeys = ['greeting', 'ctaLabel', 'closing'] as const
+    const configKeys = ['subject', 'greeting', 'ctaLabel', 'closing'] as const
 
     for (const configKey of configKeys) {
         const defaultsKey = fieldMap[configKey]
@@ -79,12 +77,6 @@ export function mergeTemplateConfig<T extends Record<string, unknown>>(
                 : (defaults[defaultsKey] as string | undefined)
 
         result[defaultsKey] = applyVariables(baseValue, vars) as T[keyof T]
-    }
-
-    // Apply variable substitution to the subject from defaults only (no CMS override)
-    if (fieldMap.subject) {
-        const subjectDefault = defaults[fieldMap.subject] as string | undefined
-        result[fieldMap.subject] = applyVariables(subjectDefault, vars) as T[keyof T]
     }
 
     return result

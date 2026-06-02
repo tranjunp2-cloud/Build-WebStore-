@@ -1727,6 +1727,8 @@
                 "statusCritical": "Security-critical — cannot be disabled",
                 "contentLocale": "Content locale",
                 "localeDesc": "Each locale stores its own copy. Visitors get the closest match.",
+                "fieldSubject": "Subject",
+                "hintSubject": "Shown in the inbox preview. Keep it under 60 chars for mobile.",
                 "fieldGreeting": "Greeting",
                 "fieldCtaLabel": "CTA Label",
                 "fieldClosing": "Closing",

@@ -133,6 +133,12 @@ export const EmailTemplateSettings: CollectionConfig = {
             label: 'Content (English)',
             fields: [
                 {
+                    name: 'subject',
+                    type: 'text',
+                    maxLength: 200,
+                    admin: { description: 'Email subject line (English).' },
+                },
+                {
                     name: 'greeting',
                     type: 'textarea',
                     maxLength: 500,
@@ -157,6 +163,12 @@ export const EmailTemplateSettings: CollectionConfig = {
             type: 'group',
             label: 'Content (Bahasa Malaysia)',
             fields: [
+                {
+                    name: 'subject',
+                    type: 'text',
+                    maxLength: 200,
+                    admin: { description: 'Email subject line (Bahasa Malaysia).' },
+                },
                 {
                     name: 'greeting',
                     type: 'textarea',
