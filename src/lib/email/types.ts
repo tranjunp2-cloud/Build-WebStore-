@@ -45,11 +45,11 @@ export interface EmailTemplateConfig {
  * Used for UI tab gating and seeding default rows.
  */
 export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient[]> = {
-  // Account & Security
-  'welcome':                    ['seller'],
-  'otp-verification':           ['seller'],
-  'forgot-password':            ['seller'],
-  'password-changed':           ['seller'],
+  // Account & Security — platform-managed, not CMS-customisable per tenant
+  'welcome':                    [],
+  'otp-verification':           [],
+  'forgot-password':            [],
+  'password-changed':           [],
   // Order Flow
   'order-confirmation':         ['buyer'],
   'order-completed':            ['buyer'],
@@ -62,8 +62,8 @@ export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient
   'payment-rejected':           ['buyer'],
   // Operations
   'new-order-seller':           ['seller'],
-  // Team
-  'staff-invitation':           ['seller'],
+  // Team — platform-managed, not CMS-customisable per tenant
+  'staff-invitation':           [],
   // Seller Communications
   'contact-from-seller':        ['seller'],
   'newsletter-seller-digest':   ['seller'],
