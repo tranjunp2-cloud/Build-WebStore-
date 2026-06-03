@@ -69,7 +69,13 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
     }
 
     // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
-    await sendOrderPaidEmailsAndNotify(payload, order)
+    // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are
+    // non-critical and must never abort the reconcile after stock is already decremented.
+    try {
+        await sendOrderPaidEmailsAndNotify(payload, order)
+    } catch (err) {
+        console.error(`[Reconcile:${source}] Order ${orderId} emails/notify failed (non-critical):`, err)
+    }
 
     // Display-only metadata LAST: the Stripe round-trip is the slow/failure-prone step, so it runs
     // after all money-critical work is durably committed. A failure here only loses cosmetic card
