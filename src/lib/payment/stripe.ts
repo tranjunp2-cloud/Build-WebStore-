@@ -121,6 +121,28 @@ export async function getConnectedAccountStatus(
     }
 }
 
+/**
+ * Retrieve a Checkout Session on a connected account (Direct Charges) with the PaymentIntent
+ * expanded. Used by the active-reconcile endpoint + cron to check whether a pending order was
+ * actually paid at Stripe when the webhook is late/missing. Returns null on any Stripe error.
+ */
+export async function retrieveCheckoutSession(
+    sessionId: string,
+    connectedAccountId: string,
+): Promise<Stripe.Checkout.Session | null> {
+    try {
+        const stripe = getStripeClient()
+        return await stripe.checkout.sessions.retrieve(
+            sessionId,
+            { expand: ['payment_intent'] },
+            { stripeAccount: connectedAccountId },
+        )
+    } catch (err) {
+        console.error(`[Stripe] retrieveCheckoutSession failed for ${sessionId}:`, err instanceof Error ? err.message : err)
+        return null
+    }
+}
+
 // ── Direct Charges Checkout ──────────────────────────────────────────
 
 /**

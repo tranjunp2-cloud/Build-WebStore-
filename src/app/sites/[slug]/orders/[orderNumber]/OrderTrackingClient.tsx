@@ -435,6 +435,22 @@ export default function OrderTrackingClient({ order, slug }: Props) {
     const [isRetrying, setIsRetrying] = useState(false)
     const statusRef = useRef(order.status)
 
+    // Browser Back from Stripe (after retry-payment) → confirm Payment Failed. The inline script in
+    // page.tsx covers no-store fresh loads; this pageshow handler covers bfcache restores.
+    useEffect(() => {
+        const onPageShow = () => {
+            const raw = sessionStorage.getItem('pw_stripe_pending')
+            if (!raw) return
+            sessionStorage.removeItem('pw_stripe_pending')
+            try {
+                const { orderId, slug: s } = JSON.parse(raw)
+                if (orderId && s) window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+            } catch { /* malformed flag — ignore */ }
+        }
+        window.addEventListener('pageshow', onPageShow)
+        return () => window.removeEventListener('pageshow', onPageShow)
+    }, [])
+
     useEffect(() => {
         if (TERMINAL_STATUSES.has(statusRef.current)) return
 
@@ -495,6 +511,8 @@ export default function OrderTrackingClient({ order, slug }: Props) {
             })
             const data = await res.json()
             if (res.ok && data.success && data.data?.sessionUrl) {
+                // Flag for the back-redirect script: browser Back from Stripe → confirm Payment Failed
+                sessionStorage.setItem('pw_stripe_pending', JSON.stringify({ orderId: liveOrder.id, slug }))
                 window.location.href = data.data.sessionUrl
             } else {
                 toast.error(data.error?.message || 'Could not start payment. Please try again.')

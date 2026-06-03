@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { CheckoutClient } from './CheckoutClient'
+import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
 
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
@@ -147,15 +148,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
 
     return (
         <>
-            {/* Runs during HTML parse — before checkout paints — so Browser Back from Stripe
-                redirects to the confirm page (Pay Now) with no flash of the checkout form.
-                Covers the no-store fresh-load path; bfcache restores are handled by a pageshow
-                listener in CheckoutClient. The flag is set right before redirecting to Stripe. */}
-            <script
-                dangerouslySetInnerHTML={{
-                    __html: `(function(){try{var r=sessionStorage.getItem('pw_stripe_pending');if(r){sessionStorage.removeItem('pw_stripe_pending');var d=JSON.parse(r);if(d&&d.orderId&&d.slug){location.replace('/sites/'+encodeURIComponent(d.slug)+'/order/'+encodeURIComponent(d.orderId)+'/confirm?cancelled=1');}}}catch(e){}})();`,
-                }}
-            />
+            {/* Browser Back from Stripe → confirm page (no flash). See component for the mechanism. */}
+            <StripeBackRedirectScript />
             <CheckoutClient
                 slug={slug}
                 initialThemeCSS={initialThemeCSS}

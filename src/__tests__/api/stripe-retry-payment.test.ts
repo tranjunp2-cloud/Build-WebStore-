@@ -728,44 +728,29 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(body.error.code).toBe('INTERNAL_ERROR')
     })
 
-    // ─── TC-F13.155: retry refreshes paymentExpiresAt ─────────────────────
-    it('[TC-F13.155] update data includes refreshed paymentExpiresAt ~24h ahead on retry', async () => {
+    // ─── TC-F13.155: retry does NOT extend the 24h hold (fixed from placement) ─────
+    it('[TC-F13.155] retry preserves the placement deadline — does not touch paymentExpiresAt', async () => {
         // Arrange
-        const before = Date.now()
         mockFindByID.mockResolvedValue(VALID_PENDING_ORDER)
         mockCookies.mockResolvedValue({
-            get: vi.fn((key) => {
-                if (key === 'ct_123') return { value: 'valid-token' }
-                return undefined
-            }),
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
         } as any)
         mockVerifyConfirmToken.mockReturnValue(true)
         mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
         mockBuildOrderItems.mockResolvedValue({
             errorResponse: null,
             checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50,
         })
         mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
         mockUpdate.mockResolvedValue({})
 
         // Act
-        const req = mockRequest({})
-        await POST(req, { params: Promise.resolve({ id: '123' }) })
+        await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
 
-        const after = Date.now()
-
-        // Assert — update must include paymentExpiresAt within the 24h window
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    stripeSessionId: VALID_CHECKOUT_SESSION.sessionId,
-                    paymentExpiresAt: expect.any(String),
-                }),
-            }),
-        )
-        const updateCall = mockUpdate.mock.calls[0][0]
-        const exp = new Date(updateCall.data.paymentExpiresAt).getTime()
-        expect(exp).toBeGreaterThanOrEqual(before + 24 * 60 * 60 * 1000 - 2000)
-        expect(exp).toBeLessThanOrEqual(after + 24 * 60 * 60 * 1000 + 2000)
+        // Assert — update sets the new session but leaves paymentExpiresAt untouched (24h runs from placement)
+        const updateData = mockUpdate.mock.calls[0][0].data
+        expect(updateData.stripeSessionId).toBe(VALID_CHECKOUT_SESSION.sessionId)
+        expect(updateData).not.toHaveProperty('paymentExpiresAt')
     })
 })

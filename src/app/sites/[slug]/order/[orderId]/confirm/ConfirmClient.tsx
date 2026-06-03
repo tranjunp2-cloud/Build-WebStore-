@@ -31,6 +31,8 @@ export type ConfirmOrder = {
     paymentReference?: string
     paymentExpiresAt?: string | null
     stripePaymentIntentId?: string
+    cardBrand?: string | null
+    cardLast4?: string | null
     customerName: string
     customerEmail: string
     shippingAddress?: ShippingAddress
@@ -185,6 +187,48 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         return () => cleanup.forEach(fn => fn())
     }, [])
 
+    // Active-reconcile: POST payment-status on mount to heal the DB when the Stripe webhook is late.
+    // Only for Stripe orders not yet paid and not cancelled. The existing SSE handles the UI flip +
+    // clearCart once the DB is healed — DO NOT duplicate that logic here.
+    useEffect(() => {
+        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
+
+        let active = true
+        let retryCount = 0
+        const MAX_RETRIES = 2
+        const RETRY_DELAY_MS = 3000
+
+        async function pollOnce() {
+            try {
+                const res = await fetch(`/api/orders/${order.id}/payment-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                })
+                if (!res.ok || !active) return
+                const data = await res.json()
+                // Stop retrying once healed or definitively non-pending
+                if (data.reconciled || data.status !== 'pending') return
+                if (retryCount < MAX_RETRIES) {
+                    retryCount++
+                    retryTimer = setTimeout(pollOnce, RETRY_DELAY_MS)
+                }
+            } catch {
+                // Swallow — SSE + cron are the fallback
+            }
+        }
+
+        let retryTimer: ReturnType<typeof setTimeout>
+        void pollOnce()
+
+        return () => {
+            active = false
+            clearTimeout(retryTimer)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // SSE: poll payment status for Stripe orders not yet paid.
     // Skip when buyer cancelled — order won't become paid via the abandoned session; show Pay Now instead.
     useEffect(() => {
@@ -243,6 +287,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isFree = order.paymentMethod === 'free'
     const isStripe = !isBT && !isCod && !isFree
     const isPaid = livePay === 'paid'
+    // Confirm-page "Method" line: card brand + last4 when captured, else the method name.
+    const stripeMethodLabel = order.cardBrand && order.cardLast4
+        ? `${order.cardBrand.charAt(0).toUpperCase()}${order.cardBrand.slice(1)} ending in ${order.cardLast4}`
+        : order.paymentMethod === 'fpx' ? 'FPX (Online Banking)' : 'Credit Card'
     // Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — match both
     const payFailed = livePay === 'failed' || livePay === 'payment_failed'
     // Stripe payment not completed (buyer cancelled or webhook reported failure) — show retry, not success
@@ -267,14 +315,17 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const heroCheckClass = isPaid ? '' : isStripePending ? 'danger' : isSubmitted ? 'info' : isBT ? 'warning' : ''
     const heroClass = isPaid ? '' : isStripePending ? ' failed' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
     const heroTitle = isPaid
-        ? 'Order Confirmed — Payment Verified!'
+        // Stripe paid = "Order Successfully Placed!" (design); BT paid = seller-verified copy.
+        ? (isStripe ? 'Order Successfully Placed!' : 'Order Confirmed — Payment Verified!')
         : isStripePending
             ? 'Payment Failed — Action Required'
             : isSubmitted
                 ? 'The order has been placed — Awaiting seller confirmation.'
                 : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
     const heroSub = isPaid
-        ? 'Your payment has been verified by the seller. Your order is now being prepared for shipment.'
+        ? (isStripe
+            ? 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
+            : 'Your payment has been verified by the seller. Your order is now being prepared for shipment.')
         : isStripePending
             ? 'We couldn’t process your payment. Your order is being held for you — please retry payment within 24 hours to avoid cancellation.'
             : isSubmitted
@@ -484,6 +535,20 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 <span className="ty-step-pill pending"><AlertCircle size={11} /> Action required</span>
                             </div>
 
+                            {order.paymentExpiresAt && (
+                                <div className="ty-deadline" style={{ margin: '14px 0' }}>
+                                    <div className="ty-deadline-icon"><AlarmClock size={20} /></div>
+                                    <div className="ty-deadline-body">
+                                        <div className="ty-deadline-line1">
+                                            Upload within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
+                                        </div>
+                                        <div className="ty-deadline-line2">
+                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -691,8 +756,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     <span className="brand-mark fpx">FPX</span>
                                 </div>
                             </div>
-                            {order.stripePaymentIntentId && (
-                                <ul className="ty-paid-meta">
+                            <ul className="ty-paid-meta">
+                                {order.stripePaymentIntentId && (
                                     <li>
                                         <span className="lbl"><Hash size={12} /> Transaction ID</span>
                                         <span className="val mono">{order.stripePaymentIntentId}</span>
@@ -700,8 +765,12 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                             <CopyIcon /> Copy
                                         </button>
                                     </li>
-                                </ul>
-                            )}
+                                )}
+                                <li>
+                                    <span className="lbl"><CreditCard size={12} /> Method</span>
+                                    <span className="val">{stripeMethodLabel}</span>
+                                </li>
+                            </ul>
                             <div className="ty-email-note">
                                 <Mail size={14} />
                                 <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>

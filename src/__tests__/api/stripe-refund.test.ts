@@ -310,4 +310,55 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
             { stripeAccount: 'acct_expanded_123', idempotencyKey: 'refund-order-123' },
         )
     })
+
+    // ─── [TC-F13.146] Oversell exception refund ────────────────────────
+    it('[TC-F13.146] allows refund for oversell-flagged order (status=new, oversellReview=true)', async () => {
+        // Arrange
+        const oversellOrder = {
+            ...PAID_ORDER,
+            status: 'new', // Oversell flagged orders stay 'new', not shipped
+            oversellReview: true,
+            stripePaymentIntentId: 'pi_oversell_123',
+        }
+        mockFindByID.mockResolvedValue(oversellOrder)
+        mockRefundsCreate.mockResolvedValue(REFUND_RESPONSE)
+
+        // Act
+        const req = createRequest()
+        const ctx = createContext('order-oversell')
+        const res = await POST(req, ctx)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(mockRefundsCreate).toHaveBeenCalled()
+        // Verify CAS cleared oversellReview flag
+        expect(mockDrizzleExecute).toHaveBeenCalledWith(
+            expect.anything()
+        )
+    })
+
+    // ─── Regression: non-oversell status=new order still blocked ─────────
+    it('rejects refund for status=new order without oversellReview flag (regression)', async () => {
+        // Arrange
+        const newOrderNoOversell = {
+            ...PAID_ORDER,
+            status: 'new', // Not shipped/completed
+            oversellReview: false, // Not flagged
+            stripePaymentIntentId: 'pi_test_123',
+        }
+        mockFindByID.mockResolvedValue(newOrderNoOversell)
+
+        // Act
+        const req = createRequest()
+        const ctx = createContext('order-new-no-oversell')
+        const res = await POST(req, ctx)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(body.error.code).toBe('ORDER_NOT_REFUNDABLE')
+        expect(mockRefundsCreate).not.toHaveBeenCalled()
+    })
 })
