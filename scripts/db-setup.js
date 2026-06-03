@@ -3982,8 +3982,18 @@ const MIGRATIONS = [
 
   // GH-1004: F10 v2.2 Bank Transfer verification schema fields
   { name: 'orders.payment_reference_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_reference_idx ON orders (payment_reference);` },
-  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamp;` },
+  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamptz;` },
   { name: 'orders.payment_expires_at_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_expires_at_idx ON orders (payment_expires_at);` },
+  // US-F13-06 fix: the column was originally created as `timestamp` (no tz), so UTC values were read
+  // back naive → the confirm-page countdown was skewed by the client's UTC offset. Convert to
+  // timestamptz, interpreting existing naive values as UTC (DB session tz is UTC). Idempotent.
+  { name: 'orders.payment_expires_at_tz', sql: `DO $$
+    BEGIN
+      IF (SELECT data_type FROM information_schema.columns
+          WHERE table_name='orders' AND column_name='payment_expires_at') = 'timestamp without time zone' THEN
+        ALTER TABLE orders ALTER COLUMN payment_expires_at TYPE timestamptz USING payment_expires_at AT TIME ZONE 'UTC';
+      END IF;
+    END $$;` },
   { name: 'orders.payment_rejection_reason', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_reason varchar;` },
   { name: 'orders.payment_rejection_detail', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_detail text;` },
   { name: 'orders.payment_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_at timestamp;` },
