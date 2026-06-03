@@ -218,11 +218,12 @@ export async function POST(
             )
         }
 
-        // Step 8: Update order with new session ID; reset a failed order back to awaiting; refresh 24h window.
+        // Step 8: Update order with new session ID; reset a failed order back to awaiting.
         // Failure paymentStatus is 'failed' (webhook) or 'payment_failed' (cron); status may be 'payment_failed'.
+        // NOTE: paymentExpiresAt is intentionally NOT refreshed — the 24h hold runs from order
+        // PLACEMENT, fixed across retries (a retry never extends the auto-cancel deadline).
         const updateData: Record<string, unknown> = {
             stripeSessionId: checkout.sessionId,
-            paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             // Persist re-priced items + totals so the line items and order.total stay consistent
             // with the new Stripe charge (refund/reconcile correctness)
             items: orderItems,
