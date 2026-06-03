@@ -12,8 +12,12 @@ import { retrieveCheckoutSession } from '@/lib/payment/stripe'
  * `payment-expiry` cron owns that (it cancels Stripe + BT orders past `paymentExpiresAt`).
  * Single responsibility: this job only RECOVERS paid-but-unwebhooked orders.
  */
-export async function reconcileOrdersJob(payload: Payload, opts = { limit: 200 }) {
+export async function reconcileOrdersJob(payload: Payload, opts = { limit: 50 }) {
     const now = Date.now()
+    // Each order costs one sequential Stripe round-trip; the route's maxDuration is 60s. Stop a few
+    // seconds early so a backlog never gets killed mid-loop (silently skipping the tail every run).
+    // Limit defaults to 50 (50 × ~300ms ≈ 15s); the cron runs every 10 min so a backlog drains quickly.
+    const deadline = now + 50 * 1000
     // Only consider orders older than the 15-min webhook grace window (avoid racing fresh webhooks).
     const fifteenMinAgo = new Date(now - 15 * 60 * 1000).toISOString()
 
@@ -31,9 +35,14 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 200 }
         overrideAccess: true,
     })
 
-    let reconciled = 0, skipped = 0, errors = 0
+    let reconciled = 0, skipped = 0, errors = 0, timedOut = false
 
     for (const order of result.docs as any[]) {
+        if (Date.now() > deadline) {
+            timedOut = true
+            console.error(`[reconcile-orders] time budget reached — processed before tail; ${result.docs.length - reconciled - skipped - errors} orders deferred to next run`)
+            break
+        }
         try {
             const connectedAccountId = order.tenant?.stripeAccountId
             const sessionId = order.stripeSessionId
@@ -68,5 +77,5 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 200 }
         console.error(`[reconcile-orders] batch limit ${opts.limit} of ${result.totalDocs}`)
     }
 
-    return { reconciled, skipped, errors, total: result.totalDocs }
+    return { reconciled, skipped, errors, timedOut, total: result.totalDocs }
 }
