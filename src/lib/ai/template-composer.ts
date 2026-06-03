@@ -1266,13 +1266,12 @@ function buildClientLogos(category?: string, seed = 0): Record<string, unknown> 
   // badge when url missing (safer than broken <img>).
   const picks = pickLogosByCategory(category, 6, seed)
   return {
-    blockType: 'client-logos',
-    variant: 'scroll',
+    blockType: 'logo-cloud',
+    variant: 'row',
     headline: 'Trusted By',
     logos: picks.map((l) => ({
       name: l.name,
-      alt: l.name,
-      ...(l.url ? { url: l.url } : {}),
+      logo: { url: l.url ?? '', alt: l.name },
     })),
   }
 }
@@ -1378,7 +1377,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
     }
     case 'service-cards':
       return buildServiceCards(biz, category)
-    case 'client-logos':
+    case 'logo-cloud':
       return buildClientLogos(category)
     case 'feature-comparison':
       return buildFeatureComparison()
@@ -1825,8 +1824,8 @@ function buildBlockFromSpec(
     case 'newsletter':
       return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
-    case 'client-logos':
-      return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+    case 'client-logos': // backward compat alias — always normalise to logo-cloud (client-logos not in Payload whitelist)
+      return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: 'logo-cloud', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-food':
       return buildMenuFood(content)

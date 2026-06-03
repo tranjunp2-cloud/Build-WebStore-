@@ -135,7 +135,7 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         dnaMandatoryGroups: [['team', 'features'], ['testimonials']],
         signatureBlocks: ['team', 'stats', 'features'],
         recommendedBlocks: ['about', 'team', 'stats', 'faq', 'logo-cloud'],
-        industryBlocks: ['service-cards', 'review-cards', 'client-logos'],
+        industryBlocks: ['service-cards', 'review-cards', 'logo-cloud'],
         ctaIsMandatory: true,
     },
     events: {

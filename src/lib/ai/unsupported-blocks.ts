@@ -52,6 +52,13 @@ export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
     'property-card',  // GH-1024
     'menu-display',   // GH-1024
     'pricing-table',  // GH-1024
+    // GH-1145: aiVisible:false blocks with active composer cases — hidden from generator
+    'countdown-timer',
+    'custom-html',
+    'download-cta',
+    'video-background',
+    'breadcrumb',
+    'social-proof',
 ])
 
 /**

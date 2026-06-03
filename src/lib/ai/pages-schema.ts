@@ -24,7 +24,7 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
     'divider', 'announcement-bar', 'whatsapp-button', 'menu-food',
     'social-proof', 'portfolio-grid', 'google-maps', 'accordion',
     'countdown-timer', 'custom-html', 'blog-list',
-    'breadcrumb', 'client-logos',
+    'breadcrumb',
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile', 'property-card', 'class-schedule',
     'video-showcase', 'product-quick-view', 'feature-comparison',
@@ -139,7 +139,6 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'custom-html': ['html'],
     'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
     breadcrumb: ['variant', 'items'],
-    'client-logos': ['variant', 'headline', 'logos'],
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile': ['variant', 'headline', 'subheadline', 'doctors'],
     'property-card': ['variant', 'headline', 'subheadline', 'showMap', 'currency', 'properties'],
