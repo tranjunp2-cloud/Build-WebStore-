@@ -43,34 +43,17 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         return { status: 'already_processed' }
     }
 
-    const targetOrder = await payload.findByID({ collection: 'orders', id: orderId }).catch(() => null)
-    if (!targetOrder) {
+    const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 })
+        .catch(() => null) as unknown as PaidOrderDoc | null
+    if (!order) {
         console.warn(`[Reconcile:${source}] Order ${orderId} not found after transition — unexpected`)
         return { status: 'not_found' }
     }
-
-    const { method: paymentMethod, cardBrand, cardLast4 } = await resolveActualPaymentMethod(session, connectedAccountId)
-
-    // Record Stripe IDs + accurate payment method + card details (status already set atomically above).
-    await payload.update({
-        collection: 'orders',
-        id: orderId,
-        data: {
-            stripeSessionId: session.id,
-            stripePaymentIntentId: typeof session.payment_intent === 'string'
-                ? session.payment_intent
-                : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
-            paymentMethod,
-            ...(cardBrand ? { cardBrand } : {}),
-            ...(cardLast4 ? { cardLast4 } : {}),
-        },
-    })
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
 
-    const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 }) as unknown as PaidOrderDoc | null
-    if (!order) return { status: 'reconciled' }
-
-    // Decrement stock per item; flag the order for seller review if any product oversold.
+    // Money-critical work FIRST — runs immediately after the commit with no network I/O in between,
+    // so a later failure (e.g. the Stripe round-trip below timing out) cannot leave the order paid
+    // with stock un-decremented. Decrement per item; flag for manual seller refund if any oversold.
     let oversell = false
     if (order.items) {
         for (const item of order.items) {
@@ -85,7 +68,30 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         await flagOversell(payload, order)
     }
 
+    // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
     await sendOrderPaidEmailsAndNotify(payload, order)
+
+    // Display-only metadata LAST: the Stripe round-trip is the slow/failure-prone step, so it runs
+    // after all money-critical work is durably committed. A failure here only loses cosmetic card
+    // details (stripeSessionId is already persisted at order creation); the order stays correctly paid.
+    try {
+        const { method: paymentMethod, cardBrand, cardLast4 } = await resolveActualPaymentMethod(session, connectedAccountId)
+        await payload.update({
+            collection: 'orders',
+            id: orderId,
+            data: {
+                stripeSessionId: session.id,
+                stripePaymentIntentId: typeof session.payment_intent === 'string'
+                    ? session.payment_intent
+                    : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
+                paymentMethod,
+                ...(cardBrand ? { cardBrand } : {}),
+                ...(cardLast4 ? { cardLast4 } : {}),
+            },
+        })
+    } catch (err) {
+        console.error(`[Reconcile:${source}] Failed to persist Stripe display metadata for order ${orderId} (non-critical):`, err)
+    }
 
     return { status: 'reconciled', oversell }
 }

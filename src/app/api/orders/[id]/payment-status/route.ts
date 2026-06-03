@@ -76,9 +76,11 @@ export async function POST(_request: Request, ctx: RouteContext) {
             return NextResponse.json({ status: 'pending', reconciled: false })
         }
 
-        // Step 6: Reconcile if Stripe already captured payment
+        // Step 6: Reconcile only when Stripe has actually CAPTURED payment. Gate strictly on
+        // payment_status==='paid' — NOT session.status==='complete', which a delayed-notification
+        // method (e.g. async wallets) can reach while still unpaid → would mark paid before capture.
         let reconcileResult: { status: string } | undefined
-        if (session.payment_status === 'paid' || session.status === 'complete') {
+        if (session.payment_status === 'paid') {
             reconcileResult = await reconcileOrderPaid(payload, {
                 orderId: Number(order.id),
                 session,

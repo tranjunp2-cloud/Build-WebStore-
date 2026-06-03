@@ -57,6 +57,14 @@ export async function handleCheckoutCompleted(
     )
     if (!allowed) return
 
+    // Capture gate: checkout.session.completed can fire for a delayed-notification method while the
+    // session is still unpaid (payment_status !== 'paid'). Only reconcile once payment is captured —
+    // the async success arrives later as checkout.session.async_payment_succeeded.
+    if (session.payment_status && session.payment_status !== 'paid') {
+        console.log(`[Stripe Webhook] order ${orderIdInt} completed but payment_status=${session.payment_status} — awaiting capture`)
+        return
+    }
+
     try {
         await reconcileOrderPaid(payload, {
             orderId: orderIdInt,

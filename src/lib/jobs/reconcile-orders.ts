@@ -54,7 +54,9 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 50 })
             }
 
             const session = await retrieveCheckoutSession(sessionId, connectedAccountId)
-            if (session && (session.payment_status === 'paid' || session.status === 'complete')) {
+            // Heal only when payment is actually CAPTURED — gate strictly on payment_status==='paid',
+            // not session.status==='complete' (which async methods can reach while still unpaid).
+            if (session && session.payment_status === 'paid') {
                 const r = await reconcileOrderPaid(payload, {
                     orderId: Number(order.id),
                     session,
