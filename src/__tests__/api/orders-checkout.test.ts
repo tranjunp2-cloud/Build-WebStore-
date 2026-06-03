@@ -694,8 +694,8 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(variantUpdateCall).toBeUndefined()
     })
 
-    it('[TC-F10-02-18] bank_transfer variant order: NO stock decrement at checkout', async () => {
-        // Arrange: variant product, paymentMethod=bank_transfer
+    it('[TC-F10-02-18] bank_transfer variant order: decrements stock at checkout (same CAS as COD)', async () => {
+        // bank_transfer now decrements stock at checkout — same CAS block as COD.
         const variantProd = { id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red', stock: 5, price: 25 }], inventory: 5 }
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
@@ -706,6 +706,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         mockCreate.mockResolvedValue({
             id: 'order-bt', orderNumber: 'ORD-BT1', total: 30, currency: 'MYR',
         })
+        // mockDrizzleExecute default { rows: [{ id: 1 }] } handles: product check + CAS decrement + inventory recompute
 
         const body = {
             siteId: 'site-1',
@@ -718,16 +719,16 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const res = await POST(mockReq(body))
         const data = await res.json()
 
-        // Assert: order created, but NO stock decrement
+        // Assert: order created and stock decremented via SQL CAS (same as COD)
         expect(res.status).toBe(200)
         expect(data.data.paymentMethod).toBe('bank_transfer')
-        // No variant update (bank_transfer skips decrement)
+        // SQL CAS called (product check + CAS decrement + inventory recompute)
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        // ORM update NOT called for variant stock (SQL path)
         const variantUpdateCall = mockUpdate.mock.calls.find(
             call => call[0]?.data?.variants !== undefined
         )
         expect(variantUpdateCall).toBeUndefined()
-        // No CAS SQL
-        expect(mockDrizzleExecute).not.toHaveBeenCalled()
     })
 
     it('[TC-F10-02-19] Mid-flight variant decrement failure: compensates prior decrements, deletes order, returns 422', async () => {

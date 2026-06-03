@@ -15,7 +15,6 @@ export type ReconcileStatus = 'reconciled' | 'already_processed' | 'not_found'
 
 export interface ReconcileResult {
     status: ReconcileStatus
-    oversell?: boolean
 }
 
 /**
@@ -25,6 +24,16 @@ export interface ReconcileResult {
  * Idempotency: the atomic `UPDATE ... WHERE status='pending' RETURNING id` is the single-winner
  * guard. If 0 rows → already processed → returns immediately WITHOUT decrementing stock, emailing,
  * or notifying. Safe for webhook + poll + cron all firing on the same order.
+ *
+ * STOCK NOTE: this function intentionally does NOT decrement stock. Stock is decremented at
+ * Stripe session creation (stripe-checkout/route.ts). This function only transitions the order.
+ *
+ * DEPLOY GATE (migration, same class as cancel/route.ts BT note):
+ * Pre-deploy Stripe orders (status='pending') had stock decremented here by the old reconcileOrderPaid
+ * code. After deploy, reconcile no longer decrements — so paying an old pending Stripe order via
+ * webhook/cron does NOT decrement stock (undersell risk). Similarly, cancelling an old pending Stripe
+ * order will phantom-restock (shouldRestock=true in cancel route, but stock was decremented at webhook
+ * not checkout). Drain all pending Stripe orders before deploying to production.
  *
  * IMPORTANT: the caller is responsible for ownership/auth verification (webhook IDOR guard, endpoint
  * confirm-token, cron secret) BEFORE calling. This function trusts the context is already authorized.
@@ -50,23 +59,6 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         return { status: 'not_found' }
     }
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
-
-    // Money-critical work FIRST — runs immediately after the commit with no network I/O in between,
-    // so a later failure (e.g. the Stripe round-trip below timing out) cannot leave the order paid
-    // with stock un-decremented. Decrement per item; flag for manual seller refund if any oversold.
-    let oversell = false
-    if (order.items) {
-        for (const item of order.items) {
-            const productId = typeof item.product === 'object' ? item.product.id : item.product
-            const sold = await decrementStock(payload, productId, item.quantity)
-            if (sold.oversold) oversell = true
-        }
-    }
-
-    // AC-3: oversell AFTER capture → flag for manual seller refund (NO auto-refund, order stays paid).
-    if (oversell) {
-        await flagOversell(payload, order)
-    }
 
     // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
     // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are
@@ -99,74 +91,7 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         console.error(`[Reconcile:${source}] Failed to persist Stripe display metadata for order ${orderId} (non-critical):`, err)
     }
 
-    return { status: 'reconciled', oversell }
-}
-
-/**
- * AC-3: mark the (already paid) order for manual seller review and alert the seller.
- * No auto-refund — the seller decides amount + method via the admin "Refund customer" button.
- */
-async function flagOversell(payload: Payload, order: PaidOrderDoc): Promise<void> {
-    try {
-        await payload.update({
-            collection: 'orders',
-            id: order.id,
-            data: { oversellReview: true } as Record<string, unknown>,
-        })
-    } catch (err) {
-        console.error(`[Reconcile] Failed to set oversellReview for order ${order.id}:`, err)
-    }
-    const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-    import('@/lib/notifications/notify-tenant-owners')
-        .then(({ notifyTenantOwners }) => notifyTenantOwners(payload, tenantId, {
-            type: 'SYSTEM_ALERT',
-            title: `Order #${order.orderNumber} flagged for review — stock went negative`,
-            message: `Order #${order.orderNumber} was paid but stock ran out. Review and decide on a manual refund.`,
-            actionUrl: '/orders',
-            metadata: { orderNumber: order.orderNumber, oversell: 'true' },
-        }))
-        .catch((err) => console.error('[Notification] oversell SYSTEM_ALERT failed', err))
-}
-
-/**
- * Atomically decrement product inventory — safe for concurrent deliveries.
- * Returns oversold=true when the requested quantity exceeded available stock, so the caller can
- * flag the order for manual seller review. Products with NULL inventory (untracked/unlimited)
- * never oversell.
- *
- * Two atomic statements:
- *  1. Decrement only if enough stock (`inventory >= qty`). If a row comes back → clean sale.
- *  2. Otherwise (stock < qty, tracked) → clamp to 0 and report oversell.
- */
-export async function decrementStock(
-    payload: Payload,
-    productId: number | string,
-    quantity: number,
-): Promise<{ oversold: boolean }> {
-    try {
-        const clean = await (payload.db.drizzle as any).execute(sql`
-            UPDATE products SET inventory = inventory - ${quantity}
-            WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${quantity}
-            RETURNING inventory
-        `)
-        if (clean.rows?.length) {
-            console.log(`[Reconcile] Stock decremented: product ${productId} -${quantity}`)
-            return { oversold: false }
-        }
-
-        // No clean decrement: either untracked (inventory NULL → skip) or oversell (tracked, < qty).
-        const clamped = await (payload.db.drizzle as any).execute(sql`
-            UPDATE products SET inventory = 0
-            WHERE id = ${productId} AND inventory IS NOT NULL AND inventory < ${quantity}
-            RETURNING inventory
-        `)
-        const oversold = (clamped.rows?.length ?? 0) > 0
-        if (oversold) console.warn(`[Reconcile] OVERSELL: product ${productId} requested ${quantity}, clamped to 0`)
-        return { oversold }
-    } catch (err) {
-        console.error(`[Reconcile] Failed to update stock for product ${productId}:`, err)
-        return { oversold: false }
-    }
+    return { status: 'reconciled' }
 }
 
 export interface ResolvedPaymentMethod {

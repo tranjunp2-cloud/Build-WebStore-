@@ -168,13 +168,14 @@ export async function POST(
             )
         }
 
-        // Step 6: Rebuild order line items (validates stock at retry time)
+        // Step 6: Rebuild order line items (validates products/prices; skip OOS check — stock is
+        // already reserved for this order via the original checkout decrement).
         const rawItems = (order.items ?? []).map((i: any) => ({
             productId: typeof i.product === 'object' ? i.product.id : i.product,
             quantity: i.quantity,
             variant: i.variant || undefined,
         }))
-        const built = await buildOrderItems(payload, rawItems, tenantId)
+        const built = await buildOrderItems(payload, rawItems, tenantId, true)
         if (built.errorResponse) return built.errorResponse
 
         const { checkoutItems, subtotal, orderItems } = built

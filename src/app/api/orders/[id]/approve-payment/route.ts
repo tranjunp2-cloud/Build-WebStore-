@@ -4,7 +4,6 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { paymentConfirmedEmail } from '@/lib/email/templates/payment-confirmed'
-import { decrementVariantStock } from '../../lib/stock-utils'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -95,34 +94,6 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             depth: 2,
             overrideAccess: true,
         })
-
-        // Inventory decrement — variant-aware, best-effort (payment received = must not block approval).
-        // Variant products: atomic CAS on products_variants.stock via decrementVariantStock.
-        // Non-variant products: GREATEST(0, ...) force-decrement on products.inventory (no CAS needed).
-        const items = (order.items as any[]) ?? []
-        for (const item of items) {
-            try {
-                const productId = typeof item.product === 'object' ? item.product?.id : item.product
-                if (!productId) continue
-                const variantName = typeof item.variant === 'string' ? item.variant.trim() : ''
-                if (variantName) {
-                    const result = await decrementVariantStock(payload, productId, variantName, item.quantity ?? 0)
-                    if (!result.ok) {
-                        payload.logger.warn({ productId, variantName, reason: result.reason },
-                            '[approve-payment] variant stock decrement failed (best-effort — order still approved)')
-                    }
-                } else {
-                    await db.execute(sql`
-                        UPDATE products
-                        SET inventory = GREATEST(0, inventory - ${item.quantity ?? 0})
-                        WHERE id = ${productId}
-                        AND inventory IS NOT NULL
-                    `)
-                }
-            } catch (err) {
-                payload.logger.error({ err }, '[approve-payment] inventory decrement failed for item')
-            }
-        }
 
         // Slug lives on the tenant, not the site — sites collection has no slug field
         const siteObj = typeof (updated as any)?.site === 'object' ? (updated as any).site : null
