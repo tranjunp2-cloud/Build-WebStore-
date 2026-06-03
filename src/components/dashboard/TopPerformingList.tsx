@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { FileText, Package, PenLine } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export type PerformingItem = {
@@ -23,10 +24,10 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
     const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs'>('pages')
 
     const TABS = [
-        { id: 'pages' as const, icon: '📄', name: t.dashboard.analytics.topPages, data: pages },
+        { id: 'pages' as const, icon: FileText, name: t.dashboard.analytics.topPages, data: pages },
         // TODO: Re-enable unconditionally when F10 is ready
-        ...(products ? [{ id: 'products' as const, icon: '📦', name: t.dashboard.analytics.topProducts, data: products }] : []),
-        { id: 'blogs' as const, icon: '📝', name: t.dashboard.analytics.topBlogs, data: blogs },
+        ...(products ? [{ id: 'products' as const, icon: Package, name: t.dashboard.analytics.topProducts, data: products }] : []),
+        { id: 'blogs' as const, icon: PenLine, name: t.dashboard.analytics.topBlogs, data: blogs },
     ]
 
     const activeData = TABS.find(t => t.id === activeTab)?.data || []
@@ -59,9 +60,9 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
                                     : 'bg-transparent text-dash-text-muted border-dash-border hover:border-[#3B82F6] hover:text-[#3B82F6]'
                             }`}
                         >
-                            <span className="flex items-center gap-1 font-semibold text-[13px] sm:text-xs truncate">
-                                <span>{tab.icon}</span>
-                                <span>{tab.name}</span>
+                            <span className="flex items-center gap-1.5 font-semibold text-[13px] sm:text-xs truncate">
+                                <tab.icon className="w-4 h-4 shrink-0" aria-hidden />
+                                <span className="truncate">{tab.name}</span>
                             </span>
                         </button>
                     )

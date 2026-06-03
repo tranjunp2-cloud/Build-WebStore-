@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { Inbox } from 'lucide-react';
 import { QnASearch } from '@/components/help/QnASearch';
 import { QnAAccordion } from '@/components/help/QnAAccordion';
 import { getQnAData } from '@/data/help-qna';
@@ -84,7 +85,7 @@ export const QnAPageClient = () => {
                 ) : (
                     /* Empty State: TC-F20.05 */
                     <div className="text-center py-12 px-6 text-slate-400">
-                        <div className="text-[48px] mb-3 leading-none">📭</div>
+                        <Inbox className="w-12 h-12 mx-auto mb-3 text-slate-500" aria-hidden />
                         <p className="text-[14px]">
                             <strong className="font-bold text-slate-300 text-[14px]">{t.help.qna.emptyTitle}</strong>
                         </p>

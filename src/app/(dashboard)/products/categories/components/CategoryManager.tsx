@@ -13,8 +13,8 @@ import {
     Trash2,
     Loader2, 
     Search,
-    AlertCircle,
-    Folder,
+    AlertTriangle,
+    FolderOpen,
     File,
     ChevronLeft,
     X,
@@ -279,10 +279,10 @@ export default function CategoryManager() {
                         >
                             {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                         </button>
-                        <div className="flex items-center justify-center pt-0.5 pr-2 pl-1">
-                            <span className="text-[18px] leading-none grayscale opacity-90">
-                                {hasChildren ? '📂' : '📄'}
-                            </span>
+                        <div className="flex items-center justify-center pt-0.5 pr-2 pl-1 text-[#94A3B8]">
+                            {hasChildren
+                                ? <FolderOpen className="w-[18px] h-[18px] shrink-0" aria-hidden />
+                                : <File className="w-[18px] h-[18px] shrink-0" aria-hidden />}
                         </div>
                         <span className="text-[14px] font-medium text-[#F1F5F9] truncate">{node.name}</span>
                     </div>
@@ -585,7 +585,7 @@ export default function CategoryManager() {
                     <div className="bg-[#1E293B] border border-white/10 rounded-[16px] shadow-[0_25px_60px_rgba(0,0,0,0.5)] w-full max-w-[420px] flex flex-col max-h-[85vh] overflow-y-auto">
                         <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
                             <div className="text-[18px] font-bold text-[#F8FAFC] flex items-center gap-2.5 m-0 leading-none">
-                                <span className="text-[20px]">🗑️</span>
+                                <Trash2 className="w-5 h-5 shrink-0" aria-hidden />
                                 <span>{t.dashboard.products.categories.deleteModal.title || 'Delete Category'}</span>
                             </div>
                             <button 
@@ -610,7 +610,7 @@ export default function CategoryManager() {
                                 
                                 {hasChildren && (
                                     <div className="mt-5 p-3 pr-4 shadow-[0_0_0_1px_rgba(245,158,11,0.2)] bg-[#F59E0B]/10 rounded-[8px] text-[13px] text-[#F59E0B] text-left flex items-start gap-2.5 w-full">
-                                        <span className="shrink-0 leading-none translate-y-[2px]">⚠️</span>
+                                        <AlertTriangle className="w-4 h-4 shrink-0 mt-[1px]" aria-hidden />
                                         <span className="leading-snug">
                                             {t.dashboard.products.categories.deleteModal.subCategoryWarning || 'This category has child categories. They will be unlinked from the tree (not permanently deleted).'}
                                         </span>

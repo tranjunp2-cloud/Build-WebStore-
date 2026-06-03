@@ -1,5 +1,6 @@
 'use client'
 
+import { LayoutDashboard, BarChart3, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { useTabContext } from './DashboardTabContent'
@@ -9,9 +10,9 @@ export function DashboardTabs() {
     const { activeTab, setActiveTab } = useTabContext()
 
     const TABS = [
-        { id: 'overview' as const, label: `📊 ${t.dashboard.overview.tabs.overview}` },
-        { id: 'analytics' as const, label: `📈 ${t.dashboard.overview.tabs.analytics}` },
-        { id: 'seo' as const, label: `🔍 ${t.dashboard.overview.tabs.seo}` },
+        { id: 'overview' as const, Icon: LayoutDashboard, label: t.dashboard.overview.tabs.overview },
+        { id: 'analytics' as const, Icon: BarChart3, label: t.dashboard.overview.tabs.analytics },
+        { id: 'seo' as const, Icon: Search, label: t.dashboard.overview.tabs.seo },
     ]
 
     return (
@@ -31,7 +32,10 @@ export function DashboardTabs() {
                                     : "text-[#9CA3AF] hover:text-[#E5E7EB] hover:bg-white/5"
                             )}
                         >
-                            <span className="leading-[1.69em]">{tab.label}</span>
+                            <span className="flex items-center gap-1.5 leading-[1.69em]">
+                                <tab.Icon className="w-4 h-4 shrink-0" aria-hidden />
+                                {tab.label}
+                            </span>
                         </button>
                     )
                 })}

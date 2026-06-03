@@ -1,5 +1,6 @@
 "use client"
 
+import { PartyPopper, Lightbulb } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { ShippingConfig } from '@/lib/shipping'
 import { getShippingRate } from '@/lib/shipping'
@@ -49,15 +50,16 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
                 <div className="flex justify-between text-[13px]">
                     <span className="text-slate-400">{s.liveShipping}</span>
                     {isFree ? (
-                        <span className="text-emerald-400 font-semibold">🎉 FREE</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold"><PartyPopper className="w-4 h-4 shrink-0" aria-hidden /> FREE</span>
                     ) : (
                         <span className="text-slate-200">{formatRm(shipSen)}</span>
                     )}
                 </div>
                 {gapSen != null && (
                     <div className="flex items-center gap-2 rounded-[8px] border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2">
+                        <Lightbulb className="w-4 h-4 shrink-0 text-emerald-300" aria-hidden />
                         <span className="text-[13px] text-emerald-300">
-                            💡 {s.liveAddMore.replace('{amount}', formatRm(gapSen))}
+                            {s.liveAddMore.replace('{amount}', formatRm(gapSen))}
                         </span>
                     </div>
                 )}

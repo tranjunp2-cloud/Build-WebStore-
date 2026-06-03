@@ -23,11 +23,11 @@ export function AISmartInsights({ views, prevViews }: Props) {
         if (diff > 0) {
             message = `Trending: Traffic is up ${percent}% compared to the previous period.`
             type = 'up'
-            if (percent > 50) message = `🚀 Viral alert! Traffic has surged by ${percent}% recently.`
+            if (percent > 50) message = `Viral alert! Traffic has surged by ${percent}% recently.`
         } else if (diff < 0) {
             message = `Traffic dropped by ${percent}% compared to the previous period. Consider checking your SEO or running a campaign.`
             type = 'down'
-            if (percent > 30) message = `⚠️ Warning: Significant traffic drop (${percent}%). Check your site's health and SEO rankings.`
+            if (percent > 30) message = `Warning: Significant traffic drop (${percent}%). Check your site's health and SEO rankings.`
         } else {
             message = "Traffic is stable compared to the previous period."
             type = 'neutral'
