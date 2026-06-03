@@ -1728,10 +1728,10 @@
                 "contentLocale": "Content locale",
                 "localeDesc": "Each locale stores its own copy. Visitors get the closest match.",
                 "fieldSubject": "Subject",
+                "hintSubject": "Shown in the inbox preview. Keep it under 60 chars for mobile.",
                 "fieldGreeting": "Greeting",
                 "fieldCtaLabel": "CTA Label",
                 "fieldClosing": "Closing",
-                "hintSubject": "Shown in the inbox preview. Keep it under 60 chars for mobile.",
                 "hintCtaLabel": "Button text. Use a strong verb — \"Track Order\", \"Confirm\", \"Open Inbox\".",
                 "unsavedChanges": "Unsaved changes",
                 "allChangesSaved": "All changes saved",
@@ -1754,18 +1754,20 @@
                 "descriptions": {
                     "welcome": "First-touch hello when a buyer signs up or places their first order.",
                     "otp-verification": "One-time verification code for login and account security.",
-                    "forgot-password": "Password reset link, valid for 30 minutes.",
+                    "forgot-password": "One-tap password reset link, valid for 30 minutes.",
                     "password-changed": "Confirm password was changed successfully.",
                     "order-confirmation": "Sent the moment a buyer's checkout succeeds — receipts, items, shipping.",
-                    "order-shipped": "Delivery confirmation when the order is shipped.",
+                    "order-completed": "Delivery confirmation when the order has arrived.",
                     "order-cancelled": "Notify buyer when their order is cancelled.",
                     "order-expired": "Alert buyer when an unpaid order has expired.",
                     "order-refunded": "Notify buyer when their order has been refunded.",
                     "bank-transfer-instructions": "Remind buyer to complete bank transfer — order auto-cancels after 24h.",
                     "payment-confirmed": "Confirm payment has been received and order is processing.",
                     "payment-rejected": "Inform buyer that their payment was rejected.",
-                    "new-order-seller": "New order notification for the seller dashboard.",
-                    "staff-invitation": "Invite new staff members to access the dashboard."
+                    "new-order-seller": "Heads-up to the seller every time a new order lands.",
+                    "staff-invitation": "Invite new staff members to access the dashboard.",
+                    "contact-from-seller": "Forward the message to the seller's support inbox.",
+                    "newsletter-seller-digest": "Digest of newsletter signups, opens, and click-through rates."
                 }
             }
         },

@@ -113,6 +113,7 @@ describe('getTemplateConfig [TC-F32]', () => {
             subject: 'Your OTP Code',
             greeting: 'Hi {customerName}',
             ctaLabel: 'Verify',
+            closing: undefined,
         })
 
         expect(mockRedisSet).toHaveBeenCalledWith(
@@ -122,6 +123,7 @@ describe('getTemplateConfig [TC-F32]', () => {
                 subject: 'Your OTP Code',
                 greeting: 'Hi {customerName}',
                 ctaLabel: 'Verify',
+                closing: undefined,
             }),
             { ex: 300 },
         )
@@ -174,6 +176,9 @@ describe('getTemplateConfig [TC-F32]', () => {
         expect(result).toEqual({
             enabled: true,
             subject: 'Order Confirmation',
+            greeting: undefined,
+            ctaLabel: undefined,
+            closing: undefined,
         })
         expect(mockFind).toHaveBeenCalled()
     })
@@ -203,14 +208,14 @@ describe('getTemplateConfig [TC-F32]', () => {
     it('[TC: F32-U-06] cache key format: returns email_config:tenantId:type:recipient', () => {
         // Arrange
         const tenantId = 'tenant-abc'
-        const type = 'order-shipped'
-        const recipient = 'seller'
+        const type = 'order-completed'
+        const recipient = 'buyer'
 
         // Act
         const key = templateConfigCacheKey(tenantId, type, recipient)
 
         // Assert
-        expect(key).toBe('email_config:tenant-abc:order-shipped:seller')
+        expect(key).toBe('email_config:tenant-abc:order-completed:buyer')
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -218,7 +223,7 @@ describe('getTemplateConfig [TC-F32]', () => {
     it('[TC: F32-U-02.1] handles contentEn with partial fields', async () => {
         // Arrange
         const tenantId = 'tenant-004'
-        const type = 'order-status'
+        const type = 'order-cancelled'
         const recipient = 'buyer'
 
         mockRedisGet.mockResolvedValue(null)

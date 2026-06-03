@@ -172,12 +172,9 @@ export function EmailTemplateFormCard({
             {/* Subject */}
             <FieldRow
                 label={et.fieldSubject}
-                required
                 hint={et.hintSubject}
                 value={cur.subject ?? ''}
                 limit={LIMITS.subject}
-                variables={vars}
-                insertVarLabel={et.insertVar}
                 onChange={(v) => onFieldChange(locale, 'subject', v)}
             />
 

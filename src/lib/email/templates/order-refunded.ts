@@ -89,7 +89,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
             <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-size:13.5px;color:#0F172A;vertical-align:top;">${fmtPrice(item.lineTotal)}</td>
         </tr>`).join('')
 
-    const subject = config?.subject ? tR.subject : `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
+    const subject = `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
 
     return {
         subject,

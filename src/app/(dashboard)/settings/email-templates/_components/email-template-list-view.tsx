@@ -2,9 +2,9 @@
 
 import type { ElementType } from 'react'
 import {
-    Mail, Edit2, Info, ShoppingBag, PackageX, Truck, TimerOff,
+    Mail, Edit2, Info, ShoppingBag, PackageX, TimerOff,
     Timer, Key, ShoppingCart, ShieldCheck, BadgeCheck, XCircle,
-    Lock, UserPlus, Users,
+    Lock, UserPlus, Users, CheckCircle, MessageSquare, BookOpen,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import {
@@ -23,7 +23,7 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'forgot-password':            Key,
     'password-changed':           Lock,
     'order-confirmation':         ShoppingBag,
-    'order-shipped':              Truck,
+    'order-completed':            CheckCircle,
     'order-cancelled':            PackageX,
     'order-expired':              TimerOff,
     'order-refunded':             XCircle,
@@ -32,10 +32,22 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'payment-rejected':           XCircle,
     'new-order-seller':           ShoppingCart,
     'staff-invitation':           UserPlus,
+    'contact-from-seller':        MessageSquare,
+    'newsletter-seller-digest':   BookOpen,
+}
+
+const TEMPLATE_LABELS: Partial<Record<EmailTemplateType, string>> = {
+    'otp-verification':           'OTP Verification',
+    'forgot-password':            'Password Reset',
+    'order-completed':            'Order Delivered',
+    'bank-transfer-instructions': 'Payment Reminder (Bank Transfer)',
+    'new-order-seller':           'New Order Notification',
+    'contact-from-seller':        'Contact Form (Seller)',
+    'newsletter-seller-digest':   'Newsletter (Seller Digest)',
 }
 
 function toLabel(type: EmailTemplateType): string {
-    return type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    return TEMPLATE_LABELS[type] ?? type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
@@ -232,8 +244,14 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                                     )}
                                                 </div>
                                                 <p
-                                                    className="truncate"
-                                                    style={{ fontSize: 12, color: 'var(--dash-text-muted)', maxWidth: 320 }}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: 'var(--dash-text-muted)',
+                                                        overflow: 'hidden',
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                    }}
                                                 >
                                                     {et.descriptions[type]}
                                                 </p>
@@ -259,7 +277,7 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                     {/* Last edited column */}
                                     <td style={{ padding: '14px 20px' }}>
                                         <span style={{ fontSize: 13, color: 'var(--dash-text-muted)', whiteSpace: 'nowrap' as const }}>
-                                            {relTime(row?.updatedAt, et.defaultLabel, et.editedAgo, ti)}
+                                            {relTime(row?.updatedAt, et.neverEdited, et.editedAgo, ti)}
                                         </span>
                                     </td>
 

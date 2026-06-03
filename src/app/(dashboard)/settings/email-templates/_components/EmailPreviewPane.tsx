@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical } from 'lucide-react'
+import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical, Mail } from 'lucide-react'
 import type { EmailTemplateType } from '@/lib/email/types'
 import type { EmailTemplateConfig } from '@/lib/email/types'
 
@@ -72,12 +72,12 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
     }
 
     return (
-        <div className="rounded-xl border border-solid border-white/[0.15] bg-[#1a2540] overflow-hidden flex flex-col">
+        <div className="rounded-xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[#1a2540] overflow-hidden flex flex-col">
             {/* Header bar */}
-            <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#1a2540] px-4 py-2.5">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/[0.06] bg-slate-50 dark:bg-[#1a2540] px-4 py-2.5">
                 <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-green-500" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         Live Preview
                     </span>
                 </div>
@@ -86,7 +86,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         type="button"
                         onClick={() => setPreviewMode('desktop')}
                         title="Desktop"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'desktop' ? 'bg-white/[0.1] text-blue-400' : 'text-slate-500 hover:text-white'}`}
+                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-blue-500 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                     >
                         <Monitor className="h-4 w-4" />
                     </button>
@@ -94,7 +94,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         type="button"
                         onClick={() => setPreviewMode('mobile')}
                         title="Mobile"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'mobile' ? 'bg-white/[0.1] text-blue-400' : 'text-slate-500 hover:text-white'}`}
+                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-blue-500 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                     >
                         <Smartphone className="h-4 w-4" />
                     </button>
@@ -102,26 +102,27 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         type="button"
                         onClick={handleRefresh}
                         title="Refresh"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:text-white transition-colors"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors"
                     >
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>
 
-            {/* Mock inbox subject bar */}
-            <div className="flex items-center gap-2 border-b border-white/[0.06] bg-[#1a2540] px-4 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 shrink-0">Subject:</span>
-                <span className="text-xs text-slate-300 truncate">
-                    {subject || <span className="text-slate-600 italic">Default subject (type to override)</span>}
+            {/* Mock inbox subject bar — styled as an inbox preview row */}
+            <div className="flex items-center gap-2.5 border-b border-slate-200 dark:border-white/[0.1] bg-slate-100 dark:bg-[#131d35] px-4 py-2.5 min-w-0">
+                <Mail className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 shrink-0" />
+                <span className="shrink-0 text-[11px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wide">Subject:</span>
+                <span className="text-sm font-semibold text-slate-800 dark:text-white truncate min-w-0">
+                    {subject || <span className="font-normal italic text-slate-400 dark:text-slate-600">Default subject (type to override)</span>}
                 </span>
             </div>
 
-            {/* Preview canvas — dark background matching dashboard dark mode */}
-            <div className="relative flex min-h-[540px] max-h-[720px] overflow-y-auto items-start justify-center bg-[#0d1525] p-6">
+            {/* Preview canvas */}
+            <div className="relative flex min-h-[540px] items-start justify-center bg-slate-100 dark:bg-[#0d1525] p-6">
                 {/* Subtle loading overlay — keeps iframe visible to avoid flash */}
                 {loading && (
-                    <div className="absolute inset-0 flex items-start justify-center pt-8 bg-[#0d1525]/70 z-10 pointer-events-none">
+                    <div className="absolute inset-0 flex items-start justify-center pt-8 bg-slate-100/70 dark:bg-[#0d1525]/70 z-10 pointer-events-none">
                         <div className="h-6 w-6 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" />
                     </div>
                 )}
@@ -150,12 +151,17 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                             background: '#fff',
                             boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
                             transition: 'width 0.2s',
+                            overflow: 'auto',
                         }}
                         onLoad={(e) => {
                             const iframe = e.currentTarget
                             try {
-                                const body = iframe.contentDocument?.body
-                                if (body) iframe.style.height = body.scrollHeight + 'px'
+                                const doc = iframe.contentDocument
+                                if (doc) {
+                                    // Add 48px buffer for padding-bottom of wrapper divs not captured by scrollHeight
+                                    const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight) + 48
+                                    iframe.style.height = h + 'px'
+                                }
                             } catch {
                                 // sandboxed — ignore cross-origin height
                             }
