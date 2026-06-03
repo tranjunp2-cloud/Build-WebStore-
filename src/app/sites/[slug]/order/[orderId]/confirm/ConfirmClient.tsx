@@ -535,6 +535,20 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 <span className="ty-step-pill pending"><AlertCircle size={11} /> Action required</span>
                             </div>
 
+                            {order.paymentExpiresAt && (
+                                <div className="ty-deadline" style={{ margin: '14px 0' }}>
+                                    <div className="ty-deadline-icon"><AlarmClock size={20} /></div>
+                                    <div className="ty-deadline-body">
+                                        <div className="ty-deadline-line1">
+                                            Upload within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
+                                        </div>
+                                        <div className="ty-deadline-line2">
+                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <input
                                 ref={fileInputRef}
                                 type="file"
