@@ -371,6 +371,17 @@ export const Orders: CollectionConfig = {
             index: true,
             admin: { description: 'Stock oversold after payment captured — seller must decide on a manual refund' },
         },
+        // --- Stripe card details (for confirm-page "Method" line) ---
+        {
+            name: 'cardBrand',
+            type: 'text',
+            admin: { readOnly: true, description: 'Stripe card brand (e.g. visa) — captured from PaymentIntent on payment' },
+        },
+        {
+            name: 'cardLast4',
+            type: 'text',
+            admin: { readOnly: true, description: 'Last 4 digits of the card used (Stripe) — display only' },
+        },
         // --- Notes ---
         {
             name: 'notes',

@@ -49,9 +49,9 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         return { status: 'not_found' }
     }
 
-    const paymentMethod = await resolveActualPaymentMethod(session, connectedAccountId)
+    const { method: paymentMethod, cardBrand, cardLast4 } = await resolveActualPaymentMethod(session, connectedAccountId)
 
-    // Record Stripe IDs + accurate payment method (status already set atomically above).
+    // Record Stripe IDs + accurate payment method + card details (status already set atomically above).
     await payload.update({
         collection: 'orders',
         id: orderId,
@@ -61,6 +61,8 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
                 ? session.payment_intent
                 : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
             paymentMethod,
+            ...(cardBrand ? { cardBrand } : {}),
+            ...(cardLast4 ? { cardLast4 } : {}),
         },
     })
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
@@ -155,21 +157,29 @@ export async function decrementStock(
     }
 }
 
-/** Resolve the actual payment method used by expanding payment_intent.payment_method.
- *  Falls back to 'card' if expansion fails or method is unrecognized. */
+export interface ResolvedPaymentMethod {
+    method: 'card' | 'fpx'
+    cardBrand?: string
+    cardLast4?: string
+}
+
+/** Resolve the actual payment method + card details by expanding payment_intent.payment_method.
+ *  Falls back to 'card' (no card details) if expansion fails or the intent is unavailable. */
 export async function resolveActualPaymentMethod(
     session: Record<string, any>,
     connectedAccountId?: string,
-): Promise<'card' | 'fpx'> {
+): Promise<ResolvedPaymentMethod> {
     const enabledTypes: string[] = session.payment_method_types ?? []
-    if (enabledTypes.length === 1) {
-        return enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
-    }
+
+    // Single-method FPX is unambiguous — no need to expand the intent, and there are no card details.
+    if (enabledTypes.length === 1 && enabledTypes[0] === 'fpx') return { method: 'fpx' }
 
     const paymentIntentId = typeof session.payment_intent === 'string'
         ? session.payment_intent
         : (session.payment_intent as { id?: string } | null)?.id
-    if (!paymentIntentId) return 'card'
+
+    // No intent to expand → method is card (the only remaining single type / multi default); no details.
+    if (!paymentIntentId) return { method: 'card' }
 
     try {
         const stripe = getStripeClient()
@@ -178,10 +188,11 @@ export async function resolveActualPaymentMethod(
             { expand: ['payment_method'] },
             connectedAccountId ? { stripeAccount: connectedAccountId } : undefined,
         )
-        const pmType = (pi.payment_method as { type?: string } | null)?.type
-        return pmType === 'fpx' ? 'fpx' : 'card'
+        const pm = pi.payment_method as { type?: string; card?: { brand?: string; last4?: string } } | null
+        if (pm?.type === 'fpx') return { method: 'fpx' }
+        return { method: 'card', cardBrand: pm?.card?.brand ?? undefined, cardLast4: pm?.card?.last4 ?? undefined }
     } catch (err) {
         console.warn('[Reconcile] Could not expand payment_intent for method detection, defaulting to card:', err)
-        return 'card'
+        return { method: 'card' }
     }
 }

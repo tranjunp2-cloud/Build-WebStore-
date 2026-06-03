@@ -31,6 +31,8 @@ export type ConfirmOrder = {
     paymentReference?: string
     paymentExpiresAt?: string | null
     stripePaymentIntentId?: string
+    cardBrand?: string | null
+    cardLast4?: string | null
     customerName: string
     customerEmail: string
     shippingAddress?: ShippingAddress
@@ -285,6 +287,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isFree = order.paymentMethod === 'free'
     const isStripe = !isBT && !isCod && !isFree
     const isPaid = livePay === 'paid'
+    // Confirm-page "Method" line: card brand + last4 when captured, else the method name.
+    const stripeMethodLabel = order.cardBrand && order.cardLast4
+        ? `${order.cardBrand.charAt(0).toUpperCase()}${order.cardBrand.slice(1)} ending in ${order.cardLast4}`
+        : order.paymentMethod === 'fpx' ? 'FPX (Online Banking)' : 'Credit Card'
     // Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — match both
     const payFailed = livePay === 'failed' || livePay === 'payment_failed'
     // Stripe payment not completed (buyer cancelled or webhook reported failure) — show retry, not success
@@ -309,14 +315,17 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const heroCheckClass = isPaid ? '' : isStripePending ? 'danger' : isSubmitted ? 'info' : isBT ? 'warning' : ''
     const heroClass = isPaid ? '' : isStripePending ? ' failed' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
     const heroTitle = isPaid
-        ? 'Order Confirmed — Payment Verified!'
+        // Stripe paid = "Order Successfully Placed!" (design); BT paid = seller-verified copy.
+        ? (isStripe ? 'Order Successfully Placed!' : 'Order Confirmed — Payment Verified!')
         : isStripePending
             ? 'Payment Failed — Action Required'
             : isSubmitted
                 ? 'The order has been placed — Awaiting seller confirmation.'
                 : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
     const heroSub = isPaid
-        ? 'Your payment has been verified by the seller. Your order is now being prepared for shipment.'
+        ? (isStripe
+            ? 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
+            : 'Your payment has been verified by the seller. Your order is now being prepared for shipment.')
         : isStripePending
             ? 'We couldn’t process your payment. Your order is being held for you — please retry payment within 24 hours to avoid cancellation.'
             : isSubmitted
@@ -733,8 +742,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     <span className="brand-mark fpx">FPX</span>
                                 </div>
                             </div>
-                            {order.stripePaymentIntentId && (
-                                <ul className="ty-paid-meta">
+                            <ul className="ty-paid-meta">
+                                {order.stripePaymentIntentId && (
                                     <li>
                                         <span className="lbl"><Hash size={12} /> Transaction ID</span>
                                         <span className="val mono">{order.stripePaymentIntentId}</span>
@@ -742,8 +751,12 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                             <CopyIcon /> Copy
                                         </button>
                                     </li>
-                                </ul>
-                            )}
+                                )}
+                                <li>
+                                    <span className="lbl"><CreditCard size={12} /> Method</span>
+                                    <span className="val">{stripeMethodLabel}</span>
+                                </li>
+                            </ul>
                             <div className="ty-email-note">
                                 <Mail size={14} />
                                 <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>

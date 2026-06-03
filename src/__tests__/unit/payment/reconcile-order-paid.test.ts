@@ -283,102 +283,80 @@ describe('[TC-F13.147] resolveActualPaymentMethod', () => {
         vi.clearAllMocks()
     })
 
-    it('single payment_method_type=fpx → returns fpx', async () => {
+    it('single payment_method_type=fpx → fpx, no Stripe expand', async () => {
         // Arrange
-        const session = {
-            id: 'cs_test',
-            payment_method_types: ['fpx'],
-            payment_intent: 'pi_test',
-        }
+        const session = { id: 'cs_test', payment_method_types: ['fpx'], payment_intent: 'pi_test' }
 
         // Act
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('fpx')
+        expect(result.method).toBe('fpx')
         expect(mockGetStripeClient).not.toHaveBeenCalled()
     })
 
-    it('single payment_method_type=card → returns card', async () => {
-        // Arrange
-        const session = {
-            id: 'cs_test',
-            payment_method_types: ['card'],
-            payment_intent: 'pi_test',
+    it('single payment_method_type=card → expands to capture brand + last4', async () => {
+        // Arrange — card now expands the intent to read card details for the confirm "Method" line
+        const mockStripeClient = {
+            paymentIntents: {
+                retrieve: vi.fn().mockResolvedValueOnce({ payment_method: { type: 'card', card: { brand: 'visa', last4: '4242' } } }),
+            },
         }
+        mockGetStripeClient.mockReturnValueOnce(mockStripeClient as any)
+        const session = { id: 'cs_test', payment_method_types: ['card'], payment_intent: 'pi_test' }
 
         // Act
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('card')
-        expect(mockGetStripeClient).not.toHaveBeenCalled()
+        expect(result).toEqual({ method: 'card', cardBrand: 'visa', cardLast4: '4242' })
     })
 
     it('multi-method session expands payment_intent → detects fpx', async () => {
         // Arrange
         const mockStripeClient = {
-            paymentIntents: {
-                retrieve: vi.fn().mockResolvedValueOnce({
-                    payment_method: { type: 'fpx' },
-                }),
-            },
+            paymentIntents: { retrieve: vi.fn().mockResolvedValueOnce({ payment_method: { type: 'fpx' } }) },
         }
         mockGetStripeClient.mockReturnValueOnce(mockStripeClient as any)
-
-        const session = {
-            id: 'cs_test',
-            payment_method_types: ['card', 'fpx'],
-            payment_intent: 'pi_test_123',
-        }
+        const session = { id: 'cs_test', payment_method_types: ['card', 'fpx'], payment_intent: 'pi_test_123' }
 
         // Act
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('fpx')
+        expect(result.method).toBe('fpx')
         expect(mockStripeClient.paymentIntents.retrieve).toHaveBeenCalledWith(
             'pi_test_123',
             { expand: ['payment_method'] },
-            { stripeAccount: 'acct_test' }
+            { stripeAccount: 'acct_test' },
         )
     })
 
-    it('expand fails → falls back to card', async () => {
+    it('expand fails → falls back to card (no details)', async () => {
         // Arrange
         const mockStripeClient = {
-            paymentIntents: {
-                retrieve: vi.fn().mockRejectedValueOnce(new Error('Rate limited')),
-            },
+            paymentIntents: { retrieve: vi.fn().mockRejectedValueOnce(new Error('Rate limited')) },
         }
         mockGetStripeClient.mockReturnValueOnce(mockStripeClient as any)
-
-        const session = {
-            id: 'cs_test',
-            payment_method_types: ['card', 'fpx'],
-            payment_intent: 'pi_test_123',
-        }
+        const session = { id: 'cs_test', payment_method_types: ['card', 'fpx'], payment_intent: 'pi_test_123' }
 
         // Act
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('card')
+        expect(result.method).toBe('card')
+        expect(result.cardLast4).toBeUndefined()
     })
 
-    it('missing payment_intent → returns card', async () => {
+    it('missing payment_intent → card, no expand', async () => {
         // Arrange
-        const session = {
-            id: 'cs_test',
-            payment_method_types: ['card', 'fpx'],
-            payment_intent: undefined,
-        }
+        const session = { id: 'cs_test', payment_method_types: ['card', 'fpx'], payment_intent: undefined }
 
         // Act
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('card')
+        expect(result.method).toBe('card')
         expect(mockGetStripeClient).not.toHaveBeenCalled()
     })
 
@@ -403,6 +381,6 @@ describe('[TC-F13.147] resolveActualPaymentMethod', () => {
         const result = await resolveActualPaymentMethod(session, 'acct_test')
 
         // Assert
-        expect(result).toBe('card')
+        expect(result.method).toBe('card')
     })
 })

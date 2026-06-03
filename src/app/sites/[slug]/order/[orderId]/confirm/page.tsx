@@ -100,6 +100,8 @@ export default async function OrderConfirmPage({
                 paymentReference: raw.paymentReference,
                 paymentExpiresAt: raw.paymentExpiresAt,
                 stripePaymentIntentId: raw.stripePaymentIntentId,
+                cardBrand: raw.cardBrand,
+                cardLast4: raw.cardLast4,
                 customerName: raw.customerName,
                 customerEmail: raw.customerEmail,
                 shippingAddress: raw.shippingAddress,

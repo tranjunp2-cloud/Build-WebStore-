@@ -4073,6 +4073,9 @@ const MIGRATIONS = [
   // ── F13 US-F13-06: oversell review flag (set when stock oversold after payment captured) ──
   { name: 'orders.oversell_review',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review boolean DEFAULT false;` },
+  // ── F13: Stripe card details for the confirm-page "Method" line (e.g. "Visa ending in 4242") ──
+  { name: 'orders.card_brand', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand varchar;` },
+  { name: 'orders.card_last4', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_last4 varchar;` },
   // ── F25 phase-03: Orders → Customer FK ──
   { name: 'orders.customer',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
