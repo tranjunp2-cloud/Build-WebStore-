@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Gauge, Map, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { AutoMetaToggle } from './SEOKeywordTracker'
 import { GenerateSitemapButton } from './GenerateSitemapButton'
@@ -84,7 +85,8 @@ export function SEOViewContent({
                 {/* SEO Health Overview */}
                 <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm">
                     <div className="text-base font-bold text-white mb-6 flex items-center gap-2">
-                        📋 {seo.healthOverview || 'SEO Health Overview'}
+                        <Gauge className="w-5 h-5 shrink-0" aria-hidden />
+                        {seo.healthOverview || 'SEO Health Overview'}
                     </div>
 
                     <div className="flex items-center gap-[24px] mb-[24px]">
@@ -112,7 +114,8 @@ export function SEOViewContent({
                                 disabled={!siteId || missingSeoItems.length === 0}
                                 className="flex items-center justify-center gap-2 px-[16px] pt-[8.5px] pb-[9px] bg-[linear-gradient(167deg,#3B82F6_0%,#2DD4BF_100%)] text-white rounded-[8px] font-semibold text-[13px] leading-[1.21em] hover:opacity-90 transition-opacity whitespace-nowrap w-fit disabled:opacity-50"
                             >
-                                {seo.fixAllButton || '✨ AI Fix All Issues'}
+                                <Sparkles className="w-4 h-4 shrink-0" aria-hidden />
+                                {seo.fixAllButton || 'AI Fix All Issues'}
                             </button>
                         </div>
                     </div>
@@ -126,23 +129,49 @@ export function SEOViewContent({
 
                 {/* Sitemap & Meta Tags */}
                 <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-[25px] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)]">
-                    <div className="text-[16px] leading-[1.375em] font-bold text-white mb-[16px]">
-                        🗺️ {seo.sitemapAndMeta || 'Sitemap & Meta Tags'}
+                    <div className="text-[16px] leading-[1.375em] font-bold text-white mb-[20px] flex items-center gap-2">
+                        <Map className="w-5 h-5 shrink-0" aria-hidden />
+                        {seo.sitemapAndMeta || 'Sitemap & Meta Tags'}
                     </div>
 
-                    <div className="mb-[16px]">
-                        {siteId ? <GenerateSitemapButton siteId={siteId} /> : (
-                            <button disabled className="flex items-center justify-center px-[16px] pt-[8.5px] pb-[9px] bg-transparent border border-solid border-[#374151] text-[#6B7280] rounded-[8px] font-semibold text-[13px] leading-[1.21em] opacity-50 cursor-not-allowed">
-                                🗺️ {seo.generateSitemap || 'Generate Sitemap'}
-                            </button>
-                        )}
+                    {/* Sub-section: Sitemap Configuration */}
+                    <div className="pb-[20px]">
+                        <div className="text-[12px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-[12px]">
+                            {seo.sitemapConfig || 'Sitemap Configuration'}
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex flex-col gap-[4px] min-w-0">
+                                {/* TODO: status is currently static/cosmetic — wire real sitemap-freshness data when available */}
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" aria-hidden />
+                                    <span className="text-[14px] font-semibold text-white">
+                                        {seo.statusLabel || 'Status:'} {seo.statusUpToDate || 'Up-to-date'}
+                                    </span>
+                                </div>
+                                <div className="text-[12px] leading-[1.5] text-[#9CA3AF] pl-[24px]">
+                                    {ti(seo.lastUpdated, { date: new Date().toISOString().split('T')[0] })}
+                                </div>
+                            </div>
+                            <div className="shrink-0">
+                                {siteId ? <GenerateSitemapButton siteId={siteId} /> : (
+                                    <button disabled className="flex items-center justify-center px-[16px] pt-[8.5px] pb-[9px] bg-transparent border border-solid border-[#374151] text-[#6B7280] rounded-[8px] font-semibold text-[13px] leading-[1.21em] opacity-50 cursor-not-allowed">
+                                        {seo.generateSitemap || 'Generate Sitemap'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="text-[13px] leading-[1.69em] text-[#9CA3AF] mb-[8px]">
-                        {ti(seo.lastUpdated, { date: new Date().toISOString().split('T')[0] })}
-                    </div>
+                    {/* Divider between the two functional areas */}
+                    <div className="h-[1px] w-full bg-[#1F2937]" />
 
-                    <AutoMetaToggle defaultChecked={autoMetaGenerationEnabled} siteId={siteId ?? undefined} />
+                    {/* Sub-section: Automatic Meta Tags */}
+                    <div className="pt-[20px]">
+                        <div className="text-[12px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-[12px]">
+                            {seo.metaTagsSection || 'Automatic Meta Tags'}
+                        </div>
+                        <AutoMetaToggle defaultChecked={autoMetaGenerationEnabled} siteId={siteId ?? undefined} />
+                    </div>
                 </div>
             </div>
 
@@ -153,7 +182,8 @@ export function SEOViewContent({
             {missingSeoItems.length > 0 && (
                 <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm">
                     <div className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                        ⚠️ {seo.issuesList || 'SEO Issues'}
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500" aria-hidden />
+                        {seo.issuesList || 'SEO Issues'}
                     </div>
                     <div className="flex flex-col">
                         {missingSeoItems.slice(0, 10).map((item, idx) => (

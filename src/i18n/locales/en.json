@@ -682,17 +682,25 @@
             "missingDesc": "Missing description",
             "healthOverview": "SEO Health Overview",
             "scoreLabel": "Score: {score}/100",
-            "fixAllButton": "✨ AI Fix All Issues",
+            "fixAllButton": "AI Fix All Issues",
             "contentQuality": "Content Quality",
             "technicalSeo": "Technical SEO",
             "sitemapAndMeta": "Sitemap & Meta Tags",
+            "sitemapConfig": "Sitemap Configuration",
+            "metaTagsSection": "Automatic Meta Tags",
+            "statusLabel": "Status:",
+            "statusUpToDate": "Up-to-date",
             "lastUpdated": "Last updated: {date}",
             "generating": "Generating...",
             "sitemapCount": "Sitemap generated — {count} pages",
             "sitemapEmpty": "Sitemap generated — no pages yet",
             "autoMeta": {
                 "enabled": "Auto Meta Generation: Enabled",
-                "disabled": "Auto Meta Generation: Disabled"
+                "disabled": "Auto Meta Generation: Disabled",
+                "label": "Auto-Generate Meta Tags",
+                "description": "Automatically creates SEO-optimized title and description tags for new pages and products.",
+                "on": "ON",
+                "off": "OFF"
             },
             "keywordColumns": {
                 "keyword": "Keyword",
