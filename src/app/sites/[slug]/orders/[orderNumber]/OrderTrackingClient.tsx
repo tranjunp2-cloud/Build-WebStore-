@@ -393,7 +393,7 @@ function OtSide({ order, slug }: { order: OrderData; slug: string }) {
                 </div>
             )}
 
-<div className="ot-back-row">
+            <div className="ot-back-row">
                 <Link href={`/sites/${slug}`} className="ot-back-btn">
                     <Store size={14} /> Back to Shop
                 </Link>
