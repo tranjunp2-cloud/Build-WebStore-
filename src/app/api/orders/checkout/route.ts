@@ -6,6 +6,7 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getShippingRate } from '@/lib/shipping'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { generatePaymentReference } from '@/lib/payment/reference'
 import { signOrderToken } from '@/lib/auth/order-token'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
@@ -213,7 +214,26 @@ export async function POST(request: Request) {
 
         // Tax (SST 6% on subtotal only — BR-05)
         const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = subtotal + shippingFee + tax
+
+        // Discount: re-validate server-side from code — client amount is never trusted
+        let discountSen = 0
+        let discountRow: any = null
+        if (data.discountCode) {
+            const code = String(data.discountCode).trim().toUpperCase()
+            const discountResult = await payload.find({
+                collection: 'discounts',
+                where: { and: [{ tenant: { equals: tenantId } }, { code: { equals: code } }] },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            discountRow = discountResult.docs[0] ?? null
+            const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) discountSen = applied.discountSen
+            else discountRow = null // silent reject — proceed at full price
+        }
+        const discountRM = discountSen / 100
+        const total = Math.max(0, subtotal - discountRM) + shippingFee + tax
 
         // Compute bank_transfer-specific fields (before create)
         let paymentReference: string | undefined
@@ -258,8 +278,46 @@ export async function POST(request: Request) {
                     postcode: customer.address.postcode || '',
                     country: customer.address.country || 'Malaysia',
                 } : undefined,
+                ...(discountRow ? {
+                    discount: discountRow.id,
+                    discountCode: discountRow.code,
+                    discountAmount: discountSen,
+                } : {}),
             } as any,
         })
+
+        // Record discount usage (COD/bank_transfer — Stripe records at webhook)
+        if (discountRow && discountSen > 0) {
+            try {
+                const db = payload.db as { drizzle: { execute: (q: unknown) => Promise<{ rows: any[] }> } }
+                // Idempotent: ON CONFLICT (order_id) DO NOTHING — prevents double-count on retry
+                const usageResult = await db.drizzle.execute(sql`
+                    INSERT INTO discount_usage_history
+                        (tenant_id, discount_id, order_id, amount_applied, customer_email, used_at, created_at, updated_at)
+                    VALUES (
+                        ${Number(tenantId)},
+                        ${Number(discountRow.id)},
+                        ${Number((order as any).id)},
+                        ${discountSen},
+                        ${customer.email},
+                        NOW(),
+                        NOW(),
+                        NOW()
+                    )
+                    ON CONFLICT (order_id) DO NOTHING
+                    RETURNING id
+                `)
+                // Only increment usageCount if a new history row was actually inserted
+                if ((usageResult as any).rows?.length > 0) {
+                    await db.drizzle.execute(sql`
+                        UPDATE discounts SET usage_count = usage_count + 1 WHERE id = ${Number(discountRow.id)}
+                    `)
+                }
+            } catch (usageErr) {
+                // Non-fatal — order is already created; log and continue
+                console.error('[checkout] discount usage history write failed', usageErr)
+            }
+        }
 
         // Decrement inventory for COD only — bank_transfer reserves stock without decrement
         // (decrement happens at Approve step in P06)

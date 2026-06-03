@@ -4212,6 +4212,105 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.email_template_settings_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_email_template_settings_id_idx" ON "payload_locked_documents_rels" ("email_template_settings_id");`,
   },
+  // ── F33: discounts ──
+  {
+    name: 'discounts.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS discounts (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      site_id integer REFERENCES sites(id) ON DELETE SET NULL,
+      code varchar NOT NULL,
+      description text,
+      type varchar NOT NULL,
+      value numeric NOT NULL DEFAULT 0,
+      status varchar NOT NULL DEFAULT 'active',
+      usage_limit integer,
+      usage_count integer NOT NULL DEFAULT 0,
+      starts_at timestamptz,
+      expires_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'discounts.tenant_code_uq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS discounts_tenant_code_uq ON discounts (tenant_id, upper(code));`,
+  },
+  {
+    name: 'discounts.status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discounts_status_idx ON discounts (status);`,
+  },
+  {
+    name: 'discounts.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discounts_tenant_idx ON discounts (tenant_id);`,
+  },
+  {
+    name: 'discounts.alter_columns',
+    sql: `
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS site_id integer REFERENCES sites(id) ON DELETE SET NULL;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS code varchar;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS description text;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS type varchar;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS value numeric NOT NULL DEFAULT 0;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'active';
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS usage_limit integer;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS usage_count integer NOT NULL DEFAULT 0;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS starts_at timestamptz;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
+  // ── F33: discount_usage_history ──
+  {
+    name: 'discount_usage_history.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS discount_usage_history (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      discount_id integer REFERENCES discounts(id) ON DELETE SET NULL,
+      order_id integer REFERENCES orders(id) ON DELETE SET NULL,
+      amount_applied numeric NOT NULL DEFAULT 0,
+      customer_email varchar,
+      used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'discount_usage_history.order_uq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS discount_usage_history_order_uq ON discount_usage_history (order_id);`,
+  },
+  {
+    name: 'discount_usage_history.discount_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discount_usage_history_discount_idx ON discount_usage_history (discount_id);`,
+  },
+  {
+    name: 'discount_usage_history.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discount_usage_history_tenant_idx ON discount_usage_history (tenant_id);`,
+  },
+  {
+    name: 'discount_usage_history.alter_columns',
+    sql: `
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_id integer REFERENCES discounts(id) ON DELETE SET NULL;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS order_id integer REFERENCES orders(id) ON DELETE SET NULL;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS amount_applied numeric NOT NULL DEFAULT 0;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS customer_email varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS used_at timestamptz;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
+  // ── F33: orders ALTER — add discount columns ──
+  {
+    name: 'orders.add_discount_columns',
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_id integer REFERENCES discounts(id) ON DELETE SET NULL;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code varchar;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount numeric
+    `,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4248,6 +4347,8 @@ const COLLECTION_SLUGS = [
   'template_versions',
   'customers',
   'email-template-settings',
+  'discounts',
+  'discount_usage_history',
 ];
 
 /**
@@ -4700,6 +4801,10 @@ async function main() {
   -- F25 phase-03 Relationship Bypass: customer → Payload uses customer_id column;
   -- bare name registered here so check-migrations CI can match the field name.
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer
+
+  -- F33 Relationship Bypass: discount → Payload uses discount_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments

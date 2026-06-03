@@ -7,6 +7,7 @@ import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
@@ -179,7 +180,27 @@ export async function POST(request: NextRequest) {
         // Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
         const shippingFee = 10
         const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
+        const subtotalSen = Math.round(subtotal * 100)
+
+        // Discount: re-validate server-side from code — client amount is never trusted
+        let discountSen = 0
+        let discountRow: any = null
+        if (parse.data.discountCode) {
+            const code = String(parse.data.discountCode).trim().toUpperCase()
+            const discountResult = await payload.find({
+                collection: 'discounts',
+                where: { and: [{ tenant: { equals: tenantId } }, { code: { equals: code } }] },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            discountRow = discountResult.docs[0] ?? null
+            const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) discountSen = applied.discountSen
+            else discountRow = null
+        }
+        const discountRM = discountSen / 100
+        const total = Math.round((subtotal - discountRM + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
@@ -243,6 +264,11 @@ export async function POST(request: NextRequest) {
                           country: customer.address.country || 'Malaysia',
                       }
                     : undefined,
+                ...(discountRow ? {
+                    discount: discountRow.id,
+                    discountCode: discountRow.code,
+                    discountAmount: discountSen,
+                } : {}),
             } as Record<string, unknown>,
         })
 
@@ -250,12 +276,17 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
 
-        // Include shipping and tax as Stripe line items so buyer is charged the full order total
-        const allCheckoutItems = [
-            ...checkoutItems,
-            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
-        ]
+        // When discount applied, use a single consolidated line item so Stripe charges
+        // exactly the discounted total. Stripe forbids negative line items, so per-item
+        // proportional split is not viable (Q2 confirmed: consolidated line is acceptable).
+        const finalTotalSen = Math.round(total * 100)
+        const allCheckoutItems = discountRow
+            ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
+            : [
+                ...checkoutItems,
+                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+                ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
+              ]
 
         let checkout
         try {
