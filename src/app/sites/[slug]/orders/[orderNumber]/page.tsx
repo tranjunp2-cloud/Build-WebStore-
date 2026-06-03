@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import OrderTrackingClient from './OrderTrackingClient'
+import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
 import { OT_CSS } from './order-tracking-styles'
 import ResendUploadLinkForm from './ResendUploadLinkForm'
 
@@ -148,6 +149,8 @@ export default async function OrderTrackingPage({
 
     return (
         <>
+            {/* Browser Back from Stripe (retry-payment flow) → confirm page Payment Failed (no flash) */}
+            <StripeBackRedirectScript />
             {fontLinks}
             <style dangerouslySetInnerHTML={{ __html: OT_CSS }} />
             <OrderTrackingClient order={sanitizedOrder} slug={slug} />

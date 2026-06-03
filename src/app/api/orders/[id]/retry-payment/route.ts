@@ -204,7 +204,8 @@ export async function POST(
                 currency: order.currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: order.customerEmail,
                 successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`,
+                // Cancel/back at Stripe → confirm page "payment not completed" (consistent with place-order)
+                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
