@@ -40,7 +40,7 @@ export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
 ])
 
 // feat/fix-broken-block-variants: blocks hidden until render/variant issues are resolved.
-// Re-enable: remove entry here + from TEMP_HIDDEN_BLOCK_TYPES (template-composer.ts) + EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
+// Re-enable: remove entry here + from EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
 // PR #836 accidentally re-enabled doctor-profile, gallery-masonry, before-after — re-hidden 260508.
 // GH-1024: property-card, menu-display, pricing-table hidden — use features/gallery, menu-food, pricing respectively.
 export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([

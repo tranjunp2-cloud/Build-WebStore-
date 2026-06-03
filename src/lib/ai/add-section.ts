@@ -16,13 +16,13 @@ export type SupportedAddSectionType =
     | 'socialWidget'
     | 'cartWidget'
     // v1.1 new blocks
-    | 'pricing-table'
-    | 'gallery-masonry'
+    // | 'pricing-table' // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // | 'gallery-masonry' // hidden: BLOCKS_TEMP_HIDDEN
     | 'whatsapp-button'
     | 'google-maps'
     | 'social-proof'
     | 'countdown-timer'
-    | 'before-after'
+    // | 'before-after' // hidden: BLOCKS_TEMP_HIDDEN
     | 'feature-comparison'
     | 'download-cta'
     | 'video-background'
@@ -49,11 +49,11 @@ export type SupportedAddSectionType =
     | 'products-featured'
     // v2.0 industry blocks
     | 'booking-widget'
-    | 'class-schedule'
     | 'review-cards'
     // | 'video-showcase' // temporarily hidden (aiVisible: false, archived)
-    | 'doctor-profile'
-    | 'property-card'
+    // | 'class-schedule' // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // | 'doctor-profile' // hidden: BLOCKS_TEMP_HIDDEN
+    // | 'property-card' // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
     | 'product-quick-view'
 
 export type AddSectionLocale = 'en' | 'ms'
@@ -81,13 +81,13 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['socialWidget', [/\bsocial\s*widget\b/i, /\bsocial\s*media\b/i, /\bsocial\s*links?\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
     ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
     // v1.1 new blocks
-    ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]],
-    ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]],
+    // ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]], // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
     ['whatsapp-button', [/\bwhatsapp\b/i, /\bwa\s*button\b/i]],
     ['google-maps', [/\bgoogle\s*maps?\b/i, /\bmap\b/i, /\blocation\b/i, /\baddress\b/i]],
     ['social-proof', [/\bsocial\s*proof\b/i, /\breview\b/i, /\brating\b/i, /\bstar\b/i]],
     ['countdown-timer', [/\bcountdown\b/i, /\btimer\b/i, /\burgency\b/i]],
-    ['before-after', [/\bbefore\s*after\b/i, /\bcomparison\s*slider\b/i]],
+    // ['before-after', [/\bbefore\s*after\b/i, /\bcomparison\s*slider\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
     ['feature-comparison', [/\bfeature\s*comparison\b/i, /\bcompare\s*plan\b/i, /\bvs\b/i]],
     ['download-cta', [/\bdownload\b/i, /\bfile\b/i, /\bebook\b/i, /\bpdf\b/i]],
     ['video-background', [/\bvideo\s*background\b/i, /\bvideo\s*hero\b/i, /\bfull\s*video\b/i]],
@@ -111,9 +111,9 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
     ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
     // ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]], // feat/fix-broken-block-variants: temporarily hidden
-    ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]],
-    ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]],
-    ['property-card', [/\bproperty(-card)?\b/i, /\breal[-\s]estate\b/i, /\blisting\b/i]],
+    // ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]], // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]], // hidden: BLOCKS_TEMP_HIDDEN
+    // ['property-card', [/\bproperty(-card)?\b/i, /\breal[-\s]estate\b/i, /\blisting\b/i]], // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
     ['products-grid', [/\bproduct(s)?\b/i, /\bshop\b/i, /\bstore\b/i]],
     ['logo-cloud', [/\blogo\b/i, /\bpartner\b/i, /\btrusted\b/i]],
     ['custom-html', [/\bcustom\s*html\b/i, /\bembed\b/i, /\bhtml\b/i, /\bcode\b/i]],
@@ -132,13 +132,13 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     cta: 'CTA',
     socialWidget: 'social media',
     cartWidget: 'cart',
-    'pricing-table': 'pricing table',
-    'gallery-masonry': 'masonry gallery',
+    // 'pricing-table': 'pricing table', // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+    // 'gallery-masonry': 'masonry gallery', // hidden: BLOCKS_TEMP_HIDDEN
     'whatsapp-button': 'WhatsApp button',
     'google-maps': 'Google Maps',
     'social-proof': 'social proof',
     'countdown-timer': 'countdown timer',
-    'before-after': 'before/after comparison',
+    // 'before-after': 'before/after comparison', // hidden: BLOCKS_TEMP_HIDDEN
     'feature-comparison': 'feature comparison',
     'download-cta': 'download CTA',
     'video-background': 'video background',
@@ -165,11 +165,11 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'products-featured': 'featured products',
     // v2.0 industry blocks
     'booking-widget': 'booking widget',
-    'class-schedule': 'class schedule',
     'review-cards': 'review cards',
     // 'video-showcase': 'video showcase', // temporarily hidden (aiVisible: false, archived)
-    'doctor-profile': 'doctor profile',
-    'property-card': 'property card',
+    // 'class-schedule': 'class schedule', // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+    // 'doctor-profile': 'doctor profile', // hidden: BLOCKS_TEMP_HIDDEN
+    // 'property-card': 'property card', // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
     'product-quick-view': 'product quick view',
 }
 
@@ -348,26 +348,26 @@ export function createAddSectionBlock({
 
         // ── v1.1 New Blocks ─────────────────────────────────────────
 
-        case 'pricing-table':
-            return {
-                blockType: 'pricing-table',
-                variant: 'columns',
-                headline: `Choose the right plan for you`,
-                subheadline: 'Simple, transparent pricing. No hidden fees.',
-                plans: [
-                    { name: 'Starter', price: 29, currency: 'RM', features: ['1 project', 'Basic support', '1GB storage'], cta: { label: 'Get Started', url: '#contact' } },
-                    { name: 'Business', price: 69, currency: 'RM', features: ['5 projects', 'Priority support', '10GB storage', 'Custom domain'], cta: { label: 'Get Started', url: '#contact' }, popular: true },
-                    { name: 'Enterprise', price: 149, currency: 'RM', features: ['Unlimited projects', '24/7 support', '100GB storage', 'API access', 'White label'], cta: { label: 'Contact Us', url: '#contact' } },
-                ],
-            }
+        // case 'pricing-table': // hidden: BLOCKS_TEMP_HIDDEN GH-1024
+        //     return {
+        //         blockType: 'pricing-table',
+        //         variant: 'columns',
+        //         headline: `Choose the right plan for you`,
+        //         subheadline: 'Simple, transparent pricing. No hidden fees.',
+        //         plans: [
+        //             { name: 'Starter', price: 29, currency: 'RM', features: ['1 project', 'Basic support', '1GB storage'], cta: { label: 'Get Started', url: '#contact' } },
+        //             { name: 'Business', price: 69, currency: 'RM', features: ['5 projects', 'Priority support', '10GB storage', 'Custom domain'], cta: { label: 'Get Started', url: '#contact' }, popular: true },
+        //             { name: 'Enterprise', price: 149, currency: 'RM', features: ['Unlimited projects', '24/7 support', '100GB storage', 'API access', 'White label'], cta: { label: 'Contact Us', url: '#contact' } },
+        //         ],
+        //     }
 
-        case 'gallery-masonry':
-            return {
-                blockType: 'gallery-masonry',
-                variant: 'masonry',
-                headline: `${brandName} Gallery`,
-                images: Array.from({ length: 6 }, (_, i) => ({ url: '', alt: `Gallery image ${i + 1}`, caption: `Photo ${i + 1}` })),
-            }
+        // case 'gallery-masonry': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'gallery-masonry',
+        //         variant: 'masonry',
+        //         headline: `${brandName} Gallery`,
+        //         images: Array.from({ length: 6 }, (_, i) => ({ url: '', alt: `Gallery image ${i + 1}`, caption: `Photo ${i + 1}` })),
+        //     }
 
         case 'whatsapp-button':
             return {
@@ -410,14 +410,14 @@ export function createAddSectionBlock({
                 expiredMessage: 'This offer has ended.',
             }
 
-        case 'before-after':
-            return {
-                blockType: 'before-after',
-                variant: 'slider',
-                headline: 'See the Transformation',
-                beforeImage: { url: '', alt: 'Before', label: 'Before' },
-                afterImage: { url: '', alt: 'After', label: 'After' },
-            }
+        // case 'before-after': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'before-after',
+        //         variant: 'slider',
+        //         headline: 'See the Transformation',
+        //         beforeImage: { url: '', alt: 'Before', label: 'Before' },
+        //         afterImage: { url: '', alt: 'After', label: 'After' },
+        //     }
 
         case 'feature-comparison':
             return {
@@ -735,20 +735,6 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'class-schedule':
-            return {
-                blockType: 'class-schedule',
-                variant: 'grid',
-                headline: `${brandName} Class Schedule`,
-                showCapacity: true,
-                highlightToday: true,
-                classes: [
-                    { name: 'Morning Session', instructor: 'Instructor A', day: 1, startTime: '07:00', endTime: '08:00', capacity: 15, enrolled: 8, level: 'Beginner' },
-                    { name: 'Afternoon Workshop', instructor: 'Instructor B', day: 3, startTime: '14:00', endTime: '15:30', capacity: 20, enrolled: 12, level: 'Intermediate' },
-                    { name: 'Evening Class', instructor: 'Instructor C', day: 5, startTime: '18:00', endTime: '19:00', capacity: 12, enrolled: 5, level: 'All Levels' },
-                ],
-            }
-
         case 'review-cards':
             return {
                 blockType: 'review-cards',
@@ -777,31 +763,45 @@ export function createAddSectionBlock({
         //         ],
         //     }
 
-        case 'doctor-profile':
-            return {
-                blockType: 'doctor-profile',
-                variant: 'cards',
-                headline: 'Meet Our Specialists',
-                subheadline: `Trusted professionals at ${brandName}`,
-                doctors: [
-                    { name: 'Dr. Sarah Lee', specialisation: 'General Practice', qualifications: ['MBBS', 'MMed'], availableDays: [1, 2, 3, 4, 5], languages: 'English, Malay', consultationFee: 'RM 80' },
-                    { name: 'Dr. Ahmad Razif', specialisation: 'Internal Medicine', qualifications: ['MBBS', 'MRCP'], availableDays: [1, 3, 5], languages: 'English, Malay, Arabic', consultationFee: 'RM 120' },
-                ],
-            }
+        // case 'class-schedule': // hidden: EDITOR_HIDDEN_BLOCKS, BLOCKS_REQUIRE_MEDIA_PIPELINE
+        //     return {
+        //         blockType: 'class-schedule',
+        //         variant: 'grid',
+        //         headline: `${brandName} Class Schedule`,
+        //         showCapacity: true,
+        //         highlightToday: true,
+        //         classes: [
+        //             { name: 'Morning Session', instructor: 'Instructor A', day: 1, startTime: '07:00', endTime: '08:00', capacity: 15, enrolled: 8, level: 'Beginner' },
+        //             { name: 'Afternoon Workshop', instructor: 'Instructor B', day: 3, startTime: '14:00', endTime: '15:30', capacity: 20, enrolled: 12, level: 'Intermediate' },
+        //             { name: 'Evening Class', instructor: 'Instructor C', day: 5, startTime: '18:00', endTime: '19:00', capacity: 12, enrolled: 5, level: 'All Levels' },
+        //         ],
+        //     }
 
-        case 'property-card':
-            return {
-                blockType: 'property-card',
-                variant: 'grid',
-                headline: 'Featured Properties',
-                subheadline: `Explore available listings from ${brandName}`,
-                showMap: false,
-                currency: 'RM',
-                properties: [
-                    { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale' as const, description: 'Modern apartment in a prime location.' },
-                    { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent' as const, description: 'Cozy studio ideal for working professionals.' },
-                ],
-            }
+        // case 'doctor-profile': // hidden: BLOCKS_TEMP_HIDDEN
+        //     return {
+        //         blockType: 'doctor-profile',
+        //         variant: 'cards',
+        //         headline: 'Meet Our Specialists',
+        //         subheadline: `Trusted professionals at ${brandName}`,
+        //         doctors: [
+        //             { name: 'Dr. Sarah Lee', specialisation: 'General Practice', qualifications: ['MBBS', 'MMed'], availableDays: [1, 2, 3, 4, 5], languages: 'English, Malay', consultationFee: 'RM 80' },
+        //             { name: 'Dr. Ahmad Razif', specialisation: 'Internal Medicine', qualifications: ['MBBS', 'MRCP'], availableDays: [1, 3, 5], languages: 'English, Malay, Arabic', consultationFee: 'RM 120' },
+        //         ],
+        //     }
+
+        // case 'property-card': // hidden: BLOCKS_TEMP_HIDDEN, EDITOR_HIDDEN_BLOCKS GH-1024
+        //     return {
+        //         blockType: 'property-card',
+        //         variant: 'grid',
+        //         headline: 'Featured Properties',
+        //         subheadline: `Explore available listings from ${brandName}`,
+        //         showMap: false,
+        //         currency: 'RM',
+        //         properties: [
+        //             { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale', description: 'Modern apartment in a prime location.' },
+        //             { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent', description: 'Cozy studio ideal for working professionals.' },
+        //         ],
+        //     }
 
         case 'product-quick-view':
             return {

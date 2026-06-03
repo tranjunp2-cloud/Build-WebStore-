@@ -4,6 +4,7 @@ import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { DEFAULT_FOCUS_STYLE } from '@/lib/ai/theme-presets'
 import { FONT_PAIRINGS } from '@/lib/fonts/pairings'
 import { TEMPLATE_RULES } from '@/lib/ai/template-rules'
+import { isUnsupportedBlock } from './unsupported-blocks'
 
 /** Resolve explicit heading + body font names from a pairing id. Returns nulls if id unknown. */
 function resolveFontNames(pairingId: string | undefined): { heading?: string; body?: string } {
@@ -63,19 +64,6 @@ export const BROKEN_VARIANTS: Record<string, string[]> = {
   testimonials: ['grid', 'single'],
 }
 
-// feat/fix-broken-block-variants: entire block types temporarily hidden from AI generation.
-// To re-enable a block, remove its entry from this set.
-// Mirror: also listed in EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
-export const TEMP_HIDDEN_BLOCK_TYPES = new Set([
-  'step-process',     // temporarily hidden
-  'booking-widget',   // temporarily hidden
-  'doctor-profile',   // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
-  'gallery-masonry',  // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
-  'before-after',     // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
-  'property-card',    // GH-1024 — hidden; use features/gallery
-  'menu-display',     // GH-1024 — hidden; use menu-food
-  'pricing-table',    // GH-1024 — hidden; use pricing
-])
 
 function simpleHash(str: string): number {
   let hash = 0
@@ -1339,8 +1327,8 @@ function getPageNames(variant: 'starter' | 'professional' | 'premium'): string[]
 }
 
 function buildIndustryBlock(blockType: string, content: CategoryContent, biz: BusinessSample, category: string): Record<string, unknown> | null {
-  // Guard: temporarily hidden block types — return null so callers skip them cleanly
-  if (TEMP_HIDDEN_BLOCK_TYPES.has(blockType)) return null
+  // Guard: unsupported block types — return null so callers skip them cleanly
+  if (isUnsupportedBlock(blockType)) return null
   switch (blockType) {
     case 'menu-food':
       return buildMenuFood(content)
@@ -2168,8 +2156,8 @@ export function composeFromBlueprint(
       title: page.name,
       slug: page.slug,
       layout: specs
-        // Filter out temporarily hidden block types before building
-        .filter((spec) => !TEMP_HIDDEN_BLOCK_TYPES.has(spec.blockType))
+        // Filter out unsupported block types before building
+        .filter((spec) => !isUnsupportedBlock(spec.blockType))
         .map((spec) => {
           const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet)
           return applyContentValidation(block, templateLang)
