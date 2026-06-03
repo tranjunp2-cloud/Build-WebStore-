@@ -64,7 +64,7 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     currency: 'MYR',
     locale: 'en',
   },
-  'order-shipped': {
+  'order-completed': {
     shopName: 'Aurora Batik',
     supportEmail: 'support@aurora-batik.my',
     orderNumber: 'DEMO-001',
@@ -77,9 +77,7 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     shippingFee: 10,
     total: 309,
     paymentMethod: 'stripe',
-    shippingProvider: 'J&T Express',
-    orderDate: '2026-05-26T10:00:00.000Z',
-    shippedDate: '2026-05-27T10:00:00.000Z',
+    completedDate: '2026-05-28T10:00:00.000Z',
     orderPageUrl: 'https://aurora-batik.my/orders/DEMO-001',
     currency: 'MYR',
     locale: 'en',
@@ -104,9 +102,17 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
   },
   'new-order-seller': {
     shopName: 'Aurora Batik',
+    sellerName: 'Siti Yusoff',
     orderNumber: 'DEMO-001',
     customerName: 'John Doe',
     orderPageUrl: 'https://aurora-batik.my/dashboard/orders/DEMO-001',
+    items: [
+      { name: 'Demo Product A', variant: 'Default', quantity: 2, lineTotal: 199 },
+      { name: 'Demo Product B', variant: 'Large', quantity: 1, lineTotal: 100 },
+    ],
+    orderTotal: 299,
+    shippingFee: 0,
+    currency: 'MYR',
     locale: 'en',
   },
   'bank-transfer-instructions': {
@@ -172,6 +178,23 @@ export const EMAIL_PREVIEW_FIXTURES: Record<EmailTemplateType, Record<string, un
     refundNote: 'Item out of stock',
     shopUrl: 'https://aurora-batik.my',
     currency: 'MYR',
+    locale: 'en',
+  },
+  'contact-from-seller': {
+    shopName: 'Aurora Batik',
+    sellerName: 'Ahmad',
+    dashboardUrl: 'https://aurora-batik.my/dashboard',
+    visitorName: 'John Doe',
+    visitorEmail: 'john.doe@example.com',
+    visitorPhone: '0123456789',
+    message: 'I would like to enquire about your batik collection. Do you have custom orders available?',
+    locale: 'en',
+  },
+  'newsletter-seller-digest': {
+    shopName: 'Aurora Batik',
+    sellerName: 'Ahmad',
+    dashboardUrl: 'https://aurora-batik.my/dashboard',
+    subscriberEmail: 'subscriber@example.com',
     locale: 'en',
   },
 }

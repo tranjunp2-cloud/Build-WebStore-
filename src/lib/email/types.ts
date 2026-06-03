@@ -13,7 +13,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   'password-changed',
   // Order Flow
   'order-confirmation',
-  'order-shipped',
+  'order-completed',
   'order-cancelled',
   'order-expired',
   'order-refunded',
@@ -25,6 +25,9 @@ export const EMAIL_TEMPLATE_TYPES = [
   'new-order-seller',
   // Team
   'staff-invitation',
+  // Seller Communications
+  'contact-from-seller',
+  'newsletter-seller-digest',
 ] as const
 
 export type EmailTemplateType = typeof EMAIL_TEMPLATE_TYPES[number]
@@ -49,7 +52,7 @@ export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient
   'password-changed':           ['seller'],
   // Order Flow
   'order-confirmation':         ['buyer'],
-  'order-shipped':              ['buyer'],
+  'order-completed':            ['buyer'],
   'order-cancelled':            ['buyer'],
   'order-expired':              ['buyer'],
   'order-refunded':             ['buyer'],
@@ -61,6 +64,9 @@ export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient
   'new-order-seller':           ['seller'],
   // Team
   'staff-invitation':           ['seller'],
+  // Seller Communications
+  'contact-from-seller':        ['seller'],
+  'newsletter-seller-digest':   ['seller'],
 }
 
 /**
@@ -76,7 +82,7 @@ export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateType, string[]> = {
   'password-changed':           ['userName', 'brandName', 'supportEmail'],
   // Order Flow
   'order-confirmation':         ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl', 'supportEmail'],
-  'order-shipped':              ['customerName', 'orderNumber', 'trackingNumber', 'brandName', 'supportEmail'],
+  'order-completed':            ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl', 'supportEmail'],
   'order-cancelled':            ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'supportEmail'],
   'order-expired':              ['customerName', 'orderNumber', 'brandName', 'supportEmail'],
   'order-refunded':             ['customerName', 'orderNumber', 'refundAmount', 'brandName', 'supportEmail'],
@@ -88,4 +94,7 @@ export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateType, string[]> = {
   'new-order-seller':           ['orderNumber', 'orderTotal', 'brandName', 'dashboardUrl'],
   // Team
   'staff-invitation':           ['inviteeName', 'inviterName', 'brandName', 'dashboardUrl', 'supportEmail'],
+  // Seller Communications
+  'contact-from-seller':        ['sellerName', 'brandName', 'dashboardUrl', 'visitorName', 'visitorEmail'],
+  'newsletter-seller-digest':   ['sellerName', 'brandName', 'dashboardUrl', 'subscriberEmail'],
 }

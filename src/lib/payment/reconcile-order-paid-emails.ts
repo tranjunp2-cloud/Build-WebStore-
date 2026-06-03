@@ -58,8 +58,8 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
 
     try {
         const [buyerCmsConfig, sellerCmsConfig] = await Promise.all([
-            getTemplateConfig(tenantId, 'order-confirmation', 'buyer'),
-            getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+            getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale),
+            getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale),
         ])
 
         if (buyerCmsConfig?.enabled === false) {
@@ -105,6 +105,16 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 orderNumber: order.orderNumber,
                 customerName: order.customerName,
                 orderPageUrl: dashboardOrderUrl,
+                items: (order.items || []).map((item) => ({
+                    name: item.productName ?? '',
+                    variant: item.variant || undefined,
+                    quantity: item.quantity,
+                    lineTotal: (item.unitPrice ?? 0) * item.quantity,
+                })),
+                orderTotal: order.total,
+                shippingFee: order.shippingFee ?? 0,
+                currency: order.currency || 'MYR',
+                locale: siteLocale,
             }, sellerCmsConfig ?? undefined)
             ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
                 .catch((err: unknown) => console.error('[Reconcile] seller email failed', err)))

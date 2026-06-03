@@ -12,7 +12,7 @@ import {
   passwordChangedEmail,
   orderConfirmationEmail,
   orderCancelledEmail,
-  orderShippedEmail,
+  orderCompletedEmail,
   orderExpiredEmail,
   newOrderSellerEmail,
   bankTransferInstructionsEmail,
@@ -20,6 +20,8 @@ import {
   paymentRejectedEmail,
   staffInvitationEmail,
   orderRefundedEmail,
+  contactFromSellerEmail,
+  newsletterSellerDigestEmail,
 } from './templates'
 
 export type TemplateFn = (
@@ -43,11 +45,11 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
   'order-confirmation': (fixture, config) =>
     orderConfirmationEmail(fixture as any, config),
 
+  'order-completed': (fixture, config) =>
+    orderCompletedEmail(fixture as any, config),
+
   'order-cancelled': (fixture, config) =>
     orderCancelledEmail(fixture as any, config),
-
-  'order-shipped': (fixture, config) =>
-    orderShippedEmail(fixture as any, config),
 
   'order-expired': (fixture, config) =>
     orderExpiredEmail(fixture as any, config),
@@ -69,4 +71,10 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
 
   'order-refunded': (fixture, config) =>
     orderRefundedEmail(fixture as any, config),
+
+  'contact-from-seller': (fixture, config) =>
+    contactFromSellerEmail(fixture as any, config),
+
+  'newsletter-seller-digest': (fixture, config) =>
+    newsletterSellerDigestEmail(fixture as any, config),
 }

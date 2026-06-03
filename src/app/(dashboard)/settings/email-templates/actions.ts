@@ -51,11 +51,11 @@ function validateContentFields(fields: ContentFields, label: string): string | n
     if (fields.subject !== undefined && fields.subject.length > 200) {
         return `${label} subject exceeds 200 characters`
     }
-    if (fields.ctaLabel !== undefined && fields.ctaLabel.length > 100) {
-        return `${label} ctaLabel exceeds 100 characters`
-    }
     if (fields.greeting !== undefined && fields.greeting.length > 500) {
         return `${label} greeting exceeds 500 characters`
+    }
+    if (fields.ctaLabel !== undefined && fields.ctaLabel.length > 100) {
+        return `${label} ctaLabel exceeds 100 characters`
     }
     if (fields.closing !== undefined && fields.closing.length > 2000) {
         return `${label} closing exceeds 2000 characters`

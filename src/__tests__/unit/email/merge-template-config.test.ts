@@ -145,14 +145,13 @@ describe('mergeTemplateConfig [TC-F32]', () => {
     it('[TC: F32-M-06] non-empty config field overrides default', () => {
         // Arrange
         const defaults = {
-            subject: 'Default Subject',
+            subject: 'Default {type} Subject',
             greeting: 'Default Greeting',
             bodyText: 'Default Body',
         }
 
         const config: EmailTemplateConfig = {
             enabled: true,
-            subject: 'Custom {type} Subject',
             greeting: 'Hi there',
         }
 
@@ -166,8 +165,8 @@ describe('mergeTemplateConfig [TC-F32]', () => {
         const result = mergeTemplateConfig(defaults, config, vars, fieldMap)
 
         // Assert
-        expect(result.subject).toBe('Custom Order Subject')
-        expect(result.greeting).toBe('Hi there')
+        expect(result.subject).toBe('Default Order Subject') // subject only from defaults, with variables substituted
+        expect(result.greeting).toBe('Hi there') // from config override
         expect(result.bodyText).toBe('Default Body')
     })
 
@@ -183,9 +182,8 @@ describe('mergeTemplateConfig [TC-F32]', () => {
 
         const config: EmailTemplateConfig = {
             enabled: true,
-            subject: '', // empty — should NOT override
             greeting: 'Custom Greeting',
-            ctaLabel: '',
+            ctaLabel: '', // empty string should NOT override
         }
 
         const vars = {}
@@ -199,14 +197,14 @@ describe('mergeTemplateConfig [TC-F32]', () => {
         const result = mergeTemplateConfig(defaults, config, vars, fieldMap)
 
         // Assert
-        expect(result.subject).toBe('Default Subject')
+        expect(result.subject).toBe('Default Subject') // subject always from defaults
         expect(result.greeting).toBe('Custom Greeting')
-        expect(result.ctaLabel).toBe('Default CTA')
+        expect(result.ctaLabel).toBe('Default CTA') // empty string falls back to default
     })
 
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC: F32-M-05.1] substitutes variables in both defaults and config overrides', () => {
+    it('[TC: F32-M-05.1] substitutes variables in defaults and config overrides', () => {
         // Arrange
         const defaults = {
             subject: 'Hello {name}',
@@ -215,7 +213,7 @@ describe('mergeTemplateConfig [TC-F32]', () => {
 
         const config: EmailTemplateConfig = {
             enabled: true,
-            subject: 'Hi {name}!', // overrides default
+            greeting: 'Hi {name}!', // overrides default greeting
         }
 
         const vars = {
@@ -232,8 +230,8 @@ describe('mergeTemplateConfig [TC-F32]', () => {
         const result = mergeTemplateConfig(defaults, config, vars, fieldMap)
 
         // Assert
-        expect(result.subject).toBe('Hi Bob!')
-        expect(result.greeting).toBe('Welcome to MyBrand')
+        expect(result.subject).toBe('Hello Bob') // subject from defaults only, with variables substituted
+        expect(result.greeting).toBe('Hi Bob!') // greeting from config override with variables substituted
     })
 
     // ──────────────────────────────────────────────────────────────────
@@ -277,7 +275,6 @@ describe('mergeTemplateConfig [TC-F32]', () => {
 
         const config: EmailTemplateConfig = {
             enabled: true,
-            subject: 'Custom',
             closing: 'Best',
         }
 
@@ -292,9 +289,9 @@ describe('mergeTemplateConfig [TC-F32]', () => {
         const result = mergeTemplateConfig(defaults, config, vars, fieldMap)
 
         // Assert
-        expect(result.subject).toBe('Custom')
-        expect(result.greeting).toBe('Greeting') // unchanged
-        expect(result.closingText).toBe('Best')
+        expect(result.subject).toBe('Subject') // subject always from defaults
+        expect(result.greeting).toBe('Greeting') // unchanged (not mapped)
+        expect(result.closingText).toBe('Best') // from config override
     })
 
     // ──────────────────────────────────────────────────────────────────

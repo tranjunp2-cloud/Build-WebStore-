@@ -1728,10 +1728,10 @@
                 "contentLocale": "Bahasa kandungan",
                 "localeDesc": "Setiap bahasa menyimpan salinannya sendiri. Pelawat mendapat padanan terdekat.",
                 "fieldSubject": "Subjek",
+                "hintSubject": "Dipaparkan dalam pratonton peti masuk. Pastikan di bawah 60 aksara untuk mudah alih.",
                 "fieldGreeting": "Ucapan",
                 "fieldCtaLabel": "Label CTA",
                 "fieldClosing": "Penutup",
-                "hintSubject": "Ditunjukkan dalam pratonton peti masuk. Hadkan di bawah 60 aksara untuk mudah alih.",
                 "hintCtaLabel": "Teks butang. Gunakan kata kerja yang kukuh — \"Jejak Pesanan\", \"Sahkan\", \"Buka Peti Masuk\".",
                 "unsavedChanges": "Perubahan belum disimpan",
                 "allChangesSaved": "Semua perubahan disimpan",
@@ -1754,18 +1754,20 @@
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",
                     "otp-verification": "Kod pengesahan satu kali untuk log masuk dan keselamatan akaun.",
-                    "forgot-password": "Pautan set semula kata laluan, sah selama 30 minit.",
+                    "forgot-password": "Pautan set semula kata laluan satu ketuk, sah selama 30 minit.",
                     "password-changed": "Pengesahan kata laluan telah ditukar dengan berjaya.",
                     "order-confirmation": "Dihantar serta-merta apabila pembayaran pembeli berjaya — resit, item, penghantaran.",
-                    "order-shipped": "Pengesahan penghantaran apabila pesanan dihantar.",
+                    "order-completed": "Pengesahan penghantaran apabila pesanan telah tiba.",
                     "order-cancelled": "Maklumkan pembeli apabila pesanan dibatalkan.",
                     "order-expired": "Amaran kepada pembeli apabila pesanan yang belum dibayar telah tamat tempoh.",
                     "order-refunded": "Maklumkan pembeli apabila pesanan telah dibayar balik.",
-                    "bank-transfer-instructions": "Peringatan kepada pembeli untuk melengkapkan pemindahan bank — pesanan dibatalkan secara automatik selepas 24 jam.",
+                    "bank-transfer-instructions": "Ingatkan pembeli untuk melengkapkan pindahan bank — pesanan dibatalkan selepas 24j.",
                     "payment-confirmed": "Pengesahan bahawa pembayaran telah diterima dan pesanan sedang diproses.",
                     "payment-rejected": "Maklumkan pembeli bahawa pembayaran mereka ditolak.",
-                    "new-order-seller": "Pemberitahuan pesanan baru untuk papan pemuka penjual.",
-                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka."
+                    "new-order-seller": "Pemberitahuan kepada penjual setiap kali pesanan baharu masuk.",
+                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka.",
+                    "contact-from-seller": "Hantar mesej kepada peti masuk sokongan penjual.",
+                    "newsletter-seller-digest": "Ringkasan pendaftaran surat berita, kadar buka, dan kadar klik."
                 }
             }
         },
