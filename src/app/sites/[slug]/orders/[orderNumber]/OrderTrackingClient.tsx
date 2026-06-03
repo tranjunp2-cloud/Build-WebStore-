@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
-    CalendarClock, Navigation, LifeBuoy, Mail, ChevronDown,
+    CalendarClock, Navigation, ChevronDown,
     RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw,
 } from 'lucide-react'
 
@@ -393,19 +393,8 @@ function OtSide({ order, slug }: { order: OrderData; slug: string }) {
                 </div>
             )}
 
-            <div className="ot-support">
-                <div className="ot-support-head">
-                    <div className="ot-support-icon"><LifeBuoy size={19} /></div>
-                    <div>
-                        <div className="ot-support-title">Need help?</div>
-                        <div className="ot-support-sub">Contact the seller for assistance</div>
-                    </div>
-                </div>
-                <button className="ot-support-btn primary"><Mail size={13} /> Email Support</button>
-            </div>
-
             <div className="ot-back-row">
-                <Link href={`/sites/${slug}/products`} className="ot-back-btn">
+                <Link href={`/sites/${slug}`} className="ot-back-btn">
                     <Store size={14} /> Back to Shop
                 </Link>
             </div>
@@ -537,7 +526,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                     <ChevronRight size={14} />
                     <strong>{liveOrder.orderNumber}</strong>
                 </div>
-                <Link href={`/sites/${slug}/products`} className="ot-shop-back">
+                <Link href={`/sites/${slug}`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
                 </Link>
             </header>

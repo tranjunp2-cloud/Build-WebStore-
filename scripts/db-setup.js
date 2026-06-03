@@ -4008,6 +4008,10 @@ const MIGRATIONS = [
   { name: 'orders.enum_payment_method_fpx', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'fpx'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   // 'new' = order confirmed by Stripe webhook (checkout.session.completed). Webhook sets status 'pending' → 'new'.
   { name: 'orders.enum_status_new', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'new'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  // 'confirmed' + 'ready_to_ship' were added to Orders.ts collection definition without a corresponding db-setup migration.
+  // Staging DB enum was missing these values — caused INTERNAL_ERROR when seller confirms an order.
+  { name: 'orders.enum_status_confirmed', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'confirmed'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  { name: 'orders.enum_status_ready_to_ship', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'ready_to_ship'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
