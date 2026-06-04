@@ -363,14 +363,6 @@ export const Orders: CollectionConfig = {
             type: 'textarea',
             admin: { description: 'Required reason when order is cancelled' },
         },
-        // --- Oversell review (US-F13-06) ---
-        {
-            name: 'oversellReview',
-            type: 'checkbox',
-            defaultValue: false,
-            index: true,
-            admin: { description: 'Stock oversold after payment captured — seller must decide on a manual refund' },
-        },
         // --- Stripe card details (for confirm-page "Method" line) ---
         {
             name: 'cardBrand',

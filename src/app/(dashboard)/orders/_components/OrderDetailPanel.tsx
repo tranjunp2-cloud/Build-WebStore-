@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, ZoomIn, X, AlertTriangle } from 'lucide-react'
+import { Loader2, ZoomIn, X } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
@@ -49,7 +49,6 @@ export interface OrderDetail {
         quantity: number
         unitPrice: number
     }[]
-    oversellReview?: boolean
 }
 
 // ─── SECTION CARD wrapper ───
@@ -879,7 +878,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || !(['shipped', 'completed'].includes(status) || order.oversellReview)
+                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}
@@ -1053,34 +1052,6 @@ export function OrderDetailPanel({
                     <div className="z-20 md:static md:p-0 md:m-0 md:bg-transparent">
                         <ActionButtons order={order} onUpdate={() => { fetchOrder(); onUpdate?.(); }} />
                     </div>
-
-                    {/* Oversell Warning Banner */}
-                    {order.oversellReview && (
-                        <div
-                            style={{
-                                display: 'flex',
-                                alignItems: 'flex-start',
-                                gap: 10,
-                                padding: '12px 16px',
-                                borderRadius: 12,
-                                background: 'rgba(245, 158, 11, 0.1)',
-                                border: '1px solid rgba(245, 158, 11, 0.35)',
-                            }}
-                        >
-                            <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: '#F59E0B' }} />
-                            <span
-                                style={{
-                                    fontFamily: 'Inter, sans-serif',
-                                    fontWeight: 500,
-                                    fontSize: 13,
-                                    lineHeight: '20px',
-                                    color: '#F59E0B',
-                                }}
-                            >
-                                Oversold — stock went negative after payment. Review and refund if needed.
-                            </span>
-                        </div>
-                    )}
 
                     {/* BT Verification Block */}
                     {(order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending_verification') || (order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'paid') ? (

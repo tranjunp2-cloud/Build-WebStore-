@@ -52,8 +52,6 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     }
 
     // Only shipped/completed orders can be refunded — mirrors the dashboard UI gate.
-    // Exception: oversell-flagged orders (oversellReview === true) are always refundable
-    // regardless of status (they remain status='new' after capture when stock goes negative).
     if (order.status === 'refunded') {
         return NextResponse.json(
             { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
@@ -61,7 +59,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
     }
     const refundableStatuses = ['shipped', 'completed']
-    if (!refundableStatuses.includes(order.status) && !order.oversellReview) {
+    if (!refundableStatuses.includes(order.status)) {
         return NextResponse.json(
             {
                 success: false,
@@ -150,9 +148,9 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         let casResult: { rows?: Array<Record<string, unknown>> }
         try {
             casResult = await (payload.db.drizzle as any).execute(sql`
-                UPDATE orders SET status = 'refunded', payment_status = 'refunded', oversell_review = false, updated_at = NOW()
+                UPDATE orders SET status = 'refunded', payment_status = 'refunded', updated_at = NOW()
                 WHERE id = ${order.id}
-                AND (status = ANY(ARRAY['shipped','completed']::enum_orders_status[]) OR oversell_review = true)
+                AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
                 RETURNING id
             `)
         } catch (err) {
@@ -229,9 +227,9 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     let casResult: { rows?: Array<Record<string, unknown>> }
     try {
         casResult = await (payload.db.drizzle as any).execute(sql`
-            UPDATE orders SET status = 'refunded', payment_status = 'refunded', oversell_review = false, updated_at = NOW()
+            UPDATE orders SET status = 'refunded', payment_status = 'refunded', updated_at = NOW()
             WHERE id = ${order.id}
-            AND (status = ANY(ARRAY['shipped','completed']::enum_orders_status[]) OR oversell_review = true)
+            AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
             RETURNING id
         `)
     } catch (err) {

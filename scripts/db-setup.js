@@ -4074,7 +4074,11 @@ const MIGRATIONS = [
   { name: 'payload_preferences_rels.customers_id',
     sql: `ALTER TABLE payload_preferences_rels
           ADD COLUMN IF NOT EXISTS customers_id integer;` },
-  // ── F13 US-F13-06: oversell review flag (set when stock oversold after payment captured) ──
+  // ── F13 US-F13-06: oversell_review column RETAINED per NEVER-DROP policy.
+  //    Field removed from Orders collection (GH-1099): the decrement-upfront architecture
+  //    (stock decremented at checkout/session creation, CAS-guarded, for all payment methods)
+  //    makes oversell-after-capture impossible, so the flag was dead code. Column kept
+  //    (harmless, default false) — never read or written by application code anymore. ──
   { name: 'orders.oversell_review',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review boolean DEFAULT false;` },
   // ── F13: Stripe card details for the confirm-page "Method" line (e.g. "Visa ending in 4242") ──
