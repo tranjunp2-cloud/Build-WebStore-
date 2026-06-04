@@ -33,7 +33,7 @@ export function LazyScreenshot({
       {/* Fallback khi Image die link (Error) */}
       {hasError ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#9CA3AF]">
-          <span className="text-[32px] leading-none mb-1">📷</span>
+          <Camera className="w-8 h-8 mb-1" aria-hidden />
           <span className="text-[13px] font-medium opacity-80 decoration-0">{ti(t.help.modules.lazyScreenshot.screenshot, { title })}</span>
         </div>
       ) : (
