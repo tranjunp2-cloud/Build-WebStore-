@@ -15,6 +15,10 @@ vi.mock('@/lib/email/templates/order-expired', () => ({
     orderExpiredEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>test</p>' })),
 }))
 
+vi.mock('@/lib/email/get-template-config', () => ({
+    getTemplateConfig: vi.fn().mockResolvedValue(null),
+}))
+
 const orderExpiredEmailMock = vi.mocked(orderExpiredEmail)
 
 function makeStripeOrder(id: number, overrides: Record<string, unknown> = {}) {
