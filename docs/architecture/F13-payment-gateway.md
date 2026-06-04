@@ -1,7 +1,7 @@
 # F13 Payment Gateway — Architecture
 
 > **Feature:** F13 — Payment Gateway (Malaysia, Wave 6–6.5)
-> **Version:** 2.0 | **Updated:** 2026-05-27 | **Owner:** Backend Dev + docs-manager
+> **Version:** 2.1 | **Updated:** 2026-06-04 | **Owner:** Backend Dev + docs-manager
 > **Links:**
 > - PRD: [`docs/prd/F13-payment-gateway.md`](../prd/F13-payment-gateway.md)
 > - Design: [`docs/design/F13-payment-gateway-design.md`](../design/F13-payment-gateway-design.md)
@@ -32,13 +32,16 @@
 
 ```
 Buyer (Storefront)
-  ↓ Click "Pay with Stripe" + "Place Order"
-Client POST /api/orders/stripe-checkout (corrected endpoint name, Wave 6.5)
-  ↓ withAuth=false (guest checkout)
+  ↓ Click "Place Order" (Wave 6.5 terminology)
+Client POST /api/orders/stripe-checkout
+  ├── Cart state: clear cart on API success (before redirect) per BR-04
+  ├── Payload: { items, siteId, email, ... }
 Backend
   ├── Validate tenant.payment_card OR tenant.payment_fpx (FR-15)
   ├── buildPaymentMethodTypes(tenant) → ['card'] | ['fpx'] | ['card','fpx']
   ├── Check stock, prevent oversell at checkout time
+  ├── Create order status='pending'
+  ├── Decrement stock immediately (Wave 6.5)
   ├── createStripeCheckoutSession({
   │     paymentMethodTypes,
   │     stripeAccountId: tenant.stripeAccountId,
@@ -46,24 +49,31 @@ Backend
   │     // Wave 7+: add applicationFeePercent: 3 when cross-border lifted
   │     successUrl, cancelUrl,
   │   })
+  ├── Save stripeSessionId on order
+  └── Fire orderConfirmationEmail (event='placed', paymentMethod='stripe') fire-and-forget
   ↓ Stripe API (Direct Charge on connected account)
 Stripe creates Session
   ↓ Returns { sessionId, url }
-Backend saves stripeSessionId on order, returns { url } to client
-  ↓ Client: window.location.href = url
+Backend returns { url } to client
+  ↓ Client: window.location.href = url (cart already cleared client-side)
 Stripe Checkout (hosted page)
   ├── Card flow: input card → submit → 3D Secure → return success_url
   └── FPX flow: select bank → redirect bank login → authorize → return success_url
 
 Success path:
-  Stripe → success_url → /sites/[slug]/order/[id]/confirm?session_id={...}
-  Stripe → webhook checkout.session.completed → backend reconcileOrderPaid()
-    (atomic: status='new', paymentStatus='paid', decrement stock, send emails)
+  Stripe → success_url → /sites/[slug]/order/[id]/confirm
+  ├── Frontend: SSE /api/orders/stream/[orderNumber] subscribes to paymentStatus push
+  ├── Optional: POST /api/orders/[id]/payment-status on mount for active-reconcile backup
+  ├── Webhook checkout.session.completed → backend reconcileOrderPaid()
+  │     (atomic: status='new', paymentStatus='paid', send emails, notifications)
+  └── SSE/polling push paymentStatus='paid' → frontend shows success, clearCart() idempotent
 
-Cancel path:
+Cancel/Back path:
   Stripe → cancel_url → /sites/[slug]/checkout?stripe_cancelled=1
-  Frontend → toast BM "Pembayaran gagal" + cart preserved (NOT cleared, BR-04)
-  Order status stays 'pending'
+  ├── Browser-back detection also redirects to /order/[id]/confirm?cancelled=1
+  ├── Frontend → show Payment Failed state + "Pay Now" CTA
+  ├── Order status stays 'pending', paymentStatus='awaiting_payment'
+  └── Click "Pay Now" → POST /api/orders/[id]/retry-payment → new Stripe session
 ```
 
 ### 2.2. Seller onboarding
@@ -145,30 +155,39 @@ reconcileOrderPaid(payload, orderId, context='webhook'|'poll'|'cron'):
   └── Return success flag
 
 2.4a. Oversell handling (Wave 6.5):
-  ├── If stock goes negative on any product after decrement:
+  ├── Stock decrement: `UPDATE products SET inventory = GREATEST(0, inventory - qty) WHERE id=? AND inventory >= qty`
+  ├── If inventory goes negative on any product (checked AFTER update):
   │   ├── Set order.oversellReview=true (boolean flag)
   │   ├── Send SYSTEM_ALERT to merchant: "Order #123 flagged for review — stock went negative"
-  │   ├── Admin UI shows "Refund customer" button → calls existing POST /api/orders/[id]/refund
+  │   ├── Admin UI shows "Refund customer" button → calls POST /api/orders/[id]/refund
   │   └── Order stays status='new' + paymentStatus='paid' (paid, not auto-refunded)
+  └── Note: Stock decrement happens at order creation time (checkout), before Stripe redirect
 ```
 
-### 2.5. Confirm Polling + Self-Heal (v2.0 — Wave 6.5)
+### 2.5. Confirm Polling + Live Update (v2.1 — Wave 6.5)
 
 ```
 Buyer at /sites/[slug]/order/[id]/confirm
-  ↓ Page mounted, order.status='pending'
-Frontend
-  └── polling loop every 2s:
-        GET /api/orders/[id]/payment-status (auth via ct_{orderId} cookie)
-              ├── Returns { status, paymentStatus, stripeSessionId }
-              ├── If paymentStatus='paid': exit loop, show success
-              └── If still 'pending' + stripeSessionId set:
-                  └── Active reconcile: GET Stripe session on connected account
-                      ├── Check session.payment_status (paid/processing/requires_payment_method)
-                      ├── If Stripe says 'paid' but DB says 'pending':
-                      │   → Call reconcileOrderPaid() to self-heal
-                      └── Update display state
-        ↓ Loop exits after 15min timeout or success
+  ↓ Page mounted
+Frontend (ConfirmClient.tsx)
+  ├── PRIMARY: SSE /api/orders/stream/[orderNumber]
+  │   └── Subscribe to paymentStatus changes (real-time push when webhook arrives or reconcile succeeds)
+  │       └── If paymentStatus='paid': show success, clearCart() once (idempotent ref guard)
+  │
+  └── SECONDARY (Wave 6.5): Optional POST /api/orders/[id]/payment-status on mount
+        (Active-reconcile backup if webhook delayed; reads Stripe session status directly)
+        ├── Auth via ct_{orderId} cookie
+        ├── Returns { status, paymentStatus, stripeSessionId }
+        ├── If paymentStatus='paid' already: skip reconcile
+        └── If pending + stripeSessionId set:
+            └── Inspect Stripe session payment_status
+                ├── If Stripe says 'paid' but DB pending: call reconcileOrderPaid() to heal
+                └── Update display if healed
+
+Result:
+  ├── If webhook arrives timely: SSE push → success within <5s
+  ├── If webhook delayed 5-15min: POST active-reconcile + SSE eventually push → success
+  └── If >15 min: show timeout message + manual help link
 ```
 
 ### 2.6. Retry Payment Endpoint (v2.0 — Wave 6.5)
@@ -210,12 +229,13 @@ GET /api/cron/reconcile-orders (called by Vercel cron, auth: CRON_SECRET header)
 | **Reconcile (shared, v2.0 NEW)** | **`src/lib/payment/reconcile-order.ts`** | **Atomic order-paid transition + stock + emails + oversell handling** |
 | Onboard endpoint | `src/app/api/stripe/connect/onboard/route.ts` | POST creates Connect account + returns onboardingUrl |
 | Status endpoint | `src/app/api/stripe/connect/status/route.ts` | GET returns chargesEnabled/payoutsEnabled |
-| Stripe checkout endpoint | `src/app/api/orders/stripe-checkout/route.ts` | POST creates order + Stripe Checkout Session |
-| **Payment status endpoint (v2.0 NEW)** | **`src/app/api/orders/[id]/payment-status/route.ts`** | **GET auth cookie, return status; optional active reconcile** |
+| Stripe checkout endpoint | `src/app/api/orders/stripe-checkout/route.ts` | POST creates order + Stripe Checkout Session; clears cart on success |
+| **Payment status endpoint (v2.1 NEW)** | **`src/app/api/orders/[id]/payment-status/route.ts`** | **POST auth cookie, return status; optional active reconcile (backup to SSE)** |
 | **Retry payment endpoint (v2.0 NEW)** | **`src/app/api/orders/[id]/retry-payment/route.ts`** | **POST re-validate stock + new Stripe session** |
 | **Cron reconcile endpoint (v2.0 NEW)** | **`src/app/api/cron/reconcile-orders/route.ts`** | **GET CRON_SECRET auth; reconcile pending >15min + expire stale** |
 | Webhook handler | `src/app/api/webhooks/stripe/route.ts` | Process Stripe events + call reconcile |
 | Webhook handlers (sub) | `src/app/api/webhooks/stripe/handlers/*.ts` | checkout-completed, payment-failed, account-updated, etc. |
+| **Stream endpoint (v2.1)** | **`src/app/api/orders/stream/[orderNumber]/route.ts`** | **GET EventSource SSE; pushes paymentStatus changes in real-time** |
 | Settings actions | `src/app/(dashboard)/settings/payments/actions.ts` | `getPaymentSettings`, `updatePaymentSettings` |
 | Settings UI | `src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx` | Container |
 | Stripe toggles wrapper | `src/app/(dashboard)/settings/payments/stripe-payment-toggles.tsx` | Card + FPX toggles + Connect CTA + return handler |

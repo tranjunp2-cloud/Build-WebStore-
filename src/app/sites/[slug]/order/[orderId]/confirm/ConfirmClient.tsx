@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast, Toaster } from 'sonner'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
     Clock, Mail, Calendar, ShoppingBag, ReceiptText,
@@ -26,7 +27,7 @@ export type ConfirmOrder = {
     tax: number
     total: number
     currency: string
-    paymentMethod?: string
+    paymentMethod: string
     paymentStatus?: string
     paymentReference?: string
     paymentExpiresAt?: string | null
@@ -165,6 +166,16 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     // set by checkout so a later fresh checkout visit doesn't false-redirect here.
     useEffect(() => {
         try { sessionStorage.removeItem('pw_stripe_pending') } catch {}
+    }, [])
+
+    // Show toast when buyer cancels Stripe checkout and is redirected back (AC-1)
+    useEffect(() => {
+        const pm = order.paymentMethod
+        const isStripeOrder = pm !== 'bank_transfer' && pm !== 'cod' && pm !== 'free'
+        if (cancelled && isStripeOrder) {
+            toast.error(t.storefront.checkout.paymentCancelled)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -957,6 +968,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                 </div>
             )}
 
+            <Toaster position="bottom-center" richColors />
             <style>{TY_CSS}</style>
         </div>
     )

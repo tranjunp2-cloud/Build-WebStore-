@@ -9,11 +9,13 @@ import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
     id: string | number
+    name?: string
     stripeAccountId?: string | null
     stripeOnboardingComplete?: boolean
     status?: string
@@ -378,6 +380,35 @@ export async function POST(request: NextRequest) {
                 { status: 500 },
             )
         }
+
+        // Fire-and-forget: notify buyer of pending Stripe order (mirrors BT awaiting-payment email)
+        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const shopName = tenantTyped.name ?? siteSlug
+        const buyerEmail = orderConfirmationEmail({
+            shopName,
+            orderNumber,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone ?? null,
+            customerAddress: customer.address ?? null,
+            items: orderItems.map(item => ({
+                name: item.productName,
+                variant: item.variant || null,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                lineTotal: item.quantity * item.unitPrice,
+            })),
+            subtotal,
+            shippingFee,
+            total,
+            currency,
+            paymentMethod: 'stripe',
+            event: 'placed',
+            orderDate: new Date().toISOString(),
+            orderPageUrl,
+        })
+        payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
+            .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
         const res = NextResponse.json({
