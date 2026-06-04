@@ -6,7 +6,7 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
-import { mergeTemplateConfig } from '../merge-template-config'
+import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -135,8 +135,13 @@ export function orderCancelledEmail(data: OrderCancelledData, config?: EmailTemp
             <td colspan="2"></td>
         </tr>` : ''
 
-    const subject = `${data.shopName} - ${tCMerged.subject} - ${data.orderNumber}`
-    const htmlTitle = `${esc(data.shopName)} - ${tCMerged.subject} - ${esc(data.orderNumber)}`
+    const defaultSubject = `${data.shopName} - ${tCMerged.subject} - ${data.orderNumber}`
+    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(escapeHtml(config.subject), vars) ?? defaultSubject)
+        : defaultSubject
+    const htmlTitle = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? subject
+        : `${esc(data.shopName)} - ${tCMerged.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,

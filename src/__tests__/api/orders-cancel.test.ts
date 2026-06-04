@@ -262,14 +262,18 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(mockDrizzleExecute).toHaveBeenCalledTimes(6)
     })
 
-    it('[TC-F10-03-16] bank_transfer variant order cancel: does NOT restock products_variants.stock', async () => {
-        // bank_transfer does not decrement stock at checkout — restocking would create phantom +qty.
-        // CAS is still executed (1 SQL call), but no restock SQL follows.
+    it('[TC-F10-03-16] bank_transfer awaiting_payment cancel → restocks products_variants.stock', async () => {
+        // bank_transfer now decrements stock at checkout — cancel must always restock.
         mockFindByID.mockResolvedValueOnce({
             id: 'order-bt-1', status: 'pending', paymentMethod: 'bank_transfer', paymentStatus: 'awaiting_payment',
             items: [{ product: 'prod-v', variant: 'Red - M', quantity: 2 }],
         })
-        // CAS uses default (success). No explicit restock SQL.
+        // CAS + restockItem variant path: product check + variant stock increment + inventory recompute
+        mockDrizzleExecute
+            .mockResolvedValueOnce({ rows: [{ id: 1 }] })                             // CAS succeeds
+            .mockResolvedValueOnce({ rows: [{ id: 'prod-v', has_variants: true }] }) // product check
+            .mockResolvedValueOnce({ rows: [{ id: 'uuid-v' }] })                     // variant stock increment
+            .mockResolvedValueOnce({ rows: [] })                                      // inventory recompute
 
         const req = { json: () => Promise.resolve({ reason: 'Customer changed mind' }) } as unknown as Request
         const res = await POST(req, ctx as any)
@@ -277,12 +281,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
 
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
-        // Only CAS SQL — no restock SQL (stock was never decremented for bank_transfer pre-approval)
-        expect(mockDrizzleExecute).toHaveBeenCalledTimes(1)
-        // ORM update not called (CAS replaced status update)
+        // CAS + 3 restock SQL calls
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(4)
         expect(mockUpdate).not.toHaveBeenCalled()
-        // restock array is empty (skipped for bank_transfer awaiting_payment)
-        expect(body.restock).toEqual([])
+        expect(body.restock[0].restocked).toBe(2)
     })
 
     it('[TC-F10-03-17] NULL stock variant restock → skipped with null_inventory (no false ops alert)', async () => {

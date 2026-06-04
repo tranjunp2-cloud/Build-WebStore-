@@ -172,26 +172,23 @@ describe('Approve/Reject Payment APIs [TC-F10-06]', () => {
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
-    // ─── TC-F10-06-41 through TC-F10-06-43: variant-aware inventory decrement ────
+    // ─── TC-F10-06-41 through TC-F10-06-43: stock no longer decremented at approve ────
+    // Stock is now decremented at checkout — approve-payment must NOT touch inventory.
 
-    it('[TC-F10-06-41] approve with variant item → decrementVariantStock SQL called', async () => {
+    it('[TC-F10-06-41] approve with variant item → NO stock SQL called (stock decremented at checkout)', async () => {
         mockFindByID
             .mockResolvedValueOnce({
                 ...baseBTOrder,
                 items: [{ product: 'prod-v', variant: 'Red - M', quantity: 2 }],
             })
             .mockResolvedValueOnce({ ...baseBTOrder, paymentStatus: 'paid' }) // post-CAS fetch
-        // SQL call sequence: approve CAS + product check + variant CAS decrement + inventory recompute
-        mockDrizzleExecute
-            .mockResolvedValueOnce({ rows: [{ id: 1 }] })            // approve CAS → success
-            .mockResolvedValueOnce({ rows: [{ id: 'prod-v' }] })     // product check
-            .mockResolvedValueOnce({ rows: [{ id: 'uuid-v' }] })     // variant CAS decrement → success
-            .mockResolvedValueOnce({ rows: [] })                      // inventory recompute
+        // Only approve CAS fires — no stock decrement SQL
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [{ id: 1 }] })
 
         const res = await ApprovePATCH(mockReq(), mockParams('order-1'))
         expect(res.status).toBe(200)
-        expect(mockDrizzleExecute).toHaveBeenCalledTimes(4) // approve CAS + 3 variant decrement calls
-        // ORM update NOT called for variant stock (SQL path)
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only approve CAS
+        // ORM update NOT called
         const variantUpdateCall = mockUpdate.mock.calls.find(c => c[0]?.data?.variants !== undefined)
         expect(variantUpdateCall).toBeUndefined()
     })
@@ -218,7 +215,7 @@ describe('Approve/Reject Payment APIs [TC-F10-06]', () => {
         expect(mockUpdate).not.toHaveBeenCalled() // CAS replaces ORM update
     })
 
-    it('[TC-F10-06-43] approve with non-variant item → aggregate GREATEST(0,...) SQL called', async () => {
+    it('[TC-F10-06-43] approve with non-variant item → NO stock SQL called (stock decremented at checkout)', async () => {
         mockFindByID
             .mockResolvedValueOnce({
                 ...baseBTOrder,
@@ -229,7 +226,7 @@ describe('Approve/Reject Payment APIs [TC-F10-06]', () => {
 
         const res = await ApprovePATCH(mockReq(), mockParams('order-1'))
         expect(res.status).toBe(200)
-        expect(mockDrizzleExecute).toHaveBeenCalledTimes(2) // approve CAS + GREATEST update
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only approve CAS
     })
 
     // ─── TC-F10-06-44 through TC-F10-06-46: cancel+approve race fixes ────────────

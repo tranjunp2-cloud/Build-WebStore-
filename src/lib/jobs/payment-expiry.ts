@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { restockItem } from '@/app/api/orders/lib/stock-utils'
 
 export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) {
     const now = new Date().toISOString()
@@ -41,6 +43,18 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                 continue  // already processed by a concurrent cron invocation
             }
 
+            // Restock items — stock was decremented at checkout for all payment methods.
+            // Best-effort: failure logged but must not abort cancellation.
+            for (const item of (order.items ?? []) as any[]) {
+                const productId = typeof item.product === 'object' ? item.product?.id : item.product
+                if (!productId) continue
+                await restockItem(payload, productId, item.variant ?? null, item.quantity)
+                    .catch((err) => payload.logger.error(
+                        { err, orderId: order.id, productId },
+                        '[payment-expiry] restock failed',
+                    ))
+            }
+
             // Slug lives on the tenant, not the site — sites collection has no slug field
             const siteObj = typeof order.site === 'object' ? order.site : null
             const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
@@ -66,7 +80,16 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                 lineTotal: (item.quantity ?? 1) * (item.unitPrice ?? 0),
             }))
 
-            const emailTemplate = orderExpiredEmail({
+            const tenantId = (tenantObj as any)?.id ? String((tenantObj as any).id) : null
+            const cmsConfig = tenantId
+                ? await getTemplateConfig(tenantId, 'order-expired', 'buyer', siteLocale as 'en' | 'ms').catch(() => null)
+                : null
+
+            if (order.customerEmail) {
+                if (cmsConfig?.enabled === false) {
+                    payload.logger.info({ orderId: order.id }, '[Email] suppressed (disabled): order-expired')
+                } else {
+                    const emailTemplate = orderExpiredEmail({
                         shopName,
                         orderNumber: order.orderNumber,
                         customerName: order.customerName,
@@ -83,13 +106,13 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                         elapsedTime,
                         reorderUrl,
                         locale: siteLocale,
-                    })
-            if (order.customerEmail) {
-                payload
-                    .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
-                    .catch((e: unknown) =>
-                        payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
-                    )
+                    }, cmsConfig ?? undefined)
+                    payload
+                        .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
+                        .catch((e: unknown) =>
+                            payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
+                        )
+                }
             }
 
             processed++
