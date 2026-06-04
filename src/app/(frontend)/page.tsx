@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import {
   Sparkles,
@@ -90,7 +90,9 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900">
+    // font-heading default (Outfit) has no Vietnamese subset → headings break on VN text.
+    // Scope the marketing page to Manrope (already loaded, has 'vietnamese' subset).
+    <div className="min-h-screen bg-white text-zinc-900" style={{ '--font-heading': 'var(--font-manrope)' } as CSSProperties}>
       {/* ═══ Navigation ═══ */}
       <nav
         className="fixed top-0 w-full z-50 border-b border-zinc-200/80 bg-white/80 backdrop-blur-xl backdrop-saturate-150"
