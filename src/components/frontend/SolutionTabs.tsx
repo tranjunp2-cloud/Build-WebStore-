@@ -33,12 +33,15 @@ export function SolutionTabs() {
   const activeIndex = TABS.findIndex((tab) => tab.id === active)
   const content = industries[active]
 
-  // Sliding pill indicator — update on tab change or resize
+  // Sliding pill indicator — update on tab change, resize, or locale change.
+  // `industries` is an intentional dep: locale switch changes tab-label widths,
+  // so the pill must re-measure even though this body reads only the DOM (ESLint can't see that).
   const updatePill = useCallback(() => {
     const el = tabRefs.current[activeIndex]
     if (!el) return
     setPillStyle({ left: el.offsetLeft, width: el.offsetWidth })
-  }, [activeIndex])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, industries])
   useEffect(() => {
     updatePill()
     const timer = setTimeout(updatePill, 100)
