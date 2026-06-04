@@ -16,6 +16,10 @@ vi.mock('@/lib/email/templates/order-expired', () => ({
     orderExpiredEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>test</p>' })),
 }))
 
+vi.mock('@/lib/email/get-template-config', () => ({
+    getTemplateConfig: vi.fn().mockResolvedValue(null),
+}))
+
 vi.mock('@/app/api/orders/lib/stock-utils', () => ({
     restockItem: vi.fn().mockResolvedValue({ restocked: 1, skipped: false }),
 }))

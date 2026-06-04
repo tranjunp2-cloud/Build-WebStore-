@@ -14,6 +14,10 @@ vi.mock('@/lib/email/templates/order-expired', () => ({
     orderExpiredEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>test</p>' })),
 }))
 
+vi.mock('@/lib/email/get-template-config', () => ({
+    getTemplateConfig: vi.fn().mockResolvedValue(null),
+}))
+
 const orderExpiredEmailMock = vi.mocked(orderExpiredEmail)
 
 const makeOrder = (id: number, overrides: Record<string, unknown> = {}) => ({
@@ -95,6 +99,7 @@ describe('paymentExpiryJob — happy path', () => {
                 reorderUrl: expect.stringContaining('/sites/test-shop/products'),
                 elapsedTime: expect.stringMatching(/\d+ jam \d+ minit/),
             }),
+            undefined,  // cmsConfig: tenant has no id in test fixture → null → undefined
         )
         expect(payload.sendEmail).toHaveBeenCalledWith({ to: 'customer1@test.com', subject: 'Order cancelled', html: '<p>test</p>' })
     })

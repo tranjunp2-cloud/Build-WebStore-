@@ -93,13 +93,15 @@ export async function POST(req: Request) {
         if (cmsConfig?.enabled === false) {
             console.log('[Email] suppressed (disabled): resend-upload-link')
         } else {
+            // Pass no config — resend-upload-link has no own CMS template type;
+            // bank-transfer-instructions config is only used for the enabled check above.
             const emailData = resendUploadLinkEmail({
                 shopName,
                 orderNumber,
                 customerName: order.customerName ?? '',
                 resumeUrl,
                 locale: siteLocale,
-            }, cmsConfig ?? undefined)
+            })
 
             await payload.sendEmail({
                 to: order.customerEmail,

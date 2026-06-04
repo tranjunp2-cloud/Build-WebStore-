@@ -6,7 +6,7 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
-import { mergeTemplateConfig } from '../merge-template-config'
+import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -122,8 +122,13 @@ export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplate
             <td align="right" style="padding:6px 14px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#EF4444;">-${fp(data.discountAmount)}</td>
         </tr>` : ''
 
-    const subject = `${data.shopName} - ${tAMerged.subject} - ${data.orderNumber}`
-    const htmlTitle = `${esc(data.shopName)} - ${tAMerged.subject} - ${esc(data.orderNumber)}`
+    const defaultSubject = `${data.shopName} - ${tAMerged.subject} - ${data.orderNumber}`
+    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(escapeHtml(config.subject), vars) ?? defaultSubject)
+        : defaultSubject
+    const htmlTitle = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? subject
+        : `${esc(data.shopName)} - ${tAMerged.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,

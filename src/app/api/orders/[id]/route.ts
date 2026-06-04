@@ -10,6 +10,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { orderCompletedEmail } from '@/lib/email/templates/order-completed'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
@@ -121,10 +122,10 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         lineTotal: item.quantity * item.unitPrice,
                     }))
 
-                    if (newStatus === 'confirmed' || newStatus === 'completed') {
+                    if (newStatus === 'confirmed') {
                         const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale)
                         if (cmsConfig?.enabled === false) {
-                            console.log(`[Email] suppressed (disabled): order-confirmation (${newStatus})`)
+                            console.log('[Email] suppressed (disabled): order-confirmation (confirmed)')
                         } else {
                             const richEmail = orderConfirmationEmail({
                                 shopName,
@@ -143,10 +144,39 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                                 orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
                                 currency: (order as any).currency ?? 'MYR',
                                 locale: siteLocale,
-                                event: newStatus as 'confirmed' | 'completed',
+                                event: 'confirmed',
                             }, cmsConfig ?? undefined)
                             payload.sendEmail({ to: customerEmail, subject: richEmail.subject, html: richEmail.html })
-                                .catch((err: unknown) => console.error(`[Email ${newStatus} notify]`, err))
+                                .catch((err: unknown) => console.error('[Email confirmed notify]', err))
+                        }
+                    } else if (newStatus === 'completed') {
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-completed', 'buyer', siteLocale)
+                        if (cmsConfig?.enabled === false) {
+                            console.log('[Email] suppressed (disabled): order-completed')
+                        } else {
+                            const completedEmail = orderCompletedEmail({
+                                shopName,
+                                supportEmail,
+                                orderNumber,
+                                customerName: (order as any).customerName ?? '',
+                                customerEmail,
+                                customerPhone: (order as any).customerPhone ?? null,
+                                customerAddress: (order as any).shippingAddress ?? null,
+                                items: orderItems,
+                                subtotal: (order as any).subtotal ?? 0,
+                                discountAmount: (order as any).discountAmount ?? null,
+                                discountCode: (order as any).discountCode ?? null,
+                                shippingFee: (order as any).shippingFee ?? 0,
+                                total: (order as any).total ?? 0,
+                                paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
+                                completedDate: new Date().toISOString(),
+                                orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                                currency: (order as any).currency ?? 'MYR',
+                                buyerNote: (order as any).notes ?? null,
+                                locale: siteLocale,
+                            }, cmsConfig ?? undefined)
+                            payload.sendEmail({ to: customerEmail, subject: completedEmail.subject, html: completedEmail.html })
+                                .catch((err: unknown) => console.error('[Email completed notify]', err))
                         }
                     } else if (newStatus === 'cancelled') {
                         const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
