@@ -15,6 +15,8 @@ vi.mock('payload', () => ({
         update: mockUpdate,
         delete: mockDelete,
         db: { drizzle: { execute: mockDrizzleExecute } },
+        sendEmail: vi.fn().mockResolvedValue(undefined),
+        logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
     })),
 }))
 
