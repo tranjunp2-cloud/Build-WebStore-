@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, ZoomIn, X } from 'lucide-react'
+import { Loader2, ZoomIn, X, AlertTriangle } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
@@ -1067,7 +1067,7 @@ export function OrderDetailPanel({
                                 border: '1px solid rgba(245, 158, 11, 0.35)',
                             }}
                         >
-                            <span style={{ fontSize: 16, lineHeight: '20px', flexShrink: 0 }}>⚠</span>
+                            <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: '#F59E0B' }} />
                             <span
                                 style={{
                                     fontFamily: 'Inter, sans-serif',

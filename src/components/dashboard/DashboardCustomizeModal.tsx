@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GripVertical, Check, ArrowUp, ArrowDown } from 'lucide-react'
+import { GripVertical, Check, ArrowUp, ArrowDown, Settings } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -199,7 +199,7 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
   return (
     <>
       <button data-testid="customize-dashboard-btn" onClick={() => setIsOpen(true)} className="flex items-center gap-[6px] rounded-[8px] border border-solid border-[#1F2937] bg-transparent px-[16px] py-[8px] text-[13px] font-semibold text-white hover:bg-[#1F2937] transition-all leading-none">
-        <span>⚙️</span>
+        <Settings className="w-4 h-4 shrink-0" aria-hidden />
         <span>{t.dashboard.overview.customize}</span>
       </button>
 

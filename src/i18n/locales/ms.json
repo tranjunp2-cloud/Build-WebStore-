@@ -682,17 +682,25 @@
             "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
-            "fixAllButton": "✨ Baiki Semua Isu",
+            "fixAllButton": "Baiki Semua Isu",
             "contentQuality": "Kualiti Kandungan",
             "technicalSeo": "SEO Teknikal",
             "sitemapAndMeta": "Peta Laman & Tag Meta",
+            "sitemapConfig": "Konfigurasi Peta Laman",
+            "metaTagsSection": "Tag Meta Automatik",
+            "statusLabel": "Status:",
+            "statusUpToDate": "Terkini",
             "lastUpdated": "Kemaskini terakhir: {date}",
             "generating": "Sedang menjana...",
             "sitemapCount": "Peta Laman dijana — {count} halaman",
             "sitemapEmpty": "Peta Laman dijana — tiada halaman lagi",
             "autoMeta": {
                 "enabled": "Penjanaan Meta Auto: Aktif",
-                "disabled": "Penjanaan Meta Auto: Tidak Aktif"
+                "disabled": "Penjanaan Meta Auto: Tidak Aktif",
+                "label": "Auto-Jana Tag Meta",
+                "description": "Mencipta tag tajuk dan penerangan yang dioptimumkan SEO secara automatik untuk halaman dan produk baharu.",
+                "on": "ON",
+                "off": "OFF"
             },
             "keywordColumns": {
                 "keyword": "Kata Kunci",

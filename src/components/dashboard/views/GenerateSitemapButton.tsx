@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 
@@ -37,9 +38,13 @@ export function GenerateSitemapButton({ siteId }: { siteId: string | number }) {
         <button
             onClick={handleClick}
             disabled={loading}
-            className="flex items-center justify-center px-[16px] pt-[8.5px] pb-[9px] bg-transparent border border-solid border-[#374151] text-white rounded-[8px] font-semibold text-[13px] leading-[1.21em] hover:!border-[#3B82F6] hover:text-[#3B82F6] transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-[16px] pt-[8.5px] pb-[9px] bg-transparent border border-solid border-[#374151] text-white rounded-[8px] font-semibold text-[13px] leading-[1.21em] hover:!border-[#3B82F6] hover:text-[#3B82F6] transition-colors disabled:opacity-50"
         >
-            {loading ? `⏳ ${seo.generating}` : `🗺️ ${seo.generateSitemap}`}
+            {loading ? (
+                <><Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden /> {seo.generating}</>
+            ) : (
+                seo.generateSitemap
+            )}
         </button>
     )
 }

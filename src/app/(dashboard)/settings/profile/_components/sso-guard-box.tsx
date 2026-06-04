@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 type Props = {
@@ -30,11 +31,11 @@ export function SsoGuardBox({ ssoUrl, variant = 'general' }: Props) {
                             className="flex items-center gap-1 py-2 text-[16px] font-medium text-[#3b82f6] underline decoration-solid hover:text-blue-400 transition-colors"
                         >
                             <span>{linkText}</span>
-                            <span className="text-[13px] font-semibold">→</span>
+                            <ArrowRight className="w-4 h-4 shrink-0" aria-hidden />
                         </a>
                     ) : (
-                        <span className="py-2 text-[16px] font-medium text-[#3b82f6]/50 underline decoration-solid cursor-not-allowed">
-                            {linkText} →
+                        <span className="inline-flex items-center gap-1 py-2 text-[16px] font-medium text-[#3b82f6]/50 underline decoration-solid cursor-not-allowed">
+                            {linkText} <ArrowRight className="w-4 h-4 shrink-0" aria-hidden />
                         </span>
                     )}
                 </div>

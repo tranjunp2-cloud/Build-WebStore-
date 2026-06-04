@@ -1,5 +1,6 @@
 'use client';
 
+import { BarChart3, Bot, PenLine, Settings } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 export default function GuidelinePage() {
@@ -7,22 +8,22 @@ export default function GuidelinePage() {
 
   const features = [
     {
-      emoji: '📊',
+      Icon: BarChart3,
       title: t.help.overview.features.dashboardTitle,
       desc: t.help.overview.features.dashboardDesc
     },
     {
-      emoji: '🤖',
+      Icon: Bot,
       title: t.help.overview.features.aiBuilderTitle,
       desc: t.help.overview.features.aiBuilderDesc
     },
     {
-      emoji: '📝',
+      Icon: PenLine,
       title: t.help.overview.features.blogTitle,
       desc: t.help.overview.features.blogDesc
     },
     {
-      emoji: '⚙️',
+      Icon: Settings,
       title: t.help.overview.features.settingsTitle,
       desc: t.help.overview.features.settingsDesc
     }
@@ -70,13 +71,13 @@ export default function GuidelinePage() {
                   'hover:-translate-y-0.5 hover:border-blue-500/40 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)]',
                 ].join(' ')}
               >
-                {/* Emoji icon box: 40x40, bg:#161E2E, centered — matches demo .feature-icon */}
+                {/* Icon box: 40x40, bg:#161E2E, centered — matches demo .feature-icon */}
                 <div
-                  className="flex items-center justify-center rounded-[8px] bg-[#161E2E] shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] shrink-0 text-[28px]"
+                  className="flex items-center justify-center rounded-[8px] bg-[#161E2E] shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] shrink-0 text-blue-400"
                   style={{ width: 40, height: 40 }}
                   aria-hidden="true"
                 >
-                  {item.emoji}
+                  <item.Icon className="w-6 h-6" />
                 </div>
                 {/* Text group */}
                 <div className="flex flex-col gap-[4px] flex-1 min-w-0">

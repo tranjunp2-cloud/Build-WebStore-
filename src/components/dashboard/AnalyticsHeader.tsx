@@ -1,5 +1,6 @@
 'use client'
 
+import { Settings } from 'lucide-react'
 import { DashboardTabs } from './DashboardTabs'
 import { PeriodSelector } from './PeriodSelector'
 
@@ -10,8 +11,9 @@ export function AnalyticsHeader() {
             
             <div className="flex items-center flex-wrap gap-3">
                 <PeriodSelector />
-                <button className="flex items-center px-4 py-[7px] border border-[#1F2937] rounded-lg text-[13px] font-semibold text-white/90 hover:border-blue-500 hover:text-blue-500 transition-colors h-full bg-[#161E2E]">
-                    ⚙️ Settings
+                <button className="flex items-center gap-2 px-4 py-[7px] border border-[#1F2937] rounded-lg text-[13px] font-semibold text-white/90 hover:border-blue-500 hover:text-blue-500 transition-colors h-full bg-[#161E2E]">
+                    <Settings className="w-4 h-4 shrink-0" aria-hidden />
+                    Settings
                 </button>
             </div>
         </div>
