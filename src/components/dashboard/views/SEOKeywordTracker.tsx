@@ -184,7 +184,7 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
     }
 
     return (
-        <div className="flex items-center justify-between gap-4 select-none">
+        <div className="flex items-center justify-between gap-4">
             <div className="flex flex-col gap-[2px] min-w-0">
                 <span className="text-[14px] font-semibold text-white leading-[1.4]">
                     {autoMeta.label || 'Auto-Generate Meta Tags'}
@@ -194,8 +194,8 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
                 </span>
             </div>
             {/* Only the switch itself toggles — clicking the label/description does nothing */}
-            <label className={`relative shrink-0 ${saving ? 'cursor-wait' : 'cursor-pointer'}`}>
-                <input type="checkbox" checked={checked} onChange={handleChange} disabled={saving} className="peer sr-only" />
+            <label className={`relative shrink-0 select-none ${saving ? 'cursor-wait' : 'cursor-pointer'}`}>
+                <input type="checkbox" checked={checked} onChange={handleChange} disabled={saving} className="peer sr-only" aria-label={autoMeta.label || 'Auto-Generate Meta Tags'} />
                 <div className="w-[52px] h-[28px] rounded-full bg-[#374151] peer-checked:bg-[#3B82F6] transition-colors peer-disabled:opacity-50" />
                 <span className="absolute top-1/2 -translate-y-1/2 left-[7px] text-[9px] font-bold text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
                     {autoMeta.on || 'ON'}
