@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
+import { restockItem } from '@/app/api/orders/lib/stock-utils'
 
 export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) {
     const now = new Date().toISOString()
@@ -39,6 +40,18 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             `)
             if (!updateResult.rows?.length) {
                 continue  // already processed by a concurrent cron invocation
+            }
+
+            // Restock items — stock was decremented at checkout for all payment methods.
+            // Best-effort: failure logged but must not abort cancellation.
+            for (const item of (order.items ?? []) as any[]) {
+                const productId = typeof item.product === 'object' ? item.product?.id : item.product
+                if (!productId) continue
+                await restockItem(payload, productId, item.variant ?? null, item.quantity)
+                    .catch((err) => payload.logger.error(
+                        { err, orderId: order.id, productId },
+                        '[payment-expiry] restock failed',
+                    ))
             }
 
             // Slug lives on the tenant, not the site — sites collection has no slug field

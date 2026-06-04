@@ -6,6 +6,7 @@ const mockFindByID = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
+const mockDrizzleExecute = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
@@ -13,7 +14,13 @@ vi.mock('payload', () => ({
         create: mockCreate,
         update: mockUpdate,
         delete: mockDelete,
+        db: { drizzle: { execute: mockDrizzleExecute } },
     })),
+}))
+
+vi.mock('@/app/api/orders/lib/stock-utils', () => ({
+    decrementVariantStock: vi.fn().mockResolvedValue({ ok: true }),
+    restockItem: vi.fn().mockResolvedValue({ restocked: 1, skipped: false }),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -122,6 +129,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockDelete.mockResolvedValue({})
+        // Default: non-variant stock CAS succeeds (returns id row)
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
     })
 
     // ─── TC-F13.01: FPX checkout success ─────────────────────────────

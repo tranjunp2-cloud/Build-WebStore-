@@ -137,9 +137,10 @@ export async function POST(request: Request) {
             const unitPrice = variant ? variant.price : p.price
             hasVariantsMap.set(String(productLookupId), !!p.hasVariants)
 
-            // Variant-aware availability: per-variant stock for variant products, aggregate otherwise
+            // Variant-aware availability: per-variant stock for variant products, aggregate otherwise.
+            // NULL stock = tracking disabled (unlimited). Mirror non-variant ?? Infinity pattern.
             const stockAvail = (p.hasVariants && variant)
-                ? (variant.stock ?? 0)
+                ? (variant.stock != null ? variant.stock : Infinity)
                 : (p.inventory ?? Infinity)
 
             if (stockAvail < item.quantity) {
@@ -261,12 +262,13 @@ export async function POST(request: Request) {
             } as any,
         })
 
-        // Decrement inventory for COD only — bank_transfer reserves stock without decrement
-        // (decrement happens at Approve step in P06)
+        // Decrement inventory for COD and bank_transfer at checkout time.
+        // bank_transfer: stock is reserved immediately; restock only on cancel or refund.
+        // Seller reject does NOT restock — customer is expected to resubmit proof.
         // CAS-style: UPDATE WHERE inventory >= qty prevents oversell under concurrent requests.
         // Compensation: if any item fails the CAS, re-increment all already-decremented items
         // and delete the order so the buyer sees a clear out-of-stock error.
-        if (paymentMethod === 'cod') {
+        if (paymentMethod === 'cod' || paymentMethod === 'bank_transfer') {
             const decremented: Array<{ productId: number | string; quantity: number; variantName?: string; kind: 'variant' | 'aggregate' }> = []
             let failedItem: string | undefined
             let failedVariant: string | undefined

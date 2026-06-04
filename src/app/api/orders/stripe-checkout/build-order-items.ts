@@ -9,7 +9,7 @@ interface ProductDoc {
     currency?: string
     inventory?: number | null
     hasVariants?: boolean
-    variants?: Array<{ name: string; price: number }>  // stock omitted: server uses aggregate p.inventory, not per-variant stock
+    variants?: Array<{ name: string; price: number; stock?: number | null }>
     tenant?: string | number | { id: string | number }
     images?: Array<{ url?: string }>
 }
@@ -45,6 +45,7 @@ export async function buildOrderItems(
     payload: Payload,
     items: Array<{ productId: string | number; quantity: number; variant?: string }>,
     tenantId?: number | string,
+    skipStockCheck = false,
 ): Promise<BuildResult> {
     const orderItems: OrderItemRow[] = []
     const checkoutItems: CheckoutItemRow[] = []
@@ -125,12 +126,15 @@ export async function buildOrderItems(
         }
 
         const unitPrice = variant ? variant.price : p.price
-        // Advisory OOS guard: use aggregate p.inventory (decremented by COD CAS in stock-cas.ts).
-        // Per-variant stock decrement (products_variants.stock) is a follow-up task — variant.stock
-        // is never decremented today, so reading it would give a permanently stale value.
-        const stockAvail = p.inventory ?? Infinity
+        // Variant-aware availability: per-variant stock for variant products, aggregate otherwise.
+        // Mirrors COD flow (checkout/route.ts). variant.stock is accurate since decrementVariantStock
+        // now keeps products_variants.stock in sync after every payment method.
+        // NULL stock = tracking disabled (unlimited). Mirror non-variant ?? Infinity pattern.
+        const stockAvail = (p.hasVariants && variant)
+            ? (variant.stock != null ? variant.stock : Infinity)
+            : (p.inventory ?? Infinity)
 
-        if (stockAvail < item.quantity) {
+        if (!skipStockCheck && stockAvail < item.quantity) {
             return {
                 orderItems: [], checkoutItems: [], subtotal: 0, currency,
                 errorResponse: NextResponse.json(
@@ -138,7 +142,12 @@ export async function buildOrderItems(
                         success: false,
                         error: {
                             code: 'OUT_OF_STOCK',
-                            message: `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
+                            message: p.hasVariants
+                                ? `"${p.name}" (${item.variant}) has only ${stockAvail} left`
+                                : `"${p.name}" has only ${p.inventory ?? 0} left in stock`,
+                            ...(p.hasVariants ? { variant: item.variant } : {}),
+                            available: stockAvail,
+                            requested: item.quantity,
                         },
                     },
                     { status: 422 },
