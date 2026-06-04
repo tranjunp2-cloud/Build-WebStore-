@@ -26,6 +26,10 @@ import {
   DollarSign,
   Palette,
   Package,
+  Bot,
+  BarChart3,
+  Link2,
+  Zap,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -74,15 +78,15 @@ export default function HomePage() {
   const { t } = useI18n()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const featureItems = [
-    { icon: '🤖', ...t.features.items.aiGeneration },
-    { icon: '🧩', ...t.features.items.dragDrop },
-    { icon: '🔍', ...t.features.items.seo },
-    { icon: '🎨', ...t.features.items.templates },
-    { icon: '🌐', ...t.features.items.domains },
-    { icon: '📦', ...t.features.items.ecommerce },
-    { icon: '📊', ...t.features.items.analytics },
-    { icon: '🔗', ...t.features.items.integration },
-    { icon: '⚡', ...t.features.items.performance },
+    { Icon: Bot, ...t.features.items.aiGeneration },
+    { Icon: LayoutGrid, ...t.features.items.dragDrop },
+    { Icon: Search, ...t.features.items.seo },
+    { Icon: LayoutTemplate, ...t.features.items.templates },
+    { Icon: Globe, ...t.features.items.domains },
+    { Icon: ShoppingBag, ...t.features.items.ecommerce },
+    { Icon: BarChart3, ...t.features.items.analytics },
+    { Icon: Link2, ...t.features.items.integration },
+    { Icon: Zap, ...t.features.items.performance },
   ]
 
   return (
@@ -653,7 +657,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featureItems.map((feature, i) => (
               <div key={i} className="group p-8 rounded-2xl border border-zinc-200 bg-white shadow-sm hover:shadow-md hover:border-sky-200 transition-all">
-                <div className="text-3xl mb-4">{feature.icon}</div>
+                <div className="text-sky-600 mb-4"><feature.Icon className="w-8 h-8" aria-hidden /></div>
                 <h3 className="text-lg font-heading font-bold text-zinc-900 mb-2 group-hover:text-sky-600 transition-colors">{feature.title}</h3>
                 <p className="text-zinc-600 text-sm leading-relaxed">{feature.desc}</p>
               </div>
