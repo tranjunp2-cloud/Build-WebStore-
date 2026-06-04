@@ -27,7 +27,7 @@ export type ConfirmOrder = {
     tax: number
     total: number
     currency: string
-    paymentMethod?: string
+    paymentMethod: string
     paymentStatus?: string
     paymentReference?: string
     paymentExpiresAt?: string | null

@@ -15,6 +15,7 @@ import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-u
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
     id: string | number
+    name?: string
     stripeAccountId?: string | null
     stripeOnboardingComplete?: boolean
     status?: string
@@ -382,7 +383,7 @@ export async function POST(request: NextRequest) {
 
         // Fire-and-forget: notify buyer of pending Stripe order (mirrors BT awaiting-payment email)
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
-        const shopName = (tenantTyped as any).name ?? siteSlug
+        const shopName = tenantTyped.name ?? siteSlug
         const buyerEmail = orderConfirmationEmail({
             shopName,
             orderNumber,
