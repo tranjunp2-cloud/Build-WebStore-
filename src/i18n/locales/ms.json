@@ -75,6 +75,292 @@
             }
         }
     },
+    "landing": {
+        "platform": {
+            "label": "Platform",
+            "title": "Satu platform untuk menjalankan perniagaan anda",
+            "titleHighlight": "dari hujung ke hujung",
+            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — PrimeWeb membantu anda mengurus segalanya dalam satu sistem.",
+            "pillars": {
+                "website": {
+                    "title": "Laman Web & Jualan",
+                    "desc": "Landing Page bertukar tinggi, kedai dalam talian dengan pembayaran bersepadu, dan SEO berkuasa AI."
+                },
+                "customers": {
+                    "title": "Pengurusan Pelanggan",
+                    "desc": "Data pelanggan berpusat, penglibatan berbilang saluran, dan penjejakan hasil masa nyata."
+                },
+                "operations": {
+                    "title": "Operasi Efisien",
+                    "desc": "Pengurusan tugasan mengikut jabatan, aliran kerja piawai, dan pemantauan prestasi operasi."
+                }
+            },
+            "cta": "Terokai ekosistem PrimeWeb"
+        },
+        "product": {
+            "label": "Produk",
+            "title": "Penyelesaian lengkap untuk perjalanan pertumbuhan anda",
+            "subtitle": "Reka bentuk cantik, penciptaan AI pantas, dioptimumkan untuk setiap peranti dan SEO.",
+            "hero": {
+                "title": "Landing Page & Laman Web bertukar tinggi",
+                "points": [
+                    "Reka bentuk cantik, seret & lepas pantas, dioptimumkan untuk setiap peranti",
+                    "Pemuatan pantas, mesra SEO",
+                    "Lebih 900+ templat Landing Page sedia digunakan",
+                    "Penyegerakan data berbilang saluran dari borang ke sistem storan"
+                ],
+                "tagLanding": "Landing Page",
+                "tagBuilder": "Pembina Laman Web",
+                "detailLink": "Lihat butiran",
+                "tryFree": "Cuba percuma",
+                "mockupLabel": "Perpustakaan Templat"
+            },
+            "blocks": {
+                "aiBuilder": {
+                    "title": "Pembina Laman Web AI",
+                    "items": [
+                        "Berbual dengan AI, huraikan perniagaan anda → laman web lengkap dalam beberapa minit",
+                        "Lebih 900+ templat blok: Hero, Tentang Kami, Produk, Hubungi...",
+                        "Penyuntingan seret & lepas, dioptimumkan untuk setiap peranti",
+                        "Mesra SEO, pemuatan pantas"
+                    ],
+                    "cta": "Cuba percuma"
+                },
+                "templateEditor": {
+                    "title": "Templat & Editor",
+                    "items": [
+                        "Templat mengikut industri: Runcit, F&B, Kemasukan, Portfolio",
+                        "Penyuntingan visual, penyesuaian blok secara inline",
+                        "Terbit satu klik, subdomain atau domain tersuai"
+                    ],
+                    "cta": "Layari koleksi"
+                },
+                "salesPayment": {
+                    "title": "Halaman Jualan & Pembayaran",
+                    "items": [
+                        "Produk, troli, dan pembayaran dalam talian",
+                        "Pelbagai kaedah pembayaran dan pilihan penghantaran",
+                        "Deskripsi produk ditulis AI, dioptimumkan SEO"
+                    ],
+                    "cta": "Mula menjual"
+                },
+                "seoAnalytics": {
+                    "title": "SEO & Analitik",
+                    "items": [
+                        "Skor SEO setiap halaman, cadangan meta oleh AI",
+                        "JSON-LD, peta laman automatik",
+                        "Papan pemuka penjejakan pesanan dan hasil"
+                    ],
+                    "cta": "Optimumkan sekarang"
+                }
+            }
+        },
+        "solutions": {
+            "title": "Platform komprehensif untuk setiap sektor perniagaan",
+            "subtitle": "Disesuaikan dengan keperluan setiap industri untuk strategi operasi yang berkesan.",
+            "industries": {
+                "admissions": {
+                    "label": "Kemasukan",
+                    "title": "Sektor Kemasukan",
+                    "points": [
+                        "Tarik dan optimumkan penukaran pendaftaran pelajar",
+                        "Jangkau prospek pada masa yang tepat, tingkatkan kadar penutupan",
+                        "Data berpusat, optimumkan kempen pemasaran",
+                        "Uruskan kursus, pelajar, dan program dari hujung ke hujung"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Borang pendaftaran", "Jadual kelas", "Galeri kursus..."]
+                    },
+                    "block2": {
+                        "title": "Borang Hubungi",
+                        "items": ["Tajuk, Mesej", "Hantar e-mel perundingan"]
+                    }
+                },
+                "training": {
+                    "label": "Latihan",
+                    "title": "Sektor Latihan",
+                    "points": [
+                        "Laman web kursus profesional, mudah dikemas kini",
+                        "Pendaftaran, pembayaran, dan penjadualan kelas bersepadu",
+                        "Peringatan automatik dan penghantaran bahan",
+                        "Laporan penjejakan pelajar dan hasil"
+                    ],
+                    "block1": {
+                        "title": "Blok Kursus",
+                        "items": ["Senarai kursus", "Jadual kelas", "Pengajar..."]
+                    },
+                    "block2": {
+                        "title": "Pendaftaran & Pembayaran",
+                        "items": ["Borang pendaftaran", "Jadual pembayaran"]
+                    }
+                },
+                "retail": {
+                    "label": "Runcit",
+                    "title": "Sektor Runcit",
+                    "points": [
+                        "Halaman produk dioptimumkan SEO, fokus penukaran",
+                        "Troli dan daftar keluar berbilang saluran",
+                        "Pengurusan pesanan dan inventori yang mudah",
+                        "Deskripsi produk dan cadangan meta ditulis AI"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Produk", "Troli", "Penapis..."]
+                    },
+                    "block2": {
+                        "title": "Daftar Keluar",
+                        "items": ["Maklumat penghantaran", "Pembayaran"]
+                    }
+                },
+                "fnb": {
+                    "label": "F&B",
+                    "title": "Sektor F&B",
+                    "points": [
+                        "Menu dalam talian, tempahan meja dan pesanan penghantaran",
+                        "Persediaan promosi, kombo, dan baucar yang mudah",
+                        "Perkhidmatan penghantaran bersepadu",
+                        "Landing page untuk acara dan hidangan baharu"
+                    ],
+                    "block1": {
+                        "title": "Blok Menu",
+                        "items": ["Kategori hidangan", "Kombo", "Tempahan meja..."]
+                    },
+                    "block2": {
+                        "title": "Pesanan & Penghantaran",
+                        "items": ["Troli", "Alamat penghantaran"]
+                    }
+                },
+                "events": {
+                    "label": "Acara",
+                    "title": "Sektor Acara",
+                    "points": [
+                        "Landing page pendaftaran acara, tiket, borang tangkap lead",
+                        "Pemasa undur, pemberitahuan automatik",
+                        "Pengurusan senarai tetamu dan daftar masuk",
+                        "Laporan pasca acara"
+                    ],
+                    "block1": {
+                        "title": "Blok Acara",
+                        "items": ["Pemasa undur", "Borang pendaftaran tiket", "Jadual..."]
+                    },
+                    "block2": {
+                        "title": "Pengesahan Kehadiran",
+                        "items": ["Hantar e-mel", "Daftar masuk QR"]
+                    }
+                },
+                "other": {
+                    "label": "Lain-lain",
+                    "title": "Sektor Lain-lain",
+                    "points": [
+                        "Laman profil syarikat, portfolio, dan perkhidmatan",
+                        "Blog, berita, dan SEO kandungan",
+                        "Borang hubungi dan tempahan perundingan",
+                        "Boleh disesuaikan mengikut keperluan mana-mana industri"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Hero, Borang", "Galeri", "Butang..."]
+                    },
+                    "block2": {
+                        "title": "Borang Hubungi",
+                        "items": ["Tajuk, Mesej", "Hantar e-mel"]
+                    }
+                }
+            }
+        },
+        "why": {
+            "title": "Mengapa memilih PrimeWeb?",
+            "subtitle": "Platform laman web AI terkemuka — pelopor laman web bina AI dengan pemasaran & jualan serba lengkap.",
+            "stats": {
+                "customers": { "value": "10,000+", "label": "Pelanggan aktif" },
+                "published": { "value": "50,000+", "label": "Laman web diterbitkan" },
+                "blocks": { "value": "900+", "label": "Templat blok sedia" },
+                "speed": { "value": "5 minit", "label": "Bina laman web dengan AI" }
+            },
+            "cards": {
+                "easyToUse": {
+                    "title": "Mudah digunakan — pantas dilancarkan",
+                    "points": ["Reka bentuk dengan seret & lepas yang mudah", "Tiada pengetahuan pengkodan diperlukan", "Mengurangkan masa pemasangan dengan ketara"]
+                },
+                "dataSync": {
+                    "title": "Ketersambungan data yang lancar",
+                    "points": ["Pusatkan data dari pelbagai saluran", "Sambungkan borang, e-mel, dan banyak lagi"]
+                },
+                "security": {
+                    "title": "Keselamatan tinggi, operasi stabil",
+                    "points": ["Infrastruktur selamat, dioptimumkan prestasi", "Antara muka mesra di semua peranti"]
+                },
+                "yourContent": {
+                    "title": "Kandungan anda",
+                    "points": ["Editor visual, penyuntingan pantas", "Cadangan deskripsi dan SEO oleh AI"]
+                },
+                "automation": {
+                    "title": "Penglibatan & automasi",
+                    "points": ["Penglibatan pelanggan berbilang saluran", "Asuhan sepanjang perjalanan pelanggan", "Automatikkan tugasan berulang"]
+                },
+                "fullAi": {
+                    "title": "Keupayaan AI penuh",
+                    "points": ["Bina laman web melalui sembang", "AI menulis deskripsi, optimumkan SEO", "Automatikkan penciptaan kandungan"]
+                }
+            }
+        },
+        "featuresGrid": {
+            "label": "Ciri-ciri",
+            "title": "Semua yang anda perlukan untuk",
+            "titleHighlight": "Bina & Kembangkan",
+            "subtitle": "Dari penciptaan laman web AI hingga penyuntingan seret & lepas — semua dalam satu platform.",
+            "items": {
+                "aiCreate": {
+                    "title": "Penciptaan laman web AI",
+                    "desc": "Huraikan perniagaan anda dalam bahasa semula jadi dan AI menjana laman web lengkap dalam beberapa saat."
+                },
+                "dragDrop": {
+                    "title": "Editor Seret & Lepas",
+                    "desc": "Sesuaikan mana-mana blok: Hero, Tentang Kami, Produk, Hubungi dan banyak lagi."
+                },
+                "seo": {
+                    "title": "Mesra SEO",
+                    "desc": "Rendering sisi pelayan, pengindeksan Google penuh, dan data berstruktur terbina dalam."
+                },
+                "templates": {
+                    "title": "Templat cantik",
+                    "desc": "Templat mengikut industri: restoran, runcit, portfolio, blog."
+                },
+                "domain": {
+                    "title": "Domain tersuai",
+                    "desc": "Sambungkan domain anda sendiri dalam beberapa minit. Sijil SSL percuma."
+                },
+                "sales": {
+                    "title": "Sedia untuk jualan",
+                    "desc": "Produk, troli, dan daftar keluar — semua terbina dalam."
+                }
+            }
+        },
+        "heroDemo": {
+            "appSuite": "Suite aplikasi",
+            "homeCrumb": "PrimeWeb · Laman Utama",
+            "experienceTitle": "Pengalaman laman web profesional",
+            "experienceDesc": "Dibina oleh AI dalam 5 minit. Sunting seret & lepas, terbitkan serta-merta.",
+            "viewDetails": "Lihat butiran",
+            "tryIt": "Cuba sekarang",
+            "confirmed": "Disahkan",
+            "customerLabel": "Pelanggan:",
+            "customerSample": "Aiman bin Rahman",
+            "phoneLabel": "Telefon:",
+            "phoneSample": "012-345 6789",
+            "totalLabel": "Jumlah:",
+            "totalSample": "RM 1,250",
+            "aiDone": "AI telah siap",
+            "readyPublish": "Laman web anda sudah sedia. Terbitkan sekarang?"
+        },
+        "ctaBadge": "Kurangkan kos operasi",
+        "menuAria": "Menu utama",
+        "solutionsMeta": {
+            "trustedBy": "Dipercayai oleh:",
+            "learnMore": "Ketahui lebih lanjut"
+        }
+    },
     "cta": {
         "title": "Bersedia Membina",
         "titleHighlight": "Laman Web Impian",
