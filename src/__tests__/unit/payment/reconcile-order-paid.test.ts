@@ -13,7 +13,7 @@ vi.mock('drizzle-orm', () => ({
     }),
 }))
 
-import { reconcileOrderPaid, decrementStock, resolveActualPaymentMethod } from '@/lib/payment/reconcile-order-paid'
+import { reconcileOrderPaid, resolveActualPaymentMethod } from '@/lib/payment/reconcile-order-paid'
 import * as stripeClient from '@/lib/payment/stripe-client'
 import * as orderPaidEmails from '@/lib/payment/reconcile-order-paid-emails'
 import * as tenantNotifications from '@/lib/notifications/notify-tenant-owners'
@@ -168,9 +168,8 @@ describe('[TC-F13.143] reconcileOrderPaid — idempotency & oversell', () => {
         )
     })
 
-    it('[TC-F13.145] detects oversell during stock decrement flow', async () => {
-        // TC-F13.145: oversell detection tested via decrementStock unit tests below.
-        // This integration test verifies reconcileOrderPaid calls decrementStock for each item.
+    it('[TC-F13.145] stock not decremented by reconcileOrderPaid (decremented at checkout)', async () => {
+        // Stock is now decremented at Stripe session creation — reconcileOrderPaid must NOT touch inventory.
         // Arrange
         const payload = createMockPayload()
         const mockExecute = vi.fn()
@@ -205,74 +204,8 @@ describe('[TC-F13.143] reconcileOrderPaid — idempotency & oversell', () => {
 
         // Assert
         expect(result.status).toBe('reconciled')
-        // Oversell detection tested in dedicated decrementStock unit tests below
-    })
-})
-
-// ─── decrementStock Tests ──────────────────────────────────────────────────
-
-describe('[TC-F13.143/145] decrementStock', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-    })
-
-    it('clean decrement: 1st UPDATE returns row → oversold=false', async () => {
-        // Arrange
-        const payload = createMockPayload()
-        const mockExecute = vi.fn().mockResolvedValueOnce({ rows: [{ inventory: 95 }] })
-        ;(payload.db.drizzle as any).execute = mockExecute
-
-        // Act
-        const result = await decrementStock(payload, 999, 5)
-
-        // Assert
-        expect(result.oversold).toBe(false)
-        expect(mockExecute).toHaveBeenCalledOnce()
-    })
-
-    it('oversell: 1st UPDATE 0 rows, 2nd clamp UPDATE returns row → oversold=true', async () => {
-        // Arrange
-        const payload = createMockPayload()
-        const mockExecute = vi.fn()
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [{ inventory: 0 }] })
-        ;(payload.db.drizzle as any).execute = mockExecute
-
-        // Act
-        const result = await decrementStock(payload, 999, 5)
-
-        // Assert
-        expect(result.oversold).toBe(true)
-        expect(mockExecute).toHaveBeenCalledTimes(2)
-    })
-
-    it('untracked (inventory NULL): both UPDATEs 0 rows → oversold=false', async () => {
-        // Arrange
-        const payload = createMockPayload()
-        const mockExecute = vi.fn()
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] })
-        ;(payload.db.drizzle as any).execute = mockExecute
-
-        // Act
-        const result = await decrementStock(payload, 999, 5)
-
-        // Assert
-        expect(result.oversold).toBe(false)
-        expect(mockExecute).toHaveBeenCalledTimes(2)
-    })
-
-    it('handles DB error gracefully → oversold=false', async () => {
-        // Arrange
-        const payload = createMockPayload()
-        const mockExecute = vi.fn().mockRejectedValueOnce(new Error('Connection timeout'))
-        ;(payload.db.drizzle as any).execute = mockExecute
-
-        // Act
-        const result = await decrementStock(payload, 999, 5)
-
-        // Assert
-        expect(result.oversold).toBe(false)
+        // Only 1 SQL call: atomic transition (no stock decrement SQL)
+        expect(mockExecute).toHaveBeenCalledTimes(1)
     })
 })
 

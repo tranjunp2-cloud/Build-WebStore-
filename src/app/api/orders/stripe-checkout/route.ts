@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -8,6 +9,7 @@ import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -207,6 +209,28 @@ export async function POST(request: NextRequest) {
                     customerPhone: customer.phone || '',
                 } as Record<string, unknown>,
             })
+
+            // Decrement stock for free orders — consistent with all payment methods.
+            for (const item of orderItems) {
+                const productId = item.product
+                const variantName = item.variant?.trim() || null
+                if (variantName) {
+                    await decrementVariantStock(payload, productId, variantName, item.quantity)
+                        .catch((e: unknown) => payload.logger.error(
+                            { err: e, productId, variantName },
+                            '[stripe-checkout] free order variant stock decrement failed',
+                        ))
+                } else {
+                    await (payload.db.drizzle as any).execute(sql`
+                        UPDATE products SET inventory = inventory - ${item.quantity}
+                        WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${item.quantity}
+                    `).catch((e: unknown) => payload.logger.error(
+                        { err: e, productId },
+                        '[stripe-checkout] free order aggregate stock decrement failed',
+                    ))
+                }
+            }
+
             return NextResponse.json({
                 success: true,
                 data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', sessionUrl: null },
@@ -253,6 +277,51 @@ export async function POST(request: NextRequest) {
             } as Record<string, unknown>,
         })
 
+        // Decrement stock at session creation — restock on cancel/expiry, NOT on webhook.
+        // CAS-style: variant items via decrementVariantStock; non-variant via SQL inventory >= qty.
+        // Compensation on partial failure: restock decremented items, delete order → 422.
+        const decremented: Array<{ productId: number | string; quantity: number; variantName: string | null; kind: 'variant' | 'aggregate' }> = []
+        for (const item of orderItems) {
+            const productId = item.product
+            const variantName = item.variant?.trim() || null
+            if (variantName) {
+                const res = await decrementVariantStock(payload, productId, variantName, item.quantity)
+                if (res.ok) {
+                    decremented.push({ productId, quantity: item.quantity, variantName, kind: 'variant' })
+                } else {
+                    const msg = res.reason === 'insufficient_stock'
+                        ? `"${item.productName}" (${variantName}) is out of stock`
+                        : `Stock update failed for "${item.productName}"`
+                    for (const d of decremented) {
+                        await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+                    }
+                    await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'OUT_OF_STOCK', message: msg } },
+                        { status: 422 },
+                    )
+                }
+            } else {
+                const result = await (payload.db.drizzle as any).execute(sql`
+                    UPDATE products SET inventory = inventory - ${item.quantity}
+                    WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${item.quantity}
+                    RETURNING id
+                `)
+                if (result.rows?.length) {
+                    decremented.push({ productId, quantity: item.quantity, variantName: null, kind: 'aggregate' })
+                } else {
+                    for (const d of decremented) {
+                        await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+                    }
+                    await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'OUT_OF_STOCK', message: `"${item.productName}" is out of stock` } },
+                        { status: 422 },
+                    )
+                }
+            }
+        }
+
         // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
@@ -279,8 +348,11 @@ export async function POST(request: NextRequest) {
             })
         } catch (stripeErr: unknown) {
             console.error('[stripe-checkout] Stripe API error:', stripeErr instanceof Error ? stripeErr.message : stripeErr)
-            // Clean up pending order so it doesn't litter the DB
-            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            // Compensate stock — session creation failed, no payment will occur
+            for (const d of decremented) {
+                await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+            }
+            await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'STRIPE_API_ERROR', message: 'Payment service is busy. Please try again.' } },
                 { status: 502 },
@@ -297,7 +369,10 @@ export async function POST(request: NextRequest) {
             })
         } catch (updateErr) {
             console.error('[stripe-checkout] Failed to save stripeSessionId, cleaning up:', updateErr)
-            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            for (const d of decremented) {
+                await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+            }
+            await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
                 { status: 500 },

@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { paymentExpiryJob } from '@/lib/jobs/payment-expiry'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
+import { restockItem } from '@/app/api/orders/lib/stock-utils'
 
 vi.mock('@/lib/email/templates/order-expired', () => ({
     orderExpiredEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>test</p>' })),
@@ -19,7 +20,12 @@ vi.mock('@/lib/email/get-template-config', () => ({
     getTemplateConfig: vi.fn().mockResolvedValue(null),
 }))
 
+vi.mock('@/app/api/orders/lib/stock-utils', () => ({
+    restockItem: vi.fn().mockResolvedValue({ restocked: 1, skipped: false }),
+}))
+
 const orderExpiredEmailMock = vi.mocked(orderExpiredEmail)
+const mockRestockItem = vi.mocked(restockItem)
 
 function makeStripeOrder(id: number, overrides: Record<string, unknown> = {}) {
     return {
@@ -29,7 +35,7 @@ function makeStripeOrder(id: number, overrides: Record<string, unknown> = {}) {
         customerEmail: `buyer${id}@test.com`,
         customerPhone: null,
         shippingAddress: null,
-        items: [{ productName: 'Widget', variant: null, quantity: 1, unitPrice: 100 }],
+        items: [{ product: `prod-${id}`, productName: 'Widget', variant: null, quantity: 1, unitPrice: 100 }],
         subtotal: 100,
         shippingFee: 10,
         total: 110,
@@ -63,7 +69,8 @@ function makePayload(docs: unknown[], drizzleImpl?: () => Promise<unknown>) {
 // ─── TC-F13.155: expired card order with awaiting_payment ─────────────────────
 describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
     beforeEach(() => {
-        orderExpiredEmailMock.mockClear()
+        vi.clearAllMocks()
+        orderExpiredEmailMock.mockReturnValue({ subject: 'Order cancelled', html: '<p>test</p>' })
     })
 
     it('[TC-F13.155] cancels expired card order with paymentStatus=awaiting_payment', async () => {
@@ -75,11 +82,13 @@ describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
         const result = await paymentExpiryJob(payload as any)
 
         // Assert
-        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1)
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1) // only cancel CAS (restockItem mocked)
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
         expect(payload.sendEmail).toHaveBeenCalledWith(
             expect.objectContaining({ to: 'buyer1@test.com' }),
         )
+        // Stock restocked — product is included in mock items
+        expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-1', null, 1)
     })
 
     it('[TC-F13.155] cancels expired fpx order with paymentStatus=awaiting_payment', async () => {
@@ -93,6 +102,7 @@ describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
         // Assert
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
         expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1)
+        expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-2', null, 1)
     })
 
     it('[TC-F13.155] Payload find query includes card and fpx in paymentMethod filter', async () => {
@@ -116,6 +126,10 @@ describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
 
 // ─── TC-F13.156: expired Stripe payment_failed orders auto-cancel ─────────────
 describe('paymentExpiryJob — Stripe payment_failed order auto-cancel', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
     it('[TC-F13.156] cancels expired card order with paymentStatus=payment_failed', async () => {
         // Arrange — simulates Stripe card order that webhook marked as payment_failed
         const order = makeStripeOrder(4, {
@@ -131,6 +145,7 @@ describe('paymentExpiryJob — Stripe payment_failed order auto-cancel', () => {
         // Assert
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
         expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1)
+        expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-4', null, 1)
     })
 
     it('[TC-F13.156] payment_failed status included in Payload find query filter', async () => {
