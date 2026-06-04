@@ -15,6 +15,27 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### GH-1099 — Remove Dead `oversellReview` Flag (US-F13-06 Rework)
+
+**Decision:** Decrement-upfront architecture makes oversell-after-capture impossible; `oversellReview` flag is dead code.
+
+**Root cause:** F13 Wave 6.5 (GH-1099) changed payment flow to decrement stock UPFRONT at checkout (Stripe session creation for card/FPX, COD/bank_transfer order creation) using atomic CAS `WHERE stock >= qty RETURNING id`. This eliminates the race window where an order could be charged but inventory unavailable (oversell-after-capture). The `oversellReview` flag was designed to detect this scenario post-capture as fallback; with prevention upstream, the flag is never set.
+
+**Implementation:**
+- **Removed from Orders collection:** Field `oversellReview` deleted from `src/collections/Orders.ts` (no Payload form exposure, no REST CRUD).
+- **Removed from refund route:** `src/app/api/orders/[id]/refund/route.ts` — condition `order.oversellReview ? showBanner : hideBanner` removed; refund remains available via standard POST flow for legitimate use cases (customer requests, returns).
+- **Removed from UI:** `src/components/dashboard/OrderDetailPanel.tsx` — oversell warning banner and "Manual Refund Required" indicator removed.
+- **Database idempotent:** Column `oversell_review` KEPT in DB per NEVER-DROP policy; migration `orders.oversell_review` in `scripts/db-setup.js` unchanged (field optional, default false, forever stale); no data cleanup.
+- **Tests simplified:** TC-F13.146 (UI banner test) removed; TC-F13.145 (oversell-after-capture TC) marked OBSOLETE with decision reference.
+
+**Rationale:** Decrement-upfront + atomic CAS achieves prevention where fallback detection would have been needed. Architecture more robust; less code to maintain.
+
+**Non-breaking:** Refund API unchanged; existing refund workflows unaffected. Dead field removal has no impact on shipping, payment reconciliation, or order status flow.
+
+**Related:** GH-1099 decrement-upfront decision log; see `docs/qa/F13-payment-gateway.md` TC-F13.145..146 for obsolete TC docs.
+
+---
+
 ### GH-1082 Final Review Fixes (Approve-Payment Race Guard + Orphaned Order Sentinel)
 
 **2 additional critical fixes from fix/1082-f10-cancel-variant-stock-restock branch:**

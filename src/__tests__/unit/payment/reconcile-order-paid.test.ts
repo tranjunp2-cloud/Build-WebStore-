@@ -35,7 +35,7 @@ function createMockPayload(): Payload {
 
 // ─── TC-F13.143: Idempotent Payment Reconciliation ─────────────────────────
 
-describe('[TC-F13.143] reconcileOrderPaid — idempotency & oversell', () => {
+describe('[TC-F13.143] reconcileOrderPaid — idempotency', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
