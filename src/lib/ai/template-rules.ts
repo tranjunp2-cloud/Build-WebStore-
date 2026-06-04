@@ -36,7 +36,7 @@ export interface CategoryRule {
 // realestate used property-card — all now replaced/substituted via GH-1024.
 // GH-1024: menu-display → menu-food (restaurant/fnb); property-card → features (realestate);
 // pricing-table removed from dnaMandatoryGroups (ecommerce/tech) — use pricing as sole representative.
-// On re-enable, restore: EDITOR_HIDDEN_BLOCKS, BLOCKS_TEMP_HIDDEN, TEMP_HIDDEN_BLOCK_TYPES,
+// On re-enable, restore: EDITOR_HIDDEN_BLOCKS, BLOCKS_TEMP_HIDDEN,
 // SUPPORTED_BLOCK_IDS, category-recipes, system-prompt VARIETY RULES, and entries below.
 export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
     restaurant: {
@@ -135,7 +135,7 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         dnaMandatoryGroups: [['team', 'features'], ['testimonials']],
         signatureBlocks: ['team', 'stats', 'features'],
         recommendedBlocks: ['about', 'team', 'stats', 'faq', 'logo-cloud'],
-        industryBlocks: ['service-cards', 'review-cards', 'client-logos'],
+        industryBlocks: ['service-cards', 'review-cards', 'logo-cloud'],
         ctaIsMandatory: true,
     },
     events: {

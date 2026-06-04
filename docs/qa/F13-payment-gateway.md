@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.6 | **Cập nhật:** 2026-05-27 | **Thực hiện:** QA Team  
 > **Nguồn tham chiếu:** `docs/prd/F13-payment-gateway.md`, `docs/stories/F13-payment-gateway-stories.md`, `docs/design/F13-payment-gateway-design.md`, `docs/architecture/F13-payment-gateway.md`, `src/lib/payment/stripe.ts`, `src/app/api/webhooks/stripe/route.ts`, `src/collections/Orders.ts`  
-> **Changelog v1.6 (Wave 6.5 Hardening, 2026-05-27):** Sync drift corrections: endpoint name corrected to `/api/orders/stripe-checkout`; status contract `status='new' + paymentStatus='paid'` atomic on webhook success (NOT just `paid`); fee=0 (Wave 6, not 3%); payment_failed handler implemented (not "out of scope"); account.deauthorized implemented. Add NHÓM 16 (TC-F13.142..157, Wave 6.5 Flow Hardening): atomic webhook + stock, oversell flag, retry payment, confirm polling, cron reconcile. Total TCs: 157.
+> **Changelog v1.7 (2026-06-04):** Sync PRD/architecture/code reality: cart cleared on placement (not preserved on cancel); confirm page uses SSE stream (not pure polling); payment-status endpoint is POST (not GET); TC-F13.148-149 revised to reflect design change (cancel→confirm Pay Now, not checkout toast); TC-F13.150 clarifies SSE-first with optional POST; TC-F13.152 deferred (active-reconcile separate from US-F13-05 confirm-page, which uses existing SSE). Total TCs: 162 (added Refund API tests + clarifications).
 
 ---
 
@@ -55,7 +55,9 @@ Bộ testcase này dùng để kiểm thử đầy đủ F13 - Payment Gateway c
 | Stripe data | Test card `4242 4242 4242 4242`, declined card `4000 0000 0000 0002`, FPX test bank, Stripe CLI `stripe listen` |
 | Tenant data | Tenant onboarded, tenant chưa onboard, tenant có `stripeAccountId` nhưng KYC chưa complete |
 | Payment settings | `payment_card`, `payment_fpx`, `payment_cod`, `payment_qr` |
-| **Order status contract (v1.6)** | **Success: `status='new'` AND `paymentStatus='paid'` (atomic on webhook); fail/cancel: stay `pending`; payment_failed: `paymentStatus='payment_failed'`** |
+| **Order status contract (v1.7)** | **Success: `status='new'` AND `paymentStatus='paid'` (atomic on webhook); fail/cancel: stay `pending`; payment_failed: `paymentStatus='payment_failed'`** |
+| **Payment-status endpoint** | **POST (not GET) /api/orders/[id]/payment-status** — active-reconcile backup to SSE stream; both optional for Wave 6.5 |
+| **Cart behavior (v1.7 design)** | **Cleared on order placement (POST /api/orders/stripe-checkout success), NOT preserved on cancel; retry is order-based** |
 
 ---
 

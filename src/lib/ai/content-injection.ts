@@ -592,6 +592,7 @@ export function buildBlockFromLibrary(
         }
 
         case 'logo-cloud':
+        case 'client-logos': // backward compat alias for saved pages
             return {
                 blockType: 'logo-cloud',
                 variant: 'row',
@@ -599,18 +600,6 @@ export function buildBlockFromLibrary(
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
                     .slice(0, 6)
                     .map((l) => ({ name: l.name, logo: { url: l.url ?? '', alt: l.name } })),
-            }
-
-        case 'client-logos':
-            return {
-                blockType: 'client-logos',
-                variant: 'scroll',
-                headline: i18n.clientLogos.headline,
-                // Seed library lacks image urls (copyright); pass name as alt + empty url.
-                // Render falls back to initials badge placeholder — see LogoImage in client-logos/index.tsx.
-                logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
-                    .slice(0, 6)
-                    .map((l) => ({ url: l.url ?? '', alt: l.name })),
             }
 
         default: {
