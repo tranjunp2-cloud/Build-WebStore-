@@ -1,5 +1,6 @@
 import React, { KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -49,10 +50,10 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                     {question}
                 </div>
                 <div
-                    className={`shrink-0 transition-transform duration-250 ease-in-out text-[12px] text-[#9CA3AF] ${isOpen ? 'rotate-180' : 'rotate-0'
+                    className={`shrink-0 transition-transform duration-250 ease-in-out text-[#9CA3AF] ${isOpen ? 'rotate-180' : 'rotate-0'
                         }`}
                 >
-                    ▼
+                    <ChevronDown className="w-3.5 h-3.5" aria-hidden />
                 </div>
             </div>
 

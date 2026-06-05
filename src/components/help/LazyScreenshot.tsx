@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Camera } from 'lucide-react'
+import { Camera, ZoomIn } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 interface LazyScreenshotProps {
@@ -65,6 +65,7 @@ export function LazyScreenshot({
 
       {/* Zoom Hint Overlay */}
       <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center gap-1">
+        <ZoomIn className="w-3 h-3 shrink-0" aria-hidden />
         {t.help.modules.lazyScreenshot.clickToZoom}
       </div>
     </div>

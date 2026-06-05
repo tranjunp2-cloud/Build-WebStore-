@@ -394,7 +394,7 @@
             "business": "🏢 Perniagaan",
             "fnb": "🍜 Kafe & Bakeri",
             "events": "🎉 Acara",
-            "blog": "📝 Blog",
+            "blog": "Blog",
             "travel": "✈️ Pelancongan"
         },
         "sort": "Susun mengikut",
@@ -2445,16 +2445,16 @@
     },
     "help": {
         "nav": {
-            "overview": "📋 Gambaran Keseluruhan",
-            "qna": "❓ S&J",
-            "modules": "📚 Panduan Modul"
+            "overview": "Gambaran Keseluruhan",
+            "qna": "S&J",
+            "modules": "Panduan Modul"
         },
         "overview": {
             "title": "Pusat Bantuan",
             "subtitle": "Ketahui cara menggunakan sistem pengurusan laman web anda.",
-            "welcomeTitle": "👋 Selamat datang ke EchPrime!",
+            "welcomeTitle": "Selamat datang ke EchPrime!",
             "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional anda — daripada mencipta laman web dengan AI, menulis artikel blog dioptimumkan SEO hingga menjejak trafik dan penglibatan. Berikut adalah gambaran keseluruhan ciri utama.",
-            "featuresTitle": "🚀 Ciri Utama",
+            "featuresTitle": "Ciri Utama",
             "features": {
                 "dashboardTitle": "Papan Pemuka",
                 "dashboardDesc": "Lihat gambaran masa nyata tentang trafik laman web, petunjuk, dan penglibatan.",
@@ -2465,13 +2465,13 @@
                 "settingsTitle": "Tetapan",
                 "settingsDesc": "Konfigurasikan domain dan jemput staf pentadbir."
             },
-            "needHelpTitle": "📞 Perlukan lebih bantuan?",
+            "needHelpTitle": "Perlukan lebih bantuan?",
             "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
         },
         "modules": {
             "lazyScreenshot": {
                 "screenshot": "Tangkapan skrin: {title}",
-                "clickToZoom": "🔍 Klik untuk zum"
+                "clickToZoom": "Klik untuk zum"
             },
             "tab": {
                 "escToClose": "ESC untuk tutup · Cubit untuk zum di mudah alih",
@@ -2648,28 +2648,28 @@
             "emptyTitle": "Tiada jawapan dijumpai",
             "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
             "categories": {
-                "dashboardTitle": "📊 Papan Pemuka",
+                "dashboardTitle": "Papan Pemuka",
                 "qDashboardMetrics": "Apakah metrik yang dipaparkan di Papan Pemuka?",
                 "aDashboardMetrics": "Papan Pemuka memaparkan tiga metrik utama: <strong>Trafik / Paparan</strong> (jumlah lawatan halaman), <strong>Petunjuk / Klik</strong> (klik pautan dan interaksi), dan <strong>Penglibatan</strong> (aktiviti pengguna bukan paparan halaman). Gunakan pemilih tempoh untuk melihat data untuk Hari Ini, 7 hari, atau 30 hari.",
                 "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
                 "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
                 "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
                 "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
-                "builderTitle": "🤖 Pembina Laman Web AI",
+                "builderTitle": "Pembina Laman Web AI",
                 "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
                 "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",
                 "qBuilderEdit": "Bolehkah saya mengedit laman web yang dijana AI?",
                 "aBuilderEdit": "Ya! Selepas AI menjana laman web anda, anda boleh menyesuaikannya sepenuhnya menggunakan <strong>Editor Visual</strong>. Edit teks, tukar imej, susun semula bahagian, laraskan warna dan fon — semuanya dengan antara muka seret-dan-lepas.",
                 "qBuilderMobile": "Adakah laman web yang dijana AI responsif untuk mudah alih?",
                 "aBuilderMobile": "Ya, semua laman web yang dijana AI adalah responsif sepenuhnya. Anda boleh pratonton paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> menggunakan butang togol di halaman Pratonton Laman Web. Susun atur menyesuaikan secara automatik kepada semua saiz skrin.",
-                "blogTitle": "📝 Blog",
+                "blogTitle": "Blog",
                 "qBlogCreate": "Bagaimana mencipta artikel blog baru?",
                 "aBlogCreate": "Pergi ke <strong>\"📝 Blog\"</strong> di bar sisi → klik <strong>[+ Artikel Baru]</strong>. Masukkan tajuk, tulis kandungan menggunakan Editor Teks Kaya, muat naik lakaran kecil utama, tetapkan kategori dan tarikh terbit, kemudian klik <strong>Terbit</strong> atau <strong>Simpan Draf</strong>.",
                 "qBlogAi": "Bagaimana Pembantu AI Blog berfungsi?",
                 "aBlogAi": "Klik butang <strong>\"Pembantu AI\"</strong> (ungu) di bahagian atas kanan editor blog. Masukkan topik anda, pilih nada suara (Profesional, Mesra, atau Memujuk), kemudian klik <strong>\"Jana Idea Blog\"</strong>. AI akan menjana tajuk, rangka kandungan, dan meta SEO untuk anda.",
                 "qBlogSeo": "Bagaimana mengoptimumkan artikel blog untuk SEO?",
                 "aBlogSeo": "Dalam editor blog, tatal ke bahagian <strong>\"Pengoptimuman Carian (SEO)\"</strong> di bar sisi kanan. Isi <strong>Tajuk Meta</strong> (maksimum 60 aksara) dan <strong>Penerangan Meta</strong> (maksimum 160 aksara). Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> untuk menjana tag meta yang dioptimumkan secara automatik.",
-                "settingsTitle": "⚙️ Tetapan",
+                "settingsTitle": "Tetapan",
                 "qSettingsDomain": "Bagaimana menyambungkan domain tersuai?",
                 "aSettingsDomain": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Klik <strong>\"+ Tambah Domain Tersuai\"</strong>, masukkan nama domain anda (cth., abccompany.com). Kemudian konfigurasi rekod DNS di pendaftar domain anda dan klik <strong>\"Sahkan Sambungan\"</strong>.",
                 "qSettingsDns": "Bagaimana mengkonfigurasi rekod DNS?",

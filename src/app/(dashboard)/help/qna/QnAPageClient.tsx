@@ -66,6 +66,7 @@ export const QnAPageClient = () => {
                     filteredCategories.map((category) => (
                         <div key={category.id} className="flex flex-col gap-3">
                             <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <category.Icon className="w-4 h-4 text-[#3B82F6] shrink-0" aria-hidden />
                                 {category.title}
                             </h3>
                             <div className="bg-[#161E2E] border border-[#1F2937] rounded-[12px] overflow-hidden">
