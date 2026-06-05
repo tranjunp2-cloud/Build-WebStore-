@@ -90,13 +90,13 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
                     type="button"
                     onClick={() => onChange('highlighted', !plan.highlighted)}
                     className={cn(
-                        'rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors',
+                        'inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors',
                         plan.highlighted
                             ? 'bg-amber-500/15 text-amber-300'
                             : 'bg-white/5 text-slate-400 hover:bg-white/10'
                     )}
                 >
-                    <Star className="h-3 w-3 fill-current" aria-hidden /> {plan.highlighted ? s.highlighted : s.fcDefault}
+                    <Star className="h-3 w-3 fill-current" aria-hidden />{plan.highlighted ? s.highlighted : s.fcDefault}
                 </button>
             </div>
 

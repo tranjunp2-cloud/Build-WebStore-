@@ -1384,11 +1384,11 @@ function SettingsPanelInner({
                 <div className="mb-6">
                     <div className="flex items-start gap-4">
                         <div>
-                            <div className="flex items-start gap-2">
-                                <span className="text-[#2DD4BF] leading-6">
+                            <div className="flex items-center gap-2">
+                                <span className="flex shrink-0 text-[#2DD4BF]">
                                     {activeTab === 'global' ? <Settings className="h-4 w-4" aria-hidden /> : activeTab === 'seo' ? <Search className="h-4 w-4" aria-hidden /> : activeTab === 'menu' ? <Compass className="h-4 w-4" aria-hidden /> : <Palette className="h-4 w-4" aria-hidden />}
                                 </span>
-                                <p className="pt-[2px] text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
+                                <p className="text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
                             </div>
                             {activeTab === 'block' && block ? (
                                 <div className="mt-1 pl-7 flex items-center gap-2">
