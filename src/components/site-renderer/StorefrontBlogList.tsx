@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { FileText } from 'lucide-react'
 
 interface BlogPost {
     id: string
@@ -137,7 +138,7 @@ export function StorefrontBlogList({ tenantId, siteBasePath, tenantSlug }: Store
     if (!loading && posts.length === 0) {
         return (
             <div className="text-center py-20">
-                <div className="text-5xl mb-4 opacity-20">📝</div>
+                <FileText className="w-12 h-12 mx-auto mb-4 opacity-20" aria-hidden />
                 <h3 className="text-xl font-semibold mb-2">No published posts yet</h3>
                 <p className="text-sm opacity-60">Check back soon for new content!</p>
             </div>
@@ -195,7 +196,7 @@ export function StorefrontBlogList({ tenantId, siteBasePath, tenantSlug }: Store
                             {post.image ? (
                                 <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-4xl opacity-10">📝</div>
+                                <div className="w-full h-full flex items-center justify-center opacity-10"><FileText className="w-10 h-10" aria-hidden /></div>
                             )}
                             {post.category && (
                                 <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold bg-black/50 backdrop-blur-md text-white border border-white/10">
