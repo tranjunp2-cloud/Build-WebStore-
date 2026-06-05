@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 
 interface BuilderFieldProps {
-    icon: string
     label: string
     required?: boolean
     optionalLabel?: string
@@ -11,7 +10,6 @@ interface BuilderFieldProps {
 }
 
 export function BuilderField({
-    icon,
     label,
     required,
     optionalLabel,
@@ -22,7 +20,6 @@ export function BuilderField({
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-sm font-medium text-[#f8fafc]">
-                <span className="w-5 text-center text-base leading-6">{icon}</span>
                 <span>{label}</span>
                 {required ? <span className="text-[#ef4444]">*</span> : null}
                 {optionalLabel ? (

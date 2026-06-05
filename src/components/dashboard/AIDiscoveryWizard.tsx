@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { Sparkles } from 'lucide-react'
 
 import { useI18n } from '@/i18n'
 
@@ -141,7 +142,8 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-7 pb-5 sm:px-8 sm:py-6 gap-4">
-          <h2 className="text-[18px] sm:text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-[1.4] max-w-[180px] sm:max-w-none">
+          <h2 className="flex items-center gap-2 text-[18px] sm:text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-[1.4] max-w-[180px] sm:max-w-none">
+            <Sparkles className="h-5 w-5 shrink-0 text-blue-400" aria-hidden />
             {t.onboarding.wizard.title}
           </h2>
           <button

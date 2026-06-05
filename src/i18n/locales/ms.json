@@ -417,12 +417,12 @@
         "welcome": {
             "title": "Selamat datang ke PrimeWeb",
             "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
-            "createStore": "🚀 Cipta Kedai Saya dengan AI",
+            "createStore": "Cipta Kedai Saya dengan AI",
             "skip": "Langkau & Pergi ke Papan Pemuka",
             "step": "Langkah 1 dari 2: Cipta Kedai"
         },
         "wizard": {
-            "title": "✨ Terokai Kuasa AI",
+            "title": "Terokai Kuasa AI",
             "slides": {
                 "editor": {
                     "title": "Editor AI",
