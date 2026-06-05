@@ -417,12 +417,12 @@
         "welcome": {
             "title": "Welcome to PrimeWeb",
             "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
-            "createStore": "🚀 Create My Store with AI",
+            "createStore": "Create My Store with AI",
             "skip": "Skip & Go to Dashboard",
             "step": "Step 1 of 2: Create Store"
         },
         "wizard": {
-            "title": "✨ Discover the Power of AI",
+            "title": "Discover the Power of AI",
             "slides": {
                 "editor": {
                     "title": "AI Editor",

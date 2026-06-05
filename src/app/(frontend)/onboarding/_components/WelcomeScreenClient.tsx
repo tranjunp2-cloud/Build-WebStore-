@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Rocket } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export function WelcomeScreenClient() {
@@ -58,6 +58,7 @@ export function WelcomeScreenClient() {
                             prefetch={true}
                             className="group flex no-underline hover:no-underline h-[56px] w-full items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 text-[18px] font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.4)] transition-all hover:scale-[1.02] hover:shadow-[0_0_32px_rgba(45,212,191,0.5)] active:scale-[0.98]"
                         >
+                            <Rocket className="h-5 w-5 shrink-0" aria-hidden />
                             <span>{t.onboarding.welcome.createStore}</span>
                             <ArrowRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-transform hidden sm:block" />
                         </Link>
