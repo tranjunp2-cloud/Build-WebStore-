@@ -35,7 +35,7 @@ export const QnASearch: React.FC<QnASearchProps> = ({
     return (
         <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <span className="text-[18px]">🔍</span>
+                <Search className="w-[18px] h-[18px] text-slate-400" aria-hidden />
             </div>
             <input
                 type="text"
