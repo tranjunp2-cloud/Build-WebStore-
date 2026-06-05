@@ -5,6 +5,7 @@
  * Placeholder for Category DNA heatmap — real data arrives in Phase 08.
  * Renders an empty matrix with a clear "coming soon" message.
  */
+import { Dna } from 'lucide-react'
 
 const STUB_CATEGORIES = [
     'Restaurant', 'Beauty', 'Fitness', 'Medical', 'Real Estate',
@@ -17,7 +18,7 @@ export function DnaHeatmapStub({ blockSlug }: { blockSlug: string }) {
             <div className="rounded-xl border border-dashed border-white/20 bg-white/[0.02] p-6 flex flex-col gap-4">
                 {/* Header */}
                 <div className="flex items-center gap-3">
-                    <span className="text-2xl">🧬</span>
+                    <Dna className="h-6 w-6 shrink-0 text-white/70" aria-hidden />
                     <div>
                         <p className="text-sm font-semibold text-white/80">Category DNA Heatmap</p>
                         <p className="text-xs text-white/40">Arriving in Phase 08 — Category Intelligence</p>

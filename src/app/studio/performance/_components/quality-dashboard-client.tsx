@@ -7,6 +7,7 @@
 'use client'
 
 import { useState } from 'react'
+import { AlertTriangle, ArrowDown, ArrowUp, Download } from 'lucide-react'
 import { KpiCard } from './kpi-card'
 import { FailReasonDonut } from './fail-reason-donut'
 import { WorstBlocksRanking } from './worst-blocks-ranking'
@@ -113,8 +114,13 @@ export function QualityDashboardClient({
         <div className="page-actions">
           <DateRangePicker from={from} to={to} />
           <RefreshNowButton />
-          <a href={exportUrl} download className="btn btn-sm">
-            ↓ Export CSV
+          <a
+            href={exportUrl}
+            download
+            className="btn btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden /> Export CSV
           </a>
         </div>
       </div>
@@ -125,14 +131,16 @@ export function QualityDashboardClient({
           label="Avg Quality Score"
           value={quality?.overall != null ? String(quality.overall) : '—'}
           unit="/100"
-          delta="↑ 4pt"
+          delta="4pt"
+          trend="up"
           color="success"
           spark={quality?.series?.map((s) => s.avg) ?? [70, 72, 71, 73, 75, 74, 76, 78, 77, 79]}
         />
         <AiqMetric
           label="Gen Success Rate"
           value={genRate ? `${genRate.successPct}%` : '—'}
-          delta="↑ 3pt"
+          delta="3pt"
+          trend="up"
           color="accent"
           spark={genRate?.series?.map((s) => s.successPct) ?? [68, 71, 70, 73, 75, 74, 76, 77, 78, 78]}
         />
@@ -146,14 +154,16 @@ export function QualityDashboardClient({
           label="Avg Latency"
           value={genRate?.avgDurationMs ? `${(genRate.avgDurationMs / 1000).toFixed(1)}` : '—'}
           unit="s"
-          delta="↓ 1.2s"
+          delta="1.2s"
+          trend="down"
           invertDelta
           spark={genRate?.series?.map((s) => s.total) ?? [16, 15.8, 16.2, 15.3, 15.1, 14.8, 14.6, 14.3, 14.2, 14.2]}
         />
         <AiqMetric
           label="Avg Cost / Gen"
           value={cost?.avgUsd ? `$${cost.avgUsd.toFixed(4)}` : '—'}
-          delta="↓ 2pt"
+          delta="2pt"
+          trend="down"
           invertDelta
           color="warn"
           spark={cost?.series?.map((s) => s.totalUsd) ?? [18, 17, 19, 16, 17, 15, 16, 14, 15, 14]}
@@ -169,7 +179,7 @@ export function QualityDashboardClient({
       {/* ── Alert banner ────────────────────────────────────────── */}
       {totalFails >= criticalThreshold && (
         <div className="aiq-alert">
-          <span className="aiq-alert-icon">⚠</span>
+          <AlertTriangle className="aiq-alert-icon h-5 w-5" aria-hidden />
           <div style={{ flex: 1 }}>
             <b>{totalFails} failed generations</b> in range — check fail reasons below.
           </div>
@@ -317,14 +327,16 @@ type AiqMetricProps = {
   value: string
   unit?: string
   delta: string | null
+  /** Direction of change — drives the trend arrow icon and positive coloring. */
+  trend?: 'up' | 'down'
   color?: 'success' | 'accent' | 'warn' | 'danger'
   spark: number[]
   invertDelta?: boolean
 }
 
-function AiqMetric({ label, value, unit, delta, color, spark, invertDelta }: AiqMetricProps) {
-  const isUp = delta?.startsWith('↑')
-  const isDown = delta?.startsWith('↓')
+function AiqMetric({ label, value, unit, delta, trend, color, spark, invertDelta }: AiqMetricProps) {
+  const isUp = trend === 'up'
+  const isDown = trend === 'down'
   const positive = invertDelta ? isDown : isUp
 
   // Hand-rolled sparkline — same as existing Sparkline component, inlined for class control
@@ -356,7 +368,14 @@ function AiqMetric({ label, value, unit, delta, color, spark, invertDelta }: Aiq
         {unit && <span className="aiq-metric-unit">{unit}</span>}
       </div>
       {delta != null && (
-        <div className={`aiq-metric-delta${positive ? ' positive' : ''}`}>{delta}</div>
+        <div
+          className={`aiq-metric-delta${positive ? ' positive' : ''}`}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+        >
+          {trend === 'up' && <ArrowUp className="h-3 w-3" aria-hidden />}
+          {trend === 'down' && <ArrowDown className="h-3 w-3" aria-hidden />}
+          {delta}
+        </div>
       )}
       <div className="aiq-metric-spark">
         <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ display: 'block' }}>
