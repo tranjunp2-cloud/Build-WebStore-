@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Plus, Settings2, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -517,7 +517,7 @@ export function PageManagerPanel({
                                                 onClick={() => onPageSelected(page404.id)}
                                                 className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
                                             >
-                                                <span aria-hidden="true">✏️</span>
+                                                <Pencil className="h-4 w-4" aria-hidden />
                                                 {pm.edit404Page}
                                             </button>
                                         </div>

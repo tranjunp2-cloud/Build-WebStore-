@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { AlertTriangle, ChevronDown, Globe2, Loader2, UploadCloud } from 'lucide-react'
+import { AlertTriangle, Building2, ChevronDown, Compass, Globe, Globe2, ListTree, Loader2, Palette, Search, Settings, Sparkles, UploadCloud, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
@@ -837,7 +837,7 @@ function SettingsPanelInner({
                         {isGeneratingSEO ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
-                            <span>✨</span>
+                            <Sparkles className="h-4 w-4" aria-hidden />
                         )}
                         {isGeneratingSEO ? s.generating : s.autoSeo}
                     </button>
@@ -1004,7 +1004,7 @@ function SettingsPanelInner({
                 {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
                 <div ref={breadcrumbSectionRef} className={sectionCls}>
                     <div className="flex items-center gap-2 mb-4">
-                        <span className="text-base leading-none">🍞</span>
+                        <ListTree className="h-4 w-4 text-[#2dd4bf]" aria-hidden />
                         <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.breadcrumbSettings}</span>
                     </div>
                     <BreadcrumbEditor
@@ -1022,7 +1022,7 @@ function SettingsPanelInner({
                 {footerBlock && (
                     <div ref={footerSectionRef} className={sectionCls}>
                         <div className="flex items-center gap-2 mb-4">
-                            <span className="text-base leading-none">🎨</span>
+                            <Palette className="h-4 w-4 text-[#2dd4bf]" aria-hidden />
                             <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.footerSettings}</span>
                         </div>
 
@@ -1060,7 +1060,7 @@ function SettingsPanelInner({
                                 onClick={() => setIsFooterBrandOpen(v => !v)}
                                 className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
-                                <span>🏢 {s.brandLogo}</span>
+                                <span className="flex items-center gap-1"><Building2 className="h-4 w-4" aria-hidden /> {s.brandLogo}</span>
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
                             </button>
                             {isFooterBrandOpen && (() => {
@@ -1326,10 +1326,10 @@ function SettingsPanelInner({
     }
 
     const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
-        { id: 'global', label: s.tabGlobal, icon: <span aria-hidden="true" className="text-[15px] leading-none">⚙️</span> },
-        { id: 'seo', label: s.tabSeo, icon: <span aria-hidden="true" className="text-[15px] leading-none">🔍</span> },
-        { id: 'menu', label: s.tabMenu, icon: <span aria-hidden="true" className="text-[15px] leading-none">🧭</span> },
-        { id: 'block', label: s.tabBlock, icon: <span aria-hidden="true" className="text-[15px] leading-none">🎨</span>, disabled: !block },
+        { id: 'global', label: s.tabGlobal, icon: <Settings className="h-4 w-4" aria-hidden /> },
+        { id: 'seo', label: s.tabSeo, icon: <Search className="h-4 w-4" aria-hidden /> },
+        { id: 'menu', label: s.tabMenu, icon: <Compass className="h-4 w-4" aria-hidden /> },
+        { id: 'block', label: s.tabBlock, icon: <Palette className="h-4 w-4" aria-hidden />, disabled: !block },
     ]
 
     return (
@@ -1385,8 +1385,8 @@ function SettingsPanelInner({
                     <div className="flex items-start gap-4">
                         <div>
                             <div className="flex items-start gap-2">
-                                <span className="text-[16px] font-semibold leading-6 text-[#2DD4BF]">
-                                    {activeTab === 'global' ? '⚙️' : activeTab === 'seo' ? '🔍' : activeTab === 'menu' ? '🧭' : '🎨'}
+                                <span className="text-[#2DD4BF] leading-6">
+                                    {activeTab === 'global' ? <Settings className="h-4 w-4" aria-hidden /> : activeTab === 'seo' ? <Search className="h-4 w-4" aria-hidden /> : activeTab === 'menu' ? <Compass className="h-4 w-4" aria-hidden /> : <Palette className="h-4 w-4" aria-hidden />}
                                 </span>
                                 <p className="pt-[2px] text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
                             </div>
@@ -1394,8 +1394,8 @@ function SettingsPanelInner({
                                 <div className="mt-1 pl-7 flex items-center gap-2">
                                     <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
                                     {isGlobal && (
-                                        <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
-                                            🌐 Global
+                                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+                                            <Globe className="h-3 w-3" aria-hidden /> Global
                                         </span>
                                     )}
                                 </div>
@@ -1850,7 +1850,7 @@ function SettingsPanelInner({
                                                 onClick={() => onBlockUpdate(currentBlockIndex, { secondaryCtaLabel: '', secondaryCtaUrl: '' })}
                                                 aria-label="Remove secondary button"
                                                 className="mt-2 w-full rounded-lg bg-red-500/10 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
-                                            >✕ {s.removeButton}</button>
+                                            ><X className="mr-1 inline-block h-3 w-3 align-text-bottom" aria-hidden />{s.removeButton}</button>
                                         </>
                                     ) : (
                                         <button
@@ -1883,7 +1883,7 @@ function SettingsPanelInner({
                                         <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] text-gray-500">{ti(s.buttonN, { n: i + 1 })}</span>
-                                                <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                                <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300"><X className="h-4 w-4" aria-hidden /></button>
                                             </div>
                                             <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
@@ -1964,7 +1964,7 @@ function SettingsPanelInner({
                                         <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] text-gray-500">{feat.icon || '✦'} {ti(s.featureN, { n: i + 1 })}</span>
-                                                <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                                <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300"><X className="h-4 w-4" aria-hidden /></button>
                                             </div>
                                             <Input defaultValue={feat.title || ''} placeholder={s.title}
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'title', e.target.value)}
@@ -1993,7 +1993,7 @@ function SettingsPanelInner({
                                         <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[10px] text-gray-500">{ti(s.reviewN, { n: i + 1 })}</span>
-                                                <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                                <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300"><X className="h-4 w-4" aria-hidden /></button>
                                             </div>
                                             <Input defaultValue={item.name || ''} placeholder={s.name}
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'name', e.target.value)}
@@ -2078,8 +2078,8 @@ function SettingsPanelInner({
                                             <div key={`mf-cat-${ci}`} className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2">
                                                 <div className="mb-1 flex items-center justify-between">
                                                     <span className="text-xs font-medium text-gray-300">{ti(s.categoryN, { n: ci + 1 })}</span>
-                                                    <button type="button" onClick={() => removeArrayItem('categories', ci)}
-                                                        className="text-xs text-red-400 hover:text-red-300 transition-colors">✕</button>
+                                                    <button type="button" aria-label={`Remove category ${ci + 1}`} onClick={() => removeArrayItem('categories', ci)}
+                                                        className="text-xs text-red-400 hover:text-red-300 transition-colors"><X className="h-4 w-4" aria-hidden /></button>
                                                 </div>
                                                 <Input defaultValue={plainText(cat.name)} placeholder={s.name}
                                                     onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}
@@ -2091,8 +2091,8 @@ function SettingsPanelInner({
                                                     <div key={`mf-item-${ci}-${ii}`} className="mb-2 rounded border border-white/5 bg-black/20 p-2">
                                                         <div className="mb-1 flex items-center justify-between">
                                                             <span className="text-[11px] text-gray-400">{ti(s.menuItemN, { n: ii + 1 })}</span>
-                                                            <button type="button" onClick={() => removeNestedItem('categories', ci, ii)}
-                                                                className="text-xs text-red-400 hover:text-red-300 transition-colors">✕</button>
+                                                            <button type="button" aria-label={`Remove item ${ii + 1} from category ${ci + 1}`} onClick={() => removeNestedItem('categories', ci, ii)}
+                                                                className="text-xs text-red-400 hover:text-red-300 transition-colors"><X className="h-4 w-4" aria-hidden /></button>
                                                         </div>
                                                         <Input defaultValue={plainText(item.name)} placeholder={s.name}
                                                             onFocus={() => { focusedBlockIndexRef.current = currentBlockIndex }}

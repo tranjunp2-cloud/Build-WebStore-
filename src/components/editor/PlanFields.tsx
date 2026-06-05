@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -96,7 +96,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
                             : 'bg-white/5 text-slate-400 hover:bg-white/10'
                     )}
                 >
-                    ★ {plan.highlighted ? s.highlighted : s.fcDefault}
+                    <Star className="h-3 w-3 fill-current" aria-hidden /> {plan.highlighted ? s.highlighted : s.fcDefault}
                 </button>
             </div>
 

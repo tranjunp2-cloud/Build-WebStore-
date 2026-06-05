@@ -1,7 +1,7 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Loader2, Rocket } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Inter } from 'next/font/google'
 import type { PageData } from '@/store/editorStore'
@@ -94,7 +94,7 @@ export function PrePublishModal({
                             >
                                 <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(59,130,246,0.15)] dark:bg-[rgba(30,41,59,0.6)] bg-white dark:backdrop-blur-[25px] backdrop-blur-none p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
                                     <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal dark:text-[#F8FAFC] text-slate-900">
-                                        <span className="mr-2">🚀</span>
+                                        <Rocket className="mr-2 inline-block h-5 w-5 align-text-bottom" aria-hidden />
                                         {pm.title}
                                     </Dialog.Title>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState } from 'react'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import type { FeatureComparisonConfig, ComparisonProduct, ComparisonFeature } from '@/blocks/feature-comparison/config'
@@ -149,7 +149,7 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                                             : 'bg-white/5 text-slate-400 hover:bg-white/10'
                                     )}
                                 >
-                                    ★ {products[safeTab].highlighted ? s.highlighted : s.fcDefault}
+                                    <Star className="h-3 w-3 fill-current" aria-hidden /> {products[safeTab].highlighted ? s.highlighted : s.fcDefault}
                                 </button>
                             </div>
                         </div>

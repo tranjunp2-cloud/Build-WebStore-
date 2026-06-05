@@ -47,7 +47,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                 </I18nProvider>
             )
             
-            const seoTab = screen.getByText('🔍')
+            const seoTab = screen.getByRole('button', { name: /SEO/ })
             fireEvent.click(seoTab)
             
             const titleInput = screen.getByDisplayValue('SEO Title') as HTMLInputElement
@@ -77,7 +77,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                     />
                 </I18nProvider>
             )
-            fireEvent.click(screen.getByText('🔍'))
+            fireEvent.click(screen.getByRole('button', { name: /SEO/ }))
             
             const aiButton = screen.getByText('Automatic SEO Optimization')
             

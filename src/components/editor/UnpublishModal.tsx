@@ -50,7 +50,7 @@ export function UnpublishModal({
                             >
                                 <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(239,68,68,0.15)] dark:bg-[rgba(30,41,59,0.6)] bg-white dark:backdrop-blur-[25px] backdrop-blur-none p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
                                     <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal dark:text-[#F8FAFC] text-slate-900">
-                                        <span className="mr-2">⚠️</span>
+                                        <AlertTriangle className="mr-2 inline-block h-5 w-5 align-text-bottom" aria-hidden />
                                         {et.title}
                                     </Dialog.Title>
 

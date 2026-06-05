@@ -1,5 +1,7 @@
 'use client'
 
+import { Lock } from 'lucide-react'
+
 interface TabSuspendedOverlayProps {
     onReclaim: () => void
     onReload: () => void
@@ -10,7 +12,7 @@ export function TabSuspendedOverlay({ onReclaim, onReload }: TabSuspendedOverlay
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0B1120]/95 backdrop-blur-sm">
             <div className="w-full max-w-sm text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                    <span className="text-3xl">🔒</span>
+                    <Lock className="h-8 w-8" aria-hidden />
                 </div>
                 <h2 className="mt-4 text-xl font-bold text-white">Session moved to another tab</h2>
                 <p className="mt-2 text-sm text-slate-400">
