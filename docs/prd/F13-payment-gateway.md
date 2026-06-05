@@ -63,7 +63,8 @@ Thêm Card + FPX via **Stripe Checkout Session HOSTED** (Wave 6 P0). Dùng **Str
 
 ### In Scope (Wave 6.5 — Flow Hardening)
 - Atomic webhook success: order `status='new'` AND `paymentStatus='paid'` in single update (US-F13-06)
-- Atomic stock decrement; oversell flag + seller manual refund (US-F13-06)
+- Atomic stock decrement UPFRONT at checkout; CAS `WHERE inventory >= qty` prevents oversell (US-F13-06)
+- **[SUPERSEDED GH-1099]** ~~Oversell flag + seller manual refund~~ → Prevented via CAS at checkout (PR #1160)
 - Accurate payment method detection (card vs FPX) from PaymentIntent (US-F13-06)
 - Cart preserved on cancel; cleared only after confirmed success (US-F13-05)
 - Confirm page polling + self-heal against late webhooks (US-F13-05, US-F13-06)
@@ -129,8 +130,8 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-ID | Requirement | Story Ref | Priority | Phase | Notes |
 |-------|-------------|-----------|----------|-------|-------|
 | FR-16 | Webhook success sets `status='new'` AND `paymentStatus='paid'` atomically (single SQL) | US-F13-06 | P0 | 01 | Fixes bug where Stripe-paid orders never showed paid |
-| FR-17 | Stock decrement MUST be atomic; concurrent orders never drive inventory negative | US-F13-06 | P0 | 02 | `UPDATE ... WHERE inventory >= qty` |
-| FR-18 | Oversell after capture → flag `oversellReview=true`, order stays paid/new, notify seller | US-F13-06 | P0 | 02, 07 | No auto-refund; manual seller handling |
+| FR-17 | Stock decrement MUST be atomic at checkout; CAS `WHERE inventory >= qty` prevents oversell upfront | US-F13-06 | P0 | 02 | Prevent-upfront: reject if inventory insufficient (commit `938406a9`) |
+| **FR-18** | **[SUPERSEDED GH-1099]** ~~Oversell after capture → flag oversellReview=true~~ → Rendered obsolete by prevent-upfront (FR-17 CAS); oversellReview field deprecated as of PR #1160 | US-F13-06 | ~~P0~~ | ~~02, 07~~ | **Oversell is no longer possible due to atomic stock validation at order creation** |
 | FR-19 | Record actual payment method (card vs fpx) from PaymentIntent on connected account | US-F13-06 | P1 | 03 | Not defaulting 'card' for multi-method tenants |
 | FR-20 | Cart cleared on order placement at `/api/orders/stripe-checkout` time (Wave 6.5 design change); on cancel/back, cart preserved only within confirm for order-based retry | US-F13-05 | P0 | 04, 05 | Cancel/back lands on `/confirm?cancelled=1` → Payment Failed state + Pay Now CTA; no checkout toast |
 | FR-21 | Confirm page: processing state, SSE stream + optional POST `/api/orders/[id]/payment-status` for active reconcile, explicit payment_failed state | US-F13-05, US-F13-06 | P0 | 05 | Reuses existing SSE `/api/orders/stream/[orderNumber]` for live updates; active Stripe session reconcile is Wave 6.5 enhancement |
@@ -347,7 +348,7 @@ function buildPaymentMethodTypes(tenant): StripePaymentMethod[] {
 | Stripe Idempotency Key API param | Wave 7+ | Order status check sufficient for Wave 6 volume |
 | TnG, GrabPay, Boost | Wave 7+ | Stripe MY not yet GA |
 | Saved cards / tokenized re-purchase | Wave 7+ | Requires buyer accounts |
-| Refund UI in order detail | Wave 7+ (F10 scope) | Wave 6.5 manual seller "Refund customer" button on oversell |
+| Refund UI in order detail | Wave 7+ (F10 scope) | **[OBSOLETE as of GH-1099]** Manual seller oversell refund button deprecated — oversell is now prevented upfront (PR #1160) |
 | Stripe Connect Express/Custom | Wave 8+ | Standard accounts sufficient for marketplace launch |
 | Multi-currency support | Wave 8+ | Malaysia focus, MYR-only Wave 6 |
 

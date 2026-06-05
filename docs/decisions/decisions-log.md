@@ -212,7 +212,20 @@
 
 ---
 
-## PD-018 — Manual Payment (Bank Transfer) Verification Flow
+## PD-018 — Oversell Handling: Prevent-Upfront vs Detect-After (GH-1099, F13 AC-3 Supersede)
+
+| | |
+|---|---|
+| **Decision** | AC-3 (Oversell-detect-after + manual seller refund) **SUPERSEDED** by prevent-upfront architecture |
+| **Options** | 1. Detect after capture (original AC-3): flag oversellReview, manual seller refund; 2. Prevent upfront: atomic CAS at checkout |
+| **Chosen** | **Prevent-upfront (Option 2)** — stock decrement at order creation via atomic `WHERE inventory >= qty` |
+| **Rationale** | **Upfront prevention is operationally simpler + safer.** Detect-after requires manual seller intervention (refund button), creates order processing ambiguity, and risks customer dissatisfaction. Prevent-upfront: fail fast at checkout (422 OUT_OF_STOCK), no order created, buyer sees error immediately, cart preserved for retry. Zero post-capture oversell scenarios. **Objective: never oversell** is achieved via architecture, not manual process. |
+| **Impact** | **Code:** Stock decrement moved from webhook `reconcileOrderPaid()` to checkout/session-creation for all payment methods (commit `938406a9`); the now-dead `oversellReview` field + refund branch removed in PR #1160. **Docs:** FR-18, US-F13-06 AC-3 marked SUPERSEDED; schema field `oversell_review` deprecated (column kept for backward-compat, NEVER-DROP rule). **QA:** TC-F13.145, TC-F13.146 marked OBSOLETE (no post-capture oversell scenario to test). |
+| **Status** | ✅ Decided 2026-06-04 (GH-1099, PR #1160 merged) — Docs sync: 2026-06-05 |
+
+---
+
+## PD-019 — Manual Payment (Bank Transfer) Verification Flow
 
 | | |
 |---|---|
