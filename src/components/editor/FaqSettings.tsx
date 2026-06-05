@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -131,7 +131,7 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
                                             disabled={count <= 3}
                                             onClick={() => handleRemoveAt(i)}
                                             className="text-[10px] text-red-400 hover:text-red-300 disabled:opacity-30"
-                                        >✕</button>
+                                        ><X className="h-4 w-4" aria-hidden /></button>
                                     </div>
                                     <Input
                                         defaultValue={typeof item.question === 'string' ? item.question : ''}

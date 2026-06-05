@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
@@ -1968,9 +1969,9 @@ export default function EditorPage() {
     }, [isCompactLayout])
 
     const sidebarTabs = [
-        { id: 'chat' as const, label: 'AI Chat', icon: <span aria-hidden="true">💬</span> },
-        { id: 'components' as const, label: 'Components', icon: <span aria-hidden="true">⚡</span> },
-        { id: 'pages' as const, label: 'Pages', icon: <span aria-hidden="true">📄</span> },
+        { id: 'chat' as const, label: 'AI Chat', icon: <MessageCircle className="h-4 w-4" aria-hidden /> },
+        { id: 'components' as const, label: 'Components', icon: <Zap className="h-4 w-4" aria-hidden /> },
+        { id: 'pages' as const, label: 'Pages', icon: <FileText className="h-4 w-4" aria-hidden /> },
     ]
 
     const sidebarContent = (

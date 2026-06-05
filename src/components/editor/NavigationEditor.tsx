@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, GripVertical } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, GripVertical, Pencil, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
 import {
     DndContext,
     closestCenter,
@@ -219,13 +219,14 @@ function NavLinkRow({
                 {/* Edit button — always visible per Figma */}
                 <button
                     type="button"
+                    aria-label="Edit link"
                     onClick={(e) => {
                         e.stopPropagation()
                         setIsPanelOpen(!isPanelOpen)
                     }}
                     className="shrink-0 text-xs text-slate-500 hover:text-amber-400 transition-colors"
                 >
-                    ✏️
+                    <Pencil className="h-3 w-3" aria-hidden />
                 </button>
             </div>
 
@@ -289,10 +290,10 @@ function NavLinkRow({
                                 <Plus className="w-3.5 h-3.5" />
                             </button>
                         )}
-                        {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↑</button>}
-                        {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↓</button>}
-                        {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">←</button>}
-                        {depth < 1 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
+                        {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowUp className="h-3 w-3" aria-hidden /></button>}
+                        {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowDown className="h-3 w-3" aria-hidden /></button>}
+                        {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowLeft className="h-3 w-3" aria-hidden /></button>}
+                        {depth < 1 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowRight className="h-3 w-3" aria-hidden /></button>}
                         <div className="flex-1" />
                         <button type="button" onClick={() => onDelete(link.id)} className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />
