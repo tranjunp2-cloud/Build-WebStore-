@@ -37,8 +37,26 @@ Per-tenant customization of transactional emails (subject, greeting, CTA label, 
 | **F32-S-03** | Security | IDOR prevention — getCurrentTenantId() scopes all DB ops | Unit | P1 |
 | **F32-S-04** | Security | Preview API authenticated + no DB write/send | Unit | P1 |
 | **F32-S-05** | Security | HTML escaping prevents injection via config values | Unit | P1 |
+| **F32-V-01** | Validation | `validateContentFields` — null fields pass without crash (regression: `null.length`) | Unit | P1 |
+| **F32-V-02** | Validation | `validateContentFields` — over-limit string returns error per field | Unit | P2 |
 
 ---
+
+### TC-F32-V-01: Null content fields do not crash save (regression)
+
+Context: Payload persists unset group/text fields as `null`. Re-saving an existing
+config row whose blank fields are `null` previously crashed with
+`Cannot read properties of null (reading 'length')`.
+
+Arrange: `fields = { subject: null, greeting: null, ctaLabel: null, closing: null }` (cast)
+Act: `validateContentFields(fields, 'contentEn')`
+Assert: returns `null` (no error, no throw)
+
+### TC-F32-V-02: Over-limit field returns error
+
+Arrange: `fields = { subject: 'x'.repeat(201) }`
+Act: `validateContentFields(fields, 'contentEn')`
+Assert: returns `'contentEn subject exceeds 200 characters'`; valid-length fields return `null`
 
 ## Detailed Test Coverage
 
