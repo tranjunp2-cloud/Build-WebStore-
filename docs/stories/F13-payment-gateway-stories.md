@@ -324,7 +324,7 @@ THEN  UPDATE orders SET status='new', payment_status='paid'
 ```gherkin
 GIVEN buyer place order for product with inventory=M at checkout
 WHEN  POST /api/orders/stripe-checkout executes
-THEN  UPDATE products SET inventory = GREATEST(0, inventory - qty)
+THEN  UPDATE products SET inventory = inventory - qty
       WHERE id=? AND inventory >= qty (atomic CAS at checkout, not webhook)
   AND IF inventory >= qty: order created, Stripe session returned → buyer pays
   AND IF inventory < qty: order creation fails → HTTP 422 OUT_OF_STOCK, buyer sees error, cart preserved

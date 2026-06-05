@@ -40,8 +40,8 @@ Backend
   ├── Validate tenant.payment_card OR tenant.payment_fpx (FR-15)
   ├── buildPaymentMethodTypes(tenant) → ['card'] | ['fpx'] | ['card','fpx']
   ├── **[GH-1099]** Check stock + DECREMENT atomically via CAS (prevent-upfront)
-  │   ├── UPDATE products SET inventory = GREATEST(0, inventory - qty)
-  │   │   WHERE id=? AND inventory >= qty (atomic per-product)
+  │   ├── UPDATE products SET inventory = inventory - qty
+  │   │   WHERE id=? AND inventory >= qty (atomic per-product; WHERE guard makes GREATEST unnecessary)
   │   ├── IF inventory < qty → reject 422 OUT_OF_STOCK, order not created, cart preserved
   │   └── IF inventory >= qty → order created, proceed to Stripe (oversell impossible)
   ├── Create order status='pending'
