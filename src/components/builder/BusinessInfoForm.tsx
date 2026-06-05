@@ -3,7 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle, Type, Building2, Package, FileText } from 'lucide-react'
+import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
@@ -550,7 +550,6 @@ export default function BusinessInfoForm({
 
                     <BuilderField
                         error={errors.businessName}
-                        Icon={Type}
                         label={t.onboarding.form.businessName}
                         required
                     >
@@ -576,7 +575,6 @@ export default function BusinessInfoForm({
 
                     <BuilderField
                         error={errors.industry}
-                        Icon={Building2}
                         label={t.onboarding.form.industry}
                         required
                     >
@@ -608,7 +606,6 @@ export default function BusinessInfoForm({
                             </div>
                         )}
                         error={errors.products}
-                        Icon={Package}
                         label={t.onboarding.form.products}
                         required
                     >
@@ -634,7 +631,6 @@ export default function BusinessInfoForm({
                             </div>
                         )}
                         error={errors.shortDescription}
-                        Icon={FileText}
                         label={t.onboarding.form.shortDescription}
                         required
                     >
