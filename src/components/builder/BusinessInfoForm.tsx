@@ -3,7 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle, Type, Building2, Package, FileText } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
@@ -549,6 +549,7 @@ export default function BusinessInfoForm({
                     {confidenceBadge}
 
                     <BuilderField
+                        Icon={Type}
                         error={errors.businessName}
                         label={t.onboarding.form.businessName}
                         required
@@ -574,6 +575,7 @@ export default function BusinessInfoForm({
                     )}
 
                     <BuilderField
+                        Icon={Building2}
                         error={errors.industry}
                         label={t.onboarding.form.industry}
                         required
@@ -599,6 +601,7 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
+                        Icon={Package}
                         hint={(
                             <div className="flex items-center gap-2">
                                 <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
@@ -624,6 +627,7 @@ export default function BusinessInfoForm({
                     </BuilderField>
 
                     <BuilderField
+                        Icon={FileText}
                         hint={(
                             <div className="flex items-center gap-2">
                                 <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
