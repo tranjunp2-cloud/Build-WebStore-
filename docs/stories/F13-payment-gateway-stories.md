@@ -320,25 +320,32 @@ THEN  UPDATE orders SET status='new', payment_status='paid'
   AND ORDER_NEW notification fired once
 ```
 
-#### AC-2: Atomic stock decrement
+#### AC-2: Atomic stock decrement UPFRONT (Prevent-Upfront, GH-1099)
 ```gherkin
-GIVEN N concurrent paid orders on product inventory=M
-WHEN  N webhooks decrement stock simultaneously
-THEN  UPDATE products SET inventory = GREATEST(0, inventory - qty)
-      WHERE id=? AND inventory >= qty (atomic per-product)
-  AND inventory never goes <0 (safe for concurrent payment)
-  AND if qty > available: set order.oversellReview=true [see AC-3]
+GIVEN buyer place order for product with inventory=M at checkout
+WHEN  POST /api/orders/stripe-checkout executes
+THEN  UPDATE products SET inventory = inventory - qty
+      WHERE id=? AND inventory >= qty (atomic CAS at checkout, not webhook)
+  AND IF inventory >= qty: order created, Stripe session returned → buyer pays
+  AND IF inventory < qty: order creation fails → HTTP 422 OUT_OF_STOCK, buyer sees error, cart preserved
+  AND Oversell is prevented upfront — NOT detected after capture
 ```
 
-#### AC-3: Oversell after capture → manual seller refund (NO auto-refund)
+#### AC-3: **[SUPERSEDED GH-1099, PR #1160]** Oversell after capture (OBSOLETE — No Longer Applicable)
 ```gherkin
-GIVEN stock ran out AFTER payment captured (concurrent webhooks)
-WHEN  2nd webhook detects inventory<qty
-THEN  set order.oversellReview=true (flag, NOT a status)
-  AND order stays status='new', paymentStatus='paid' (paid, not reversed)
-  AND send SYSTEM_ALERT to seller: "Order #123 flagged for review — stock went negative"
-  AND admin panel shows "Refund customer" button (wired to POST /api/orders/[id]/refund)
-  AND NO auto-refund; seller decides amount + method manually (locked decision Wave 6.5)
+PREVIOUS APPROACH (Wave 6 initial): Oversell after capture → manual seller refund
+  ↓
+CURRENT APPROACH (GH-1099): Stock decremented UPFRONT at checkout (AC-2 CAS)
+  → Oversell is impossible due to atomic stock validation
+  → `oversellReview` field deprecated; order CANNOT have inventory < qty after payment
+  → Manual seller refund scenario eliminated by architecture (prevent-upfront)
+
+RATIONALE:
+  - Moving stock decrement from webhook (post-capture) to checkout (pre-redirect)
+  - CAS `WHERE inventory >= qty` ensures atomic validation
+  - If qty unavailable: order fails at creation, never reaches Stripe
+  - If qty available: order guaranteed to succeed without oversell risk
+  → No `SYSTEM_ALERT`, no admin refund button, no post-capture oversell handling needed
 ```
 
 #### AC-4: Accurate payment method detection
@@ -376,11 +383,12 @@ THEN  cron queries Stripe session on connected account
 
 ### Definition of Done
 - [ ] Atomic `UPDATE WHERE status='pending'` tested (idempotent on retry)
-- [ ] Stock decrement with GREATEST(0, ...) prevents negative
-- [ ] Oversell flag (boolean `oversellReview`) tested; admin refund button wired
+- [ ] **[GH-1099]** Stock decrement moved to checkout; CAS `WHERE inventory >= qty` tested + prevents negative
+- [ ] **[GH-1099, OBSOLETE]** ~~Oversell flag (boolean `oversellReview`) tested~~ → Oversell no longer possible; flag deprecated (PR #1160)
+- [ ] **[GH-1099, OBSOLETE]** ~~Admin refund button~~ → No longer needed; prevent-upfront ensures no post-capture oversell
 - [ ] PaymentIntent read from connected account; fpx method recorded correctly
 - [ ] Confirm polling + active reconcile tested with delayed webhook (5+ min)
 - [ ] Cron reconcile tested; stale orders expired; CRON_SECRET auth verified
-- [ ] Schema migration `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN` passes check-migrations
-- [ ] i18n (en + ms) for oversell alert, system notification, and cron message
+- [ ] Schema migration: `oversell_review` column kept (NEVER-DROP per `.claude/rules/database-schema.md`) but unused
+- [ ] i18n (en + ms) for cron message + confirmation state; ~~oversell alert~~ removed
 

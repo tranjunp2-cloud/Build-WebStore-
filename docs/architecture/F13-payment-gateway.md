@@ -39,9 +39,12 @@ Client POST /api/orders/stripe-checkout
 Backend
   ├── Validate tenant.payment_card OR tenant.payment_fpx (FR-15)
   ├── buildPaymentMethodTypes(tenant) → ['card'] | ['fpx'] | ['card','fpx']
-  ├── Check stock, prevent oversell at checkout time
+  ├── **[GH-1099]** Check stock + DECREMENT atomically via CAS (prevent-upfront)
+  │   ├── UPDATE products SET inventory = inventory - qty
+  │   │   WHERE id=? AND inventory >= qty (atomic per-product; WHERE guard makes GREATEST unnecessary)
+  │   ├── IF inventory < qty → reject 422 OUT_OF_STOCK, order not created, cart preserved
+  │   └── IF inventory >= qty → order created, proceed to Stripe (oversell impossible)
   ├── Create order status='pending'
-  ├── Decrement stock immediately (Wave 6.5)
   ├── createStripeCheckoutSession({
   │     paymentMethodTypes,
   │     stripeAccountId: tenant.stripeAccountId,
@@ -144,9 +147,8 @@ reconcileOrderPaid(payload, orderId, context='webhook'|'poll'|'cron'):
   ├── IDOR guard: verify connected account owns order's tenant (fail-closed)
   ├── Atomic transition: UPDATE orders SET status='new', payment_status='paid'
   │   WHERE id=? AND status='pending' [only first wins]
-  ├── Decrement stock: UPDATE products SET inventory = GREATEST(0, inventory - qty)
-  │   WHERE id=? AND inventory >= qty (atomic per-product)
-  │   → if qty > available: flag order oversellReview=true [see §2.4a]
+  ├── **[GH-1099]** NO stock decrement here — already done at checkout (prevent-upfront)
+  │   └── Webhook/polling/cron reconcile operates on already-decremented inventory
   ├── Resolve tenant for emails (shop name, site slug)
   ├── Retrieve PaymentIntent (optional, Wave 6.5+): read from connected account
   │   to get actual method (card vs fpx) — update order.paymentMethod
@@ -154,14 +156,14 @@ reconcileOrderPaid(payload, orderId, context='webhook'|'poll'|'cron'):
   ├── Fire ORDER_NEW notification (merchant dashboard)
   └── Return success flag
 
-2.4a. Oversell handling (Wave 6.5):
-  ├── Stock decrement: `UPDATE products SET inventory = GREATEST(0, inventory - qty) WHERE id=? AND inventory >= qty`
-  ├── If inventory goes negative on any product (checked AFTER update):
-  │   ├── Set order.oversellReview=true (boolean flag)
-  │   ├── Send SYSTEM_ALERT to merchant: "Order #123 flagged for review — stock went negative"
-  │   ├── Admin UI shows "Refund customer" button → calls POST /api/orders/[id]/refund
-  │   └── Order stays status='new' + paymentStatus='paid' (paid, not auto-refunded)
-  └── Note: Stock decrement happens at order creation time (checkout), before Stripe redirect
+**[GH-1099, SUPERSEDED]** 2.4a. Oversell handling (Wave 6.5 initial — OBSOLETE):
+  ├── **PREVIOUS:** Stock decrement at webhook time (post-capture)
+  │   └── If qty > available after decrement: flag oversellReview=true + send SYSTEM_ALERT
+  │   └── **NOW REMOVED** — oversell is prevented upfront (§2.1, CAS at checkout)
+  ├── **CURRENT:** Stock already decremented at order creation (checkout, commit `938406a9`)
+  │   └── Oversellreview field deprecated; no post-capture oversell handling
+  └── **RATIONALE:** Moving validation from detect-after (risky, manual seller refund) to prevent-upfront
+      (atomic, fail-fast, guaranteed inventory safety)
 ```
 
 ### 2.5. Confirm Polling + Live Update (v2.1 — Wave 6.5)
@@ -239,8 +241,8 @@ GET /api/cron/reconcile-orders (called by Vercel cron, auth: CRON_SECRET header)
 | Settings actions | `src/app/(dashboard)/settings/payments/actions.ts` | `getPaymentSettings`, `updatePaymentSettings` |
 | Settings UI | `src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx` | Container |
 | Stripe toggles wrapper | `src/app/(dashboard)/settings/payments/stripe-payment-toggles.tsx` | Card + FPX toggles + Connect CTA + return handler |
-| Tenants schema | `src/collections/Tenants.ts` | `stripeAccountId`, `stripeOnboardingComplete`, `payment_card`, `payment_fpx`, `oversellReview` (NEW) |
-| Orders schema | `src/collections/Orders.ts` | `status`, `paymentStatus`, `stripeSessionId`, `stripePaymentIntentId`, `paymentMethod`, `oversellReview` (NEW) |
+| Tenants schema | `src/collections/Tenants.ts` | `stripeAccountId`, `stripeOnboardingComplete`, `payment_card`, `payment_fpx` |
+| Orders schema | `src/collections/Orders.ts` | `status`, `paymentStatus`, `stripeSessionId`, `stripePaymentIntentId`, `paymentMethod`; ~~`oversellReview`~~ (DEPRECATED) |
 
 ---
 
@@ -281,11 +283,14 @@ GET /api/cron/reconcile-orders (called by Vercel cron, auth: CRON_SECRET header)
   paymentStatus: 'pending' | 'paid' | 'payment_failed' | 'refunded' | null,  // Atomic with status='new'
   stripeSessionId: string | null,          // Stripe checkout session ID (for idempotency)
   stripePaymentIntentId: string | null,    // Stripe payment intent ID (for reconcile)
-  oversellReview: boolean = false,         // Flag if stock went negative; needs seller manual refund
+  
+  // **[GH-1099, OBSOLETE]** oversellReview field deprecated (PR #1160)
+  // ~~oversellReview: boolean = false,~~  // DEPRECATED — stock decrement moved upfront (prevent-upfront)
+  // Kept in DB schema for backward-compat (NEVER-DROP); no longer set or checked in code
 }
 ```
 
-### 4.3. Migration (v2.0)
+### 4.3. Migration (v2.0 — GH-1099 Corrected)
 
 **Per `.claude/rules/database-schema.md` convention:**
 
@@ -297,10 +302,12 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payment_fpx BOOLEAN DEFAULT false;
 -- 2. Add Wave 6.5 columns (Phase 01 setup)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status VARCHAR DEFAULT 'pending';  -- 'pending'|'paid'|'payment_failed'|'refunded'
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR UNIQUE;  -- Idempotency key
-
--- 3. Add Wave 6.5 columns (Phase 02 setup)
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR;
+
+-- 3. **[GH-1099]** oversell_review column (DEPRECATED, kept for backward-compat)
+-- Previously added in Phase 02; UNUSED since stock decrement moved upfront (commit `938406a9`); field removed from collection in PR #1160
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review BOOLEAN DEFAULT false;
+-- Note: Column kept per NEVER-DROP rule. No new code sets this field.
 
 -- 4. Backfill Wave 6 (D-02 — preserve hardcode behavior)
 UPDATE tenants
@@ -309,6 +316,7 @@ WHERE stripe_onboarding_complete = true AND payment_card = false;
 ```
 
 **Migration entry:** Add entries to `scripts/db-setup.js` `MIGRATIONS` array per convention.
+**Note (GH-1099):** `oversell_review` column kept for backward-compat but NOT referenced in code paths post-PR #1160.
 
 ### 4.4. Payload hooks
 
@@ -597,7 +605,7 @@ new Stripe(key, {
 | Stripe Idempotency Key | Wave 7+ | Atomic status='pending' guard sufficient Wave 6 volume |
 | TnG, GrabPay, Boost | Wave 7+ | Not yet GA on Stripe MY |
 | Saved cards / Re-purchase | Wave 7+ | Requires buyer accounts (no-auth model conflict) |
-| Refund UI in order detail | Wave 7+ (F10) | Wave 6.5 manual seller "Refund customer" on oversell flag |
+| **[OBSOLETE GH-1099]** Refund UI on oversell | ~~Wave 7+~~ | **Superseded by prevent-upfront (PR #1160)** — oversell no longer possible |
 | Express/Custom Connect | Wave 8+ | Standard accounts sufficient |
 | Multi-currency | Wave 8+ | Malaysia focus, MYR-only |
 
