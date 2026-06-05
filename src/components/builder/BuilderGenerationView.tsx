@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, Loader2, Rocket, X } from 'lucide-react'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -186,8 +186,8 @@ export default function BuilderGenerationView({
     const leftBody = (
         <div className="flex flex-col gap-6">
             <div className="flex items-start gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)] text-sm">
-                    🚀
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]">
+                    <Rocket className="h-4 w-4 text-white" aria-hidden />
                 </div>
                 <div className="relative rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[17px] py-[13px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
                     <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />

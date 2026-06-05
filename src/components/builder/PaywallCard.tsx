@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { Lock, Check, ArrowLeft } from 'lucide-react'
 
 interface PaywallCardProps {
     onBack?: () => void
@@ -28,7 +29,7 @@ export function PaywallCard({ onBack }: PaywallCardProps) {
         <div className="mx-auto w-full max-w-lg space-y-6 py-8">
             <div className="text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
-                    <span className="text-3xl">🔒</span>
+                    <Lock className="h-8 w-8 text-amber-400" aria-hidden />
                 </div>
                 <h2 className="mt-4 text-2xl font-bold text-white">Out of AI credits</h2>
                 <p className="mt-2 text-sm text-slate-400">
@@ -59,7 +60,8 @@ export function PaywallCard({ onBack }: PaywallCardProps) {
                         <ul className="mt-4 space-y-2">
                             {plan.features.map((f) => (
                                 <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
-                                    <span className="text-emerald-400">✓</span> {f}
+                                    <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden />
+                                    {f}
                                 </li>
                             ))}
                         </ul>
@@ -91,9 +93,10 @@ export function PaywallCard({ onBack }: PaywallCardProps) {
                     <button
                         type="button"
                         onClick={onBack}
-                        className="text-xs text-slate-400 hover:text-slate-300"
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-300"
                     >
-                        ← Go back
+                        <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        Go back
                     </button>
                 </div>
             )}
