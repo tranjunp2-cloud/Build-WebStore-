@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, type LucideIcon } from 'lucide-react'
+import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, ZoomIn, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 interface StepData {
@@ -248,7 +248,7 @@ export function ModuleGuidesTab() {
                     </div>
                     <div className="px-3 py-1.5 border-t border-[#1F2937] flex items-center justify-between gap-4 w-full">
                       <span className="text-[11px] text-[#9CA3AF] truncate">{step.imgTitle}</span>
-                      <span className="text-[11px] text-[#3B82F6] whitespace-nowrap">{t.help.modules.lazyScreenshot.clickToZoom}</span>
+                      <span className="text-[11px] text-[#3B82F6] whitespace-nowrap flex items-center gap-1"><ZoomIn className="w-3 h-3 shrink-0" aria-hidden />{t.help.modules.lazyScreenshot.clickToZoom}</span>
                     </div>
                   </div>
                   </div>

@@ -394,7 +394,7 @@
             "business": "🏢 Business",
             "fnb": "🍜 Cafe & Bakery",
             "events": "🎉 Events",
-            "blog": "📝 Blog",
+            "blog": "Blog",
             "travel": "✈️ Travel"
         },
         "sort": "Sort by",
@@ -2445,16 +2445,16 @@
     },
     "help": {
         "nav": {
-            "overview": "📋 Overview",
-            "qna": "❓ Q&A",
-            "modules": "📚 Module Guides"
+            "overview": "Overview",
+            "qna": "Q&A",
+            "modules": "Module Guides"
         },
         "overview": {
             "title": "Help Center",
             "subtitle": "Learn how to use your website management system.",
-            "welcomeTitle": "👋 Welcome to EchPrime!",
+            "welcomeTitle": "Welcome to EchPrime!",
             "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating websites with AI, writing SEO-optimized blog posts to tracking traffic and engagement. Here is an overview of the main features.",
-            "featuresTitle": "🚀 Key Features",
+            "featuresTitle": "Key Features",
             "features": {
                 "dashboardTitle": "Dashboard",
                 "dashboardDesc": "View real-time overview of website traffic, leads, and engagement.",
@@ -2465,13 +2465,13 @@
                 "settingsTitle": "Settings",
                 "settingsDesc": "Configure domain and invite admin staff."
             },
-            "needHelpTitle": "📞 Need more help?",
+            "needHelpTitle": "Need more help?",
             "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
         },
         "modules": {
             "lazyScreenshot": {
                 "screenshot": "Screenshot: {title}",
-                "clickToZoom": "🔍 Click to zoom"
+                "clickToZoom": "Click to zoom"
             },
             "tab": {
                 "escToClose": "ESC to close · Pinch to zoom on mobile",
@@ -2648,28 +2648,28 @@
             "emptyTitle": "No answers found",
             "emptyDesc": "Try different keywords or contact support via WhatsApp.",
             "categories": {
-                "dashboardTitle": "📊 Dashboard",
+                "dashboardTitle": "Dashboard",
                 "qDashboardMetrics": "What metrics are shown on the Dashboard?",
                 "aDashboardMetrics": "The Dashboard displays three key metrics: <strong>Traffic / Views</strong> (total page visits), <strong>Leads / Clicks</strong> (link clicks and interactions), and <strong>Engagement</strong> (non-pageview user activities). Use the period selector to view data for Today, 7 days, or 30 days.",
                 "qDashboardCustomize": "How to customize the Dashboard layout?",
                 "aDashboardCustomize": "Click the <strong>Customize</strong> button at the top right of the Dashboard. A modal will appear where you can drag-and-drop to reorder metric cards, and toggle the eye icon to show or hide specific metrics.",
                 "qDashboardSeo": "What is the SEO Health Widget?",
                 "aDashboardSeo": "The <strong>SEO Health Widget</strong> displays your website's SEO score out of 100. It shows warnings like missing meta titles or unoptimized images. Click <strong>\"AI Fix All Issues\"</strong> to let AI automatically optimize your site's SEO.",
-                "builderTitle": "🤖 AI Website Builder",
+                "builderTitle": "AI Website Builder",
                 "qBuilderCreate": "How to create a website with AI?",
                 "aBuilderCreate": "Click <strong>\"Build with AI\"</strong> on the Dashboard or go to <strong>Builder → New</strong>. Enter your business name, select your industry, describe your products/services, then click <strong>\"Continue — AI will create your website\"</strong>. AI will generate a complete website in about 30-60 seconds.",
                 "qBuilderEdit": "Can I edit the AI-generated website?",
                 "aBuilderEdit": "Yes! After AI generates your website, you can fully customize it using the <strong>Visual Editor</strong>. Edit text, change images, rearrange sections, adjust colors and fonts — all with a drag-and-drop interface.",
                 "qBuilderMobile": "Is the AI-generated website mobile-responsive?",
                 "aBuilderMobile": "Yes, all AI-generated websites are fully responsive. You can preview both <strong>Desktop</strong> and <strong>Mobile</strong> views using the toggle buttons in the Website Preview page. The layout automatically adapts to all screen sizes.",
-                "blogTitle": "📝 Blog",
+                "blogTitle": "Blog",
                 "qBlogCreate": "How to create a new blog post?",
                 "aBlogCreate": "Go to <strong>\"📝 Blog\"</strong> in the sidebar → click <strong>[+ New Post]</strong>. Enter a title, write content using the Rich Text Editor, upload a featured thumbnail, set the category and publish date, then click <strong>Publish</strong> or <strong>Save Draft</strong>.",
                 "qBlogAi": "How does the AI Blog Assistant work?",
                 "aBlogAi": "Click the <strong>\"AI Assistant\"</strong> button (purple) at the top right of the blog editor. Enter your topic, choose a tone of voice (Professional, Friendly, or Persuasive), then click <strong>\"Generate Blog Idea\"</strong>. AI will generate a title, content outline, and SEO meta for you.",
                 "qBlogSeo": "How to optimize blog posts for SEO?",
                 "aBlogSeo": "In the blog editor, scroll to the <strong>\"Search Optimization (SEO)\"</strong> section on the right sidebar. Fill in the <strong>Meta Title</strong> (max 60 characters) and <strong>Meta Description</strong> (max 160 characters). You can also click <strong>\"Generate via AI\"</strong> to auto-generate optimized meta tags.",
-                "settingsTitle": "⚙️ Settings",
+                "settingsTitle": "Settings",
                 "qSettingsDomain": "How to connect a custom domain?",
                 "aSettingsDomain": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Click <strong>\"+ Add Custom Domain\"</strong>, enter your domain name (e.g., abccompany.com). Then configure DNS records at your domain registrar and click <strong>\"Verify Connection\"</strong>.",
                 "qSettingsDns": "How to configure DNS records?",
