@@ -5,6 +5,7 @@
  * Restyled to bundle .dna-* classes.
  */
 import { useState, useCallback } from 'react'
+import { ArrowRight, Ban, ChevronRight, Plus, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import { DnaBlockListField } from './dna-block-list-field'
 import type { CategoryDNA } from '@/lib/admin/dna-compliance'
@@ -122,7 +123,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
             {/* Signature blocks */}
             <DnaBlockListField
                 label="Signature blocks"
-                labelPrefix="★"
+                Icon={Star}
                 hint="bắt buộc — AI sẽ tự điền nếu user quên"
                 value={form.signatureBlocks}
                 onChange={(v) => set('signatureBlocks', v)}
@@ -131,7 +132,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
             {/* Mandatory order */}
             <div className="dna-field-group">
                 <div className="dna-section-label">
-                    <span>→</span>
+                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                     <span>Mandatory order</span>
                     <span className="dna-section-hint">blocks must appear in this sequence</span>
                 </div>
@@ -152,7 +153,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
                                     {b}
                                 </div>
                                 {i < mandatoryChips.length - 1 && (
-                                    <span className="dna-order-arrow">›</span>
+                                    <span className="dna-order-arrow"><ChevronRight className="h-3.5 w-3.5" aria-hidden /></span>
                                 )}
                             </span>
                         ))}
@@ -163,7 +164,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
             {/* Recommended blocks */}
             <DnaBlockListField
                 label="Recommended"
-                labelPrefix="+"
+                Icon={Plus}
                 hint="Encouraged but not required"
                 value={form.recommendedBlocks}
                 onChange={(v) => set('recommendedBlocks', v)}
@@ -172,7 +173,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
             {/* Forbidden blocks */}
             <DnaBlockListField
                 label="Forbidden"
-                labelPrefix="⊘"
+                Icon={Ban}
                 hint="Must NOT appear in this category"
                 value={form.forbiddenBlocks}
                 chipVariant="forbidden"
