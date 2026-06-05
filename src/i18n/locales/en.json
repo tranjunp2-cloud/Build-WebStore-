@@ -75,6 +75,292 @@
             }
         }
     },
+    "landing": {
+        "platform": {
+            "label": "Platform",
+            "title": "One platform to run your business",
+            "titleHighlight": "end-to-end",
+            "subtitle": "From attracting customers and closing sales to running internal operations — PrimeWeb helps you manage everything on a single system.",
+            "pillars": {
+                "website": {
+                    "title": "Website & Sales",
+                    "desc": "High-converting Landing Pages, an online store with integrated payment, and AI-powered SEO."
+                },
+                "customers": {
+                    "title": "Customer Management",
+                    "desc": "Centralised customer data, multi-channel engagement, and real-time revenue tracking."
+                },
+                "operations": {
+                    "title": "Lean Operations",
+                    "desc": "Department task management, standardised workflows, and operational performance monitoring."
+                }
+            },
+            "cta": "Explore the PrimeWeb ecosystem"
+        },
+        "product": {
+            "label": "Products",
+            "title": "A complete solution for your growth journey",
+            "subtitle": "Beautiful design, fast AI creation, optimised for every device and SEO.",
+            "hero": {
+                "title": "High-converting Landing Page & Website",
+                "points": [
+                    "Beautiful design, fast drag & drop, optimised for every device",
+                    "Fast loading, SEO-ready",
+                    "Over 900+ Landing Page templates ready to use",
+                    "Multi-channel data sync from forms to your storage system"
+                ],
+                "tagLanding": "Landing Page",
+                "tagBuilder": "Website Builder",
+                "detailLink": "View details",
+                "tryFree": "Try for free",
+                "mockupLabel": "Template Library"
+            },
+            "blocks": {
+                "aiBuilder": {
+                    "title": "AI Website Builder",
+                    "items": [
+                        "Chat with AI, describe your business → complete website in minutes",
+                        "Over 900+ block templates: Hero, About, Products, Contact...",
+                        "Drag & drop editing, optimised for every device",
+                        "SEO-ready, fast loading"
+                    ],
+                    "cta": "Try for free"
+                },
+                "templateEditor": {
+                    "title": "Template & Editor",
+                    "items": [
+                        "Industry-specific templates: Retail, F&B, Admissions, Portfolio",
+                        "Visual editing, inline block customisation",
+                        "One-click publish, subdomain or custom domain"
+                    ],
+                    "cta": "Browse collection"
+                },
+                "salesPayment": {
+                    "title": "Sales Page & Payment",
+                    "items": [
+                        "Products, cart, and online payment",
+                        "Multiple payment methods and delivery options",
+                        "AI-written product descriptions, SEO-optimised"
+                    ],
+                    "cta": "Start selling"
+                },
+                "seoAnalytics": {
+                    "title": "SEO & Analytics",
+                    "items": [
+                        "Per-page SEO score, AI meta suggestions",
+                        "JSON-LD, automatic sitemap",
+                        "Dashboard tracking orders and revenue"
+                    ],
+                    "cta": "Optimise now"
+                }
+            }
+        },
+        "solutions": {
+            "title": "A comprehensive platform for every business sector",
+            "subtitle": "Customised to the specifics of each industry for effective operational strategy.",
+            "industries": {
+                "admissions": {
+                    "label": "Admissions",
+                    "title": "Admissions Sector",
+                    "points": [
+                        "Attract and optimise student registration conversions",
+                        "Reach prospects at the right time, increase close rate",
+                        "Centralised data, optimised marketing campaigns",
+                        "Manage courses, students, and programmes end-to-end"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Registration form", "Course schedule", "Course gallery..."]
+                    },
+                    "block2": {
+                        "title": "Contact Form",
+                        "items": ["Subject, Message", "Send consultation email"]
+                    }
+                },
+                "training": {
+                    "label": "Training",
+                    "title": "Training Sector",
+                    "points": [
+                        "Professional course website, easy to update",
+                        "Integrated registration, payment, and class scheduling",
+                        "Automated reminders and material delivery",
+                        "Student and revenue tracking reports"
+                    ],
+                    "block1": {
+                        "title": "Course Blocks",
+                        "items": ["Course list", "Class schedule", "Instructors..."]
+                    },
+                    "block2": {
+                        "title": "Registration & Payment",
+                        "items": ["Registration form", "Payment schedule"]
+                    }
+                },
+                "retail": {
+                    "label": "Retail",
+                    "title": "Retail Sector",
+                    "points": [
+                        "SEO-optimised product pages, conversion-focused",
+                        "Cart and multi-channel checkout",
+                        "Simple order and inventory management",
+                        "AI-written product descriptions and meta suggestions"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Products", "Cart", "Filters..."]
+                    },
+                    "block2": {
+                        "title": "Checkout",
+                        "items": ["Delivery information", "Payment"]
+                    }
+                },
+                "fnb": {
+                    "label": "F&B",
+                    "title": "F&B Sector",
+                    "points": [
+                        "Online menu, table booking and delivery ordering",
+                        "Easy setup of promotions, combos, and vouchers",
+                        "Integrated delivery services",
+                        "Landing pages for events and new dishes"
+                    ],
+                    "block1": {
+                        "title": "Menu Blocks",
+                        "items": ["Dish categories", "Combos", "Table booking..."]
+                    },
+                    "block2": {
+                        "title": "Order & Delivery",
+                        "items": ["Cart", "Delivery address"]
+                    }
+                },
+                "events": {
+                    "label": "Events",
+                    "title": "Events Sector",
+                    "points": [
+                        "Event registration landing page, tickets, lead capture forms",
+                        "Countdown timer, automated notifications",
+                        "Guest list management and check-in",
+                        "Post-event reports"
+                    ],
+                    "block1": {
+                        "title": "Event Blocks",
+                        "items": ["Countdown", "Ticket registration form", "Schedule..."]
+                    },
+                    "block2": {
+                        "title": "Attendance Confirmation",
+                        "items": ["Send email", "QR check-in"]
+                    }
+                },
+                "other": {
+                    "label": "Other",
+                    "title": "Other Sectors",
+                    "points": [
+                        "Company profile, portfolio, and service websites",
+                        "Blog, news, and content SEO",
+                        "Contact forms and consultation booking",
+                        "Customisable to any industry's needs"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Hero, Form", "Gallery", "Button..."]
+                    },
+                    "block2": {
+                        "title": "Contact Form",
+                        "items": ["Subject, Message", "Send email"]
+                    }
+                }
+            }
+        },
+        "why": {
+            "title": "Why choose PrimeWeb?",
+            "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
+            "stats": {
+                "customers": { "value": "10,000+", "label": "Active customers" },
+                "published": { "value": "50,000+", "label": "Websites published" },
+                "blocks": { "value": "900+", "label": "Block templates ready" },
+                "speed": { "value": "5 min", "label": "Build a website with AI" }
+            },
+            "cards": {
+                "easyToUse": {
+                    "title": "Easy to use — fast to deploy",
+                    "points": ["Design with simple drag & drop", "No coding knowledge required", "Dramatically reduces deployment time"]
+                },
+                "dataSync": {
+                    "title": "Seamless data connectivity",
+                    "points": ["Centralise data from multiple channels", "Connect forms, email, and more"]
+                },
+                "security": {
+                    "title": "High security, stable operations",
+                    "points": ["Secure infrastructure, performance-optimised", "Friendly interface across all devices"]
+                },
+                "yourContent": {
+                    "title": "Your content",
+                    "points": ["Visual editor, fast editing", "AI description and SEO suggestions"]
+                },
+                "automation": {
+                    "title": "Engagement & automation",
+                    "points": ["Multi-channel customer engagement", "Nurture throughout the customer journey", "Automate repetitive tasks"]
+                },
+                "fullAi": {
+                    "title": "Full AI capabilities",
+                    "points": ["Build websites via chat", "AI writes descriptions, optimises SEO", "Automate content creation"]
+                }
+            }
+        },
+        "featuresGrid": {
+            "label": "Features",
+            "title": "Everything you need to",
+            "titleHighlight": "Build & Grow",
+            "subtitle": "From AI website creation to drag & drop editing — all on one platform.",
+            "items": {
+                "aiCreate": {
+                    "title": "AI website creation",
+                    "desc": "Describe your business in natural language and AI generates a complete website in seconds."
+                },
+                "dragDrop": {
+                    "title": "Drag & Drop Editor",
+                    "desc": "Customise any block: Hero, About, Products, Contact and more."
+                },
+                "seo": {
+                    "title": "SEO-ready",
+                    "desc": "Server-side rendering, full Google indexing, and structured data built in."
+                },
+                "templates": {
+                    "title": "Beautiful templates",
+                    "desc": "Industry-specific templates: restaurants, retail, portfolio, blog."
+                },
+                "domain": {
+                    "title": "Custom domain",
+                    "desc": "Connect your own domain in minutes. Free SSL certificate."
+                },
+                "sales": {
+                    "title": "Sales-ready",
+                    "desc": "Products, cart, and checkout — all built in."
+                }
+            }
+        },
+        "heroDemo": {
+            "appSuite": "App suite",
+            "homeCrumb": "PrimeWeb · Home",
+            "experienceTitle": "A professional website experience",
+            "experienceDesc": "Built by AI in 5 minutes. Drag-and-drop edits, publish instantly.",
+            "viewDetails": "View details",
+            "tryIt": "Try it",
+            "confirmed": "Confirmed",
+            "customerLabel": "Customer:",
+            "customerSample": "Aiman bin Rahman",
+            "phoneLabel": "Phone:",
+            "phoneSample": "012-345 6789",
+            "totalLabel": "Total:",
+            "totalSample": "RM 1,250",
+            "aiDone": "AI is done",
+            "readyPublish": "Your website is ready. Publish now?"
+        },
+        "ctaBadge": "Lower operating costs",
+        "menuAria": "Main menu",
+        "solutionsMeta": {
+            "trustedBy": "Trusted by:",
+            "learnMore": "Learn more"
+        }
+    },
     "cta": {
         "title": "Ready to Build Your",
         "titleHighlight": "Dream Website",
