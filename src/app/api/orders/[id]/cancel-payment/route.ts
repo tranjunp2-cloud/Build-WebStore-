@@ -5,8 +5,16 @@ import config from '@payload-config'
 import { cookies } from 'next/headers'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
+import { restockItem, type RestockResult } from '../../lib/stock-utils'
 
 type RouteContext = { params: Promise<{ id: string }> }
+
+/** Minimal shape of an order line at depth:0 (product is stored as ID or populated object). */
+type OrderItemDoc = {
+    product: number | string | { id: number | string } | null
+    variant?: string | null
+    quantity: number
+}
 
 /**
  * POST /api/orders/[id]/cancel-payment
@@ -15,8 +23,10 @@ type RouteContext = { params: Promise<{ id: string }> }
  * Auth: HttpOnly ct_ cookie (confirm token) OR magic-link token in body — same model as
  * retry-payment. Distinct from the seller-only `/cancel` route which uses withAuth.
  *
- * No stock restore: Stripe + BT orders do not decrement inventory until payment is
- * captured (Stripe webhook) / approved (BT), so an awaiting order never reserved stock.
+ * Stock IS decremented at checkout (BT: checkout/route.ts) / session creation (Stripe:
+ * stripe-checkout/route.ts). Cancel must therefore restock — mirrors the seller /cancel
+ * route pattern (cancel/route.ts:106-140). Restock runs only on the CAS-winning path
+ * to guarantee no double-restock on concurrent cancel attempts.
  */
 export async function POST(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params
@@ -71,6 +81,38 @@ export async function POST(request: Request, ctx: RouteContext) {
             { status: 409 },
         )
     }
+
+    // Restock inventory for each order line — stock was decremented at checkout.
+    // restockItem is variant-aware and atomic; never throws (returns skipped result on failure).
+    const items = (order.items ?? []) as OrderItemDoc[]
+    const restockResults: RestockResult[] = []
+
+    for (const item of items) {
+        const rawProductId = typeof item.product === 'object' && item.product !== null
+            ? item.product.id
+            : item.product
+        if (!rawProductId) {
+            restockResults.push({ productId: 'unknown', restocked: 0, skipped: true, reason: 'product_not_found' })
+            continue
+        }
+        const productId = Number.isFinite(Number(rawProductId)) ? Number(rawProductId) : rawProductId
+        const result = await restockItem(payload, productId, item.variant ?? null, item.quantity)
+        restockResults.push(result)
+    }
+
+    // Alert ops for failures requiring manual inventory reconciliation.
+    const alertable = restockResults.filter(
+        r => r.skipped && (r.reason === 'write_failed' || r.reason === 'product_not_found' || r.reason === 'variant_not_found')
+    )
+    if (alertable.length > 0) {
+        payload.logger.error(
+            { orderId: order.id, failedProducts: alertable.map(r => ({ id: r.productId, reason: r.reason })) },
+            '[cancel-payment] Restock failed — manual inventory reconciliation required',
+        )
+    }
+
+    // restockResults intentionally not returned — buyer-facing endpoint should not
+    // expose inventory details. Ops alerts above handle any restock failures.
 
     // Invalidate the confirm cookie — the order is now terminal.
     const res = NextResponse.json({ success: true, data: { cancelled: true } })
