@@ -36,6 +36,9 @@ import { ContentPacks } from './collections/ContentPacks'
 import { TemplateVersions } from './collections/TemplateVersions'
 import { Customers } from './collections/Customers'
 import { EmailTemplateSettings } from './collections/EmailTemplateSettings'
+import { PlanSubscriptions } from './collections/PlanSubscriptions'
+import { PlanSubscriptionUsages } from './collections/PlanSubscriptionUsages'
+import { PlanFeatures } from './collections/PlanFeatures'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -144,6 +147,9 @@ export default buildConfig({
     TemplateVersions,
     Customers,
     EmailTemplateSettings,
+    PlanSubscriptions,
+    PlanSubscriptionUsages,
+    PlanFeatures,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

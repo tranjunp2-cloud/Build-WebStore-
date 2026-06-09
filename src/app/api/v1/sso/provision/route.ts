@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { getCurrentUser } from '@/lib/auth'
+import { getPlanCode, mapPlanCodeToTier, dateOnly } from '@/lib/subscriptions/plan-subscription'
 
 /**
  * POST /api/v1/sso/provision
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
         const password = rawPayload.password || ''
         const phone = rawPayload.phone || rawPayload.telephone || ''
         const packCode = rawPayload.subscription_code || rawPayload.pack_code || ''
+        const subscriptionType = rawPayload.subscription_type ?? rawPayload.subscription_type_id ?? null
+        const startDate = rawPayload.start_date || null
+        const endDate = rawPayload.end_date || null
         const customerId = rawPayload.customer_id_number || ''
         const serviceId = rawPayload.service_id || ''
         const orderId = rawPayload.unifi_order_id || ''
@@ -91,13 +95,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── 5. Map pack_code → plan ──
-        const mapPlan = (code: string): string => {
-            const c = code.toLowerCase()
-            if (c.includes('business')) return 'business'
-            if (c.includes('pro')) return 'pro'
-            if (c.includes('starter')) return 'starter'
-            return 'free'
-        }
+        const planCode = getPlanCode(packCode, subscriptionType)
 
         // ── 6. Generate slug ──
         // ── 7. Create Tenant ──
@@ -115,7 +113,7 @@ export async function POST(req: NextRequest) {
             data: {
                 name: companyName,
                 slug: uniqueSlug,
-                plan: mapPlan(packCode),
+                plan: mapPlanCodeToTier(planCode),
                 status: 'active',
                 // SSO fields (optional — populated if provided)
                 ...(customerId && { customerId }),
@@ -143,6 +141,27 @@ export async function POST(req: NextRequest) {
                         role: 'owner',
                     },
                 ],
+            },
+        })
+
+        // ── 9. Create PlanSubscription ──
+        const startsAt = startDate
+            ? new Date(`${dateOnly(startDate)}T00:00:00Z`).toISOString()
+            : new Date().toISOString()
+        const endsAt = endDate
+            ? new Date(`${dateOnly(endDate)}T23:59:59Z`).toISOString()
+            : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+
+        await payload.create({
+            collection: 'plan-subscriptions',
+            data: {
+                tenant: newTenant.id,
+                name: 'main',
+                plan: planCode,
+                status: 'active',
+                startsAt,
+                endsAt,
+                packCode: packCode.toUpperCase(),
             },
         })
 

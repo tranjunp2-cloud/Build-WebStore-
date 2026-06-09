@@ -4236,6 +4236,254 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.email_template_settings_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_email_template_settings_id_idx" ON "payload_locked_documents_rels" ("email_template_settings_id");`,
   },
+  // ── F34: Plan Subscription Management ──
+  {
+    name: 'f-subscription-plans-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plans (
+        id                 SERIAL PRIMARY KEY,
+        code               VARCHAR(50)  NOT NULL UNIQUE,
+        name               VARCHAR(100) NOT NULL,
+        description        TEXT,
+        price              DECIMAL(7,2) NOT NULL DEFAULT 0.00,
+        currency           VARCHAR(10)  NOT NULL DEFAULT 'MYR',
+        interval           VARCHAR(20)  NOT NULL DEFAULT 'month',
+        interval_count     SMALLINT     NOT NULL DEFAULT 1,
+        trial_period_days  SMALLINT,
+        sort_order         SMALLINT,
+        created_at         TIMESTAMPTZ  DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ  DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_plans_code ON plans(code);
+    `,
+  },
+  {
+    name: 'f-subscription-plans-seed',
+    sql: `
+      INSERT INTO plans (code, name, description, price, currency, interval, interval_count, trial_period_days, sort_order)
+      VALUES
+        ('FREEMIUM',                 'Freemium',      'Freemium plan',                       0.00,   'MYR', 'month', 1, 0, 1),
+        ('STARTER_TM_USER',          'Starter',       'Starter plan for TM User',            49.00,  'MYR', 'month', 1, 0, 5),
+        ('STARTER_NON_TM_USER',      'Starter',       'Starter plan for Non TM User',        59.00,  'MYR', 'month', 1, 0, 10),
+        ('STANDARD_TM_USER',         'Standard',      'Standard plan for TM User',           129.00, 'MYR', 'month', 1, 0, 15),
+        ('STANDARD_NON_TM_USER',     'Standard',      'Standard plan for Non TM User',       159.00, 'MYR', 'month', 1, 0, 20),
+        ('PROFESSIONAL_TM_USER',     'Professional',  'Professional plan for TM User',       289.00, 'MYR', 'month', 1, 0, 25),
+        ('PROFESSIONAL_NON_TM_USER', 'Professional',  'Professional plan for Non TM User',   309.00, 'MYR', 'month', 1, 0, 30)
+      ON CONFLICT (code) DO NOTHING;
+    `,
+  },
+  {
+    name: 'f-subscription-plan-subscriptions-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_subscriptions (
+        id          SERIAL PRIMARY KEY,
+        tenant_id   INTEGER NOT NULL REFERENCES tenants(id),
+        name        VARCHAR(50) NOT NULL DEFAULT 'main',
+        plan        VARCHAR(50) NOT NULL,
+        status      VARCHAR(20) NOT NULL DEFAULT 'active',
+        starts_at   TIMESTAMPTZ NOT NULL,
+        ends_at     TIMESTAMPTZ NOT NULL,
+        canceled_at          TIMESTAMPTZ,
+        canceled_immediately BOOLEAN NOT NULL DEFAULT false,
+        pack_code            VARCHAR(100),
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(tenant_id, name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_subscriptions_tenant_id ON plan_subscriptions(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_plan_subscriptions_ends_at ON plan_subscriptions(ends_at);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-subscription-usages-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_subscription_usages (
+        id              SERIAL PRIMARY KEY,
+        subscription_id INTEGER NOT NULL REFERENCES plan_subscriptions(id) ON DELETE CASCADE,
+        feature_code    VARCHAR(100) NOT NULL,
+        used            SMALLINT NOT NULL DEFAULT 0,
+        valid_until     TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(subscription_id, feature_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_sub_usages_subscription_id ON plan_subscription_usages(subscription_id);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-features-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_features (
+        id           SERIAL PRIMARY KEY,
+        plan_id      INTEGER REFERENCES plans(id) ON DELETE CASCADE,
+        plan_code    VARCHAR(50) NOT NULL,
+        feature_code VARCHAR(100) NOT NULL,
+        value        VARCHAR(100) NOT NULL DEFAULT 'YES',
+        settings     JSONB,
+        sort_order   SMALLINT,
+        created_at   TIMESTAMPTZ DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(plan_code, feature_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_features_plan_code ON plan_features(plan_code);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-features-seed',
+    sql: `
+      INSERT INTO plan_features (plan_id, plan_code, feature_code, value)
+      SELECT p.id, v.plan_code, v.feature_code, v.value
+      FROM (VALUES
+        ('FREEMIUM','website_builder','YES'),
+        ('FREEMIUM','template_limit','YES'),
+        ('FREEMIUM','code_snippet','YES'),
+        ('FREEMIUM','sitemap_robot_configuration','YES'),
+        ('FREEMIUM','live_chat_plugin','YES'),
+        ('FREEMIUM','domain_connection','YES'),
+        ('FREEMIUM','shipping_fee_configuration','YES'),
+        ('FREEMIUM','delivery_provider_limit','YES'),
+        ('FREEMIUM','allowing_buyer_making_order','YES'),
+        ('FREEMIUM','allowing_buyer_tracking_order','YES'),
+        ('FREEMIUM','payment_integration','YES'),
+        ('FREEMIUM','order_management','YES'),
+        ('FREEMIUM','product_management','YES'),
+        ('FREEMIUM','promotion_management','YES'),
+        ('FREEMIUM','content_management','YES'),
+        ('FREEMIUM','email_confirmation','YES'),
+        ('FREEMIUM','email_template_configuration','YES'),
+        ('FREEMIUM','staff_limit','YES'),
+        ('FREEMIUM','account_profile','YES'),
+        ('FREEMIUM','distribution_integration','YES'),
+        ('STARTER_TM_USER','website_builder','YES'),
+        ('STARTER_TM_USER','template_limit','YES'),
+        ('STARTER_TM_USER','code_snippet','YES'),
+        ('STARTER_TM_USER','sitemap_robot_configuration','YES'),
+        ('STARTER_TM_USER','live_chat_plugin','YES'),
+        ('STARTER_TM_USER','domain_connection','YES'),
+        ('STARTER_TM_USER','shipping_fee_configuration','YES'),
+        ('STARTER_TM_USER','delivery_provider_limit','YES'),
+        ('STARTER_TM_USER','allowing_buyer_making_order','YES'),
+        ('STARTER_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STARTER_TM_USER','payment_integration','YES'),
+        ('STARTER_TM_USER','order_management','YES'),
+        ('STARTER_TM_USER','product_management','YES'),
+        ('STARTER_TM_USER','promotion_management','YES'),
+        ('STARTER_TM_USER','content_management','YES'),
+        ('STARTER_TM_USER','email_confirmation','YES'),
+        ('STARTER_TM_USER','email_template_configuration','YES'),
+        ('STARTER_TM_USER','staff_limit','YES'),
+        ('STARTER_TM_USER','account_profile','YES'),
+        ('STARTER_TM_USER','distribution_integration','YES'),
+        ('STARTER_NON_TM_USER','website_builder','YES'),
+        ('STARTER_NON_TM_USER','template_limit','YES'),
+        ('STARTER_NON_TM_USER','code_snippet','YES'),
+        ('STARTER_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('STARTER_NON_TM_USER','live_chat_plugin','YES'),
+        ('STARTER_NON_TM_USER','domain_connection','YES'),
+        ('STARTER_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('STARTER_NON_TM_USER','delivery_provider_limit','YES'),
+        ('STARTER_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('STARTER_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STARTER_NON_TM_USER','payment_integration','YES'),
+        ('STARTER_NON_TM_USER','order_management','YES'),
+        ('STARTER_NON_TM_USER','product_management','YES'),
+        ('STARTER_NON_TM_USER','promotion_management','YES'),
+        ('STARTER_NON_TM_USER','content_management','YES'),
+        ('STARTER_NON_TM_USER','email_confirmation','YES'),
+        ('STARTER_NON_TM_USER','email_template_configuration','YES'),
+        ('STARTER_NON_TM_USER','staff_limit','YES'),
+        ('STARTER_NON_TM_USER','account_profile','YES'),
+        ('STARTER_NON_TM_USER','distribution_integration','YES'),
+        ('STANDARD_TM_USER','website_builder','YES'),
+        ('STANDARD_TM_USER','template_limit','YES'),
+        ('STANDARD_TM_USER','code_snippet','YES'),
+        ('STANDARD_TM_USER','sitemap_robot_configuration','YES'),
+        ('STANDARD_TM_USER','live_chat_plugin','YES'),
+        ('STANDARD_TM_USER','domain_connection','YES'),
+        ('STANDARD_TM_USER','shipping_fee_configuration','YES'),
+        ('STANDARD_TM_USER','delivery_provider_limit','YES'),
+        ('STANDARD_TM_USER','allowing_buyer_making_order','YES'),
+        ('STANDARD_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STANDARD_TM_USER','payment_integration','YES'),
+        ('STANDARD_TM_USER','order_management','YES'),
+        ('STANDARD_TM_USER','product_management','YES'),
+        ('STANDARD_TM_USER','promotion_management','YES'),
+        ('STANDARD_TM_USER','content_management','YES'),
+        ('STANDARD_TM_USER','email_confirmation','YES'),
+        ('STANDARD_TM_USER','email_template_configuration','YES'),
+        ('STANDARD_TM_USER','staff_limit','YES'),
+        ('STANDARD_TM_USER','account_profile','YES'),
+        ('STANDARD_TM_USER','distribution_integration','YES'),
+        ('STANDARD_NON_TM_USER','website_builder','YES'),
+        ('STANDARD_NON_TM_USER','template_limit','YES'),
+        ('STANDARD_NON_TM_USER','code_snippet','YES'),
+        ('STANDARD_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('STANDARD_NON_TM_USER','live_chat_plugin','YES'),
+        ('STANDARD_NON_TM_USER','domain_connection','YES'),
+        ('STANDARD_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('STANDARD_NON_TM_USER','delivery_provider_limit','YES'),
+        ('STANDARD_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('STANDARD_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STANDARD_NON_TM_USER','payment_integration','YES'),
+        ('STANDARD_NON_TM_USER','order_management','YES'),
+        ('STANDARD_NON_TM_USER','product_management','YES'),
+        ('STANDARD_NON_TM_USER','promotion_management','YES'),
+        ('STANDARD_NON_TM_USER','content_management','YES'),
+        ('STANDARD_NON_TM_USER','email_confirmation','YES'),
+        ('STANDARD_NON_TM_USER','email_template_configuration','YES'),
+        ('STANDARD_NON_TM_USER','staff_limit','YES'),
+        ('STANDARD_NON_TM_USER','account_profile','YES'),
+        ('STANDARD_NON_TM_USER','distribution_integration','YES'),
+        ('PROFESSIONAL_TM_USER','website_builder','YES'),
+        ('PROFESSIONAL_TM_USER','template_limit','YES'),
+        ('PROFESSIONAL_TM_USER','code_snippet','YES'),
+        ('PROFESSIONAL_TM_USER','sitemap_robot_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','live_chat_plugin','YES'),
+        ('PROFESSIONAL_TM_USER','domain_connection','YES'),
+        ('PROFESSIONAL_TM_USER','shipping_fee_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','delivery_provider_limit','YES'),
+        ('PROFESSIONAL_TM_USER','allowing_buyer_making_order','YES'),
+        ('PROFESSIONAL_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('PROFESSIONAL_TM_USER','payment_integration','YES'),
+        ('PROFESSIONAL_TM_USER','order_management','YES'),
+        ('PROFESSIONAL_TM_USER','product_management','YES'),
+        ('PROFESSIONAL_TM_USER','promotion_management','YES'),
+        ('PROFESSIONAL_TM_USER','content_management','YES'),
+        ('PROFESSIONAL_TM_USER','email_confirmation','YES'),
+        ('PROFESSIONAL_TM_USER','email_template_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','staff_limit','YES'),
+        ('PROFESSIONAL_TM_USER','account_profile','YES'),
+        ('PROFESSIONAL_TM_USER','distribution_integration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','website_builder','YES'),
+        ('PROFESSIONAL_NON_TM_USER','template_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','code_snippet','YES'),
+        ('PROFESSIONAL_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','live_chat_plugin','YES'),
+        ('PROFESSIONAL_NON_TM_USER','domain_connection','YES'),
+        ('PROFESSIONAL_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','delivery_provider_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('PROFESSIONAL_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('PROFESSIONAL_NON_TM_USER','payment_integration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','order_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','product_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','promotion_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','content_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','email_confirmation','YES'),
+        ('PROFESSIONAL_NON_TM_USER','email_template_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','staff_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','account_profile','YES'),
+        ('PROFESSIONAL_NON_TM_USER','distribution_integration','YES')
+      ) AS v(plan_code, feature_code, value)
+      JOIN plans p ON p.code = v.plan_code
+      ON CONFLICT (plan_code, feature_code) DO NOTHING;
+      DO $$ BEGIN
+        IF (SELECT COUNT(*) FROM plan_features) < 140 THEN
+          RAISE EXCEPTION 'plan_features seed incomplete: expected >= 140 rows (plans seed may have failed)';
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4272,6 +4520,9 @@ const COLLECTION_SLUGS = [
   'template_versions',
   'customers',
   'email-template-settings',
+  'plan-subscriptions',
+  'plan-subscription-usages',
+  'plan-features',
 ];
 
 /**
