@@ -75,6 +75,292 @@
             }
         }
     },
+    "landing": {
+        "platform": {
+            "label": "Platform",
+            "title": "Satu platform untuk menjalankan perniagaan anda",
+            "titleHighlight": "dari hujung ke hujung",
+            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — PrimeWeb membantu anda mengurus segalanya dalam satu sistem.",
+            "pillars": {
+                "website": {
+                    "title": "Laman Web & Jualan",
+                    "desc": "Landing Page bertukar tinggi, kedai dalam talian dengan pembayaran bersepadu, dan SEO berkuasa AI."
+                },
+                "customers": {
+                    "title": "Pengurusan Pelanggan",
+                    "desc": "Data pelanggan berpusat, penglibatan berbilang saluran, dan penjejakan hasil masa nyata."
+                },
+                "operations": {
+                    "title": "Operasi Efisien",
+                    "desc": "Pengurusan tugasan mengikut jabatan, aliran kerja piawai, dan pemantauan prestasi operasi."
+                }
+            },
+            "cta": "Terokai ekosistem PrimeWeb"
+        },
+        "product": {
+            "label": "Produk",
+            "title": "Penyelesaian lengkap untuk perjalanan pertumbuhan anda",
+            "subtitle": "Reka bentuk cantik, penciptaan AI pantas, dioptimumkan untuk setiap peranti dan SEO.",
+            "hero": {
+                "title": "Landing Page & Laman Web bertukar tinggi",
+                "points": [
+                    "Reka bentuk cantik, seret & lepas pantas, dioptimumkan untuk setiap peranti",
+                    "Pemuatan pantas, mesra SEO",
+                    "Lebih 900+ templat Landing Page sedia digunakan",
+                    "Penyegerakan data berbilang saluran dari borang ke sistem storan"
+                ],
+                "tagLanding": "Landing Page",
+                "tagBuilder": "Pembina Laman Web",
+                "detailLink": "Lihat butiran",
+                "tryFree": "Cuba percuma",
+                "mockupLabel": "Perpustakaan Templat"
+            },
+            "blocks": {
+                "aiBuilder": {
+                    "title": "Pembina Laman Web AI",
+                    "items": [
+                        "Berbual dengan AI, huraikan perniagaan anda → laman web lengkap dalam beberapa minit",
+                        "Lebih 900+ templat blok: Hero, Tentang Kami, Produk, Hubungi...",
+                        "Penyuntingan seret & lepas, dioptimumkan untuk setiap peranti",
+                        "Mesra SEO, pemuatan pantas"
+                    ],
+                    "cta": "Cuba percuma"
+                },
+                "templateEditor": {
+                    "title": "Templat & Editor",
+                    "items": [
+                        "Templat mengikut industri: Runcit, F&B, Kemasukan, Portfolio",
+                        "Penyuntingan visual, penyesuaian blok secara inline",
+                        "Terbit satu klik, subdomain atau domain tersuai"
+                    ],
+                    "cta": "Layari koleksi"
+                },
+                "salesPayment": {
+                    "title": "Halaman Jualan & Pembayaran",
+                    "items": [
+                        "Produk, troli, dan pembayaran dalam talian",
+                        "Pelbagai kaedah pembayaran dan pilihan penghantaran",
+                        "Deskripsi produk ditulis AI, dioptimumkan SEO"
+                    ],
+                    "cta": "Mula menjual"
+                },
+                "seoAnalytics": {
+                    "title": "SEO & Analitik",
+                    "items": [
+                        "Skor SEO setiap halaman, cadangan meta oleh AI",
+                        "JSON-LD, peta laman automatik",
+                        "Papan pemuka penjejakan pesanan dan hasil"
+                    ],
+                    "cta": "Optimumkan sekarang"
+                }
+            }
+        },
+        "solutions": {
+            "title": "Platform komprehensif untuk setiap sektor perniagaan",
+            "subtitle": "Disesuaikan dengan keperluan setiap industri untuk strategi operasi yang berkesan.",
+            "industries": {
+                "admissions": {
+                    "label": "Kemasukan",
+                    "title": "Sektor Kemasukan",
+                    "points": [
+                        "Tarik dan optimumkan penukaran pendaftaran pelajar",
+                        "Jangkau prospek pada masa yang tepat, tingkatkan kadar penutupan",
+                        "Data berpusat, optimumkan kempen pemasaran",
+                        "Uruskan kursus, pelajar, dan program dari hujung ke hujung"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Borang pendaftaran", "Jadual kelas", "Galeri kursus..."]
+                    },
+                    "block2": {
+                        "title": "Borang Hubungi",
+                        "items": ["Tajuk, Mesej", "Hantar e-mel perundingan"]
+                    }
+                },
+                "training": {
+                    "label": "Latihan",
+                    "title": "Sektor Latihan",
+                    "points": [
+                        "Laman web kursus profesional, mudah dikemas kini",
+                        "Pendaftaran, pembayaran, dan penjadualan kelas bersepadu",
+                        "Peringatan automatik dan penghantaran bahan",
+                        "Laporan penjejakan pelajar dan hasil"
+                    ],
+                    "block1": {
+                        "title": "Blok Kursus",
+                        "items": ["Senarai kursus", "Jadual kelas", "Pengajar..."]
+                    },
+                    "block2": {
+                        "title": "Pendaftaran & Pembayaran",
+                        "items": ["Borang pendaftaran", "Jadual pembayaran"]
+                    }
+                },
+                "retail": {
+                    "label": "Runcit",
+                    "title": "Sektor Runcit",
+                    "points": [
+                        "Halaman produk dioptimumkan SEO, fokus penukaran",
+                        "Troli dan daftar keluar berbilang saluran",
+                        "Pengurusan pesanan dan inventori yang mudah",
+                        "Deskripsi produk dan cadangan meta ditulis AI"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Produk", "Troli", "Penapis..."]
+                    },
+                    "block2": {
+                        "title": "Daftar Keluar",
+                        "items": ["Maklumat penghantaran", "Pembayaran"]
+                    }
+                },
+                "fnb": {
+                    "label": "F&B",
+                    "title": "Sektor F&B",
+                    "points": [
+                        "Menu dalam talian, tempahan meja dan pesanan penghantaran",
+                        "Persediaan promosi, kombo, dan baucar yang mudah",
+                        "Perkhidmatan penghantaran bersepadu",
+                        "Landing page untuk acara dan hidangan baharu"
+                    ],
+                    "block1": {
+                        "title": "Blok Menu",
+                        "items": ["Kategori hidangan", "Kombo", "Tempahan meja..."]
+                    },
+                    "block2": {
+                        "title": "Pesanan & Penghantaran",
+                        "items": ["Troli", "Alamat penghantaran"]
+                    }
+                },
+                "events": {
+                    "label": "Acara",
+                    "title": "Sektor Acara",
+                    "points": [
+                        "Landing page pendaftaran acara, tiket, borang tangkap lead",
+                        "Pemasa undur, pemberitahuan automatik",
+                        "Pengurusan senarai tetamu dan daftar masuk",
+                        "Laporan pasca acara"
+                    ],
+                    "block1": {
+                        "title": "Blok Acara",
+                        "items": ["Pemasa undur", "Borang pendaftaran tiket", "Jadual..."]
+                    },
+                    "block2": {
+                        "title": "Pengesahan Kehadiran",
+                        "items": ["Hantar e-mel", "Daftar masuk QR"]
+                    }
+                },
+                "other": {
+                    "label": "Lain-lain",
+                    "title": "Sektor Lain-lain",
+                    "points": [
+                        "Laman profil syarikat, portfolio, dan perkhidmatan",
+                        "Blog, berita, dan SEO kandungan",
+                        "Borang hubungi dan tempahan perundingan",
+                        "Boleh disesuaikan mengikut keperluan mana-mana industri"
+                    ],
+                    "block1": {
+                        "title": "Perpustakaan Blok",
+                        "items": ["Hero, Borang", "Galeri", "Butang..."]
+                    },
+                    "block2": {
+                        "title": "Borang Hubungi",
+                        "items": ["Tajuk, Mesej", "Hantar e-mel"]
+                    }
+                }
+            }
+        },
+        "why": {
+            "title": "Mengapa memilih PrimeWeb?",
+            "subtitle": "Platform laman web AI terkemuka — pelopor laman web bina AI dengan pemasaran & jualan serba lengkap.",
+            "stats": {
+                "customers": { "value": "10,000+", "label": "Pelanggan aktif" },
+                "published": { "value": "50,000+", "label": "Laman web diterbitkan" },
+                "blocks": { "value": "900+", "label": "Templat blok sedia" },
+                "speed": { "value": "5 minit", "label": "Bina laman web dengan AI" }
+            },
+            "cards": {
+                "easyToUse": {
+                    "title": "Mudah digunakan — pantas dilancarkan",
+                    "points": ["Reka bentuk dengan seret & lepas yang mudah", "Tiada pengetahuan pengkodan diperlukan", "Mengurangkan masa pemasangan dengan ketara"]
+                },
+                "dataSync": {
+                    "title": "Ketersambungan data yang lancar",
+                    "points": ["Pusatkan data dari pelbagai saluran", "Sambungkan borang, e-mel, dan banyak lagi"]
+                },
+                "security": {
+                    "title": "Keselamatan tinggi, operasi stabil",
+                    "points": ["Infrastruktur selamat, dioptimumkan prestasi", "Antara muka mesra di semua peranti"]
+                },
+                "yourContent": {
+                    "title": "Kandungan anda",
+                    "points": ["Editor visual, penyuntingan pantas", "Cadangan deskripsi dan SEO oleh AI"]
+                },
+                "automation": {
+                    "title": "Penglibatan & automasi",
+                    "points": ["Penglibatan pelanggan berbilang saluran", "Asuhan sepanjang perjalanan pelanggan", "Automatikkan tugasan berulang"]
+                },
+                "fullAi": {
+                    "title": "Keupayaan AI penuh",
+                    "points": ["Bina laman web melalui sembang", "AI menulis deskripsi, optimumkan SEO", "Automatikkan penciptaan kandungan"]
+                }
+            }
+        },
+        "featuresGrid": {
+            "label": "Ciri-ciri",
+            "title": "Semua yang anda perlukan untuk",
+            "titleHighlight": "Bina & Kembangkan",
+            "subtitle": "Dari penciptaan laman web AI hingga penyuntingan seret & lepas — semua dalam satu platform.",
+            "items": {
+                "aiCreate": {
+                    "title": "Penciptaan laman web AI",
+                    "desc": "Huraikan perniagaan anda dalam bahasa semula jadi dan AI menjana laman web lengkap dalam beberapa saat."
+                },
+                "dragDrop": {
+                    "title": "Editor Seret & Lepas",
+                    "desc": "Sesuaikan mana-mana blok: Hero, Tentang Kami, Produk, Hubungi dan banyak lagi."
+                },
+                "seo": {
+                    "title": "Mesra SEO",
+                    "desc": "Rendering sisi pelayan, pengindeksan Google penuh, dan data berstruktur terbina dalam."
+                },
+                "templates": {
+                    "title": "Templat cantik",
+                    "desc": "Templat mengikut industri: restoran, runcit, portfolio, blog."
+                },
+                "domain": {
+                    "title": "Domain tersuai",
+                    "desc": "Sambungkan domain anda sendiri dalam beberapa minit. Sijil SSL percuma."
+                },
+                "sales": {
+                    "title": "Sedia untuk jualan",
+                    "desc": "Produk, troli, dan daftar keluar — semua terbina dalam."
+                }
+            }
+        },
+        "heroDemo": {
+            "appSuite": "Suite aplikasi",
+            "homeCrumb": "PrimeWeb · Laman Utama",
+            "experienceTitle": "Pengalaman laman web profesional",
+            "experienceDesc": "Dibina oleh AI dalam 5 minit. Sunting seret & lepas, terbitkan serta-merta.",
+            "viewDetails": "Lihat butiran",
+            "tryIt": "Cuba sekarang",
+            "confirmed": "Disahkan",
+            "customerLabel": "Pelanggan:",
+            "customerSample": "Aiman bin Rahman",
+            "phoneLabel": "Telefon:",
+            "phoneSample": "012-345 6789",
+            "totalLabel": "Jumlah:",
+            "totalSample": "RM 1,250",
+            "aiDone": "AI telah siap",
+            "readyPublish": "Laman web anda sudah sedia. Terbitkan sekarang?"
+        },
+        "ctaBadge": "Kurangkan kos operasi",
+        "menuAria": "Menu utama",
+        "solutionsMeta": {
+            "trustedBy": "Dipercayai oleh:",
+            "learnMore": "Ketahui lebih lanjut"
+        }
+    },
     "cta": {
         "title": "Bersedia Membina",
         "titleHighlight": "Laman Web Impian",
@@ -108,7 +394,7 @@
             "business": "🏢 Perniagaan",
             "fnb": "🍜 Kafe & Bakeri",
             "events": "🎉 Acara",
-            "blog": "📝 Blog",
+            "blog": "Blog",
             "travel": "✈️ Pelancongan"
         },
         "sort": "Susun mengikut",
@@ -131,12 +417,12 @@
         "welcome": {
             "title": "Selamat datang ke PrimeWeb",
             "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
-            "createStore": "🚀 Cipta Kedai Saya dengan AI",
+            "createStore": "Cipta Kedai Saya dengan AI",
             "skip": "Langkau & Pergi ke Papan Pemuka",
             "step": "Langkah 1 dari 2: Cipta Kedai"
         },
         "wizard": {
-            "title": "✨ Terokai Kuasa AI",
+            "title": "Terokai Kuasa AI",
             "slides": {
                 "editor": {
                     "title": "Editor AI",
@@ -682,17 +968,25 @@
             "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
-            "fixAllButton": "✨ Baiki Semua Isu",
+            "fixAllButton": "Baiki Semua Isu",
             "contentQuality": "Kualiti Kandungan",
             "technicalSeo": "SEO Teknikal",
             "sitemapAndMeta": "Peta Laman & Tag Meta",
+            "sitemapConfig": "Konfigurasi Peta Laman",
+            "metaTagsSection": "Tag Meta Automatik",
+            "statusLabel": "Status:",
+            "statusUpToDate": "Terkini",
             "lastUpdated": "Kemaskini terakhir: {date}",
             "generating": "Sedang menjana...",
             "sitemapCount": "Peta Laman dijana — {count} halaman",
             "sitemapEmpty": "Peta Laman dijana — tiada halaman lagi",
             "autoMeta": {
                 "enabled": "Penjanaan Meta Auto: Aktif",
-                "disabled": "Penjanaan Meta Auto: Tidak Aktif"
+                "disabled": "Penjanaan Meta Auto: Tidak Aktif",
+                "label": "Auto-Jana Tag Meta",
+                "description": "Mencipta tag tajuk dan penerangan yang dioptimumkan SEO secara automatik untuk halaman dan produk baharu.",
+                "on": "ON",
+                "off": "OFF"
             },
             "keywordColumns": {
                 "keyword": "Kata Kunci",
@@ -1728,10 +2022,10 @@
                 "contentLocale": "Bahasa kandungan",
                 "localeDesc": "Setiap bahasa menyimpan salinannya sendiri. Pelawat mendapat padanan terdekat.",
                 "fieldSubject": "Subjek",
+                "hintSubject": "Dipaparkan dalam pratonton peti masuk. Pastikan di bawah 60 aksara untuk mudah alih.",
                 "fieldGreeting": "Ucapan",
                 "fieldCtaLabel": "Label CTA",
                 "fieldClosing": "Penutup",
-                "hintSubject": "Ditunjukkan dalam pratonton peti masuk. Hadkan di bawah 60 aksara untuk mudah alih.",
                 "hintCtaLabel": "Teks butang. Gunakan kata kerja yang kukuh — \"Jejak Pesanan\", \"Sahkan\", \"Buka Peti Masuk\".",
                 "unsavedChanges": "Perubahan belum disimpan",
                 "allChangesSaved": "Semua perubahan disimpan",
@@ -1754,18 +2048,20 @@
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",
                     "otp-verification": "Kod pengesahan satu kali untuk log masuk dan keselamatan akaun.",
-                    "forgot-password": "Pautan set semula kata laluan, sah selama 30 minit.",
+                    "forgot-password": "Pautan set semula kata laluan satu ketuk, sah selama 30 minit.",
                     "password-changed": "Pengesahan kata laluan telah ditukar dengan berjaya.",
                     "order-confirmation": "Dihantar serta-merta apabila pembayaran pembeli berjaya — resit, item, penghantaran.",
-                    "order-shipped": "Pengesahan penghantaran apabila pesanan dihantar.",
+                    "order-completed": "Pengesahan penghantaran apabila pesanan telah tiba.",
                     "order-cancelled": "Maklumkan pembeli apabila pesanan dibatalkan.",
                     "order-expired": "Amaran kepada pembeli apabila pesanan yang belum dibayar telah tamat tempoh.",
                     "order-refunded": "Maklumkan pembeli apabila pesanan telah dibayar balik.",
-                    "bank-transfer-instructions": "Peringatan kepada pembeli untuk melengkapkan pemindahan bank — pesanan dibatalkan secara automatik selepas 24 jam.",
+                    "bank-transfer-instructions": "Ingatkan pembeli untuk melengkapkan pindahan bank — pesanan dibatalkan selepas 24j.",
                     "payment-confirmed": "Pengesahan bahawa pembayaran telah diterima dan pesanan sedang diproses.",
                     "payment-rejected": "Maklumkan pembeli bahawa pembayaran mereka ditolak.",
-                    "new-order-seller": "Pemberitahuan pesanan baru untuk papan pemuka penjual.",
-                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka."
+                    "new-order-seller": "Pemberitahuan kepada penjual setiap kali pesanan baharu masuk.",
+                    "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka.",
+                    "contact-from-seller": "Hantar mesej kepada peti masuk sokongan penjual.",
+                    "newsletter-seller-digest": "Ringkasan pendaftaran surat berita, kadar buka, dan kadar klik."
                 }
             }
         },
@@ -2149,16 +2445,16 @@
     },
     "help": {
         "nav": {
-            "overview": "📋 Gambaran Keseluruhan",
-            "qna": "❓ S&J",
-            "modules": "📚 Panduan Modul"
+            "overview": "Gambaran Keseluruhan",
+            "qna": "S&J",
+            "modules": "Panduan Modul"
         },
         "overview": {
             "title": "Pusat Bantuan",
             "subtitle": "Ketahui cara menggunakan sistem pengurusan laman web anda.",
-            "welcomeTitle": "👋 Selamat datang ke EchPrime!",
+            "welcomeTitle": "Selamat datang ke EchPrime!",
             "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional anda — daripada mencipta laman web dengan AI, menulis artikel blog dioptimumkan SEO hingga menjejak trafik dan penglibatan. Berikut adalah gambaran keseluruhan ciri utama.",
-            "featuresTitle": "🚀 Ciri Utama",
+            "featuresTitle": "Ciri Utama",
             "features": {
                 "dashboardTitle": "Papan Pemuka",
                 "dashboardDesc": "Lihat gambaran masa nyata tentang trafik laman web, petunjuk, dan penglibatan.",
@@ -2169,13 +2465,13 @@
                 "settingsTitle": "Tetapan",
                 "settingsDesc": "Konfigurasikan domain dan jemput staf pentadbir."
             },
-            "needHelpTitle": "📞 Perlukan lebih bantuan?",
+            "needHelpTitle": "Perlukan lebih bantuan?",
             "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
         },
         "modules": {
             "lazyScreenshot": {
                 "screenshot": "Tangkapan skrin: {title}",
-                "clickToZoom": "🔍 Klik untuk zum"
+                "clickToZoom": "Klik untuk zum"
             },
             "tab": {
                 "escToClose": "ESC untuk tutup · Cubit untuk zum di mudah alih",
@@ -2352,28 +2648,28 @@
             "emptyTitle": "Tiada jawapan dijumpai",
             "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
             "categories": {
-                "dashboardTitle": "📊 Papan Pemuka",
+                "dashboardTitle": "Papan Pemuka",
                 "qDashboardMetrics": "Apakah metrik yang dipaparkan di Papan Pemuka?",
                 "aDashboardMetrics": "Papan Pemuka memaparkan tiga metrik utama: <strong>Trafik / Paparan</strong> (jumlah lawatan halaman), <strong>Petunjuk / Klik</strong> (klik pautan dan interaksi), dan <strong>Penglibatan</strong> (aktiviti pengguna bukan paparan halaman). Gunakan pemilih tempoh untuk melihat data untuk Hari Ini, 7 hari, atau 30 hari.",
                 "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
                 "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
                 "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
                 "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
-                "builderTitle": "🤖 Pembina Laman Web AI",
+                "builderTitle": "Pembina Laman Web AI",
                 "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
                 "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",
                 "qBuilderEdit": "Bolehkah saya mengedit laman web yang dijana AI?",
                 "aBuilderEdit": "Ya! Selepas AI menjana laman web anda, anda boleh menyesuaikannya sepenuhnya menggunakan <strong>Editor Visual</strong>. Edit teks, tukar imej, susun semula bahagian, laraskan warna dan fon — semuanya dengan antara muka seret-dan-lepas.",
                 "qBuilderMobile": "Adakah laman web yang dijana AI responsif untuk mudah alih?",
                 "aBuilderMobile": "Ya, semua laman web yang dijana AI adalah responsif sepenuhnya. Anda boleh pratonton paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> menggunakan butang togol di halaman Pratonton Laman Web. Susun atur menyesuaikan secara automatik kepada semua saiz skrin.",
-                "blogTitle": "📝 Blog",
+                "blogTitle": "Blog",
                 "qBlogCreate": "Bagaimana mencipta artikel blog baru?",
                 "aBlogCreate": "Pergi ke <strong>\"📝 Blog\"</strong> di bar sisi → klik <strong>[+ Artikel Baru]</strong>. Masukkan tajuk, tulis kandungan menggunakan Editor Teks Kaya, muat naik lakaran kecil utama, tetapkan kategori dan tarikh terbit, kemudian klik <strong>Terbit</strong> atau <strong>Simpan Draf</strong>.",
                 "qBlogAi": "Bagaimana Pembantu AI Blog berfungsi?",
                 "aBlogAi": "Klik butang <strong>\"Pembantu AI\"</strong> (ungu) di bahagian atas kanan editor blog. Masukkan topik anda, pilih nada suara (Profesional, Mesra, atau Memujuk), kemudian klik <strong>\"Jana Idea Blog\"</strong>. AI akan menjana tajuk, rangka kandungan, dan meta SEO untuk anda.",
                 "qBlogSeo": "Bagaimana mengoptimumkan artikel blog untuk SEO?",
                 "aBlogSeo": "Dalam editor blog, tatal ke bahagian <strong>\"Pengoptimuman Carian (SEO)\"</strong> di bar sisi kanan. Isi <strong>Tajuk Meta</strong> (maksimum 60 aksara) dan <strong>Penerangan Meta</strong> (maksimum 160 aksara). Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> untuk menjana tag meta yang dioptimumkan secara automatik.",
-                "settingsTitle": "⚙️ Tetapan",
+                "settingsTitle": "Tetapan",
                 "qSettingsDomain": "Bagaimana menyambungkan domain tersuai?",
                 "aSettingsDomain": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Klik <strong>\"+ Tambah Domain Tersuai\"</strong>, masukkan nama domain anda (cth., abccompany.com). Kemudian konfigurasi rekod DNS di pendaftar domain anda dan klik <strong>\"Sahkan Sambungan\"</strong>.",
                 "qSettingsDns": "Bagaimana mengkonfigurasi rekod DNS?",
@@ -3019,7 +3315,20 @@
             "moveUp": "Alih ke atas",
             "moveDown": "Alih ke bawah",
             "moveLeft": "Alih ke kiri",
-            "makeSubItem": "Jadikan sub-item"
+            "makeSubItem": "Jadikan sub-item",
+            "quickLanguage": {
+                "title": "Bahasa Pantas",
+                "tooltip": "Aktifkan untuk menterjemah dan memaparkan laman web anda dalam pelbagai bahasa untuk pelanggan antarabangsa atau pelbagai etnik.",
+                "enable": "Aktifkan Pelbagai Bahasa",
+                "enabledHint": "Laman menyokong bahasa kedua.",
+                "primary": "Utama",
+                "makeDefault": "Jadikan Lalai",
+                "removeLanguage": "Alih keluar bahasa",
+                "addSecondary": "Tambah bahasa kedua",
+                "adding": "Menambah…",
+                "add": "Tambah",
+                "maxLanguages": "Maksimum 2 bahasa. Alih keluar {name} untuk menukar."
+            }
         },
         "settings": {
             "brandIdentity": "Identiti Jenama",
@@ -3513,7 +3822,7 @@
             "stripeCardDesc": "Visa atau Mastercard melalui Stripe",
             "stripeFpx": "Bayar dengan FPX (Perbankan Dalam Talian)",
             "stripeFpxDesc": "Perbankan Dalam Talian Malaysia melalui Stripe",
-            "paymentCancelled": "Pembayaran dibatalkan. Troli anda dikekalkan — sila cuba lagi.",
+            "paymentCancelled": "Pembayaran gagal. Sila cuba lagi.",
             "paymentFailed": "Pembayaran tidak dapat dimulakan. Sila cuba lagi.",
             "redirectingTitle": "Mengarahkan ke Stripe Checkout",
             "redirectingDesc": "Sila jangan tutup tetingkap ini. Anda akan kembali ke sini selepas pembayaran.",
@@ -3541,7 +3850,16 @@
             "leaveAnyway": "Keluar sahaja",
             "stayUpload": "Kekal & Muat Naik",
             "sumStatusBtS1": "Tindakan Diperlukan — Muat Naik Resit",
-            "sumStatusBtS2": "Kami tidak boleh menghantar sehingga pemindahan anda disahkan."
+            "sumStatusBtS2": "Kami tidak boleh menghantar sehingga pemindahan anda disahkan.",
+            "verifyingPayment": "Mengesahkan pembayaran anda…",
+            "verifyingHint": "Ini mungkin mengambil masa beberapa saat. Anda juga boleh semak Pesanan Saya.",
+            "retryError": "Tidak dapat memulakan pembayaran. Sila cuba lagi.",
+            "cancelConfirmBanner": "Batal Pesanan",
+            "cancelConfirmTitle": "Batalkan pesanan ini?",
+            "cancelConfirmBody": "Pesanan anda akan dibatalkan dan item yang ditempah akan dilepaskan. Tindakan ini tidak boleh dibuat asal — anda perlu membuat pesanan baharu untuk membeli semula.",
+            "cancelConfirmYes": "Ya, batalkan pesanan",
+            "cancelKeepOrder": "Kekalkan pesanan",
+            "cancelling": "Membatalkan…"
         },
         "resendUpload": {
             "checkEmailTitle": "Semak e-mel anda",

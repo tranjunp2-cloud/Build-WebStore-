@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { X, BookOpen } from 'lucide-react'
+import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, ZoomIn, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 interface StepData {
@@ -18,7 +18,7 @@ interface StepData {
 
 interface ModuleData {
   id: string
-  icon: string
+  Icon: LucideIcon
   label: string
   steps: StepData[]
 }
@@ -60,7 +60,7 @@ export function ModuleGuidesTab() {
   const MODULES_DATA: ModuleData[] = [
     {
       id: 'dashboard',
-      icon: '📊',
+      Icon: BarChart3,
       label: d.dashboard.label,
       steps: [
         {
@@ -77,7 +77,7 @@ export function ModuleGuidesTab() {
     },
     {
       id: 'builder',
-      icon: '🚀',
+      Icon: Rocket,
       label: d.builder.label,
       steps: (d.builder.steps || []).map((s: LocaleStep, i: number) => ({
         num: i + 1,
@@ -92,7 +92,7 @@ export function ModuleGuidesTab() {
     },
     {
       id: 'blog',
-      icon: '📝',
+      Icon: PenLine,
       label: d.blog.label,
       steps: (d.blog.steps || []).map((s: LocaleStep, i: number) => ({
         num: i + 1,
@@ -107,7 +107,7 @@ export function ModuleGuidesTab() {
     },
     {
       id: 'settings',
-      icon: '⚙️',
+      Icon: Settings,
       label: d.settings.label,
       steps: [
         {
@@ -189,7 +189,7 @@ export function ModuleGuidesTab() {
                 : 'bg-[#161E2E] border-[#1F2937] text-[#9CA3AF] hover:border-[#3B82F6] hover:text-[#3B82F6]'
             }`}
           >
-            {module.icon} {module.label}
+            <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
           </button>
         ))}
       </div>
@@ -248,7 +248,7 @@ export function ModuleGuidesTab() {
                     </div>
                     <div className="px-3 py-1.5 border-t border-[#1F2937] flex items-center justify-between gap-4 w-full">
                       <span className="text-[11px] text-[#9CA3AF] truncate">{step.imgTitle}</span>
-                      <span className="text-[11px] text-[#3B82F6] whitespace-nowrap">{t.help.modules.lazyScreenshot.clickToZoom}</span>
+                      <span className="text-[11px] text-[#3B82F6] whitespace-nowrap flex items-center gap-1"><ZoomIn className="w-3 h-3 shrink-0" aria-hidden />{t.help.modules.lazyScreenshot.clickToZoom}</span>
                     </div>
                   </div>
                   </div>

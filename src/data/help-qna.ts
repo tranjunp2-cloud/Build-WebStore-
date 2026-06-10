@@ -1,3 +1,4 @@
+import { BarChart3, Rocket, PenLine, Settings, type LucideIcon } from 'lucide-react';
 import { Translations } from '@/i18n';
 
 export interface QnAItem {
@@ -9,6 +10,7 @@ export interface QnAItem {
 export interface QnACategory {
     id: string;
     title: string;
+    Icon: LucideIcon;
     items: QnAItem[];
 }
 
@@ -16,6 +18,7 @@ export const getQnAData = (t: Translations): QnACategory[] => [
     {
         id: 'dashboard',
         title: t.help.qna.categories.dashboardTitle,
+        Icon: BarChart3,
         items: [
             {
                 id: 'q-dashboard-metrics',
@@ -37,6 +40,7 @@ export const getQnAData = (t: Translations): QnACategory[] => [
     {
         id: 'builder',
         title: t.help.qna.categories.builderTitle,
+        Icon: Rocket,
         items: [
             {
                 id: 'q-builder-create',
@@ -58,6 +62,7 @@ export const getQnAData = (t: Translations): QnACategory[] => [
     {
         id: 'blog',
         title: t.help.qna.categories.blogTitle,
+        Icon: PenLine,
         items: [
             {
                 id: 'q-blog-create',
@@ -79,6 +84,7 @@ export const getQnAData = (t: Translations): QnACategory[] => [
     {
         id: 'settings',
         title: t.help.qna.categories.settingsTitle,
+        Icon: Settings,
         items: [
             {
                 id: 'q-settings-domain',

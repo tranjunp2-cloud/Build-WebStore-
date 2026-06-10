@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { restockItem } from '@/app/api/orders/lib/stock-utils'
 
 export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) {
     const now = new Date().toISOString()
@@ -8,8 +10,8 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
         collection: 'orders',
         where: {
             and: [
-                { paymentMethod: { equals: 'bank_transfer' } },
-                { paymentStatus: { in: ['awaiting_payment', 'pending_verification'] } },
+                { paymentMethod: { in: ['bank_transfer', 'card', 'fpx'] } },
+                { paymentStatus: { in: ['awaiting_payment', 'pending_verification', 'payment_failed', 'failed'] } },
                 { paymentExpiresAt: { less_than: now } },
             ],
         },
@@ -32,12 +34,25 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                     payment_status = 'payment_failed',
                     cancel_reason = 'Auto-cancelled: payment not received within 24h'
                 WHERE id = ${order.id}
-                AND payment_status IN ('awaiting_payment', 'pending_verification')
-                AND status::text IN ('pending', 'new')
+                AND payment_status IN ('awaiting_payment', 'pending_verification', 'payment_failed', 'failed')
+                AND status::text IN ('pending', 'new', 'payment_failed')
+                AND payment_expires_at < ${now}
                 RETURNING id
             `)
             if (!updateResult.rows?.length) {
                 continue  // already processed by a concurrent cron invocation
+            }
+
+            // Restock items — stock was decremented at checkout for all payment methods.
+            // Best-effort: failure logged but must not abort cancellation.
+            for (const item of (order.items ?? []) as any[]) {
+                const productId = typeof item.product === 'object' ? item.product?.id : item.product
+                if (!productId) continue
+                await restockItem(payload, productId, item.variant ?? null, item.quantity)
+                    .catch((err) => payload.logger.error(
+                        { err, orderId: order.id, productId },
+                        '[payment-expiry] restock failed',
+                    ))
             }
 
             // Slug lives on the tenant, not the site — sites collection has no slug field
@@ -65,7 +80,16 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                 lineTotal: (item.quantity ?? 1) * (item.unitPrice ?? 0),
             }))
 
-            const emailTemplate = orderExpiredEmail({
+            const tenantId = (tenantObj as any)?.id ? String((tenantObj as any).id) : null
+            const cmsConfig = tenantId
+                ? await getTemplateConfig(tenantId, 'order-expired', 'buyer', siteLocale as 'en' | 'ms').catch(() => null)
+                : null
+
+            if (order.customerEmail) {
+                if (cmsConfig?.enabled === false) {
+                    payload.logger.info({ orderId: order.id }, '[Email] suppressed (disabled): order-expired')
+                } else {
+                    const emailTemplate = orderExpiredEmail({
                         shopName,
                         orderNumber: order.orderNumber,
                         customerName: order.customerName,
@@ -82,13 +106,13 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                         elapsedTime,
                         reorderUrl,
                         locale: siteLocale,
-                    })
-            if (order.customerEmail) {
-                payload
-                    .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
-                    .catch((e: unknown) =>
-                        payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
-                    )
+                    }, cmsConfig ?? undefined)
+                    payload
+                        .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
+                        .catch((e: unknown) =>
+                            payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
+                        )
+                }
             }
 
             processed++

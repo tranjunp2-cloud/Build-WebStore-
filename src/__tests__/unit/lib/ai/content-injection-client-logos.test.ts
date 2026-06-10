@@ -17,7 +17,7 @@ describe('buildBlockFromLibrary — client-logos case handler', () => {
         const block = buildBlockFromLibrary('client-logos', 'tech', { seed: 42 })
 
         expect(block).not.toBeNull()
-        expect(block!.blockType).toBe('client-logos')
+        expect(block!.blockType).toBe('logo-cloud')
         expect(Array.isArray(block!.logos)).toBe(true)
         expect((block!.logos as unknown[]).length).toBeGreaterThanOrEqual(1)
         expect((block!.logos as unknown[]).length).toBeLessThanOrEqual(6)
@@ -27,12 +27,13 @@ describe('buildBlockFromLibrary — client-logos case handler', () => {
         const block = buildBlockFromLibrary('client-logos', 'business', { seed: 7 })
 
         expect(block).not.toBeNull()
-        expect(block!.blockType).toBe('client-logos')
-        // Each logo item matches ClientLogosConfigSchema: { url: string, alt: string }
-        for (const logo of block!.logos as Array<{ url: string; alt: string }>) {
-            expect(typeof logo.url).toBe('string')
-            expect(typeof logo.alt).toBe('string')
-            expect(logo.alt.length).toBeGreaterThan(0)
+        expect(block!.blockType).toBe('logo-cloud')
+        // Each logo item matches logo-cloud row shape: { name: string, logo: { url: string, alt: string } }
+        for (const logo of block!.logos as Array<{ name: string; logo: { url: string; alt: string } }>) {
+            expect(typeof logo.name).toBe('string')
+            expect(logo.name.length).toBeGreaterThan(0)
+            expect(typeof logo.logo.url).toBe('string')
+            expect(typeof logo.logo.alt).toBe('string')
         }
     })
 })

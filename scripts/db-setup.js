@@ -3982,8 +3982,18 @@ const MIGRATIONS = [
 
   // GH-1004: F10 v2.2 Bank Transfer verification schema fields
   { name: 'orders.payment_reference_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_reference_idx ON orders (payment_reference);` },
-  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamp;` },
+  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamptz;` },
   { name: 'orders.payment_expires_at_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_expires_at_idx ON orders (payment_expires_at);` },
+  // US-F13-06 fix: the column was originally created as `timestamp` (no tz), so UTC values were read
+  // back naive → the confirm-page countdown was skewed by the client's UTC offset. Convert to
+  // timestamptz, interpreting existing naive values as UTC (DB session tz is UTC). Idempotent.
+  { name: 'orders.payment_expires_at_tz', sql: `DO $$
+    BEGIN
+      IF (SELECT data_type FROM information_schema.columns
+          WHERE table_name='orders' AND column_name='payment_expires_at') = 'timestamp without time zone' THEN
+        ALTER TABLE orders ALTER COLUMN payment_expires_at TYPE timestamptz USING payment_expires_at AT TIME ZONE 'UTC';
+      END IF;
+    END $$;` },
   { name: 'orders.payment_rejection_reason', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_reason varchar;` },
   { name: 'orders.payment_rejection_detail', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_detail text;` },
   { name: 'orders.payment_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_at timestamp;` },
@@ -3998,6 +4008,10 @@ const MIGRATIONS = [
   { name: 'orders.enum_payment_method_fpx', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'fpx'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   // 'new' = order confirmed by Stripe webhook (checkout.session.completed). Webhook sets status 'pending' → 'new'.
   { name: 'orders.enum_status_new', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'new'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  // 'confirmed' + 'ready_to_ship' were added to Orders.ts collection definition without a corresponding db-setup migration.
+  // Staging DB enum was missing these values — caused INTERNAL_ERROR when seller confirms an order.
+  { name: 'orders.enum_status_confirmed', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'confirmed'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  { name: 'orders.enum_status_ready_to_ship', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'ready_to_ship'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
@@ -4060,6 +4074,16 @@ const MIGRATIONS = [
   { name: 'payload_preferences_rels.customers_id',
     sql: `ALTER TABLE payload_preferences_rels
           ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  // ── F13 US-F13-06: oversell_review column RETAINED per NEVER-DROP policy.
+  //    Field removed from Orders collection (GH-1099): the decrement-upfront architecture
+  //    (stock decremented at checkout/session creation, CAS-guarded, for all payment methods)
+  //    makes oversell-after-capture impossible, so the flag was dead code. Column kept
+  //    (harmless, default false) — never read or written by application code anymore. ──
+  { name: 'orders.oversell_review',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS oversell_review boolean DEFAULT false;` },
+  // ── F13: Stripe card details for the confirm-page "Method" line (e.g. "Visa ending in 4242") ──
+  { name: 'orders.card_brand', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand varchar;` },
+  { name: 'orders.card_last4', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_last4 varchar;` },
   // ── F25 phase-03: Orders → Customer FK ──
   { name: 'orders.customer',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },

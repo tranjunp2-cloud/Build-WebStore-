@@ -2,7 +2,8 @@
 
 > **Status:** Draft for Claude Design  ·  **Updated:** 2026-05-30  ·  **Owner:** Design
 > **Related:** `docs/prd/F33-discount-cms.md` · `docs/stories/F33-discount-cms-stories.md` · `plans/260529-1135-f33-discount-cms/`
-> **Claude Design:** https://claude.ai/public/artifacts/ (placeholder — update after build)
+> **Claude Design (placeholder):** https://claude.ai/public/artifacts/ (placeholder — update after build)
+> **Claude Design:** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=f33%2FF33%20Discount%20Codes.html&present=1
 > **Purpose:** Self-contained handoff brief — everything Claude Design needs to build F33's 4 screens without reading other docs.
 
 ---

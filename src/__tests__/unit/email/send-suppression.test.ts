@@ -232,7 +232,7 @@ describe('sendEmail [TC-F32]', () => {
         const subject = 'Config Error'
         const html = '<p>Test</p>'
         const tenantId = 'tenant-006'
-        const templateType = 'order-shipped'
+        const templateType = 'order-completed'
         const recipient = 'seller'
 
         mockGetTemplateConfig.mockRejectedValue(new Error('Redis connection failed'))

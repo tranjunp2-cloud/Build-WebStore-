@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { Inbox } from 'lucide-react';
 import { QnASearch } from '@/components/help/QnASearch';
 import { QnAAccordion } from '@/components/help/QnAAccordion';
 import { getQnAData } from '@/data/help-qna';
@@ -65,6 +66,7 @@ export const QnAPageClient = () => {
                     filteredCategories.map((category) => (
                         <div key={category.id} className="flex flex-col gap-3">
                             <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <category.Icon className="w-4 h-4 text-[#3B82F6] shrink-0" aria-hidden />
                                 {category.title}
                             </h3>
                             <div className="bg-[#161E2E] border border-[#1F2937] rounded-[12px] overflow-hidden">
@@ -84,7 +86,7 @@ export const QnAPageClient = () => {
                 ) : (
                     /* Empty State: TC-F20.05 */
                     <div className="text-center py-12 px-6 text-slate-400">
-                        <div className="text-[48px] mb-3 leading-none">📭</div>
+                        <Inbox className="w-12 h-12 mx-auto mb-3 text-slate-500" aria-hidden />
                         <p className="text-[14px]">
                             <strong className="font-bold text-slate-300 text-[14px]">{t.help.qna.emptyTitle}</strong>
                         </p>

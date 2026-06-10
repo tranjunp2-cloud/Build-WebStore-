@@ -63,7 +63,8 @@ Thêm Card + FPX via **Stripe Checkout Session HOSTED** (Wave 6 P0). Dùng **Str
 
 ### In Scope (Wave 6.5 — Flow Hardening)
 - Atomic webhook success: order `status='new'` AND `paymentStatus='paid'` in single update (US-F13-06)
-- Atomic stock decrement; oversell flag + seller manual refund (US-F13-06)
+- Atomic stock decrement UPFRONT at checkout; CAS `WHERE inventory >= qty` prevents oversell (US-F13-06)
+- **[SUPERSEDED GH-1099]** ~~Oversell flag + seller manual refund~~ → Prevented via CAS at checkout (PR #1160)
 - Accurate payment method detection (card vs FPX) from PaymentIntent (US-F13-06)
 - Cart preserved on cancel; cleared only after confirmed success (US-F13-05)
 - Confirm page polling + self-heal against late webhooks (US-F13-05, US-F13-06)
@@ -112,7 +113,7 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-02 | Bank dropdown cho FPX rendered **bởi Stripe Checkout page** (KHÔNG build inline) | US-F13-01 | P0 | Stripe handle 18 MY banks |
 | FR-03 | Redirect Stripe → bank (FPX) → return `success_url`/`cancel_url` | US-F13-01 | P0 | 3D Secure flow |
 | FR-04 | Payment fail: BM toast "Pembayaran gagal. Sila cuba lagi." | US-F13-01 | P0 | |
-| FR-05 | Cart preserved nếu payment fail | US-F13-01 | P0 | |
+| FR-05 | Cart cleared on order placement; on cancel/fail, preserved for order-based retry | US-F13-01, US-F13-05 | P0 | Wave 6.5 design change: cart cleared on `POST /api/orders/stripe-checkout`, not after success |
 | FR-06 | Seller payment settings: enable/disable Card + FPX riêng | US-F13-02 | P0 | Backend pass dynamic `payment_method_types` |
 | FR-07 | Webhook `checkout.session.completed` → order status='new' + paymentStatus='paid' atomically | US-F13-01 | P0 | Fixed Wave 6.5 |
 | FR-08 | **[Mobile]** Method picker stack vertical, hitbox ≥ 54px | US-F13-03 | P1 | Anti-mis-tap |
@@ -129,11 +130,11 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-ID | Requirement | Story Ref | Priority | Phase | Notes |
 |-------|-------------|-----------|----------|-------|-------|
 | FR-16 | Webhook success sets `status='new'` AND `paymentStatus='paid'` atomically (single SQL) | US-F13-06 | P0 | 01 | Fixes bug where Stripe-paid orders never showed paid |
-| FR-17 | Stock decrement MUST be atomic; concurrent orders never drive inventory negative | US-F13-06 | P0 | 02 | `UPDATE ... WHERE inventory >= qty` |
-| FR-18 | Oversell after capture → flag `oversellReview=true`, order stays paid/new, notify seller | US-F13-06 | P0 | 02, 07 | No auto-refund; manual seller handling |
+| FR-17 | Stock decrement MUST be atomic at checkout; CAS `WHERE inventory >= qty` prevents oversell upfront | US-F13-06 | P0 | 02 | Prevent-upfront: reject if inventory insufficient (commit `938406a9`) |
+| **FR-18** | **[SUPERSEDED GH-1099]** ~~Oversell after capture → flag oversellReview=true~~ → Rendered obsolete by prevent-upfront (FR-17 CAS); oversellReview field deprecated as of PR #1160 | US-F13-06 | ~~P0~~ | ~~02, 07~~ | **Oversell is no longer possible due to atomic stock validation at order creation** |
 | FR-19 | Record actual payment method (card vs fpx) from PaymentIntent on connected account | US-F13-06 | P1 | 03 | Not defaulting 'card' for multi-method tenants |
-| FR-20 | Do NOT clear cart before Stripe redirect; clear only on confirmed success at Confirm page | US-F13-05 | P0 | 04 | On cancel: keep cart + show toast |
-| FR-21 | Confirm page: processing state, polling, self-heal against Stripe, explicit payment_failed state | US-F13-05, US-F13-06 | P0 | 05 | Active reconcile endpoint |
+| FR-20 | Cart cleared on order placement at `/api/orders/stripe-checkout` time (Wave 6.5 design change); on cancel/back, cart preserved only within confirm for order-based retry | US-F13-05 | P0 | 04, 05 | Cancel/back lands on `/confirm?cancelled=1` → Payment Failed state + Pay Now CTA; no checkout toast |
+| FR-21 | Confirm page: processing state, SSE stream + optional POST `/api/orders/[id]/payment-status` for active reconcile, explicit payment_failed state | US-F13-05, US-F13-06 | P0 | 05 | Reuses existing SSE `/api/orders/stream/[orderNumber]` for live updates; active Stripe session reconcile is Wave 6.5 enhancement |
 | FR-22 | "Pay Now" CTA on order detail for pending/payment_failed → new Stripe session, re-validate stock | US-F13-05 | P0 | 06 | No buyer order-list page |
 | FR-23 | Cron reconciles pending orders >15min, expires stale, syncs with Stripe session lookup | US-F13-06 | P1 | 07 | Self-heal late webhooks |
 
@@ -144,7 +145,7 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 - **BR-01:** Currency phải là MYR để FPX available (Stripe auto-detect)
 - **BR-02:** Payment method hiện theo seller settings (không hardcode)
 - **BR-03:** Order status stays 'pending' nếu payment fail (không xóa)
-- **BR-04:** Cart cleared ONLY after confirmed payment success at Confirm page; cancel/retry preserve cart
+- **BR-04:** Cart cleared on order placement at checkout time (when POST `/api/orders/stripe-checkout` success); on cancel/back, retry is order-based ("Pay Now" endpoint), NOT cart-based
 - **BR-05:** Oversell (stock gone when webhook decrements) handled manually by seller via admin "Refund customer" button; NO auto-refund Wave 6.5
 
 ---
@@ -172,17 +173,21 @@ Checkout → "Choose payment method" (RadioGroup: Stripe / COD / QR)
 ### 9.1a. Confirm & Retry Flow (Wave 6.5)
 
 ```
-Confirmation Page → polling `/api/orders/[id]/payment-status`
-  ├── Status = 'new'/'paid': show success, clear cart exactly once
-  ├── Status = 'pending': show skeleton + polling (webhook delayed)
-  │   └── If Stripe says paid: self-heal via active reconcile
-  ├── Status = 'payment_failed': show failed state + "Retry" CTA
-  │   └── Click "Retry" → POST `/api/orders/[id]/retry-payment`
+Confirmation Page (mounted on paid order OR pending/payment_failed with ?cancelled=1)
+  ├── SSE `/api/orders/stream/[orderNumber]` live-subscribes to paymentStatus changes
+  │   └── Webhook success or cron/polling reconcile → push update → flip UI to success, clearCart once
+  ├── Optional POST `/api/orders/[id]/payment-status` on mount (if webhook delayed)
+  │   ├── Returns current { status, paymentStatus, stripeSessionId }
+  │   └── If Stripe says paid but DB pending: active-reconcile call reconcileOrderPaid()
+  ├── Status = 'new'/'paid': show success, clearCart idempotently
+  ├── Status = 'pending': show "Verifying your payment…" skeleton + wait for SSE push
+  │   └── Timeout >15min: show "Payment verification timeout, retry below"
+  ├── Status = 'payment_failed': show failed state + "Pay Now" CTA
+  │   └── Click "Pay Now" → POST `/api/orders/[id]/retry-payment`
   │       → new Stripe session, re-validate stock
-  └── Timeout (>15min): show manual help message
 
-Order Detail (for pending/payment_failed):
-  └── "Pay Now" CTA → retry-payment flow (same as Confirm "Retry")
+Order Detail Page (for pending/payment_failed orders):
+  └── "Pay Now" CTA visible → POST `/api/orders/[id]/retry-payment` (same flow as Confirm)
 ```
 
 ### 9.2. Seller onboarding flow (one-time)
@@ -214,9 +219,10 @@ Settings > Payments → Card + FPX toggles Locked (Stripe chưa connect)
 ### 10.1. Màn hình Checkout Payment Selection (Storefront)
 - **Mô tả:** Màn hình thanh toán bên phí khách hàng (Buyer).
 - **Components chính:**
-  - Khối Phương thức thanh toán (Radio group): "FPX (Online Banking)", "Credit/Debit Card", "E-wallet".
-  - Khi chọn FPX: Hiển thị Bank Selection Dropdown.
-  - Khối Order Summary (Bên phải/Dưới): Phân rã Total (Subtotal, Shipping, SST). Bấm [Pay Now].
+  - Khối Phương thức thanh toán (Radio group): "Pay with Stripe (Card·FPX)", "COD", "QR", etc.
+  - Stripe label dynamic theo seller settings: "Card·FPX", "Card", "FPX", or hidden if both-OFF.
+  - Khối Order Summary (Bên phải/Dưới): Phân rã Total (Subtotal, Shipping, SST). Bấm [Place Order].
+  - Loading state: button disabled + "Processing..." spinner + full-page dialog "Redirecting to Stripe Checkout. Please don't close this window."
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]
 
@@ -234,8 +240,9 @@ Settings > Payments → Card + FPX toggles Locked (Stripe chưa connect)
 - **Loading State:** Nút "Place Order" hiển thị Spinner + text "Processing...". Sau click → full-page Dialog overlay "Redirecting to Stripe Checkout. Please don't close this window." (chống user đóng tab). FPX flow: sau khi vào Stripe page, Stripe tự handle redirect to bank.
 - **Error State / Edge Cases:** Toast đỏ BM: "Pembayaran gagal. Sila cuba lagi." khi return cancel_url. Cart preserved (FR-05, BR-04). "Try Again" CTA → re-submit Stripe Checkout Session.
 - **Success State:** Stripe redirect success_url → Order Confirmation Page (F10 scope). Order status `pending → new` + `paymentStatus='paid'` qua webhook.
-- **Confirm Processing State (Wave 6.5):** Skeleton loader + polling spinner; BM message "Verifying your payment...". Flips to success when `paymentStatus=paid`.
-- **Confirm Failed State (Wave 6.5):** Destructive alert "Payment declined. Try again or contact support."; "Pay Now" CTA wired to retry-payment endpoint.
+- **Confirm Processing State (Wave 6.5):** Skeleton loader + spinner; BM message "Verifying your payment...". Flips to success when SSE push `paymentStatus=paid` OR active-reconcile detects it.
+- **Confirm Failed State (Wave 6.5):** Destructive alert "Payment declined. Try again or contact support."; "Pay Now" CTA (visible on confirm `?cancelled=1` and order detail) wired to retry-payment endpoint.
+- **Confirm Cancelled State (Wave 6.5):** Browser-back or cancel_url lands on `/order/[id]/confirm?cancelled=1` → Payment Failed screen + "Pay Now" CTA (no checkout flash).
 - **Settings — Loading:** Skeleton 2 method rows khi fetch initial settings.
 - **Settings — Not onboarded:** Destructive Alert + Connect Stripe CTA + toggles Disabled+Lock+Tooltip.
 - **Settings — Return-from-Stripe:** Toast success/warning + refetch status (FR-11, FR-12).
@@ -264,10 +271,11 @@ THEN  redirect to bank's login page (3D Secure)
 
 ```gherkin
 GIVEN payment fails (bank declined, timeout)
-WHEN  buyer redirected back
-THEN  error: "Pembayaran gagal. Sila cuba lagi."
-  AND cart items preserved — buyer can retry
+WHEN  buyer redirected back (cancel_url or browser-back from Stripe)
+THEN  redirect to /confirm?cancelled=1 → destructive alert or Payment Failed screen
+  AND "Pay Now" CTA visible → retry via /api/orders/[id]/retry-payment
   AND order status stays 'pending'
+  AND cart already cleared (cleared on placement, not preserved)
 ```
 
 ---
@@ -276,7 +284,7 @@ THEN  error: "Pembayaran gagal. Sila cuba lagi."
 
 **Approach:** Stripe Checkout Session HOSTED + Stripe Connect Standard accounts + Direct Charges. Buyer redirect ra `checkout.stripe.com/...`; Stripe-hosted page render Card form + FPX bank picker. Wave 6: **Zero application fee (0%)** due to cross-border limitation (US platform → MY seller). **Wave 7+**: revisit 3% when same-country or destination charges available.
 
-**Endpoint:** `POST /api/orders/stripe-checkout` (NOT `/api/orders/create` — endpoint name corrected Wave 6.5)
+**Endpoint:** `POST /api/orders/stripe-checkout` (Wave 6 correct endpoint)
 
 ```typescript
 // Stripe Checkout Session — Direct Charges on connected account
@@ -340,7 +348,7 @@ function buildPaymentMethodTypes(tenant): StripePaymentMethod[] {
 | Stripe Idempotency Key API param | Wave 7+ | Order status check sufficient for Wave 6 volume |
 | TnG, GrabPay, Boost | Wave 7+ | Stripe MY not yet GA |
 | Saved cards / tokenized re-purchase | Wave 7+ | Requires buyer accounts |
-| Refund UI in order detail | Wave 7+ (F10 scope) | Wave 6.5 manual seller "Refund customer" button on oversell |
+| Refund UI in order detail | Wave 7+ (F10 scope) | **[OBSOLETE as of GH-1099]** Manual seller oversell refund button deprecated — oversell is now prevented upfront (PR #1160) |
 | Stripe Connect Express/Custom | Wave 8+ | Standard accounts sufficient for marketplace launch |
 | Multi-currency support | Wave 8+ | Malaysia focus, MYR-only Wave 6 |
 

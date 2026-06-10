@@ -491,6 +491,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         info: BusinessInfo,
         extraInstructions?: string,
         briefSnapshot?: Record<string, unknown> | null,
+        // F26: verbatim source locale (e.g. 'ja','zh') confirmed in the pre-gen modal.
+        // `info.language` collapses non en/ms/vi to 'auto' for the prompt, losing the real
+        // code — this is persisted to Sites.generationLocale so the editor shows it as primary.
+        generationLocale?: string,
     ) => {
         const controller = new AbortController()
         abortControllerRef.current = controller
@@ -528,6 +532,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     businessInfo: info,
                     extraInstructions,
                     language: info.language || 'auto',
+                    ...(generationLocale ? { generationLocale } : {}),
                     ...(brief ? { contentBrief: brief } : {}),
                 }),
                 credentials: 'include',
@@ -610,7 +615,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
                 sseRetryTimerRef.current = setTimeout(() => {
                     sseRetryTimerRef.current = null
-                    void startSSEGeneration(info, extraInstructions, briefSnapshot)
+                    void startSSEGeneration(info, extraInstructions, briefSnapshot, generationLocale)
                 }, delay)
                 return
             }
@@ -668,11 +673,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const { info, briefSnapshot } = pendingGenRef.current
         pendingGenRef.current = null
         // API only accepts 'en'|'ms'|'vi'|'auto' — unsupported locales (ar, zh, etc.) fall back
-        // to 'auto' so the AI infers language from business content.
+        // to 'auto' so the AI infers language from business content. The verbatim locale is sent
+        // separately as generationLocale so it persists as the editor's primary language.
         const apiLang = (['en', 'ms', 'vi'] as const).includes(locale as 'en' | 'ms' | 'vi') ? locale : 'auto'
         const updatedInfo: BusinessInfo = { ...info, language: apiLang }
         prepareGenerationSession(updatedInfo)
-        void startSSEGeneration(updatedInfo, undefined, briefSnapshot as any)
+        void startSSEGeneration(updatedInfo, undefined, briefSnapshot as any, locale)
     }, [prepareGenerationSession, startSSEGeneration])
 
     const handleRetryGeneration = useCallback((info: BusinessInfo) => {

@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
@@ -326,12 +327,17 @@ export default function BusinessInfoForm({
             aria-live="polite"
         >
             <div className="flex items-center justify-between">
-                <span className="font-semibold">
+                <span className="flex items-center gap-1.5 font-semibold">
+                    {extractionResult.confidence === 'high' ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" aria-hidden />
+                    ) : (
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" aria-hidden />
+                    )}
                     {extractionResult.confidence === 'high'
-                        ? `✅ ${t.onboarding.form.confidenceHigh}`
+                        ? t.onboarding.form.confidenceHigh
                         : extractionResult.confidence === 'medium'
-                          ? `⚠️ ${t.onboarding.form.confidenceMedium}`
-                          : `⚠️ ${t.onboarding.form.confidenceLow}`}
+                          ? t.onboarding.form.confidenceMedium
+                          : t.onboarding.form.confidenceLow}
                 </span>
                 <div className="flex gap-1">
                     {[0, 1, 2, 3].map((i) => (
@@ -376,7 +382,10 @@ export default function BusinessInfoForm({
                 onClick={() => handleSwitchToManual()}
                 type="button"
             >
-                ✏️ {t.onboarding.form.tabManual}
+                <span className="inline-flex items-center justify-center gap-2">
+                    <Pencil className="h-4 w-4 shrink-0" aria-hidden />
+                    {t.onboarding.form.tabManual}
+                </span>
             </button>
             <button
                 role="tab"
@@ -394,14 +403,17 @@ export default function BusinessInfoForm({
                 }}
                 type="button"
             >
-                🔗 {t.onboarding.form.tabUrl}
+                <span className="inline-flex items-center justify-center gap-2">
+                    <Link2 className="h-4 w-4 shrink-0" aria-hidden />
+                    {t.onboarding.form.tabUrl}
+                </span>
             </button>
         </div>
     )
 
     const urlInputSection = (
         <div id="panel-url" role="tabpanel" aria-labelledby="tab-url">
-            <BuilderField icon="🔗" label={t.onboarding.form.urlLabel} required>
+            <BuilderField label={t.onboarding.form.urlLabel} required>
                 <div className="flex gap-3">
                     <div className="flex-1">
                         <BuilderTextInput
@@ -430,7 +442,7 @@ export default function BusinessInfoForm({
                         ) : (
                             <>
                                 <span>{t.onboarding.form.extractButton}</span>
-                                <span>→</span>
+                                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
                             </>
                         )}
                     </button>
@@ -503,11 +515,12 @@ export default function BusinessInfoForm({
                 <div className="mt-6 rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]" role="alert">
                     <p>{extractionError}</p>
                     <button
-                        className="mt-3 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
+                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
                         onClick={handleSwitchToManual}
                         type="button"
                     >
-                        {t.onboarding.form.tryManual} →
+                        {t.onboarding.form.tryManual}
+                        <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
                     </button>
                 </div>
             )}
@@ -537,7 +550,6 @@ export default function BusinessInfoForm({
 
                     <BuilderField
                         error={errors.businessName}
-                        icon="📝"
                         label={t.onboarding.form.businessName}
                         required
                     >
@@ -563,7 +575,6 @@ export default function BusinessInfoForm({
 
                     <BuilderField
                         error={errors.industry}
-                        icon="🏢"
                         label={t.onboarding.form.industry}
                         required
                     >
@@ -595,7 +606,6 @@ export default function BusinessInfoForm({
                             </div>
                         )}
                         error={errors.products}
-                        icon="📦"
                         label={t.onboarding.form.products}
                         required
                     >
@@ -621,7 +631,6 @@ export default function BusinessInfoForm({
                             </div>
                         )}
                         error={errors.shortDescription}
-                        icon="📝"
                         label={t.onboarding.form.shortDescription}
                         required
                     >

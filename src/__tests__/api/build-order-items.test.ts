@@ -157,15 +157,15 @@ describe('buildOrderItems [TC-F09.230–236: GH-1084 direct unit coverage]', () 
         expect(result.subtotal).toBe(75)
     })
 
-    // ── Aggregate inventory OOS check (Phase 01) ─────────────────────────
+    // ── Per-variant stock check (Phase 01) ─────────────────────────
 
-    it('[TC-F09.235] OOS guard uses aggregate p.inventory — variant.stock is irrelevant', async () => {
-        // Arrange: aggregate inventory=0 (exhausted by CAS); variant.stock=10 (stale, never decremented).
-        // Guard must fire on p.inventory, not variant.stock.
+    it('[TC-F09.235] OOS guard uses variant.stock for variant products', async () => {
+        // Arrange: variant.stock=0 (exhausted); aggregate inventory=10 (irrelevant for variants).
+        // Guard must fire on variant.stock, not p.inventory (per-variant decrement in place).
         mockFindByID.mockResolvedValueOnce(mockProduct({
-            inventory: 0,
+            inventory: 10,
             hasVariants: true,
-            variants: [{ name: 'Red', price: 75, stock: 10 }], // stale — must NOT be used
+            variants: [{ name: 'Red', price: 75, stock: 0 }], // Red variant is out of stock
         }))
 
         // Act: request 1 unit of Red variant
@@ -175,7 +175,7 @@ describe('buildOrderItems [TC-F09.230–236: GH-1084 direct unit coverage]', () 
             TENANT,
         )
 
-        // Assert: OUT_OF_STOCK based on p.inventory=0, not variant.stock=10
+        // Assert: OUT_OF_STOCK based on variant.stock=0, not p.inventory=10
         expect(result.errorResponse).toBeDefined()
         expect(result.errorResponse!.status).toBe(422)
         const body = await result.errorResponse!.json()

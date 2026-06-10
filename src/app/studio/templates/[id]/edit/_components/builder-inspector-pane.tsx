@@ -8,6 +8,10 @@
  * Phase P3: AI tab shows editable per-template prompt override section.
  */
 import { useState, useRef } from 'react'
+import {
+    AlertTriangle, Check, ChevronDown, ChevronLeft, ChevronRight, Eye,
+    FileText, LayoutGrid, Pencil, Settings, Sparkles,
+} from 'lucide-react'
 import { useBuilderStore } from '@/lib/admin/builder-store'
 import type { BlockPromptOverride } from '@/lib/admin/builder-store'
 import { getFieldSchema } from '@/lib/admin/section-field-schema'
@@ -21,7 +25,7 @@ type Tab = 'content' | 'variant' | 'settings' | 'ai'
 function InspectorEmpty() {
     return (
         <div className="b-insp-empty">
-            <div className="ico">⚙</div>
+            <div className="ico"><Settings className="h-6 w-6" aria-hidden /></div>
             <div style={{ color: 'var(--text-2)', fontWeight: 600, marginBottom: 4 }}>
                 No section selected
             </div>
@@ -96,9 +100,9 @@ function SettingsTab({ visible, onToggleVisible }: {
             <div className="b-group">
                 <div className="b-group-title">Device visibility</div>
                 <div className="b-seg" style={{ width: '100%' }}>
-                    <button type="button" className="active" style={{ flex: 1 }}>Desktop ✓</button>
-                    <button type="button" className="active" style={{ flex: 1 }}>Tablet ✓</button>
-                    <button type="button" className="active" style={{ flex: 1 }}>Mobile ✓</button>
+                    <button type="button" className="active" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>Desktop <Check className="h-3 w-3" aria-hidden /></button>
+                    <button type="button" className="active" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>Tablet <Check className="h-3 w-3" aria-hidden /></button>
+                    <button type="button" className="active" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>Mobile <Check className="h-3 w-3" aria-hidden /></button>
                 </div>
             </div>
             <div className="b-group">
@@ -210,7 +214,9 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
                     style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                     onClick={() => setExpanded((v) => !v)}
                 >
-                    <span>{expanded ? '▾' : '▸'}</span>
+                    {expanded
+                        ? <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+                        : <ChevronRight className="h-3.5 w-3.5" aria-hidden />}
                     AI prompt override
                     {hasOverride && (
                         <span className="b-pill-ai" style={{ fontSize: 10, marginLeft: 'auto' }}>
@@ -236,7 +242,7 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
                                 lineHeight: 1.45,
                             }}
                         >
-                            ⚠ Chỉ áp dụng khi gen mode = <strong>AI-first</strong> (env
+                            <AlertTriangle className="inline-block h-3.5 w-3.5" style={{ verticalAlign: '-2px', marginRight: 3 }} aria-hidden /> Chỉ áp dụng khi gen mode = <strong>AI-first</strong> (env
                             <code style={{ fontFamily: 'var(--mono)', padding: '0 3px' }}>GEN_MODE=ai-first</code>
                             {' '}hoặc user cung cấp extra instructions / reference prompt). Template-first
                             (default path với 56 blueprints) dùng content từ industry library, bỏ qua override.
@@ -319,14 +325,14 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                         title="Expand inspector"
                         style={{ transform: 'rotate(180deg)' }}
                     >
-                        ‹
+                        <ChevronLeft className="h-4 w-4" aria-hidden />
                     </button>
                 </div>
                 <div className="b-insp-collapsed">
-                    <button type="button" title="Content">✏</button>
-                    <button type="button" title="Variant">⊞</button>
-                    <button type="button" title="Settings">⚙</button>
-                    <button type="button" title="AI">✨</button>
+                    <button type="button" title="Content"><Pencil className="h-4 w-4" aria-hidden /></button>
+                    <button type="button" title="Variant"><LayoutGrid className="h-4 w-4" aria-hidden /></button>
+                    <button type="button" title="Settings"><Settings className="h-4 w-4" aria-hidden /></button>
+                    <button type="button" title="AI"><Sparkles className="h-4 w-4" aria-hidden /></button>
                 </div>
             </aside>
         )
@@ -344,7 +350,7 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                         style={{ marginLeft: 'auto' }}
                         onClick={() => setCollapsed(true)}
                     >
-                        ›
+                        <ChevronRight className="h-4 w-4" aria-hidden />
                     </button>
                 </div>
                 <div className="b-insp-body">
@@ -369,7 +375,7 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                     className="b-pane-collapse-btn"
                     onClick={() => setCollapsed(true)}
                 >
-                    ›
+                    <ChevronRight className="h-4 w-4" aria-hidden />
                 </button>
             </div>
 
@@ -419,19 +425,19 @@ export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderI
                             type="button"
                             className="b-btn ghost b-insp-docs-link"
                             title="View block docs inline"
-                            style={{ height: 28, padding: '0 8px', fontSize: 11 }}
+                            style={{ height: 28, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                             onClick={() => onOpenBlockDetail(section.blockType)}
                         >
-                            📄 View block docs
+                            <FileText className="h-3.5 w-3.5" aria-hidden /> View block docs
                         </button>
                     ) : (
                         <a
                             href={`/studio/blocks/${section.blockType}`}
                             className="b-btn ghost"
                             title="View block details and all variants"
-                            style={{ height: 28, padding: '0 8px', fontSize: 11 }}
+                            style={{ height: 28, padding: '0 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                         >
-                            👁 Details
+                            <Eye className="h-3.5 w-3.5" aria-hidden /> Details
                         </a>
                     )}
                 </div>

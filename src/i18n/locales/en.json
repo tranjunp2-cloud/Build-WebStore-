@@ -75,6 +75,292 @@
             }
         }
     },
+    "landing": {
+        "platform": {
+            "label": "Platform",
+            "title": "One platform to run your business",
+            "titleHighlight": "end-to-end",
+            "subtitle": "From attracting customers and closing sales to running internal operations — PrimeWeb helps you manage everything on a single system.",
+            "pillars": {
+                "website": {
+                    "title": "Website & Sales",
+                    "desc": "High-converting Landing Pages, an online store with integrated payment, and AI-powered SEO."
+                },
+                "customers": {
+                    "title": "Customer Management",
+                    "desc": "Centralised customer data, multi-channel engagement, and real-time revenue tracking."
+                },
+                "operations": {
+                    "title": "Lean Operations",
+                    "desc": "Department task management, standardised workflows, and operational performance monitoring."
+                }
+            },
+            "cta": "Explore the PrimeWeb ecosystem"
+        },
+        "product": {
+            "label": "Products",
+            "title": "A complete solution for your growth journey",
+            "subtitle": "Beautiful design, fast AI creation, optimised for every device and SEO.",
+            "hero": {
+                "title": "High-converting Landing Page & Website",
+                "points": [
+                    "Beautiful design, fast drag & drop, optimised for every device",
+                    "Fast loading, SEO-ready",
+                    "Over 900+ Landing Page templates ready to use",
+                    "Multi-channel data sync from forms to your storage system"
+                ],
+                "tagLanding": "Landing Page",
+                "tagBuilder": "Website Builder",
+                "detailLink": "View details",
+                "tryFree": "Try for free",
+                "mockupLabel": "Template Library"
+            },
+            "blocks": {
+                "aiBuilder": {
+                    "title": "AI Website Builder",
+                    "items": [
+                        "Chat with AI, describe your business → complete website in minutes",
+                        "Over 900+ block templates: Hero, About, Products, Contact...",
+                        "Drag & drop editing, optimised for every device",
+                        "SEO-ready, fast loading"
+                    ],
+                    "cta": "Try for free"
+                },
+                "templateEditor": {
+                    "title": "Template & Editor",
+                    "items": [
+                        "Industry-specific templates: Retail, F&B, Admissions, Portfolio",
+                        "Visual editing, inline block customisation",
+                        "One-click publish, subdomain or custom domain"
+                    ],
+                    "cta": "Browse collection"
+                },
+                "salesPayment": {
+                    "title": "Sales Page & Payment",
+                    "items": [
+                        "Products, cart, and online payment",
+                        "Multiple payment methods and delivery options",
+                        "AI-written product descriptions, SEO-optimised"
+                    ],
+                    "cta": "Start selling"
+                },
+                "seoAnalytics": {
+                    "title": "SEO & Analytics",
+                    "items": [
+                        "Per-page SEO score, AI meta suggestions",
+                        "JSON-LD, automatic sitemap",
+                        "Dashboard tracking orders and revenue"
+                    ],
+                    "cta": "Optimise now"
+                }
+            }
+        },
+        "solutions": {
+            "title": "A comprehensive platform for every business sector",
+            "subtitle": "Customised to the specifics of each industry for effective operational strategy.",
+            "industries": {
+                "admissions": {
+                    "label": "Admissions",
+                    "title": "Admissions Sector",
+                    "points": [
+                        "Attract and optimise student registration conversions",
+                        "Reach prospects at the right time, increase close rate",
+                        "Centralised data, optimised marketing campaigns",
+                        "Manage courses, students, and programmes end-to-end"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Registration form", "Course schedule", "Course gallery..."]
+                    },
+                    "block2": {
+                        "title": "Contact Form",
+                        "items": ["Subject, Message", "Send consultation email"]
+                    }
+                },
+                "training": {
+                    "label": "Training",
+                    "title": "Training Sector",
+                    "points": [
+                        "Professional course website, easy to update",
+                        "Integrated registration, payment, and class scheduling",
+                        "Automated reminders and material delivery",
+                        "Student and revenue tracking reports"
+                    ],
+                    "block1": {
+                        "title": "Course Blocks",
+                        "items": ["Course list", "Class schedule", "Instructors..."]
+                    },
+                    "block2": {
+                        "title": "Registration & Payment",
+                        "items": ["Registration form", "Payment schedule"]
+                    }
+                },
+                "retail": {
+                    "label": "Retail",
+                    "title": "Retail Sector",
+                    "points": [
+                        "SEO-optimised product pages, conversion-focused",
+                        "Cart and multi-channel checkout",
+                        "Simple order and inventory management",
+                        "AI-written product descriptions and meta suggestions"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Products", "Cart", "Filters..."]
+                    },
+                    "block2": {
+                        "title": "Checkout",
+                        "items": ["Delivery information", "Payment"]
+                    }
+                },
+                "fnb": {
+                    "label": "F&B",
+                    "title": "F&B Sector",
+                    "points": [
+                        "Online menu, table booking and delivery ordering",
+                        "Easy setup of promotions, combos, and vouchers",
+                        "Integrated delivery services",
+                        "Landing pages for events and new dishes"
+                    ],
+                    "block1": {
+                        "title": "Menu Blocks",
+                        "items": ["Dish categories", "Combos", "Table booking..."]
+                    },
+                    "block2": {
+                        "title": "Order & Delivery",
+                        "items": ["Cart", "Delivery address"]
+                    }
+                },
+                "events": {
+                    "label": "Events",
+                    "title": "Events Sector",
+                    "points": [
+                        "Event registration landing page, tickets, lead capture forms",
+                        "Countdown timer, automated notifications",
+                        "Guest list management and check-in",
+                        "Post-event reports"
+                    ],
+                    "block1": {
+                        "title": "Event Blocks",
+                        "items": ["Countdown", "Ticket registration form", "Schedule..."]
+                    },
+                    "block2": {
+                        "title": "Attendance Confirmation",
+                        "items": ["Send email", "QR check-in"]
+                    }
+                },
+                "other": {
+                    "label": "Other",
+                    "title": "Other Sectors",
+                    "points": [
+                        "Company profile, portfolio, and service websites",
+                        "Blog, news, and content SEO",
+                        "Contact forms and consultation booking",
+                        "Customisable to any industry's needs"
+                    ],
+                    "block1": {
+                        "title": "Block Library",
+                        "items": ["Hero, Form", "Gallery", "Button..."]
+                    },
+                    "block2": {
+                        "title": "Contact Form",
+                        "items": ["Subject, Message", "Send email"]
+                    }
+                }
+            }
+        },
+        "why": {
+            "title": "Why choose PrimeWeb?",
+            "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
+            "stats": {
+                "customers": { "value": "10,000+", "label": "Active customers" },
+                "published": { "value": "50,000+", "label": "Websites published" },
+                "blocks": { "value": "900+", "label": "Block templates ready" },
+                "speed": { "value": "5 min", "label": "Build a website with AI" }
+            },
+            "cards": {
+                "easyToUse": {
+                    "title": "Easy to use — fast to deploy",
+                    "points": ["Design with simple drag & drop", "No coding knowledge required", "Dramatically reduces deployment time"]
+                },
+                "dataSync": {
+                    "title": "Seamless data connectivity",
+                    "points": ["Centralise data from multiple channels", "Connect forms, email, and more"]
+                },
+                "security": {
+                    "title": "High security, stable operations",
+                    "points": ["Secure infrastructure, performance-optimised", "Friendly interface across all devices"]
+                },
+                "yourContent": {
+                    "title": "Your content",
+                    "points": ["Visual editor, fast editing", "AI description and SEO suggestions"]
+                },
+                "automation": {
+                    "title": "Engagement & automation",
+                    "points": ["Multi-channel customer engagement", "Nurture throughout the customer journey", "Automate repetitive tasks"]
+                },
+                "fullAi": {
+                    "title": "Full AI capabilities",
+                    "points": ["Build websites via chat", "AI writes descriptions, optimises SEO", "Automate content creation"]
+                }
+            }
+        },
+        "featuresGrid": {
+            "label": "Features",
+            "title": "Everything you need to",
+            "titleHighlight": "Build & Grow",
+            "subtitle": "From AI website creation to drag & drop editing — all on one platform.",
+            "items": {
+                "aiCreate": {
+                    "title": "AI website creation",
+                    "desc": "Describe your business in natural language and AI generates a complete website in seconds."
+                },
+                "dragDrop": {
+                    "title": "Drag & Drop Editor",
+                    "desc": "Customise any block: Hero, About, Products, Contact and more."
+                },
+                "seo": {
+                    "title": "SEO-ready",
+                    "desc": "Server-side rendering, full Google indexing, and structured data built in."
+                },
+                "templates": {
+                    "title": "Beautiful templates",
+                    "desc": "Industry-specific templates: restaurants, retail, portfolio, blog."
+                },
+                "domain": {
+                    "title": "Custom domain",
+                    "desc": "Connect your own domain in minutes. Free SSL certificate."
+                },
+                "sales": {
+                    "title": "Sales-ready",
+                    "desc": "Products, cart, and checkout — all built in."
+                }
+            }
+        },
+        "heroDemo": {
+            "appSuite": "App suite",
+            "homeCrumb": "PrimeWeb · Home",
+            "experienceTitle": "A professional website experience",
+            "experienceDesc": "Built by AI in 5 minutes. Drag-and-drop edits, publish instantly.",
+            "viewDetails": "View details",
+            "tryIt": "Try it",
+            "confirmed": "Confirmed",
+            "customerLabel": "Customer:",
+            "customerSample": "Aiman bin Rahman",
+            "phoneLabel": "Phone:",
+            "phoneSample": "012-345 6789",
+            "totalLabel": "Total:",
+            "totalSample": "RM 1,250",
+            "aiDone": "AI is done",
+            "readyPublish": "Your website is ready. Publish now?"
+        },
+        "ctaBadge": "Lower operating costs",
+        "menuAria": "Main menu",
+        "solutionsMeta": {
+            "trustedBy": "Trusted by:",
+            "learnMore": "Learn more"
+        }
+    },
     "cta": {
         "title": "Ready to Build Your",
         "titleHighlight": "Dream Website",
@@ -108,7 +394,7 @@
             "business": "🏢 Business",
             "fnb": "🍜 Cafe & Bakery",
             "events": "🎉 Events",
-            "blog": "📝 Blog",
+            "blog": "Blog",
             "travel": "✈️ Travel"
         },
         "sort": "Sort by",
@@ -131,12 +417,12 @@
         "welcome": {
             "title": "Welcome to PrimeWeb",
             "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
-            "createStore": "🚀 Create My Store with AI",
+            "createStore": "Create My Store with AI",
             "skip": "Skip & Go to Dashboard",
             "step": "Step 1 of 2: Create Store"
         },
         "wizard": {
-            "title": "✨ Discover the Power of AI",
+            "title": "Discover the Power of AI",
             "slides": {
                 "editor": {
                     "title": "AI Editor",
@@ -682,17 +968,25 @@
             "missingDesc": "Missing description",
             "healthOverview": "SEO Health Overview",
             "scoreLabel": "Score: {score}/100",
-            "fixAllButton": "✨ AI Fix All Issues",
+            "fixAllButton": "AI Fix All Issues",
             "contentQuality": "Content Quality",
             "technicalSeo": "Technical SEO",
             "sitemapAndMeta": "Sitemap & Meta Tags",
+            "sitemapConfig": "Sitemap Configuration",
+            "metaTagsSection": "Automatic Meta Tags",
+            "statusLabel": "Status:",
+            "statusUpToDate": "Up-to-date",
             "lastUpdated": "Last updated: {date}",
             "generating": "Generating...",
             "sitemapCount": "Sitemap generated — {count} pages",
             "sitemapEmpty": "Sitemap generated — no pages yet",
             "autoMeta": {
                 "enabled": "Auto Meta Generation: Enabled",
-                "disabled": "Auto Meta Generation: Disabled"
+                "disabled": "Auto Meta Generation: Disabled",
+                "label": "Auto-Generate Meta Tags",
+                "description": "Automatically creates SEO-optimized title and description tags for new pages and products.",
+                "on": "ON",
+                "off": "OFF"
             },
             "keywordColumns": {
                 "keyword": "Keyword",
@@ -1728,10 +2022,10 @@
                 "contentLocale": "Content locale",
                 "localeDesc": "Each locale stores its own copy. Visitors get the closest match.",
                 "fieldSubject": "Subject",
+                "hintSubject": "Shown in the inbox preview. Keep it under 60 chars for mobile.",
                 "fieldGreeting": "Greeting",
                 "fieldCtaLabel": "CTA Label",
                 "fieldClosing": "Closing",
-                "hintSubject": "Shown in the inbox preview. Keep it under 60 chars for mobile.",
                 "hintCtaLabel": "Button text. Use a strong verb — \"Track Order\", \"Confirm\", \"Open Inbox\".",
                 "unsavedChanges": "Unsaved changes",
                 "allChangesSaved": "All changes saved",
@@ -1754,18 +2048,20 @@
                 "descriptions": {
                     "welcome": "First-touch hello when a buyer signs up or places their first order.",
                     "otp-verification": "One-time verification code for login and account security.",
-                    "forgot-password": "Password reset link, valid for 30 minutes.",
+                    "forgot-password": "One-tap password reset link, valid for 30 minutes.",
                     "password-changed": "Confirm password was changed successfully.",
                     "order-confirmation": "Sent the moment a buyer's checkout succeeds — receipts, items, shipping.",
-                    "order-shipped": "Delivery confirmation when the order is shipped.",
+                    "order-completed": "Delivery confirmation when the order has arrived.",
                     "order-cancelled": "Notify buyer when their order is cancelled.",
                     "order-expired": "Alert buyer when an unpaid order has expired.",
                     "order-refunded": "Notify buyer when their order has been refunded.",
                     "bank-transfer-instructions": "Remind buyer to complete bank transfer — order auto-cancels after 24h.",
                     "payment-confirmed": "Confirm payment has been received and order is processing.",
                     "payment-rejected": "Inform buyer that their payment was rejected.",
-                    "new-order-seller": "New order notification for the seller dashboard.",
-                    "staff-invitation": "Invite new staff members to access the dashboard."
+                    "new-order-seller": "Heads-up to the seller every time a new order lands.",
+                    "staff-invitation": "Invite new staff members to access the dashboard.",
+                    "contact-from-seller": "Forward the message to the seller's support inbox.",
+                    "newsletter-seller-digest": "Digest of newsletter signups, opens, and click-through rates."
                 }
             }
         },
@@ -2149,16 +2445,16 @@
     },
     "help": {
         "nav": {
-            "overview": "📋 Overview",
-            "qna": "❓ Q&A",
-            "modules": "📚 Module Guides"
+            "overview": "Overview",
+            "qna": "Q&A",
+            "modules": "Module Guides"
         },
         "overview": {
             "title": "Help Center",
             "subtitle": "Learn how to use your website management system.",
-            "welcomeTitle": "👋 Welcome to EchPrime!",
+            "welcomeTitle": "Welcome to EchPrime!",
             "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating websites with AI, writing SEO-optimized blog posts to tracking traffic and engagement. Here is an overview of the main features.",
-            "featuresTitle": "🚀 Key Features",
+            "featuresTitle": "Key Features",
             "features": {
                 "dashboardTitle": "Dashboard",
                 "dashboardDesc": "View real-time overview of website traffic, leads, and engagement.",
@@ -2169,13 +2465,13 @@
                 "settingsTitle": "Settings",
                 "settingsDesc": "Configure domain and invite admin staff."
             },
-            "needHelpTitle": "📞 Need more help?",
+            "needHelpTitle": "Need more help?",
             "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
         },
         "modules": {
             "lazyScreenshot": {
                 "screenshot": "Screenshot: {title}",
-                "clickToZoom": "🔍 Click to zoom"
+                "clickToZoom": "Click to zoom"
             },
             "tab": {
                 "escToClose": "ESC to close · Pinch to zoom on mobile",
@@ -2352,28 +2648,28 @@
             "emptyTitle": "No answers found",
             "emptyDesc": "Try different keywords or contact support via WhatsApp.",
             "categories": {
-                "dashboardTitle": "📊 Dashboard",
+                "dashboardTitle": "Dashboard",
                 "qDashboardMetrics": "What metrics are shown on the Dashboard?",
                 "aDashboardMetrics": "The Dashboard displays three key metrics: <strong>Traffic / Views</strong> (total page visits), <strong>Leads / Clicks</strong> (link clicks and interactions), and <strong>Engagement</strong> (non-pageview user activities). Use the period selector to view data for Today, 7 days, or 30 days.",
                 "qDashboardCustomize": "How to customize the Dashboard layout?",
                 "aDashboardCustomize": "Click the <strong>Customize</strong> button at the top right of the Dashboard. A modal will appear where you can drag-and-drop to reorder metric cards, and toggle the eye icon to show or hide specific metrics.",
                 "qDashboardSeo": "What is the SEO Health Widget?",
                 "aDashboardSeo": "The <strong>SEO Health Widget</strong> displays your website's SEO score out of 100. It shows warnings like missing meta titles or unoptimized images. Click <strong>\"AI Fix All Issues\"</strong> to let AI automatically optimize your site's SEO.",
-                "builderTitle": "🤖 AI Website Builder",
+                "builderTitle": "AI Website Builder",
                 "qBuilderCreate": "How to create a website with AI?",
                 "aBuilderCreate": "Click <strong>\"Build with AI\"</strong> on the Dashboard or go to <strong>Builder → New</strong>. Enter your business name, select your industry, describe your products/services, then click <strong>\"Continue — AI will create your website\"</strong>. AI will generate a complete website in about 30-60 seconds.",
                 "qBuilderEdit": "Can I edit the AI-generated website?",
                 "aBuilderEdit": "Yes! After AI generates your website, you can fully customize it using the <strong>Visual Editor</strong>. Edit text, change images, rearrange sections, adjust colors and fonts — all with a drag-and-drop interface.",
                 "qBuilderMobile": "Is the AI-generated website mobile-responsive?",
                 "aBuilderMobile": "Yes, all AI-generated websites are fully responsive. You can preview both <strong>Desktop</strong> and <strong>Mobile</strong> views using the toggle buttons in the Website Preview page. The layout automatically adapts to all screen sizes.",
-                "blogTitle": "📝 Blog",
+                "blogTitle": "Blog",
                 "qBlogCreate": "How to create a new blog post?",
                 "aBlogCreate": "Go to <strong>\"📝 Blog\"</strong> in the sidebar → click <strong>[+ New Post]</strong>. Enter a title, write content using the Rich Text Editor, upload a featured thumbnail, set the category and publish date, then click <strong>Publish</strong> or <strong>Save Draft</strong>.",
                 "qBlogAi": "How does the AI Blog Assistant work?",
                 "aBlogAi": "Click the <strong>\"AI Assistant\"</strong> button (purple) at the top right of the blog editor. Enter your topic, choose a tone of voice (Professional, Friendly, or Persuasive), then click <strong>\"Generate Blog Idea\"</strong>. AI will generate a title, content outline, and SEO meta for you.",
                 "qBlogSeo": "How to optimize blog posts for SEO?",
                 "aBlogSeo": "In the blog editor, scroll to the <strong>\"Search Optimization (SEO)\"</strong> section on the right sidebar. Fill in the <strong>Meta Title</strong> (max 60 characters) and <strong>Meta Description</strong> (max 160 characters). You can also click <strong>\"Generate via AI\"</strong> to auto-generate optimized meta tags.",
-                "settingsTitle": "⚙️ Settings",
+                "settingsTitle": "Settings",
                 "qSettingsDomain": "How to connect a custom domain?",
                 "aSettingsDomain": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Click <strong>\"+ Add Custom Domain\"</strong>, enter your domain name (e.g., abccompany.com). Then configure DNS records at your domain registrar and click <strong>\"Verify Connection\"</strong>.",
                 "qSettingsDns": "How to configure DNS records?",
@@ -3019,7 +3315,20 @@
             "moveUp": "Move up",
             "moveDown": "Move down",
             "moveLeft": "Move left",
-            "makeSubItem": "Make sub-item"
+            "makeSubItem": "Make sub-item",
+            "quickLanguage": {
+                "title": "Quick Language",
+                "tooltip": "Enable to translate and display your website in multiple languages for international or multi-ethnic customers.",
+                "enable": "Enable Multi-language",
+                "enabledHint": "Site supports a secondary language.",
+                "primary": "Primary",
+                "makeDefault": "Make Default",
+                "removeLanguage": "Remove language",
+                "addSecondary": "Add a secondary language",
+                "adding": "Adding…",
+                "add": "Add",
+                "maxLanguages": "Max 2 languages. Remove {name} to switch."
+            }
         },
         "settings": {
             "brandIdentity": "Brand Identity",
@@ -3541,7 +3850,16 @@
             "leaveAnyway": "Leave anyway",
             "stayUpload": "Stay & Upload",
             "sumStatusBtS1": "Action Required — Upload Receipt",
-            "sumStatusBtS2": "We can't ship until your transfer is verified."
+            "sumStatusBtS2": "We can't ship until your transfer is verified.",
+            "verifyingPayment": "Verifying your payment…",
+            "verifyingHint": "This can take a few seconds. You can also check My Orders.",
+            "retryError": "Could not start payment. Please try again.",
+            "cancelConfirmBanner": "Cancel Order",
+            "cancelConfirmTitle": "Cancel this order?",
+            "cancelConfirmBody": "Your order will be cancelled and the reserved items released. This cannot be undone — you'd need to place a new order to buy again.",
+            "cancelConfirmYes": "Yes, cancel order",
+            "cancelKeepOrder": "Keep order",
+            "cancelling": "Cancelling…"
         },
         "resendUpload": {
             "checkEmailTitle": "Check your email",

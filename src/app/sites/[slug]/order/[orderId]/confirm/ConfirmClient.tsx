@@ -1,16 +1,19 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast, Toaster } from 'sonner'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
     Clock, Mail, Calendar, ShoppingBag, ReceiptText,
     Truck, MapPin, Hash, Info, Package,
     UploadCloud, FileImage, X, RotateCcw, Hourglass, AlertCircle,
     PhoneCall, PackageX, HandCoins, Banknote,
+    XCircle, CreditCard, AlarmClock, RefreshCw,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
 import { useI18n } from '@/i18n'
 import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
+import { useCartStore } from '@/store/cartStore'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -24,10 +27,13 @@ export type ConfirmOrder = {
     tax: number
     total: number
     currency: string
-    paymentMethod?: string
+    paymentMethod: string
     paymentStatus?: string
     paymentReference?: string
+    paymentExpiresAt?: string | null
     stripePaymentIntentId?: string
+    cardBrand?: string | null
+    cardLast4?: string | null
     customerName: string
     customerEmail: string
     shippingAddress?: ShippingAddress
@@ -41,6 +47,7 @@ type Props = {
     bankAccountHolder: string
     merchantQrUrl: string
     uploadToken: string
+    cancelled?: boolean
 }
 
 type UploadStatus = 'empty' | 'staged' | 'uploading' | 'success'
@@ -77,10 +84,64 @@ const CopyIcon = () => (
     </svg>
 )
 
-export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
+export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken, cancelled = false }: Props) {
     const router = useRouter()
     const { t } = useI18n()
     const cp = t.storefront.confirmPage
+    const { clearCart } = useCartStore()
+    const clearedRef = useRef(false)
+    const [livePay, setLivePay] = useState(order.paymentStatus)
+    const [retrying, setRetrying] = useState(false)
+    const [retryError, setRetryError] = useState('')
+    const [cancelConfirm, setCancelConfirm] = useState(false)
+    const [cancelling, setCancelling] = useState(false)
+    const bypassUnloadGuardRef = useRef(false)
+
+    // Cancel an unpaid awaiting-payment order (Stripe or Bank Transfer) from the confirm page
+    const handleCancelOrder = useCallback(async () => {
+        setCancelling(true)
+        try {
+            const res = await fetch(`/api/orders/${order.id}/cancel-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            })
+            const data = await res.json()
+            if (res.ok && data.success) {
+                bypassUnloadGuardRef.current = true // skip the BT leave-prompt on this intentional navigation
+                window.location.href = `/sites/${slug}/orders/${order.orderNumber}`
+            } else {
+                setCancelling(false)
+                setCancelConfirm(false)
+            }
+        } catch {
+            setCancelling(false)
+            setCancelConfirm(false)
+        }
+    }, [order.id, order.orderNumber, slug])
+
+    // Retry payment — buyer cancelled or payment failed; create a fresh Stripe session
+    const handleRetryPayment = useCallback(async () => {
+        setRetrying(true)
+        setRetryError('')
+        try {
+            const res = await fetch(`/api/orders/${order.id}/retry-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            })
+            const data = await res.json()
+            if (res.ok && data.success && data.data?.sessionUrl) {
+                window.location.href = data.data.sessionUrl
+            } else {
+                setRetryError(data.error?.message || cp.retryError)
+                setRetrying(false)
+            }
+        } catch {
+            setRetryError(cp.retryError)
+            setRetrying(false)
+        }
+    }, [order.id, cp.retryError])
 
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
@@ -100,6 +161,22 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const [uploadError, setUploadError] = useState('')
     const [leaveHref, setLeaveHref] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // The Stripe round-trip concluded (we're on the confirm page) — clear the back-button flag
+    // set by checkout so a later fresh checkout visit doesn't false-redirect here.
+    useEffect(() => {
+        try { sessionStorage.removeItem('pw_stripe_pending') } catch {}
+    }, [])
+
+    // Show toast when buyer cancels Stripe checkout and is redirected back (AC-1)
+    useEffect(() => {
+        const pm = order.paymentMethod
+        const isStripeOrder = pm !== 'bank_transfer' && pm !== 'cod' && pm !== 'free'
+        if (cancelled && isStripeOrder) {
+            toast.error(t.storefront.checkout.paymentCancelled)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     useEffect(() => {
         const buttons = document.querySelectorAll<HTMLButtonElement>('[data-copy]')
@@ -121,6 +198,78 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         return () => cleanup.forEach(fn => fn())
     }, [])
 
+    // Active-reconcile: POST payment-status on mount to heal the DB when the Stripe webhook is late.
+    // Only for Stripe orders not yet paid and not cancelled. The existing SSE handles the UI flip +
+    // clearCart once the DB is healed — DO NOT duplicate that logic here.
+    useEffect(() => {
+        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
+
+        let active = true
+        let retryCount = 0
+        const MAX_RETRIES = 2
+        const RETRY_DELAY_MS = 3000
+
+        async function pollOnce() {
+            try {
+                const res = await fetch(`/api/orders/${order.id}/payment-status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}',
+                })
+                if (!res.ok || !active) return
+                const data = await res.json()
+                // Stop retrying once healed or definitively non-pending
+                if (data.reconciled || data.status !== 'pending') return
+                if (retryCount < MAX_RETRIES) {
+                    retryCount++
+                    retryTimer = setTimeout(pollOnce, RETRY_DELAY_MS)
+                }
+            } catch {
+                // Swallow — SSE + cron are the fallback
+            }
+        }
+
+        let retryTimer: ReturnType<typeof setTimeout>
+        void pollOnce()
+
+        return () => {
+            active = false
+            clearTimeout(retryTimer)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // SSE: poll payment status for Stripe orders not yet paid.
+    // Skip when buyer cancelled — order won't become paid via the abandoned session; show Pay Now instead.
+    useEffect(() => {
+        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
+
+        let errorCount = 0
+        const es = new EventSource(
+            `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
+        )
+        es.onmessage = (e) => {
+            try {
+                const data = JSON.parse(e.data)
+                if (data.paymentStatus) setLivePay(data.paymentStatus)
+                if (data.paymentStatus === 'paid' && !clearedRef.current) {
+                    clearedRef.current = true
+                    clearCart()
+                    es.close()
+                }
+                if (data.terminal) es.close()
+            } catch {}
+        }
+        es.onerror = () => {
+            errorCount++
+            if (errorCount >= 5) es.close()
+        }
+        return () => es.close()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // Intercept browser back button and tab close when BT upload is still pending
     useEffect(() => {
         if (order.paymentMethod !== 'bank_transfer' || uploadStatus === 'success') return
@@ -130,6 +279,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             setLeaveHref(`/sites/${slug}`)
         }
         const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (bypassUnloadGuardRef.current) return // intentional cancel navigation — don't prompt
             e.preventDefault()
             e.returnValue = ''
         }
@@ -145,8 +295,19 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const shippingFee = order.shippingFee ?? 0
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
-    const isStripe = !isBT && !isCod
-    const isPaid = order.paymentStatus === 'paid'
+    const isFree = order.paymentMethod === 'free'
+    const isStripe = !isBT && !isCod && !isFree
+    const isPaid = livePay === 'paid'
+    // Confirm-page "Method" line: card brand + last4 when captured, else the method name.
+    const stripeMethodLabel = order.cardBrand && order.cardLast4
+        ? `${order.cardBrand.charAt(0).toUpperCase()}${order.cardBrand.slice(1)} ending in ${order.cardLast4}`
+        : order.paymentMethod === 'fpx' ? 'FPX (Online Banking)' : 'Credit Card'
+    // Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — match both
+    const payFailed = livePay === 'failed' || livePay === 'payment_failed'
+    // Stripe payment not completed (buyer cancelled or webhook reported failure) — show retry, not success
+    const isStripePending = isStripe && !isPaid && (cancelled || payFailed)
+    // Order still awaiting payment (Stripe failed/cancelled, or BT not yet submitted) → buyer may cancel it
+    const isAwaitingPayment = isStripePending || (isBT && !isPaid && uploadStatus !== 'success')
     // Order is "done" from the confirm page POV: payment confirmed or COD placed.
     // Stripe without isPaid means webhook hasn't fired yet — don't clear token prematurely.
     const isOrderSuccess = isPaid || isCod
@@ -162,40 +323,51 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         : `${fmtEstDay(addBusinessDays(today, 3))} – ${fmtEstDay(addBusinessDays(today, 5))}`
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
-    const heroCheckClass = isPaid ? '' : isSubmitted ? 'info' : isBT ? 'warning' : ''
-    const heroClass = isPaid ? '' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
+    const heroCheckClass = isPaid ? '' : isStripePending ? 'danger' : isSubmitted ? 'info' : isBT ? 'warning' : ''
+    const heroClass = isPaid ? '' : isStripePending ? ' failed' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
     const heroTitle = isPaid
-        ? 'Order Confirmed — Payment Verified!'
-        : isSubmitted
-            ? 'The order has been placed — Awaiting seller confirmation.'
-            : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
+        // Stripe paid = "Order Successfully Placed!" (design); BT paid = seller-verified copy.
+        ? (isStripe ? 'Order Successfully Placed!' : 'Order Confirmed — Payment Verified!')
+        : isStripePending
+            ? 'Payment Failed — Action Required'
+            : isSubmitted
+                ? 'The order has been placed — Awaiting seller confirmation.'
+                : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
     const heroSub = isPaid
-        ? 'Your payment has been verified by the seller. Your order is now being prepared for shipment.'
-        : isSubmitted
-            ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
-            : isBT
-                ? 'Please complete your bank transfer and upload the receipt below to avoid order cancellation.'
-                : isCod
-                    ? 'Your order is reserved. Our team will verify your address by phone, then dispatch it for cash-on-delivery.'
-                    : 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
-    const badgeLabel = isPaid ? 'Payment Verified' : isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
-    const badgeTone = isPaid ? 'teal' : isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
-    const badgeIcon = isPaid ? <Check size={11} /> : isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
+        ? (isStripe
+            ? 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
+            : 'Your payment has been verified by the seller. Your order is now being prepared for shipment.')
+        : isStripePending
+            ? 'We couldn’t process your payment. Your order is being held for you — please retry payment within 24 hours to avoid cancellation.'
+            : isSubmitted
+                ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
+                : isBT
+                    ? 'Please complete your bank transfer and upload the receipt below to avoid order cancellation.'
+                    : isCod
+                        ? 'Your order is reserved. Our team will verify your address by phone, then dispatch it for cash-on-delivery.'
+                        : 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
+    const badgeLabel = isPaid ? 'Payment Verified' : isStripePending ? 'Payment Failed' : isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
+    const badgeTone = isPaid ? 'teal' : isStripePending ? 'red' : isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
+    const badgeIcon = isPaid ? <Check size={11} /> : isStripePending ? <XCircle size={11} /> : isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
     const heroIcon = isPaid
         ? <Check size={36} strokeWidth={3} />
-        : isSubmitted
-            ? <Hourglass size={36} strokeWidth={2} />
-            : isBT ? <Clock size={36} strokeWidth={2.5} /> : <Check size={36} strokeWidth={3} />
+        : isStripePending
+            ? <X size={36} strokeWidth={3} />
+            : isSubmitted
+                ? <Hourglass size={36} strokeWidth={2} />
+                : isBT ? <Clock size={36} strokeWidth={2.5} /> : <Check size={36} strokeWidth={3} />
 
     const sumStatus = isPaid
         ? { tone: 'teal', s1: 'Payment verified · Order confirmed', s2: 'Warehouse is preparing your parcel.' }
-        : isSubmitted
-            ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
-            : isBT
-                ? { tone: 'amber', s1: cp.sumStatusBtS1, s2: cp.sumStatusBtS2 }
-                : isCod
-                    ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
-                    : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
+        : isStripePending
+            ? { tone: 'red', s1: 'Payment failed · Action required', s2: 'Retry payment to secure your order.' }
+            : isSubmitted
+                ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
+                : isBT
+                    ? { tone: 'amber', s1: cp.sumStatusBtS1, s2: cp.sumStatusBtS2 }
+                    : isCod
+                        ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
+                        : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
 
     const shipsText = isCod ? 'After phone verification' : isBT && !isPaid ? 'Within 24 h after verification' : 'Within 24 h'
 
@@ -374,6 +546,20 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 <span className="ty-step-pill pending"><AlertCircle size={11} /> Action required</span>
                             </div>
 
+                            {order.paymentExpiresAt && (
+                                <div className="ty-deadline" style={{ margin: '14px 0' }}>
+                                    <div className="ty-deadline-icon"><AlarmClock size={20} /></div>
+                                    <div className="ty-deadline-body">
+                                        <div className="ty-deadline-line1">
+                                            Upload within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
+                                        </div>
+                                        <div className="ty-deadline-line2">
+                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -486,8 +672,80 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         </div>
                     )}
 
+                    {/* ── Stripe: Verifying payment (came from success redirect, webhook not yet received) ── */}
+                    {isStripe && !isPaid && !cancelled && !payFailed && (
+                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                            <p style={{ fontSize: '18px', fontWeight: 600, marginBottom: 8 }}>{cp.verifyingPayment}</p>
+                            <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>{cp.verifyingHint}</p>
+                        </div>
+                    )}
+
+                    {/* ── Stripe: Payment Failed / Cancelled → Retry within 24h (design: d-stripe-failed) ── */}
+                    {isStripe && !isPaid && (cancelled || payFailed) && (
+                        <div className="ty-bank-block ty-unified ty-failed-block">
+                            <div className="ty-block-head no-num">
+                                <div className="ty-block-titles">
+                                    <h3>Payment &amp; Order Status</h3>
+                                    <p>Your payment didn’t go through — retry to secure your order before it’s released.</p>
+                                </div>
+                                <span className="ty-step-pill failed">
+                                    <XCircle size={11} /> Failed
+                                </span>
+                            </div>
+
+                            <div className="ty-failed-card">
+                                <div className="ty-failed-icon">
+                                    <CreditCard size={22} />
+                                </div>
+                                <div className="ty-failed-body">
+                                    <p className="ty-failed-title">
+                                        We couldn’t process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'Your card was declined.' : 'You exited before completing checkout.'}
+                                    </p>
+                                    <p className="ty-failed-sub">No money has been charged. You can retry with the same card or switch to another payment method.</p>
+                                </div>
+                            </div>
+
+                            {order.paymentExpiresAt && (
+                                <div className="ty-deadline">
+                                    <div className="ty-deadline-icon"><AlarmClock size={20} /></div>
+                                    <div className="ty-deadline-body">
+                                        <div className="ty-deadline-line1">
+                                            Retry within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
+                                        </div>
+                                        <div className="ty-deadline-line2">
+                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {retryError && <p className="ty-upload-error">{retryError}</p>}
+
+                            <div className="ty-failed-actions">
+                                <button
+                                    className="ty-btn danger lg"
+                                    onClick={handleRetryPayment}
+                                    disabled={retrying}
+                                    aria-busy={retrying}
+                                >
+                                    {retrying
+                                        ? <><span className="ty-spin">↻</span> Redirecting…</>
+                                        : <><RefreshCw size={14} /> Retry Payment</>
+                                    }
+                                </button>
+                            </div>
+
+                            {payFailed && (
+                                <div className="ty-email-note">
+                                    <Mail size={14} />
+                                    <span>A secure re-payment link has been sent to <strong>{maskedEmail}</strong> — valid for the next 24 hours.</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* ── Stripe: Payment Confirmed ── */}
-                    {isStripe && (
+                    {isStripe && isPaid && (
                         <div className="ty-bank-block ty-unified">
                             <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
@@ -509,8 +767,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     <span className="brand-mark fpx">FPX</span>
                                 </div>
                             </div>
-                            {order.stripePaymentIntentId && (
-                                <ul className="ty-paid-meta">
+                            <ul className="ty-paid-meta">
+                                {order.stripePaymentIntentId && (
                                     <li>
                                         <span className="lbl"><Hash size={12} /> Transaction ID</span>
                                         <span className="val mono">{order.stripePaymentIntentId}</span>
@@ -518,11 +776,39 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                             <CopyIcon /> Copy
                                         </button>
                                     </li>
-                                </ul>
-                            )}
+                                )}
+                                <li>
+                                    <span className="lbl"><CreditCard size={12} /> Method</span>
+                                    <span className="val">{stripeMethodLabel}</span>
+                                </li>
+                            </ul>
                             <div className="ty-email-note">
                                 <Mail size={14} />
                                 <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Free order (100% coupon / zero total) — no payment required ── */}
+                    {isFree && (
+                        <div className="ty-bank-block ty-unified">
+                            <div className="ty-block-head no-num">
+                                <div className="ty-block-titles">
+                                    <h3>Payment &amp; Order Status</h3>
+                                    <p>No payment was required — your order is confirmed and being prepared for shipment.</p>
+                                </div>
+                                <span className="ty-step-pill done"><Check size={11} /> Confirmed</span>
+                            </div>
+                            <div className="ty-paid-card">
+                                <div className="ty-paid-icon"><Check size={22} strokeWidth={3} /></div>
+                                <div className="ty-paid-body">
+                                    <p className="ty-paid-title">This order is <strong>free</strong> — no charge applied.</p>
+                                    <p className="ty-paid-sub">Your items are reserved and will be dispatched shortly.</p>
+                                </div>
+                            </div>
+                            <div className="ty-email-note">
+                                <Mail size={14} />
+                                <span>A confirmation + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
                             </div>
                         </div>
                     )}
@@ -613,11 +899,15 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             }}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
-                            {(!isBT || isPaid) && (
+                            {isAwaitingPayment ? (
+                                <button className="ty-btn outline lg" onClick={() => setCancelConfirm(true)}>
+                                    <XCircle size={15} /> Cancel Order
+                                </button>
+                            ) : (!isBT || isPaid) ? (
                                 <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.orderNumber}`, isOrderSuccess)}>
                                     <ReceiptText size={15} /> View My Orders
                                 </button>
-                            )}
+                            ) : null}
                         </div>
                         <div className="summary-trust"><ShieldCheck size={11} /> Encrypted Checkout · Order Locked</div>
                     </div>
@@ -650,7 +940,58 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                 </div>
             )}
 
+            {/* Cancel-order confirmation modal (danger tone) */}
+            {cancelConfirm && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', padding: '24px', zIndex: 200 }}
+                    onClick={() => !cancelling && setCancelConfirm(false)}
+                >
+                    <div
+                        style={{ background: 'var(--card)', border: '1px solid var(--bd)', borderRadius: '16px', overflow: 'hidden', maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px -16px rgba(15,23,42,0.20),0 4px 16px -4px rgba(15,23,42,0.12)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ background: '#fdeaea', borderBottom: '1px solid #f6bcbc', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <XCircle size={15} style={{ color: '#b91c1c', flexShrink: 0 }} />
+                            <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#b91c1c', margin: 0 }}>{cp.cancelConfirmBanner}</p>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--f1)', margin: '0 0 8px' }}>{cp.cancelConfirmTitle}</p>
+                            <p style={{ fontSize: '13px', color: 'var(--f3)', lineHeight: 1.6, margin: '0 0 20px' }}>{cp.cancelConfirmBody}</p>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button className="ty-btn ghost" onClick={() => setCancelConfirm(false)} disabled={cancelling}>{cp.cancelKeepOrder}</button>
+                                <button className="ty-btn danger" onClick={handleCancelOrder} disabled={cancelling} aria-busy={cancelling}>
+                                    {cancelling ? <><span className="ty-spin">↻</span> {cp.cancelling}</> : <><XCircle size={13} /> {cp.cancelConfirmYes}</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <Toaster position="bottom-center" richColors />
             <style>{TY_CSS}</style>
         </div>
+    )
+}
+
+/** Live HH:MM:SS countdown to the payment deadline (design: TyCountdown). */
+function PaymentCountdown({ deadline }: { deadline: string }) {
+    const [remaining, setRemaining] = useState(() => Math.max(0, new Date(deadline).getTime() - Date.now()))
+    useEffect(() => {
+        const id = setInterval(() => {
+            setRemaining(Math.max(0, new Date(deadline).getTime() - Date.now()))
+        }, 1000)
+        return () => clearInterval(id)
+    }, [deadline])
+    const totalSec = Math.floor(remaining / 1000)
+    const h = String(Math.floor(totalSec / 3600)).padStart(2, '0')
+    const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0')
+    const s = String(totalSec % 60).padStart(2, '0')
+    return (
+        <span className="ty-countdown">
+            <span className="ty-cd-seg">{h}</span><span className="ty-cd-colon">:</span>
+            <span className="ty-cd-seg">{m}</span><span className="ty-cd-colon">:</span>
+            <span className="ty-cd-seg">{s}</span>
+        </span>
     )
 }

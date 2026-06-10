@@ -211,13 +211,7 @@ export const OT_CSS = `
 .ot-addr-lines em{font-style:normal;color:var(--f3);}
 .ot-addr-tag{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--tl5);border:1px solid var(--tl2);color:var(--tl7);align-self:flex-start;}
 .ot-addr-tag svg{width:11px;height:11px;}
-/* Support card */
-.ot-support{background:var(--card);border:1px solid var(--bd);border-left:3px solid var(--tl);border-radius:var(--rc);padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
-.ot-support-head{display:flex;align-items:center;gap:12px;}
-.ot-support-icon{width:40px;height:40px;border-radius:12px;background:var(--tl);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 6px 14px -6px rgba(14,117,86,.45);}
-.ot-support-icon svg{width:19px;height:19px;}
-.ot-support-title{font-family:var(--hf);font-size:16px;font-weight:800;color:var(--f1);letter-spacing:-.005em;}
-.ot-support-sub{font-size:12px;color:var(--f3);margin-top:1px;}
+
 .ot-support-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 12px;border-radius:9px;font-size:12.5px;font-weight:700;border:1px solid var(--tl2);background:var(--card);color:var(--tl7);transition:all 140ms ease;white-space:nowrap;cursor:pointer;width:100%;}
 .ot-support-btn:hover{background:var(--tl5);border-color:var(--tl);}
 .ot-support-btn.primary{background:var(--tl);color:#fff;border-color:var(--tl);box-shadow:0 4px 12px -4px rgba(14,117,86,.45);}

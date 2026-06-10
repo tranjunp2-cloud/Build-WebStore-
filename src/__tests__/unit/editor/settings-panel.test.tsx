@@ -213,7 +213,7 @@ describe('SettingsPanel', () => {
             </I18nProvider>
         )
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
 
         const selects = screen.getAllByRole('combobox')
         expect(selects[0]).toHaveValue('page')
@@ -305,12 +305,12 @@ describe('SettingsPanel CRUD — menu-food [TC-F08-CRUD-MENUFOOD]', () => {
     })
 
     it('[TC-F08-CRUD-MENUFOOD-CAT-REMOVE] clicking remove on category removes it', () => {
-        // Arrange — no items so only one ✕ (the category remove)
+        // Arrange — no items so only one category remove button
         const emptyCatBlock = { blockType: 'menu-food', categories: [{ name: 'Burgers', items: [] }] }
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={emptyCatBlock} /></I18nProvider>)
 
         // Act
-        fireEvent.click(screen.getByText('✕'))
+        fireEvent.click(screen.getByRole('button', { name: 'Remove category 1' }))
 
         // Assert
         expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, { categories: [] })
@@ -344,12 +344,11 @@ describe('SettingsPanel CRUD — menu-food [TC-F08-CRUD-MENUFOOD]', () => {
     })
 
     it('[TC-F08-CRUD-MENUFOOD-ITEM-REMOVE] clicking remove on item removes it from category', () => {
-        // Arrange — category ✕ first, item ✕ second
+        // Arrange
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
 
-        // Act — second ✕ is the item remove button
-        const removeBtns = screen.getAllByText('✕')
-        fireEvent.click(removeBtns[1])
+        // Act — item remove button (aria-label distinguishes it from category remove)
+        fireEvent.click(screen.getByRole('button', { name: 'Remove item 1 from category 1' }))
 
         // Assert: item removed, category remains with empty items
         expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {

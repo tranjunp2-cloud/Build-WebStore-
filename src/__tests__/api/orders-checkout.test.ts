@@ -7,10 +7,12 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockSendEmail = vi.fn(() => Promise.resolve())
 const mockDrizzleExecute = vi.fn()
+const mockLogger = { warn: vi.fn(), error: vi.fn(), info: vi.fn() }
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate, delete: mockDelete, sendEmail: mockSendEmail,
         db: { drizzle: { execute: mockDrizzleExecute } },
+        logger: mockLogger,
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -692,8 +694,8 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(variantUpdateCall).toBeUndefined()
     })
 
-    it('[TC-F10-02-18] bank_transfer variant order: NO stock decrement at checkout', async () => {
-        // Arrange: variant product, paymentMethod=bank_transfer
+    it('[TC-F10-02-18] bank_transfer variant order: decrements stock at checkout (same CAS as COD)', async () => {
+        // bank_transfer now decrements stock at checkout — same CAS block as COD.
         const variantProd = { id: 'prod-1', name: 'Shirt', price: 25, hasVariants: true, variants: [{ name: 'Red', stock: 5, price: 25 }], inventory: 5 }
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
@@ -704,6 +706,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         mockCreate.mockResolvedValue({
             id: 'order-bt', orderNumber: 'ORD-BT1', total: 30, currency: 'MYR',
         })
+        // mockDrizzleExecute default { rows: [{ id: 1 }] } handles: product check + CAS decrement + inventory recompute
 
         const body = {
             siteId: 'site-1',
@@ -716,16 +719,16 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const res = await POST(mockReq(body))
         const data = await res.json()
 
-        // Assert: order created, but NO stock decrement
+        // Assert: order created and stock decremented via SQL CAS (same as COD)
         expect(res.status).toBe(200)
         expect(data.data.paymentMethod).toBe('bank_transfer')
-        // No variant update (bank_transfer skips decrement)
+        // SQL CAS called (product check + CAS decrement + inventory recompute)
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        // ORM update NOT called for variant stock (SQL path)
         const variantUpdateCall = mockUpdate.mock.calls.find(
             call => call[0]?.data?.variants !== undefined
         )
         expect(variantUpdateCall).toBeUndefined()
-        // No CAS SQL
-        expect(mockDrizzleExecute).not.toHaveBeenCalled()
     })
 
     it('[TC-F10-02-19] Mid-flight variant decrement failure: compensates prior decrements, deletes order, returns 422', async () => {
@@ -855,8 +858,6 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         mockFind.mockResolvedValueOnce(mockProduct(variantProd))
         mockCreate.mockResolvedValue({ id: 'order-recompute-1' })
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
         mockDrizzleExecute
             .mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] })  // 1. product check
             .mockResolvedValueOnce({ rows: [{ id: 'uuid-a' }] })  // 2. CAS decrement → success
@@ -878,11 +879,10 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         // No compensation: delete not called
         expect(mockDelete).not.toHaveBeenCalled()
         // Recompute failure was logged as warning, not thrown
-        expect(consoleSpy).toHaveBeenCalledWith(
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+            expect.objectContaining({ productId: expect.anything() }),
             expect.stringContaining('[Decrement] Inventory recompute failed'),
-            expect.any(Error)
         )
-        consoleSpy.mockRestore()
     })
 
     it('[TC-F10-02-20] Product deleted mid-decrement → 422 OUT_OF_STOCK with "no longer available" message', async () => {

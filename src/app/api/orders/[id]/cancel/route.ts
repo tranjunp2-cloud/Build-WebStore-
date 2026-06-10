@@ -104,20 +104,15 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const updated = { ...(order as any), status: 'cancelled', cancelReason: reason }
 
         // Auto-restock inventory (variant-aware).
-        // bank_transfer: stock is decremented at approve-payment (paymentStatus=paid), not checkout.
-        // Pre-approval cancellations (awaiting_payment / pending_verification) must skip restock —
-        // stock was never decremented, so incrementing would create phantom +qty.
-        //
-        // NOTE (pre-#1082 order transition): For variant orders created before this fix,
-        // products_variants.stock was never decremented at checkout. Restocking those orders
-        // will phantom-increment variant stock. A migration to reconcile existing orders is
-        // required before deploying to environments with pre-existing production variant orders.
-        const orderPaymentMethod = (order as any).paymentMethod
-        const orderPaymentStatus = (order as any).paymentStatus
         const restockResults: RestockResult[] = []
         const items = (order as any).items || []
 
-        const shouldRestock = orderPaymentMethod !== 'bank_transfer' || orderPaymentStatus === 'paid'
+        // All payment methods decrement stock at checkout — always restock on cancel.
+        // bank_transfer: stock decremented at checkout (not at approval) since 2026-06-03.
+        // Migration note: BT orders created before that date had stock decremented at approval.
+        // If any such orders were in-flight at deploy time, cancelling them now phantom-increments
+        // their variant stock. Resolve in-flight BT orders before deploying to avoid this.
+        const shouldRestock = true
         if (shouldRestock) {
             for (const item of items) {
                 const rawProductId = typeof item.product === 'object' ? item.product?.id : item.product

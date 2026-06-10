@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { CheckoutClient } from './CheckoutClient'
+import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
 
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
@@ -146,12 +147,16 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
     }
 
     return (
-        <CheckoutClient
-            slug={slug}
-            initialThemeCSS={initialThemeCSS}
-            initialFontHeading={initialFontHeading}
-            initialFontBody={initialFontBody}
-            initialSiteData={initialSiteData}
-        />
+        <>
+            {/* Browser Back from Stripe → confirm page (no flash). See component for the mechanism. */}
+            <StripeBackRedirectScript />
+            <CheckoutClient
+                slug={slug}
+                initialThemeCSS={initialThemeCSS}
+                initialFontHeading={initialFontHeading}
+                initialFontBody={initialFontBody}
+                initialSiteData={initialSiteData}
+            />
+        </>
     )
 }

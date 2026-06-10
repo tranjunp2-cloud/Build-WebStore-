@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -9,10 +10,13 @@ import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
     id: string | number
+    name?: string
     stripeAccountId?: string | null
     stripeOnboardingComplete?: boolean
     status?: string
@@ -202,6 +206,8 @@ export async function POST(request: NextRequest) {
         const discountRM = discountSen / 100
         const total = Math.round((subtotal - discountRM + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
+        // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
+        const magicLinkSecret = randomBytes(32).toString('hex')
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
         if (total <= 0) {
@@ -219,12 +225,35 @@ export async function POST(request: NextRequest) {
                     total: 0,
                     currency,
                     status: 'paid',
+                    paymentStatus: 'paid',
                     paymentMethod: 'free',
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
                 } as Record<string, unknown>,
             })
+
+            // Decrement stock for free orders — consistent with all payment methods.
+            for (const item of orderItems) {
+                const productId = item.product
+                const variantName = item.variant?.trim() || null
+                if (variantName) {
+                    await decrementVariantStock(payload, productId, variantName, item.quantity)
+                        .catch((e: unknown) => payload.logger.error(
+                            { err: e, productId, variantName },
+                            '[stripe-checkout] free order variant stock decrement failed',
+                        ))
+                } else {
+                    await (payload.db.drizzle as any).execute(sql`
+                        UPDATE products SET inventory = inventory - ${item.quantity}
+                        WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${item.quantity}
+                    `).catch((e: unknown) => payload.logger.error(
+                        { err: e, productId },
+                        '[stripe-checkout] free order aggregate stock decrement failed',
+                    ))
+                }
+            }
+
             return NextResponse.json({
                 success: true,
                 data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', sessionUrl: null },
@@ -235,7 +264,7 @@ export async function POST(request: NextRequest) {
         // Webhook will update to actual method used when checkout.session.completed fires.
         const orderPaymentMethod = types.length === 1 ? types[0] : 'card'
 
-        // Create order in pending status
+        // Create order in pending status — 24h window matches Stripe Checkout session default expiry
         const order = await payload.create({
             collection: 'orders',
             // Payload collection data type is overly strict; cast required until generated types exist
@@ -251,6 +280,10 @@ export async function POST(request: NextRequest) {
                 currency,
                 status: 'pending',
                 paymentMethod: orderPaymentMethod,
+                // 'awaiting_payment' (not default 'unpaid') so the 24h payment-expiry cron can auto-cancel it
+                paymentStatus: 'awaiting_payment',
+                paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                magicLinkSecret,
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
@@ -271,6 +304,51 @@ export async function POST(request: NextRequest) {
                 } : {}),
             } as Record<string, unknown>,
         })
+
+        // Decrement stock at session creation — restock on cancel/expiry, NOT on webhook.
+        // CAS-style: variant items via decrementVariantStock; non-variant via SQL inventory >= qty.
+        // Compensation on partial failure: restock decremented items, delete order → 422.
+        const decremented: Array<{ productId: number | string; quantity: number; variantName: string | null; kind: 'variant' | 'aggregate' }> = []
+        for (const item of orderItems) {
+            const productId = item.product
+            const variantName = item.variant?.trim() || null
+            if (variantName) {
+                const res = await decrementVariantStock(payload, productId, variantName, item.quantity)
+                if (res.ok) {
+                    decremented.push({ productId, quantity: item.quantity, variantName, kind: 'variant' })
+                } else {
+                    const msg = res.reason === 'insufficient_stock'
+                        ? `"${item.productName}" (${variantName}) is out of stock`
+                        : `Stock update failed for "${item.productName}"`
+                    for (const d of decremented) {
+                        await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+                    }
+                    await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'OUT_OF_STOCK', message: msg } },
+                        { status: 422 },
+                    )
+                }
+            } else {
+                const result = await (payload.db.drizzle as any).execute(sql`
+                    UPDATE products SET inventory = inventory - ${item.quantity}
+                    WHERE id = ${productId} AND inventory IS NOT NULL AND inventory >= ${item.quantity}
+                    RETURNING id
+                `)
+                if (result.rows?.length) {
+                    decremented.push({ productId, quantity: item.quantity, variantName: null, kind: 'aggregate' })
+                } else {
+                    for (const d of decremented) {
+                        await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+                    }
+                    await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
+                    return NextResponse.json(
+                        { success: false, error: { code: 'OUT_OF_STOCK', message: `"${item.productName}" is out of stock` } },
+                        { status: 422 },
+                    )
+                }
+            }
+        }
 
         // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
@@ -296,15 +374,18 @@ export async function POST(request: NextRequest) {
                 currency: currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: customer.email,
                 successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
+                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
             })
         } catch (stripeErr: unknown) {
             console.error('[stripe-checkout] Stripe API error:', stripeErr instanceof Error ? stripeErr.message : stripeErr)
-            // Clean up pending order so it doesn't litter the DB
-            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            // Compensate stock — session creation failed, no payment will occur
+            for (const d of decremented) {
+                await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+            }
+            await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'STRIPE_API_ERROR', message: 'Payment service is busy. Please try again.' } },
                 { status: 502 },
@@ -321,12 +402,44 @@ export async function POST(request: NextRequest) {
             })
         } catch (updateErr) {
             console.error('[stripe-checkout] Failed to save stripeSessionId, cleaning up:', updateErr)
-            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            for (const d of decremented) {
+                await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+            }
+            await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
                 { status: 500 },
             )
         }
+
+        // Fire-and-forget: notify buyer of pending Stripe order (mirrors BT awaiting-payment email)
+        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const shopName = tenantTyped.name ?? siteSlug
+        const buyerEmail = orderConfirmationEmail({
+            shopName,
+            orderNumber,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone ?? null,
+            customerAddress: customer.address ?? null,
+            items: orderItems.map(item => ({
+                name: item.productName,
+                variant: item.variant || null,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                lineTotal: item.quantity * item.unitPrice,
+            })),
+            subtotal,
+            shippingFee,
+            total,
+            currency,
+            paymentMethod: 'stripe',
+            event: 'placed',
+            orderDate: new Date().toISOString(),
+            orderPageUrl,
+        })
+        payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
+            .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
         const res = NextResponse.json({

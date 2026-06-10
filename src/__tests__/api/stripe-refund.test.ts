@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
+// Auth strategy: this file exercises the REAL withAuth wrapper and mocks payload.auth
+// (integration-level — verifies withAuth→auth chaining). orders-refund.test.ts mocks
+// @/lib/auth directly for handler-unit isolation. Both strategies are intentional.
 
 const mockAuth = vi.fn()
 const mockFindByID = vi.fn()
@@ -15,7 +18,7 @@ vi.mock('payload', () => ({
         findByID: mockFindByID,
         update: mockUpdate,
         sendEmail: mockSendEmail,
-        logger: { error: vi.fn() },
+        logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
         db: { drizzle: { execute: mockDrizzleExecute } },
     })),
 }))
@@ -59,6 +62,7 @@ const PAID_ORDER = {
     stripePaymentIntentId: 'pi_test_intent_123',
     stripeChargeId: 'ch_test_charge_123',
     total: 15000,
+    createdAt: '2026-06-02T00:00:00Z',
 }
 
 const REFUND_RESPONSE = {
@@ -126,8 +130,8 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
         expect(mockRefundsCreate).not.toHaveBeenCalled()
     })
 
-    // ─── TC-F13.29: IDOR protection ─────────────────────────────────
-    it('[TC-F13.29] returns 403 FORBIDDEN when user does not own order tenant (IDOR)', async () => {
+    // ─── TC-F13.158: IDOR protection ─────────────────────────────────
+    it('[TC-F13.158] returns 403 FORBIDDEN when user does not own order tenant (IDOR)', async () => {
         // Arrange — order belongs to tenant-3, user only has tenant-1 and tenant-2
         const otherTenantOrder = {
             ...PAID_ORDER,
@@ -182,7 +186,7 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
     })
 
     // ─── Edge: No stripePaymentIntentId ──────────────────────────────
-    it('[TC-F13.29] returns 400 NO_PAYMENT_INTENT when order has no Stripe payment intent', async () => {
+    it('[TC-F13.159] returns 400 NO_PAYMENT_INTENT when order has no Stripe payment intent', async () => {
         // Arrange
         const orderNoPaymentIntent = {
             ...PAID_ORDER,
@@ -305,5 +309,27 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
             expect.any(Object),
             { stripeAccount: 'acct_expanded_123', idempotencyKey: 'refund-order-123' },
         )
+    })
+
+    // ─── Regression: status=new order not refundable (only shipped/completed) ─────────
+    it('rejects refund for status=new order (not shipped/completed)', async () => {
+        // Arrange
+        const newOrder = {
+            ...PAID_ORDER,
+            status: 'new', // Not shipped/completed
+            stripePaymentIntentId: 'pi_test_123',
+        }
+        mockFindByID.mockResolvedValue(newOrder)
+
+        // Act
+        const req = createRequest()
+        const ctx = createContext('order-new')
+        const res = await POST(req, ctx)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(body.error.code).toBe('ORDER_NOT_REFUNDABLE')
+        expect(mockRefundsCreate).not.toHaveBeenCalled()
     })
 })

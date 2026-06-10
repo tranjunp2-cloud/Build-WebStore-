@@ -398,7 +398,7 @@ export function EditorToolbar({
                     className="inline-flex h-9 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[#F8FAFC] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
                     title={et.templates}
                 >
-                    <span className="text-base leading-none">🎨</span>
+                    <Palette className="h-4 w-4 shrink-0" aria-hidden />
                     <span className="hidden lg:inline">{et.templates}</span>
                 </button>
 
@@ -444,7 +444,7 @@ export function EditorToolbar({
                         )}
                         title={et.desktop}
                     >
-                        <span className="text-[15px] leading-none">💻</span>
+                        <Monitor className="h-4 w-4 shrink-0" aria-hidden />
                         <span className="hidden min-[1366px]:inline">{et.desktop}</span>
                     </button>
                     <button
@@ -458,7 +458,7 @@ export function EditorToolbar({
                         )}
                         title={et.mobile}
                     >
-                        <span className="text-[15px] leading-none">📱</span>
+                        <Smartphone className="h-4 w-4 shrink-0" aria-hidden />
                         <span className="hidden min-[1366px]:inline">{et.mobile}</span>
                     </button>
                 </div>

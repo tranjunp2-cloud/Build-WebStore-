@@ -5,6 +5,10 @@
  * Ported DOM from builder-library.jsx. Zustand wiring unchanged.
  */
 import { useState } from 'react'
+import {
+    ChevronRight, Compass, Crown, Factory, FileText, Image as ImageIcon,
+    LayoutGrid, Megaphone, MessageCircle, Newspaper, Package, ShoppingCart, Wrench,
+} from 'lucide-react'
 import { listAllBlocks } from '@/lib/admin/block-registry-reader'
 import { useBuilderStore } from '@/lib/admin/builder-store'
 
@@ -12,18 +16,18 @@ const ALL_BLOCKS = listAllBlocks()
 
 // Category metadata for the sidebar rail
 const BLOCK_CATEGORIES = [
-    { id: 'all',        name: 'All',        icon: '▦' },
-    { id: 'hero',       name: 'Hero',       icon: '🦸' },
-    { id: 'nav',        name: 'Nav',        icon: '🧭' },
-    { id: 'content',    name: 'Content',    icon: '📝' },
-    { id: 'social',     name: 'Social',     icon: '💬' },
-    { id: 'media',      name: 'Media',      icon: '🖼️' },
-    { id: 'conversion', name: 'Conversion', icon: '📣' },
-    { id: 'commerce',   name: 'Commerce',   icon: '💰' },
-    { id: 'blog',       name: 'Blog',       icon: '📰' },
-    { id: 'utility',    name: 'Utility',    icon: '🔧' },
-    { id: 'industry',   name: 'Industry',   icon: '🏭' },
-    { id: 'other',      name: 'Other',      icon: '📦' },
+    { id: 'all',        name: 'All',        Icon: LayoutGrid },
+    { id: 'hero',       name: 'Hero',       Icon: Crown },
+    { id: 'nav',        name: 'Nav',        Icon: Compass },
+    { id: 'content',    name: 'Content',    Icon: FileText },
+    { id: 'social',     name: 'Social',     Icon: MessageCircle },
+    { id: 'media',      name: 'Media',      Icon: ImageIcon },
+    { id: 'conversion', name: 'Conversion', Icon: Megaphone },
+    { id: 'commerce',   name: 'Commerce',   Icon: ShoppingCart },
+    { id: 'blog',       name: 'Blog',       Icon: Newspaper },
+    { id: 'utility',    name: 'Utility',    Icon: Wrench },
+    { id: 'industry',   name: 'Industry',   Icon: Factory },
+    { id: 'other',      name: 'Other',      Icon: Package },
 ]
 
 export function BuilderLibraryPane() {
@@ -55,7 +59,7 @@ export function BuilderLibraryPane() {
                         onClick={() => setCollapsed(false)}
                         title="Expand library"
                     >
-                        ›
+                        <ChevronRight className="h-4 w-4" aria-hidden />
                     </button>
                 </div>
                 <div className="b-lib-collapsed">
@@ -67,7 +71,7 @@ export function BuilderLibraryPane() {
                             title={c.name}
                             onClick={() => { setCat(c.id); setCollapsed(false) }}
                         >
-                            {c.icon}
+                            <c.Icon className="h-4 w-4" aria-hidden />
                         </button>
                     ))}
                 </div>
@@ -89,7 +93,7 @@ export function BuilderLibraryPane() {
                     title="Collapse library"
                     style={{ transform: 'rotate(180deg)' }}
                 >
-                    ›
+                    <ChevronRight className="h-4 w-4" aria-hidden />
                 </button>
             </div>
 
@@ -117,7 +121,7 @@ export function BuilderLibraryPane() {
                         onClick={() => setCat(c.id)}
                         onKeyDown={(e) => e.key === 'Enter' && setCat(c.id)}
                     >
-                        <span className="cat-icon">{c.icon}</span>
+                        <span className="cat-icon"><c.Icon className="h-4 w-4" aria-hidden /></span>
                         <span>{c.name}</span>
                         <span className="count">{countByCat(c.id)}</span>
                     </div>

@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Rectangle
 } from 'recharts'
+import { BarChart3 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export type ChartData = {
@@ -61,7 +62,8 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
     return (
         <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm mb-6 w-full">
             <div className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                📊 {t.dashboard.analytics.chart}
+                <BarChart3 className="w-5 h-5 shrink-0" aria-hidden />
+                {t.dashboard.analytics.chart}
             </div>
             
             <div className="h-[280px] w-full pt-4 relative">

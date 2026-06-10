@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -138,7 +138,7 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
                                             disabled={count <= 1}
                                             onClick={() => handleRemoveAt(i)}
                                             className="text-[10px] text-red-400 hover:text-red-300 disabled:opacity-30"
-                                        >✕</button>
+                                        ><X className="h-4 w-4" aria-hidden /></button>
                                     </div>
                                     <BlockImageEditor
                                         imageUrl={member.image?.url ?? ''}

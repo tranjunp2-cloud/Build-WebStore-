@@ -44,7 +44,7 @@ describe('NavigationEditor', () => {
     it('keeps the edit panel open while interacting with controls inside it', () => {
         render(<NavigationEditorHarness />)
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
 
         expect(screen.getAllByRole('combobox')).toHaveLength(2)
 
@@ -84,7 +84,7 @@ describe('NavigationEditor', () => {
             </I18nProvider>
         )
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
 
         const selects = screen.getAllByRole('combobox')
         expect(selects[1]).toHaveValue('/about')
@@ -113,7 +113,7 @@ describe('NavigationEditor', () => {
             </I18nProvider>
         )
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
 
         expect(screen.queryByRole('option', { name: '404 Not Found' })).not.toBeInTheDocument()
     })
@@ -139,7 +139,7 @@ describe('NavigationEditor', () => {
             </I18nProvider>
         )
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
         fireEvent.blur(screen.getByDisplayValue('https://example.com'), {
             target: { value: '   ' },
         })
@@ -169,7 +169,7 @@ describe('NavigationEditor', () => {
             </I18nProvider>
         )
 
-        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Edit link' }))
         fireEvent.blur(screen.getByDisplayValue('https://example.com'), {
             target: { value: 'https://asdasd' },
         })

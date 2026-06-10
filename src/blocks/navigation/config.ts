@@ -20,8 +20,16 @@ export type NavigationConfig = {
     ctaButton?: { show: boolean; label: string; url: string }
     /** Accessible label for screen readers. Defaults to "Main navigation" at render time. */
     ariaLabel?: string
-    /** F26-07: Language switcher locked to header. F27 wires live switching. */
+    /** F26-07: Header switcher render gate — true only when site has ≥2 languages. */
     showLanguageSwitcher?: boolean
+    /** F26: Multilingual feature enabled (Quick Language panel visible). Independent
+     *  from showLanguageSwitcher, which only turns on once a 2nd language is added. */
+    multilingualEnabled?: boolean
+    /** F26: Persisted language pair — single source of truth for the panel + header switcher.
+     *  primaryLocale defaults to the site's generationLocale; secondaryLocale is the [Add]ed
+     *  2nd language. The visitor switcher renders exactly [primaryLocale, secondaryLocale]. */
+    primaryLocale?: string
+    secondaryLocale?: string
 }
 
 const NavLinkSchema: z.ZodType<NavLink> = z.lazy(() =>
@@ -45,6 +53,9 @@ export const NavigationConfigSchema = BaseBlockSchema.extend({
     }).optional(),
     ariaLabel: z.string().optional(),
     showLanguageSwitcher: z.boolean().optional(),
+    multilingualEnabled: z.boolean().optional(),
+    primaryLocale: z.string().max(10).optional(),
+    secondaryLocale: z.string().max(10).optional(),
 })
 
 export const navigationMeta = {

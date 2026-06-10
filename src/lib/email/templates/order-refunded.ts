@@ -5,7 +5,7 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
-import { mergeTemplateConfig } from '../merge-template-config'
+import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -89,7 +89,13 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
             <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-size:13.5px;color:#0F172A;vertical-align:top;">${fmtPrice(item.lineTotal)}</td>
         </tr>`).join('')
 
-    const subject = config?.subject ? tR.subject : `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
+    const defaultSubject = `${data.shopName} - ${tR.subject} - ${data.orderNumber}`
+    const subject = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? (applyVariables(esc(config.subject), vars) ?? defaultSubject)
+        : defaultSubject
+    const htmlTitle = (typeof config?.subject === 'string' && config.subject.length > 0)
+        ? subject
+        : `${esc(data.shopName)} - ${esc(tR.subject)} - ${esc(data.orderNumber)}`
 
     return {
         subject,
@@ -98,7 +104,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(data.shopName)} - ${esc(tR.subject)} - ${esc(data.orderNumber)}</title>
+<title>${htmlTitle}</title>
 <style>
   body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   .page-bg{background:transparent;padding:0;}

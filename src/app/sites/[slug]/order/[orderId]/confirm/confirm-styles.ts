@@ -245,6 +245,42 @@ export const TY_CSS = `
 .ty-upload-error{font-size:12.5px;color:#b91c1c;margin:8px 0 0;padding:8px 12px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.20);border-radius:8px;}
 @keyframes tySpin{to{transform:rotate(360deg);}}
 .ty-spin{display:inline-block;animation:tySpin 1s linear infinite;}
+
+/* ── Stripe Payment Failed / Retry (red/danger state) ──────────────────── */
+.ty-check.danger{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);box-shadow:0 0 0 6px #fff,0 0 0 7px #fbcaca,0 16px 30px -10px rgba(220,38,38,.42);animation:tyCheckPop 520ms cubic-bezier(.22,1,.36,1),tyDangerPulse 2.2s ease-in-out 520ms infinite;}
+@keyframes tyDangerPulse{0%,100%{box-shadow:0 0 0 6px #fff,0 0 0 7px #fbcaca,0 16px 30px -10px rgba(220,38,38,.42),0 0 0 0 rgba(239,68,68,.45);}50%{box-shadow:0 0 0 6px #fff,0 0 0 7px #fbcaca,0 16px 30px -10px rgba(220,38,38,.42),0 0 0 11px rgba(239,68,68,0);}}
+.ty-hero.failed::before{background:radial-gradient(ellipse at center,#fde7e7 0%,transparent 70%);}
+.ty-hero-badge.tone-red{background:#fdeaea;border-color:#f6bcbc;color:#b91c1c;}
+.ty-step-pill.failed{background:#fdeaea;border:1px solid #f6bcbc;color:#b91c1c;}
+.ty-failed-block{border:1.5px solid #f6bcbc;}
+.ty-failed-card{display:flex;align-items:center;gap:16px;padding:16px 18px;background:#fdeeee;border:1px solid #f6bcbc;border-radius:14px;}
+.ty-failed-icon{width:44px;height:44px;border-radius:999px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 12px -4px rgba(220,38,38,.45);}
+.ty-failed-body{flex:1;min-width:0;}
+.ty-failed-title{font-size:14px;font-weight:600;color:var(--f1);line-height:1.5;margin:0 0 3px;}
+.ty-failed-title strong{color:#b91c1c;font-weight:800;}
+.ty-failed-sub{font-size:12px;color:var(--f3);margin:0;line-height:1.5;}
+.ty-deadline{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px 16px;background:#fff7ed;border:1px solid #f3c79b;border-radius:12px;}
+.ty-deadline-icon{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 12px -4px rgba(217,119,6,.45);animation:tyDeadlineTick 2s ease-in-out infinite;}
+@keyframes tyDeadlineTick{0%,92%,100%{transform:rotate(0);}94%{transform:rotate(-9deg);}96%{transform:rotate(9deg);}98%{transform:rotate(-5deg);}}
+.ty-deadline-body{flex:1;min-width:0;}
+.ty-deadline-line1{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:#92400e;letter-spacing:.01em;}
+.ty-deadline-unit{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#b45309;}
+.ty-deadline-line2{font-size:12px;color:#7c5314;line-height:1.5;margin-top:4px;}
+.ty-deadline-line2 strong{color:#92400e;font-weight:700;}
+.ty-countdown{display:inline-flex;align-items:center;gap:2px;font-family:monospace;}
+.ty-cd-seg{display:inline-block;min-width:26px;padding:2px 5px;background:#92400e;color:#fff;border-radius:6px;font-size:14px;font-weight:700;text-align:center;letter-spacing:.02em;}
+.ty-cd-colon{color:#b45309;font-weight:800;animation:tyColonBlink 1s step-end infinite;}
+@keyframes tyColonBlink{50%{opacity:.25;}}
+.ty-failed-actions{display:flex;gap:10px;margin-top:14px;}
+.ty-btn.danger{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;box-shadow:0 4px 12px -4px rgba(220,38,38,.45);}
+.ty-btn.danger:hover{background:linear-gradient(135deg,#dc2626,#b91c1c);}
+.ty-btn.lg{height:46px;font-size:14px;}
+.ty-failed-actions .ty-btn.danger{flex:1;}
+.ty-summary-status.tone-red{background:#fdeaea;border:1px solid #f6bcbc;}
+.ty-summary-status.tone-red .ty-status-dot{background:#dc2626;animation-name:pulseAmber;}
+.ty-summary-status.tone-red .ty-status-line1{color:#b91c1c;}
+.ty-summary-status.tone-red .ty-status-line2{color:#991b1b;}
+
 /* Mobile */
 @media(max-width:768px){
   .ty-hd{padding:14px 16px;}
@@ -272,5 +308,8 @@ export const TY_CSS = `
   .ty-dropzone.horizontal .ty-dz-btn{width:100%;justify-content:center;margin-top:4px;}
   .ty-upload-actions{flex-direction:column;}
   .ty-upload-actions .ty-btn.primary{margin-left:0;width:100%;}
+  .ty-failed-card{flex-wrap:wrap;padding:14px;gap:12px;}
+  .ty-failed-actions{flex-direction:column;}
+  .ty-deadline{flex-wrap:wrap;}
 }
 `

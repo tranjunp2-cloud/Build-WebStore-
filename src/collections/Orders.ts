@@ -380,6 +380,17 @@ export const Orders: CollectionConfig = {
             type: 'number',
             admin: { readOnly: true, description: 'Discount amount in sen' },
         },
+        // --- Stripe card details (for confirm-page "Method" line) ---
+        {
+            name: 'cardBrand',
+            type: 'text',
+            admin: { readOnly: true, description: 'Stripe card brand (e.g. visa) — captured from PaymentIntent on payment' },
+        },
+        {
+            name: 'cardLast4',
+            type: 'text',
+            admin: { readOnly: true, description: 'Last 4 digits of the card used (Stripe) — display only' },
+        },
         // --- Notes ---
         {
             name: 'notes',

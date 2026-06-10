@@ -4,6 +4,7 @@ import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
+import { restockItem } from '../../../orders/lib/stock-utils'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -18,14 +19,14 @@ export async function handleChargeRefunded(
 
     // Direct Charges: every legitimate charge.refunded must carry a connectedAccountId.
     if (!event.connectedAccountId) {
-        console.error('[Stripe Webhook] SECURITY: charge.refunded without connectedAccountId — Direct Charges require connected account context; rejecting')
+        payload.logger.error('[Stripe Webhook] SECURITY: charge.refunded without connectedAccountId — Direct Charges require connected account context; rejecting')
         return
     }
 
     const paymentIntentId = charge.payment_intent as string | undefined
 
     if (!paymentIntentId) {
-        console.warn('[Stripe Webhook] charge.refunded has no payment_intent — skipping')
+        payload.logger.warn('[Stripe Webhook] charge.refunded has no payment_intent — skipping')
         return
     }
 
@@ -37,7 +38,7 @@ export async function handleChargeRefunded(
     })
 
     if (orders.docs.length === 0) {
-        console.warn(`[Stripe Webhook] No order found for payment_intent ${paymentIntentId}`)
+        payload.logger.warn(`[Stripe Webhook] No order found for payment_intent ${paymentIntentId}`)
         return
     }
 
@@ -50,16 +51,41 @@ export async function handleChargeRefunded(
     // Atomic guard: only the first concurrent delivery wins — prevents duplicate refund emails
     // under Stripe's at-least-once delivery guarantee.
     const updateResult = await (payload.db.drizzle as any).execute(sql`
-        UPDATE orders SET status = 'refunded', payment_status = 'refunded'
+        UPDATE orders SET status = 'refunded', payment_status = 'refunded', updated_at = NOW()
         WHERE id = ${order.id} AND status != 'refunded'
         RETURNING id
     `)
     if (!updateResult.rows?.length) {
-        console.log(`[Stripe Webhook] Order ${order.id} already refunded — skipping concurrent delivery`)
+        payload.logger.info({ orderId: order.id }, '[Stripe Webhook] Order already refunded — skipping concurrent delivery')
         return
     }
 
-    console.log(`[Stripe Webhook] Order ${order.id} marked refunded via charge.refunded`)
+    payload.logger.info({ orderId: order.id }, '[Stripe Webhook] Order marked refunded via charge.refunded')
+
+    // Restock inventory (best-effort) — mirrors refund/route.ts for ECH-initiated refunds.
+    // This path handles Stripe Dashboard refunds where the refund/route.ts path was not called.
+    for (const [index, item] of ((order.items as any[]) ?? []).entries()) {
+        const rawProductId = typeof item.product === 'object' ? (item.product as any)?.id : item.product
+        if (!rawProductId) {
+            payload.logger.error(
+                { orderId: order.id, itemIndex: index },
+                '[charge.refunded] Restock skipped — item has no product ID (data integrity concern)',
+            )
+            continue
+        }
+        const productId = Number.isFinite(Number(rawProductId)) ? Number(rawProductId) : rawProductId
+        const result = await restockItem(payload, productId, (item as any).variant, item.quantity)
+        if (result.skipped) {
+            if (result.reason === 'null_inventory') {
+                payload.logger.warn({ orderId: order.id, productId: result.productId }, '[charge.refunded] Restock skipped — inventory tracking disabled')
+            } else {
+                payload.logger.error(
+                    { orderId: order.id, productId: result.productId, reason: result.reason },
+                    '[charge.refunded] Restock failed — manual inventory reconciliation required',
+                )
+            }
+        }
+    }
 
     if (!order.customerEmail) return
 
@@ -80,7 +106,7 @@ export async function handleChargeRefunded(
         customerAddress: order.shippingAddress ?? null,
         items: (order.items ?? []).map((item: any) => ({
             name: item.productName ?? item.name ?? '',
-            variant: item.variantName ?? null,
+            variant: item.variant ?? null,
             quantity: item.quantity ?? 1,
             unitPrice: item.unitPrice ?? 0,
             lineTotal: item.lineTotal ?? 0,

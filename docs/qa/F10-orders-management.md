@@ -6,6 +6,10 @@
 
 ---
 
+> **PRE-DEPLOY GATE (GH-#1082):** Orders created before #1082 never had `products_variants.stock` decremented at checkout (per-variant decrement was deferred). Restocking those legacy variant orders via the refund path phantom-increments per-variant stock. **Before deploying #1082 to any environment with existing production variant orders, run a one-time reconciliation migration** for affected orders. Ref: `src/app/api/orders/lib/stock-utils.ts` `restockItem` note (lines 109-113).
+
+---
+
 ## 1. Muc Tieu Kiem Thu
 
 Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State Machine don hang, bao mat (IDOR, XSS, Price Spoofing), Idempotency chong nhan ban kho, Race Condition, va trai nghiem Mobile. Moi AC Happy Path co it nhat 3 case Negative/Edge tuong ung.
@@ -71,6 +75,21 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-01-23** | `[Negative]` | Chan Refund vuot tong gia tri don | 1. Nhap so tien Refund lon hon Grand Total cua don. | - Validation highlight do ngay lap tuc.<br>- API tu choi voi loi "So tien hoan vuot qua tong don hang". | Blocker | [ ] |
 | **TC-F10-01-24** | `[BVA]` | Refund dung bang 100% tong don (Full Refund) | 1. Nhap so tien Refund bang dung Grand Total.<br>2. Xac nhan. | - Refund thanh cong.<br>- Trang thai don chuyen sang "Refunded". | High | [ ] |
 | **TC-F10-01-25** | `[Cancel]` | Huy Modal Refund giua chung | 1. Nhan nut Refund, Modal nhap so tien mo ra.<br>2. Nhan Cancel hoac dong Modal. | - Modal dong lai.<br>- Don hang **khong bi thay doi trang thai**. | Medium | [ ] |
+| **TC-F10.R1** | `[Restock]` | bank_transfer: refund variant product → restock variant stock | 1. Don hang shipped co variant product (e.g. Size M qty=2).<br>2. Refund don. | - `products_variants.stock` tang them 2.<br>- Response co `restock[0].restocked=2`. | P1 | [x] |
+| **TC-F10.R2** | `[Restock]` | bank_transfer/COD: refund non-variant product → restock inventory | 1. Don hang shipped, san pham khong co variant.<br>2. Refund don. | - `products.inventory` tang them dung so luong.<br>- Response co restock result. | P1 | [x] |
+| **TC-F10.R3** | `[Restock]` | Stripe: mixed items (variant + non-variant) → ca hai duoc restock | 1. Don Stripe shipped, cart co 1 variant + 1 non-variant item.<br>2. Refund. | - restockItem goi 2 lan.<br>- `restock` array dai 2, `refundId` tra ve. | P1 | [x] |
+| **TC-F10.R4** | `[Edge]` | item.product = null → skip, khong crash | 1. Order item khong co product ID.<br>2. Refund. | - `restock[0].skipped=true, reason='product_not_found'`.<br>- Response 200, refund thanh cong. | High | [x] |
+| **TC-F10.R5** | `[Error]` | Stripe: restock write_failed → ops alert logged, refund van thanh cong | 1. restockItem tra ve write_failed.<br>2. Refund. | - `payload.logger.error` duoc goi.<br>- Response 200, `refundId` co gia tri. | High | [x] |
+| **TC-F10.R6** | `[Idempotent]` | Don da refunded → ALREADY_REFUNDED, restockItem khong goi | 1. Order.status = 'refunded'.<br>2. Refund lai. | - HTTP 400 ALREADY_REFUNDED.<br>- restockItem KHONG goi. | High | [x] |
+| **TC-F10.R7** | `[Concurrency]` | Stripe CAS miss → ALREADY_REFUNDED, restockItem + Stripe KHONG goi | 1. Concurrent refund, CAS tra 0 rows.<br>2. | - HTTP 400 ALREADY_REFUNDED.<br>- Khong double-restock. | High | [x] |
+| **TC-F10.R8** | `[Order]` | Stripe: restock chay SAU stripe.refunds.create (success-gated) | 1. Refund Stripe order co items. | - callOrder = ['stripe','restock'] (restock chay sau khi Stripe thanh cong). | Medium | [x] |
+| **TC-F10.R9** | `[Edge]` | item.product la expanded object (depth:1) → productId duoc extract dung | 1. item.product = `{id:'prod-1', name:'...'}`. | - restockItem duoc goi voi productId='prod-1'. | Medium | [x] |
+| **TC-F10.R10** | `[Error]` | Stripe refunds.create that bai → 502, restock KHONG goi | 1. Stripe order shipped.<br>2. stripe.refunds.create throw error. | - HTTP 502 REFUND_FAILED.<br>- restockItem KHONG goi (restock chi chay sau khi Stripe thanh cong).<br>- Status rollback ve 'shipped'. | High | [x] |
+| **TC-F10.R11** | `[Concurrency]` | bank_transfer CAS miss → ALREADY_REFUNDED | 1. Concurrent refund bank_transfer, CAS tra 0 rows. | - HTTP 400 ALREADY_REFUNDED.<br>- restockItem KHONG goi (CAS bao ve double-restock). | High | [x] |
+| **TC-F10.R9b** | `[Edge]` | bank_transfer: expanded product co numeric-string ID → coerce sang number | 1. item.product = `{id:'1', name:'T-Shirt'}` (numeric string).<br>2. Refund. | - restockItem duoc goi voi productId=1 (number, da coerce tu '1').<br>- Response 200, refund thanh cong. | Medium | [x] |
+| **TC-F10.R10b** | `[Idempotent]` | Stripe: charge_already_refunded → 200 idempotent success, restock van goi, refundId null | 1. stripe.refunds.create throw err.code='charge_already_refunded'.<br>2. Refund. | - HTTP 200 success.<br>- restockItem duoc goi 1 lan.<br>- `data.refundId` = null. | High | [x] |
+| **TC-F10.R12** | `[Error]` | Stripe: restock null_inventory → logger.warn, refund van 200, logger.error KHONG goi | 1. restockItem tra ve skipped reason='null_inventory'.<br>2. Refund. | - `payload.logger.warn` duoc goi (tracking disabled).<br>- `payload.logger.error` KHONG goi.<br>- Response 200, refund thanh cong. | High | [x] |
+| **TC-F10.R13** | `[Error]` | Stripe refund fails AND rollback UPDATE fails → 502, ca hai loi deu duoc log | 1. stripe.refunds.create throw loi (non-charge_already_refunded).<br>2. Rollback UPDATE orders throw loi DB. | - HTTP 502 REFUND_FAILED.<br>- `logger.error` goi voi '[Refund] Stripe refund failed'.<br>- `logger.error` goi voi '[Refund] Status rollback failed — DB state may be inconsistent' kem `rollbackErr`, `orderId`, `originalStatus`. | High | [x] |
 
 #### Nhom 1E — Bulk Action Chinh Trang Thai Hang Loat
 
@@ -162,6 +181,7 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-03-21** | `[Positive]` | Approved BT variant cancel → restocks products_variants.stock | 1. Order bank_transfer, paymentStatus=paid.<br>2. Variant item (Red - M) qty=1.<br>3. Huy don. | - shouldRestock=true.<br>- restockItem SQL: 3 calls (product check + variant increment + recompute).<br>- restock[0].restocked=1. | Blocker | [x] |
 | **TC-F10-03-24** | `[Defensive]` | quantity guard: restock with qty <= 0 short-circuits | 1. Force order item with qty=0 or qty<0 (data corruption sim).<br>2. Cancel order. | - No restock SQL executed (only CAS).<br>- qty=0 → skipped silently.<br>- qty<0 → skipped with reason=write_failed and warn log. | Medium | [x] |
 | **TC-F10-03-23** | `[Data]` | CAS cancel SQL sets updated_at = NOW() | 1. Cancel any order via POST /api/orders/[id]/cancel. | - CAS SQL string contains `updated_at = NOW()` so orders.updated_at is refreshed on cancellation (Payload timestamps:true bypassed by raw SQL). | High | [x] |
+| **TC-F10-03-25** | `[Guard]` | Huy don khong ton tai → 404 NOT_FOUND | 1. Goi POST /api/orders/[id]/cancel voi order ID khong ton tai trong DB. | - HTTP 404.<br>- body.error.code = NOT_FOUND. | High | [x] |
 
 ---
 

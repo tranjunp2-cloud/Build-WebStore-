@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
+import { validateContentFields } from './validate-content-fields'
 
 // These templates cannot be disabled — security-critical flows
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
@@ -45,22 +46,6 @@ export async function getEmailTemplateSettings(): Promise<{ success: boolean; ro
         console.error('[getEmailTemplateSettings] error:', error instanceof Error ? error.message : error)
         return { success: false, error: 'Internal server error' }
     }
-}
-
-function validateContentFields(fields: ContentFields, label: string): string | null {
-    if (fields.subject !== undefined && fields.subject.length > 200) {
-        return `${label} subject exceeds 200 characters`
-    }
-    if (fields.ctaLabel !== undefined && fields.ctaLabel.length > 100) {
-        return `${label} ctaLabel exceeds 100 characters`
-    }
-    if (fields.greeting !== undefined && fields.greeting.length > 500) {
-        return `${label} greeting exceeds 500 characters`
-    }
-    if (fields.closing !== undefined && fields.closing.length > 2000) {
-        return `${label} closing exceeds 2000 characters`
-    }
-    return null
 }
 
 export async function saveEmailTemplateConfig(

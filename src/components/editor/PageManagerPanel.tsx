@@ -1,12 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Plus, Settings2, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, getDisplayPageTitle } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import type { PageData } from '@/store/editorStore'
@@ -110,6 +110,7 @@ export function PageManagerPanel({
     const { t } = useI18n()
     const pm = t.editor.pageManager
     const pages = useEditorStore(state => state.pages)
+    const activeLocale = useEditorStore(state => state.activeLocale)
     const setPages = useEditorStore(state => state.setPages)
     const addPageToState = useEditorStore(state => state.addPageToState)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
@@ -379,7 +380,7 @@ export function PageManagerPanel({
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <div className="truncate text-sm font-medium text-[#F8FAFC]">
-                                                        {page.title}
+                                                        {getDisplayPageTitle(page, activeLocale)}
                                                     </div>
                                                     {page.isHomepage ? (
                                                         <span className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] px-2 py-[3px] text-[12px] font-semibold leading-4 text-[#b9f8cf]">
@@ -516,7 +517,7 @@ export function PageManagerPanel({
                                                 onClick={() => onPageSelected(page404.id)}
                                                 className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
                                             >
-                                                <span aria-hidden="true">✏️</span>
+                                                <Pencil className="h-4 w-4" aria-hidden />
                                                 {pm.edit404Page}
                                             </button>
                                         </div>

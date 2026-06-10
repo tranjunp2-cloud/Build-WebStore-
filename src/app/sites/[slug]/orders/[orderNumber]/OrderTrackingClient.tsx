@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
-    CalendarClock, Navigation, LifeBuoy, Mail, ChevronDown,
+    CalendarClock, Navigation, ChevronDown,
     RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw,
 } from 'lucide-react'
 
@@ -56,8 +57,11 @@ function getTrackingStatus(status: string, paymentStatus?: string): TrackingStat
     if (status === 'shipped') return 'in-transit'
     if (status === 'completed') return 'delivered'
     if (status === 'refunded') return 'refunded'
-    if (status === 'cancelled' && paymentStatus === 'payment_failed') return 'payment_failed'
-    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
+    // Auto-cancelled after payment failure → show as payment_failed (retry window may still apply on the order page)
+    if (status === 'cancelled' && (paymentStatus === 'payment_failed' || paymentStatus === 'failed')) return 'payment_failed'
+    // Webhook-failed order (status='payment_failed') is retryable, not cancelled
+    if (status === 'payment_failed') return 'payment_failed'
+    if (status === 'cancelled') return 'cancelled'
     return 'processing'
 }
 
@@ -93,7 +97,7 @@ function getStageStates(trackingStatus: TrackingStatus) {
 function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const isPaid = order.paymentStatus === 'paid'
-    const isPaymentFailed = order.paymentStatus === 'payment_failed'
+    const isPaymentFailed = order.paymentStatus === 'failed' || order.paymentStatus === 'payment_failed'
 
     const STATUS_META = {
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
@@ -389,19 +393,8 @@ function OtSide({ order, slug }: { order: OrderData; slug: string }) {
                 </div>
             )}
 
-            <div className="ot-support">
-                <div className="ot-support-head">
-                    <div className="ot-support-icon"><LifeBuoy size={19} /></div>
-                    <div>
-                        <div className="ot-support-title">Need help?</div>
-                        <div className="ot-support-sub">Contact the seller for assistance</div>
-                    </div>
-                </div>
-                <button className="ot-support-btn primary"><Mail size={13} /> Email Support</button>
-            </div>
-
             <div className="ot-back-row">
-                <Link href={`/sites/${slug}/products`} className="ot-back-btn">
+                <Link href={`/sites/${slug}`} className="ot-back-btn">
                     <Store size={14} /> Back to Shop
                 </Link>
             </div>
@@ -422,9 +415,30 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
     )
 }
 
+// Stripe failure paymentStatus is 'failed' (webhook) or 'payment_failed' (auto-cancel cron) — accept both.
+const PAY_NOW_STATUSES = new Set(['awaiting_payment', 'failed', 'payment_failed'])
+const PAID_STATUSES = new Set(['paid', 'cancelled', 'refunded', 'completed'])
+
 export default function OrderTrackingClient({ order, slug }: Props) {
     const [liveOrder, setLiveOrder] = useState(order)
+    const [isRetrying, setIsRetrying] = useState(false)
     const statusRef = useRef(order.status)
+
+    // Browser Back from Stripe (after retry-payment) → confirm Payment Failed. The inline script in
+    // page.tsx covers no-store fresh loads; this pageshow handler covers bfcache restores.
+    useEffect(() => {
+        const onPageShow = () => {
+            const raw = sessionStorage.getItem('pw_stripe_pending')
+            if (!raw) return
+            sessionStorage.removeItem('pw_stripe_pending')
+            try {
+                const { orderId, slug: s } = JSON.parse(raw)
+                if (orderId && s) window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+            } catch { /* malformed flag — ignore */ }
+        }
+        window.addEventListener('pageshow', onPageShow)
+        return () => window.removeEventListener('pageshow', onPageShow)
+    }, [])
 
     useEffect(() => {
         if (TERMINAL_STATUSES.has(statusRef.current)) return
@@ -464,6 +478,41 @@ export default function OrderTrackingClient({ order, slug }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    // Pay Now is a Stripe-only retry. BT orders use the receipt-upload flow, not a Stripe session.
+    const isStripeOrder = liveOrder.paymentMethod === 'card' || liveOrder.paymentMethod === 'fpx'
+    const showPayNow =
+        isStripeOrder &&
+        PAY_NOW_STATUSES.has(liveOrder.paymentStatus) &&
+        !PAID_STATUSES.has(liveOrder.paymentStatus)
+
+    async function handleRetry() {
+        setIsRetrying(true)
+        try {
+            // Read magic-link token from URL if present (no SSR — client-only)
+            const urlToken = typeof window !== 'undefined'
+                ? new URLSearchParams(window.location.search).get('token') ?? undefined
+                : undefined
+
+            const res = await fetch(`/api/orders/${liveOrder.id}/retry-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: urlToken }),
+            })
+            const data = await res.json()
+            if (res.ok && data.success && data.data?.sessionUrl) {
+                // Flag for the back-redirect script: browser Back from Stripe → confirm Payment Failed
+                sessionStorage.setItem('pw_stripe_pending', JSON.stringify({ orderId: liveOrder.id, slug }))
+                window.location.href = data.data.sessionUrl
+            } else {
+                toast.error(data.error?.message || 'Could not start payment. Please try again.')
+            }
+        } catch {
+            toast.error('Could not start payment. Please try again.')
+        } finally {
+            setIsRetrying(false)
+        }
+    }
+
     const trackingStatus = getTrackingStatus(liveOrder.status, liveOrder.paymentStatus)
     const isDelivered = trackingStatus === 'delivered'
     const isNegativeTerminal = trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed'
@@ -477,7 +526,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                     <ChevronRight size={14} />
                     <strong>{liveOrder.orderNumber}</strong>
                 </div>
-                <Link href={`/sites/${slug}/products`} className="ot-shop-back">
+                <Link href={`/sites/${slug}`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
                 </Link>
             </header>
@@ -486,6 +535,27 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                 <div className="ck-form-col">
                     {isDelivered && <OtDeliveredBanner order={liveOrder} />}
                     <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
+                    {showPayNow && (
+                        <div className="ot-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                            <div>
+                                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                    {(liveOrder.paymentStatus === 'failed' || liveOrder.paymentStatus === 'payment_failed') ? 'Payment failed' : 'Payment pending'}
+                                </div>
+                                <div style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)' }}>
+                                    Complete your payment to confirm the order.
+                                </div>
+                            </div>
+                            <button
+                                className="ot-support-btn primary"
+                                onClick={handleRetry}
+                                disabled={isRetrying}
+                                style={{ whiteSpace: 'nowrap' }}
+                            >
+                                <CreditCard size={13} />
+                                {isRetrying ? 'Redirecting…' : 'Pay Now'}
+                            </button>
+                        </div>
+                    )}
                     <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
                     {!isNegativeTerminal && <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />}
                     <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />

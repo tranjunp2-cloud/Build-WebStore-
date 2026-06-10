@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { Package, Check, AlertTriangle, X } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -242,7 +243,7 @@ export default async function ProductDetailPage({ params }: Props) {
                             <img src={images[0].image.url} alt={images[0].alt || p.name}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                            <span style={{ fontSize: '80px', opacity: 0.15 }}>📦</span>
+                            <Package size={80} aria-hidden style={{ opacity: 0.15 }} />
                         )}
                     </div>
 
@@ -296,9 +297,16 @@ export default async function ProductDetailPage({ params }: Props) {
                             </div>
                             <p style={{
                                 fontSize: '13px', marginBottom: '24px',
+                                display: 'flex', alignItems: 'center', gap: '6px',
                                 color: p.inventory > 10 ? '#22c55e' : p.inventory > 0 ? '#f59e0b' : '#ef4444',
                             }}>
-                                {p.inventory > 10 ? '✓ In Stock' : p.inventory > 0 ? `⚠ Only ${p.inventory} left` : '✕ Out of Stock'}
+                                {p.inventory > 10 ? (
+                                    <><Check size={15} aria-hidden /> In Stock</>
+                                ) : p.inventory > 0 ? (
+                                    <><AlertTriangle size={15} aria-hidden /> Only {p.inventory} left</>
+                                ) : (
+                                    <><X size={15} aria-hidden /> Out of Stock</>
+                                )}
                             </p>
                         </>
                     )}

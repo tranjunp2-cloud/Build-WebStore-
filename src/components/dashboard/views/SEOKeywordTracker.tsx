@@ -184,15 +184,27 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
     }
 
     return (
-        <label className="flex items-center gap-[8px] cursor-pointer">
-            <div className="relative flex items-center justify-center">
-                <input type="checkbox" checked={checked} onChange={handleChange} disabled={saving}
-                    className="peer appearance-none w-[18px] h-[18px] rounded-[2.5px] border-2 border-[#6B7280] bg-[#1F2937] checked:bg-[#3B82F6] checked:border-[#3B82F6] focus:ring-0 focus:ring-offset-0 cursor-pointer transition-colors disabled:opacity-50" />
-                <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-[2px] min-w-0">
+                <span className="text-[14px] font-semibold text-white leading-[1.4]">
+                    {autoMeta.label || 'Auto-Generate Meta Tags'}
+                </span>
+                <span className="text-[12px] leading-[1.5] text-[#9CA3AF]">
+                    {autoMeta.description || 'Automatically creates SEO-optimized title and description tags for new pages and products.'}
+                </span>
             </div>
-            <span className={`text-[14px] leading-[1.57em] font-normal transition-colors select-none ${checked ? 'text-white' : 'text-[#9CA3AF]'}`}>
-                {checked ? (autoMeta.enabled || 'Auto Meta Generation: Enabled') : (autoMeta.disabled || 'Auto Meta Generation: Disabled')}
-            </span>
-        </label>
+            {/* Only the switch itself toggles — clicking the label/description does nothing */}
+            <label className={`relative shrink-0 select-none ${saving ? 'cursor-wait' : 'cursor-pointer'}`}>
+                <input type="checkbox" checked={checked} onChange={handleChange} disabled={saving} className="peer sr-only" aria-label={autoMeta.label || 'Auto-Generate Meta Tags'} />
+                <div className="w-[52px] h-[28px] rounded-full bg-[#374151] peer-checked:bg-[#3B82F6] transition-colors peer-disabled:opacity-50" />
+                <span className="absolute top-1/2 -translate-y-1/2 left-[7px] text-[9px] font-bold text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
+                    {autoMeta.on || 'ON'}
+                </span>
+                <span className="absolute top-1/2 -translate-y-1/2 right-[6px] text-[9px] font-bold text-[#9CA3AF] opacity-100 peer-checked:opacity-0 transition-opacity pointer-events-none">
+                    {autoMeta.off || 'OFF'}
+                </span>
+                <div className="absolute top-[3px] left-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-[24px] pointer-events-none" />
+            </label>
+        </div>
     )
 }

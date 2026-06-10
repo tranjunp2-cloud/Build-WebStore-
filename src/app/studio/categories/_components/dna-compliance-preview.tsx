@@ -5,6 +5,7 @@
  * Restyled to bundle .comp-* classes.
  */
 import { useState, useEffect } from 'react'
+import { Check, X } from 'lucide-react'
 import { checkCompliance, type CategoryDNA, type ComplianceResult } from '@/lib/admin/dna-compliance'
 
 type TemplateSummary = {
@@ -103,8 +104,14 @@ export function DnaCompliancePreview({ categoryId, dna }: Props) {
                 <div className="comp-result-card">
                     <div className="comp-result-head">
                         <span className="comp-result-name">{selected.name}</span>
-                        <span className={scoreBadgeClass(result.score, result.pass)}>
-                            {result.pass ? '✓ Pass' : '✗ Fail'} — {result.score}/100
+                        <span
+                            className={scoreBadgeClass(result.score, result.pass)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                            {result.pass
+                                ? <Check className="h-3.5 w-3.5" aria-hidden />
+                                : <X className="h-3.5 w-3.5" aria-hidden />}
+                            {result.pass ? 'Pass' : 'Fail'} — {result.score}/100
                         </span>
                     </div>
 

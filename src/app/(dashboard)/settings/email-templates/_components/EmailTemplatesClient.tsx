@@ -222,10 +222,11 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             })
             if (!res.ok) return
             const { subject, html } = await res.json()
-            const win = window.open('', '_blank')
+            const win = window.open('', '_blank', 'noopener,noreferrer')
             if (win) {
+                const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
                 win.document.open()
-                win.document.write(`<!DOCTYPE html><html><head><title>${subject ?? 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${subject ?? ''}</span></div>${html}</body></html>`)
+                win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
                 win.document.close()
             }
         } catch (err) {
@@ -239,6 +240,7 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
         enabled: boolean
     ) {
         const row = findRow(templateType, recipient)
+        const previousEnabled = row?.enabled ?? true  // capture pre-click value for accurate rollback
         // Optimistic update
         setRows((prev) => {
             const existing = prev.find((r) => r.templateType === templateType && r.recipient === recipient)
@@ -274,11 +276,11 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
             if (result.success) {
                 toast.success(enabled ? et.toast.enabled : et.toast.disabled)
             } else {
-                // Revert optimistic update on failure
+                // Revert to pre-click value (not !r.enabled which races under rapid toggles)
                 setRows((prev) =>
                     prev.map((r) =>
                         r.templateType === templateType && r.recipient === recipient
-                            ? { ...r, enabled: !r.enabled }
+                            ? { ...r, enabled: previousEnabled }
                             : r
                     )
                 )

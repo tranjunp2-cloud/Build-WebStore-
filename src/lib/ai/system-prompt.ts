@@ -222,7 +222,7 @@ ${langOverrideRule}- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\
 Follow this general flow but VARY the middle sections:
 1. Navigation — sticky, logo left, CTA button right
 2. Hero — value proposition, primary CTA (ABOVE THE FOLD)
-3. Trust bar (logo-cloud/social-proof) or Features — immediately establish credibility
+3. Trust bar (logo-cloud) or Features — immediately establish credibility
 4-9. MIDDLE SECTION (vary order): features, industry-specific blocks, stats, testimonials, gallery, pricing, FAQ, newsletter, team
 10. Contact + Footer
 
@@ -255,7 +255,7 @@ ORDERING RULES:
 3. Features has 8 variants — do NOT always use "grid-3". Try zigzag, carousel, icon-left, list.
 4. Testimonials has 8 variants — try spotlight, masonry, avatar-row, not just "cards".
 5. Footer has 4 variants — vary between simple, minimal, centered-stack, dark-gradient.
-6. Include at least ONE uncommon block on homepage: before-after, countdown-timer, or social-proof.
+6. Include at least ONE uncommon block on homepage: announcement-bar, feature-comparison, or portfolio-grid.
 7. Block ORDER must vary — do NOT always put features directly after hero.
 8. Ecommerce homepages SHOULD use **product-quick-view** for quick add-to-cart — reserve products-grid for catalog/shop pages.
 

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ClipboardList, HelpCircle, BookOpen, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 export function HelpCenterNav() {
@@ -12,10 +12,10 @@ export function HelpCenterNav() {
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
 
-  const TABS = [
-    { name: t.help.nav.overview, href: '/help' },
-    { name: t.help.nav.qna, href: '/help/qna' },
-    { name: t.help.nav.modules, href: '/help/modules' }
+  const TABS: { name: string; href: string; Icon: LucideIcon }[] = [
+    { name: t.help.nav.overview, href: '/help', Icon: ClipboardList },
+    { name: t.help.nav.qna, href: '/help/qna', Icon: HelpCircle },
+    { name: t.help.nav.modules, href: '/help/modules', Icon: BookOpen }
   ]
 
   const activeTab =
@@ -42,6 +42,7 @@ export function HelpCenterNav() {
                   : 'text-[#9CA3AF] hover:text-white'
               }`}
             >
+              <tab.Icon className="w-4 h-4 shrink-0" aria-hidden />
               {tab.name}
             </Link>
           )
@@ -56,7 +57,10 @@ export function HelpCenterNav() {
           aria-haspopup="listbox"
           aria-expanded={open}
         >
-          <span>{activeTab.name}</span>
+          <span className="flex items-center gap-2">
+            <activeTab.Icon className="w-4 h-4 shrink-0" aria-hidden />
+            {activeTab.name}
+          </span>
           <ChevronDown
             className={`w-4 h-4 text-[#9CA3AF] transition-transform ${open ? 'rotate-180' : ''}`}
           />
@@ -76,12 +80,13 @@ export function HelpCenterNav() {
                     router.push(tab.href)
                     setOpen(false)
                   }}
-                  className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors ${
+                  className={`w-full flex items-center gap-2 text-left px-4 py-3 text-sm font-semibold transition-colors ${
                     isActive
                       ? 'text-blue-400 bg-blue-500/10'
                       : 'text-[#9CA3AF] hover:text-white hover:bg-[#1F2937]'
                   }`}
                 >
+                  <tab.Icon className="w-4 h-4 shrink-0" aria-hidden />
                   {tab.name}
                 </button>
               )

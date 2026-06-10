@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import {
   Sparkles,
@@ -26,6 +26,10 @@ import {
   DollarSign,
   Palette,
   Package,
+  Bot,
+  BarChart3,
+  Link2,
+  Zap,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -74,23 +78,25 @@ export default function HomePage() {
   const { t } = useI18n()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const featureItems = [
-    { icon: '🤖', ...t.features.items.aiGeneration },
-    { icon: '🧩', ...t.features.items.dragDrop },
-    { icon: '🔍', ...t.features.items.seo },
-    { icon: '🎨', ...t.features.items.templates },
-    { icon: '🌐', ...t.features.items.domains },
-    { icon: '📦', ...t.features.items.ecommerce },
-    { icon: '📊', ...t.features.items.analytics },
-    { icon: '🔗', ...t.features.items.integration },
-    { icon: '⚡', ...t.features.items.performance },
+    { Icon: Bot, ...t.features.items.aiGeneration },
+    { Icon: LayoutGrid, ...t.features.items.dragDrop },
+    { Icon: Search, ...t.features.items.seo },
+    { Icon: LayoutTemplate, ...t.features.items.templates },
+    { Icon: Globe, ...t.features.items.domains },
+    { Icon: ShoppingBag, ...t.features.items.ecommerce },
+    { Icon: BarChart3, ...t.features.items.analytics },
+    { Icon: Link2, ...t.features.items.integration },
+    { Icon: Zap, ...t.features.items.performance },
   ]
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900">
+    // font-heading default (Outfit) has no Vietnamese subset → headings break on VN text.
+    // Scope the marketing page to Manrope (already loaded, has 'vietnamese' subset).
+    <div className="min-h-screen bg-white text-zinc-900" style={{ '--font-heading': 'var(--font-manrope)' } as CSSProperties}>
       {/* ═══ Navigation ═══ */}
       <nav
         className="fixed top-0 w-full z-50 border-b border-zinc-200/80 bg-white/80 backdrop-blur-xl backdrop-saturate-150"
-        aria-label="Menu chính"
+        aria-label={t.landing.menuAria}
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
@@ -230,7 +236,7 @@ export default function HomePage() {
                     <div className="w-6 h-6 rounded-lg bg-sky-500 flex items-center justify-center">
                       <Sparkles className="w-3.5 h-3.5 text-white" />
                     </div>
-                    <span className="text-zinc-500 text-sm">Bộ ứng dụng</span>
+                    <span className="text-zinc-500 text-sm">{t.landing.heroDemo.appSuite}</span>
                     <span className="text-zinc-800 font-semibold text-sm">
                       Website & Marketing
                     </span>
@@ -261,7 +267,7 @@ export default function HomePage() {
                     <div className="ml-10 min-h-[280px] bg-white">
                       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-200 bg-zinc-50">
                         <span className="text-sm font-medium text-zinc-700">
-                          PrimeWeb · Trang chủ
+                          {t.landing.heroDemo.homeCrumb}
                         </span>
                         <div className="flex gap-1">
                           <span className="w-2 h-2 rounded-full bg-red-400" />
@@ -273,18 +279,17 @@ export default function HomePage() {
                         <div className="flex flex-col sm:flex-row gap-4 items-start">
                           <div className="flex-1">
                             <h3 className="text-zinc-800 font-bold text-lg mb-1">
-                              Trải nghiệm website chuyên nghiệp
+                              {t.landing.heroDemo.experienceTitle}
                             </h3>
                             <p className="text-zinc-500 text-sm mb-3">
-                              Tạo bằng AI trong 5 phút. Chỉnh sửa kéo thả, xuất
-                              bản ngay.
+                              {t.landing.heroDemo.experienceDesc}
                             </p>
                             <div className="flex gap-2">
                               <span className="inline-block px-3 py-1.5 rounded-lg bg-sky-500 text-white text-xs font-medium">
-                                Xem chi tiết
+                                {t.landing.heroDemo.viewDetails}
                               </span>
                               <span className="inline-block px-3 py-1.5 rounded-lg border border-zinc-300 text-zinc-600 text-xs font-medium">
-                                Dùng thử
+                                {t.landing.heroDemo.tryIt}
                               </span>
                             </div>
                           </div>
@@ -303,25 +308,26 @@ export default function HomePage() {
                         <Check className="w-4 h-4 text-white" />
                       </div>
                       <span className="text-sm font-semibold text-zinc-800">
-                        Đã xác nhận
+                        {t.landing.heroDemo.confirmed}
                       </span>
                     </div>
                     <div className="space-y-1.5 text-xs text-zinc-600">
                       <p>
-                        <span className="text-zinc-400">Tên khách hàng:</span>{' '}
-                        Nguyễn Văn A
+                        <span className="text-zinc-400">{t.landing.heroDemo.customerLabel}</span>{' '}
+                        {t.landing.heroDemo.customerSample}
                       </p>
                       <p>
-                        <span className="text-zinc-400">SĐT:</span> 0901 234 567
+                        <span className="text-zinc-400">{t.landing.heroDemo.phoneLabel}</span>{' '}
+                        {t.landing.heroDemo.phoneSample}
                       </p>
                       <p>
                         <span className="text-zinc-400">Email:</span>{' '}
                         email@example.com
                       </p>
                       <p>
-                        <span className="text-zinc-400">Tổng tiền:</span>{' '}
+                        <span className="text-zinc-400">{t.landing.heroDemo.totalLabel}</span>{' '}
                         <span className="font-semibold text-zinc-800">
-                          1.250.000đ
+                          {t.landing.heroDemo.totalSample}
                         </span>
                       </p>
                     </div>
@@ -338,11 +344,11 @@ export default function HomePage() {
                         <Sparkles className="w-4 h-4 text-sky-500" />
                       </div>
                       <span className="text-xs font-semibold text-zinc-800">
-                        AI đã tạo xong
+                        {t.landing.heroDemo.aiDone}
                       </span>
                     </div>
                     <p className="text-[11px] text-zinc-500">
-                      Website của bạn đã sẵn sàng. Xuất bản ngay?
+                      {t.landing.heroDemo.readyPublish}
                     </p>
                   </div>
                 </div>
@@ -363,10 +369,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <SectionHeader
             id="nen-tang-title"
-            label="Nền tảng"
-            title="Một nền tảng vận hành kinh doanh"
-            subtitle="Từ thu hút khách hàng, bán hàng đến vận hành nội bộ — PrimeWeb giúp doanh nghiệp quản lý trọn vẹn trên một hệ thống duy nhất."
-            titleHighlight="xuyên suốt"
+            label={t.landing.platform.label}
+            title={t.landing.platform.title}
+            subtitle={t.landing.platform.subtitle}
+            titleHighlight={t.landing.platform.titleHighlight}
           />
           {/* Đường sóng nối 3 icon (LadiPage style) */}
           <div className="relative flex flex-col md:flex-row md:items-start justify-between gap-8 md:gap-4 max-w-4xl mx-auto mb-12">
@@ -380,9 +386,9 @@ export default function HomePage() {
               />
             </svg>
             {[
-              { icon: ShoppingBag, title: 'Website & Bán hàng', desc: 'Landing Page tối ưu chuyển đổi, trang bán hàng tích hợp thanh toán trực tuyến và AI tối ưu SEO.' },
-              { icon: Users, title: 'Quản lý khách hàng', desc: 'Quản lý khách hàng tập trung, chăm sóc qua đa kênh và theo dõi doanh thu theo thời gian thực.' },
-              { icon: Settings, title: 'Vận hành tinh gọn', desc: 'Quản lý công việc theo phòng ban, chuẩn hóa quy trình và theo dõi hiệu suất vận hành.' },
+              { icon: ShoppingBag, ...t.landing.platform.pillars.website },
+              { icon: Users, ...t.landing.platform.pillars.customers },
+              { icon: Settings, ...t.landing.platform.pillars.operations },
             ].map((item, i) => (
               <div key={i} className="relative flex flex-col items-center text-center md:flex-1">
                 <div className="w-16 h-16 rounded-full bg-sky-100 flex items-center justify-center mb-4 border-2 border-sky-200">
@@ -398,7 +404,7 @@ export default function HomePage() {
               href="#san-pham"
               className="inline-flex items-center justify-center rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-8 py-4 transition-colors"
             >
-              Khám phá hệ sinh thái PrimeWeb
+              {t.landing.platform.cta}
             </Link>
           </div>
         </div>
@@ -415,24 +421,19 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <SectionHeader
             id="san-pham-title"
-            label="Sản phẩm"
-            title="Giải pháp toàn diện cho hành trình tăng trưởng"
-            subtitle="Thiết kế đẹp, AI tạo nhanh, tối ưu mọi thiết bị và SEO."
+            label={t.landing.product.label}
+            title={t.landing.product.title}
+            subtitle={t.landing.product.subtitle}
           />
           {/* Card lớn 2 cột: trái list + phải builder mockup (LadiPage style) */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-xl overflow-hidden mb-16">
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="p-8 lg:p-10 flex flex-col justify-center">
                 <h3 className="text-2xl font-heading font-bold text-zinc-900 mb-6">
-                  Landing Page & Website chuyển đổi cao
+                  {t.landing.product.hero.title}
                 </h3>
                 <ul className="space-y-3 mb-6">
-                  {[
-                    'Thiết kế đẹp, kéo thả nhanh, tối ưu mọi thiết bị',
-                    'Tải trang nhanh, chuẩn SEO',
-                    'Hơn 900+ mẫu Landing Page sẵn sàng sử dụng',
-                    'Đồng bộ dữ liệu đa kênh từ form về hệ thống lưu trữ',
-                  ].map((item, i) => (
+                  {t.landing.product.hero.points.map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-zinc-600 text-sm">
                       <span className="text-sky-500 shrink-0 mt-0.5">■</span>
                       {item}
@@ -441,25 +442,25 @@ export default function HomePage() {
                 </ul>
                 <div className="flex flex-wrap gap-2 mb-6">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 text-sky-700 px-3 py-1 text-xs font-medium">
-                    <LayoutTemplate className="w-3.5 h-3.5" /> Landing Page
+                    <LayoutTemplate className="w-3.5 h-3.5" /> {t.landing.product.hero.tagLanding}
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 text-sky-700 px-3 py-1 text-xs font-medium">
-                    <Globe className="w-3.5 h-3.5" /> Website Builder
+                    <Globe className="w-3.5 h-3.5" /> {t.landing.product.hero.tagBuilder}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <Link href="/login" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 text-sm transition-colors">
-                    Xem chi tiết
+                    {t.landing.product.hero.detailLink}
                   </Link>
                   <Link href="/login" className="text-sky-600 font-medium text-sm hover:text-sky-700 inline-flex items-center gap-1">
-                    Dùng thử miễn phí →
+                    {t.landing.product.hero.tryFree} →
                   </Link>
                 </div>
               </div>
               <div className="relative min-h-[320px] bg-zinc-100 border-l border-zinc-200">
                 <div className="absolute top-3 left-3 right-3 h-8 rounded-lg bg-sky-100 flex items-center px-3 gap-2">
                   <LayoutTemplate className="w-4 h-4 text-sky-600" />
-                  <span className="text-xs font-medium text-sky-700">Thư viện mẫu</span>
+                  <span className="text-xs font-medium text-sky-700">{t.landing.product.hero.mockupLabel}</span>
                 </div>
                 <div className="absolute left-0 top-12 bottom-0 w-10 bg-zinc-800 flex flex-col items-center py-2 gap-1">
                   {[LayoutGrid, Type, Image, Star, Layers].map((Icon, i) => (
@@ -487,47 +488,22 @@ export default function HomePage() {
             {[
               {
                 icon: Sparkles,
-                title: 'AI Website Builder',
-                items: [
-                  'Chat với AI, mô tả doanh nghiệp → website hoàn chỉnh trong vài phút',
-                  'Hơn 900+ mẫu block: Hero, Giới thiệu, Sản phẩm, Liên hệ...',
-                  'Kéo thả chỉnh sửa, tối ưu mọi thiết bị',
-                  'Chuẩn SEO, tải trang nhanh',
-                ],
-                cta: 'Dùng thử miễn phí',
+                ...t.landing.product.blocks.aiBuilder,
                 href: '/register',
               },
               {
                 icon: LayoutTemplate,
-                title: 'Template & Editor',
-                items: [
-                  'Nhiều mẫu theo ngành: Bán lẻ, F&B, Tuyển sinh, Portfolio',
-                  'Chỉnh sửa trực quan, sửa inline từng block',
-                  'Xuất bản một click, subdomain hoặc tên miền riêng',
-                ],
-                cta: 'Xem bộ sưu tập',
+                ...t.landing.product.blocks.templateEditor,
                 href: '/templates',
               },
               {
                 icon: ShoppingBag,
-                title: 'Trang bán hàng & Thanh toán',
-                items: [
-                  'Sản phẩm, giỏ hàng, thanh toán trực tuyến',
-                  'Đa phương thức thanh toán, đơn vị vận chuyển',
-                  'AI viết mô tả sản phẩm, tối ưu SEO',
-                ],
-                cta: 'Bắt đầu bán hàng',
+                ...t.landing.product.blocks.salesPayment,
                 href: '/register',
               },
               {
                 icon: Search,
-                title: 'SEO & Phân tích',
-                items: [
-                  'Điểm SEO từng trang, AI gợi ý sửa meta',
-                  'JSON-LD, sitemap tự động',
-                  'Dashboard theo dõi đơn hàng, doanh thu',
-                ],
-                cta: 'Tối ưu ngay',
+                ...t.landing.product.blocks.seoAnalytics,
                 href: '/register',
               },
             ].map((block, i) => (
@@ -575,8 +551,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <SectionHeader
             id="giai-phap-title"
-            title="Nền tảng toàn diện đáp ứng mọi lĩnh vực kinh doanh"
-            subtitle="Tùy biến theo đặc thù từng ngành để triển khai chiến lược vận hành hiệu quả."
+            title={t.landing.solutions.title}
+            subtitle={t.landing.solutions.subtitle}
           />
           <SolutionTabs />
         </div>
@@ -593,16 +569,16 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <SectionHeader
             id="tai-sao-title"
-            title="Tại sao nên chọn PrimeWeb?"
-            subtitle="Nền tảng Website AI hàng đầu Việt Nam, tiên phong tạo website bằng AI và vận hành Marketing & Sales toàn diện."
+            title={t.landing.why.title}
+            subtitle={t.landing.why.subtitle}
           />
           {/* 4 số liệu (LadiPage style) */}
           <div className="flex flex-wrap justify-center gap-8 md:gap-12 mb-16 py-8 border-y border-zinc-200">
             {[
-              { value: '10,000+', label: 'Khách hàng sử dụng' },
-              { value: '50,000+', label: 'Website được xuất bản' },
-              { value: '900+', label: 'Mẫu block sẵn sàng' },
-              { value: '5 phút', label: 'Tạo website bằng AI' },
+              t.landing.why.stats.customers,
+              t.landing.why.stats.published,
+              t.landing.why.stats.blocks,
+              t.landing.why.stats.speed,
             ].map((stat, i) => (
               <div key={i} className="text-center">
                 <p className="text-2xl md:text-3xl font-heading font-bold text-sky-600">{stat.value}</p>
@@ -613,12 +589,12 @@ export default function HomePage() {
           {/* 6 thẻ 2x3, bullet hình thoi xanh */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { title: 'Dễ dùng — triển khai nhanh', points: ['Thiết kế chỉ cần kéo thả', 'Không cần biết code', 'Rút ngắn thời gian triển khai'] },
-              { title: 'Kết nối dữ liệu liền mạch', points: ['Thu dữ liệu từ đa kênh về 1 nơi', 'Kết nối form, email và nhiều kênh khác'] },
-              { title: 'Bảo mật cao, vận hành ổn định', points: ['Hạ tầng bảo mật, tối ưu hiệu suất', 'Giao diện thân thiện, mọi thiết bị'] },
-              { title: 'Nội dung của bạn', points: ['Editor trực quan, chỉnh sửa nhanh', 'AI gợi ý mô tả, SEO'] },
-              { title: 'Tương tác và tự động hóa', points: ['Tương tác khách hàng đa kênh', 'Nuôi dưỡng xuyên suốt hành trình', 'Tự động hóa tác vụ'] },
-              { title: 'AI toàn diện', points: ['Tạo website bằng chat', 'AI viết mô tả, tối ưu SEO', 'Tự động hóa nội dung'] },
+              t.landing.why.cards.easyToUse,
+              t.landing.why.cards.dataSync,
+              t.landing.why.cards.security,
+              t.landing.why.cards.yourContent,
+              t.landing.why.cards.automation,
+              t.landing.why.cards.fullAi,
             ].map((block, i) => (
               <div key={i} className="p-6 rounded-2xl border border-zinc-200 bg-white shadow-sm hover:shadow-md hover:border-sky-200 transition-all">
                 <h3 className="font-heading font-bold text-zinc-900 mb-4">{block.title}</h3>
@@ -653,7 +629,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featureItems.map((feature, i) => (
               <div key={i} className="group p-8 rounded-2xl border border-zinc-200 bg-white shadow-sm hover:shadow-md hover:border-sky-200 transition-all">
-                <div className="text-3xl mb-4">{feature.icon}</div>
+                <div className="text-sky-600 mb-4"><feature.Icon className="w-8 h-8" aria-hidden /></div>
                 <h3 className="text-lg font-heading font-bold text-zinc-900 mb-2 group-hover:text-sky-600 transition-colors">{feature.title}</h3>
                 <p className="text-zinc-600 text-sm leading-relaxed">{feature.desc}</p>
               </div>
@@ -673,19 +649,19 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <SectionHeader
             id="tinh-nang-title"
-            label="Tính năng"
-            title="Mọi thứ bạn cần để"
-            subtitle="Từ tạo website bằng AI đến chỉnh sửa kéo thả — tất cả trên một nền tảng."
-            titleHighlight="Xây dựng & Phát triển"
+            label={t.landing.featuresGrid.label}
+            title={t.landing.featuresGrid.title}
+            subtitle={t.landing.featuresGrid.subtitle}
+            titleHighlight={t.landing.featuresGrid.titleHighlight}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { Icon: Sparkles, title: 'Tạo website bằng AI', desc: 'Mô tả doanh nghiệp bằng ngôn ngữ tự nhiên, AI tạo website hoàn chỉnh trong vài giây.', accent: 'sky' },
-              { Icon: LayoutTemplate, title: 'Editor kéo thả', desc: 'Tùy chỉnh từng block: Hero, Giới thiệu, Sản phẩm, Liên hệ và nhiều hơn.', accent: 'emerald' },
-              { Icon: Search, title: 'Chuẩn SEO', desc: 'Server-side rendering, Google index đầy đủ, dữ liệu có cấu trúc sẵn.', accent: 'violet' },
-              { Icon: Palette, title: 'Mẫu đẹp sẵn', desc: 'Nhiều template theo ngành: nhà hàng, bán lẻ, portfolio, blog.', accent: 'amber' },
-              { Icon: Globe, title: 'Tên miền riêng', desc: 'Kết nối tên miền của bạn trong vài phút. SSL miễn phí.', accent: 'blue' },
-              { Icon: Package, title: 'Sẵn sàng bán hàng', desc: 'Sản phẩm, giỏ hàng, thanh toán — tích hợp sẵn.', accent: 'rose' },
+              { Icon: Sparkles, ...t.landing.featuresGrid.items.aiCreate, accent: 'sky' },
+              { Icon: LayoutTemplate, ...t.landing.featuresGrid.items.dragDrop, accent: 'emerald' },
+              { Icon: Search, ...t.landing.featuresGrid.items.seo, accent: 'violet' },
+              { Icon: Palette, ...t.landing.featuresGrid.items.templates, accent: 'amber' },
+              { Icon: Globe, ...t.landing.featuresGrid.items.domain, accent: 'blue' },
+              { Icon: Package, ...t.landing.featuresGrid.items.sales, accent: 'rose' },
             ].map((f, i) => (
               <div
                 key={i}
@@ -764,7 +740,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="absolute animate-float -top-2 right-4 w-44 rounded-xl bg-white shadow-xl p-4 text-zinc-800">
-                <p className="text-xs font-semibold text-zinc-500 mb-1">Tối ưu chi phí vận hành</p>
+                <p className="text-xs font-semibold text-zinc-500 mb-1">{t.landing.ctaBadge}</p>
                 <p className="text-2xl font-bold">8,476</p>
                 <p className="text-xs text-green-600 flex items-center gap-1">
                   <TrendingUp className="w-3.5 h-3.5" /> 103,45%
