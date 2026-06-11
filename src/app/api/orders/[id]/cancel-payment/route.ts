@@ -6,6 +6,7 @@ import { cookies } from 'next/headers'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -81,6 +82,10 @@ export async function POST(request: Request, ctx: RouteContext) {
             { status: 409 },
         )
     }
+
+    // Release the redeemed discount slot (F33) — runs only on the CAS winner. No-op for a Stripe
+    // order still pending (redemption happens at reconcile, so no history row exists yet).
+    await releaseDiscountRedemption(payload, Number(order.id))
 
     // Restock inventory for each order line — stock was decremented at checkout.
     // restockItem is variant-aware and atomic; never throws (returns skipped result on failure).

@@ -143,6 +143,9 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
+                                discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
@@ -170,7 +173,8 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
-                                discountAmount: (order as any).discountAmount ?? null,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
                                 discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
@@ -199,6 +203,9 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
+                                discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod ?? 'cod',

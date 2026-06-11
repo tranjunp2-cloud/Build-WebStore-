@@ -363,6 +363,23 @@ export const Orders: CollectionConfig = {
             type: 'textarea',
             admin: { description: 'Required reason when order is cancelled' },
         },
+        // --- Discount ---
+        {
+            name: 'discount',
+            type: 'relationship',
+            relationTo: 'discounts',
+            admin: { readOnly: true, description: 'Applied discount code record' },
+        },
+        {
+            name: 'discountCode',
+            type: 'text',
+            admin: { readOnly: true, description: 'Snapshot of discount code at time of order' },
+        },
+        {
+            name: 'discountAmount',
+            type: 'number',
+            admin: { readOnly: true, description: 'Discount amount in sen' },
+        },
         // --- Stripe card details (for confirm-page "Method" line) ---
         {
             name: 'cardBrand',

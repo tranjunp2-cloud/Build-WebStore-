@@ -122,6 +122,42 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### F33 — Discount CMS Dashboard UI (Phase 2: Form + Usage History + Stripe Bugfix)
+
+**Dashboard discount create/edit form + cross-tenant usage history page + stripe-checkout free-order bugfix.**
+
+**Code changes (Phase 2 UI + API integration):**
+- New: `src/app/(dashboard)/discounts/new/page.tsx` (RSC create discount page, server-side redirect)
+- New: `src/app/(dashboard)/discounts/[id]/page.tsx` (RSC edit discount page, server-side fetch + error handling)
+- New: `src/app/(dashboard)/discounts/usage-history/page.tsx` (S4 global usage history page, date range filtering)
+- New: `src/app/api/v1/discounts/usage-history/route.ts` (GET cross-discount usage history, tenant-scoped, paginated, sortable)
+- New: `src/app/(dashboard)/discounts/_components/discount-form.tsx` (client form component, edit/create branch logic)
+- New: `src/app/(dashboard)/discounts/_components/discount-form-fields.tsx` (code, type, value, dates, limits fields with validation)
+- New: `src/app/(dashboard)/discounts/_components/discount-form-header.tsx` (header with back button + page title)
+- New: `src/app/(dashboard)/discounts/_components/discount-delete-dialog.tsx` (async delete with success toast)
+- New: `src/app/(dashboard)/discounts/_components/discounts-usage-history-layout.tsx` (client layout with date pickers, table, pagination)
+
+**Bug fix:**
+- **fix(orders): stripe-checkout free-order detection** — `src/app/api/orders/stripe-checkout/route.ts` removed premature `Math.max(0, subtotal - discountRM)` clamping that broke the `total <= 0` check (TC-F13.103). Now correctly detects free orders when discount eliminates cost, enabling COD zero-charge checkout without Stripe session.
+
+**Integration:**
+- Discount form wired to `PATCH /api/v1/discounts/{id}` (update) + `POST /api/v1/discounts` (create)
+- Usage history endpoint scoped to tenant, supports date-range filtering (startsAt/endsAt), pagination (limit/offset), sorting (by usage/date)
+- Form validation matches backend: code 3–50 chars alphanumeric+hyphen, type enum, value bounds, date logic (startsAt < expiresAt)
+- Delete action calls `DELETE /api/v1/discounts/{id}` (soft-delete via beforeDelete hook)
+
+**UX:**
+- Create: empty form, POST to `/api/v1/discounts`, redirect to edit page on success
+- Edit: pre-fill form from `PATCH`, show current usage count + limit meter, delete button with confirmation dialog
+- Usage history: sortable table (order ID, code, discount amount, order total, customer, date), date range filters, per-page limit (25/50/100)
+
+**Non-breaking:**
+- Phase 1 discount list page behavior unchanged
+- Existing orders unaffected; new usage history rows only on fresh orders
+- Stripe checkout correctly handles free-cost orders with or without discount code
+
+**Related:** `docs/qa/F33-discounts.md` (usage history TCs), `docs/prd/F33-discounts.md` (phase 2 spec)
+
 ### GH-1099 — Remove Dead `oversellReview` Flag (US-F13-06 Rework)
 
 **Decision:** Decrement-upfront architecture makes oversell-after-capture impossible; `oversellReview` flag is dead code.
@@ -251,6 +287,73 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 **Tests:** New TC-F10-02-20 added to `src/__tests__/api/orders-checkout.test.ts` covering variant deletion mid-decrement scenario. All 48 tests pass (orders-checkout: 33, orders-cancel: 15).
 
 **Impact:** Race condition now has clear, actionable UX feedback. Type safety improved.
+
+---
+
+### F33 — Discount CMS Dashboard UI (Phase 1: List Page)
+
+**Dashboard discount list page** with sortable table, search, filters, status badge, and usage meter.
+
+**Code changes (Phase 1 UI):**
+- New: `src/lib/discounts/format.ts` (formatting utilities: fmtRM, fmtValue, fmtDate)
+- New: `src/app/(dashboard)/discounts/page.tsx` (RSC shell, force-dynamic)
+- New: `src/app/(dashboard)/discounts/_components/discounts-client-layout.tsx` (client orchestration)
+- New: `src/app/(dashboard)/discounts/_components/discounts-toolbar.tsx` (search + filters + buttons)
+- New: `src/app/(dashboard)/discounts/_components/discounts-table.tsx` (sortable table with type/status/usage cols)
+- New: `src/app/(dashboard)/discounts/_components/discount-status-badge.tsx` (status pill component)
+- New: `src/app/(dashboard)/discounts/_components/discount-usage-meter.tsx` (count/limit progress bar)
+- Modified: `src/components/dashboard/Sidebar.tsx` (add Discounts nav item with children after Orders)
+- Modified: `src/components/editor/EditorMenuDrawer.tsx` (same nav item)
+- Modified: `src/app/api/v1/discounts/route.ts` (add type filter param, sort allowlist, parseInt NaN guard)
+
+---
+
+### F33 — Discount CMS Backend (Phases 1–5 complete)
+
+**Overview:** Discount code engine with admin CRUD API and storefront preview. Supports percentage + fixed discounts, usage limits, date-based activation/expiry, per-tenant isolation, and server-side recomputation at order time.
+
+**Phases 1–4 (Implementation):**
+- **Phase 1:** `applyDiscount()` pure function, Zod validation, Discounts + DiscountUsageHistory collections, DB migrations
+- **Phase 2:** Admin REST API (`POST /api/v1/discounts`, `GET /api/v1/discounts`, `PATCH /api/v1/discounts/:id`)
+- **Phase 3:** Storefront preview endpoint (`POST /api/storefront/discounts/apply`) with rate-limiting (20 req/60s), silent-reject (no reason leakage)
+- **Phase 4:** Order integration — server-side recomputation, usage history row creation, checkout field binding
+
+**Phase 5 (Tests only — this phase):**
+- Unit tests: `src/__tests__/unit/discounts/apply-discount.test.ts` (9 tests, TC-F33-01..09)
+- Unit tests: `src/__tests__/unit/discounts/discount-validation.test.ts` (validates Zod schema, code format, value bounds)
+- Integration tests: `src/__tests__/integration/discounts/discounts-api.test.ts` (4 tests, TC-F33-10..13, 20..23)
+- All tests use TC-IDs from `docs/qa/F33-discounts.md` (22 TCs total, 21 AUTO, 1 MANUAL)
+- All 22 tests passing; 100% coverage on discount modules
+
+**Code changes (Phases 1–4):**
+- New: `src/collections/Discounts.ts`, `src/collections/DiscountUsageHistory.ts` (schema + tenant-scoped access)
+- New: `src/lib/discounts/apply-discount.ts` (pure engine, 9 guard checks), `src/lib/validations/discounts.ts` (Zod)
+- New: `src/app/api/v1/discounts/route.ts` (CRUD, 201/409/403/400 guards)
+- New: `src/app/api/storefront/discounts/apply/route.ts` (public preview, rate-limited, silent-reject)
+- Modified: `src/collections/Orders.ts` (discount_code FK, discountSen field)
+- Modified: `src/app/api/orders/checkout/route.ts`, `/stripe-checkout/route.ts` (recompute discount server-side)
+- Modified: `scripts/db-setup.js` (6 migrations: discounts table, usage-history table, FK, indices, fields)
+
+**Key properties:**
+- **Discount types:** percentage (0–100) | fixed (0–999,999,999 sen)
+- **Validation:** code (3–50 chars, alphanumeric + hyphen), dates (startsAt < expiresAt), rates (0 ≤ value ≤ max)
+- **Clamping:** discount amount never exceeds subtotal; final total ≥ 0
+- **Tenant isolation:** (tenant_id, upper(code)) unique; cross-tenant blocked; case-insensitive lookup
+- **Usage tracking:** usageCount incremented on order creation (idempotent; duplicate orders don't double-count)
+- **Backward compatible:** existing orders unchanged; preview API returns silent reject (no reason leak)
+
+**Security:**
+- Server-side recomputation: client-sent discount amounts never trusted
+- Critical guard order: not-found → expired → not-started → inactive → at-limit → wrong-tenant
+- Storefront API always returns HTTP 200 (no 4xx for invalid codes), preventing enumeration attacks
+- IDOR prevention: all queries scoped to tenant + authenticated user
+
+**Non-breaking:**
+- No changes to existing order fields or checkout UX
+- Discount feature opt-in per order; NULL code allowed
+- All tests pass; zero regression in adjacent modules
+
+**Related:** `docs/qa/F33-discounts.md` (22 TCs + coverage notes), `docs/prd/F33-discounts.md` (phase specs)
 
 ---
 

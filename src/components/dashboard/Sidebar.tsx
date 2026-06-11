@@ -38,6 +38,7 @@ import {
     Menu,
     X,
     ChevronDown,
+    Percent,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -88,6 +89,16 @@ const NAV_ITEMS: NavItemConfig[] = [
         icon: ShoppingCart,
         href: '/orders',
         permissionId: 'orders',
+    },
+    {
+        label: { en: 'Discounts', ms: 'Diskaun' },
+        icon: Percent,
+        href: '/discounts',
+        permissionId: 'orders',
+        children: [
+            { label: { en: 'Discount codes', ms: 'Kod diskaun' }, href: '/discounts' },
+            { label: { en: 'Usage history', ms: 'Sejarah penggunaan' }, href: '/discounts/usage-history' },
+        ],
     },
     {
         label: { en: 'Customers', ms: 'Pelanggan' },

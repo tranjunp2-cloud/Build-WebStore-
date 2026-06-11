@@ -10,6 +10,7 @@ import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import type { User } from 'payload'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -173,6 +174,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 { status: 400 })
         }
         // --- refund financially committed via CAS; restock is best-effort ---
+        // Release the redeemed discount slot (F33) — refund frees the promo seat like cancel does.
+        // Runs only on the CAS winner; idempotent + non-throwing (no-op when the order never redeemed).
+        await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
         if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
@@ -260,7 +264,10 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             { stripeAccount: stripeAccountId, idempotencyKey: `refund-${id}` },
         )
 
-        // Restock ONLY after Stripe irreversibly succeeds — retry-safe (CAS blocks 2nd refund).
+        // Restock + discount-slot release ONLY after Stripe irreversibly succeeds — retry-safe
+        // (CAS blocks 2nd refund). Releasing earlier would leak a slot if Stripe fails and the
+        // status rolls back below. releaseDiscountRedemption is idempotent + non-throwing.
+        await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
         if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: refund.id }, restock: restockResults })
@@ -269,6 +276,8 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // Covers the network-timeout case where Stripe processed the refund but our request timed out.
         // CAS + idempotencyKey prevent any double-charge.
         if (err?.code === 'charge_already_refunded') {
+            // Refund exists on Stripe → same irreversible-success semantics: release + restock.
+            await releaseDiscountRedemption(payload, Number(order.id))
             const restockResults = await runRestockForItems(order.items)
             if (canSendRefundEmail) void fireRefundEmail()
             return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })

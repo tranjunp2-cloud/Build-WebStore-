@@ -46,15 +46,6 @@ export function validateCheckoutForm(form: CheckoutForm): { valid: boolean; erro
     return { valid: errors.length === 0, errors }
 }
 
-const SST_RATE = 0.06
-
-export function calculateOrderTotals(items: Array<{ price: number; quantity: number }>) {
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const tax = Math.round(subtotal * SST_RATE * 100) / 100
-    const total = subtotal + tax
-    return { subtotal, tax, total }
-}
-
 export function generateOrderNumber(): string {
     return `ORD-${Date.now().toString(36).toUpperCase()}`
 }

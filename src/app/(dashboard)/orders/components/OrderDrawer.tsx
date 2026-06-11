@@ -176,14 +176,24 @@ export function OrderDrawer({
                             <span>{o.drawer.subtotal}</span>
                             <span>{formatPrice(order.subtotal, order.currency)}</span>
                         </div>
+                        {/* Discount line — snapshot in sen → /100 for RM (F33) */}
+                        {(order.discountAmount ?? 0) > 0 && (
+                            <div className="flex justify-between text-emerald-400">
+                                <span>Discount{order.discountCode ? ` (${order.discountCode})` : ''}</span>
+                                <span>−{formatPrice((order.discountAmount ?? 0) / 100, order.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-gray-400">
                             <span>{o.drawer.shipping}</span>
                             <span>{formatPrice(order.shippingFee || 0, order.currency)}</span>
                         </div>
-                        <div className="flex justify-between text-gray-400">
-                            <span>{o.drawer.tax}</span>
-                            <span>{formatPrice(order.tax, order.currency)}</span>
-                        </div>
+                        {/* SST removed at checkout (F33 phase-06) — show only for historical orders that carried tax */}
+                        {order.tax > 0 && (
+                            <div className="flex justify-between text-gray-400">
+                                <span>{o.drawer.tax}</span>
+                                <span>{formatPrice(order.tax, order.currency)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between pt-2 mt-2 border-t border-white/10 font-bold text-white text-base">
                             <span>{o.drawer.total}</span>
                             <span>{formatPrice(order.total, order.currency)}</span>

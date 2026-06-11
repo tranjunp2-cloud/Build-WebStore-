@@ -41,6 +41,13 @@ vi.mock('@/lib/orders/upload-token', () => ({
     generateConfirmToken: vi.fn(() => 'mock-confirm-token'),
     verifyConfirmToken: vi.fn(() => true),
 }))
+// Q7: the COD/bank_transfer path must delegate redemption to the idempotent helper (single writer,
+// ON CONFLICT (order_id)). We mock it here to assert the route WIRES it correctly; the helper's own
+// idempotency is unit-tested in record-discount-redemption.test.ts [TC-F33-10-07].
+const mockRecordRedemption = vi.fn(() => Promise.resolve({ recorded: true }))
+vi.mock('@/lib/discounts/record-discount-redemption', () => ({
+    recordDiscountRedemption: (...args: any[]) => mockRecordRedemption(...args),
+}))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -173,7 +180,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(body.error.code).toBe('OUT_OF_STOCK')
     })
 
-    it('calculates SST 6% tax', async () => {
+    it('[F33 phase-06] no SST tax added to total', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
             .mockResolvedValueOnce(MOCK_TENANT)
@@ -184,7 +191,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }] }))
         const body = await res.json()
 
-        expect(body.data.total).toBe(114) // 100 subtotal + 8 shipping (Selangor/west default) + 6 SST
+        expect(body.data.total).toBe(108) // 100 subtotal + 8 shipping (Selangor/west default), SST removed (phase-06)
     })
 
     it('[TC-F14.02 integration] Sabah → east rate RM 15 applied to order total', async () => {
@@ -204,7 +211,7 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const data = await res.json()
 
         expect(res.status).toBe(200)
-        expect(data.data.total).toBe(121) // 100 sub + 15 ship (east default) + 6 SST
+        expect(data.data.total).toBe(115) // 100 sub + 15 ship (east default), SST removed (phase-06)
     })
 
     it('[TC-F14.06 integration] shippingFee=0 when subtotal meets freeAbove threshold', async () => {
@@ -223,7 +230,109 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const data = await res.json()
 
         expect(res.status).toBe(200)
-        expect(data.data.total).toBe(106) // 100 sub + 0 ship (free) + 6 SST
+        expect(data.data.total).toBe(100) // 100 sub + 0 ship (free), SST removed (phase-06)
+    })
+
+    it('[TC-F33-35 integration] discount drops subtotal below freeAbove → shipping charged', async () => {
+        const siteWithConfig = {
+            id: 'site-1', tenant: 'tenant-1',
+            shippingConfig: { enabled: true, westRate: 800, eastRate: 1500, freeAbove: 10_000 },
+        }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithConfig)
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 120, inventory: 10 })) // subtotal=120 → 12000 sen ≥ freeAbove
+            .mockResolvedValueOnce({ // discounts find: 30% off → 3600 sen → effective 8400 sen < freeAbove
+                docs: [{ id: 5, code: 'SAVE30', type: 'percentage', value: 30, status: 'active', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'SAVE30' }))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data.total).toBe(92) // max(0, 120 − 36) + 8 west ship — free-ship lost after discount
+    })
+
+    it('[TC-F33-36 integration] discount but subtotal still ≥ freeAbove → free ship kept', async () => {
+        const siteWithConfig = {
+            id: 'site-1', tenant: 'tenant-1',
+            shippingConfig: { enabled: true, westRate: 800, eastRate: 1500, freeAbove: 10_000 },
+        }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithConfig)
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 200, inventory: 10 })) // subtotal=200 → 20000 sen
+            .mockResolvedValueOnce({ // 10% off → 2000 sen → effective 18000 sen ≥ freeAbove
+                docs: [{ id: 6, code: 'SAVE10', type: 'percentage', value: 10, status: 'active', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'SAVE10' }))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data.total).toBe(180) // max(0, 200 − 20) + 0 free ship — still above threshold after discount
+    })
+
+    it('[TC-F33-10-07 Q7] COD checkout routes redemption through the idempotent helper', async () => {
+        // Arrange — valid active discount on a COD order
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 })) // subtotal 100 → 10000 sen
+            .mockResolvedValueOnce({ // active 50% discount → 5000 sen
+                docs: [{ id: 5, code: 'SAVE50', type: 'percentage', value: 50, status: 'active', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 42 }) // numeric order id
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'SAVE50' }))
+
+        // Assert — helper called exactly once with the order/discount snapshot (idempotency lives in the helper)
+        expect(res.status).toBe(200)
+        expect(mockRecordRedemption).toHaveBeenCalledTimes(1)
+        expect(mockRecordRedemption).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            discountId: 5,
+            orderId: 42,
+            amountApplied: 5000,
+            discountCode: 'SAVE50',
+            customerEmail: 'john@test.com',
+        }))
+    })
+
+    it('[TC-F33-10-18 Q9] discount set inactive between apply and place-order → silent reject at commit, no redemption', async () => {
+        // Arrange — checkout re-fetches the discount fresh; admin flipped it to inactive after the
+        // customer saw the "applied" chip. BR-03: silent reject, order proceeds at full price.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+            .mockResolvedValueOnce({ // discount now inactive
+                docs: [{ id: 5, code: 'OFF50', type: 'percentage', value: 50, status: 'inactive', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 43 })
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'OFF50' }))
+        const data = await res.json()
+
+        // Assert — full price (100 sub + 8 west ship), no discount applied, no redemption recorded
+        expect(res.status).toBe(200)
+        expect(data.data.total).toBe(108)
+        expect(mockRecordRedemption).not.toHaveBeenCalled()
+        // Order persisted WITHOUT the discount snapshot fields
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBeUndefined()
+        expect(createData.discountAmount).toBeUndefined()
     })
 
     it('[TC-F14.04] empty/invalid state rejected by schema — returns 400', async () => {
@@ -1159,5 +1268,82 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(updateOrder).toBeLessThan(deleteOrder)
 
         consoleSpy.mockRestore()
+    })
+
+    // ─── TC-F33-31 (scenario #31): site-scoping enforced at checkout ──────────
+
+    it('[TC-F33-31 scenario#31 behavioral] discount from another site is silently rejected — order at full price', async () => {
+        // Arrange — discount is scoped to site-2; checkout is on site-1.
+        // The where-clause filters it out → find() returns empty → silent reject → full price.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 })) // product
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 }) // site-scoped lookup returns empty
+        mockCreate.mockResolvedValue({ id: 'order-site-scoped-1' })
+
+        // Act
+        const res = await POST(mockReq({
+            ...validBody,
+            items: [{ productId: 'prod-1', quantity: 1 }],
+            discountCode: 'SITE2ONLY',
+        }))
+        const data = await res.json()
+
+        // Assert — order created at full price; discount fields absent from persisted order
+        expect(res.status).toBe(200)
+        expect(data.data.total).toBe(108) // 100 sub + 8 west ship, no discount
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBeUndefined()
+        expect(createData.discountAmount).toBeUndefined()
+    })
+
+    it('[TC-F33-31 scenario#31 whitebox] discount find() called with site or-clause for site scoping', async () => {
+        // White-box: verify the where-clause shape passed to payload.find for the discount lookup.
+        // This ensures the scoping is enforced at the DB query level, not post-filter.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+            .mockResolvedValueOnce({
+                docs: [{
+                    id: 7,
+                    code: 'GLOBAL',
+                    type: 'percentage',
+                    value: 10,
+                    status: 'active',
+                    usageLimit: null,
+                    usageCount: 0,
+                    startsAt: null,
+                    expiresAt: null,
+                    tenant: 'tenant-1',
+                }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 'order-wb-1' })
+
+        // Act
+        await POST(mockReq({
+            ...validBody,
+            items: [{ productId: 'prod-1', quantity: 1 }],
+            discountCode: 'GLOBAL',
+        }))
+
+        // Assert — the discount find() call must include the site or-clause
+        const discountFindCall = mockFind.mock.calls.find(
+            (call) => call[0]?.collection === 'discounts',
+        )
+        expect(discountFindCall).toBeDefined()
+        const whereAnd: any[] = discountFindCall![0].where.and
+        const siteOrClause = whereAnd.find((clause: any) => clause.or !== undefined)
+        expect(siteOrClause).toBeDefined()
+        expect(siteOrClause.or).toEqual(
+            expect.arrayContaining([
+                { site: { exists: false } },
+                { site: { equals: expect.anything() } },
+            ]),
+        )
     })
 })
