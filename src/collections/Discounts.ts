@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { startOfDayKL, endOfDayKL } from '@/lib/discounts/date-boundaries'
 
 export const Discounts: CollectionConfig = {
     slug: 'discounts',
@@ -9,8 +10,17 @@ export const Discounts: CollectionConfig = {
     hooks: {
         beforeValidate: [
             ({ data }) => {
-                if (data && typeof data.code === 'string') {
+                if (!data) return data
+                if (typeof data.code === 'string') {
                     data.code = data.code.trim().toUpperCase()
+                }
+                // Pin date-only inputs to KL day boundaries so a code is valid for the whole local day
+                // (startsAt from 00:00, expiresAt through 23:59:59.999 Asia/Kuala_Lumpur). Idempotent on re-save.
+                if (data.startsAt) {
+                    data.startsAt = startOfDayKL(data.startsAt as string | Date).toISOString()
+                }
+                if (data.expiresAt) {
+                    data.expiresAt = endOfDayKL(data.expiresAt as string | Date).toISOString()
                 }
                 return data
             },

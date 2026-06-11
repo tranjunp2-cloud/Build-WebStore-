@@ -181,10 +181,10 @@ export async function POST(
         const { checkoutItems, subtotal, orderItems } = built
 
         // Re-price at retry time so the Stripe charge matches what we persist — product prices may
-        // have changed since placement. Mirrors stripe-checkout totals (flat shipping + 6% SST).
+        // have changed since placement. Mirrors stripe-checkout totals (flat shipping, SST removed — F33 phase-06).
         const shippingFee = 10
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
+        const tax = 0 // SST removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated
+        const total = Math.round((subtotal + shippingFee) * 100) / 100
 
         // Step 7: Create new Stripe Checkout Session
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
@@ -194,7 +194,6 @@ export async function POST(
         const allCheckoutItems = [
             ...checkoutItems,
             ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
         ]
 
         let checkout: { sessionId: string; url: string }

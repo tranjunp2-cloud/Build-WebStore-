@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Lock, Search, X, Receipt, SearchX, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmtRM, fmtValue, fmtDate } from '@/lib/discounts/format'
 
 interface UsageRow {
     id: string
     discount: { id: string; code: string; type: string; value: number } | null
+    /** Code snapshot — survives discount deletion; falls back to the relation for legacy rows. */
+    discountCode?: string | null
     order: { id: string; orderNumber?: string } | null
     amountApplied: number
     customerEmail?: string | null
@@ -30,10 +32,22 @@ export function DiscountsUsageHistoryLayout() {
     const [totalPages, setTotalPages] = useState(1)
     const [totalDocs, setTotalDocs] = useState(0)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
 
+    // Debounce the input so each keystroke doesn't hit the API; reset to page 1 on a new query.
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setDebouncedSearch(search.trim())
+            setPage(1)
+        }, 300)
+        return () => clearTimeout(t)
+    }, [search])
+
+    // Server-side search across the WHOLE dataset (not just the current page).
     useEffect(() => {
         setLoading(true)
-        fetch(`/api/v1/discounts/usage-history?limit=${PAGE_LIMIT}&page=${page}`)
+        const qs = `limit=${PAGE_LIMIT}&page=${page}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`
+        fetch(`/api/v1/discounts/usage-history?${qs}`)
             .then((r) => r.json())
             .then((json: ApiResponse) => {
                 if (json.success) {
@@ -44,17 +58,7 @@ export function DiscountsUsageHistoryLayout() {
             })
             .catch(() => {/* silent — empty state shown */})
             .finally(() => setLoading(false))
-    }, [page])
-
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase()
-        if (!q) return rows
-        return rows.filter((u) => {
-            const code = (u.discount?.code ?? '').toLowerCase()
-            const orderNo = (u.order?.orderNumber ?? '').toLowerCase()
-            return code.includes(q) || orderNo.includes(q)
-        })
-    }, [rows, search])
+    }, [page, debouncedSearch])
 
     const hasAnyData = rows.length > 0 || loading
     const textMuted = { color: 'var(--dash-text-muted)' } as React.CSSProperties
@@ -72,7 +76,7 @@ export function DiscountsUsageHistoryLayout() {
                 </div>
                 <span
                     className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shrink-0 mt-1"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}
+                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}
                 >
                     <Lock className="h-3 w-3" />
                     Read-only
@@ -81,19 +85,24 @@ export function DiscountsUsageHistoryLayout() {
 
             {/* Search toolbar */}
             <div
-                className="flex items-center gap-2 rounded-md border px-3 py-2 max-w-sm"
-                style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'var(--dash-border)' }}
+                className="group flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 max-w-sm transition-colors focus-within:border-[var(--dash-accent,#6366f1)]"
+                style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)' }}
             >
                 <Search className="h-4 w-4 shrink-0" style={textMuted} />
                 <input
-                    className="flex-1 bg-transparent text-sm outline-none"
+                    className="flex-1 min-w-0 border-0 bg-transparent p-0 text-sm outline-none focus:outline-none focus:ring-0 placeholder:opacity-70"
                     style={textMain}
                     placeholder="Search by code or order #…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
                 {search && (
-                    <button onClick={() => setSearch('')} style={textMuted}>
+                    <button
+                        onClick={() => setSearch('')}
+                        className="shrink-0 rounded p-0.5 transition-opacity hover:opacity-70"
+                        style={textMuted}
+                        aria-label="Clear search"
+                    >
                         <X className="h-3.5 w-3.5" />
                     </button>
                 )}
@@ -108,7 +117,7 @@ export function DiscountsUsageHistoryLayout() {
                     <div className="flex items-center justify-center py-16 text-sm" style={textMuted}>Loading…</div>
                 ) : !hasAnyData ? (
                     <EmptyNoData />
-                ) : filtered.length === 0 ? (
+                ) : rows.length === 0 ? (
                     <EmptyNoResults onClear={() => setSearch('')} />
                 ) : (
                     <>
@@ -116,10 +125,10 @@ export function DiscountsUsageHistoryLayout() {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b" style={{ borderColor: 'var(--dash-border)' }}>
-                                        {['Code', 'Type', 'Amount applied', 'Order #', 'Customer email', 'Used date'].map((h, i) => (
+                                        {['Code', 'Type', 'Amount applied', 'Order #', 'Customer email', 'Used date'].map((h) => (
                                             <th
                                                 key={h}
-                                                className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${i === 2 ? 'text-right' : ''}`}
+                                                className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide"
                                                 style={textMuted}
                                             >
                                                 {h}
@@ -128,7 +137,7 @@ export function DiscountsUsageHistoryLayout() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filtered.map((u) => (
+                                    {rows.map((u) => (
                                         <tr
                                             key={u.id}
                                             className="border-b last:border-0"
@@ -137,15 +146,15 @@ export function DiscountsUsageHistoryLayout() {
                                             <td className="px-4 py-3">
                                                 <span
                                                     className="inline-block rounded px-2 py-0.5 font-mono text-xs font-semibold"
-                                                    style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--dash-text)' }}
+                                                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
                                                 >
-                                                    {u.discount?.code ?? '—'}
+                                                    {u.discountCode ?? u.discount?.code ?? '—'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3" style={textMuted}>
                                                 {u.discount ? fmtValue(u.discount.type, u.discount.value) : '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono text-green-400">
+                                            <td className="px-4 py-3 text-left font-mono text-green-400">
                                                 −{fmtRM(u.amountApplied)}
                                             </td>
                                             <td className="px-4 py-3">
@@ -178,9 +187,9 @@ export function DiscountsUsageHistoryLayout() {
                             style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             <span>
-                                {search.trim()
-                                    ? <><strong style={textMain}>{filtered.length}</strong> matches on this page</>
-                                    : <>Showing <strong style={textMain}>{filtered.length}</strong> of{' '}
+                                {debouncedSearch
+                                    ? <><strong style={textMain}>{totalDocs}</strong> {totalDocs === 1 ? 'match' : 'matches'}</>
+                                    : <>Showing <strong style={textMain}>{rows.length}</strong> of{' '}
                                         <strong style={textMain}>{totalDocs}</strong> redemptions</>
                                 }
                             </span>
@@ -231,7 +240,7 @@ function EmptyNoData() {
         <div className="flex flex-col items-center gap-3 py-16 text-center px-6">
             <div
                 className="flex h-12 w-12 items-center justify-center rounded-full"
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-muted)' }}
+                style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }}
             >
                 <Receipt className="h-6 w-6" />
             </div>
@@ -249,7 +258,7 @@ function EmptyNoResults({ onClear }: { onClear: () => void }) {
         <div className="flex flex-col items-center gap-3 py-16 text-center px-6">
             <div
                 className="flex h-12 w-12 items-center justify-center rounded-full border"
-                style={{ background: 'rgba(255,255,255,0.04)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-muted)' }}
+                style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-muted)' }}
             >
                 <SearchX className="h-6 w-6" />
             </div>
@@ -260,7 +269,7 @@ function EmptyNoResults({ onClear }: { onClear: () => void }) {
             <button
                 onClick={onClear}
                 className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium mt-1"
-                style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text)' }}
+                style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
             >
                 <X className="h-3 w-3" />
                 Clear search

@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { createDiscountSchema, updateDiscountSchema } from '@/lib/validations/discounts'
+import { MAX_FIXED_DISCOUNT_SEN } from '@/lib/discounts/format'
 
 // ── TC-F33-10: Discount code validation ────────────────────────────────────
 describe('createDiscountSchema — TC-F33-10: Code validation', () => {
@@ -255,20 +256,37 @@ describe('createDiscountSchema — TC-F33-10: Type and value validation', () => 
         expect(result.success).toBe(true)
     })
 
-    it('accepts fixed type with any non-negative value (no upper limit enforced by schema)', () => {
-        // Arrange
+    it('accepts fixed value at the cap (MAX_FIXED_DISCOUNT_SEN)', () => {
+        // Arrange — value is in sen; the cap is the boundary, still valid
         const data = {
-            code: 'FIXED_BIG',
+            code: 'FIXED_MAX',
             type: 'fixed',
-            value: 1000000,
+            value: MAX_FIXED_DISCOUNT_SEN,
         }
 
         // Act
         const result = createDiscountSchema.safeParse(data)
 
         // Assert
-        // fixed type has no upper limit in schema
         expect(result.success).toBe(true)
+    })
+
+    it('rejects fixed value above the cap (prevents 1e+ overflow in preview)', () => {
+        // Arrange — one sen over the cap
+        const data = {
+            code: 'FIXED_TOOBIG',
+            type: 'fixed',
+            value: MAX_FIXED_DISCOUNT_SEN + 1,
+        }
+
+        // Act
+        const result = createDiscountSchema.safeParse(data)
+
+        // Assert
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.issues.find((e) => e.path[0] === 'value')).toBeDefined()
+        }
     })
 
     it('rejects invalid type', () => {
@@ -482,6 +500,82 @@ describe('createDiscountSchema — TC-F33-10: Date range validation', () => {
 })
 
 // ── TC-F33-10: Combined validation ─────────────────────────────────────────
+// ── TC-F33-10-16: usageLimit bounds (Q10 — min 1, null = unlimited) ─────────
+// Spec §9: usageLimit Optional (null = unlimited); min 1. `0` is rejected because a
+// discount with usageLimit=0 is born "at-limit" (usageCount 0 >= limit 0 → silent reject),
+// i.e. a dead code. All four layers (UI input, client validate, this zod schema, Payload
+// collection) now agree on min 1.
+describe('createDiscountSchema — TC-F33-10-16: usageLimit bounds', () => {
+    const base = { code: 'LIMIT', type: 'percentage' as const, value: 10 }
+
+    it('rejects usageLimit = 0 (born at-limit → dead code)', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: 0 })
+
+        // Assert
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.issues.find((e) => e.path[0] === 'usageLimit')).toBeDefined()
+        }
+    })
+
+    it('rejects negative usageLimit', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: -5 })
+
+        // Assert
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects non-integer usageLimit', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: 1.5 })
+
+        // Assert
+        expect(result.success).toBe(false)
+    })
+
+    it('accepts usageLimit = 1 (minimum valid)', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: 1 })
+
+        // Assert
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts large usageLimit', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: 100000 })
+
+        // Assert
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts null usageLimit (unlimited)', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base, usageLimit: null })
+
+        // Assert
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts omitted usageLimit (unlimited)', () => {
+        // Act
+        const result = createDiscountSchema.safeParse({ ...base })
+
+        // Assert
+        expect(result.success).toBe(true)
+    })
+
+    it('applies the same min-1 rule on updates (rejects 0)', () => {
+        // Act
+        const result = updateDiscountSchema.safeParse({ usageLimit: 0 })
+
+        // Assert
+        expect(result.success).toBe(false)
+    })
+})
+
 describe('createDiscountSchema — TC-F33-10: Combined validation', () => {
     it('accepts fully valid discount', () => {
         // Arrange

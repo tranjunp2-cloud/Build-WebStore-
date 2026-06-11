@@ -29,8 +29,7 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
         freeAbove: freeEnabled && freeAboveRm ? Math.round(parseFloat(freeAboveRm) * 100) : null,
     }
     const shipSen = getShippingRate(SIM_STATE, cfg, SIM_CART_SEN)
-    const sstSen = Math.round(SIM_CART_SEN * 0.06)
-    const totalSen = SIM_CART_SEN + shipSen + sstSen
+    const totalSen = SIM_CART_SEN + shipSen
     const isFree = cfg.freeAbove != null && SIM_CART_SEN >= cfg.freeAbove
     const gapSen = cfg.freeAbove != null && !isFree ? cfg.freeAbove - SIM_CART_SEN : null
 
@@ -63,10 +62,6 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
                         </span>
                     </div>
                 )}
-                <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400">{s.liveSst}</span>
-                    <span className="text-slate-200">{formatRm(sstSen)}</span>
-                </div>
                 <div className="flex justify-between items-center pt-1.5 border-t border-white/[0.06]">
                     <span className="text-[14px] font-bold text-slate-200">{s.liveBuyerPays}</span>
                     <span className="text-[15px] font-bold text-slate-50">{formatRm(totalSen)}</span>

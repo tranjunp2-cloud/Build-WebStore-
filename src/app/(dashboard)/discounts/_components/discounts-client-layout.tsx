@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DiscountsToolbar } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
+import { DiscountDeleteDialog } from './discount-delete-dialog'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -26,6 +27,8 @@ export function DiscountsClientLayout() {
     const [limit, setLimit]               = useState(25)
     const [loading, setLoading]           = useState(true)
     const [isFirstLoad, setIsFirstLoad]   = useState(true)
+    // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().
+    const [deleteTarget, setDeleteTarget] = useState<Discount | null>(null)
 
     // Generation ref — stale fetch guard (same pattern as customers layout)
     const genRef = useRef(0)
@@ -85,10 +88,42 @@ export function DiscountsClientLayout() {
 
     const handleEdit   = useCallback((id: string)      => { router.push(`/discounts/${id}`) }, [router])
     const handleNew    = useCallback(()                 => { router.push('/discounts/new') }, [router])
-    const handleExport = useCallback(()                 => { window.location.assign('/api/v1/discounts/export') }, [])
+    const handleExport = useCallback(async () => {
+        try {
+            const res = await fetch('/api/v1/discounts/export')
+            if (res.status === 413) {
+                toast.error('Export limited to 10,000 rows. Please apply a date filter first.')
+                return
+            }
+            if (!res.ok) {
+                toast.error('Export failed. Please try again.')
+                return
+            }
+            // Stream → blob → download with the server-provided filename (no raw browser navigation).
+            const blob = await res.blob()
+            const cd = res.headers.get('Content-Disposition') || ''
+            const filename = /filename="?([^"]+)"?/.exec(cd)?.[1] ?? 'discounts.csv'
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+        } catch {
+            toast.error('Export failed. Please try again.')
+        }
+    }, [])
 
-    const handleDelete = useCallback(async (discount: Discount) => {
-        if (!window.confirm(`Delete discount "${discount.code}"? This cannot be undone.`)) return
+    // Open the styled confirm modal (per F33 design — shared with the edit form, no native confirm()).
+    const handleDelete = useCallback((discount: Discount) => { setDeleteTarget(discount) }, [])
+
+    // Run the actual delete after the user confirms in the modal.
+    const confirmDelete = useCallback(async () => {
+        const discount = deleteTarget
+        if (!discount) return
+        setDeleteTarget(null)
         // Optimistic remove
         setDiscounts(prev => prev.filter(d => d.id !== discount.id))
         try {
@@ -104,7 +139,7 @@ export function DiscountsClientLayout() {
             setDiscounts(prev => [discount, ...prev])
             toast.error(`Failed to delete "${discount.code}"`)
         }
-    }, [])
+    }, [deleteTarget])
 
     const hasFilters = !!(search || statusFilter !== 'all' || typeFilter !== 'all')
     const isEmpty = !loading && discounts.length === 0
@@ -127,7 +162,7 @@ export function DiscountsClientLayout() {
                         type="button"
                         onClick={handleExport}
                         className="flex items-center gap-2 h-[36px] px-4 rounded-[10px] text-[13px] font-medium transition-colors hover:bg-white/[0.05] cursor-pointer"
-                        style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(248,250,252,0.8)' }}
+                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                     >
                         <Download className="w-3.5 h-3.5" />
                         Export CSV
@@ -214,7 +249,7 @@ export function DiscountsClientLayout() {
                                 value={limit}
                                 onChange={e => { setLimit(Number(e.target.value)); setPage(1) }}
                                 className="h-[32px] rounded-[8px] px-2 pr-6 text-[13px] cursor-pointer outline-none appearance-none"
-                                style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(248,250,252,0.9)' }}
+                                style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                             >
                                 {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
@@ -228,7 +263,7 @@ export function DiscountsClientLayout() {
                             disabled={page <= 1}
                             onClick={() => setPage(p => p - 1)}
                             className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] transition-colors disabled:opacity-30 cursor-pointer"
-                            style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(248,250,252,0.5)' }}
+                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -243,7 +278,7 @@ export function DiscountsClientLayout() {
                                     className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] text-[13px] font-medium transition-colors cursor-pointer"
                                     style={p === page
                                         ? { background: '#0891b2', color: '#fff', border: '1px solid #0891b2' }
-                                        : { border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(248,250,252,0.5)' }
+                                        : { border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }
                                     }
                                 >
                                     {p}
@@ -255,12 +290,23 @@ export function DiscountsClientLayout() {
                             disabled={page >= totalPages}
                             onClick={() => setPage(p => p + 1)}
                             className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] transition-colors disabled:opacity-30 cursor-pointer"
-                            style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(248,250,252,0.5)' }}
+                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* Delete confirmation modal (replaces native confirm; matches the edit-form modal) */}
+            {deleteTarget && (
+                <DiscountDeleteDialog
+                    code={deleteTarget.code}
+                    usageCount={deleteTarget.usageCount}
+                    open={!!deleteTarget}
+                    onConfirm={confirmDelete}
+                    onCancel={() => setDeleteTarget(null)}
+                />
             )}
         </div>
     )

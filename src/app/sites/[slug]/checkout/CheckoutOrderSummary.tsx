@@ -15,6 +15,8 @@ type CartItem = {
 type Props = {
     items: CartItem[]
     sub: number
+    /** Post-discount subtotal for the free-ship gate (F33 phase-07); defaults to `sub`. */
+    effectiveSub?: number
     tax: number
     total: number
     shippingFee: number
@@ -29,12 +31,13 @@ type Props = {
 }
 
 export function CheckoutOrderSummary({
-    items, sub, tax, total, shippingFee, freeAboveRM,
+    items, sub, effectiveSub, total, shippingFee, freeAboveRM,
     currency, selectedStateZone, paymentMethod,
     canPlaceOrder, isPlacing, formatPrice, onPlaceOrder,
 }: Props) {
     const { t } = useI18n()
     const ck = t.storefront.checkout
+    const freeShipSub = effectiveSub ?? sub
 
     return (
         <div className="sum-card">
@@ -60,7 +63,6 @@ export function CheckoutOrderSummary({
 
             {/* TODO: Promo/gift card — re-enable when promotion system is defined */}
             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
-            <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
             <div className="sum-row">
                 <span className="sr-l">{ck.shipping} ({selectedStateZone === 'east' ? 'East MY' : 'West MY'})</span>
                 <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
@@ -70,12 +72,12 @@ export function CheckoutOrderSummary({
                 <>
                     <div className="sum-nudge">
                         <Truck size={12} />
-                        {sub < freeAboveRM
-                            ? <span>Add <strong>{formatPrice(freeAboveRM - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                        {freeShipSub < freeAboveRM
+                            ? <span>Add <strong>{formatPrice(freeAboveRM - freeShipSub, currency)}</strong> more for <strong>FREE shipping</strong></span>
                             : <span><strong>FREE shipping</strong> unlocked!</span>}
                     </div>
                     <div className="sn-bar">
-                        <div className="sn-fill" style={{ width: `${Math.min((sub / freeAboveRM) * 100, 100)}%` }} />
+                        <div className="sn-fill" style={{ width: `${Math.min((freeShipSub / freeAboveRM) * 100, 100)}%` }} />
                     </div>
                 </>
             )}

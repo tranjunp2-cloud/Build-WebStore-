@@ -56,7 +56,7 @@ export function DiscountDeleteDialog({
                 <div className="flex items-center justify-center gap-3 mt-4">
                     <button
                         className="rounded-md px-4 py-2 text-sm font-medium transition-colors"
-                        style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text)' }}
+                        style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
                         onClick={onCancel}
                     >
                         Cancel

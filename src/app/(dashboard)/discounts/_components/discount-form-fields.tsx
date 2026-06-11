@@ -1,7 +1,7 @@
 'use client'
 
 import { Percent, Banknote, Info, CircleAlert } from 'lucide-react'
-import { fmtRM } from '@/lib/discounts/format'
+import { fmtRM, MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 
 export interface DiscountDraft {
     code: string
@@ -30,15 +30,20 @@ interface DiscountFormFieldsProps {
 }
 
 export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: DiscountFormFieldsProps) {
-    const senPreview =
+    // Only preview when the typed amount is a valid number within the cap — the `max` attribute on a
+    // number input doesn't block keyboard entry, so an over-cap value would otherwise render as 1e+.
+    const fixedAmount =
         draft.type === 'fixed' && draft.valueInput !== '' && !Number.isNaN(Number(draft.valueInput))
-            ? fmtRM(Math.round(parseFloat(draft.valueInput) * 100))
+            ? parseFloat(draft.valueInput)
             : null
+    const fixedOverCap = fixedAmount != null && fixedAmount > MAX_FIXED_DISCOUNT_RM
+    const senPreview =
+        fixedAmount != null && !fixedOverCap ? fmtRM(Math.round(fixedAmount * 100)) : null
 
     const inputBase =
         'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors'
     const inputStyle = {
-        background: 'rgba(255,255,255,0.04)',
+        background: 'var(--dash-surface-hover)',
         borderColor: 'var(--dash-border)',
         color: 'var(--dash-text)',
     } as React.CSSProperties
@@ -60,9 +65,11 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     autoComplete="off"
                     maxLength={32}
                     spellCheck={false}
+                    aria-invalid={!!errors.code}
+                    aria-describedby={errors.code ? 'discount-code-error' : undefined}
                 />
                 {errors.code
-                    ? <span className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.code}</span>
+                    ? <span id="discount-code-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.code}</span>
                     : <span style={helpStyle}>Unique per store · UPPERCASE · case-insensitive at checkout.</span>
                 }
             </div>
@@ -111,7 +118,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                             style={
                                 draft.type === t
                                     ? { background: 'var(--brand, #14b8a6)', color: '#fff' }
-                                    : { background: 'rgba(255,255,255,0.04)', color: 'var(--dash-text-muted)' }
+                                    : { background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }
                             }
                         >
                             {t === 'percentage' ? <Percent className="h-3.5 w-3.5" /> : <Banknote className="h-3.5 w-3.5" />}
@@ -125,28 +132,54 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label style={labelStyle}>Value <span className="text-red-400">*</span></label>
                 <div className="flex items-center gap-3">
-                    <div className="relative flex items-center">
+                    {/* Affix-input group (per F33 design): unit label is a sibling panel with a divider,
+                        not an overlay — keeps the native number spinner usable without overlapping the
+                        RM/% label. Fixed → RM prefix (left); percentage → % suffix (right). */}
+                    <div
+                        className="flex max-w-[220px] items-center overflow-hidden rounded-md border transition-colors focus-within:border-sky-500"
+                        style={{
+                            background: 'var(--dash-surface-hover)',
+                            borderColor: errors.value ? 'rgb(239,68,68)' : 'var(--dash-border)',
+                        }}
+                    >
+                        {draft.type === 'fixed' && (
+                            <span
+                                className="flex h-9 shrink-0 items-center border-r px-3 text-xs font-semibold"
+                                style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)' }}
+                            >
+                                RM
+                            </span>
+                        )}
                         <input
-                            className={`${inputBase} w-36`}
-                            style={errors.value ? inputErrorStyle : inputStyle}
+                            className="w-28 border-0 bg-transparent px-3 py-2 text-sm outline-none"
+                            style={{ color: 'var(--dash-text)' }}
                             type="number"
                             value={draft.valueInput}
                             onChange={(e) => set('valueInput', e.target.value)}
                             placeholder={draft.type === 'percentage' ? '50' : '25.00'}
                             min="0"
-                            max={draft.type === 'percentage' ? '100' : undefined}
+                            max={draft.type === 'percentage' ? '100' : String(MAX_FIXED_DISCOUNT_RM)}
                             step={draft.type === 'fixed' ? '0.01' : '1'}
+                            aria-invalid={!!errors.value}
+                            aria-describedby={errors.value ? 'discount-value-error' : undefined}
                         />
-                        <span
-                            className="absolute right-3 text-xs font-semibold pointer-events-none"
-                            style={{ color: 'var(--dash-text-muted)' }}
-                        >
-                            {draft.type === 'percentage' ? '%' : 'RM'}
-                        </span>
+                        {draft.type === 'percentage' && (
+                            <span
+                                className="flex h-9 shrink-0 items-center border-l px-3 text-xs font-semibold"
+                                style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)' }}
+                            >
+                                %
+                            </span>
+                        )}
                     </div>
                     {draft.type === 'fixed' && senPreview && (
                         <span className="text-sm font-medium" style={{ color: 'var(--dash-text-muted)' }}>
                             = {senPreview}
+                        </span>
+                    )}
+                    {fixedOverCap && (
+                        <span className="text-xs font-medium text-red-400">
+                            Max RM {MAX_FIXED_DISCOUNT_RM.toLocaleString('en-MY')}
                         </span>
                     )}
                     {draft.type === 'percentage' && (
@@ -154,7 +187,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     )}
                 </div>
                 {errors.value
-                    ? <span className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.value}</span>
+                    ? <span id="discount-value-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.value}</span>
                     : <span style={helpStyle}>{draft.type === 'percentage' ? 'Percent off the subtotal.' : 'Enter amount in RM (e.g. 25.00 = RM 25).'}</span>
                 }
             </div>
@@ -169,58 +202,69 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     value={draft.usageLimit}
                     onChange={(e) => set('usageLimit', e.target.value)}
                     placeholder="Leave blank = unlimited"
-                    min="0"
+                    min="1"
                     step="1"
+                    aria-invalid={!!errors.usageLimit}
+                    aria-describedby={errors.usageLimit ? 'discount-usagelimit-error' : undefined}
                 />
                 {errors.usageLimit
-                    ? <span className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.usageLimit}</span>
+                    ? <span id="discount-usagelimit-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.usageLimit}</span>
                     : <span style={helpStyle}>Blank = unlimited redemptions.</span>
                 }
             </div>
 
-            {/* Used so far (read-only, edit only) */}
-            <div className="flex flex-col gap-1.5">
-                <label className="flex items-center gap-1" style={labelStyle}>
-                    Used so far
-                    <span title="Read-only. Increments per order that redeems this code." style={{ color: 'var(--dash-text-muted)' }}>
-                        <Info className="h-3 w-3" />
-                    </span>
-                </label>
-                <input
-                    className={`${inputBase} font-mono`}
-                    style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }}
-                    value={isNew ? '0' : String(usageCount)}
-                    readOnly
-                />
-            </div>
+            {/* Used so far (read-only, edit/detail only — hidden on create) */}
+            {!isNew && (
+                <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-1" style={labelStyle}>
+                        Used so far
+                        <span title="Read-only. Increments per order that redeems this code." style={{ color: 'var(--dash-text-muted)' }}>
+                            <Info className="h-3 w-3" />
+                        </span>
+                    </label>
+                    <input
+                        className={`${inputBase} font-mono`}
+                        style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }}
+                        value={String(usageCount)}
+                        readOnly
+                    />
+                </div>
+            )}
 
-            {/* Starts At */}
-            <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>Starts at</label>
-                <input
-                    className={inputBase}
-                    style={errors.dates ? inputErrorStyle : inputStyle}
-                    type="date"
-                    value={draft.startsAt}
-                    onChange={(e) => set('startsAt', e.target.value)}
-                />
-                <span style={helpStyle}>Normalized to start of day (Asia/Kuala_Lumpur).</span>
-            </div>
+            {/* Date window — Starts at + Expires at always share one row */}
+            <div className="grid grid-cols-1 gap-5 sm:col-span-2 sm:grid-cols-2">
+                {/* Starts At */}
+                <div className="flex flex-col gap-1.5">
+                    <label style={labelStyle}>Starts at</label>
+                    <input
+                        className={inputBase}
+                        style={errors.dates ? inputErrorStyle : inputStyle}
+                        type="date"
+                        value={draft.startsAt}
+                        onChange={(e) => set('startsAt', e.target.value)}
+                        aria-invalid={!!errors.dates}
+                        aria-describedby={errors.dates ? 'discount-dates-error' : undefined}
+                    />
+                    <span style={helpStyle}>Normalized to start of day (Asia/Kuala_Lumpur).</span>
+                </div>
 
-            {/* Expires At */}
-            <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>Expires at</label>
-                <input
-                    className={inputBase}
-                    style={errors.dates ? inputErrorStyle : inputStyle}
-                    type="date"
-                    value={draft.expiresAt}
-                    onChange={(e) => set('expiresAt', e.target.value)}
-                />
-                {errors.dates
-                    ? <span className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.dates}</span>
-                    : <span style={helpStyle}>End of day. Both blank = always available.</span>
-                }
+                {/* Expires At */}
+                <div className="flex flex-col gap-1.5">
+                    <label style={labelStyle}>Expires at</label>
+                    <input
+                        className={inputBase}
+                        style={errors.dates ? inputErrorStyle : inputStyle}
+                        type="date"
+                        value={draft.expiresAt}
+                        onChange={(e) => set('expiresAt', e.target.value)}
+                        aria-invalid={!!errors.dates}
+                        aria-describedby={errors.dates ? 'discount-dates-error' : undefined}
+                    />
+                    {errors.dates
+                        ? <span id="discount-dates-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.dates}</span>
+                        : <span style={helpStyle}>End of day. Both blank = always available.</span>
+                    }
+                </div>
             </div>
         </div>
     )

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_FIXED_DISCOUNT_SEN } from '@/lib/discounts/format'
 
 const codeRegex = /^[A-Z0-9_-]+$/
 
@@ -8,6 +9,14 @@ function withDiscountRefinements<T extends z.ZodObject<any>>(schema: T) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: 'Percentage value must be 100 or less',
+                path: ['value'],
+            })
+        }
+        // Fixed value is stored in sen; cap it so the formatted preview never overflows to 1e+ notation.
+        if (data.type === 'fixed' && data.value != null && data.value > MAX_FIXED_DISCOUNT_SEN) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Fixed amount is too large',
                 path: ['value'],
             })
         }
@@ -37,7 +46,9 @@ const discountBaseObject = z.object({
     description: z.string().max(500).optional().nullable(),
     type: z.enum(['percentage', 'fixed']),
     value: z.number().min(0),
-    usageLimit: z.number().int().min(0).optional().nullable(),
+    // min 1 — null/blank = unlimited (PRD §9). 0 is invalid: it would make a discount born "at-limit"
+    // (usageCount 0 >= limit 0 → silent reject), so we reject it here instead of persisting a dead code.
+    usageLimit: z.number().int().min(1).optional().nullable(),
     startsAt: z.string().optional().nullable(),
     expiresAt: z.string().optional().nullable(),
     status: z.enum(['active', 'inactive']).optional(),

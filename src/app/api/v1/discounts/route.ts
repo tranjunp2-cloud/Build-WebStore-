@@ -107,7 +107,7 @@ export const POST = withAuth(async (user, request) => {
             // Unique constraint on (tenant_id, upper(code)) → 409
             if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.code === '23505') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'A discount with this code already exists for your store' } },
+                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'This code is already in use for your tenant. Try a different code or append a number.' } },
                     { status: 409 },
                 )
             }

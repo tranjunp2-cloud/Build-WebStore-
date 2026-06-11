@@ -50,13 +50,13 @@ function FilterChip<T extends string>({
                 className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                    color: active ? '#60a5fa' : 'rgba(248,250,252,0.6)',
+                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--dash-border)',
+                    color: active ? '#60a5fa' : 'var(--dash-text-muted)',
                 }}
             >
                 <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>
-                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>{label} : </span>
+                    <span style={{ color: 'var(--dash-text-muted)' }}>{label} : </span>
                     {selected.label}
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
@@ -64,8 +64,8 @@ function FilterChip<T extends string>({
 
             {open && (
                 <div
-                    className="absolute top-[calc(100%+4px)] left-0 min-w-[140px] z-50 rounded-[12px] border border-white/[0.08] overflow-hidden"
-                    style={{ background: '#1e293b' }}
+                    className="absolute top-[calc(100%+4px)] left-0 min-w-[140px] z-50 rounded-[12px] overflow-hidden"
+                    style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                 >
                     {options.map(o => (
                         <button
@@ -74,7 +74,7 @@ function FilterChip<T extends string>({
                             onClick={() => { onChange(o.key); setOpen(false) }}
                             className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-white/[0.05] cursor-pointer"
                             style={{
-                                color: o.key === value ? 'rgba(248,250,252,1)' : 'rgba(248,250,252,0.5)',
+                                color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)',
                                 fontWeight: o.key === value ? 500 : 400,
                             }}
                         >
@@ -119,7 +119,7 @@ export function DiscountsToolbar({
     return (
         <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px] max-w-[360px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'rgba(255,255,255,0.4)' }} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--dash-text-muted)' }} />
                 <input
                     type="text"
                     value={input}
@@ -127,9 +127,9 @@ export function DiscountsToolbar({
                     placeholder="Search code or description..."
                     className="w-full h-[40px] rounded-[10px] pl-9 pr-3 text-[13px] outline-none transition-colors"
                     style={{
-                        background: '#1e293b',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        color: 'rgba(248,250,252,1)',
+                        background: 'var(--dash-surface)',
+                        border: '1px solid var(--dash-border)',
+                        color: 'var(--dash-text)',
                     }}
                 />
             </div>

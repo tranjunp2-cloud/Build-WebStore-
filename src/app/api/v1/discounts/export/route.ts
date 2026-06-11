@@ -2,7 +2,8 @@
  * GET /api/v1/discounts/export
  *
  * Streams a CSV export of discounts for the authenticated user's tenant(s).
- * Columns: code,type,value,status,usageCount,usageLimit,startsAt,expiresAt,createdAt
+ * Columns (design §S1): Code,Type,Value,Status,Usage Limit,Usage Count,Started At,Expires At,Created At
+ * Dates formatted `YYYY-MM-DD HH:MM:SS` in Asia/Kuala_Lumpur.
  * Hard cap: 10 000 rows → 413 with JSON hint if exceeded.
  * Security: no anonymous access, tenant-scoped, Cache-Control: private,no-store.
  */
@@ -36,6 +37,18 @@ function toCsvLine(fields: unknown[]): string {
 
 function sanitizeFilenameSegment(s: string): string {
     return s.replace(/[^A-Za-z0-9_-]/g, '-')
+}
+
+/** Format an instant as `YYYY-MM-DD HH:MM:SS` in Asia/Kuala_Lumpur (design §S1 / §4). */
+function fmtKL(value: string | Date | null): string {
+    if (!value) return ''
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kuala_Lumpur',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(new Date(value))
+    const g = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+    return `${g('year')}-${g('month')}-${g('day')} ${g('hour')}:${g('minute')}:${g('second')}`
 }
 
 function resolveTenantIds(user: AuthUserShape, requestedTenantId: string | null) {
@@ -90,8 +103,13 @@ export async function GET(req: NextRequest) {
             drizzle: { execute: (q: unknown) => Promise<DrizzleQueryResult<unknown>> }
         }
 
+        // Bind tenant ids as a Postgres array LITERAL string ('{46,47}'), not a raw JS array — the
+        // driver serializes a JS array param to a bare scalar, producing `ANY('46'::integer[])` →
+        // "malformed array literal". ids are validated integers (resolveTenantIds), so the join is safe.
+        const tenantArray = `{${tenantIds.join(',')}}`
+
         const countQuery = tenantIds.length > 0
-            ? sql`SELECT COUNT(*) AS cnt FROM discounts WHERE tenant_id = ANY(${tenantIds}::integer[])`
+            ? sql`SELECT COUNT(*) AS cnt FROM discounts WHERE tenant_id = ANY(${tenantArray}::integer[])`
             : sql`SELECT COUNT(*) AS cnt FROM discounts`
 
         const countResult = (await db.drizzle.execute(countQuery)) as DrizzleQueryResult<{ cnt: string | number }>
@@ -99,7 +117,7 @@ export async function GET(req: NextRequest) {
 
         if (total > EXPORT_ROW_CAP) {
             return Response.json(
-                { error: 'export_too_large', hint: 'Filter by status or date' },
+                { error: 'export_too_large', hint: 'Export limited to 10,000 rows. Please apply a date filter first.' },
                 { status: 413, headers: { 'Cache-Control': 'private, no-store' } },
             )
         }
@@ -115,7 +133,7 @@ export async function GET(req: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 const enc = new TextEncoder()
-                controller.enqueue(enc.encode('code,type,value,status,usageCount,usageLimit,startsAt,expiresAt,createdAt\n'))
+                controller.enqueue(enc.encode('Code,Type,Value,Status,Usage Limit,Usage Count,Started At,Expires At,Created At\n'))
 
                 try {
                     const dataQuery = tenantIds.length > 0
@@ -123,7 +141,7 @@ export async function GET(req: NextRequest) {
                             SELECT code, type, value, status, usage_count, usage_limit,
                                    starts_at, expires_at, created_at
                             FROM discounts
-                            WHERE tenant_id = ANY(${tenantIds}::integer[])
+                            WHERE tenant_id = ANY(${tenantArray}::integer[])
                             ORDER BY created_at DESC
                         `
                         : sql`
@@ -149,13 +167,14 @@ export async function GET(req: NextRequest) {
                         const line = toCsvLine([
                             row.code,
                             row.type,
-                            Number(row.value),
+                            // Value: percentage → raw percent (50); fixed → RM (sen/100, 2dp) to match the UI table.
+                            row.type === 'fixed' ? (Number(row.value) / 100).toFixed(2) : Number(row.value),
                             row.status,
-                            Number(row.usage_count),
                             row.usage_limit != null ? Number(row.usage_limit) : '',
-                            row.starts_at ? new Date(row.starts_at as string).toISOString() : '',
-                            row.expires_at ? new Date(row.expires_at as string).toISOString() : '',
-                            new Date(row.created_at as string).toISOString(),
+                            Number(row.usage_count),
+                            fmtKL(row.starts_at),
+                            fmtKL(row.expires_at),
+                            fmtKL(row.created_at),
                         ])
                         controller.enqueue(enc.encode(line + '\n'))
                     }

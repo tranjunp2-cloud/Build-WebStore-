@@ -23,7 +23,7 @@ Let a non-technical merchant run promotions end-to-end — create a code, watch 
 - **Status + usage at a glance** — every code shows status badge + `usageCount / usageLimit`
 - **Never hard-fail checkout** — expired / at-limit / inactive / wrong-tenant code → silently dropped, order proceeds at full price
 - **Validation up front (admin)** — block bad input inline (percentage 0–100, fixed ≥ 0, code unique per tenant, start < expiry)
-- **Discount on subtotal only** — `finalAmount = (subtotal − discount) + shipping + tax`
+- **Discount on subtotal only** — `finalAmount = (subtotal − discount) + shipping` *(v1.1 2026-06-11: SST tax removed at checkout — no `+ tax`; free-ship gate uses post-discount subtotal)*
 - **Tenant-safe** — a merchant only ever sees its own codes & usage
 - **Admin-native** — S1/S2/S4 follow Payload admin conventions; S3 matches storefront checkout
 - **Immutable audit** — usage history is read-only; deleting a code never deletes its history
@@ -173,12 +173,12 @@ Order summary
 ```
 
 **Components:** code input (case-insensitive, backend normalizes) + Apply button; applied chip + Remove; discount line (distinct, negative); recomputed total.
-**Pricing rule (BR-02):** discount on **subtotal only**, then add shipping + tax → `finalAmount`. Stripe charged exactly `finalAmount` (no Stripe Coupon; line items rebuilt to sum to it, no negative items, total ≥ 0).
+**Pricing rule (BR-02):** discount on **subtotal only**, then add shipping → `finalAmount` *(v1.1: SST tax removed; no `+ tax`)*. Stripe charged exactly `finalAmount` (no Stripe Coupon; single consolidated line item = finalAmount, no negative items, total ≥ 0).
 **States:**
 - **empty** — input + Apply
 - **applying** — button spinner / disabled
 - **applied** — success chip, discount line, total updated, Remove available
-- **invalid (silent reject)** — no error toast/message; code field clears; order continues at full price. Covers expired / at-limit / inactive / wrong-tenant / non-existent.
+- **invalid (warning, never blocks)** — *(v1.1 2026-06-11)* a reason-specific warning shows below the input; code field clears; order still continues at full price. Two messages only (backend collapses reasons to avoid code enumeration): **at-limit** → "This voucher has reached its usage limit and is no longer available."; **everything else** (inactive / expired / wrong-tenant / non-existent / not-started) → "This voucher is no longer available. Please try another voucher."
 - **removed** — total reverts to full price
 **Confirmation parity:** applied discount must appear identically in summary, payment step, and the email receipt line `Discount: −RM 50.00`.
 

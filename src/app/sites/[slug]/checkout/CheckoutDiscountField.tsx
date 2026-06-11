@@ -6,17 +6,27 @@ import { Tag, Loader2, Check, X, Info } from 'lucide-react'
 type AppliedDiscount = { code: string; type: 'percentage' | 'fixed'; value: number }
 type Phase = 'empty' | 'applying' | 'applied' | 'rejected'
 
+// Reason-specific warnings. Backend collapses every non-`at-limit` reason to 'unavailable'
+// (no code enumeration), so only these two messages are possible.
+const REJECT_MESSAGE: Record<string, string> = {
+    'at-limit': 'This voucher has reached its usage limit and is no longer available.',
+    unavailable: 'This voucher is no longer available. Please try another voucher.',
+}
+
 type Props = {
     siteSlug: string
+    /** Resolved site id — lets the preview honour site-scoped discounts (matches the checkout routes). */
+    siteId?: string | number
     subtotalSen: number
     onApplied: (discount: AppliedDiscount, discountSen: number) => void
     onRemoved: () => void
     appliedDiscount: AppliedDiscount | null
 }
 
-export function CheckoutDiscountField({ siteSlug, subtotalSen, onApplied, onRemoved, appliedDiscount }: Props) {
+export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied, onRemoved, appliedDiscount }: Props) {
     const [code, setCode] = useState('')
     const [phase, setPhase] = useState<Phase>(appliedDiscount ? 'applied' : 'empty')
+    const [rejectMsg, setRejectMsg] = useState<string | null>(null)
     const [flash, setFlash] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -30,22 +40,28 @@ export function CheckoutDiscountField({ siteSlug, subtotalSen, onApplied, onRemo
             const res = await fetch('/api/storefront/discounts/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ siteSlug, code: key, subtotalSen }),
+                body: JSON.stringify({ siteSlug, siteId, code: key, subtotalSen }),
             })
             const data = await res.json()
 
             if (data.ok) {
                 onApplied(data.discount, data.discountSen)
                 setPhase('applied')
+                setRejectMsg(null)
                 setCode('')
             } else {
+                // Reject with a reason-specific warning below the input. Order still proceeds at full price
+                // (the code just isn't applied) — this is a warning, not a hard checkout failure.
                 onRemoved()
+                setRejectMsg(REJECT_MESSAGE[data.reason] ?? REJECT_MESSAGE.unavailable)
                 setPhase('rejected')
                 setCode('')
                 setFlash(true)
                 timerRef.current = setTimeout(() => setFlash(false), 1400)
             }
         } catch {
+            onRemoved()
+            setRejectMsg(REJECT_MESSAGE.unavailable)
             setPhase('rejected')
             setCode('')
         }
@@ -54,6 +70,7 @@ export function CheckoutDiscountField({ siteSlug, subtotalSen, onApplied, onRemo
     const remove = () => {
         onRemoved()
         setPhase('empty')
+        setRejectMsg(null)
         setCode('')
     }
 
@@ -68,12 +85,14 @@ export function CheckoutDiscountField({ siteSlug, subtotalSen, onApplied, onRemo
                         <input
                             placeholder="Promo or gift card code"
                             value={code}
-                            onChange={e => setCode(e.target.value)}
+                            onChange={e => { setCode(e.target.value); if (phase === 'rejected') { setPhase('empty'); setRejectMsg(null) } }}
                             onKeyDown={e => e.key === 'Enter' && apply()}
                             disabled={phase === 'applying'}
                             spellCheck={false}
                             autoCapitalize="characters"
                             maxLength={32}
+                            aria-invalid={phase === 'rejected'}
+                            aria-describedby={phase === 'rejected' ? 'ck-discount-error' : undefined}
                         />
                         <button
                             className="ck-dc-apply"
@@ -85,10 +104,10 @@ export function CheckoutDiscountField({ siteSlug, subtotalSen, onApplied, onRemo
                                 : 'Apply'}
                         </button>
                     </div>
-                    {phase === 'rejected' && (
-                        <div className="ck-dc-hint error">
+                    {phase === 'rejected' && rejectMsg && (
+                        <div id="ck-discount-error" role="alert" className="ck-dc-hint error">
                             <Info size={12} />
-                            That code couldn't be applied — your order continues at full price.
+                            {rejectMsg}
                         </div>
                     )}
                     {phase === 'empty' && (

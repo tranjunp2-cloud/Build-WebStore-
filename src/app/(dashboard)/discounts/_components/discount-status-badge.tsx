@@ -8,10 +8,9 @@ export function DiscountStatusBadge({ status }: DiscountStatusBadgeProps) {
     return (
         <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium ${
-                isActive
-                    ? 'bg-green-100/10 text-green-400'
-                    : 'bg-slate-100/10 text-slate-400'
+                isActive ? 'text-green-400' : 'text-slate-400'
             }`}
+            style={{ background: 'var(--dash-surface-hover)' }}
         >
             <span
                 className={`h-1.5 w-1.5 rounded-full shrink-0 ${

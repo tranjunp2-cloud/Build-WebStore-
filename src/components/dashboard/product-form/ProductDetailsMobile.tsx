@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { DetailedProduct } from '../ProductQuickViewModal';
 import { ArrowLeft, Package, Trash2, Edit2 } from 'lucide-react';
 import Image from 'next/image';
@@ -126,16 +126,6 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                                 <span className="text-[18px] text-[#C1C6D7] leading-[1.55]">{displayComparePrice.toFixed(2)}</span>
                             </div>
                         ) : null}
-                        <div className="ml-auto bg-[#1D2026] rounded-[2px] py-1 pl-2 pr-4 text-[10px] text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.5]">
-                            <span>
-                                {(t.dashboard?.products?.mobile?.taxesSst || 'Taxes: SST (6%)\nIncl.').split('\n').map((line, i, arr) => (
-                                    <React.Fragment key={i}>
-                                        {line}
-                                        {i < arr.length - 1 && <br />}
-                                    </React.Fragment>
-                                ))}
-                            </span>
-                        </div>
                     </div>
 
                     {/* Stock Indicator Card */}

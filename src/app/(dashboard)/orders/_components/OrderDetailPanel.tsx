@@ -30,6 +30,8 @@ export interface OrderDetail {
     shippingFee: number
     tax: number
     total: number
+    discountCode?: string | null
+    discountAmount?: number | null
     currency: string
     customerName: string
     customerEmail: string
@@ -698,6 +700,17 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 {order.currency} {order.subtotal?.toFixed(2) || '0.00'}
                             </span>
                         </div>
+                        {/* Discount — snapshot in sen → /100 for RM (F33) */}
+                        {(order.discountAmount ?? 0) > 0 && (
+                            <div className="flex items-center justify-between">
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
+                                    Discount{order.discountCode ? ` (${order.discountCode})` : ''}
+                                </span>
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#10b981' }}>
+                                    −{order.currency} {((order.discountAmount ?? 0) / 100).toFixed(2)}
+                                </span>
+                            </div>
+                        )}
                         {/* Shipping Fee */}
                         <div className="flex items-center justify-between">
                             <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
@@ -707,15 +720,17 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 {order.currency} {order.shippingFee?.toFixed(2) || '0.00'}
                             </span>
                         </div>
-                        {/* Tax */}
-                        <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
-                                {d.tax}
-                            </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                                {order.currency} {order.tax?.toFixed(2) || '0.00'}
-                            </span>
-                        </div>
+                        {/* SST removed at checkout (F33 phase-06) — show only for historical orders that carried tax */}
+                        {(order.tax ?? 0) > 0 && (
+                            <div className="flex items-center justify-between">
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
+                                    {d.tax}
+                                </span>
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
+                                    {order.currency} {order.tax?.toFixed(2) || '0.00'}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Grand Total — separated by margin 12, border top, padding 13 */}

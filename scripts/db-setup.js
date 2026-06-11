@@ -4296,6 +4296,7 @@ const MIGRATIONS = [
       order_id integer REFERENCES orders(id) ON DELETE SET NULL,
       amount_applied numeric NOT NULL DEFAULT 0,
       customer_email varchar,
+      discount_code varchar,
       used_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
@@ -4321,6 +4322,7 @@ const MIGRATIONS = [
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS order_id integer REFERENCES orders(id) ON DELETE SET NULL;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS amount_applied numeric NOT NULL DEFAULT 0;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS customer_email varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_code varchar;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS used_at timestamptz;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
@@ -4829,6 +4831,15 @@ async function main() {
   -- F33 Relationship Bypass: discount → Payload uses discount_id column;
   -- bare name registered here so check-migrations CI can match the field name.
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount
+
+  -- F33 discounts + discount_usage_history Relationship Bypass: Payload uses {field}_id columns
+  -- (tenant_id, site_id, discount_id, order_id — created in their CREATE TABLE bodies above);
+  -- bare field names registered here so check-migrations CI can match them.
+  ALTER TABLE discounts ADD COLUMN IF NOT EXISTS tenant
+  ALTER TABLE discounts ADD COLUMN IF NOT EXISTS site
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS tenant
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS order
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments

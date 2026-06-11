@@ -14,6 +14,8 @@ import { applyDiscount } from '@/lib/discounts/apply-discount'
 
 const applyDiscountBodySchema = z.object({
     siteSlug: z.string().min(1).max(63),
+    // Optional resolved site id — lets the preview honour site-scoped discounts like the checkout routes.
+    siteId: z.union([z.string(), z.number()]).optional(),
     code: z.string().min(1).max(32),
     subtotalSen: z.number().int().min(0),
 })
@@ -39,7 +41,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false }, { status: 400 })
     }
 
-    const { siteSlug, code, subtotalSen } = body
+    const { siteSlug, siteId, code, subtotalSen } = body
+    const siteIdNum = siteId != null && siteId !== '' && !Number.isNaN(Number(siteId)) ? Number(siteId) : null
 
     try {
         const payload = await getPayload({ config })
@@ -60,13 +63,18 @@ export async function POST(req: Request) {
         }
         const tenantId = tenant.id
 
-        // Look up discount by code (case-insensitive via uppercase) + tenant
+        // Look up discount by code (case-insensitive via uppercase) + tenant.
+        // Site scoping (PRD §9): when the client passes the resolved siteId, a site-scoped discount
+        // resolves only on its own site — matches the authoritative COD/Stripe checkout filter.
         const discountResult = await payload.find({
             collection: 'discounts',
             where: {
                 and: [
                     { tenant: { equals: tenantId } },
                     { code: { equals: code.trim().toUpperCase() } },
+                    ...(siteIdNum != null
+                        ? [{ or: [{ site: { exists: false } }, { site: { equals: siteIdNum } }] }]
+                        : []),
                 ],
             },
             limit: 1,
@@ -78,9 +86,13 @@ export async function POST(req: Request) {
         const result = applyDiscount(row, { subtotalSen, tenantId, now: new Date() })
 
         if (!result.ok) {
-            // Log reason server-side only — never expose to client
-            console.info(`[discount-apply] silent-reject siteSlug=${siteSlug} code=${code} reason=${result.reason}`)
-            return NextResponse.json({ ok: false })
+            console.info(`[discount-apply] reject siteSlug=${siteSlug} code=${code} reason=${result.reason}`)
+            // Expose only a COARSE reason to the client:
+            //   - 'at-limit'    → exhausted voucher (its own message)
+            //   - 'unavailable' → everything else (inactive/expired/not-found/wrong-tenant/not-started)
+            // Collapsing the rest keeps real-vs-fake codes indistinguishable (no enumeration).
+            const reason = result.reason === 'at-limit' ? 'at-limit' : 'unavailable'
+            return NextResponse.json({ ok: false, reason })
         }
 
         return NextResponse.json({

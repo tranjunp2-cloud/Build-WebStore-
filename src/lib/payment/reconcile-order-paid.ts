@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { getStripeClient } from '@/lib/payment/stripe-client'
+import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { sendOrderPaidEmailsAndNotify, type PaidOrderDoc } from './reconcile-order-paid-emails'
 
 export interface ReconcileContext {
@@ -59,6 +60,25 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         return { status: 'not_found' }
     }
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
+
+    // Discount redemption (gap A): the pending order snapshotted discount/discountCode/discountAmount at
+    // checkout but never redeemed. Runs ONLY inside the single-winner block, so a re-delivered webhook /
+    // confirm-poll / cron that early-returns ('already_processed') redeems nothing. The helper's
+    // ON CONFLICT (order_id) makes a concurrent double-fire a no-op. Non-throwing — never aborts the reconcile.
+    const dRaw = (order as any).discount
+    if (dRaw && Number((order as any).discountAmount) > 0) {
+        const discId = typeof dRaw === 'object' ? dRaw.id : dRaw
+        const tRaw = (order as any).tenant
+        const tId = typeof tRaw === 'object' ? tRaw.id : tRaw
+        await recordDiscountRedemption(payload, {
+            tenantId: Number(tId),
+            discountId: Number(discId),
+            orderId,
+            amountApplied: Number((order as any).discountAmount),
+            discountCode: (order as any).discountCode ?? null,
+            customerEmail: (order as any).customerEmail ?? null,
+        })
+    }
 
     // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
     // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are

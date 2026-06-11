@@ -43,7 +43,7 @@ export function DiscountFormHeader({
                     <button
                         onClick={onBack}
                         className="flex items-center justify-center h-8 w-8 rounded-md transition-colors shrink-0"
-                        style={{ color: 'var(--dash-text-muted)', background: 'rgba(255,255,255,0.04)' }}
+                        style={{ color: 'var(--dash-text-muted)', background: 'var(--dash-surface-hover)' }}
                         title="Back to discounts"
                     >
                         <ArrowLeft className="h-4 w-4" />
@@ -65,7 +65,7 @@ export function DiscountFormHeader({
                             <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--dash-text-muted)' }}>
                                 <span
                                     className="font-mono px-1 py-0.5 rounded text-[10px]"
-                                    style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--dash-text-muted)' }}
+                                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }}
                                 >
                                     {discountIdChip}
                                 </span>

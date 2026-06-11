@@ -18,7 +18,7 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                         UNLIMITED
                     </span>
                 </div>
-                <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'var(--dash-border)' }}>
                     <div className="h-full rounded-full" style={{ width: `${fill}%`, background: '#38bdf8' }} />
                 </div>
             </div>
@@ -44,7 +44,7 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                     </span>
                 )}
             </div>
-            <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'var(--dash-border)' }}>
                 <div
                     className={`h-full rounded-full transition-all ${barColor}`}
                     style={{ width: `${pct}%` }}

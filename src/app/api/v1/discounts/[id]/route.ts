@@ -84,7 +84,7 @@ export const PUT = withAuth<RouteContext>(async (user, request, ctx) => {
         } catch (err: any) {
             if (err?.message?.includes('duplicate') || err?.message?.includes('unique') || err?.code === '23505') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'A discount with this code already exists for your store' } },
+                    { success: false, error: { code: 'DUPLICATE_CODE', message: 'This code is already in use for your tenant. Try a different code or append a number.' } },
                     { status: 409 },
                 )
             }
@@ -130,7 +130,8 @@ export const DELETE = withAuth<RouteContext>(async (user, _request, ctx) => {
             overrideAccess: false,
         })
 
-        return NextResponse.json({ success: true })
+        // 204 No Content — delete succeeded, nothing to return (US-F33-03 AC).
+        return new NextResponse(null, { status: 204 })
     } catch (error: any) {
         console.error('[Discount Delete Error]', error)
         return NextResponse.json(

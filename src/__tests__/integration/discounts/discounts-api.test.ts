@@ -97,7 +97,9 @@ describe('POST /api/v1/discounts — TC-F33-10: Create discount', () => {
         expect(data.data.tenant).toBe('tenant-abc')
         expect(data.data.usageCount).toBe(0)
 
-        // Verify create was called with tenant forced and usageCount=0
+        // Verify create was called with tenant forced and usageCount=0.
+        // overrideAccess: true — tenant comes from the authenticated user, so auth is already enforced
+        // by withAuth + extractTenantId; false would trip Payload's tenants read-check and reject valid IDs.
         expect(mockCreate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'discounts',
@@ -108,8 +110,7 @@ describe('POST /api/v1/discounts — TC-F33-10: Create discount', () => {
                     tenant: 'tenant-abc',
                     usageCount: 0,
                 }),
-                user: mockUser,
-                overrideAccess: false,
+                overrideAccess: true,
             }),
         )
     })
@@ -475,7 +476,8 @@ describe('POST /api/v1/discounts — TC-F33-12: Duplicate code rejection', () =>
         // Assert
         expect(response.status).toBe(409)
         expect(data.error.code).toBe('DUPLICATE_CODE')
-        expect(data.error.message).toContain('already exists')
+        // Message matches story US-F33-01 AC-3 ("…already in use for your tenant…")
+        expect(data.error.message).toContain('already in use')
     })
 
     it('allows same code in different tenants (conceptually)', async () => {

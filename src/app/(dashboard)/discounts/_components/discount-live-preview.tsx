@@ -1,7 +1,7 @@
 'use client'
 
 import { ShieldCheck } from 'lucide-react'
-import { fmtValue, fmtDate } from '@/lib/discounts/format'
+import { fmtValue, fmtDate, MAX_FIXED_DISCOUNT_SEN } from '@/lib/discounts/format'
 import { draftValueToStored } from '@/lib/discounts/draft-value'
 import { DiscountUsageMeter } from './discount-usage-meter'
 import { DiscountTypeBadge } from './discount-type-badge'
@@ -16,7 +16,9 @@ interface DiscountLivePreviewProps {
 
 export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: DiscountLivePreviewProps) {
     const stored = draftValueToStored(draft.type, draft.valueInput)
-    const valueDisplay = stored != null ? fmtValue(draft.type, stored) : '—'
+    // Guard against an over-cap fixed amount overflowing to 1e+ notation in the preview.
+    const overCap = stored != null && draft.type === 'fixed' && stored > MAX_FIXED_DISCOUNT_SEN
+    const valueDisplay = stored != null && !overCap ? fmtValue(draft.type, stored) : '—'
     const usageLimitNum = draft.usageLimit === '' ? null : Number(draft.usageLimit)
 
     const cardStyle = {
@@ -37,7 +39,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                     <span
                         className="px-2 py-0.5 rounded text-sm font-mono font-semibold"
-                        style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--dash-text)' }}
+                        style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
                     >
                         {draft.code || 'CODE'}
                     </span>

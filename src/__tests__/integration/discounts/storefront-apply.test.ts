@@ -147,8 +147,10 @@ describe('POST /api/storefront/discounts/apply — TC-F33-20: Success response',
     })
 })
 
-// ── TC-F33-21: Failure response (silent reject, no reason leak) ──────────────
-describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent reject', () => {
+// ── TC-F33-21: Failure response — coarse reason only ─────────────────────────
+// Reject reveals only 'at-limit' (exhausted) vs 'unavailable' (everything else collapsed:
+// inactive/expired/not-found/wrong-tenant/not-started) so real-vs-fake codes can't be enumerated.
+describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure coarse reason', () => {
     let mockFind: any
 
     beforeEach(() => {
@@ -159,7 +161,7 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         } as any)
     })
 
-    it('returns 200 with ok:false for nonexistent code (no reason field)', async () => {
+    it("returns 200 with ok:false + reason 'unavailable' for nonexistent code", async () => {
         // Arrange
         const mockTenantResult = { docs: [{ id: 'tenant-1' }] }
         const mockDiscountResult = { docs: [] }
@@ -185,12 +187,12 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         // Assert
         expect(response.status).toBe(200)
         expect(data.ok).toBe(false)
-        expect(data).not.toHaveProperty('reason')
+        expect(data.reason).toBe('unavailable') // collapsed — indistinguishable from a real-but-unavailable code
         expect(data).not.toHaveProperty('discountSen')
         expect(data).not.toHaveProperty('discount')
     })
 
-    it('returns 200 with ok:false for expired code (no reason)', async () => {
+    it("returns 200 with ok:false + reason 'unavailable' for expired code", async () => {
         // Arrange
         const pastDate = new Date(Date.now() - 86400000).toISOString()
         const mockTenantResult = { docs: [{ id: 'tenant-1' }] }
@@ -228,10 +230,10 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         // Assert
         expect(response.status).toBe(200)
         expect(data.ok).toBe(false)
-        expect(data).not.toHaveProperty('reason')
+        expect(data.reason).toBe('unavailable')
     })
 
-    it('returns 200 with ok:false for inactive discount (no reason)', async () => {
+    it("returns 200 with ok:false + reason 'unavailable' for inactive discount", async () => {
         // Arrange
         const mockTenantResult = { docs: [{ id: 'tenant-1' }] }
         const mockDiscount = {
@@ -268,10 +270,10 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         // Assert
         expect(response.status).toBe(200)
         expect(data.ok).toBe(false)
-        expect(data).not.toHaveProperty('reason')
+        expect(data.reason).toBe('unavailable')
     })
 
-    it('returns 200 with ok:false for usage limit reached (no reason)', async () => {
+    it("returns 200 with ok:false + reason 'at-limit' for usage limit reached", async () => {
         // Arrange
         const mockTenantResult = { docs: [{ id: 'tenant-1' }] }
         const mockDiscount = {
@@ -308,10 +310,10 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         // Assert
         expect(response.status).toBe(200)
         expect(data.ok).toBe(false)
-        expect(data).not.toHaveProperty('reason')
+        expect(data.reason).toBe('at-limit') // the ONE distinct reason — exhausted voucher
     })
 
-    it('returns 200 with ok:false for wrong tenant (no reason)', async () => {
+    it("returns 200 with ok:false + reason 'unavailable' for wrong tenant", async () => {
         // Arrange
         const mockTenantResult = { docs: [{ id: 'tenant-1' }] }
         const mockDiscount = {
@@ -348,7 +350,7 @@ describe('POST /api/storefront/discounts/apply — TC-F33-21: Failure silent rej
         // Assert
         expect(response.status).toBe(200)
         expect(data.ok).toBe(false)
-        expect(data).not.toHaveProperty('reason')
+        expect(data.reason).toBe('unavailable') // wrong-tenant collapsed with not-found → no enumeration
     })
 
     it('returns 200 with ok:false for nonexistent site (no leak)', async () => {

@@ -140,7 +140,7 @@ export function DiscountsTable({
                                 </td>
 
                                 {/* Value */}
-                                <td className="px-4 py-3 text-right">
+                                <td className="px-4 py-3 text-left">
                                     <span className="text-[13px] font-semibold tabular-nums" style={{ color: 'var(--dash-text)' }}>
                                         {fmtValue(discount.type, discount.value)}
                                     </span>

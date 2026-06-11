@@ -609,8 +609,8 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(setCookieHeader).toContain('mock-confirm-token')
     })
 
-    // ─── Re-priced shipping + tax at retry (recomputed, not stored) ─────
-    it('[TC-F13.158] re-prices shipping (flat) + 6% SST from current subtotal on retry', async () => {
+    // ─── Re-priced shipping at retry, no SST (recomputed, not stored) ─────
+    it('[TC-F13.158] re-prices flat shipping with no SST from current subtotal on retry', async () => {
         // Arrange — retry recomputes totals from current product prices, ignoring stale order fields
         mockFindByID.mockResolvedValue(VALID_PENDING_ORDER)
         mockCookies.mockResolvedValue({
@@ -621,7 +621,7 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         mockBuildOrderItems.mockResolvedValue({
             errorResponse: null,
             checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
-            subtotal: 50, // RM 50 → shipping flat RM10, SST 6% = RM3
+            subtotal: 50, // RM 50 → shipping flat RM10, no SST (F33 phase-06)
         })
         mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
         mockUpdate.mockResolvedValue({})
@@ -629,21 +629,23 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         // Act
         const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
 
-        // Assert — line items use recomputed flat shipping (1000 sen) + 6% SST (300 sen)
+        // Assert — line items use recomputed flat shipping (1000 sen); SST removed (F33 phase-06)
         expect(res.status).toBe(200)
         expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
             expect.objectContaining({
                 items: expect.arrayContaining([
                     expect.objectContaining({ name: 'Product' }),
                     expect.objectContaining({ name: 'Shipping', price: 1000 }),
-                    expect.objectContaining({ name: 'SST (6%)', price: 300 }),
                 ]),
             }),
         )
-        // And persists the re-priced totals so order.total matches the Stripe charge
+        // No SST line item on the Stripe charge
+        const sessionItems = mockCreateCheckoutSession.mock.calls[0][0].items
+        expect(sessionItems.some((i: { name: string }) => i.name === 'SST (6%)')).toBe(false)
+        // And persists the re-priced totals (tax 0) so order.total matches the Stripe charge
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({ subtotal: 50, shippingFee: 10, tax: 3, total: 63 }),
+                data: expect.objectContaining({ subtotal: 50, shippingFee: 10, tax: 0, total: 60 }),
             }),
         )
     })

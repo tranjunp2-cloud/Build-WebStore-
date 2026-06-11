@@ -9,6 +9,7 @@ import { DiscountFormFields, type DiscountDraft, type DiscountFormErrors } from 
 import { DiscountLivePreview } from './discount-live-preview'
 import { DiscountSaveBar } from './discount-save-bar'
 import { draftValueToStored } from '@/lib/discounts/draft-value'
+import { MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 
 export interface DiscountDoc {
     id: string
@@ -93,9 +94,10 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
             if (isNaN(v)) e.value = 'Enter a number.'
             else if (draft.type === 'percentage' && (v < 0 || v > 100)) e.value = 'Percentage must be between 0 and 100.'
             else if (draft.type === 'fixed' && v < 0) e.value = 'Fixed amount must be ≥ 0.'
+            else if (draft.type === 'fixed' && v > MAX_FIXED_DISCOUNT_RM) e.value = `Fixed amount is too large (max RM ${MAX_FIXED_DISCOUNT_RM.toLocaleString('en-MY')}).`
         }
 
-        if (draft.usageLimit !== '' && Number(draft.usageLimit) < 0) e.usageLimit = 'Usage limit must be ≥ 0.'
+        if (draft.usageLimit !== '' && Number(draft.usageLimit) < 1) e.usageLimit = 'Usage limit must be at least 1 (leave blank for unlimited).'
         if (draft.startsAt && draft.expiresAt && new Date(draft.startsAt) >= new Date(draft.expiresAt)) {
             e.dates = 'Start date must be before expiry date.'
         }
@@ -136,8 +138,8 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
 
             if (!res.ok) {
                 if (json?.error?.code === 'DUPLICATE_CODE') {
-                    setErrors((e) => ({ ...e, code: 'This code is already in use for your store.' }))
-                    toast.error('Duplicate code', { description: 'Choose a different code.' })
+                    setErrors((e) => ({ ...e, code: 'This code is already in use for your tenant. Try a different code or append a number.' }))
+                    toast.error('Duplicate code', { description: 'Try a different code or append a number.' })
                     return
                 }
                 throw new Error(json?.error?.message ?? 'Save failed')

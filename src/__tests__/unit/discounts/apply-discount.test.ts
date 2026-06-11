@@ -541,6 +541,35 @@ describe('applyDiscount — TC-F33-07: Usage limit reached', () => {
             expect(result.reason).toBe('at-limit')
         }
     })
+
+    // TC-F33-10-16 (Q10): proves the engine-level reason a usageLimit of 0 is banned at validation.
+    // If a 0 ever slipped past validation into the DB, the engine treats it as at-limit on first use
+    // (usageCount 0 >= limit 0) → silent reject. This is why createDiscountSchema enforces min 1.
+    it('treats usageLimit=0 as at-limit on the very first use (dead code)', () => {
+        // Arrange
+        const row: DiscountRow = {
+            id: '7',
+            code: 'BORNDEAD',
+            type: 'percentage',
+            value: 10,
+            status: 'active',
+            usageLimit: 0,
+            usageCount: 0,
+            startsAt: null,
+            expiresAt: null,
+            tenant: 'borndead',
+        }
+        const ctx = { subtotalSen: 10000, tenantId: 'borndead', now: new Date() }
+
+        // Act
+        const result = applyDiscount(row, ctx)
+
+        // Assert
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+            expect(result.reason).toBe('at-limit')
+        }
+    })
 })
 
 // ── TC-F33-08: Wrong tenant isolation ──────────────────────────────────────
