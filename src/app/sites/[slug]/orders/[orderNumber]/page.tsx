@@ -125,6 +125,8 @@ export default async function OrderTrackingPage({
         subtotal: order.subtotal ?? 0,
         shippingFee: order.shippingFee ?? 0,
         tax: order.tax ?? 0,
+        discountCode: order.discountCode ?? null,
+        discountAmount: order.discountAmount ?? 0, // sen — client divides by 100 for RM
         currency: order.currency ?? 'MYR',
         customerName: order.customerName ?? '',
         customerPhone: order.customerPhone ?? null,

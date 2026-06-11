@@ -211,10 +211,6 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                         <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.skuIdentification || 'SKU Identification'}</span>
                                         <span className="text-[14px] text-[#ADC7FF]">{product.sku || 'N/A'}</span>
                                     </div>
-                                    <div className="flex flex-col gap-[4px]">
-                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.taxConfiguration || 'Tax Configuration'}</span>
-                                        <span className="text-[14px] font-medium text-[#E1E2EB]">{t.dashboard?.products?.quickView?.taxesSst || 'Taxes: SST (6%) Incl.'}</span>
-                                    </div>
                                     <div className="flex flex-col gap-[4px] col-span-2">
                                         <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.categoryPath || 'Category Path'}</span>
                                         <div className="flex items-center gap-[8px] text-[14px] font-medium">

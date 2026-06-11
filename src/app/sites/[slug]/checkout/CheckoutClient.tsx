@@ -9,9 +9,10 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
-    QrCode, UploadCloud, FileImage, /* Tag, */ Info, Lock,
+    QrCode, UploadCloud, FileImage, Tag, Info, Lock,
     Landmark, Check,
 } from 'lucide-react'
+import { CheckoutDiscountField } from './CheckoutDiscountField'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
@@ -107,6 +108,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
     const [isPlacing, setIsPlacing] = useState(false)
+
+    // ── Discount state ───────────────────────────────────────────────
+    const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; type: 'percentage' | 'fixed'; value: number } | null>(null)
+    const [discountSen, setDiscountSen] = useState(0)
     const [showOverlay, setShowOverlay] = useState(false)
     const [overlayTakingLong, setOverlayTakingLong] = useState(false)
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -228,9 +233,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const sub = subtotal()
     const selectedState = states.find(s => s.id === Number(selectedStateId))
     const baseShipping = sub > 0 ? (selectedState?.zone === 'east' ? shippingEastRM : shippingWestRM) : 0
-    const shippingFee = freeAboveRM !== null && sub >= freeAboveRM ? 0 : baseShipping
-    const tax = Math.round(sub * 0.06 * 100) / 100
-    const total = sub + shippingFee + tax
+    // SST removed at checkout (F33 phase-06) — no tax line
+    const discountRM = discountSen / 100
+    // Free-ship gates on the POST-discount subtotal (F33 phase-07) — mirrors the server so UI total matches.
+    const effectiveSub = Math.max(0, sub - discountRM)
+    const shippingFee = freeAboveRM !== null && effectiveSub >= freeAboveRM ? 0 : baseShipping
+    const total = Math.round((Math.max(0, sub - discountRM) + shippingFee) * 100) / 100
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
@@ -361,6 +369,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         name: form.name, email: form.email, phone: form.phone,
                         address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
                     },
+                    ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
                 }
                 const res = await fetch('/api/orders/stripe-checkout', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stripePayload),
@@ -403,6 +412,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
                 },
                 paymentMethod,
+                ...(appliedDiscount ? { discountCode: appliedDiscount.code } : {}),
             }
 
             const res = await fetch('/api/orders/checkout', {
@@ -786,15 +796,21 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 ))}
                             </ul>
 
-                            {/* TODO: Promo/gift card — re-enable when promotion system is defined
-                            <div className="sum-promo">
-                                <Tag size={13} />
-                                <input placeholder="Promo or gift card code" />
-                                <button className="sp-ap" disabled>Apply</button>
-                            </div>
-                            */}
+                            <CheckoutDiscountField
+                                siteSlug={slug}
+                                siteId={siteId}
+                                subtotalSen={Math.round(sub * 100)}
+                                appliedDiscount={appliedDiscount}
+                                onApplied={(discount, sen) => { setAppliedDiscount(discount); setDiscountSen(sen) }}
+                                onRemoved={() => { setAppliedDiscount(null); setDiscountSen(0) }}
+                            />
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
-                            <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
+                            {appliedDiscount && discountSen > 0 && (
+                                <div className="sum-row sum-discount">
+                                    <span className="sr-l"><Tag size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />Discount {appliedDiscount.type === 'percentage' ? `(${appliedDiscount.value}%)` : ''}</span>
+                                    <span className="sr-v" style={{ color: 'var(--success, #0e7556)' }}>−{formatPrice(discountRM, currency)}</span>
+                                </div>
+                            )}
                             <div className="sum-row">
                                 <span className="sr-l">{ck.shipping} ({selectedState?.zone === 'east' ? 'East MY' : 'West MY'})</span>
                                 <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
@@ -803,12 +819,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 <>
                                     <div className="sum-nudge">
                                         <Truck size={12} />
-                                        {sub < freeAboveRM
-                                            ? <span>Add <strong>{formatPrice(freeAboveRM - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                                        {effectiveSub < freeAboveRM
+                                            ? <span>Add <strong>{formatPrice(freeAboveRM - effectiveSub, currency)}</strong> more for <strong>FREE shipping</strong></span>
                                             : <span><strong>FREE shipping</strong> unlocked!</span>}
                                     </div>
                                     <div className="sn-bar">
-                                        <div className="sn-fill" style={{ width: `${Math.min((sub / freeAboveRM) * 100, 100)}%` }} />
+                                        <div className="sn-fill" style={{ width: `${Math.min((effectiveSub / freeAboveRM) * 100, 100)}%` }} />
                                     </div>
                                 </>
                             )}
@@ -950,13 +966,32 @@ const CK_CSS = `
 .sum-nudge strong{color:var(--tl7);}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
 .sr-l{color:var(--f3);}
-/* TODO: Promo input CSS — re-enable with .sum-promo JSX above
-.sum-promo{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--inp);border:1.5px dashed var(--bd);border-radius:10px;margin-bottom:10px;}
-.sum-promo svg{color:var(--f4);flex-shrink:0;}
-.sum-promo input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;}
-.sum-promo input::placeholder{color:var(--f4);}
-.sp-ap{flex-shrink:0;font-size:12px;font-weight:700;color:var(--tl);background:transparent;border:none;padding:0;opacity:.4;cursor:not-allowed;}
-*/
+/* Discount field */
+.ck-discount{margin-bottom:10px;}
+.ck-dc-input{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;background:var(--inp);border:1.5px solid var(--bd2);border-radius:10px;transition:border-color .15s,box-shadow .15s;}
+.ck-dc-input:focus-within{border-color:var(--tlb);box-shadow:0 0 0 3px rgba(var(--accent-rgb,14,117,86),.10);background:#fff;}
+.ck-dc-input:focus-within>svg{color:#6b7280;}
+.ck-dc-input:focus-within input{color:#0c1014;}
+.ck-dc-input:focus-within input::placeholder{color:#9aa3ad;}
+.ck-dc-input.flash{border-color:#fca5a5;animation:dc-shake .35s ease;}
+@keyframes dc-shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+.ck-dc-input>svg{color:var(--f4);flex-shrink:0;}
+.ck-dc-input input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;height:32px;padding:0;}
+.ck-dc-input input::placeholder{color:var(--f4);}
+.ck-dc-apply{flex-shrink:0;height:32px;padding:0 14px;border-radius:7px;border:1.5px solid var(--tl2);background:var(--card);font-size:12.5px;font-weight:700;color:var(--tl);cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.ck-dc-apply:hover:not(:disabled){background:var(--tl5);}
+.ck-dc-apply:disabled{opacity:.4;cursor:not-allowed;}
+.ck-dc-hint{display:flex;align-items:center;gap:5px;font-size:11.5px;margin-top:5px;font-weight:500;}
+.ck-dc-hint.subtle{color:var(--f4);}
+.ck-dc-hint.error{color:#dc2626;}
+.ck-dc-applied{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--tl5);border:1.5px solid var(--tl2);border-radius:10px;margin-bottom:10px;}
+.ck-dc-tick{width:22px;height:22px;border-radius:999px;background:var(--tl);color:#fff;display:grid;place-items:center;flex-shrink:0;}
+.ck-dc-body{flex:1;min-width:0;}
+.ck-dc-code{font-size:13px;font-weight:600;color:var(--f1);}
+.ck-dc-chip{font-family:monospace;font-weight:700;color:var(--tl7);background:var(--tl2);padding:1px 6px;border-radius:4px;}
+.ck-dc-sub{font-size:11.5px;color:var(--tl7);margin-top:1px;font-weight:500;}
+.ck-dc-remove{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--f3);background:transparent;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;transition:color .12s,background .12s;}
+.ck-dc-remove:hover{color:#b91c1c;background:rgba(239,68,68,.08);}
 .sr-v{font-family:monospace;font-weight:500;color:var(--f2);white-space:nowrap;flex-shrink:0;}
 .sr-v.free{color:var(--tl);font-weight:700;font-family:inherit;}
 .sum-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 0;padding-top:16px;border-top:1px solid var(--bd);}

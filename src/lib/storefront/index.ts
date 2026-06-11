@@ -2,7 +2,6 @@ export {
     validateCheckoutForm,
     validateEmail,
     validatePhone,
-    calculateOrderTotals,
     generateOrderNumber,
     validatePaymentProof,
     PROOF_ACCEPTED_TYPES,

@@ -10,6 +10,13 @@
 > [!IMPORTANT]
 > **Out of Scope:** Subscription-tier promo codes (TC-F15.14–17, platform-level super-admin feature) are handled separately in F15. F33 covers **merchant-scoped discount management** and **gateway-agnostic checkout apply** (all payment methods: COD, QR-banking, Stripe).
 
+> [!NOTE]
+> **v1.1 deltas (2026-06-11) — the Gherkin below predates these, follow the deltas where they conflict:**
+> - **SST tax removed at checkout:** `finalAmount = (subtotal − discount) + shipping` (NO `+ tax`). US-F33-06 AC-3 / US-F33-07 AC-2 example totals that include RM6.60 tax are stale — drop the tax term. Free-ship gate compares against the **post-discount** subtotal.
+> - **Stripe line items (US-F33-07 AC-3):** a discounted order uses **one consolidated line item** = `finalAmount` (not the per-product pro-rated split shown). No Stripe Coupon, no negative items.
+> - **Invalid-code reject (US-F33-06/07 AC-4):** a **coarse reason-specific warning** shows below the input (at-limit → "…reached its usage limit…"; everything else collapsed → "…no longer available…") — not a fully silent drop. Order still proceeds at full price; reasons are collapsed so codes can't be enumerated.
+> - **Site scoping (PRD §9):** discount `site` is honoured at COD/Stripe checkout + storefront preview (null = all tenant sites). The admin form does not yet expose a site picker, so v1.0 discounts are effectively tenant-wide.
+
 ---
 
 ## US-F33-01: Tạo discount với loại percentage hoặc fixed

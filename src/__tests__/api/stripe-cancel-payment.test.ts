@@ -26,13 +26,20 @@ vi.mock('@/lib/orders/upload-token', () => ({
 vi.mock('@/lib/auth/order-token', () => ({
     verifyOrderToken: vi.fn(),
 }))
+// Mock the F33 discount release: it runs its own SQL (covered by release-discount-redemption.test.ts).
+// Mocking keeps it off the shared mockExecute so these CAS + restock call-count assertions stay precise.
+vi.mock('@/lib/discounts/release-discount-redemption', () => ({
+    releaseDiscountRedemption: vi.fn(() => Promise.resolve({ released: false })),
+}))
 
 import { POST } from '@/app/api/orders/[id]/cancel-payment/route'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 const mockVerifyConfirmToken = vi.mocked(verifyConfirmToken)
 const mockVerifyOrderToken = vi.mocked(verifyOrderToken)
+const mockReleaseDiscount = vi.mocked(releaseDiscountRedemption)
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -95,6 +102,9 @@ describe('POST /api/orders/[id]/cancel-payment [TC-F13.07]', () => {
         expect(body.success).toBe(true)
         expect(body.data.cancelled).toBe(true)
         expect(mockExecute).toHaveBeenCalledOnce()
+        // F33: the CAS winner releases the order's redeemed discount slot
+        expect(mockReleaseDiscount).toHaveBeenCalledOnce()
+        expect(mockReleaseDiscount).toHaveBeenCalledWith(expect.anything(), 78)
     })
 
     it('[TC-F13.07] cancels with a valid magic-link token when no cookie', async () => {

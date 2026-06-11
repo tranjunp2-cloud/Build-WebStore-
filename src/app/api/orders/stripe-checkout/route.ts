@@ -8,6 +8,9 @@ import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
+import { computeOrderTotal } from '@/lib/orders/order-total'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
@@ -180,10 +183,40 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
+        // Calculate totals (flat shipping — #962 will replace shipping calc).
+        // SST tax removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated.
         const shippingFee = 10
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
+        const tax = 0
+        const subtotalSen = Math.round(subtotal * 100)
+
+        // Discount: re-validate server-side from code — client amount is never trusted
+        let discountSen = 0
+        let discountRow: any = null
+        if (parse.data.discountCode) {
+            const code = String(parse.data.discountCode).trim().toUpperCase()
+            const discountResult = await payload.find({
+                collection: 'discounts',
+                // Site scoping (PRD §9): null site = all tenant sites; site-scoped = its own site only.
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { code: { equals: code } },
+                        { or: [{ site: { exists: false } }, { site: { equals: siteIdNum } }] },
+                    ],
+                },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            discountRow = discountResult.docs[0] ?? null
+            const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) discountSen = applied.discountSen
+            else discountRow = null
+        }
+        const discountRM = discountSen / 100
+        // Shared gateway-agnostic total (F33) — identical formula as COD/QR so all gateways charge the same.
+        const shippingFeeSen = Math.round(shippingFee * 100)
+        const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
         const magicLinkSecret = randomBytes(32).toString('hex')
@@ -209,6 +242,11 @@ export async function POST(request: NextRequest) {
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
+                    ...(discountRow ? {
+                        discount: discountRow.id,
+                        discountCode: discountRow.code,
+                        discountAmount: discountSen,
+                    } : {}),
                 } as Record<string, unknown>,
             })
 
@@ -231,6 +269,20 @@ export async function POST(request: NextRequest) {
                         '[stripe-checkout] free order aggregate stock decrement failed',
                     ))
                 }
+            }
+
+            // Redeem inline — free orders skip Stripe entirely, so no webhook/reconcile fires to do it.
+            if (discountRow && discountSen > 0) {
+                await recordDiscountRedemption(payload, {
+                    tenantId: Number(tenantId),
+                    discountId: Number(discountRow.id),
+                    orderId: Number(freeOrder.id),
+                    amountApplied: discountSen,
+                    discountCode: discountRow.code,
+                    discountType: discountRow.type,
+                    discountValue: Number(discountRow.value),
+                    customerEmail: customer.email,
+                })
             }
 
             return NextResponse.json({
@@ -276,6 +328,11 @@ export async function POST(request: NextRequest) {
                           country: customer.address.country || 'Malaysia',
                       }
                     : undefined,
+                ...(discountRow ? {
+                    discount: discountRow.id,
+                    discountCode: discountRow.code,
+                    discountAmount: discountSen,
+                } : {}),
             } as Record<string, unknown>,
         })
 
@@ -328,12 +385,16 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
 
-        // Include shipping and tax as Stripe line items so buyer is charged the full order total
-        const allCheckoutItems = [
-            ...checkoutItems,
-            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
-        ]
+        // When discount applied, use a single consolidated line item so Stripe charges
+        // exactly the discounted total. Stripe forbids negative line items, so per-item
+        // proportional split is not viable (Q2 confirmed: consolidated line is acceptable).
+        const finalTotalSen = Math.round(total * 100)
+        const allCheckoutItems = discountRow
+            ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
+            : [
+                ...checkoutItems,
+                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+              ]
 
         let checkout
         try {
@@ -401,6 +462,9 @@ export async function POST(request: NextRequest) {
             subtotal,
             shippingFee,
             total,
+            // Discount line — amount in RM (template formats with the same fp() as subtotal)
+            discountCode: discountRow?.code ?? null,
+            discountAmount: discountRM || null,
             currency,
             paymentMethod: 'stripe',
             event: 'placed',
