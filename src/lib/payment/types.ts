@@ -46,7 +46,7 @@ export type PaymentEventType =
     | 'refund_completed'
 
 export interface PaymentWebhookEvent {
-    provider: 'stripe' | 'ipay88' | 'revenue_monster' | 'toyyibpay'
+    provider: 'stripe' | 'ipay88' | 'revenue_monster' | 'toyyibpay' | 'xendit'
     type: PaymentEventType
     data: Record<string, any>
     rawEvent: any
@@ -78,3 +78,14 @@ export interface PaymentProvider {
     verifyWebhook(request: Request): Promise<PaymentWebhookEvent>
     refund?(paymentId: string, amount?: number): Promise<{ refundId: string }>
 }
+
+// ── Xendit Connect (F34) ─────────────────────────────────────────────
+
+export type XenditAccountStatus =
+    | 'NOT_CONNECTED'
+    | 'INVITED'
+    | 'REGISTERED'
+    | 'AWAITING_DOCS'
+    | 'PENDING_VERIFICATION'
+    | 'LIVE'
+    | 'SUSPENDED'

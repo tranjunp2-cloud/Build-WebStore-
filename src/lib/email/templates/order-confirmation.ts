@@ -41,8 +41,8 @@ export interface OrderConfirmationData {
     discountCode?: string | null
     shippingFee: number
     total: number
-    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer */
-    paymentMethod: 'cod' | 'stripe' | 'bank_transfer'
+    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer | 'xendit' = Xendit eWallet/FPX/QR */
+    paymentMethod: 'cod' | 'stripe' | 'bank_transfer' | 'xendit'
     shippingProvider?: string | null
     orderDate: string
     orderPageUrl: string

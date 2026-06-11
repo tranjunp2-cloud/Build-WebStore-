@@ -15,6 +15,7 @@ import { verifyOrderToken } from '@/lib/auth/order-token'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
+import { retryXenditPayment } from './retry-payment-xendit'
 
 // Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
 // 'payment_failed' (24h auto-cancel cron) — accept both so either path can be retried.
@@ -28,6 +29,8 @@ interface TenantDoc {
     stripeOnboardingComplete?: boolean
     status?: string
     payments?: { payment_card?: boolean; payment_fpx?: boolean }
+    xenditAccountId?: string | null
+    xenditOnboardingComplete?: boolean
 }
 
 /** Minimal site shape needed for this flow. */
@@ -106,9 +109,10 @@ export async function POST(
             )
         }
 
-        // Stripe-only: retry creates a Stripe Checkout session. Bank-transfer/COD orders use their
-        // own flows (receipt upload / cash) — never convert them to a Stripe charge via this endpoint.
-        if (order.paymentMethod !== 'card' && order.paymentMethod !== 'fpx') {
+        // Stripe-only guard — Xendit dispatch below (after tenant resolve) handles Xendit orders.
+        // Bank-transfer/COD orders use their own flows (receipt upload / cash) — never convert them
+        // to a Stripe charge via this endpoint.
+        if (order.paymentMethod !== 'card' && order.paymentMethod !== 'fpx' && order.paymentProvider !== 'xendit') {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_RETRYABLE', message: 'This payment method cannot be retried online' } },
                 { status: 409 },
@@ -133,6 +137,11 @@ export async function POST(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },
             )
+        }
+
+        // Xendit orders: dispatch to Xendit retry helper before Stripe-specific checks
+        if (order.paymentProvider === 'xendit') {
+            return retryXenditPayment(order, tenantDoc, payload)
         }
 
         const stripeAccountId = tenantDoc.stripeAccountId

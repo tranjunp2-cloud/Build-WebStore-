@@ -28,6 +28,32 @@ export const stripeCheckoutSchema = z.object({
     }),
 })
 
+// --- Create Order via Xendit Checkout (TNG / GrabPay / DuitNow QR / FPX) ---
+// channelCode required — unlike Stripe, buyer explicitly picks their wallet/method before checkout.
+// Phase B channels: TOUCHNGO, GRABPAY, QR_CODE (DuitNow), FPX. SHOPEEPAY/CARDS deferred to Phase C.
+export const xenditCheckoutSchema = z.object({
+    siteId: z.union([z.string(), z.number()]),
+    channelCode: z.enum(['TOUCHNGO', 'GRABPAY', 'QR_CODE', 'FPX']),
+    items: z.array(z.object({
+        productId: z.union([z.string(), z.number()]),
+        quantity: z.number().int().min(1).max(100),
+        variant: z.string().optional(),
+    })).min(1).max(MAX_CHECKOUT_ITEMS),
+    customer: z.object({
+        name: z.string().min(1).max(150),
+        email: z.string().email(),
+        phone: z.string().max(30).optional(),
+        address: z.object({
+            line1: z.string().trim().min(1, 'Address line 1 is required'),
+            line2: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            postcode: z.string().optional(),
+            country: z.string().optional(),
+        }),
+    }),
+})
+
 // --- Create Order (manual: COD/QR Banking) ---
 export const orderCreateSchema = z.object({
     siteId: z.union([z.string(), z.number()]),

@@ -123,6 +123,28 @@ const MIGRATIONS = [
     name: 'tenants.stripe_account_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS tenants_stripe_account_id_idx ON tenants (stripe_account_id);`,
   },
+  // ── Tenants: Xendit Connect (F34) ──
+  {
+    name: 'tenants.xendit_account_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS xendit_account_id varchar;`,
+  },
+  {
+    name: 'tenants.xendit_account_status',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS xendit_account_status varchar DEFAULT 'NOT_CONNECTED';`,
+  },
+  {
+    name: 'tenants.xendit_onboarding_complete',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS xendit_onboarding_complete boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.xendit_account_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_xendit_account_id_idx ON tenants (xendit_account_id);`,
+  },
+  // ── F34: Xendit payment method toggles on Tenants ──
+  { name: 'tenants.payments_xendit_tng', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_tng boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_grabpay', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_grabpay boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_duitnow', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_duitnow boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_fpx', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_fpx boolean DEFAULT false;` },
   // ── Tenants: Business info ──
   {
     name: 'tenants.whatsapp_number',
@@ -4014,6 +4036,12 @@ const MIGRATIONS = [
   { name: 'orders.enum_status_ready_to_ship', sql: `DO $$ BEGIN ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'ready_to_ship'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
+  // ── F34: Xendit payment fields on Orders ──
+  { name: 'orders.xendit_payment_request_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS xendit_payment_request_id varchar;` },
+  { name: 'orders.xendit_payment_request_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_xendit_payment_request_id_idx ON orders (xendit_payment_request_id);` },
+  { name: 'orders.xendit_channel_code', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS xendit_channel_code varchar;` },
+  { name: 'orders.payment_provider', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_provider varchar;` },
+  { name: 'orders.payment_provider_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_provider_idx ON orders (payment_provider);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
   { name: 'sites.payment_config_fpx_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_fpx_enabled boolean DEFAULT true;` },
   // ── F13: Tenant-level Card/FPX master toggles (docs/architecture/F13-payment-gateway.md §4) ──

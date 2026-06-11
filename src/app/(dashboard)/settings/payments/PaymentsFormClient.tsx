@@ -10,6 +10,7 @@ import { useI18n } from '@/i18n';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
+import { XenditConnectBlock } from './XenditConnectBlock';
 
 type Media = { id: string | number; url?: string; thumbnailURL?: string };
 
@@ -52,12 +53,26 @@ export function PaymentsFormClient({
     stripeAccountId = null,
     initialCardEnabled = false,
     initialFpxEnabled = false,
+    xenditAccountId = null,
+    xenditAccountStatus = 'NOT_CONNECTED',
+    xenditOnboardingComplete: _xenditOnboardingComplete = false,
+    initialXenditTngEnabled = false,
+    initialXenditGrabpayEnabled = false,
+    initialXenditDuitnowEnabled = false,
+    initialXenditFpxEnabled = false,
 }: {
     tenantId?: string;
     stripeOnboardingComplete?: boolean;
     stripeAccountId?: string | null;
     initialCardEnabled?: boolean;
     initialFpxEnabled?: boolean;
+    xenditAccountId?: string | null;
+    xenditAccountStatus?: string;
+    xenditOnboardingComplete?: boolean;
+    initialXenditTngEnabled?: boolean;
+    initialXenditGrabpayEnabled?: boolean;
+    initialXenditDuitnowEnabled?: boolean;
+    initialXenditFpxEnabled?: boolean;
 }) {
     const router = useRouter();
     const [paymentCod, setPaymentCod] = useState(false);
@@ -81,6 +96,15 @@ export function PaymentsFormClient({
     const [isVerifying, setIsVerifying] = useState(false);
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
+    // Xendit Connect states
+    const [xenditStatus, setXenditStatus] = useState(xenditAccountStatus ?? 'NOT_CONNECTED');
+    // xenditAccountIdState persisted for future display (account ID badge) — write-only for now
+    const [, setXenditAccountIdState] = useState(xenditAccountId ?? null);
+    // Xendit payment method toggles (shown only when LIVE)
+    const [tngEnabled, setTngEnabled] = useState(initialXenditTngEnabled ?? false);
+    const [grabpayEnabled, setGrabpayEnabled] = useState(initialXenditGrabpayEnabled ?? false);
+    const [duitnowEnabled, setDuitnowEnabled] = useState(initialXenditDuitnowEnabled ?? false);
+    const [fpxXenditEnabled, setFpxXenditEnabled] = useState(initialXenditFpxEnabled ?? false);
     const [isDirty, setIsDirty] = useState(false);
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
@@ -320,6 +344,10 @@ export function PaymentsFormClient({
                 account_holder_name: accountHolderName || null,
                 bank_name: bankName || null,
                 account_number: accountNumber || null,
+                xendit_tng: tngEnabled,
+                xendit_grabpay: grabpayEnabled,
+                xendit_duitnow: duitnowEnabled,
+                xendit_fpx: fpxXenditEnabled,
             });
             if (res.success) {
                 setIsDirty(false);
@@ -475,6 +503,75 @@ export function PaymentsFormClient({
                                 )}
                             </PaymentMethodCard>
                         </div>
+                    </div>
+                )}
+            </section>
+
+            {/* ─── Xendit (F34) ─── */}
+            <section className="space-y-[14px]">
+                <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
+                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
+                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
+                        Xendit — Ví &amp; Chuyển khoản (MY)
+                    </h2>
+                    <span className="ml-auto text-[12px] text-slate-500">TNG · GrabPay · DuitNow QR · FPX</span>
+                </div>
+
+                <XenditConnectBlock
+                    status={xenditStatus as any}
+                    tenantId={tenantId}
+                    onConnected={(accountId) => {
+                        setXenditAccountIdState(accountId);
+                        setXenditStatus('INVITED');
+                    }}
+                    onStatusChange={(newStatus) => {
+                        setXenditStatus(newStatus);
+                        setIsDirty(true);
+                    }}
+                />
+
+                {xenditStatus === 'LIVE' && (
+                    <div className="space-y-[12px]">
+                        <PaymentMethodCard
+                            icon={<span className="text-[18px]">💚</span>}
+                            iconTone="teal"
+                            title="Touch 'n Go (TNG)"
+                            feePill="1.3%"
+                            desc="Dompet digital #1 Malaysia (~62% thị phần)"
+                            on={tngEnabled}
+                            onChange={(v) => { setTngEnabled(v); setIsDirty(true); }}
+                            highlight={tngEnabled}
+                        />
+                        <PaymentMethodCard
+                            icon={<span className="text-[18px]">🟢</span>}
+                            iconTone="teal"
+                            title="GrabPay"
+                            feePill="1.3%"
+                            desc="Thanh toán qua app Grab"
+                            on={grabpayEnabled}
+                            onChange={(v) => { setGrabpayEnabled(v); setIsDirty(true); }}
+                            highlight={grabpayEnabled}
+                        />
+                        <PaymentMethodCard
+                            icon={<QrCode className="w-[22px] h-[22px]" />}
+                            iconTone="teal"
+                            title="DuitNow QR"
+                            feePill="~0.5%"
+                            desc="Scan QR — hỗ trợ tất cả ngân hàng MY"
+                            on={duitnowEnabled}
+                            onChange={(v) => { setDuitnowEnabled(v); setIsDirty(true); }}
+                            highlight={duitnowEnabled}
+                        />
+                        <PaymentMethodCard
+                            icon={<Landmark className="w-[22px] h-[22px]" />}
+                            iconTone="purple"
+                            title="FPX (Xendit)"
+                            feePill="RM1.20"
+                            desc="Online banking — cá nhân & doanh nghiệp"
+                            on={fpxXenditEnabled}
+                            onChange={(v) => { setFpxXenditEnabled(v); setIsDirty(true); }}
+                            highlight={fpxXenditEnabled}
+                        />
                     </div>
                 )}
             </section>

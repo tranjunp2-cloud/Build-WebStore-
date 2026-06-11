@@ -82,6 +82,10 @@ export async function POST(request: Request, ctx: RouteContext) {
         )
     }
 
+    // Xendit orders: no remote payment request void (KISS — an uncaptured PR expires on Xendit's
+    // side automatically; a captured one would already be 'paid' and guarded out by CAS above).
+    // If Xendit exposes a cancel endpoint in future, add a best-effort void call here (non-blocking).
+
     // Restock inventory for each order line — stock was decremented at checkout.
     // restockItem is variant-aware and atomic; never throws (returns skipped result on failure).
     const items = (order.items ?? []) as OrderItemDoc[]

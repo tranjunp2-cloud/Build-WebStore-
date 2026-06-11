@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { getStripeClient } from '@/lib/payment/stripe'
+import { createRefund } from '@/lib/payment/xendit'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
@@ -169,6 +170,65 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         const restockResults = await runRestockForItems(order.items)
         void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
+    }
+
+    // Xendit refund branch — keyed on paymentProvider field.
+    // CAS-before-remote: mark refunded in DB FIRST to prevent double-refund under retry storms,
+    // mirroring the Stripe pattern. If the Xendit API call subsequently fails, ops must reconcile
+    // via Xendit dashboard — we log the failure clearly and return 502.
+    if (order.paymentProvider === 'xendit') {
+        const tenantObj = typeof order.tenant === 'object' ? order.tenant : null
+        const forUserId: string | undefined = (tenantObj as any)?.xenditAccountId
+        if (!forUserId || !order.xenditPaymentRequestId) {
+            return NextResponse.json(
+                { success: false, error: { code: 'XENDIT_NOT_REFUNDABLE', message: 'Missing Xendit payment info for refund' } },
+                { status: 422 },
+            )
+        }
+
+        let xenditCasResult: { rows?: Array<Record<string, unknown>> }
+        try {
+            xenditCasResult = await (payload.db.drizzle as any).execute(sql`
+                UPDATE orders SET status = 'refunded'::enum_orders_status, payment_status = 'refunded', updated_at = NOW()
+                WHERE id = ${order.id}
+                AND status = ANY(ARRAY['shipped','completed']::enum_orders_status[])
+                RETURNING id
+            `)
+        } catch (err) {
+            payload.logger.error({ err: err instanceof Error ? err.message : String(err), orderId: id }, '[Refund] Xendit CAS failed')
+            return NextResponse.json(
+                { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
+                { status: 502 },
+            )
+        }
+        if (!xenditCasResult.rows?.length) {
+            return NextResponse.json(
+                { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+                { status: 400 },
+            )
+        }
+
+        let xenditRefund: { id: string; status: string }
+        try {
+            xenditRefund = await createRefund({
+                forUserId,
+                paymentRequestId: order.xenditPaymentRequestId,
+                // Xendit MYR = major unit (RM). order.total already RM. NO *100.
+                amount: order.total,
+                reason: 'REQUESTED_BY_CUSTOMER',
+            })
+        } catch (err) {
+            // CAS already committed — log clearly. Ops must handle via Xendit dashboard.
+            payload.logger.error({ err: err instanceof Error ? err.message : String(err), orderId: id }, '[Refund] Xendit createRefund failed after CAS — manual reconciliation required')
+            return NextResponse.json(
+                { success: false, error: { code: 'XENDIT_REFUND_ERROR', message: 'Refund recorded locally but Xendit API call failed. Contact support.' } },
+                { status: 502 },
+            )
+        }
+
+        const restockResults = await runRestockForItems(order.items)
+        void fireRefundEmail()
+        return NextResponse.json({ success: true, data: { refundId: xenditRefund.id }, restock: restockResults })
     }
 
     // Stripe orders — resolve connected account

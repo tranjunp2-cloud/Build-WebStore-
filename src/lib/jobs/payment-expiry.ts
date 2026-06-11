@@ -10,7 +10,8 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
         collection: 'orders',
         where: {
             and: [
-                { paymentMethod: { in: ['bank_transfer', 'card', 'fpx'] } },
+                // 'ewallet' covers Xendit TNG/GrabPay/DuitNow orders; paymentStatus + paymentExpiresAt are sufficient guardrails.
+                { paymentMethod: { in: ['bank_transfer', 'card', 'fpx', 'ewallet'] } },
                 { paymentStatus: { in: ['awaiting_payment', 'pending_verification', 'payment_failed', 'failed'] } },
                 { paymentExpiresAt: { less_than: now } },
             ],

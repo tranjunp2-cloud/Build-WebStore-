@@ -14,6 +14,11 @@ export type PaymentUpdates = {
     account_holder_name?: string | null;
     bank_name?: string | null;
     account_number?: string | null;
+    // Xendit toggles
+    xendit_tng?: boolean;
+    xendit_grabpay?: boolean;
+    xendit_duitnow?: boolean;
+    xendit_fpx?: boolean;
 };
 
 export async function getPaymentSettings() {
@@ -89,6 +94,38 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
                 paymentsData.payment_fpx = updates.payment_fpx;
             } else {
                 return { success: false, error: 'Invalid type for payment_fpx. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_tng !== undefined) {
+            if (typeof updates.xendit_tng === 'boolean') {
+                paymentsData.xendit_tng = updates.xendit_tng;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_tng. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_grabpay !== undefined) {
+            if (typeof updates.xendit_grabpay === 'boolean') {
+                paymentsData.xendit_grabpay = updates.xendit_grabpay;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_grabpay. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_duitnow !== undefined) {
+            if (typeof updates.xendit_duitnow === 'boolean') {
+                paymentsData.xendit_duitnow = updates.xendit_duitnow;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_duitnow. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_fpx !== undefined) {
+            if (typeof updates.xendit_fpx === 'boolean') {
+                paymentsData.xendit_fpx = updates.xendit_fpx;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_fpx. Expected boolean.' };
             }
         }
 
