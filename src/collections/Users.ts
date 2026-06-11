@@ -10,6 +10,8 @@ import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -237,6 +239,14 @@ export const Users: CollectionConfig = {
                 }
 
                 try {
+                    // NOTE: check→recordUsage is not atomic (no Payload cross-collection lock).
+                    // Concurrent invites can race past staff_limit by 1. Accepted tradeoff —
+                    // see upsertPlanSubscription note. Revisit if Payload exposes transactions.
+                    const inviteSub = await getActivePlanSubscription(req.payload, tenantIdForPayload)
+                    if (!inviteSub || !await canUseWithinLimit(req.payload, inviteSub.id, inviteSub.plan as PlanCode, 'staff_limit')) {
+                        return Response.json({ errors: [{ message: 'Staff limit reached on your current plan' }] }, { status: 403 })
+                    }
+
                     // Check if user exists
                     const users = await req.payload.find({ collection: 'users', where: { email: { equals: email } } })
                     let targetUser = users.docs[0]
@@ -328,6 +338,11 @@ export const Users: CollectionConfig = {
                         }
                     }
 
+                    try {
+                        await recordUsage(req.payload, inviteSub.id, 'staff_limit')
+                    } catch (err: unknown) {
+                        console.error('[StaffInvite] Failed to record staff_limit usage:', err)
+                    }
                     return Response.json({ message: 'Invitation sent successfully', emailSent })
                 } catch (error: any) {
                     console.error('[StaffInvite]', error)
@@ -419,6 +434,15 @@ export const Users: CollectionConfig = {
                     overrideAccess: true,
                     data: removeData
                 })
+
+                const removeSub = await getActivePlanSubscription(req.payload, tenantId)
+                if (removeSub) {
+                    try {
+                        await reduceUsage(req.payload, removeSub.id, 'staff_limit')
+                    } catch (err) {
+                        console.warn('[StaffRemove] Failed to reduce staff_limit usage:', err)
+                    }
+                }
 
                 return Response.json({ message: 'User removed from workspace successfully' })
             }
@@ -514,6 +538,23 @@ export const Users: CollectionConfig = {
                     overrideAccess: true,
                     data: updateData
                 })
+
+                // Sync staff_limit usage when owner status changes.
+                // Owners don't count toward staff_limit; non-owners do.
+                if (wasOwner !== becomesOwner) {
+                    try {
+                        const updateSub = await getActivePlanSubscription(req.payload, tenantId)
+                        if (updateSub) {
+                            if (wasOwner && !becomesOwner) {
+                                await recordUsage(req.payload, updateSub.id, 'staff_limit')
+                            } else {
+                                await reduceUsage(req.payload, updateSub.id, 'staff_limit')
+                            }
+                        }
+                    } catch (err: unknown) {
+                        console.warn('[StaffUpdate] Failed to adjust staff_limit usage:', err)
+                    }
+                }
 
                 return Response.json({ message: 'User updated successfully' })
             }
@@ -646,6 +687,8 @@ export const Users: CollectionConfig = {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
+                const bulkRemoveSub = await getActivePlanSubscription(req.payload, tenantId)
+
                 let removedCount = 0;
                 let errorCount = 0;
 
@@ -676,6 +719,14 @@ export const Users: CollectionConfig = {
                         removedCount++;
                     } catch (e) {
                         errorCount++;
+                    }
+                }
+
+                if (bulkRemoveSub && removedCount > 0) {
+                    try {
+                        await reduceUsage(req.payload, bulkRemoveSub.id, 'staff_limit', removedCount)
+                    } catch (err) {
+                        console.warn('[BulkStaffRemove] Failed to reduce staff_limit usage:', err)
                     }
                 }
 

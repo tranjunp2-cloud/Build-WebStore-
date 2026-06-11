@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getPayload } from 'payload';
+import config from '@payload-config';
 import { getCurrentUser } from '@/lib/auth';
+import { isSubscriptionActive } from '@/lib/subscriptions/plan-subscription';
 
 export async function GET() {
     try {
@@ -14,16 +17,24 @@ export async function GET() {
         const activeTenantId = typeof firstTenant === 'string' ? firstTenant : firstTenant?.id;
 
         if (!activeTenantId) {
-            return NextResponse.json({ action: 'force_logout', reason: 'Missing Tenant' });
+            // No tenants = user was removed from their only workspace.
+            // Note: detecting removal from one workspace while still in another requires
+            // the client to pass the active tenantId as a query param — not yet implemented.
+            return NextResponse.json({ action: 'force_logout', reason: 'Removed from workspace' });
         }
 
-        const isStillInTenant = tenants?.some((t) => {
-            const tId = typeof t.tenant === 'object' ? t.tenant?.id : t.tenant;
-            return tId === activeTenantId;
+        // Subscription expiry check — only evict if a row exists but is no longer active.
+        // No row = new/unprovisioned tenant still onboarding → let through.
+        const payload = await getPayload({ config });
+        const subResult = await payload.find({
+            collection: 'plan-subscriptions',
+            where: { and: [{ tenant: { equals: activeTenantId } }, { name: { equals: 'main' } }] },
+            sort: '-createdAt',
+            limit: 1,
         });
-
-        if (!isStillInTenant) {
-            return NextResponse.json({ action: 'force_logout', reason: 'Removed from workspace' });
+        const subRow = subResult.docs[0];
+        if (subRow && !isSubscriptionActive(subRow as unknown as Parameters<typeof isSubscriptionActive>[0])) {
+            return NextResponse.json({ action: 'force_logout', reason: 'subscription_expired' });
         }
 
         const response = NextResponse.json({ ok: true });

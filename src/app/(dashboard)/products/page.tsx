@@ -18,6 +18,7 @@ import { ProductDetailsMobile } from '@/components/dashboard/product-form/Produc
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { Pagination } from '@/components/ui/Pagination'
 import { useI18n } from '@/i18n'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
@@ -87,6 +88,7 @@ function getImageUrl(image: ProductImage | string | null): string | null {
 
 export default function ProductsPage() {
     const { t } = useI18n()
+    const sub = t.common.subscriptionErrors
     const router = useRouter()
     const [products, setProducts] = useState<Product[]>([])
     const [categories, setCategories] = useState<Category[]>([])
@@ -236,7 +238,7 @@ export default function ProductsPage() {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
         } catch (e: unknown) {
-            toast.error(t.dashboard.products.form.failedUpdateStatus)
+            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
             setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
         }
     }
@@ -247,7 +249,7 @@ export default function ProductsPage() {
             toast.success(t.dashboard.products.form.restored)
             loadProducts()
         } catch(e: unknown) {
-            toast.error(t.dashboard.products.form.failedRestore)
+            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedRestore, sub))
         }
     }
 
@@ -286,7 +288,7 @@ export default function ProductsPage() {
                 duration: 5000,
             })
         } catch(e: unknown) {
-            toast.error(t.dashboard.products.form.failedDelete)
+            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedDelete, sub))
             setProductToDelete(null)
             loadProducts()
         } finally {

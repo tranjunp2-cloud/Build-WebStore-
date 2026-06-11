@@ -54,6 +54,25 @@ vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((blocks: unknown[]) => blocks),
 }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1',
+        plan: 'PROFESSIONAL_TM_USER',
+        status: 'active',
+        startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    isSubscriptionActive: vi.fn().mockReturnValue(true),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+    recordUsage: vi.fn().mockResolvedValue(undefined),
+    reduceUsage: vi.fn().mockResolvedValue(undefined),
+    getConsumed: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
+
 const makeReq = (siteId: string, pageId: string | null, body: Record<string, unknown>) => {
     const url = pageId
         ? `http://localhost:3000/api/sites/${siteId}/save?pageId=${pageId}`

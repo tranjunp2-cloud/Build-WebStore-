@@ -3,6 +3,8 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 import { validateContentFields } from './validate-content-fields'
 
@@ -57,6 +59,11 @@ export async function saveEmailTemplateConfig(
 
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' }
+        }
+
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'email_template_configuration')) {
+            return { success: false, error: 'Email template configuration is not available on your current plan.' }
         }
 
         // Server-side guard: critical templates cannot be disabled

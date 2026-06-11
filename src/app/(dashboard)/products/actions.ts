@@ -3,6 +3,8 @@
 import { getPayload, type Where } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser, extractTenantId } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 // Upper bound for SKU conflict query results. If totalDocs exceeds this, the save is aborted
 // with a user-facing error. In practice a single SKU or small batch rarely matches > 100 products.
@@ -164,6 +166,7 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             id,
             data,
             user,
+            overrideAccess: false,
         })
         return JSON.parse(JSON.stringify(res))
     } else {
@@ -171,6 +174,7 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             collection: 'products',
             data,
             user,
+            overrideAccess: false,
         })
         return JSON.parse(JSON.stringify(res))
     }
@@ -190,11 +194,21 @@ export async function updateProductFieldAction(id: string | number, data: unknow
     const validated = ProductFieldUpdateSchema.parse(data)
     const payload = await getPayload({ config: configPromise })
 
-    // Access gate: findByID with user enforces tenant-scoped access check.
+    // Subscription gate — checked here because the update below uses overrideAccess: true
+    // (required to work around a Payload 3.79 bug with variant array 'id' fields).
+    const tenantId = extractTenantId(user)
+    if (tenantId) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !(await canUse(payload, sub.plan as PlanCode, 'product_management'))) {
+            throw new Error('Product management is not available on your current plan.')
+        }
+    }
+
+    // Tenant-scoped existence check — rejects updates on products not belonging to this tenant.
     // depth:0 returns raw IDs (no populated objects) so variants/variantConfigs come back
     // as plain objects ready to be re-passed to update.
     const existing = await payload.findByID({
-        collection: 'products', id, user, depth: 0, disableErrors: true,
+        collection: 'products', id, user, depth: 0, overrideAccess: false, disableErrors: true,
     })
     if (!existing) throw new Error('Product not found or access denied')
 
@@ -253,6 +267,7 @@ export async function deleteProductAction(id: string | number) {
             deletedAt: new Date().toISOString(),
         },
         user,
+        overrideAccess: false,
     })
     return JSON.parse(JSON.stringify(res))
 }

@@ -23,6 +23,13 @@ vi.mock('@/i18n', () => ({
     useI18n: vi.fn(() => ({
         locale: 'en',
         t: {
+            common: {
+                subscriptionErrors: {
+                    featureLocked: 'This feature is not available on your current plan.',
+                    subscriptionExpired: 'Your subscription has expired. Please renew to continue.',
+                    genericLocked: 'This feature is not available on your current plan.',
+                },
+            },
             editor: {
                 template: {
                     title: 'Choose a Template', searchPlaceholder: 'Search templates...',

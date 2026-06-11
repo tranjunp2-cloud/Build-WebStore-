@@ -5,6 +5,8 @@ import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
 import psl from 'psl';
 import { getCurrentTenantId } from '@/lib/auth';
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
+import type { PlanCode } from '@/collections/PlanSubscriptions';
 import {
     addProjectDomain,
     verifyProjectDomain,
@@ -106,6 +108,15 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
     }
 
     const payload = await getPayloadHMR({ config: configPromise });
+
+    const domainSub = await getActivePlanSubscription(payload, tenantId)
+    if (!domainSub) {
+        return { success: false, error: 'Subscription expired' }
+    }
+    const domainAllowed = await canUse(payload, domainSub.plan as PlanCode, 'domain_connection')
+    if (!domainAllowed) {
+        return { success: false, error: 'Feature not available on your current plan' }
+    }
 
     const current = await getTenantDomains(payload, tenantId);
 

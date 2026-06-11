@@ -3,6 +3,9 @@ import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
@@ -21,7 +24,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  *
  * Returns: { success, data: { refundId }, restock: RestockResult[] }
  */
-export const POST = withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
+export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
     const payload = await getPayload({ config })
 
@@ -45,6 +48,10 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant),
     )
     const orderTenantId = String(typeof order.tenant === 'object' ? order.tenant.id : order.tenant)
+
+    const emailSub = await getActivePlanSubscription(payload, orderTenantId)
+    const canSendRefundEmail = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
+
     if (!userTenantIds.includes(orderTenantId)) {
         return NextResponse.json(
             { success: false, error: { code: 'FORBIDDEN' } },
@@ -171,7 +178,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         // Runs only on the CAS winner; idempotent + non-throwing (no-op when the order never redeemed).
         await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
     }
 
@@ -262,7 +269,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         // status rolls back below. releaseDiscountRedemption is idempotent + non-throwing.
         await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: refund.id }, restock: restockResults })
     } catch (err: any) {
         // 'charge_already_refunded' means the refund exists on Stripe — idempotent success.
@@ -272,7 +279,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             // Refund exists on Stripe → same irreversible-success semantics: release + restock.
             await releaseDiscountRedemption(payload, Number(order.id))
             const restockResults = await runRestockForItems(order.items)
-            void fireRefundEmail()
+            if (canSendRefundEmail) void fireRefundEmail()
             return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
         }
         // Genuine Stripe failure — roll back our pre-set status.
@@ -297,4 +304,4 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { status: 502 },
         )
     }
-})
+}))

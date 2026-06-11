@@ -3,6 +3,8 @@
 import { getPayload, type Where, type PayloadRequest } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 // ─── Types & Helpers ──────────────────────────────────────────────────────
 type TenantEntry = { tenant: { id: string } | string; role?: string; status?: string }
@@ -54,6 +56,13 @@ export async function createBlogCategoryAction(data: { name: string }) {
 
     const payload = await getPayload({ config: configPromise })
     const tenantId = getTenantId(user as UserWithTenants)
+
+    if (tenantId != null) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+            return { error: 'Content management is not available on your current plan.' }
+        }
+    }
 
     let siteId = null
     if (tenantId) {
@@ -117,6 +126,14 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
         // Check Tenant Isolation
         const existing = await payload.findByID({ collection: 'blog_categories', id })
         const tenantId = getTenantId(user as UserWithTenants)
+
+        if (tenantId != null) {
+            const sub = await getActivePlanSubscription(payload, tenantId)
+            if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+                return { error: 'Content management is not available on your current plan.' }
+            }
+        }
+
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
@@ -174,6 +191,14 @@ export async function deleteBlogCategoryAction(id: string) {
         // Check Tenant Isolation
         const existing = await payload.findByID({ collection: 'blog_categories', id })
         const tenantId = getTenantId(user as UserWithTenants)
+
+        if (tenantId != null) {
+            const sub = await getActivePlanSubscription(payload, tenantId)
+            if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+                return { error: 'Content management is not available on your current plan.' }
+            }
+        }
+
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
@@ -243,6 +268,13 @@ export async function saveBlogAction(data: {
 
     // Get the first tenant from user's tenants array (similar to how Products does)
     const tenantId = getTenantId(user as UserWithTenants)
+
+    if (tenantId != null) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+            return { error: 'Content management is not available on your current plan.' }
+        }
+    }
 
     // Fetch the site associated with this tenant
     let siteId = null
@@ -376,8 +408,16 @@ export async function deleteBlogAction(id: string) {
 
     const payload = await getPayload({ config: configPromise })
 
-    const existing = await payload.findByID({ collection: 'blogs', id })
     const tenantId = getTenantId(user as UserWithTenants)
+
+    if (tenantId != null) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+            return { success: false, error: 'Content management is not available on your current plan.' }
+        }
+    }
+
+    const existing = await payload.findByID({ collection: 'blogs', id })
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
     if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
@@ -403,6 +443,13 @@ export async function bulkDeleteBlogsAction(ids: string[]) {
     const payload = await getPayload({ config: configPromise })
     const tenantId = getTenantId(user as UserWithTenants)
 
+    if (tenantId != null) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+            return { deleted: 0, error: 'Content management is not available on your current plan.' }
+        }
+    }
+
     // Single query: delete all matching IDs scoped to tenant
     const where: Where = {
         id: { in: ids },
@@ -425,8 +472,16 @@ export async function updateBlogStatusAction(id: string, status: string) {
 
     const payload = await getPayload({ config: configPromise })
 
-    const existing = await payload.findByID({ collection: 'blogs', id })
     const tenantId = getTenantId(user as UserWithTenants)
+
+    if (tenantId != null) {
+        const sub = await getActivePlanSubscription(payload, tenantId)
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'content_management')) {
+            return { error: 'Content management is not available on your current plan.' }
+        }
+    }
+
+    const existing = await payload.findByID({ collection: 'blogs', id })
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
     if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {

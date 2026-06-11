@@ -544,8 +544,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 const genError = getGenerationError(response.status, errorBody)
                 const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
 
-                // 402 → show PaywallCard instead of form
-                if (response.status === 402) {
+                // 402/403 → show PaywallCard (free limit exceeded or feature/subscription gated)
+                if (response.status === 402 || response.status === 403) {
                     setShowPaywall(true)
                     setStep('info')
                     return

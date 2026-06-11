@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -16,7 +17,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { seoFixSchema } from '@/lib/validations/seo'
 import { parseRequest } from '@/lib/validations/helpers'
 
-export const POST = withAuth(async (user, request) => {
+export const POST = withFeatureGuard('content_management')(withAuth(async (user, request) => {
     try {
         const payload = await getPayload({ config })
 
@@ -159,4 +160,4 @@ export const POST = withAuth(async (user, request) => {
             { status: 500 }
         )
     }
-})
+}))

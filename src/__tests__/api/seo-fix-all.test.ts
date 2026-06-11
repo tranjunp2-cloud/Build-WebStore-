@@ -6,6 +6,9 @@ const mockUser = { id: 1, roles: [] as string[], tenants: [{ tenant: 'tenant-1' 
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn((handler: any) => async (req: any) => handler(mockUser, req)),
 }))
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
 
 const mockFindByID = vi.fn()
 vi.mock('payload', () => ({

@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { rejectPaymentSchema } from '@/lib/validations/orders'
 import { signOrderToken } from '@/lib/auth/order-token'
@@ -16,7 +17,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * Guards: paymentMethod==='bank_transfer' + paymentStatus==='pending_verification'
  * Rotates magicLinkSecret so old upload links are invalidated.
  */
-export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
+export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { id } = await ctx.params
 
@@ -101,4 +102,4 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 }
         )
     }
-})
+}))

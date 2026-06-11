@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getBlogCategoriesAction, listBlogsAction, deleteBlogAction, bulkDeleteBlogsAction, updateBlogStatusAction } from './actions'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 
 type BlogPost = {
     id: string
@@ -75,6 +76,7 @@ function BlogCheckbox({ checked, onClick }: { checked: boolean; onClick: () => v
 
 export default function BlogListPage() {
     const { t } = useI18n()
+    const sub = t.common.subscriptionErrors
     const router = useRouter()
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [meta, setMeta] = useState<BlogMeta | null>(null)
@@ -151,7 +153,11 @@ export default function BlogListPage() {
         if (!deleteTarget) return
         setIsDeleting(true)
         try {
-            await deleteBlogAction(deleteTarget.id)
+            const result = await deleteBlogAction(deleteTarget.id)
+            if (result && 'error' in result && result.error) {
+                toast.error(resolveApiError(result, t.dashboard.blog.actions.deleteFailed, sub))
+                return
+            }
             toast.success(t.dashboard.blog.actions.deleteSuccess.replace('{title}', deleteTarget.title))
             fetchPosts()
             setSelectedIds((prev) => {
@@ -170,7 +176,11 @@ export default function BlogListPage() {
     const handleToggleStatus = async (post: BlogPost) => {
         const newStatus = post.status === 'published' ? 'draft' : 'published'
         try {
-            await updateBlogStatusAction(post.id, newStatus)
+            const result = await updateBlogStatusAction(post.id, newStatus)
+            if (result && typeof result === 'object' && 'error' in result && result.error) {
+                toast.error(resolveApiError(result, t.dashboard.blog.actions.updateFailed, sub))
+                return
+            }
             toast.success(t.dashboard.blog.actions.statusUpdated.replace('{status}', newStatus === 'published' ? t.dashboard.blog.filters.published.toLowerCase() : t.dashboard.blog.filters.draft.toLowerCase()))
             fetchPosts()
         } catch {
@@ -182,7 +192,11 @@ export default function BlogListPage() {
         if (selectedIds.size === 0) return
         setBulkActionLoading(true)
         try {
-            await bulkDeleteBlogsAction(Array.from(selectedIds))
+            const result = await bulkDeleteBlogsAction(Array.from(selectedIds))
+            if (result && 'error' in result && result.error) {
+                toast.error(resolveApiError(result, t.dashboard.blog.actions.bulkDeleteFailed, sub))
+                return
+            }
             toast.success(t.dashboard.blog.actions.bulkDeleteSuccess.replace('{count}', selectedIds.size.toString()))
             setSelectedIds(new Set())
             fetchPosts()
@@ -197,9 +211,15 @@ export default function BlogListPage() {
         if (selectedIds.size === 0) return
         setBulkActionLoading(true)
         try {
-            await Promise.all(
+            const results = await Promise.all(
                 Array.from(selectedIds).map((id) => updateBlogStatusAction(id, 'published'))
             )
+            const blocked = results.find(r => r && typeof r === 'object' && 'error' in r && r.error)
+            if (blocked && typeof blocked === 'object' && 'error' in blocked) {
+                toast.error(resolveApiError(blocked, t.dashboard.blog.actions.bulkPublishFailed, sub))
+                fetchPosts()
+                return
+            }
             toast.success(t.dashboard.blog.actions.bulkPublishSuccess.replace('{count}', selectedIds.size.toString()))
             setSelectedIds(new Set())
             fetchPosts()

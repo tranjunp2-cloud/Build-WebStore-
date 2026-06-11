@@ -36,6 +36,9 @@ import { ContentPacks } from './collections/ContentPacks'
 import { TemplateVersions } from './collections/TemplateVersions'
 import { Customers } from './collections/Customers'
 import { EmailTemplateSettings } from './collections/EmailTemplateSettings'
+import { PlanSubscriptions } from './collections/PlanSubscriptions'
+import { PlanSubscriptionUsages } from './collections/PlanSubscriptionUsages'
+import { PlanFeatures } from './collections/PlanFeatures'
 import { Discounts } from './collections/Discounts'
 import { DiscountUsageHistory } from './collections/DiscountUsageHistory'
 
@@ -146,6 +149,9 @@ export default buildConfig({
     TemplateVersions,
     Customers,
     EmailTemplateSettings,
+    PlanSubscriptions,
+    PlanSubscriptionUsages,
+    PlanFeatures,
     Discounts,
     DiscountUsageHistory,
   ],

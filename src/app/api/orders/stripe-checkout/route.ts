@@ -14,6 +14,8 @@ import { computeOrderTotal } from '@/lib/orders/order-total'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -133,6 +135,16 @@ export async function POST(request: NextRequest) {
                 { status: 403 },
             )
         }
+
+        // Permissive pattern: only block if sub exists AND feature is explicitly disabled
+        const checkoutSub = await getActivePlanSubscription(payload, tenantId)
+        if (checkoutSub && !await canUse(payload, checkoutSub.plan as PlanCode, 'allowing_buyer_making_order')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Checkout is currently unavailable' } },
+                { status: 403 },
+            )
+        }
+        const canSendBuyerEmail = !checkoutSub || await canUse(payload, checkoutSub.plan as PlanCode, 'email_confirmation')
 
         // Step 3: Stripe-ready check
         const stripeAccountId = tenantTyped.stripeAccountId
@@ -471,8 +483,10 @@ export async function POST(request: NextRequest) {
             orderDate: new Date().toISOString(),
             orderPageUrl,
         })
-        payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
-            .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
+        if (canSendBuyerEmail) {
+            payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
+                .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
+        }
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
         const res = NextResponse.json({

@@ -90,6 +90,23 @@ describe('POST /api/v1/sso/provision', () => {
         expect(res.data.message).toContain('Missing required fields')
     })
 
+    it('rejects if pack_code is not a valid subscription code', async () => {
+        mockPayload.auth.mockResolvedValue({
+            user: { roles: ['super-admin'] }
+        })
+        const req = createMockRequest({ authorization: 'Bearer token123' }, {
+            company_name: 'Test Co',
+            email: 'new@test.com',
+            password: 'pass',
+            pack_code: 'BUSINESS',
+            first_name: 'Test',
+        })
+        const res = await POST(req) as unknown as { data: any, status: number }
+
+        expect(res.status).toBe(400)
+        expect(res.data.message).toContain('Invalid subscription_code')
+    })
+
     it('rejects if email already exists', async () => {
         mockPayload.auth.mockResolvedValue({
             user: { roles: ['super-admin'] }
@@ -124,7 +141,7 @@ describe('POST /api/v1/sso/provision', () => {
             company_name: 'Test Co',
             email: 'new@test.com',
             password: 'secret_password_123',
-            pack_code: 'BUSINESS',
+            pack_code: 'professional',
             name: 'John Doe Lee', // test full name parsing
             phone: '123456789',
             customer_id_number: 'CUS123',
