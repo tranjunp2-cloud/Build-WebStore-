@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import type { Where } from 'payload'
 import config from '@payload-config'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
 
@@ -29,6 +31,11 @@ export async function GET(
         })
         const tenant = tenantResult.docs[0] as any
         if (!tenant) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+
+        const trackSub = await getActivePlanSubscription(payload, tenant.id)
+        if (trackSub && !await canUse(payload, trackSub.plan as PlanCode, 'allowing_buyer_tracking_order')) {
+            return NextResponse.json({ error: 'Order tracking is currently unavailable' }, { status: 403 })
+        }
 
         const siteResult = await payload.find({
             collection: 'sites',

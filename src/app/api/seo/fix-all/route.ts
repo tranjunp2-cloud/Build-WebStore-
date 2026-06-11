@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
 import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
@@ -21,7 +22,7 @@ const fixAllSchema = z.object({
  * POST /api/seo/fix-all
  * Proposes fixes for multiple missing SEO fields simultaneously using AI.
  */
-export const POST = withAuth(async (_user, request) => {
+export const POST = withFeatureGuard('content_management')(withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, fixAllSchema)
         if (errorResponse) return errorResponse
@@ -113,4 +114,4 @@ export const POST = withAuth(async (_user, request) => {
             { status: 500 }
         )
     }
-})
+}))

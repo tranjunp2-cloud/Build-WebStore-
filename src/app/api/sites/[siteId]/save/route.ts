@@ -4,6 +4,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { sql } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
@@ -87,6 +89,21 @@ export async function PATCH(
         const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
         if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        const sub = await getActivePlanSubscription(payload, siteTenantId)
+        if (!sub) {
+            return NextResponse.json(
+                { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found' } },
+                { status: 403 },
+            )
+        }
+        const builderAllowed = await canUse(payload, sub.plan as PlanCode, 'website_builder')
+        if (!builderAllowed) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FEATURE_LOCKED', message: 'This feature is not available on your current plan' } },
+                { status: 403 },
+            )
         }
 
         const pageId = req.nextUrl.searchParams.get('pageId')

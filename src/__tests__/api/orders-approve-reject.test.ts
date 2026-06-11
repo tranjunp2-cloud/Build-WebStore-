@@ -26,6 +26,16 @@ vi.mock('@/lib/email/templates/payment-confirmed', () => ({
 vi.mock('@/lib/email/templates/payment-rejected', () => ({
     paymentRejectedEmail: vi.fn(() => ({ subject: 'rejected', html: '<p>rejected</p>' })),
 }))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
 
 import { PATCH as ApprovePATCH } from '@/app/api/orders/[id]/approve-payment/route'
 import { PATCH as RejectPATCH } from '@/app/api/orders/[id]/reject-payment/route'

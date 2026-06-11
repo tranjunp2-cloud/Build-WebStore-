@@ -3,6 +3,9 @@ import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
@@ -20,7 +23,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  *
  * Returns: { success, data: { refundId }, restock: RestockResult[] }
  */
-export const POST = withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
+export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
     const payload = await getPayload({ config })
 
@@ -44,6 +47,10 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant),
     )
     const orderTenantId = String(typeof order.tenant === 'object' ? order.tenant.id : order.tenant)
+
+    const emailSub = await getActivePlanSubscription(payload, orderTenantId)
+    const canSendRefundEmail = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
+
     if (!userTenantIds.includes(orderTenantId)) {
         return NextResponse.json(
             { success: false, error: { code: 'FORBIDDEN' } },
@@ -167,7 +174,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         }
         // --- refund financially committed via CAS; restock is best-effort ---
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
     }
 
@@ -255,7 +262,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
         // Restock ONLY after Stripe irreversibly succeeds — retry-safe (CAS blocks 2nd refund).
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: refund.id }, restock: restockResults })
     } catch (err: any) {
         // 'charge_already_refunded' means the refund exists on Stripe — idempotent success.
@@ -263,7 +270,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         // CAS + idempotencyKey prevent any double-charge.
         if (err?.code === 'charge_already_refunded') {
             const restockResults = await runRestockForItems(order.items)
-            void fireRefundEmail()
+            if (canSendRefundEmail) void fireRefundEmail()
             return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
         }
         // Genuine Stripe failure — roll back our pre-set status.
@@ -288,4 +295,4 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { status: 502 },
         )
     }
-})
+}))

@@ -52,15 +52,44 @@ describe('Products Collection Hooks (TC-F08)', () => {
             expect(access).toBe(true)
         })
         
-        it('TC-F08-G-03: Users can only update products matching their tenant', () => {
-            const req = { user: { tenants: [{ tenant: 'tenant-1' }, { tenant: 'tenant-2' }] } } as any
-            const access = Products.access!.update!({ req } as any)
+        it('TC-F08-G-03: Users can only update products matching their tenant', async () => {
+            // Mock multiple find() calls: plan-subscriptions and plan-features
+            const req = {
+                user: { tenants: [{ tenant: 'tenant-1' }, { tenant: 'tenant-2' }] },
+                payload: {
+                    find: vi.fn().mockImplementation(async (opts: any) => {
+                        if (opts.collection === 'plan-subscriptions') {
+                            return {
+                                docs: [{
+                                    id: 'sub-1',
+                                    plan: 'PROFESSIONAL_TM_USER',
+                                    status: 'active',
+                                    endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                                    canceledAt: null,
+                                    canceledImmediately: false,
+                                }],
+                            }
+                        }
+                        if (opts.collection === 'plan-features') {
+                            return {
+                                docs: [{
+                                    planCode: 'PROFESSIONAL_TM_USER',
+                                    featureCode: 'product_management',
+                                    value: 'UNLIMITED',
+                                }],
+                            }
+                        }
+                        return { docs: [] }
+                    }),
+                },
+            } as any
+            const access = await Products.access!.update!({ req } as any)
             expect(access).toEqual({ tenant: { in: ['tenant-1', 'tenant-2'] } })
         })
         
-        it('TC-F08-G-03: Users without tenant mapping receive false for update', () => {
+        it('TC-F08-G-03: Users without tenant mapping receive false for update', async () => {
             const req = { user: { tenants: [] } } as any
-            const access = Products.access!.update!({ req } as any)
+            const access = await Products.access!.update!({ req } as any)
             expect(access).toBe(false)
         })
     })

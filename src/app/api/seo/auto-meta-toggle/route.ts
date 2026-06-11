@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 
 /**
  * POST /api/seo/auto-meta-toggle
  * Toggle auto meta generation for a site.
  * Body: { siteId: string, enabled: boolean }
  */
-export const POST = withAuth(async (user, request) => {
+export const POST = withFeatureGuard('sitemap_robot_configuration')(withAuth(async (user, request) => {
     try {
         const { siteId, enabled } = await request.json()
         if (!siteId) {
@@ -41,4 +42,4 @@ export const POST = withAuth(async (user, request) => {
             { status: 500 },
         )
     }
-})
+}))

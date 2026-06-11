@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { paymentConfirmedEmail } from '@/lib/email/templates/payment-confirmed'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -12,7 +13,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * Seller approves a bank-transfer payment proof.
  * Guards: paymentMethod==='bank_transfer' + paymentStatus==='pending_verification' + status !== 'cancelled'
  */
-export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
+export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user, _request, ctx) => {
     try {
         const { id } = await ctx.params
         const payload = await getPayload({ config })
@@ -123,4 +124,4 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             { status: 500 }
         )
     }
-})
+}))

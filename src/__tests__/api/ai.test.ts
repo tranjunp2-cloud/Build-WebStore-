@@ -78,6 +78,22 @@ vi.mock('payload', () => {
     }
 })
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    isSubscriptionActive: vi.fn().mockReturnValue(true),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+    recordUsage: vi.fn().mockResolvedValue(undefined),
+    reduceUsage: vi.fn().mockResolvedValue(undefined),
+    getConsumed: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
+
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
     generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
@@ -250,8 +266,9 @@ describe('AI Streaming APIs', () => {
              }
         })
 
-        it('returns 402 when a free-plan tenant has already used the AI generation quota', async () => {
-             mockTenant = { id: 'tenant-1', plan: 'free', aiGenerationsCount: 1 }
+        it('[TC-F34-06] returns 403 when website_builder feature is locked on current plan', async () => {
+             const { canUse } = await import('@/lib/subscriptions/plan-subscription')
+             vi.mocked(canUse).mockResolvedValueOnce(false)
 
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
@@ -268,8 +285,8 @@ describe('AI Streaming APIs', () => {
              const res = await GenerateSitePOST(req)
              const body = await res.json()
 
-             expect(res.status).toBe(402)
-             expect(body.code).toBe('PAYMENT_REQUIRED')
+             expect(res.status).toBe(403)
+             expect(body.error.code).toBe('FEATURE_LOCKED')
              expect(mockSiteDB).toHaveLength(0)
              expect(mockPageDB).toHaveLength(0)
         })

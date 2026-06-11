@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplateType, type EmailTemplateConfig } from '@/lib/email/types'
 import { templateRegistry } from '@/lib/email/template-registry'
 import { EMAIL_PREVIEW_FIXTURES } from '@/lib/email/preview-fixtures'
@@ -18,7 +19,7 @@ import type { User } from 'payload'
 const SEND_TEST_RATE_LIMIT = 5 // max per window
 const SEND_TEST_WINDOW_SECONDS = 60
 
-export const POST = withAuth(async (user: User, req: Request) => {
+export const POST = withFeatureGuard('email_template_configuration')(withAuth(async (user: User, req: Request) => {
     let body: unknown
     try {
         body = await req.json()
@@ -90,4 +91,4 @@ export const POST = withAuth(async (user: User, req: Request) => {
     }
 
     return NextResponse.json({ success: true, sentTo: recipientEmail })
-})
+}))

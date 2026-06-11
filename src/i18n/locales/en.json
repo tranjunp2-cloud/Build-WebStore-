@@ -13,7 +13,12 @@
         "mobile": "Mobile",
         "preview": "Preview",
         "back": "Back",
-        "close": "Close"
+        "close": "Close",
+        "subscriptionErrors": {
+            "featureLocked": "This feature is not available on your current plan.",
+            "subscriptionExpired": "Your subscription has expired or was not found. Please renew to continue.",
+            "genericLocked": "This action is not available on your current plan."
+        }
     },
     "nav": {
         "platform": "Platform",

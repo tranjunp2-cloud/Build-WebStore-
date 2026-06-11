@@ -285,6 +285,25 @@ export async function canUse(
   return !isNaN(num) && num > 0
 }
 
+/** Returns true if usage for a numeric feature has not reached the plan limit.
+ *  For YES/UNLIMITED features, always returns true.
+ *  For numeric limits, compares consumed count against the plan value.
+ *  Distinct from canUse() which only checks that the limit is non-zero. */
+export async function canUseWithinLimit(
+  payload: BasePayload,
+  subscriptionId: string | number,
+  planCode: PlanCode,
+  featureCode: string,
+): Promise<boolean> {
+  const value = await getFeatureValue(payload, planCode, featureCode)
+  if (value === null) return false
+  if (POSITIVE_VALUES.has(String(value).toUpperCase())) return true
+  const limit = Number(value)
+  if (isNaN(limit) || limit <= 0) return false
+  const consumed = await getConsumed(payload, subscriptionId, featureCode)
+  return consumed < limit
+}
+
 /** Returns whitelist settings JSON for a feature (e.g. template names, payment codes), or null.
  *  Mirrors PW1 SubscriptionAbility::settings($feature). */
 export async function getFeatureSettings(

@@ -1,5 +1,7 @@
 export type GenerationErrorCode =
     | 'PAYMENT_REQUIRED'
+    | 'FEATURE_LOCKED'
+    | 'SUBSCRIPTION_EXPIRED'
     | 'RATE_LIMIT'
     | 'CONTENT_UNSAFE'
     | 'VALIDATION_ERROR'
@@ -24,6 +26,22 @@ export type GenerationError = {
 }
 
 const ERROR_MAP: Record<string, GenerationError> = {
+    '403': {
+        code: 'FEATURE_LOCKED',
+        messageEN: 'Website builder is not available on your current plan. Please upgrade to continue.',
+        messageMS: 'Pembina laman web tidak tersedia dalam pelan semasa anda. Sila naik taraf untuk meneruskan.',
+        action: { label: 'Upgrade plan', type: 'upgrade' },
+        retryable: false,
+        uiType: 'fullscreen',
+    },
+    '403_SUBSCRIPTION_EXPIRED': {
+        code: 'SUBSCRIPTION_EXPIRED',
+        messageEN: 'Your subscription has expired. Please renew to continue creating websites.',
+        messageMS: 'Langganan anda telah tamat tempoh. Sila perbaharui untuk terus membina laman web.',
+        action: { label: 'Renew subscription', type: 'upgrade' },
+        retryable: false,
+        uiType: 'fullscreen',
+    },
     '402': {
         code: 'PAYMENT_REQUIRED',
         messageEN: "You've used your free AI generation. Upgrade to Pro for unlimited creations.",
@@ -132,6 +150,18 @@ export function getGenerationError(status: number, errorBody?: unknown): Generat
 
         if (code === 'CONTENT_UNSAFE' || code === 'content_unsafe') {
             return ERROR_MAP['400_CONTENT_UNSAFE']
+        }
+    }
+
+    // For 403, check body to distinguish subscription-expired from feature-locked
+    if (status === 403 && typeof errorBody === 'object' && errorBody !== null) {
+        const body = errorBody as Record<string, unknown>
+        const code = body.code ?? (typeof body.error === 'object' && body.error !== null
+            ? (body.error as Record<string, unknown>).code
+            : undefined)
+
+        if (code === 'SUBSCRIPTION_EXPIRED') {
+            return ERROR_MAP['403_SUBSCRIPTION_EXPIRED']
         }
     }
 

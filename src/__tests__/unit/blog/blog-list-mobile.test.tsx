@@ -153,6 +153,13 @@ vi.mock('@/i18n', () => ({
                     pagination: { previous: 'Previous', next: 'Next' },
                 },
             },
+            common: {
+                subscriptionErrors: {
+                    featureLocked: 'Feature not available on this plan.',
+                    subscriptionExpired: 'Subscription expired.',
+                    genericLocked: 'Action not available on this plan.',
+                },
+            },
         },
         locale: 'en',
     })),

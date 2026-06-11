@@ -3,6 +3,8 @@
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import { getCurrentTenantId } from '@/lib/auth';
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
+import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
 
 export type PaymentUpdates = {
@@ -44,6 +46,11 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
+        }
+
+        const sub = await getActivePlanSubscription(payload, tenantId);
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {
+            return { success: false, error: 'Payment integration is not available on your current plan.' };
         }
 
         // Whitelist and validate fields, then send nested under payments group

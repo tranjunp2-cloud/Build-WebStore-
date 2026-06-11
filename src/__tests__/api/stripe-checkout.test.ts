@@ -56,6 +56,13 @@ vi.mock('@/lib/validations/orders', () => ({
         safeParse: (data: any) => ({ success: true, data }),
     },
 }))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
 
 import { POST } from '@/app/api/orders/stripe-checkout/route'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'

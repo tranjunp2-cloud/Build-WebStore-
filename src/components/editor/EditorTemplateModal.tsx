@@ -7,6 +7,7 @@ import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
 import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 
 const CATEGORY_KEYS = [
     'all', 'restaurant', 'ecommerce', 'beauty', 'tech', 'health',
@@ -39,6 +40,7 @@ interface EditorTemplateModalProps {
 export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
     const { t } = useI18n()
     const tt = t.editor.template
+    const sub = t.common.subscriptionErrors
     const categories = CATEGORY_KEYS.map(key => ({ value: CATEGORY_VALUES[key], label: tt[key] }))
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
@@ -128,7 +130,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
         setIsApplying(confirmTemplate.id)
 
         try {
-            // Save unsaved changes before applying template
+            // Save unsaved changes before applying template.
+            // onBeforeApply throws with 'PRE_SAVE_FAILED' sentinel if save fails;
+            // the caller (handleSave) already toasted the error, so we silently abort.
             if (onBeforeApply) await onBeforeApply()
 
             const res = await fetch('/api/ai/apply-template', {
@@ -140,13 +144,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
 
             if (!res.ok) {
                 const data = await res.json().catch(() => null)
-                let errMsg = `Server returned ${res.status}`
-                if (typeof data?.error === 'string') {
-                    errMsg = data.error
-                } else if (data?.error) {
-                    errMsg = typeof data.error.code === 'string' ? data.error.code : JSON.stringify(data.error)
-                }
-                throw new Error(errMsg)
+                throw new Error(resolveApiError(data, `Server returned ${res.status}`, sub))
             }
 
             const data = await res.json().catch(() => ({}))
@@ -158,11 +156,15 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
             })
         } catch (err) {
             const message = err instanceof Error ? err.message : tt.applyFailed
-            toast.error(tt.applyFailed, { description: message })
+            // PRE_SAVE_FAILED: save already showed an error toast — don't duplicate
+            if (message !== 'PRE_SAVE_FAILED') {
+                toast.error(tt.applyFailed, { description: message })
+            }
+            setConfirmTemplate(null)
         } finally {
             setIsApplying(null)
         }
-    }, [confirmTemplate, siteId, onApplied])
+    }, [confirmTemplate, siteId, onApplied, sub, tt])
 
     // Hover preview handlers (desktop)
     const handleCardMouseEnter = useCallback((template: Template, e: React.MouseEvent) => {

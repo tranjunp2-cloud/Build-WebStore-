@@ -88,6 +88,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             id,
             data,
             user,
+            overrideAccess: false,
         })
         return JSON.parse(JSON.stringify(res));
     } else {
@@ -95,6 +96,7 @@ export async function saveCategoryAction(rawData: unknown, id?: string | number)
             collection: 'categories',
             data,
             user,
+            overrideAccess: false,
         })
         return JSON.parse(JSON.stringify(res));
     }
@@ -107,7 +109,7 @@ export async function deleteCategoryAction(id: string | number) {
     }
 
     const payload = await getPayload({ config: configPromise })
-    
+
     const res = await payload.update({
         collection: 'categories',
         id,
@@ -115,6 +117,7 @@ export async function deleteCategoryAction(id: string | number) {
             deletedAt: new Date().toISOString(),
         },
         user,
+        overrideAccess: false,
     })
     return JSON.parse(JSON.stringify(res));
 }

@@ -11,6 +11,8 @@ import config from '@payload-config'
 import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
+import { getActivePlanSubscription, canUse, canUseWithinLimit, recordUsage } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
@@ -104,12 +106,39 @@ export const POST = withAuth(async (user, req) => {
                 limit: 1,
             })
             if (existing.docs.length > 0) {
-                tenantId = existing.docs[0].id
+                const recoveredId = existing.docs[0].id as string | number
+                // Provision FREEMIUM before linking user — fail-safe ordering:
+                // if subscription create fails, user stays unlinked and retries cleanly.
+                // Only provision when no row exists (expired sub = user must renew, not get FREEMIUM).
+                // Known: check-then-create has a benign race if two concurrent requests hit
+                // this path simultaneously → duplicate 'main' rows. Probability ~0 (first-time
+                // onboarding). getActivePlanSubscription sort:-createdAt,limit:1 picks the newest.
+                // Proper fix: unique constraint on (tenant_id, name) — deferred.
+                const anySubRow = await payload.find({
+                    collection: 'plan-subscriptions',
+                    where: { and: [{ tenant: { equals: recoveredId } }, { name: { equals: 'main' } }] },
+                    limit: 1,
+                })
+                if (anySubRow.totalDocs === 0) {
+                    await payload.create({
+                        collection: 'plan-subscriptions',
+                        data: {
+                            tenant: recoveredId,
+                            name: 'main',
+                            plan: 'FREEMIUM',
+                            status: 'active',
+                            startsAt: new Date().toISOString(),
+                            endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                            packCode: 'FREEMIUM',
+                        },
+                    })
+                }
                 await payload.update({
                     collection: 'users',
                     id: user.id,
-                    data: { tenants: [{ tenant: tenantId, role: 'owner' }] } as Record<string, unknown>,
+                    data: { tenants: [{ tenant: recoveredId, role: 'owner' }] } as Record<string, unknown>,
                 })
+                tenantId = recoveredId
             } else {
                 // Smart slug from template name (F23), fallback to store-{id}
                 const firstName = userWithTenants.firstName || userWithTenants.name || 'My'
@@ -122,6 +151,19 @@ export const POST = withAuth(async (user, req) => {
                     collection: 'tenants',
                     data: { name: tenantName, slug: tenantSlug },
                 })
+                // Provision FREEMIUM before linking user — fail-safe ordering.
+                await payload.create({
+                    collection: 'plan-subscriptions',
+                    data: {
+                        tenant: newTenant.id,
+                        name: 'main',
+                        plan: 'FREEMIUM',
+                        status: 'active',
+                        startsAt: new Date().toISOString(),
+                        endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                        packCode: 'FREEMIUM',
+                    },
+                })
                 tenantId = newTenant.id
                 await payload.update({
                     collection: 'users',
@@ -131,26 +173,50 @@ export const POST = withAuth(async (user, req) => {
             }
         }
 
+        // Hard-fail if tenant could not be resolved — avoids silent subscription bypass
+        if (!tenantId) {
+            return NextResponse.json({ error: 'Tenant could not be resolved' }, { status: 400 })
+        }
+
+        // Subscription check: website_builder must be enabled, then template_limit must not be exhausted
+        const templateSub = await getActivePlanSubscription(payload, tenantId as string | number)
+        if (!templateSub) {
+            return NextResponse.json(
+                { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found' } },
+                { status: 403 },
+            )
+        }
+        if (!await canUse(payload, templateSub.plan as PlanCode, 'website_builder')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FEATURE_LOCKED', message: 'Website builder is not available on your current plan.' } },
+                { status: 403 },
+            )
+        }
+        if (!await canUseWithinLimit(payload, templateSub.id, templateSub.plan as PlanCode, 'template_limit')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FEATURE_LOCKED', message: 'Template application not available on your current plan' } },
+                { status: 403 },
+            )
+        }
+
         // F23: Auto-upgrade legacy store-{id} slug to smart slug from template name
-        if (tenantId) {
-            try {
-                const tenant = await payload.findByID({ collection: 'tenants', id: tenantId as string | number })
-                const currentSlug = tenant?.slug as string | undefined
-                const templateName = (template.name as string) || ''
-                if (currentSlug && /^store-\d+$/.test(currentSlug) && templateName) {
-                    const baseSlug = slugify(templateName)
-                    if (baseSlug && baseSlug !== currentSlug) {
-                        const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
-                        await payload.update({
-                            collection: 'tenants',
-                            id: tenantId as string | number,
-                            data: { slug: newSlug } as Record<string, unknown>,
-                        })
-                    }
+        try {
+            const tenant = await payload.findByID({ collection: 'tenants', id: tenantId as string | number })
+            const currentSlug = tenant?.slug as string | undefined
+            const templateName = (template.name as string) || ''
+            if (currentSlug && /^store-\d+$/.test(currentSlug) && templateName) {
+                const baseSlug = slugify(templateName)
+                if (baseSlug && baseSlug !== currentSlug) {
+                    const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
+                    await payload.update({
+                        collection: 'tenants',
+                        id: tenantId as string | number,
+                        data: { slug: newSlug } as Record<string, unknown>,
+                    })
                 }
-            } catch {
-                // Non-critical — slug upgrade failure shouldn't block template apply
             }
+        } catch {
+            // Non-critical — slug upgrade failure shouldn't block template apply
         }
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
@@ -467,6 +533,12 @@ export const POST = withAuth(async (user, req) => {
                 console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
             }
 
+            try {
+                await recordUsage(payload, templateSub.id, 'template_limit')
+            } catch (err) {
+                console.warn('[ApplyTemplate] Failed to record template_limit usage:', err)
+            }
+
             return NextResponse.json({
                 success: true,
                 siteId: Number(siteId),
@@ -564,6 +636,12 @@ export const POST = withAuth(async (user, req) => {
             })
         } catch (err) {
             console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
+        }
+
+        try {
+            await recordUsage(payload, templateSub.id, 'template_limit')
+        } catch (err) {
+            console.warn('[ApplyTemplate] Failed to record template_limit usage:', err)
         }
 
         return NextResponse.json({

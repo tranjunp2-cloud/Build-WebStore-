@@ -60,6 +60,37 @@ SSO-driven subscription lifecycle: upgrade, downgrade, renew. Feature gating per
 
 ---
 
+### Phase 06: Pattern A Enforcement Layer
+
+| TC-ID | Category | Description | File | Priority |
+|-------|----------|-------------|------|----------|
+| TC-SUB-060 | withFeatureGuard | Returns 401 UNAUTHORIZED when no user session | `feature-guard-enforcement.test.ts` | P1 |
+| TC-SUB-061 | withFeatureGuard | Returns 403 SUBSCRIPTION_EXPIRED when tenant has no active subscription | `feature-guard-enforcement.test.ts` | P1 |
+| TC-SUB-062 | withFeatureGuard | Returns 403 FEATURE_LOCKED when feature disabled on current plan | `feature-guard-enforcement.test.ts` | P1 |
+| TC-SUB-063 | withFeatureGuard | Guard passes through to handler when subscription and feature are valid | `feature-guard-enforcement.test.ts` | P1 |
+
+---
+
+### Phase 07: Client-Side Error Resolution Helper
+
+| TC-ID | Category | Description | File | Priority |
+|-------|----------|-------------|------|----------|
+| TC-SUB-080 | resolveApiError | Returns featureLocked for FEATURE_LOCKED code (Pattern A) | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-081 | resolveApiError | Returns subscriptionExpired for SUBSCRIPTION_EXPIRED code (Pattern A) | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-082 | resolveApiError | Returns genericLocked for "Content management...current plan" string (Pattern B) | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-083 | resolveApiError | Returns genericLocked for "Feature not available on your current plan" (domains Pattern B) | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-084 | resolveApiError | Returns genericLocked for product/payments/email-templates "current plan" strings | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-085 | resolveApiError | Returns subscriptionExpired for bare "Subscription expired" string (domains action) | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-086 | resolveApiError | Passes through non-subscription server message unchanged | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-087 | resolveApiError | Passes through raw non-subscription string unchanged | `resolve-api-error.test.ts` | P2 |
+| TC-SUB-088 | resolveApiError | Returns fallback when data is null | `resolve-api-error.test.ts` | P2 |
+| TC-SUB-089 | resolveApiError | Returns fallback when data is undefined | `resolve-api-error.test.ts` | P2 |
+| TC-SUB-090 | resolveApiError | Returns fallback when error object has no code and no message | `resolve-api-error.test.ts` | P2 |
+| TC-SUB-091 | resolveApiError | Does not misclassify UNAUTHORIZED as subscription error | `resolve-api-error.test.ts` | P1 |
+| TC-SUB-092 | resolveApiError | Handles plain string input (thrown Error.message from product actions) | `resolve-api-error.test.ts` | P2 |
+
+---
+
 ## Test Files
 
 | File | Tests | Status |
@@ -67,12 +98,14 @@ SSO-driven subscription lifecycle: upgrade, downgrade, renew. Feature gating per
 | `src/__tests__/unit/subscriptions/plan-subscription.test.ts` | 19 | ✓ pass |
 | `src/__tests__/api/sso-upgrade.test.ts` | 9 | ✓ pass |
 | `src/__tests__/unit/subscriptions/plan-features.test.ts` | 13 | ✓ pass |
+| `src/__tests__/api/feature-guard-enforcement.test.ts` | 4 | ✓ pass |
+| `src/__tests__/unit/lib/resolve-api-error.test.ts` | 13 | ✓ pass |
 
-**Total automated:** 41 tests
+**Total automated:** 58 tests
 
 ---
 
-## Deferred (Phase 05–06)
+## Deferred (Phase 05)
 
 - TC-SUB-050..059: ETL migration validation (Phase 05 — F34.2, deferred)
-- TC-SUB-060..079: Subscription enforcement layer (Phase 06 — pending)
+- TC-SUB-064..079: Additional enforcement coverage (future sprint)

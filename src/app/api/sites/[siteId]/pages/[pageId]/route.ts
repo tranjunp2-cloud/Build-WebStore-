@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -35,7 +36,7 @@ type PageUpdateData = {
     seo?: { title?: string; description?: string }
 }
 
-export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
+export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(ctx.params)
@@ -300,4 +301,4 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 },
         )
     }
-})
+}))

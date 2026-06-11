@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { updateBlogSchema } from '@/lib/validations/blog'
 
@@ -48,7 +49,7 @@ export const GET = withAuth<RouteContext>(async (user, _req, ctx) => {
 /**
  * PATCH /api/blogs/[id] — Update a blog post
  */
-export const PATCH = withAuth<RouteContext>(async (user, req, ctx) => {
+export const PATCH = withFeatureGuard('content_management')(withAuth<RouteContext>(async (user, req, ctx) => {
     try {
         const { id } = await ctx.params
         const { data, errorResponse } = await parseRequest(req, updateBlogSchema)
@@ -98,13 +99,13 @@ export const PATCH = withAuth<RouteContext>(async (user, req, ctx) => {
             { status: 500 }
         )
     }
-})
+}))
 
 /**
  * DELETE /api/blogs/[id] — Hard delete a blog post (AC F17-04 AC-3: "permanently removed")
  * NOTE: PM may prefer soft delete for safety — revisit if needed
  */
-export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
+export const DELETE = withFeatureGuard('content_management')(withAuth<RouteContext>(async (user, _req, ctx) => {
     try {
         const { id } = await ctx.params
         const payload = await getPayload({ config })
@@ -142,4 +143,4 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             { status: 500 }
         )
     }
-})
+}))

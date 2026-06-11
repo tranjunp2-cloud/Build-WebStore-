@@ -4484,6 +4484,111 @@ const MIGRATIONS = [
       END $$;
     `,
   },
+  // ── F34: payload_locked_documents_rels FK columns for plan collections ──
+  {
+    name: 'payload_locked_documents_rels.plan_subscriptions_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_subscriptions_id" integer REFERENCES "public"."plan_subscriptions"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscriptions_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_subscriptions_id_idx" ON "payload_locked_documents_rels" ("plan_subscriptions_id");`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscription_usages_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_subscription_usages_id" integer REFERENCES "public"."plan_subscription_usages"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscription_usages_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_subscription_usages_id_idx" ON "payload_locked_documents_rels" ("plan_subscription_usages_id");`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_features_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_features_id" integer REFERENCES "public"."plan_features"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_features_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_features_id_idx" ON "payload_locked_documents_rels" ("plan_features_id");`,
+  },
+  // ── F34: Backfill plan_subscriptions from existing tenants.plan ──
+  // Idempotent: skips tenants that already have any plan_subscription row.
+  // Mapping matches mapPlanCodeToTier() reverse:
+  //   free→FREEMIUM, starter→STARTER_NON_TM_USER,
+  //   pro→STANDARD_NON_TM_USER, business→PROFESSIONAL_NON_TM_USER
+  {
+    name: 'f34-backfill-plan-subscriptions-from-tenants',
+    sql: `
+      INSERT INTO plan_subscriptions (tenant_id, name, plan, status, starts_at, ends_at, created_at, updated_at)
+      SELECT
+        t.id,
+        'main',
+        CASE t.plan
+          WHEN 'free'     THEN 'FREEMIUM'
+          WHEN 'starter'  THEN 'STARTER_NON_TM_USER'
+          WHEN 'pro'      THEN 'STANDARD_NON_TM_USER'
+          WHEN 'business' THEN 'PROFESSIONAL_NON_TM_USER'
+          ELSE 'FREEMIUM'
+        END,
+        'active',
+        t.created_at,
+        '2099-12-31 23:59:59+00',
+        now(),
+        now()
+      FROM tenants t
+      WHERE NOT EXISTS (
+        SELECT 1 FROM plan_subscriptions ps WHERE ps.tenant_id = t.id
+      )
+      ON CONFLICT (tenant_id, name) DO NOTHING;
+    `,
+  },
+  // ── F34: Fix incorrectly backfilled plan codes (pro/business were swapped) ──
+  {
+    name: 'f34-fix-plan-subscriptions-pro-business-mapping',
+    sql: `
+      UPDATE plan_subscriptions
+      SET plan = CASE plan
+        WHEN 'PROFESSIONAL_NON_TM_USER' THEN 'STANDARD_NON_TM_USER'
+        WHEN 'STANDARD_NON_TM_USER'     THEN 'PROFESSIONAL_NON_TM_USER'
+      END
+      WHERE plan IN ('PROFESSIONAL_NON_TM_USER', 'STANDARD_NON_TM_USER')
+        AND name = 'main'
+        AND tenant_id IN (
+          SELECT ps.tenant_id FROM plan_subscriptions ps
+          JOIN tenants t ON t.id = ps.tenant_id
+          WHERE (t.plan = 'pro' AND ps.plan = 'PROFESSIONAL_NON_TM_USER')
+             OR (t.plan = 'business' AND ps.plan = 'STANDARD_NON_TM_USER')
+        );
+    `,
+  },
+  // ── F34: Backfill sort_order for plan_features from PW1 values ──
+  {
+    name: 'f34-backfill-plan-features-sort-order',
+    sql: `
+      UPDATE plan_features SET sort_order = CASE feature_code
+        WHEN 'website_builder'              THEN 1
+        WHEN 'template_limit'               THEN 5
+        WHEN 'code_snippet'                 THEN 10
+        WHEN 'sitemap_robot_configuration'  THEN 15
+        WHEN 'live_chat_plugin'             THEN 20
+        WHEN 'domain_connection'            THEN 25
+        WHEN 'shipping_fee_configuration'   THEN 30
+        WHEN 'delivery_provider_limit'      THEN 35
+        WHEN 'allowing_buyer_making_order'  THEN 40
+        WHEN 'payment_integration'          THEN 50
+        WHEN 'allowing_buyer_tracking_order' THEN 55
+        WHEN 'order_management'             THEN 55
+        WHEN 'product_management'           THEN 60
+        WHEN 'promotion_management'         THEN 65
+        WHEN 'content_management'           THEN 70
+        WHEN 'email_confirmation'           THEN 72
+        WHEN 'email_template_configuration' THEN 75
+        WHEN 'staff_limit'                  THEN 80
+        WHEN 'account_profile'              THEN 85
+        WHEN 'distribution_integration'     THEN 90
+        ELSE sort_order
+      END
+      WHERE sort_order IS NULL;
+    `,
+  },
 ];
 
 async function runMigrations(pool) {

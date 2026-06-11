@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { getStripeClient } from '@/lib/payment/stripe'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 
@@ -21,7 +22,7 @@ interface TenantDoc {
  *
  * Auth: Required (tenant owner). Body: { tenantId }.
  */
-export const POST = withAuth(async (user, request) => {
+export const POST = withFeatureGuard('payment_integration')(withAuth(async (user, request) => {
     try {
         const body = await request.json()
         const { tenantId } = body
@@ -82,4 +83,4 @@ export const POST = withAuth(async (user, request) => {
             { status: 500 },
         )
     }
-})
+}))

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX } from '@/lib/shipping'
 
 export const maxDuration = 60
@@ -57,7 +58,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
  * Updates shippingConfig for a site. Requires site access.
  * Body: { enabled, westRateRm, eastRateRm, freeAboveRm }
  */
-export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
+export const PATCH = withFeatureGuard('shipping_fee_configuration')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { siteId } = await ctx.params
 
@@ -142,4 +143,4 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 }
         )
     }
-})
+}))

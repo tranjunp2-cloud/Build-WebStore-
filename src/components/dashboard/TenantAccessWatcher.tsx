@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 export function TenantAccessWatcher() {
     const [isEvicted, setIsEvicted] = useState(false);
+    const [evictReason, setEvictReason] = useState<string>('');
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const router = useRouter();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -21,6 +22,7 @@ export function TenantAccessWatcher() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.action === 'force_logout') {
+                        setEvictReason(data.reason ?? '');
                         setIsEvicted(true);
                     }
                 }
@@ -72,7 +74,7 @@ export function TenantAccessWatcher() {
         } catch (error) {
             console.error('Logout request failed', error);
         } finally {
-            document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+            // payload-token is httpOnly — cannot be cleared via JS; server clears it on logout.
             window.location.href = '/login';
         }
     };
@@ -88,11 +90,13 @@ export function TenantAccessWatcher() {
                 </div>
                 
                 <h2 className="text-xl font-bold text-white mb-2 font-['Inter']">
-                    Access Revoked
+                    {evictReason === 'subscription_expired' ? 'Subscription Expired' : 'Access Revoked'}
                 </h2>
-                
+
                 <p className="text-[14px] text-[rgba(248,250,252,0.7)] leading-[1.5] mb-6 font-['Inter']">
-                    Your access to this workspace has been removed by the workspace owner. You will now be logged out.
+                    {evictReason === 'subscription_expired'
+                        ? 'Your subscription has expired. Please renew your plan to continue. You will now be logged out.'
+                        : 'Your access to this workspace has been removed by the workspace owner. You will now be logged out.'}
                 </p>
 
                 <button

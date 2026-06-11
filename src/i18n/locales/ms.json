@@ -13,7 +13,12 @@
         "mobile": "Mudah alih",
         "preview": "Pratonton",
         "back": "Kembali",
-        "close": "Tutup"
+        "close": "Tutup",
+        "subscriptionErrors": {
+            "featureLocked": "Ciri ini tidak tersedia dalam pelan semasa anda.",
+            "subscriptionExpired": "Langganan anda telah tamat tempoh atau tidak dijumpai. Sila perbaharui untuk meneruskan.",
+            "genericLocked": "Tindakan ini tidak tersedia dalam pelan semasa anda."
+        }
     },
     "nav": {
         "platform": "Platform",

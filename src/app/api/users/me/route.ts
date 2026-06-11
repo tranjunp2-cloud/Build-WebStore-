@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { profilePatchSchema } from '@/lib/profile/schemas'
 import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 
@@ -59,6 +61,28 @@ export async function PATCH(req: NextRequest) {
         }
 
         const payload = await getPayload({ config: configPromise })
+
+        const tenants = (user as any).tenants as Array<{ tenant: any; role?: string }> | undefined
+        const tenantEntry = tenants?.find((t) => t.role === 'owner') ?? tenants?.[0]
+        const tenantRef = tenantEntry?.tenant
+        const tenantId = typeof tenantRef === 'object' && tenantRef !== null ? tenantRef?.id : tenantRef
+        if (tenantId) {
+            const sub = await getActivePlanSubscription(payload, tenantId)
+            if (!sub) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found' } },
+                    { status: 403 },
+                )
+            }
+            const allowed = await canUse(payload, sub.plan as PlanCode, 'account_profile')
+            if (!allowed) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'FEATURE_LOCKED', message: 'This feature is not available on your current plan' } },
+                    { status: 403 },
+                )
+            }
+        }
+
         const updated = await payload.update({
             collection: 'users',
             id: user.id,

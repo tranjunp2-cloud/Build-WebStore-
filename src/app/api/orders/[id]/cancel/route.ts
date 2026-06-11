@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCancelSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
@@ -18,7 +19,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * Cancel an order with a required reason.
  * Auto-restocks inventory for each item in the order.
  */
-export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
+export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { id } = await ctx.params
         const { data, errorResponse } = await parseRequest(request, orderCancelSchema)
@@ -211,4 +212,4 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 }
         )
     }
-})
+}))

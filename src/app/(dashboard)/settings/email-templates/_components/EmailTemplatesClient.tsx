@@ -3,6 +3,7 @@
 import { useState, useTransition, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 import {
     saveEmailTemplateConfig,
@@ -49,6 +50,7 @@ const EMPTY_CONTENT: ContentFields = {
 export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps) {
     const { t, ti } = useI18n()
     const et = t.dashboard.settings.emailTemplates
+    const sub = t.common.subscriptionErrors
     const [rows, setRows] = useState<TemplateRow[]>(() => normalizeRows(initialRows))
     const [audienceTab, setAudienceTab] = useState<'buyer' | 'seller'>('buyer')
     const [selectedTemplateId, setSelectedTemplateId] = useState<EmailTemplateType | null>(null)
@@ -152,8 +154,9 @@ export function EmailTemplatesClient({ initialRows }: EmailTemplatesClientProps)
                 setIsDirty(false)
                 toast.success(et.toast.saved)
             } else {
-                setSaveError(result.error ?? et.toast.saveFailed)
-                toast.error(result.error ?? et.toast.saveFailed)
+                const errMsg = resolveApiError(result, et.toast.saveFailed, sub)
+                setSaveError(errMsg)
+                toast.error(errMsg)
                 console.error('[EmailTemplatesClient] save failed:', result.error)
             }
         })

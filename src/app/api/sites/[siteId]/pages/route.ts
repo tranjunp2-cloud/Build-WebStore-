@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { z } from 'zod'
@@ -122,7 +123,7 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
     }
 })
 
-export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
+export const POST = withFeatureGuard('website_builder')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(ctx.params)
@@ -288,4 +289,4 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         console.error('Error creating page:', error)
         return new NextResponse('Internal Error', { status: 500 })
     }
-})
+}))
