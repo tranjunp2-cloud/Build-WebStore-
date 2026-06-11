@@ -42,6 +42,24 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### F34 — Phase 06 Code Review Fixes (Phase 3–5)
+
+**Subscription enforcement guard alignment + SSO validation + staff limit syncing:**
+
+- **fix(subscriptions): align guard tenant resolution to tenants[0]** — `src/lib/subscriptions/feature-guard.ts` now consistently uses `tenants[0]` for subscription lookup (was using `find(owner)` in one code path), eliminating auth-context mismatch that could cause false 403 errors when user is not primary owner. Defensive guard ensures all paths use same tenant selection strategy.
+
+- **fix(sso): add VALID_BASE_CODES validation on provision** — `src/app/api/v1/sso/provision/route.ts` now validates subscription code against known base codes before passing to `getPlanCode()`. Unknown codes return 400 `INVALID_SUBSCRIPTION_CODE` instead of silently fabricating invalid plan states. Prevents SSO onboarding chaos when external systems send malformed pack codes.
+
+- **fix(subscriptions): getPlanCode throws on unknown base code** — `src/lib/subscriptions/plan-subscription.ts` `getPlanCode()` now throws `SubscriptionError` on unknown base code instead of returning fabricated enum values. Requires caller to validate codes pre-call, ensuring fail-fast behavior.
+
+- **fix(subscriptions): sync staff_limit usage on role change** — `src/collections/Users.ts` `update-staff` server action now calls `recountStaffUsage()` when user toggles between owner ↔ non-owner role. Fixes usage counter drift: adding staff when non-owner doesn't increment limit, but later promotion to owner should. Recount resyncs count to match actual non-owner staff count per tenant.
+
+- **test(sso): add rejection test for invalid pack_code** — `src/__tests__/unit/auth/sso-provision.test.ts` now validates SSO endpoint returns 400 when pack_code is unknown (complementary to PR guards). TC-ID reserved.
+
+**Impact:** Subscription enforcement guards are now tenant-context consistent. SSO onboarding rejects malformed codes upfront. Staff limit tracking stays synchronized across role changes. No breaking changes; existing valid flows unaffected.
+
+---
+
 ### F34 — Plan Subscription Management Phase 06: Subscription Enforcement Layer
 
 **Features:**

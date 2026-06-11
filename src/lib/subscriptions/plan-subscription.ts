@@ -13,6 +13,7 @@ export const VALID_BASE_CODES = new Set(['freemium', 'starter', 'standard', 'pro
  *  Examples: ('professional', 1) → 'PROFESSIONAL_TM_USER', ('freemium') → 'FREEMIUM' */
 export function getPlanCode(code: string, type?: number | null): PlanCode {
   const c = code.toLowerCase().trim()
+  if (!VALID_BASE_CODES.has(c)) throw new Error(`Unknown subscription base code: ${code}`)
   if (c === 'freemium') return 'FREEMIUM'
   const suffix = type === 1 ? '_TM_USER' : '_NON_TM_USER'
   return (c.toUpperCase() + suffix) as PlanCode

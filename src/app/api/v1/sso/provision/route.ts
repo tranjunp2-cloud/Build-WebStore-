@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { getCurrentUser } from '@/lib/auth'
-import { getPlanCode, mapPlanCodeToTier, dateOnly } from '@/lib/subscriptions/plan-subscription'
+import { getPlanCode, mapPlanCodeToTier, dateOnly, VALID_BASE_CODES } from '@/lib/subscriptions/plan-subscription'
 
 /**
  * POST /api/v1/sso/provision
@@ -76,6 +76,14 @@ export async function POST(req: NextRequest) {
         if (missing.length > 0) {
             return NextResponse.json(
                 { message: `Missing required fields: ${missing.join(', ')}` },
+                { status: 400 },
+            )
+        }
+
+        // Validate subscription_code against known base codes (parity with upgrade/downgrade)
+        if (!VALID_BASE_CODES.has(packCode.toLowerCase())) {
+            return NextResponse.json(
+                { message: `Invalid subscription_code: ${packCode}` },
                 { status: 400 },
             )
         }

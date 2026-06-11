@@ -239,6 +239,9 @@ export const Users: CollectionConfig = {
                 }
 
                 try {
+                    // NOTE: check→recordUsage is not atomic (no Payload cross-collection lock).
+                    // Concurrent invites can race past staff_limit by 1. Accepted tradeoff —
+                    // see upsertPlanSubscription note. Revisit if Payload exposes transactions.
                     const inviteSub = await getActivePlanSubscription(req.payload, tenantIdForPayload)
                     if (!inviteSub || !await canUseWithinLimit(req.payload, inviteSub.id, inviteSub.plan as PlanCode, 'staff_limit')) {
                         return Response.json({ errors: [{ message: 'Staff limit reached on your current plan' }] }, { status: 403 })
@@ -535,6 +538,23 @@ export const Users: CollectionConfig = {
                     overrideAccess: true,
                     data: updateData
                 })
+
+                // Sync staff_limit usage when owner status changes.
+                // Owners don't count toward staff_limit; non-owners do.
+                if (wasOwner !== becomesOwner) {
+                    try {
+                        const updateSub = await getActivePlanSubscription(req.payload, tenantId)
+                        if (updateSub) {
+                            if (wasOwner && !becomesOwner) {
+                                await recordUsage(req.payload, updateSub.id, 'staff_limit')
+                            } else {
+                                await reduceUsage(req.payload, updateSub.id, 'staff_limit')
+                            }
+                        }
+                    } catch (err: unknown) {
+                        console.warn('[StaffUpdate] Failed to adjust staff_limit usage:', err)
+                    }
+                }
 
                 return Response.json({ message: 'User updated successfully' })
             }

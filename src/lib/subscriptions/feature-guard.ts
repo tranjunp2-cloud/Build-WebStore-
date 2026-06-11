@@ -15,9 +15,9 @@ type RouteHandler = (req: NextRequest, ctx?: any) => Promise<NextResponse>
 async function getOwnerTenantId(): Promise<number | string | null> {
   const user = await getCurrentUser()
   if (!user) return null
-  const tenants = (user as any).tenants as Array<{ tenant: unknown; role?: string }> | undefined
-  // Prefer owner role; fall back to first tenant entry (I-05 fix)
-  const entry = tenants?.find((t) => t.role === 'owner') ?? tenants?.[0]
+  const tenants = (user as any).tenants as Array<{ tenant: unknown }> | undefined
+  // Align with handlers: both guard and handler use tenants[0] as the active workspace.
+  const entry = tenants?.[0]
   if (!entry) return null
   const ref = entry.tenant
   return typeof ref === 'object' && ref !== null
