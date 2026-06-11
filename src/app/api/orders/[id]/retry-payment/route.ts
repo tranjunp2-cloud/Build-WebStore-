@@ -15,6 +15,8 @@ import { verifyOrderToken } from '@/lib/auth/order-token'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { computeOrderTotal } from '@/lib/orders/order-total'
 
 // Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
 // 'payment_failed' (24h auto-cancel cron) — accept both so either path can be retried.
@@ -184,17 +186,39 @@ export async function POST(
         // have changed since placement. Mirrors stripe-checkout totals (flat shipping, SST removed — F33 phase-06).
         const shippingFee = 10
         const tax = 0 // SST removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated
-        const total = Math.round((subtotal + shippingFee) * 100) / 100
+        const subtotalSen = Math.round(subtotal * 100)
+        const shippingFeeSen = Math.round(shippingFee * 100)
+
+        // Re-apply the order's discount against the re-priced subtotal (F33). The order snapshotted its
+        // discount at placement; a Stripe order redeems only at reconcile (on pay), so a pending/failed
+        // order has NOT consumed a slot yet — re-validating here is safe and recomputes a percentage
+        // discount on the new subtotal. A discount that since expired / hit its limit / was deleted
+        // silently drops to full price (applied.ok === false), mirroring stripe-checkout's behaviour.
+        const discountRow = (typeof order.discount === 'object' && order.discount ? order.discount : null) as any
+        let discountSen = 0
+        if (discountRow) {
+            const applied = applyDiscount(discountRow, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) discountSen = applied.discountSen
+        }
+
+        // Shared gateway-agnostic total (F33) — identical formula as stripe-checkout / COD.
+        const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
 
         // Step 7: Create new Stripe Checkout Session
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantDoc.slug || String(tenantId)
         const orderNumber = order.orderNumber
 
-        const allCheckoutItems = [
-            ...checkoutItems,
-            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-        ]
+        // When a discount applies, use a single consolidated line item so Stripe charges exactly the
+        // discounted total — Stripe forbids negative line items, so a per-item split is not viable
+        // (matches stripe-checkout). No discount → itemized lines + shipping.
+        const finalTotalSen = Math.round(total * 100)
+        const allCheckoutItems = discountSen > 0
+            ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
+            : [
+                ...checkoutItems,
+                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+              ]
 
         let checkout: { sessionId: string; url: string }
         try {
@@ -231,6 +255,16 @@ export async function POST(
             shippingFee,
             tax,
             total,
+        }
+        // Keep the persisted discount snapshot consistent with what Stripe actually charges, so the
+        // reconcile-time redemption (which reads order.discount/discountAmount) can't redeem a slot for
+        // a discount that silently dropped at retry. Recompute on re-price; clear when it no longer applies.
+        if (discountSen > 0) {
+            updateData.discountAmount = discountSen
+        } else if (order.discount) {
+            updateData.discount = null
+            updateData.discountCode = null
+            updateData.discountAmount = null
         }
         if (
             order.status === 'payment_failed' ||

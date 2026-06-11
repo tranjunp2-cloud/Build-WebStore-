@@ -730,6 +730,115 @@ describe('POST /api/orders/[id]/retry-payment [TC-F13.153-154]', () => {
         expect(body.error.code).toBe('INTERNAL_ERROR')
     })
 
+    // ─── TC-F33-07-02: retry re-applies the order's discount to the Stripe charge ─────
+    it('[TC-F33-07-02] retry charges the discounted total via a single consolidated line item', async () => {
+        // Arrange — order placed with a valid 50% discount; Stripe payment failed, now retrying.
+        // applyDiscount + computeOrderTotal run for real (pure logic, never mocked).
+        const discountedOrder = {
+            ...VALID_PAYMENT_FAILED_ORDER,
+            discount: {
+                id: 'disc-1',
+                code: 'SUMMER50',
+                type: 'percentage',
+                value: 50,
+                status: 'active',
+                usageLimit: null,
+                usageCount: 0,
+                startsAt: null,
+                expiresAt: null,
+                tenant: 'tenant-1', // matches order.tenant.id
+            },
+            discountCode: 'SUMMER50',
+            discountAmount: 2500,
+        }
+        mockFindByID.mockResolvedValue(discountedOrder)
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+        mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
+        mockBuildOrderItems.mockResolvedValue({
+            errorResponse: null,
+            checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50, // RM 50 → 5000 sen; 50% off = 2500 sen; +1000 ship = 3500 sen total
+        })
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+
+        // Assert — single consolidated line item priced at the discounted total (3500 sen), no full price
+        expect(res.status).toBe(200)
+        const sessionItems = mockCreateCheckoutSession.mock.calls[0][0].items
+        expect(sessionItems).toEqual([
+            { name: 'Order total (discount applied)', price: 3500, quantity: 1, images: [] },
+        ])
+        // Persisted order stays consistent: discounted total + recomputed discountAmount
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ total: 35, discountAmount: 2500 }),
+            }),
+        )
+    })
+
+    // ─── TC-F33-07-05: discount that no longer applies at retry → full price + cleared snapshot ─────
+    it('[TC-F33-07-05] retry drops an expired discount, charges full price and clears the snapshot', async () => {
+        // Arrange — discount expired between placement and retry → silent reject, full price.
+        const expiredDiscountOrder = {
+            ...VALID_PAYMENT_FAILED_ORDER,
+            discount: {
+                id: 'disc-1',
+                code: 'SUMMER50',
+                type: 'percentage',
+                value: 50,
+                status: 'active',
+                usageLimit: null,
+                usageCount: 0,
+                startsAt: null,
+                expiresAt: '2020-01-01T00:00:00.000Z', // expired
+                tenant: 'tenant-1',
+            },
+            discountCode: 'SUMMER50',
+            discountAmount: 2500,
+        }
+        mockFindByID.mockResolvedValue(expiredDiscountOrder)
+        mockCookies.mockResolvedValue({
+            get: vi.fn((key) => (key === 'ct_123' ? { value: 'valid-token' } : undefined)),
+        } as any)
+        mockVerifyConfirmToken.mockReturnValue(true)
+        mockBuildPaymentMethodTypes.mockReturnValue(['card', 'fpx'])
+        mockBuildOrderItems.mockResolvedValue({
+            errorResponse: null,
+            checkoutItems: [{ name: 'Product', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50,
+        })
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockRequest({}), { params: Promise.resolve({ id: '123' }) })
+
+        // Assert — itemized full price (no consolidated discount line), full total RM60
+        expect(res.status).toBe(200)
+        const sessionItems = mockCreateCheckoutSession.mock.calls[0][0].items
+        expect(sessionItems).toEqual([
+            { name: 'Product', price: 5000, quantity: 1, images: [] },
+            { name: 'Shipping', price: 1000, quantity: 1, images: [] },
+        ])
+        // Snapshot cleared so reconcile cannot redeem a slot for a discount that wasn't charged
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    total: 60,
+                    discount: null,
+                    discountCode: null,
+                    discountAmount: null,
+                }),
+            }),
+        )
+    })
+
     // ─── TC-F13.155: retry does NOT extend the 24h hold (fixed from placement) ─────
     it('[TC-F13.155] retry preserves the placement deadline — does not touch paymentExpiresAt', async () => {
         // Arrange
