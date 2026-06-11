@@ -70,12 +70,16 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         const discId = typeof dRaw === 'object' ? dRaw.id : dRaw
         const tRaw = (order as any).tenant
         const tId = typeof tRaw === 'object' ? tRaw.id : tRaw
+        // Snapshot type/value from the populated relation (depth:1) while the discount row still exists,
+        // so the audit log keeps full fidelity after a later hard-delete. Null when only an id is present.
         await recordDiscountRedemption(payload, {
             tenantId: Number(tId),
             discountId: Number(discId),
             orderId,
             amountApplied: Number((order as any).discountAmount),
             discountCode: (order as any).discountCode ?? null,
+            discountType: typeof dRaw === 'object' ? (dRaw.type ?? null) : null,
+            discountValue: typeof dRaw === 'object' && dRaw.value != null ? Number(dRaw.value) : null,
             customerEmail: (order as any).customerEmail ?? null,
         })
     }

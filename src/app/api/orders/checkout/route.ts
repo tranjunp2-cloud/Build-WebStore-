@@ -306,7 +306,7 @@ export async function POST(request: Request) {
         })
 
         // Record discount usage (COD/bank_transfer — Stripe records at reconcile). Shared idempotent
-        // helper: snapshots discount_code (survives discount deletion) + bumps usage_count once.
+        // helper: snapshots code/type/value (survives discount deletion) + bumps usage_count once, capped.
         if (discountRow && discountSen > 0) {
             await recordDiscountRedemption(payload, {
                 tenantId: Number(tenantId),
@@ -314,6 +314,8 @@ export async function POST(request: Request) {
                 orderId: Number((order as any).id),
                 amountApplied: discountSen,
                 discountCode: discountRow.code,
+                discountType: discountRow.type,
+                discountValue: Number(discountRow.value),
                 customerEmail: customer.email,
             })
         }

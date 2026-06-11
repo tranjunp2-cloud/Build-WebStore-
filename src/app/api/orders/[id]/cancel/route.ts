@@ -9,6 +9,7 @@ import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -102,6 +103,10 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         // CAS only wrote status + cancel_reason; all other order fields are unchanged.
         // Construct updated from the pre-fetched order to avoid an extra DB round trip.
         const updated = { ...(order as any), status: 'cancelled', cancelReason: reason }
+
+        // Release the redeemed discount slot (F33) — runs only on the CAS winner so a concurrent
+        // cancel can't double-release. No-op when the order never redeemed (e.g. Stripe still pending).
+        await releaseDiscountRedemption(payload, Number(orderId))
 
         // Auto-restock inventory (variant-aware).
         const restockResults: RestockResult[] = []

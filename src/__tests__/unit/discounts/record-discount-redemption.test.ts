@@ -195,7 +195,7 @@ describe('[TC-F33-09-06] recordDiscountRedemption — guard + error handling', (
 // ─── TC-F33-08-02: Invariant — snapshot fields recorded ─────────────────────
 
 describe('[TC-F33-08-02] recordDiscountRedemption — snapshot fields', () => {
-    it('includes all required fields in the INSERT (tenant_id, discount_id, order_id, amount_applied, discount_code, customer_email)', async () => {
+    it('includes all required fields in the INSERT (tenant_id, discount_id, order_id, amount_applied, discount_code, discount_type, discount_value, customer_email)', async () => {
         // Arrange
         const payload = createMockPayload()
         const mockExecute = vi.fn().mockResolvedValueOnce({
@@ -209,6 +209,8 @@ describe('[TC-F33-08-02] recordDiscountRedemption — snapshot fields', () => {
             orderId: 789,
             amountApplied: 5000,
             discountCode: 'SUMMER50',
+            discountType: 'percentage',
+            discountValue: 50,
             customerEmail: 'buyer@test.com',
         }
 
@@ -226,7 +228,37 @@ describe('[TC-F33-08-02] recordDiscountRedemption — snapshot fields', () => {
         expect(sqlStr).toContain('order_id')
         expect(sqlStr).toContain('amount_applied')
         expect(sqlStr).toContain('discount_code')
+        expect(sqlStr).toContain('discount_type')
+        expect(sqlStr).toContain('discount_value')
         expect(sqlStr).toContain('customer_email')
+        // Snapshot values are parameter-bound
+        expect(callArg.values).toContain('percentage')
+        expect(callArg.values).toContain(50)
+    })
+})
+
+// ─── TC-F33-09-04: Usage cap — bump guarded by usage_limit (race → never 11) ─
+
+describe('[TC-F33-09-04] recordDiscountRedemption — usage cap', () => {
+    it('guards the usage_count bump with a usage_limit check so it never exceeds the cap', async () => {
+        // Arrange
+        const payload = createMockPayload()
+        const mockExecute = vi.fn().mockResolvedValueOnce({ rows: [{ inserted: 1 }] })
+        ;(payload.db.drizzle as any).execute = mockExecute
+
+        // Act
+        await recordDiscountRedemption(payload, {
+            tenantId: 123,
+            discountId: 456,
+            orderId: 789,
+            amountApplied: 5000,
+            discountCode: 'CAPPED',
+        })
+
+        // Assert — the bump UPDATE carries the atomic limit guard (row-lock serialized in Postgres)
+        const sqlStr = mockExecute.mock.calls[0][0].strings.join('?')
+        expect(sqlStr).toContain('usage_count = usage_count + 1')
+        expect(sqlStr).toContain('usage_limit IS NULL OR usage_count < usage_limit')
     })
 })
 

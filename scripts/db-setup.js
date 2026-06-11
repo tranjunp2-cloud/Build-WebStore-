@@ -4297,6 +4297,8 @@ const MIGRATIONS = [
       amount_applied numeric NOT NULL DEFAULT 0,
       customer_email varchar,
       discount_code varchar,
+      discount_type varchar,
+      discount_value numeric,
       used_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
@@ -4323,6 +4325,8 @@ const MIGRATIONS = [
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS amount_applied numeric NOT NULL DEFAULT 0;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS customer_email varchar;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_code varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_type varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_value numeric;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS used_at timestamptz;
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
       ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()

@@ -9,6 +9,9 @@ interface UsageRow {
     discount: { id: string; code: string; type: string; value: number } | null
     /** Code snapshot — survives discount deletion; falls back to the relation for legacy rows. */
     discountCode?: string | null
+    /** Type/value snapshots — keep audit fidelity after the discount is hard-deleted. */
+    discountType?: string | null
+    discountValue?: number | null
     order: { id: string; orderNumber?: string } | null
     amountApplied: number
     customerEmail?: string | null
@@ -152,7 +155,11 @@ export function DiscountsUsageHistoryLayout() {
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3" style={textMuted}>
-                                                {u.discount ? fmtValue(u.discount.type, u.discount.value) : '—'}
+                                                {u.discountType != null && u.discountValue != null
+                                                    ? fmtValue(u.discountType, u.discountValue)
+                                                    : u.discount
+                                                        ? fmtValue(u.discount.type, u.discount.value)
+                                                        : '—'}
                                             </td>
                                             <td className="px-4 py-3 text-left font-mono text-green-400">
                                                 −{fmtRM(u.amountApplied)}

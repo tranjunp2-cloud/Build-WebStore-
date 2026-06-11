@@ -58,6 +58,16 @@ export const DiscountUsageHistory: CollectionConfig = {
             admin: { description: 'Discount code snapshot at time of use (survives discount deletion)' },
         },
         {
+            name: 'discountType',
+            type: 'text',
+            admin: { description: 'Discount type snapshot (percentage/fixed) — survives discount deletion' },
+        },
+        {
+            name: 'discountValue',
+            type: 'number',
+            admin: { description: 'Discount value snapshot (percent or sen) — survives discount deletion' },
+        },
+        {
             name: 'usedAt',
             type: 'date',
         },

@@ -279,6 +279,8 @@ export async function POST(request: NextRequest) {
                     orderId: Number(freeOrder.id),
                     amountApplied: discountSen,
                     discountCode: discountRow.code,
+                    discountType: discountRow.type,
+                    discountValue: Number(discountRow.value),
                     customerEmail: customer.email,
                 })
             }
