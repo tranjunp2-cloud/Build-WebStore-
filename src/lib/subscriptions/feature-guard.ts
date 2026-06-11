@@ -9,7 +9,6 @@ import {
   canUse,
 } from '@/lib/subscriptions/plan-subscription'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RouteHandler = (req: NextRequest, ctx?: any) => Promise<NextResponse>
 
 /** Resolves the owner tenantId from the current session (cookie-based). */
