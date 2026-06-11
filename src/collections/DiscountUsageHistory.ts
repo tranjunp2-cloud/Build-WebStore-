@@ -7,7 +7,10 @@ export const DiscountUsageHistory: CollectionConfig = {
         description: 'Immutable record of each discount code use. Created server-side only.',
     },
     access: {
-        create: ({ req }) => Boolean(req.user),
+        // Redemptions are written exclusively via raw SQL (record-discount-redemption.ts) — no code
+        // path uses Payload create. Locking it prevents forged audit rows and a unique-index DoS
+        // (a forged order_id row would block the real redemption's ON CONFLICT insert).
+        create: () => false,
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true

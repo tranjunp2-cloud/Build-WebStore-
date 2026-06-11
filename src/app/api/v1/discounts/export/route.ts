@@ -26,7 +26,10 @@ function csvField(value: unknown): string {
     if (value == null) return ''
     let s = String(value)
     s = s.replace(/[\r\n]+/g, ' ')
-    if (s.length > 0 && ['=', '+', '-', '@'].includes(s[0])) s = `'${s}`
+    // Formula-injection guard: spreadsheets trim leading whitespace before evaluating, so check the
+    // first NON-whitespace char (" =1+1" is still a formula in Excel). Tab is a known prefix trick too.
+    const first = s.trimStart()[0]
+    if (first && ['=', '+', '-', '@', '\t'].includes(first)) s = `'${s}`
     if (s.includes(',') || s.includes('"')) s = `"${s.replace(/"/g, '""')}"`
     return s
 }

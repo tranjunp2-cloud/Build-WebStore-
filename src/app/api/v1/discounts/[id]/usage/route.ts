@@ -31,7 +31,10 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        return NextResponse.json({ ...result, success: true })
+        // Response carries customerEmail (PII) — never let a shared cache/proxy store it.
+        return NextResponse.json({ ...result, success: true }, {
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
     } catch (error: any) {
         console.error('[Discount Usage History Error]', error)
         return NextResponse.json(

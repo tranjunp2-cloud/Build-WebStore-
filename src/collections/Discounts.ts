@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { APIError } from 'payload'
 import { startOfDayKL, endOfDayKL } from '@/lib/discounts/date-boundaries'
 
 export const Discounts: CollectionConfig = {
@@ -21,6 +22,26 @@ export const Discounts: CollectionConfig = {
                 }
                 if (data.expiresAt) {
                     data.expiresAt = endOfDayKL(data.expiresAt as string | Date).toISOString()
+                }
+                return data
+            },
+        ],
+        beforeChange: [
+            // Tenant guard (M2): create/update access only checks Boolean(req.user) / the EXISTING
+            // doc's tenant — neither validates the INCOMING data.tenant. Via Payload's auto-REST
+            // (POST/PATCH /api/discounts) a tenant-A user could otherwise create or move a discount
+            // into tenant B. Internal server calls (payload.create with overrideAccess, no req.user —
+            // e.g. /api/v1/discounts which forces tenant from the session) pass through untouched.
+            ({ req, data }) => {
+                if (!data || data.tenant == null) return data
+                const user = req.user as { roles?: string[]; tenants?: Array<{ tenant: string | number | { id: string | number } }> } | null
+                if (!user || user.roles?.includes('super-admin')) return data
+                const userTenantIds = (user.tenants ?? []).map((t) =>
+                    String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant),
+                )
+                const target = String(typeof data.tenant === 'object' ? (data.tenant as { id: string | number }).id : data.tenant)
+                if (!userTenantIds.includes(target)) {
+                    throw new APIError('You do not have permission to manage discounts for this tenant', 403)
                 }
                 return data
             },

@@ -44,7 +44,10 @@ export const GET = withAuth(async (user, request) => {
             ...(where ? { where } : {}),
         })
 
-        return NextResponse.json({ success: true, ...result })
+        // Response carries customerEmail (PII) — never let a shared cache/proxy store it.
+        return NextResponse.json({ success: true, ...result }, {
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
     } catch (error: any) {
         console.error('[Discount Usage History List Error]', error)
         return NextResponse.json(
