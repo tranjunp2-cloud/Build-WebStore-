@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import type { PlatformUser } from '@/types/user'
+import type { SidebarBadgeKey } from '@/components/dashboard/Sidebar'
+import { getCachedSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts-cached'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
 import { NotificationProvider } from '@/providers/NotificationProvider'
@@ -32,15 +34,24 @@ export default async function DashboardLayout({
     const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
 
-    // Fetch avatar URL (depth=1 to expand media relationship)
+    // Fetch avatar URL (depth=1 to expand media relationship) + dynamic sidebar badge
+    // counts (F18 #1138) in one payload session, in parallel.
     let userAvatarUrl: string | null = null
+    let badgeCounts: Partial<Record<SidebarBadgeKey, number>> = {}
     if (user) {
         try {
             const payload = await getPayload({ config: configPromise })
-            const full = await payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Record<string, unknown>
-            const av = full?.avatar as { url?: string } | null | undefined
-            if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
-        } catch (err) { console.warn('[layout] avatar fetch failed:', err) }
+            // allSettled so an avatar failure never blanks the badges (and vice versa).
+            const [avatarRes, countsRes] = await Promise.allSettled([
+                payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Promise<Record<string, unknown>>,
+                getCachedSidebarBadgeCounts(tenantId),
+            ])
+            if (avatarRes.status === 'fulfilled') {
+                const av = avatarRes.value?.avatar as { url?: string } | null | undefined
+                if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
+            }
+            if (countsRes.status === 'fulfilled') badgeCounts = countsRes.value
+        } catch (err) { console.warn('[layout] payload session failed:', err) }
     }
 
     const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string }) => {
@@ -51,6 +62,11 @@ export default async function DashboardLayout({
     const userPermissions = (currentTenantInfo as { permissions?: string[] } | undefined)?.permissions ?? []
     const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
+    // Env gate for dev-only nav (Templates Health, #1138 P03): hidden ONLY on the Production
+    // deploy. VERCEL_ENV distinguishes production from staging/preview (both are NODE_ENV
+    // 'production' builds); local fallback to NODE_ENV. Resolved server-side — no NEXT_PUBLIC var.
+    const isProduction = (process.env.VERCEL_ENV ?? process.env.NODE_ENV) === 'production'
+
     const cookieStore = await cookies()
     const themeCookie = cookieStore.get('theme')?.value
     const initialTheme = themeCookie === 'light' ? 'light' : 'dark'
@@ -60,7 +76,7 @@ export default async function DashboardLayout({
             <ThemeProvider initialTheme={initialTheme}>
                 <I18nProvider defaultLocale="en">
                     <TooltipProvider delayDuration={300}>
-                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin}>
+                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts}>
                             {children}
                         </CMSLayoutClient>
                         {typedUser && (

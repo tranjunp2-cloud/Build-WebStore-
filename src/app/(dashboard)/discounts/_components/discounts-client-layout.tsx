@@ -7,6 +7,7 @@ import { Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DiscountsToolbar } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
+import { DiscountsTabNav } from './discounts-tab-nav'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -15,18 +16,18 @@ type SortKey = 'code' | 'type' | 'value' | 'usageCount' | 'expiresAt' | 'created
 export function DiscountsClientLayout() {
     const router = useRouter()
 
-    const [discounts, setDiscounts]       = useState<Discount[]>([])
-    const [total, setTotal]               = useState(0)
-    const [totalPages, setTotalPages]     = useState(1)
-    const [page, setPage]                 = useState(1)
-    const [search, setSearch]             = useState('')
+    const [discounts, setDiscounts] = useState<Discount[]>([])
+    const [total, setTotal] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const [page, setPage] = useState(1)
+    const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-    const [typeFilter, setTypeFilter]     = useState<TypeFilter>('all')
-    const [sortBy, setSortBy]             = useState<SortKey>('createdAt')
-    const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc')
-    const [limit, setLimit]               = useState(25)
-    const [loading, setLoading]           = useState(true)
-    const [isFirstLoad, setIsFirstLoad]   = useState(true)
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+    const [sortBy, setSortBy] = useState<SortKey>('createdAt')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const [limit, setLimit] = useState(25)
+    const [loading, setLoading] = useState(true)
+    const [isFirstLoad, setIsFirstLoad] = useState(true)
     // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().
     const [deleteTarget, setDeleteTarget] = useState<Discount | null>(null)
 
@@ -72,9 +73,9 @@ export function DiscountsClientLayout() {
     useEffect(() => { load() }, [load])
 
     // Stable handlers — reset page on filter/sort change
-    const handleSearch       = useCallback((q: string)              => { setSearch(q);        setPage(1) }, [])
-    const handleStatusFilter = useCallback((s: StatusFilter)        => { setStatusFilter(s);  setPage(1) }, [])
-    const handleTypeFilter   = useCallback((t: TypeFilter)          => { setTypeFilter(t);    setPage(1) }, [])
+    const handleSearch = useCallback((q: string) => { setSearch(q); setPage(1) }, [])
+    const handleStatusFilter = useCallback((s: StatusFilter) => { setStatusFilter(s); setPage(1) }, [])
+    const handleTypeFilter = useCallback((t: TypeFilter) => { setTypeFilter(t); setPage(1) }, [])
 
     const handleSort = useCallback((key: SortKey) => {
         if (sortBy === key) {
@@ -86,8 +87,8 @@ export function DiscountsClientLayout() {
         setPage(1)
     }, [sortBy])
 
-    const handleEdit   = useCallback((id: string)      => { router.push(`/discounts/${id}`) }, [router])
-    const handleNew    = useCallback(()                 => { router.push('/discounts/new') }, [router])
+    const handleEdit = useCallback((id: string) => { router.push(`/discounts/${id}`) }, [router])
+    const handleNew = useCallback(() => { router.push('/discounts/new') }, [router])
     const handleExport = useCallback(async () => {
         try {
             const res = await fetch('/api/v1/discounts/export')
@@ -146,14 +147,13 @@ export function DiscountsClientLayout() {
 
     return (
         <div className="space-y-5 pb-20">
-            {/* Header */}
-            {/* Header row: title + action buttons */}
+            {/* Header row: title + action buttons (tabs sit BELOW, matching Email Templates) */}
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>
-                        Discount Codes
+                        Discounts
                     </h1>
-                    <p className="text-[13px] mt-1 max-w-2xl" style={{ color: 'var(--dash-text-muted)' }}>
+                    <p className="text-[14px] mt-1 w-full" style={{ color: 'var(--dash-text-muted)' }}>
                         Create and manage promo codes for this store. Customers apply one code at checkout; usage is tracked against each code&apos;s limit. Deleting a code keeps its usage history.
                     </p>
                 </div>
@@ -178,6 +178,8 @@ export function DiscountsClientLayout() {
                     </button>
                 </div>
             </div>
+
+            <DiscountsTabNav />
 
             <DiscountsToolbar
                 search={search}
