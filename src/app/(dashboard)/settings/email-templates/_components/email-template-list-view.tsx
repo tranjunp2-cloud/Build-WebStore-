@@ -5,6 +5,7 @@ import {
     Mail, Edit2, Info, ShoppingBag, PackageX, TimerOff,
     Timer, Key, ShoppingCart, ShieldCheck, BadgeCheck, XCircle,
     Lock, UserPlus, Users, CheckCircle, MessageSquare, BookOpen,
+    User, Store,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import {
@@ -139,9 +140,11 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
             <h1 className="text-2xl font-bold text-white mb-1">{et.title}</h1>
             <p className="text-sm text-slate-400 mb-6">{et.subtitle}</p>
 
-            {/* Tabs row */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-0 border-b border-white/[0.08]">
+            {/* Tabs row — full-width baseline border; blue underline only under the active tab.
+                Preflight is off (tailwind.config.js) so Tailwind border utils have no border-style
+                and render invisible — paint borders via inline shorthand instead. */}
+            <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
+                <div className="flex gap-0">
                     {(['buyer', 'seller'] as const).map((tab) => {
                         const count = tab === 'buyer' ? allBuyer.length : allSeller.length
                         const isActive = audienceTab === tab
@@ -150,13 +153,12 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                 key={tab}
                                 type="button"
                                 onClick={() => onTabChange(tab)}
-                                className={`flex items-center gap-2 px-4 pb-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                                    isActive
-                                        ? 'border-blue-500 text-white'
-                                        : 'border-transparent text-slate-400 hover:text-white'
+                                className={`flex items-center gap-2 px-4 pb-2.5 text-sm font-medium transition-colors -mb-px ${
+                                    isActive ? 'text-white' : 'text-slate-400 hover:text-white'
                                 }`}
+                                style={{ borderBottom: isActive ? '2px solid var(--dash-accent)' : '2px solid transparent' }}
                             >
-                                {tab === 'buyer' ? <Mail className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                                {tab === 'buyer' ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
                                 {tab === 'buyer' ? et.buyerEmails : et.sellerEmails}
                                 <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
                                     isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-slate-400'

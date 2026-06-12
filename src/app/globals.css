@@ -50,11 +50,17 @@
 
   /* Dashboard semantic tokens — light mode (default) */
   --dash-bg: #F8FAFC;
+  /* Sidebar column bg (sidebar + header logo segment). Light keeps the previous --dash-bg. */
+  --dash-sidebar-bg: #F8FAFC;
+  /* Sidebar/content column divider — visible in light, hidden in dark (dark bg separates on its own). */
+  --dash-col-divider-color: var(--dash-divider);
   --dash-surface: #FFFFFF;
   --dash-surface-hover: #F1F5F9;
   --dash-text: #0F172A;
   --dash-text-muted: #64748B;
   --dash-border: #E2E8F0;
+  /* Stronger-contrast divider for the sidebar/content separator (the faint --dash-border blends in). */
+  --dash-divider: #CBD5E1;
   --dash-accent: #2563EB;
   --dash-error: #FB2C36;
   --dash-overlay: rgba(0, 0, 0, 0.35);
@@ -78,11 +84,17 @@
 /* Dashboard + Editor semantic tokens — dark mode overrides */
 .dark {
   --dash-bg: #0B1120;
+  /* Sidebar column bg (sidebar + header logo segment) — darker than --dash-bg for separation. */
+  --dash-sidebar-bg: #060B18;
+  /* Column divider hidden in dark — the darker sidebar bg already separates from content. */
+  --dash-col-divider-color: transparent;
   --dash-surface: #161E2E;
   --dash-surface-hover: #1F2937;
   --dash-text: #FFFFFF;
   --dash-text-muted: #9CA3AF;
   --dash-border: #1F2937;
+  /* Subtle divider — just above --dash-border (#1F2937), barely lighter than --dash-bg (#0B1120). */
+  --dash-divider: #232E3D;
   --dash-accent: #2563EB;
   --dash-overlay: rgba(0, 0, 0, 0.5);
   --dash-secondary-bg: #1F2937;
@@ -101,6 +113,18 @@
   --editor-overlay-bg: rgba(255, 255, 255, 0.04);
   --editor-overlay-hover: rgba(255, 255, 255, 0.06);
 }
+
+/* Sidebar/content vertical divider. Preflight is OFF (tailwind.config.js corePlugins),
+   so `border-r` alone has no border-style and renders invisible — declare the full
+   shorthand here so the line actually paints. Desktop only (mobile has no fixed sidebar). */
+@media (min-width: 768px) {
+  .dash-col-divider { border-right: 1px solid var(--dash-col-divider-color); }
+}
+
+/* Tab trigger underline (shadcn Tabs use data-state, can't toggle via inline style).
+   Same preflight-off reason as above — paint the 2px underline here so it shows. */
+.dash-tab-trigger { border-bottom: 2px solid transparent; }
+.dash-tab-trigger[data-state="active"] { border-bottom-color: var(--dash-accent); }
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
 /* Dark mode (default — matches current hardcoded values) */
@@ -996,6 +1020,27 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
 
 /* ── Component Utilities ──────────────────────────────────────────────────── */
 @layer components {
+
+  /* Faint sidebar scrollbar — transparent track, low-opacity thumb that brightens
+     on hover (F18 #1138; default global scrollbar reads too solid/visible). */
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.18) transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.18);
+    border-radius: 9999px;
+  }
+  .sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+  }
 
   /* Glass card effect */
   .glass {

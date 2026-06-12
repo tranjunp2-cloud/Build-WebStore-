@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Lock, Search, X, Receipt, SearchX, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { fmtRM, fmtValue, fmtDate } from '@/lib/discounts/format'
+import { DiscountsTabNav } from './discounts-tab-nav'
 
 interface UsageRow {
     id: string
@@ -69,12 +70,12 @@ export function DiscountsUsageHistoryLayout() {
 
     return (
         <div className="flex flex-col gap-5">
-            {/* Header */}
+            {/* Header (tabs sit BELOW, matching Email Templates) */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-[18px] font-semibold" style={textMain}>Discount Usage History</h1>
+                    <h1 className="text-[24px] font-bold" style={textMain}>Discounts</h1>
                     <p className="mt-1 text-sm" style={textMuted}>
-                        Every code redemption, newest first. This log is immutable for audit — no editing or deleting.
+                        Every code redemption, newest first. This log is immutable for audit — no editing or deleting. One row per order; webhook retries never duplicate a row.
                     </p>
                 </div>
                 <span
@@ -85,6 +86,8 @@ export function DiscountsUsageHistoryLayout() {
                     Read-only
                 </span>
             </div>
+
+            <DiscountsTabNav />
 
             {/* Search toolbar */}
             <div
