@@ -257,9 +257,9 @@ export async function POST(
             tax,
             total,
         }
-        // Keep the persisted discount snapshot consistent with what Stripe actually charges, so the
-        // reconcile-time redemption (which reads order.discount/discountAmount) can't redeem a slot for
-        // a discount that silently dropped at retry. Recompute on re-price; clear when it no longer applies.
+        // Keep the persisted discount snapshot consistent with what Stripe actually charges. The slot was
+        // reserved at placement and is still held; recompute the amount on re-price. If the discount no
+        // longer applies, clear the snapshot AND release the held slot (below) so it returns to the pool.
         if (discountSen > 0) {
             updateData.discountAmount = discountSen
         } else if (order.discount) {

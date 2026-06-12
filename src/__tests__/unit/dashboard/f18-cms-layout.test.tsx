@@ -9,7 +9,11 @@ vi.mock('@/i18n', () => ({
         setLocale: vi.fn(),
         toggleLocale: vi.fn(),
         t: {
-            cms: { profile: 'Profile', logout: 'Logout' },
+            cms: {
+                profile: 'Profile',
+                logout: 'Logout',
+                appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' },
+            },
             dashboard: { overview: { greeting: 'Good' } },
         },
         tp: vi.fn(),
@@ -140,7 +144,7 @@ describe('F18 CMS Core Layout', () => {
                 locale: 'en', 
                 setLocale: vi.fn(), 
                 toggleLocale: toggleLocaleMock, 
-                t: { cms: { profile: 'Profile', logout: 'Logout' }, dashboard: { overview: { greeting: 'Good' } } } as any,
+                t: { cms: { profile: 'Profile', logout: 'Logout', appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' } }, dashboard: { overview: { greeting: 'Good' } } } as any,
                 tp: vi.fn(),
                 ti: vi.fn()
             })

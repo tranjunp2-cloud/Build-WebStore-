@@ -17,16 +17,19 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Ticket, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 const TABS = [
-    { key: 'codes', label: 'Discount Codes', href: '/discounts', icon: Ticket },
-    { key: 'history', label: 'Usage History', href: '/discounts/usage-history', icon: History },
+    { key: 'codes', href: '/discounts', icon: Ticket },
+    { key: 'history', href: '/discounts/usage-history', icon: History },
 ] as const
 
 const fmtCount = (n: number) => (n > 999 ? '999+' : String(n))
 
 export function DiscountsTabNav() {
     const pathname = usePathname()
+    const { t } = useI18n()
+    const tabLabels = t.dashboard.discounts.tabs
     const [counts, setCounts] = useState<{ codes: number | null; history: number | null }>({
         codes: null,
         history: null,
@@ -75,7 +78,7 @@ export function DiscountsTabNav() {
                         style={{ borderBottom: isActive ? '2px solid var(--dash-accent)' : '2px solid transparent' }}
                     >
                         <Icon className="h-4 w-4" />
-                        {tab.label}
+                        {tabLabels[tab.key]}
                         {count != null && (
                             <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-slate-300">
                                 {fmtCount(count)}

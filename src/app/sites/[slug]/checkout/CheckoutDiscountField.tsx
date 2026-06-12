@@ -43,6 +43,10 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
         }
     }, [externalReject])
 
+    // Clear the flash timer on unmount (e.g. checkout navigates away mid-flash) — avoids a stray
+    // setState on an unmounted component.
+    useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
     const apply = async () => {
         const key = code.trim()
         if (!key) return

@@ -128,10 +128,10 @@ export function DiscountsTable({
                                     hover xem full text qua themed tooltip (#5). min-w-0 để truncate hoạt động trong flex. */}
                                 <td className="px-4 py-3">
                                     <div className="flex flex-col gap-1 min-w-0">
-                                        {/* Code chip — themed pill matching the Usage-history table for visual consistency */}
+                                        {/* Code chip — themed pill (bordered, matches the design + Usage-history table) */}
                                         <span
-                                            className="inline-block w-fit rounded px-2 py-0.5 font-mono text-xs font-semibold"
-                                            style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
+                                            className="inline-flex w-fit items-center rounded-[4px] border px-2.5 py-[3px] font-mono text-[12px] font-semibold tracking-wide"
+                                            style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
                                         >
                                             {discount.code}
                                         </span>
@@ -149,9 +149,10 @@ export function DiscountsTable({
                                                     side="top"
                                                     align="start"
                                                     onClick={(e) => e.stopPropagation()}
-                                                    // Khung gọn chuẩn: rộng vừa, xuống dòng, và line-clamp-5 để chuỗi
-                                                    // siêu dài không kéo thành tháp — cắt gọn bằng "…". leading-relaxed cho dễ đọc.
-                                                    className="max-w-[260px] whitespace-normal break-words leading-relaxed line-clamp-5"
+                                                    // Show the FULL description: wrap on multiple lines (no line-clamp, so nothing is
+                                                    // hidden). For very long text, cap height and allow scrolling — Radix tooltip content
+                                                    // is hoverable, so the user can move into it and scroll to read the rest.
+                                                    className="max-w-[360px] max-h-[50vh] overflow-y-auto whitespace-normal break-words leading-relaxed"
                                                     style={{
                                                         backgroundColor: 'var(--dash-surface)',
                                                         color: 'var(--dash-text)',

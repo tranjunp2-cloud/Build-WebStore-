@@ -2067,6 +2067,10 @@
             }
         },
         "discounts": {
+            "tabs": {
+                "codes": "Discount Codes",
+                "history": "Usage History"
+            },
             "list": {
                 "title": "Discount Codes",
                 "subtitle": "Create and manage promo codes for this store. Customers apply one code at checkout; usage is tracked against each code's limit. Deleting a code keeps its usage history.",
@@ -2581,7 +2585,11 @@
     },
     "cms": {
         "profile": "Profile",
-        "logout": "Logout"
+        "logout": "Logout",
+        "appSwitcher": {
+            "switchApp": "Switch app",
+            "ssoRedirect": "Secure SSO redirect"
+        }
     },
     "plural": {
         "issue": {

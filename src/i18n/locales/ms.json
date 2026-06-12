@@ -2067,6 +2067,10 @@
             }
         },
         "discounts": {
+            "tabs": {
+                "codes": "Kod Diskaun",
+                "history": "Sejarah Penggunaan"
+            },
             "list": {
                 "title": "Kod Diskaun",
                 "subtitle": "Cipta dan urus kod promo untuk kedai ini. Pelanggan menggunakan satu kod semasa pembayaran; penggunaan dikesan mengikut had setiap kod. Memadamkan kod mengekalkan sejarah penggunaannya.",
@@ -2581,7 +2585,11 @@
     },
     "cms": {
         "profile": "Profil",
-        "logout": "Log Keluar"
+        "logout": "Log Keluar",
+        "appSwitcher": {
+            "switchApp": "Tukar apl",
+            "ssoRedirect": "Ubah hala SSO selamat"
+        }
     },
     "plural": {
         "issue": {

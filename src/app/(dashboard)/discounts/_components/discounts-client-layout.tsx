@@ -9,6 +9,7 @@ import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { useI18n } from '@/i18n'
 import { DiscountsTabNav } from './discounts-tab-nav'
+import { useUrlPagination } from './use-url-pagination'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -22,13 +23,13 @@ export function DiscountsClientLayout() {
     const [discounts, setDiscounts] = useState<Discount[]>([])
     const [total, setTotal] = useState(0)
     const [totalPages, setTotalPages] = useState(1)
-    const [page, setPage] = useState(1)
+    // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
+    const { page, setPage, limit, setLimit } = useUrlPagination(10)
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
     const [sortBy, setSortBy] = useState<SortKey>('createdAt')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-    const [limit, setLimit] = useState(25)
     const [loading, setLoading] = useState(true)
     const [isFirstLoad, setIsFirstLoad] = useState(true)
     // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().

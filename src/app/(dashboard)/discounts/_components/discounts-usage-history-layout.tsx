@@ -5,6 +5,7 @@ import { Lock, Search, X, Receipt, SearchX, ArrowUpRight, ChevronLeft, ChevronRi
 import { fmtRM, fmtValue, fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
 import { DiscountsTabNav } from './discounts-tab-nav'
+import { useUrlPagination } from './use-url-pagination'
 
 interface UsageRow {
     id: string
@@ -34,8 +35,8 @@ export function DiscountsUsageHistoryLayout() {
 
     const [rows, setRows] = useState<UsageRow[]>([])
     const [loading, setLoading] = useState(true)
-    const [page, setPage] = useState(1)
-    const [limit, setLimit] = useState(10)
+    // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
+    const { page, setPage, limit, setLimit } = useUrlPagination(10)
     const [totalPages, setTotalPages] = useState(1)
     const [totalDocs, setTotalDocs] = useState(0)
     const [search, setSearch] = useState('')
@@ -43,11 +44,11 @@ export function DiscountsUsageHistoryLayout() {
 
     // Debounce the input so each keystroke doesn't hit the API; reset to page 1 on a new query.
     useEffect(() => {
-        const t = setTimeout(() => {
+        const id = setTimeout(() => {
             setDebouncedSearch(search.trim())
             setPage(1)
         }, 300)
-        return () => clearTimeout(t)
+        return () => clearTimeout(id)
     }, [search])
 
     // Server-side search across the WHOLE dataset (not just the current page).
@@ -162,8 +163,8 @@ export function DiscountsUsageHistoryLayout() {
                                         >
                                             <td className="px-4 py-3">
                                                 <span
-                                                    className="inline-block rounded px-2 py-0.5 font-mono text-xs font-semibold"
-                                                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
+                                                    className="inline-flex w-fit items-center rounded-[4px] border px-2.5 py-[3px] font-mono text-[12px] font-semibold tracking-wide"
+                                                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
                                                 >
                                                     {u.discountCode ?? u.discount?.code ?? '—'}
                                                 </span>
@@ -182,10 +183,15 @@ export function DiscountsUsageHistoryLayout() {
                                                 {u.order ? (
                                                     <a
                                                         href={`/orders?order=${u.order.id}`}
-                                                        className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium transition-colors hover:opacity-80"
-                                                        style={{ borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+                                                        className="inline-flex items-center gap-1 text-sky-500 transition-opacity hover:opacity-80 dark:text-sky-400"
                                                     >
-                                                        {u.order.orderNumber ?? u.order.id}
+                                                        {/* Order # as a kbd-key box (muted mono pill); the ↗ arrow sits OUTSIDE in the link color — matches design */}
+                                                        <span
+                                                            className="rounded-[3px] border px-[5px] py-px font-mono text-[11px]"
+                                                            style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-muted)' }}
+                                                        >
+                                                            {u.order.orderNumber ?? u.order.id}
+                                                        </span>
                                                         <ArrowUpRight className="h-3 w-3" />
                                                     </a>
                                                 ) : '—'}

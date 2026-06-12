@@ -365,6 +365,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
+        // Clear any prior discount-exhausted warning so re-submitting the SAME exhausted code re-triggers
+        // the inline warning (the field effect keys on a value change, so null→message must transition).
+        setDiscountRejection(null)
         setIsPlacing(true)
         let navigatedToConfirm = false
         // Show overlay after 300ms if API still running (avoids flash on fast responses)
