@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, Clock, CheckCircle2, AlertTriangle, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { Link, Clock, CheckCircle2, AlertTriangle, ArrowRight, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { useI18n } from '@/i18n';
 
 export interface XenditConnectBlockProps {
     status: 'NOT_CONNECTED' | 'INVITED' | 'REGISTERED' | 'AWAITING_DOCS' | 'PENDING_VERIFICATION' | 'LIVE' | 'SUSPENDED';
@@ -20,6 +21,8 @@ export function XenditConnectBlock({
     onConnected,
     onStatusChange,
 }: XenditConnectBlockProps) {
+    const { t } = useI18n();
+    const pt = t.dashboard.settings.payments;
     const [isConnecting, setIsConnecting] = useState(false);
     const [isResending, setIsResending] = useState(false);
     const [connectError, setConnectError] = useState<string | null>(null);
@@ -67,13 +70,16 @@ export function XenditConnectBlock({
                 body: JSON.stringify({ tenantId }),
             });
             const body = await res.json();
-            if (!res.ok || !body?.data?.onboardingUrl) {
+            if (!res.ok) {
                 setConnectError(body?.error?.message ?? 'Không thể khởi tạo kết nối Xendit.');
                 return;
             }
-            setOnboardingUrl(body.data.onboardingUrl);
-            window.open(body.data.onboardingUrl, '_blank');
-            onConnected?.(body.data?.xenditAccountId ?? '', 'INVITED');
+            const url: string | null = body.data?.onboardingUrl ?? null;
+            if (url) {
+                setOnboardingUrl(url);
+                window.open(url, '_blank');
+            }
+            onConnected?.(body.data?.xenditAccountId ?? '', body.data?.status ?? 'INVITED');
         } catch {
             setConnectError('Lỗi mạng. Vui lòng thử lại.');
         } finally {
@@ -129,8 +135,8 @@ export function XenditConnectBlock({
                     <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                    <p className="text-[15px] font-bold text-slate-50 m-0 mb-[2px]">Xendit — Đã kết nối</p>
-                    <p className="text-[13px] text-slate-400 m-0">Tài khoản Xendit đang hoạt động. Bật các phương thức thanh toán bên dưới.</p>
+                    <p className="text-[15px] font-bold text-slate-50 m-0 mb-[2px]">{pt.xenditConnectedBar}</p>
+                    <p className="text-[13px] text-slate-400 m-0">{pt.xenditKybVerified}</p>
                 </div>
                 <span
                     className="ml-auto inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-full text-[12px] font-semibold text-emerald-300 shrink-0"
@@ -166,8 +172,8 @@ export function XenditConnectBlock({
                     <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                    <p className="text-[15px] font-bold text-slate-50 m-0 mb-[2px]">Tài khoản Xendit bị tạm ngưng</p>
-                    <p className="text-[13px] text-slate-400 m-0">Liên hệ <a href="mailto:support@xendit.co" className="text-red-400 underline">support@xendit.co</a> để được hỗ trợ.</p>
+                    <p className="text-[15px] font-bold text-slate-50 m-0 mb-[2px]">Xendit account suspended</p>
+                    <p className="text-[13px] text-slate-400 m-0">Contact <a href="mailto:support@xendit.co" className="text-red-400 underline">support@xendit.co</a> for assistance.</p>
                 </div>
                 <span
                     className="ml-auto inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-full text-[12px] font-semibold text-red-300 shrink-0"
@@ -214,17 +220,17 @@ export function XenditConnectBlock({
                 {/* Body */}
                 <div className="min-w-0">
                     <div className="flex items-center gap-[10px] mb-[6px]">
-                        <h4 className="text-[17px] font-bold text-slate-50 tracking-tight m-0">Đang xét duyệt</h4>
+                        <h4 className="text-[17px] font-bold text-slate-50 tracking-tight m-0">{pt.xenditPendingTitle}</h4>
                         <Loader2 className="w-[14px] h-[14px] text-amber-400 animate-spin shrink-0" />
                         <span
                             className="inline-flex items-center px-[8px] py-[3px] rounded-full text-[11px] font-bold text-amber-300"
                             style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.28)' }}
                         >
-                            Chờ xác minh
+                            {pt.xenditPendingVerify}
                         </span>
                     </div>
                     <p className="text-[13.5px] text-slate-400 leading-[1.55] m-0 max-w-[540px]">
-                        Xendit đang xem xét hồ sơ. Quá trình thường mất 1–3 ngày làm việc. Trang này sẽ tự cập nhật khi có kết quả.
+                        {pt.xenditPendingDesc}
                     </p>
                 </div>
 
@@ -234,13 +240,13 @@ export function XenditConnectBlock({
                         <button
                             type="button"
                             onClick={handleReopenLink}
-                            className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-[#042033] transition-all hover:brightness-110 whitespace-nowrap"
+                            className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-[#1a0a00] transition-all hover:brightness-110 whitespace-nowrap"
                             style={{
                                 background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
                                 boxShadow: '0 4px 14px rgba(251,191,36,0.30)',
                             }}
                         >
-                            Mở lại link
+                            {pt.xenditReopenLink}
                             <ArrowRight className="w-4 h-4" />
                         </button>
                     )}
@@ -254,7 +260,7 @@ export function XenditConnectBlock({
                             ? <Loader2 className="w-3 h-3 animate-spin" />
                             : <RefreshCw className="w-3 h-3" />
                         }
-                        Gửi lại link
+                        {pt.xenditResendLink}
                     </button>
                 </div>
             </div>
@@ -295,13 +301,13 @@ export function XenditConnectBlock({
             {/* Body */}
             <div className="min-w-0">
                 <h4 className="text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
-                    Kết nối Xendit
+                    {pt.xenditConnectTitle}
                 </h4>
                 <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]">
-                    Nhận thanh toán qua TNG, GrabPay, DuitNow QR và FPX tại Malaysia. Xendit xử lý xác minh doanh nghiệp (KYB) cho bạn.
+                    {pt.xenditConnectDesc}
                 </p>
                 <ul className="flex flex-wrap gap-[14px_24px] list-none m-0 p-0">
-                    {['Tạo tài khoản Xendit', 'Hoàn tất KYB online', 'Bật phương thức thanh toán'].map((step, i) => (
+                    {[pt.xenditStep1, pt.xenditStep2, pt.xenditStep3].map((step, i) => (
                         <li key={i} className="inline-flex items-center gap-2 text-[12.5px] text-slate-300">
                             <span className="w-5 h-5 rounded-full border border-cyan-500/[0.28] bg-cyan-500/[0.12] text-cyan-300 font-mono text-[11px] font-bold grid place-items-center shrink-0">
                                 {i + 1}
@@ -324,17 +330,21 @@ export function XenditConnectBlock({
                     type="button"
                     onClick={handleConnect}
                     disabled={isConnecting || !tenantId}
-                    className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-white transition-all hover:brightness-110 whitespace-nowrap disabled:opacity-70 disabled:cursor-wait"
+                    className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-[#042033] transition-all hover:brightness-110 whitespace-nowrap disabled:opacity-70 disabled:cursor-wait"
                     style={{
-                        background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+                        background: 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
                         boxShadow: '0 4px 14px rgba(14,165,233,0.30)',
                     }}
                 >
                     {isConnecting
-                        ? <><Loader2 className="w-4 h-4 animate-spin" />Đang kết nối…</>
-                        : <>Kết nối Payment<ArrowRight className="w-4 h-4" /></>
+                        ? <><Loader2 className="w-4 h-4 animate-spin" />{pt.xenditConnecting}</>
+                        : <>{pt.xenditConnectCta}<ArrowRight className="w-4 h-4" /></>
                     }
                 </button>
+                <div className="inline-flex items-center gap-[6px] text-[11.5px] text-slate-500 whitespace-nowrap">
+                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    {pt.xenditTrust}
+                </div>
             </div>
         </div>
     );

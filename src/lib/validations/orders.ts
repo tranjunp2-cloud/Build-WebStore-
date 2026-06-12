@@ -33,7 +33,7 @@ export const stripeCheckoutSchema = z.object({
 // Phase B channels: TOUCHNGO, GRABPAY, QR_CODE (DuitNow), FPX. SHOPEEPAY/CARDS deferred to Phase C.
 export const xenditCheckoutSchema = z.object({
     siteId: z.union([z.string(), z.number()]),
-    channelCode: z.enum(['TOUCHNGO', 'GRABPAY', 'QR_CODE', 'FPX']),
+    channelCode: z.enum(['TOUCHNGO', 'GRABPAY', 'SHOPEEPAY', 'BOOST', 'MAE', 'QR_CODE', 'FPX']),
     items: z.array(z.object({
         productId: z.union([z.string(), z.number()]),
         quantity: z.number().int().min(1).max(100),

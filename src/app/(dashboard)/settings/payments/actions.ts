@@ -19,6 +19,9 @@ export type PaymentUpdates = {
     xendit_grabpay?: boolean;
     xendit_duitnow?: boolean;
     xendit_fpx?: boolean;
+    xendit_shopeepay?: boolean;
+    xendit_boost?: boolean;
+    xendit_mae?: boolean;
 };
 
 export async function getPaymentSettings() {
@@ -126,6 +129,30 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
                 paymentsData.xendit_fpx = updates.xendit_fpx;
             } else {
                 return { success: false, error: 'Invalid type for xendit_fpx. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_shopeepay !== undefined) {
+            if (typeof updates.xendit_shopeepay === 'boolean') {
+                paymentsData.xendit_shopeepay = updates.xendit_shopeepay;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_shopeepay. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_boost !== undefined) {
+            if (typeof updates.xendit_boost === 'boolean') {
+                paymentsData.xendit_boost = updates.xendit_boost;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_boost. Expected boolean.' };
+            }
+        }
+
+        if (updates.xendit_mae !== undefined) {
+            if (typeof updates.xendit_mae === 'boolean') {
+                paymentsData.xendit_mae = updates.xendit_mae;
+            } else {
+                return { success: false, error: 'Invalid type for xendit_mae. Expected boolean.' };
             }
         }
 

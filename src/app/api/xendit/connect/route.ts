@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { createManagedAccount, getOnboardingUrl } from '@/lib/payment/xendit'
-import { XenditError } from '@/lib/payment/xendit-client'
+import { XenditError, xenditFetch } from '@/lib/payment/xendit-client'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /**
@@ -75,10 +75,40 @@ export const POST = withAuth(async (user, request) => {
         }
 
         // Create path: create sub-account, persist, then fetch onboarding URL
-        const account = await createManagedAccount({
-            email: user.email as string,
-            businessName: tenant.name as string,
-        })
+        const subAccountEmail = user.email as string
+        let account
+        try {
+            account = await createManagedAccount({
+                email: subAccountEmail,
+                businessName: tenant.name as string,
+            })
+        } catch (createErr) {
+            if (!(createErr instanceof XenditError) || createErr.status !== 409) throw createErr
+
+            // 409: try to recover — check if it's one of our existing sub-accounts
+            const userEmail = (user.email as string ?? '').toLowerCase()
+            const raw = await xenditFetch<unknown>('/v2/accounts', { method: 'GET' })
+            const list = Array.isArray(raw) ? raw : ((raw as { data?: unknown[] })?.data ?? [])
+            const existing = (list as Array<{ id: string; email?: string }>).find(
+                (a) => (a.email ?? '').toLowerCase() === subAccountEmail.toLowerCase(),
+            )
+            if (existing) {
+                // Our sub-account existed in Xendit but wasn't in DB — recover
+                account = existing
+            } else {
+                // Email conflicts with a non-platform Xendit account (e.g. personal account)
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'DUPLICATE_EMAIL',
+                            message: `Email ${subAccountEmail} is already registered with Xendit. Set a different "Xendit Business Email" in the payment settings and try again.`,
+                        },
+                    },
+                    { status: 409 },
+                )
+            }
+        }
 
         // Persist BEFORE fetching the onboarding URL (race-safe)
         await payload.update({

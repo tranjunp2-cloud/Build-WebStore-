@@ -145,6 +145,9 @@ const MIGRATIONS = [
   { name: 'tenants.payments_xendit_grabpay', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_grabpay boolean DEFAULT false;` },
   { name: 'tenants.payments_xendit_duitnow', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_duitnow boolean DEFAULT false;` },
   { name: 'tenants.payments_xendit_fpx', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_fpx boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_shopeepay', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_shopeepay boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_boost', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_boost boolean DEFAULT false;` },
+  { name: 'tenants.payments_xendit_mae', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_mae boolean DEFAULT false;` },
   // ── Tenants: Business info ──
   {
     name: 'tenants.whatsapp_number',

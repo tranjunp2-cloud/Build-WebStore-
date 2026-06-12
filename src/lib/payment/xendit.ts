@@ -14,6 +14,18 @@ export interface CreateManagedAccountParams {
     businessName: string
 }
 
+/** Xendit requires alphanumeric-only business names — strip diacritics + special chars. */
+function sanitizeBusinessName(name: string): string {
+    return (
+        name
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')  // strip diacritics (à→a, ê→e, etc.)
+            .replace(/[^a-zA-Z0-9 ]/g, '')    // remove non-alphanumeric non-space
+            .replace(/\s+/g, ' ')
+            .trim() || 'Business'
+    )
+}
+
 /** POST /v2/accounts — create a MANAGED sub-account. */
 export async function createManagedAccount(params: CreateManagedAccountParams): Promise<XenditAccount> {
     return xenditFetch<XenditAccount>('/v2/accounts', {
@@ -21,7 +33,7 @@ export async function createManagedAccount(params: CreateManagedAccountParams): 
         body: {
             email: params.email,
             type: 'MANAGED',
-            public_profile: { business_name: params.businessName },
+            public_profile: { business_name: sanitizeBusinessName(params.businessName) },
         },
     })
 }
@@ -31,21 +43,30 @@ export async function getAccountById(accountId: string): Promise<XenditAccount> 
     return xenditFetch<XenditAccount>(`/v2/accounts/${accountId}`, { method: 'GET' })
 }
 
-/**
- * Return the hosted onboarding/KYB URL for a MANAGED account.
- * Reads `onboarding_url` from the account object (Xendit MANAGED returns this inline).
- * NOTE: if Xendit sandbox shows a different field, update this function only.
- */
-export async function getOnboardingUrl(accountId: string): Promise<string> {
-    const account = await getAccountById(accountId)
-    const url = account.onboarding_url
-    if (!url) {
-        throw new Error(`No onboarding URL available for Xendit account ${accountId}`)
-    }
-    return url
+/** GET /v2/accounts?types[]=MANAGED — list platform sub-accounts. Used to recover from 409 duplicate. */
+export async function listManagedAccounts(): Promise<XenditAccount[]> {
+    const result = await xenditFetch<{ data?: XenditAccount[] }>('/v2/accounts?types[]=MANAGED', { method: 'GET' })
+    return result.data ?? []
 }
 
-export type XenditChannelCode = 'TOUCHNGO' | 'GRABPAY' | 'SHOPEEPAY' | 'CARDS' | 'QR_CODE' | 'FPX'
+/**
+ * Return the hosted onboarding/KYB URL for a MANAGED account, or null if unavailable.
+ * Calls POST /v2/accounts/{id}/hosted_activation — returns null in sandbox (endpoint doesn't exist).
+ * In production Xendit sends an activation email automatically; the URL is bonus for direct redirect.
+ */
+export async function getOnboardingUrl(accountId: string): Promise<string | null> {
+    try {
+        const result = await xenditFetch<{ activation_url?: string }>(`/v2/accounts/${accountId}/hosted_activation`, {
+            method: 'POST',
+            body: {},
+        })
+        return result.activation_url ?? null
+    } catch {
+        return null
+    }
+}
+
+export type XenditChannelCode = 'TOUCHNGO' | 'GRABPAY' | 'SHOPEEPAY' | 'BOOST' | 'MAE' | 'CARDS' | 'QR_CODE' | 'FPX'
 
 export interface CreatePaymentRequestParams {
     forUserId: string           // tenant.xenditAccountId
@@ -92,7 +113,7 @@ export function mapChannelToPaymentMethod(code: string): 'ewallet' | 'fpx' | 'ca
     switch (code?.toUpperCase()) {
         case 'CARDS': return 'card'
         case 'FPX': return 'fpx'
-        default: return 'ewallet' // TOUCHNGO/GRABPAY/SHOPEEPAY/QR_CODE
+        default: return 'ewallet' // TOUCHNGO/GRABPAY/SHOPEEPAY/BOOST/MAE/QR_CODE
     }
 }
 
@@ -127,7 +148,7 @@ function buildPaymentMethod(
                 card: { channel_properties: { success_return_url: successUrl, failure_return_url: failureUrl } },
             }
         default:
-            // TOUCHNGO | GRABPAY | SHOPEEPAY
+            // TOUCHNGO | GRABPAY | SHOPEEPAY | BOOST | MAE
             return {
                 type: 'EWALLET',
                 reusability: 'ONE_TIME_USE',

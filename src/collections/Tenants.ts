@@ -379,6 +379,51 @@ export const Tenants: CollectionConfig = {
                     },
                 },
                 {
+                    name: 'xendit_shopeepay',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'ShopeePay via Xendit',
+                    admin: { description: 'Nhận thanh toán ShopeePay qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_boost',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Boost via Xendit',
+                    admin: { description: 'Nhận thanh toán Boost e-wallet qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_mae',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'MAE by Maybank via Xendit',
+                    admin: { description: 'Nhận thanh toán MAE (Maybank) qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
                     name: 'payment_cod',
                     type: 'checkbox',
                     defaultValue: false,

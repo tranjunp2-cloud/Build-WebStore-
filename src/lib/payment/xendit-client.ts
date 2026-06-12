@@ -29,6 +29,7 @@ export async function xenditFetch<T>(
         'Content-Type': 'application/json',
     }
     if (init.forUserId) headers['for-user-id'] = init.forUserId
+    if (path.startsWith('/v3/')) headers['api-version'] = '2024-11-11'
 
     const res = await fetch(`${XENDIT_BASE_URL}${path}`, {
         method: init.method,

@@ -19,6 +19,9 @@ export default async function PaymentsPage() {
     let xenditGrabpayEnabled = false;
     let xenditDuitnowEnabled = false;
     let xenditFpxEnabled = false;
+    let xenditShopeepayEnabled = false;
+    let xenditBoostEnabled = false;
+    let xenditMaeEnabled = false;
 
     if (tenantId) {
         const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
@@ -33,6 +36,9 @@ export default async function PaymentsPage() {
         xenditGrabpayEnabled = (tenant as any)?.payments?.xendit_grabpay ?? false;
         xenditDuitnowEnabled = (tenant as any)?.payments?.xendit_duitnow ?? false;
         xenditFpxEnabled = (tenant as any)?.payments?.xendit_fpx ?? false;
+        xenditShopeepayEnabled = (tenant as any)?.payments?.xendit_shopeepay ?? false;
+        xenditBoostEnabled = (tenant as any)?.payments?.xendit_boost ?? false;
+        xenditMaeEnabled = (tenant as any)?.payments?.xendit_mae ?? false;
     }
 
     return (
@@ -49,6 +55,9 @@ export default async function PaymentsPage() {
             initialXenditGrabpayEnabled={xenditGrabpayEnabled}
             initialXenditDuitnowEnabled={xenditDuitnowEnabled}
             initialXenditFpxEnabled={xenditFpxEnabled}
+            initialXenditShopeepayEnabled={xenditShopeepayEnabled}
+            initialXenditBoostEnabled={xenditBoostEnabled}
+            initialXenditMaeEnabled={xenditMaeEnabled}
         />
     );
 }
