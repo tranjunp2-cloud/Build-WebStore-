@@ -47,14 +47,16 @@ describe('[TC-F33-07-06] reconcileOrderPaid — discount redemption on paid', ()
         vi.clearAllMocks()
     })
 
-    it('does NOT call recordDiscountRedemption (slot reserved at place-order)', async () => {
-        // Arrange: TC-F33-07-06 NEW behavior — reconcile no longer redeems (F33 race fix #10/#11)
-        // Slot is reserved at place-order time (like inventory), so reconcile only transitions status.
+    it('runs the legacy-backstop redemption after the transition (idempotent for new-flow orders)', async () => {
+        // Arrange: TC-F33-07-06 — new-flow orders reserve at place-order, so the backstop call inside
+        // reconcile is an idempotent no-op for them ('already-reserved' via the unique order_id row).
+        // It MUST still fire so pre-deploy pending orders (old flow: redeem here) get counted on pay.
         const payload = createMockPayload()
 
-        // First execute: atomic transition pending→paid (only call)
+        // 1st execute: atomic transition pending→paid; 2nd: backstop reserve (fresh bump here).
         const mockExecute = vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 123 }] })
+            .mockResolvedValueOnce({ rows: [{ prior_count: 0, bumped: 1 }] })
         ;(payload.db.drizzle as any).execute = mockExecute
 
         const mockFindByID = vi.fn(payload.findByID)
@@ -94,11 +96,14 @@ describe('[TC-F33-07-06] reconcileOrderPaid — discount redemption on paid', ()
 
         // Assert
         expect(result.status).toBe('reconciled')
-        // Execute called once: transition only (NO redemption call in reconcile)
-        expect(mockExecute).toHaveBeenCalledTimes(1)
+        // Execute called twice: transition first, then the backstop reserve
+        expect(mockExecute).toHaveBeenCalledTimes(2)
         const transitionCall = mockExecute.mock.calls[0][0]
-        // First call should be the status transition
         expect(transitionCall.strings.join('?')).toContain('UPDATE orders')
+        const backstopCall = mockExecute.mock.calls[1][0]
+        expect(backstopCall.strings.join('?')).toContain('discount_usage_history')
+        // Snapshot fields flow through (audit fidelity for legacy orders)
+        expect(backstopCall.values).toContain('SUMMER50')
     })
 
     it('does not redeem when order has no discount', async () => {
@@ -238,7 +243,8 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
     })
 
     it('second reconcile of same order returns already_processed (no double-work)', async () => {
-        // Arrange — TC-F33-07-07 idempotency with NEW behavior (no redemption in reconcile)
+        // Arrange — TC-F33-07-07 idempotency: the single-winner transition gates the backstop, so a
+        // re-delivered webhook runs the transition only (0 rows → early return, no redemption attempt).
         const payload = createMockPayload()
         let callCount = 0
 
@@ -248,6 +254,9 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
                 // First transition: success
                 return Promise.resolve({ rows: [{ id: 123 }] })
             } else if (callCount === 2) {
+                // First delivery's backstop reserve (fresh bump)
+                return Promise.resolve({ rows: [{ prior_count: 0, bumped: 1 }] })
+            } else if (callCount === 3) {
                 // Second transition (retry): already processed, 0 rows
                 return Promise.resolve({ rows: [] })
             } else {
@@ -298,8 +307,8 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
 
         // Assert second delivery
         expect(result2.status).toBe('already_processed')
-        // Total execute calls: transition1 + transition2 (NO redemption in either)
-        expect(mockExecute).toHaveBeenCalledTimes(2)
+        // Total execute calls: transition1 + backstop1 + transition2 (re-delivery redeems nothing)
+        expect(mockExecute).toHaveBeenCalledTimes(3)
         // Early return after status check prevents any further work
     })
 })
@@ -316,6 +325,8 @@ describe('[TC-F33-07-08] reconcileOrderPaid — discount line in email', () => {
         const payload = createMockPayload()
         const mockExecute = vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 123 }] })
+            // Backstop reserve — already reserved at place-order (new-flow order): idempotent no-op
+            .mockResolvedValueOnce({ rows: [{ prior_count: 1, bumped: 0 }] })
         ;(payload.db.drizzle as any).execute = mockExecute
 
         const mockFindByID = vi.fn(payload.findByID)

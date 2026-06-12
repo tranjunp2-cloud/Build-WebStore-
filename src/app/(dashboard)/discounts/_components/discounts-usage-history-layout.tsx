@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Lock, Search, X, Receipt, SearchX, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { fmtRM, fmtValue, fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
@@ -43,7 +43,14 @@ export function DiscountsUsageHistoryLayout() {
     const [debouncedSearch, setDebouncedSearch] = useState('')
 
     // Debounce the input so each keystroke doesn't hit the API; reset to page 1 on a new query.
+    // The mount run is skipped — it would setPage(1) ~300ms after render and clobber the page
+    // restored from ?page=N by useUrlPagination (Bug #12 AC: reload / shared links keep the page).
+    const searchDebounceReady = useRef(false)
     useEffect(() => {
+        if (!searchDebounceReady.current) {
+            searchDebounceReady.current = true
+            return
+        }
         const id = setTimeout(() => {
             setDebouncedSearch(search.trim())
             setPage(1)

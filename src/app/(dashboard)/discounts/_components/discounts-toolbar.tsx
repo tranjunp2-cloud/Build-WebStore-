@@ -103,7 +103,15 @@ export function DiscountsToolbar({
 
     useEffect(() => { setInput(search) }, [search])
 
+    // Debounced search propagation. The mount run is skipped — it would call onSearch('') which
+    // setPage(1)s in the parent ~400ms after render, clobbering the page restored from ?page=N by
+    // useUrlPagination (Bug #12 AC: reload / shared links keep the page).
+    const searchDebounceReady = useRef(false)
     useEffect(() => {
+        if (!searchDebounceReady.current) {
+            searchDebounceReady.current = true
+            return
+        }
         const timer = setTimeout(() => onSearch(input), 400)
         return () => clearTimeout(timer)
     }, [input, onSearch])
