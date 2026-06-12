@@ -1,29 +1,38 @@
 import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 
+/** Outcome of a reserve attempt. `recorded` stays for back-compat (true = slot is held by this order). */
+export type ReserveStatus = 'reserved' | 'already-reserved' | 'at-limit' | 'no-discount' | 'error'
+export interface ReserveResult {
+    recorded: boolean
+    status: ReserveStatus
+}
+
 /**
- * Idempotent, limit-capped discount redemption — the single writer of discount usage.
+ * Reserve a discount usage slot for an order — the single writer of discount usage (F33 race fix #10/#11).
  *
- * INSERTs one `discount_usage_history` row guarded by `ON CONFLICT (order_id) DO NOTHING`,
- * then increments `discounts.usage_count` ONLY when a new row was inserted AND the discount is
- * still under its `usage_limit`. Idempotent under retries — Stripe webhook re-delivery,
- * confirm-poll, cron, or an admin re-save can all fire it without double-counting.
+ * RESERVE-AT-PLACE-ORDER (gateway-agnostic): the slot is taken the moment an order is placed — for COD,
+ * bank-transfer AND Stripe alike — exactly like inventory. It is returned only on a terminal non-sale
+ * (buyer cancel, seller cancel, refund, 24h payment-expiry) via {@link releaseDiscountRedemption}. This
+ * closes the oversell window (#11) where Stripe previously redeemed only after payment success, and lets
+ * the caller HARD-BLOCK a buyer whose code just sold out instead of silently charging full price (#10).
  *
- * USAGE CAP (F33 hardening): the bump carries `AND (usage_limit IS NULL OR usage_count < usage_limit)`.
- * A conditional UPDATE on a single row is row-lock serialized — Postgres re-evaluates the WHERE against
- * the latest committed `usage_count` after acquiring the lock — so `usage_count` can NEVER exceed
- * `usage_limit`, even when two checkouts pass the (stale) pre-create `applyDiscount` check concurrently.
- * Residual (accepted, "cap count" semantics): at the exact concurrency boundary two orders may both be
- * created at the discounted price; the history records both, but `usage_count` stops at the cap — so the
- * invariant softens to `usage_count == min(COUNT(history), usage_limit)`. No FUTURE order slips through.
+ * ATOMIC GATE (UPDATE-first): the row-lock-serialized `UPDATE discounts ... WHERE usage_count < usage_limit`
+ * is the authority — Postgres re-evaluates the WHERE against the latest committed `usage_count` after
+ * acquiring the row lock, so two concurrent place-orders on a 1-slot code can NEVER both bump. The history
+ * INSERT fires ONLY when the bump fired, so an at-limit attempt leaves NO history row (no phantom reserve).
+ *   - `reserved`        — slot taken now (count bumped, history inserted).
+ *   - `already-reserved`— this order already holds a slot (prior history row); idempotent no-op. Safe under
+ *                         retries (webhook re-delivery, confirm-poll, cron, double submit).
+ *   - `at-limit`        — code sold out; nothing written. Caller MUST block + notify the buyer.
+ *   - `no-discount`     — nothing to reserve (no discount / non-positive amount).
+ *   - `error`          — unexpected DB error; caller should fail safe (do not let the order through silently).
  *
- * Snapshots `discount_code` + `discount_type` + `discount_value` so the audit report keeps full
- * fidelity (code, type, value) even after the discount row is hard-deleted (FK `ON DELETE SET NULL`).
+ * Idempotency key is the unique `discount_usage_history.order_id`. `usage_count` invariant holds:
+ * `0 <= usage_count <= usage_limit`, and never exceeds COUNT(history) for the discount.
  *
- * Non-throwing: the order is already placed/paid when this runs, so a usage-write failure must
- * never abort the caller. Failures are logged and swallowed.
- *
- * No-op when there is nothing to redeem (`amountApplied <= 0`, or missing discount/order id).
+ * Snapshots `discount_code` + `discount_type` + `discount_value` so the audit report keeps full fidelity
+ * even after the discount row is hard-deleted (FK `ON DELETE SET NULL`).
  */
 export async function recordDiscountRedemption(
     payload: Payload,
@@ -37,20 +46,33 @@ export async function recordDiscountRedemption(
         discountValue?: number | null
         customerEmail?: string | null
     },
-): Promise<{ recorded: boolean }> {
-    if (!(args.discountId && args.orderId && args.amountApplied > 0)) return { recorded: false }
+): Promise<ReserveResult> {
+    if (!(args.discountId && args.orderId && args.amountApplied > 0)) {
+        return { recorded: false, status: 'no-discount' }
+    }
 
     try {
-        const db = payload.db as { drizzle: { execute: (q: unknown) => Promise<{ rows: Array<{ inserted: number }> }> } }
+        const db = payload.db as {
+            drizzle: { execute: (q: unknown) => Promise<{ rows: Array<{ prior_count: number; bumped: number }> }> }
+        }
 
-        // Single atomic statement: the guarded INSERT and the capped usage_count bump run in one
-        // round-trip / implicit transaction. The UPDATE fires ONLY when the INSERT actually added a row
-        // (replay-safe) AND capacity remains, closing both the mid-call-crash window and the over-limit race.
+        // Single atomic statement. `prior` snapshots whether this order already reserved (idempotency).
+        // `bump` is the gate: it fires ONLY when capacity remains AND the order has no prior reservation —
+        // row-lock serialized, so concurrent place-orders can't both pass. `ins` records history ONLY when
+        // the bump fired, so an at-limit attempt writes nothing (no phantom slot to leak).
         const res = await db.drizzle.execute(sql`
-            WITH ins AS (
+            WITH prior AS (
+                SELECT 1 FROM discount_usage_history WHERE order_id = ${Number(args.orderId)}
+            ), bump AS (
+                UPDATE discounts SET usage_count = usage_count + 1
+                WHERE id = ${Number(args.discountId)}
+                  AND (usage_limit IS NULL OR usage_count < usage_limit)
+                  AND NOT EXISTS (SELECT 1 FROM prior)
+                RETURNING id
+            ), ins AS (
                 INSERT INTO discount_usage_history
                     (tenant_id, discount_id, order_id, amount_applied, customer_email, discount_code, discount_type, discount_value, used_at, created_at, updated_at)
-                VALUES (
+                SELECT
                     ${Number(args.tenantId)},
                     ${Number(args.discountId)},
                     ${Number(args.orderId)},
@@ -60,22 +82,21 @@ export async function recordDiscountRedemption(
                     ${args.discountType ?? null},
                     ${args.discountValue ?? null},
                     NOW(), NOW(), NOW()
-                )
+                WHERE EXISTS (SELECT 1 FROM bump)
                 ON CONFLICT (order_id) DO NOTHING
                 RETURNING id
-            ), bump AS (
-                UPDATE discounts SET usage_count = usage_count + 1
-                WHERE id = ${Number(args.discountId)}
-                  AND EXISTS (SELECT 1 FROM ins)
-                  AND (usage_limit IS NULL OR usage_count < usage_limit)
-                RETURNING id
             )
-            SELECT (SELECT count(*) FROM ins)::int AS inserted
+            SELECT
+                (SELECT count(*) FROM prior)::int  AS prior_count,
+                (SELECT count(*) FROM bump)::int   AS bumped
         `)
 
-        return { recorded: (res.rows?.[0]?.inserted ?? 0) > 0 }
+        const row = res.rows?.[0]
+        if ((row?.prior_count ?? 0) > 0) return { recorded: true, status: 'already-reserved' }
+        if ((row?.bumped ?? 0) > 0) return { recorded: true, status: 'reserved' }
+        return { recorded: false, status: 'at-limit' }
     } catch (err) {
-        console.error('[discount] recordDiscountRedemption failed (non-fatal)', err)
-        return { recorded: false }
+        console.error('[discount] recordDiscountRedemption (reserve) failed', err)
+        return { recorded: false, status: 'error' }
     }
 }

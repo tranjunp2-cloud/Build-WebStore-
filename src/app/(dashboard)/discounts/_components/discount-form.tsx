@@ -10,6 +10,7 @@ import { DiscountLivePreview } from './discount-live-preview'
 import { DiscountSaveBar } from './discount-save-bar'
 import { draftValueToStored } from '@/lib/discounts/draft-value'
 import { MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
+import { useI18n } from '@/i18n'
 
 export interface DiscountDoc {
     id: string
@@ -59,6 +60,10 @@ const buildInit = (discount?: DiscountDoc): DiscountDraft => {
 
 export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
     const router = useRouter()
+    const { t, ti } = useI18n()
+    const dv = t.dashboard.discounts.validation
+    const dt = t.dashboard.discounts.toast
+
     const isNew = !discount
 
     const init = useMemo(() => buildInit(discount), [discount])
@@ -82,33 +87,35 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
         return () => window.removeEventListener('beforeunload', handler)
     }, [dirty])
 
-    const validate = (): boolean => {
+    const validate = useCallback((): boolean => {
         const e: DiscountFormErrors = {}
         const code = draft.code.trim().toUpperCase()
-        if (!code) e.code = 'Code is required.'
+        if (!code) e.code = dv.codeRequired
 
         if (draft.valueInput === '' || draft.valueInput == null) {
-            e.value = 'Value is required.'
+            e.value = dv.valueRequired
         } else {
             const v = Number(draft.valueInput)
-            if (isNaN(v)) e.value = 'Enter a number.'
-            else if (draft.type === 'percentage' && (v < 0 || v > 100)) e.value = 'Percentage must be between 0 and 100.'
-            else if (draft.type === 'fixed' && v < 0) e.value = 'Fixed amount must be ≥ 0.'
-            else if (draft.type === 'fixed' && v > MAX_FIXED_DISCOUNT_RM) e.value = `Fixed amount is too large (max RM ${MAX_FIXED_DISCOUNT_RM.toLocaleString('en-MY')}).`
+            if (isNaN(v)) e.value = dv.valueNotNumber
+            else if (draft.type === 'percentage' && (v < 0 || v > 100)) e.value = dv.percentageRange
+            else if (draft.type === 'fixed' && v < 0) e.value = dv.fixedNegative
+            else if (draft.type === 'fixed' && v > MAX_FIXED_DISCOUNT_RM) {
+                e.value = ti(dv.fixedTooLarge, { max: MAX_FIXED_DISCOUNT_RM.toLocaleString('en-MY') })
+            }
         }
 
-        if (draft.usageLimit !== '' && Number(draft.usageLimit) < 1) e.usageLimit = 'Usage limit must be at least 1 (leave blank for unlimited).'
+        if (draft.usageLimit !== '' && Number(draft.usageLimit) < 1) e.usageLimit = dv.usageLimitMin
         if (draft.startsAt && draft.expiresAt && new Date(draft.startsAt) >= new Date(draft.expiresAt)) {
-            e.dates = 'Start date must be before expiry date.'
+            e.dates = dv.datesOrder
         }
 
         setErrors(e)
         return Object.keys(e).length === 0
-    }
+    }, [draft, dv, ti])
 
     const handleSave = async () => {
         if (!validate()) {
-            toast.error('Cannot save', { description: 'Please fix the highlighted fields before saving.' })
+            toast.error(dt.cannotSave, { description: dt.cannotSaveDesc })
             return
         }
 
@@ -138,19 +145,20 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
 
             if (!res.ok) {
                 if (json?.error?.code === 'DUPLICATE_CODE') {
-                    setErrors((e) => ({ ...e, code: 'This code is already in use for your tenant. Try a different code or append a number.' }))
-                    toast.error('Duplicate code', { description: 'Try a different code or append a number.' })
+                    setErrors((e) => ({ ...e, code: dt.duplicateCodeField }))
+                    toast.error(dt.duplicateCode, { description: dt.duplicateCodeDesc })
                     return
                 }
-                throw new Error(json?.error?.message ?? 'Save failed')
+                throw new Error(json?.error?.message ?? dt.saveFailed)
             }
 
             // Clear dirty before navigation to avoid beforeunload warning
             setDraft(init)
-            toast.success(isNew ? 'Discount created' : 'Discount saved')
+            toast.success(isNew ? dt.created : dt.saved)
             router.push('/discounts')
-        } catch (err: any) {
-            toast.error('Failed to save', { description: err.message })
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : dt.saveFailed
+            toast.error(dt.saveFailed, { description: message })
         } finally {
             setSaving(false)
         }
@@ -163,12 +171,13 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
             const res = await fetch(`/api/v1/discounts/${discount!.id}`, { method: 'DELETE' })
             if (!res.ok) {
                 const json = await res.json().catch(() => ({}))
-                throw new Error(json?.error?.message ?? 'Delete failed')
+                throw new Error(json?.error?.message ?? dt.deleteFailed)
             }
-            toast.success('Discount deleted')
+            toast.success(dt.deleted)
             router.push('/discounts')
-        } catch (err: any) {
-            toast.error('Failed to delete', { description: err.message })
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : dt.deleteFailed
+            toast.error(dt.deleteFailed, { description: message })
             setSaving(false)
         }
     }

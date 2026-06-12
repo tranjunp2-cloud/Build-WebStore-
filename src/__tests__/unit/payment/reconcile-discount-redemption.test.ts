@@ -47,11 +47,12 @@ describe('[TC-F33-07-06] reconcileOrderPaid — discount redemption on paid', ()
         vi.clearAllMocks()
     })
 
-    it('calls recordDiscountRedemption for order with discount', async () => {
-        // Arrange
+    it('does NOT call recordDiscountRedemption (slot reserved at place-order)', async () => {
+        // Arrange: TC-F33-07-06 NEW behavior — reconcile no longer redeems (F33 race fix #10/#11)
+        // Slot is reserved at place-order time (like inventory), so reconcile only transitions status.
         const payload = createMockPayload()
 
-        // First execute: atomic transition pending→paid
+        // First execute: atomic transition pending→paid (only call)
         const mockExecute = vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 123 }] })
         ;(payload.db.drizzle as any).execute = mockExecute
@@ -93,11 +94,11 @@ describe('[TC-F33-07-06] reconcileOrderPaid — discount redemption on paid', ()
 
         // Assert
         expect(result.status).toBe('reconciled')
-        // Execute called twice: transition + redemption SQL
-        expect(mockExecute).toHaveBeenCalledTimes(2)
-        const secondCall = mockExecute.mock.calls[1][0]
-        // Second call should be the redemption INSERT ... ON CONFLICT
-        expect(secondCall.strings.join('?')).toContain('INSERT INTO discount_usage_history')
+        // Execute called once: transition only (NO redemption call in reconcile)
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+        const transitionCall = mockExecute.mock.calls[0][0]
+        // First call should be the status transition
+        expect(transitionCall.strings.join('?')).toContain('UPDATE orders')
     })
 
     it('does not redeem when order has no discount', async () => {
@@ -236,8 +237,8 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
         vi.clearAllMocks()
     })
 
-    it('second reconcile of same order records redemption once (ON CONFLICT guards it)', async () => {
-        // Arrange — first reconcile
+    it('second reconcile of same order returns already_processed (no double-work)', async () => {
+        // Arrange — TC-F33-07-07 idempotency with NEW behavior (no redemption in reconcile)
         const payload = createMockPayload()
         let callCount = 0
 
@@ -247,10 +248,7 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
                 // First transition: success
                 return Promise.resolve({ rows: [{ id: 123 }] })
             } else if (callCount === 2) {
-                // First redemption: inserted
-                return Promise.resolve({ rows: [{ inserted: 1 }] })
-            } else if (callCount === 3) {
-                // Second transition: already processed
+                // Second transition (retry): already processed, 0 rows
                 return Promise.resolve({ rows: [] })
             } else {
                 // Should not reach here
@@ -300,9 +298,9 @@ describe('[TC-F33-07-07] reconcileOrderPaid — re-delivery idempotency', () => 
 
         // Assert second delivery
         expect(result2.status).toBe('already_processed')
-        // Total execute calls: transition1 + redemption1 + transition2
-        expect(mockExecute).toHaveBeenCalledTimes(3)
-        // NO second redemption SQL (early return after already_processed)
+        // Total execute calls: transition1 + transition2 (NO redemption in either)
+        expect(mockExecute).toHaveBeenCalledTimes(2)
+        // Early return after status check prevents any further work
     })
 })
 

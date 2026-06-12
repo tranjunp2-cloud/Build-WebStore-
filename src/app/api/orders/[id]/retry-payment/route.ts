@@ -16,6 +16,7 @@ import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { computeOrderTotal } from '@/lib/orders/order-total'
 
 // Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
@@ -189,15 +190,15 @@ export async function POST(
         const subtotalSen = Math.round(subtotal * 100)
         const shippingFeeSen = Math.round(shippingFee * 100)
 
-        // Re-apply the order's discount against the re-priced subtotal (F33). The order snapshotted its
-        // discount at placement; a Stripe order redeems only at reconcile (on pay), so a pending/failed
-        // order has NOT consumed a slot yet — re-validating here is safe and recomputes a percentage
-        // discount on the new subtotal. A discount that since expired / hit its limit / was deleted
-        // silently drops to full price (applied.ok === false), mirroring stripe-checkout's behaviour.
+        // Re-apply the order's discount against the re-priced subtotal (F33). As of the race fix (#10/#11)
+        // the slot was reserved at PLACEMENT and is still held by this order, so we pass skipUsageLimit —
+        // otherwise the limit check would count the order's OWN reservation and falsely drop a 1-slot code
+        // at retry. We still honour expiry/status/deletion: if the discount no longer applies, it drops to
+        // full price AND the held slot is released below (so a dropped discount can't leak its slot).
         const discountRow = (typeof order.discount === 'object' && order.discount ? order.discount : null) as any
         let discountSen = 0
         if (discountRow) {
-            const applied = applyDiscount(discountRow, { subtotalSen, tenantId, now: new Date() })
+            const applied = applyDiscount(discountRow, { subtotalSen, tenantId, now: new Date() }, { skipUsageLimit: true })
             if (applied.ok) discountSen = applied.discountSen
         }
 
@@ -262,6 +263,9 @@ export async function POST(
         if (discountSen > 0) {
             updateData.discountAmount = discountSen
         } else if (order.discount) {
+            // Discount no longer applies (expired / deactivated / deleted). Drop it from the order AND
+            // release the slot reserved at placement so it returns to the pool (idempotent + non-throwing).
+            await releaseDiscountRedemption(payload, Number(order.id))
             updateData.discount = null
             updateData.discountCode = null
             updateData.discountAmount = null

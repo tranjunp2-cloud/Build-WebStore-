@@ -6,6 +6,7 @@ import { draftValueToStored } from '@/lib/discounts/draft-value'
 import { DiscountUsageMeter } from './discount-usage-meter'
 import { DiscountTypeBadge } from './discount-type-badge'
 import type { DiscountDraft } from './discount-form-fields'
+import { useI18n } from '@/i18n'
 
 interface DiscountLivePreviewProps {
     draft: DiscountDraft
@@ -15,6 +16,9 @@ interface DiscountLivePreviewProps {
 }
 
 export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: DiscountLivePreviewProps) {
+    const { t, ti } = useI18n()
+    const d = t.dashboard.discounts.preview
+
     const stored = draftValueToStored(draft.type, draft.valueInput)
     // Guard against an over-cap fixed amount overflowing to 1e+ notation in the preview.
     const overCap = stored != null && draft.type === 'fixed' && stored > MAX_FIXED_DISCOUNT_SEN
@@ -33,7 +37,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
         <div className="flex flex-col gap-3">
             {/* Live preview card */}
             <div className="rounded-lg border p-4" style={cardStyle}>
-                <p style={labelStyle} className="mb-3">Live Preview</p>
+                <p style={labelStyle} className="mb-3">{d.heading}</p>
 
                 {/* Code chip + type badge */}
                 <div className="flex items-center gap-2 flex-wrap mb-3">
@@ -41,7 +45,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
                         className="px-2 py-0.5 rounded text-sm font-mono font-semibold"
                         style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
                     >
-                        {draft.code || 'CODE'}
+                        {draft.code || d.codePlaceholder}
                     </span>
                     <DiscountTypeBadge type={draft.type} />
                 </div>
@@ -51,7 +55,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
                     {valueDisplay}
                     {stored != null && (
                         <span className="text-sm font-normal ml-1.5" style={{ color: 'var(--dash-text-muted)' }}>
-                            off subtotal
+                            {d.offSubtotal}
                         </span>
                     )}
                 </p>
@@ -60,17 +64,17 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
 
                 {/* Usage */}
                 <div className="flex flex-col gap-1 mb-3">
-                    <span style={labelStyle}>Usage</span>
+                    <span style={labelStyle}>{d.usageLabel}</span>
                     <DiscountUsageMeter count={isNew ? 0 : usageCount} limit={usageLimitNum} />
                 </div>
 
                 {/* Window */}
                 <div className="flex flex-col gap-0.5">
-                    <span style={labelStyle}>Window</span>
+                    <span style={labelStyle}>{d.windowLabel}</span>
                     <p className="text-[13px]" style={{ color: 'var(--dash-text)' }}>
                         {draft.startsAt || draft.expiresAt
                             ? <>{fmtDate(draft.startsAt || null)} → {fmtDate(draft.expiresAt || null)}</>
-                            : <span style={mutedStyle}>Always available</span>
+                            : <span style={mutedStyle}>{d.alwaysAvailable}</span>
                         }
                     </p>
                 </div>
@@ -80,14 +84,14 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
             <div className="rounded-lg border p-4" style={cardStyle}>
                 <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: '#06b6d4' }} />
-                    <span style={{ ...labelStyle, color: '#06b6d4' }}>Tenant-Scoped</span>
+                    <span style={{ ...labelStyle, color: '#06b6d4' }}>{d.tenantScopedLabel}</span>
                 </div>
                 <p className="text-[12px] leading-relaxed" style={{ color: 'var(--dash-text-muted)' }}>
                     {tenantName
-                        ? <>This code is scoped to <strong style={{ color: 'var(--dash-text)' }}>{tenantName}</strong>. The same code can exist for other stores without conflict.</>
-                        : <>This code is scoped to your store. The same code can exist for other stores without conflict.</>
-                    }{' '}
-                    Discount applies to the subtotal only.
+                        ? <>{ti(d.tenantScopedNamed, { tenantName })}{' '}</>
+                        : <>{d.tenantScopedGeneric}{' '}</>
+                    }
+                    {d.discountSubtotalNote}
                 </p>
             </div>
         </div>

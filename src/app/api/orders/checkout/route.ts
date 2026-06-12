@@ -8,6 +8,8 @@ import { orderCreateSchema } from '@/lib/validations/orders'
 import { getShippingRate } from '@/lib/shipping'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { discountReserveErrorResponse } from '@/lib/discounts/messages'
 import { computeOrderTotal, effectiveSubtotalSen } from '@/lib/orders/order-total'
 import { generatePaymentReference } from '@/lib/payment/reference'
 import { signOrderToken } from '@/lib/auth/order-token'
@@ -246,8 +248,21 @@ export async function POST(request: Request) {
             })
             discountRow = discountResult.docs[0] ?? null
             const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
-            if (applied.ok) discountSen = applied.discountSen
-            else discountRow = null // silent reject — proceed at full price
+            if (applied.ok) {
+                discountSen = applied.discountSen
+            } else if (applied.reason === 'at-limit') {
+                // #10: the buyer applied this code (valid at Apply) but its last slot was taken by another
+                // buyer before they placed the order. BLOCK + warn here — never silently charge full price.
+                // No order is created yet, so nothing to roll back. (The post-create reserve below still
+                // guards the tighter race where two buyers both pass this stale check concurrently.)
+                const e = discountReserveErrorResponse('at-limit')
+                return NextResponse.json(
+                    { success: false, error: { code: e.code, message: e.message } },
+                    { status: e.httpStatus },
+                )
+            } else {
+                discountRow = null // other reasons (not-found/expired/inactive): silent reject — full price
+            }
         }
         const discountRM = discountSen / 100
 
@@ -316,10 +331,12 @@ export async function POST(request: Request) {
             } as any,
         })
 
-        // Record discount usage (COD/bank_transfer — Stripe records at reconcile). Shared idempotent
-        // helper: snapshots code/type/value (survives discount deletion) + bumps usage_count once, capped.
+        // Reserve the discount slot at PLACE ORDER (#10/#11) — like inventory, for every gateway. If the
+        // last slot was just taken by a concurrent buyer, HARD-BLOCK here: no stock is decremented yet, so
+        // just delete the order and 409 so the storefront can warn the buyer instead of letting them place
+        // the order at full price unknowingly. The slot is released on cancel / refund / 24h payment-expiry.
         if (discountRow && discountSen > 0) {
-            await recordDiscountRedemption(payload, {
+            const reserve = await recordDiscountRedemption(payload, {
                 tenantId: Number(tenantId),
                 discountId: Number(discountRow.id),
                 orderId: Number((order as any).id),
@@ -329,6 +346,14 @@ export async function POST(request: Request) {
                 discountValue: Number(discountRow.value),
                 customerEmail: customer.email,
             })
+            if (!reserve.recorded) {
+                await payload.delete({ collection: 'orders', id: (order as any).id, overrideAccess: true }).catch(() => null)
+                const e = discountReserveErrorResponse(reserve.status)
+                return NextResponse.json(
+                    { success: false, error: { code: e.code, message: e.message } },
+                    { status: e.httpStatus },
+                )
+            }
         }
 
         // Decrement inventory for COD and bank_transfer at checkout time.
@@ -431,6 +456,9 @@ export async function POST(request: Request) {
                         }
                     }
                 }
+                // Release the discount slot reserved above — this order is about to be deleted, so it must
+                // not keep holding a slot (idempotent + non-throwing).
+                await releaseDiscountRedemption(payload, Number(order.id))
                 // Sentinel: mark cancelled before delete so any concurrent/future cancel call
                 // returns idempotent success (shouldRestock=false) rather than re-incrementing
                 // already-compensated stock when delete fails (FK constraint, transient error).

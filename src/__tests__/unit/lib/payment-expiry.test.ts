@@ -66,12 +66,14 @@ const makePayload = (docs: unknown[], drizzleExecuteImpl?: () => Promise<unknown
 // ─── TC-F10-06-10: happy path ─────────────────────────────────────────────────
 describe('paymentExpiryJob — happy path', () => {
     it('cancels all expired BT orders and returns correct counts', async () => {
+        // TC-F33-07-10 + payment-expiry: now calls releaseDiscountRedemption per order (F33 race fix)
         const orders = [makeOrder(1), makeOrder(2), makeOrder(3)]
         const payload = makePayload(orders)
 
         const result = await paymentExpiryJob(payload as any)
 
-        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(3)
+        // Each order: 1 cancel UPDATE + 1 releaseDiscountRedemption execute = 2 calls per order = 6 total
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(6)
         expect(result).toEqual({ processed: 3, errors: 0, total: 3 })
     })
 
@@ -128,17 +130,26 @@ describe('paymentExpiryJob — email failure is fire-and-forget', () => {
 // ─── TC-F10-06-12: update error is caught per-order ──────────────────────────
 describe('paymentExpiryJob — update error is isolated', () => {
     it('counts failed update as error; other orders still process', async () => {
+        // TC-F33-07-10: payment-expiry now calls releaseDiscountRedemption (2 executes per order)
+        // Sequence: order1 cancel (ok) + order1 release (ok)
+        //         order2 cancel (fail) + order2 release (skipped, error thrown before release)
+        //         order3 cancel (ok) + order3 release (ok)
         const orders = [makeOrder(1), makeOrder(2), makeOrder(3)]
         let callCount = 0
         const drizzleExecuteImpl = async () => {
             callCount++
-            if (callCount === 2) throw new Error('DB write failed')
+            // Fail the order2 cancel (callCount === 3 after order1's 2 calls)
+            if (callCount === 3) throw new Error('DB write failed')
             return { rows: [{ id: callCount }] }
         }
         const payload = makePayload(orders, drizzleExecuteImpl)
 
         const result = await paymentExpiryJob(payload as any)
 
+        // Order 1: cancel (1) + release (2) = 2 calls
+        // Order 2: cancel fails (3), release skipped due to error catch
+        // Order 3: cancel (4) + release (5) = 2 calls
+        // Total: 5 execute calls
         expect(result).toEqual({ processed: 2, errors: 1, total: 3 })
         expect(payload.logger.error).toHaveBeenCalledWith(
             expect.objectContaining({ orderId: 2 }),

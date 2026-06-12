@@ -1,17 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Tag, Loader2, Check, X, Info } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 type AppliedDiscount = { code: string; type: 'percentage' | 'fixed'; value: number }
 type Phase = 'empty' | 'applying' | 'applied' | 'rejected'
-
-// Reason-specific warnings. Backend collapses every non-`at-limit` reason to 'unavailable'
-// (no code enumeration), so only these two messages are possible.
-const REJECT_MESSAGE: Record<string, string> = {
-    'at-limit': 'This voucher has reached its usage limit and is no longer available.',
-    unavailable: 'This voucher is no longer available. Please try another voucher.',
-}
 
 type Props = {
     siteSlug: string
@@ -21,14 +15,33 @@ type Props = {
     onApplied: (discount: AppliedDiscount, discountSen: number) => void
     onRemoved: () => void
     appliedDiscount: AppliedDiscount | null
+    /** Rejection pushed from the parent (e.g. Place Order returned DISCOUNT_EXHAUSTED): the discount the
+     *  buyer applied sold out at checkout. When set, the field shows it inline below the input (#10). */
+    externalReject?: string | null
 }
 
-export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied, onRemoved, appliedDiscount }: Props) {
+export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied, onRemoved, appliedDiscount, externalReject }: Props) {
+    const { t, ti } = useI18n()
+    const dc = t.storefront.checkout.discount
     const [code, setCode] = useState('')
     const [phase, setPhase] = useState<Phase>(appliedDiscount ? 'applied' : 'empty')
     const [rejectMsg, setRejectMsg] = useState<string | null>(null)
     const [flash, setFlash] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Reason-specific warning. Backend collapses every non-`at-limit` reason to 'unavailable'
+    // (no code enumeration), so only these two messages are possible.
+    const rejectMessage = (reason?: string) => (reason === 'at-limit' ? dc.atLimit : dc.unavailable)
+
+    // Parent-driven rejection: Place Order found the applied code sold out (DISCOUNT_EXHAUSTED). The parent
+    // has already cleared the applied discount; surface the warning inline below the input so the buyer sees
+    // it right where the code lives (not just a toast) and can review the new total before re-submitting.
+    useEffect(() => {
+        if (externalReject) {
+            setRejectMsg(externalReject)
+            setPhase('rejected')
+        }
+    }, [externalReject])
 
     const apply = async () => {
         const key = code.trim()
@@ -53,7 +66,7 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
                 // Reject with a reason-specific warning below the input. Order still proceeds at full price
                 // (the code just isn't applied) — this is a warning, not a hard checkout failure.
                 onRemoved()
-                setRejectMsg(REJECT_MESSAGE[data.reason] ?? REJECT_MESSAGE.unavailable)
+                setRejectMsg(rejectMessage(data.reason))
                 setPhase('rejected')
                 setCode('')
                 setFlash(true)
@@ -61,7 +74,7 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
             }
         } catch {
             onRemoved()
-            setRejectMsg(REJECT_MESSAGE.unavailable)
+            setRejectMsg(dc.unavailable)
             setPhase('rejected')
             setCode('')
         }
@@ -83,7 +96,7 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
                     <div className={`ck-dc-input${flash ? ' flash' : ''}`}>
                         <Tag size={14} />
                         <input
-                            placeholder="Promo or gift card code"
+                            placeholder={dc.placeholder}
                             value={code}
                             onChange={e => { setCode(e.target.value); if (phase === 'rejected') { setPhase('empty'); setRejectMsg(null) } }}
                             onKeyDown={e => e.key === 'Enter' && apply()}
@@ -101,7 +114,7 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
                         >
                             {phase === 'applying'
                                 ? <Loader2 size={13} className="spin" />
-                                : 'Apply'}
+                                : dc.apply}
                         </button>
                     </div>
                     {phase === 'rejected' && rejectMsg && (
@@ -113,7 +126,7 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
                     {phase === 'empty' && (
                         <div className="ck-dc-hint subtle">
                             <Info size={12} />
-                            One code per order.
+                            {dc.oneCodePerOrder}
                         </div>
                     )}
                 </>
@@ -122,16 +135,16 @@ export function CheckoutDiscountField({ siteSlug, siteId, subtotalSen, onApplied
                     <span className="ck-dc-tick"><Check size={13} /></span>
                     <div className="ck-dc-body">
                         <div className="ck-dc-code">
-                            <span className="ck-dc-chip">{appliedDiscount.code}</span> applied
+                            <span className="ck-dc-chip">{appliedDiscount.code}</span> {dc.applied}
                         </div>
                         <div className="ck-dc-sub">
                             {appliedDiscount.type === 'percentage'
-                                ? `${appliedDiscount.value}% off subtotal`
-                                : `${rmStr(appliedDiscount.value)} off`}
+                                ? ti(dc.percentOff, { value: appliedDiscount.value })
+                                : ti(dc.fixedOff, { amount: rmStr(appliedDiscount.value) })}
                         </div>
                     </div>
                     <button className="ck-dc-remove" onClick={remove}>
-                        <X size={13} />Remove
+                        <X size={13} />{dc.remove}
                     </button>
                 </div>
             ) : null}

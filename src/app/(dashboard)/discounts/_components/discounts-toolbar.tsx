@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, Clock, Tag, ChevronDown } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -95,6 +96,9 @@ export function DiscountsToolbar({
     typeFilter,
     onTypeFilter,
 }: DiscountsToolbarProps) {
+    const { t } = useI18n()
+    const tb = t.dashboard.discounts.toolbar
+
     const [input, setInput] = useState(search)
 
     useEffect(() => { setInput(search) }, [search])
@@ -105,15 +109,15 @@ export function DiscountsToolbar({
     }, [input, onSearch])
 
     const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
-        { key: 'all', label: 'All' },
-        { key: 'active', label: 'Active' },
-        { key: 'inactive', label: 'Inactive' },
+        { key: 'all', label: tb.statusAll },
+        { key: 'active', label: tb.statusActive },
+        { key: 'inactive', label: tb.statusInactive },
     ]
 
     const TYPE_OPTIONS: { key: TypeFilter; label: string }[] = [
-        { key: 'all', label: 'All' },
-        { key: 'percentage', label: 'Percentage' },
-        { key: 'fixed', label: 'Fixed' },
+        { key: 'all', label: tb.typeAll },
+        { key: 'percentage', label: tb.typePercentage },
+        { key: 'fixed', label: tb.typeFixed },
     ]
 
     return (
@@ -124,7 +128,7 @@ export function DiscountsToolbar({
                     type="text"
                     value={input}
                     onChange={e => setInput(e.target.value)}
-                    placeholder="Search code or description..."
+                    placeholder={tb.searchPlaceholder}
                     className="w-full h-[40px] rounded-[10px] pl-9 pr-3 text-[13px] outline-none transition-colors"
                     style={{
                         background: 'var(--dash-surface)',
@@ -136,7 +140,7 @@ export function DiscountsToolbar({
 
             <FilterChip<StatusFilter>
                 icon={Clock}
-                label="Status"
+                label={tb.statusLabel}
                 value={statusFilter}
                 options={STATUS_OPTIONS}
                 onChange={onStatusFilter}
@@ -144,7 +148,7 @@ export function DiscountsToolbar({
 
             <FilterChip<TypeFilter>
                 icon={Tag}
-                label="Type"
+                label={tb.typeLabel}
                 value={typeFilter}
                 options={TYPE_OPTIONS}
                 onChange={onTypeFilter}
