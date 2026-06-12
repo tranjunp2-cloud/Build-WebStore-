@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Lock, Search, X, Receipt, SearchX, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { fmtRM, fmtValue, fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
+import { DiscountsTabNav } from './discounts-tab-nav'
 
 interface UsageRow {
     id: string
@@ -81,10 +82,10 @@ export function DiscountsUsageHistoryLayout() {
 
     return (
         <div className="flex flex-col gap-5">
-            {/* Header */}
+            {/* Header (tabs sit BELOW, matching Email Templates) */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-[18px] font-semibold" style={textMain}>{d.title}</h1>
+                    <h1 className="text-[24px] font-bold" style={textMain}>{d.title}</h1>
                     <p className="mt-1 text-sm" style={textMuted}>
                         {d.subtitle}
                     </p>
@@ -97,6 +98,8 @@ export function DiscountsUsageHistoryLayout() {
                     {d.readOnly}
                 </span>
             </div>
+
+            <DiscountsTabNav />
 
             {/* Search toolbar */}
             <div

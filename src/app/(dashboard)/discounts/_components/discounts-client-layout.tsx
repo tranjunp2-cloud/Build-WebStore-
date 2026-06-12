@@ -8,6 +8,7 @@ import { DiscountsToolbar } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { useI18n } from '@/i18n'
+import { DiscountsTabNav } from './discounts-tab-nav'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -18,18 +19,18 @@ export function DiscountsClientLayout() {
     const { t, ti } = useI18n()
     const d = t.dashboard.discounts.list
 
-    const [discounts, setDiscounts]       = useState<Discount[]>([])
-    const [total, setTotal]               = useState(0)
-    const [totalPages, setTotalPages]     = useState(1)
-    const [page, setPage]                 = useState(1)
-    const [search, setSearch]             = useState('')
+    const [discounts, setDiscounts] = useState<Discount[]>([])
+    const [total, setTotal] = useState(0)
+    const [totalPages, setTotalPages] = useState(1)
+    const [page, setPage] = useState(1)
+    const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-    const [typeFilter, setTypeFilter]     = useState<TypeFilter>('all')
-    const [sortBy, setSortBy]             = useState<SortKey>('createdAt')
-    const [sortDir, setSortDir]           = useState<'asc' | 'desc'>('desc')
-    const [limit, setLimit]               = useState(25)
-    const [loading, setLoading]           = useState(true)
-    const [isFirstLoad, setIsFirstLoad]   = useState(true)
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+    const [sortBy, setSortBy] = useState<SortKey>('createdAt')
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+    const [limit, setLimit] = useState(25)
+    const [loading, setLoading] = useState(true)
+    const [isFirstLoad, setIsFirstLoad] = useState(true)
     // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().
     const [deleteTarget, setDeleteTarget] = useState<Discount | null>(null)
 
@@ -89,8 +90,8 @@ export function DiscountsClientLayout() {
         setPage(1)
     }, [sortBy])
 
-    const handleEdit   = useCallback((id: string)      => { router.push(`/discounts/${id}`) }, [router])
-    const handleNew    = useCallback(()                 => { router.push('/discounts/new') }, [router])
+    const handleEdit = useCallback((id: string) => { router.push(`/discounts/${id}`) }, [router])
+    const handleNew = useCallback(() => { router.push('/discounts/new') }, [router])
     const handleExport = useCallback(async () => {
         try {
             const res = await fetch('/api/v1/discounts/export')
@@ -149,7 +150,7 @@ export function DiscountsClientLayout() {
 
     return (
         <div className="space-y-5 pb-20">
-            {/* Header row: title + action buttons */}
+            {/* Header row: title + action buttons (tabs sit BELOW, matching Email Templates) */}
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>
@@ -180,6 +181,8 @@ export function DiscountsClientLayout() {
                     </button>
                 </div>
             </div>
+
+            <DiscountsTabNav />
 
             <DiscountsToolbar
                 search={search}

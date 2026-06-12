@@ -1683,7 +1683,7 @@
             "subtitle": "Urus produk kedai"
         },
         "customers": {
-            "title": "Pelanggan",
+            "title": "Kenalan",
             "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
             "searchPlaceholder": "Cari mengikut nama atau e-mel…",
             "sourceAll": "Semua Sumber",
@@ -1742,7 +1742,7 @@
             "view": "Lihat"
         },
         "shopCustomers": {
-            "title": "Pelanggan",
+            "title": "Semua Pelanggan",
             "subtitle": "Rekod pembeli untuk penyewa ini. Pelanggan dicipta secara automatik daripada pesanan masuk; anda boleh mengedit butiran, mengurus alamat, dan melihat pesanan yang dikaitkan di sini.",
             "loadFailed": "Gagal memuatkan pelanggan",
             "exportLimited": "Eksport terhad kepada 1,000 pertama daripada {total} pelanggan",
@@ -4077,6 +4077,12 @@
         "tabs": {
             "general": "Maklumat Umum",
             "security": "Keselamatan"
+        },
+        "teamTabs": {
+            "profile": "Profil Akaun",
+            "staff": "Kakitangan",
+            "pageTitle": "Pasukan & Akaun",
+            "pageSubtitle": "Urus profil peribadi anda dan ahli pasukan anda."
         },
         "banner": {
             "roleOwner": "Pemilik",
