@@ -36,8 +36,8 @@ Trọng tâm là kiểm tra tính năng trên thiết bị di động (Nút Menu
 | **TC-F18.06** | `AC-4` | `UX` | 1. Mở Sidebar trên Mobile.<br>2. Nhấn chọn một đường dẫn chức năng bất kỳ (ví dụ: "Products"). | - Ứng dụng điều hướng sang màn hình Products.<br>- Sidebar tự động đóng lại để người dùng xem thông tin. | High |
 | **TC-F18.07** | `AC-3` | `Logic` | 1. Cuộn Sidebar xuống mục cuối cùng.<br>2. Nhấn chọn chức năng "Help Support". | - Trình duyệt tự mở sang tab ẩn mới với đường link gọi API WhatsApp.<br>- Trang làm việc hiện tại của CMS không bị tải lại hoặc mất nội dung. | Medium |
 | **TC-F18.08** | `UX` | `UX` | 1. Dùng DevTools (F12) để xác minh kích thước nút bấm trên Mobile. | - Bất kỳ khu vực nút bấm nào cũng đạt diện tích chạm (Touch Area) tối thiểu chuẩn là `44x44px`. | Medium |
-| **TC-F18.09** | `UI` | `Menu` | 1. Nhấp chọn một danh sách mẹ có biểu tượng mũi tên xổ xuống. | - Khối danh sách (Accordion) mở trượt xuống dưới liệt kê các chức năng con.<br>- Biểu tượng mũi tên xoay đảo ngược chiều. | High |
-| **TC-F18.10** | `UI` | `State`| 1. Hệ thống có 5 đơn hàng chưa duyệt.<br>2. Quan sát menu chức năng "Orders" trên Sidebar. | - Bên cạnh văn bản "Orders" hiển thị cảnh báo vòng tròn (Badge) có số `5` với màu sắc nổi bật (thường là màu đỏ/xanh lá). | Medium |
+| **TC-F18.09** | `UI` | `Menu` | 1. Quan sát Sidebar sau khi flatten IA (#1138).<br>2. Nhấp một mục bất kỳ. | - **KHÔNG còn accordion**: section header là nhãn tĩnh (in hoa, không bấm được, không mũi tên xổ).<br>- Mọi mục là leaf → bấm điều hướng thẳng tới route, không có khối con trượt xuống. | High |
+| **TC-F18.10** | `UI` | `State`| 1. Tenant có dữ liệu ở 5 mục: Orders (nhiều status), Products, Discounts, All Customers, Contact Leads.<br>2. Quan sát badge bên phải các nhãn này trên Sidebar. | - Mỗi mục hiển thị Badge (pill **xám trung tính**, KHÔNG đỏ) = **TỔNG số record** của tenant: Orders đếm **mọi status** (kể cả cancelled); Discounts = tất cả mã; Contact Leads = contact-submissions + subscribers.<br>- Badge **ẩn khi count = 0/undefined** (không hiện "0").<br>- Số > 999 hiển thị `999+`. | Medium |
 
 ### Nhóm 2: Thanh Công Cụ Phía Trên (Global Top Header)
 

@@ -6,6 +6,9 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getShippingRate } from '@/lib/shipping'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
+import { computeOrderTotal, effectiveSubtotalSen } from '@/lib/orders/order-total'
 import { generatePaymentReference } from '@/lib/payment/reference'
 import { signOrderToken } from '@/lib/auth/order-token'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
@@ -15,6 +18,8 @@ import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementVariantStock, restockItem } from '../lib/stock-utils'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 export const maxDuration = 60
 
@@ -57,6 +62,15 @@ export async function POST(request: Request) {
         }
 
         const tenantId = typeof site.tenant === 'object' ? (site.tenant as any).id : site.tenant
+
+        const checkoutSub = await getActivePlanSubscription(payload, tenantId)
+        if (checkoutSub && !await canUse(payload, checkoutSub.plan as PlanCode, 'allowing_buyer_making_order')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Checkout is currently unavailable' } },
+                { status: 403 }
+            )
+        }
+        const canSendBuyerEmail = !checkoutSub || await canUse(payload, checkoutSub.plan as PlanCode, 'email_confirmation')
 
         // Fetch tenant early — needed for both payment validation and email generation below
         const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
@@ -206,15 +220,50 @@ export async function POST(request: Request) {
         // Generate order number
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
-        // Shipping: rates stored in sen, subtotal is RM-float → convert for calc, result back to RM
         // PR note: subtotal is RM-float (p.price * qty); shippingConfig rates are in sen (800 = RM 8)
         const subtotalSen = Math.round(subtotal * 100)
-        const shippingFeeSen = getShippingRate(customer.address.state, (site as any).shippingConfig, subtotalSen)
+
+        // Discount: re-validate server-side from code — client amount is never trusted.
+        // Resolved BEFORE shipping so the free-ship gate sees the discounted subtotal (F33 phase-07).
+        let discountSen = 0
+        let discountRow: any = null
+        if (data.discountCode) {
+            const code = String(data.discountCode).trim().toUpperCase()
+            const discountResult = await payload.find({
+                collection: 'discounts',
+                // Site scoping (PRD §9): a discount with no `site` applies to every site of the tenant;
+                // a site-scoped discount only resolves on its own site. Mismatch → not found → silent reject.
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { code: { equals: code } },
+                        { or: [{ site: { exists: false } }, { site: { equals: siteLookupId } }] },
+                    ],
+                },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            discountRow = discountResult.docs[0] ?? null
+            const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) discountSen = applied.discountSen
+            else discountRow = null // silent reject — proceed at full price
+        }
+        const discountRM = discountSen / 100
+
+        // Shipping: rates stored in sen, subtotal is RM-float → convert for calc, result back to RM.
+        // Free-ship gates on the POST-discount subtotal (F33 phase-07): a discount that drops the cart
+        // below `freeAbove` now charges shipping. Discount amount itself stays on the original subtotal.
+        const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
+        const shippingFeeSen = getShippingRate(customer.address.state, (site as any).shippingConfig, effSubtotalSen)
         const shippingFee = shippingFeeSen / 100
 
-        // Tax (SST 6% on subtotal only — BR-05)
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = subtotal + shippingFee + tax
+        // SST tax removed at checkout (F33 phase-06) — kept as 0 so the column stays populated;
+        // historical orders retain their real tax value, new orders carry none.
+        const tax = 0
+
+        // Shared gateway-agnostic total (F33): total = max(0, subtotal − discount) + shipping, sen-exact.
+        const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
 
         // Compute bank_transfer-specific fields (before create)
         let paymentReference: string | undefined
@@ -259,8 +308,28 @@ export async function POST(request: Request) {
                     postcode: customer.address.postcode || '',
                     country: customer.address.country || 'Malaysia',
                 } : undefined,
+                ...(discountRow ? {
+                    discount: discountRow.id,
+                    discountCode: discountRow.code,
+                    discountAmount: discountSen,
+                } : {}),
             } as any,
         })
+
+        // Record discount usage (COD/bank_transfer — Stripe records at reconcile). Shared idempotent
+        // helper: snapshots code/type/value (survives discount deletion) + bumps usage_count once, capped.
+        if (discountRow && discountSen > 0) {
+            await recordDiscountRedemption(payload, {
+                tenantId: Number(tenantId),
+                discountId: Number(discountRow.id),
+                orderId: Number((order as any).id),
+                amountApplied: discountSen,
+                discountCode: discountRow.code,
+                discountType: discountRow.type,
+                discountValue: Number(discountRow.value),
+                customerEmail: customer.email,
+            })
+        }
 
         // Decrement inventory for COD and bank_transfer at checkout time.
         // bank_transfer: stock is reserved immediately; restock only on cancel or refund.
@@ -438,6 +507,9 @@ export async function POST(request: Request) {
                     subtotal,
                     shippingFee,
                     total,
+                    // Discount line — amount in RM (template formats with the same fp() as subtotal)
+                    discountCode: discountRow?.code ?? null,
+                    discountAmount: discountRM || null,
                     paymentMethod: 'cod',
                     orderDate: new Date().toISOString(),
                     orderPageUrl,
@@ -445,8 +517,10 @@ export async function POST(request: Request) {
                     buyerNote: (order as any).notes ?? null,
                     locale: siteLocale,
                 }, codCmsConfig ?? undefined)
-                payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
-                    .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+                if (canSendBuyerEmail) {
+                    payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
+                        .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+                }
             }
 
             if (sellerCmsConfig?.enabled === false) {
@@ -498,6 +572,9 @@ export async function POST(request: Request) {
                     subtotal,
                     shippingFee,
                     total: order.total,
+                    // Discount line — amount in RM (template formats with the same fp() as subtotal)
+                    discountCode: discountRow?.code ?? null,
+                    discountAmount: discountRM || null,
                     currency: order.currency ?? 'MYR',
                     buyerNote: (order as any).notes ?? null,
                     orderDate: new Date().toISOString(),
@@ -511,8 +588,10 @@ export async function POST(request: Request) {
                     merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
                     locale: siteLocale,
                 }, btCmsConfig ?? undefined)
-                payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
-                    .catch((err: unknown) => console.error('[Email BT instructions]', err))
+                if (canSendBuyerEmail) {
+                    payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
+                        .catch((err: unknown) => console.error('[Email BT instructions]', err))
+                }
             }
 
             if (btSellerCmsConfig?.enabled === false) {

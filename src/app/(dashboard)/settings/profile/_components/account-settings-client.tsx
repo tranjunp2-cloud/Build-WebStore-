@@ -12,9 +12,11 @@ import { ResetAccountCard } from '@/app/(dashboard)/dashboard/settings/ResetAcco
 
 type Props = {
     initialUser: PlatformUser
+    /** Hide the "Account Settings" h1 when embedded under a page-level title (e.g. Team & Account tabs). */
+    hideHeading?: boolean
 }
 
-export function AccountSettingsClient({ initialUser }: Props) {
+export function AccountSettingsClient({ initialUser, hideHeading = false }: Props) {
     const { t } = useI18n()
     const [user, setUser] = useState<PlatformUser>(initialUser)
     const [activeTab, setActiveTab] = useState('general')
@@ -34,9 +36,11 @@ export function AccountSettingsClient({ initialUser }: Props) {
 
     return (
         <div className="flex flex-col gap-8">
-            <h1 className="text-[32px] font-black text-[#e1e2eb] tracking-[-0.9px] leading-10">
-                {t.profile.accountSettings}
-            </h1>
+            {!hideHeading && (
+                <h1 className="text-[32px] font-black text-[#e1e2eb] tracking-[-0.9px] leading-10">
+                    {t.profile.accountSettings}
+                </h1>
+            )}
 
             <ProfileBanner user={user} role={role} onUserUpdate={onUserUpdate} />
 

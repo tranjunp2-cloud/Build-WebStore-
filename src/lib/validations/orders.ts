@@ -8,6 +8,7 @@ export const MAX_CHECKOUT_ITEMS = 50
 // Legacy clients that still send paymentMethod will have it logged and ignored.
 export const stripeCheckoutSchema = z.object({
     siteId: z.union([z.string(), z.number()]),
+    discountCode: z.string().max(32).optional(),
     items: z.array(z.object({
         productId: z.union([z.string(), z.number()]),
         quantity: z.number().int().min(1).max(100),
@@ -31,6 +32,7 @@ export const stripeCheckoutSchema = z.object({
 // --- Create Order (manual: COD/QR Banking) ---
 export const orderCreateSchema = z.object({
     siteId: z.union([z.string(), z.number()]),
+    discountCode: z.string().max(32).optional(),
     items: z.array(z.object({
         productId: z.union([z.string(), z.number()]),
         quantity: z.number().int().min(1).max(100),

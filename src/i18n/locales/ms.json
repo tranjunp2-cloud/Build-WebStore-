@@ -13,7 +13,12 @@
         "mobile": "Mudah alih",
         "preview": "Pratonton",
         "back": "Kembali",
-        "close": "Tutup"
+        "close": "Tutup",
+        "subscriptionErrors": {
+            "featureLocked": "Ciri ini tidak tersedia dalam pelan semasa anda.",
+            "subscriptionExpired": "Langganan anda telah tamat tempoh atau tidak dijumpai. Sila perbaharui untuk meneruskan.",
+            "genericLocked": "Tindakan ini tidak tersedia dalam pelan semasa anda."
+        }
     },
     "nav": {
         "platform": "Platform",
@@ -1250,7 +1255,6 @@
                 "unnamedProduct": "Produk Tiada Nama",
                 "multipleSkus": "Pelbagai SKU",
                 "none": "Tiada",
-                "taxesSst": "Cukai: SST (6%)\nTermasuk",
                 "stockLevel": "Tahap Stok",
                 "centralWarehouse": "Gudang Pusat",
                 "unitsAvailable": "Unit Tersedia",
@@ -1268,8 +1272,6 @@
                 "skuIdentification": "Pengenalan SKU",
                 "skuLabel": "SKU",
                 "skuFallback": "Tiada",
-                "taxConfiguration": "Konfigurasi Cukai",
-                "taxesSst": "Cukai: SST (6%) Incl.",
                 "categoryPath": "Laluan Kategori",
                 "uncategorized": "Tiada Kategori",
                 "pricing": "Harga",
@@ -1681,7 +1683,7 @@
             "subtitle": "Urus produk kedai"
         },
         "customers": {
-            "title": "Pelanggan",
+            "title": "Kenalan",
             "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
             "searchPlaceholder": "Cari mengikut nama atau e-mel…",
             "sourceAll": "Semua Sumber",
@@ -1740,7 +1742,7 @@
             "view": "Lihat"
         },
         "shopCustomers": {
-            "title": "Pelanggan",
+            "title": "Semua Pelanggan",
             "subtitle": "Rekod pembeli untuk penyewa ini. Pelanggan dicipta secara automatik daripada pesanan masuk; anda boleh mengedit butiran, mengurus alamat, dan melihat pesanan yang dikaitkan di sini.",
             "loadFailed": "Gagal memuatkan pelanggan",
             "exportLimited": "Eksport terhad kepada 1,000 pertama daripada {total} pelanggan",
@@ -1970,7 +1972,6 @@
                 "liveSubtotal": "Jumlah Kecil",
                 "liveShipping": "Penghantaran (Malaysia Barat)",
                 "liveAddMore": "Tambah {amount} lagi untuk penghantaran PERCUMA",
-                "liveSst": "SST (6%)",
                 "liveBuyerPays": "Pembeli bayar",
                 "allSaved": "Semua perubahan disimpan",
                 "resetToDefaults": "Set Semula ke Lalai",
@@ -3757,7 +3758,7 @@
             "empty": "Troli anda kosong",
             "subtotal": "Jumlah kecil",
             "subtitle": "Produk pilihan sedia untuk pembayaran",
-            "shippingNote": "Yuran penghantaran dan SST (6%) tidak termasuk. Jumlah akhir dikira semasa pembayaran.",
+            "shippingNote": "Yuran penghantaran tidak termasuk. Jumlah akhir dikira semasa pembayaran.",
             "proceedToCheckout": "Teruskan ke Pembayaran",
             "checkoutUnavailable": "Ciri pembayaran akan datang tidak lama lagi",
             "qty": "Kuantiti:"
@@ -3895,6 +3896,12 @@
         "tabs": {
             "general": "Maklumat Umum",
             "security": "Keselamatan"
+        },
+        "teamTabs": {
+            "profile": "Profil Akaun",
+            "staff": "Kakitangan",
+            "pageTitle": "Pasukan & Akaun",
+            "pageSubtitle": "Urus profil peribadi anda dan ahli pasukan anda."
         },
         "banner": {
             "roleOwner": "Pemilik",

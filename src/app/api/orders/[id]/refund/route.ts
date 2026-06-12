@@ -3,10 +3,14 @@ import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import type { User } from 'payload'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -20,7 +24,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  *
  * Returns: { success, data: { refundId }, restock: RestockResult[] }
  */
-export const POST = withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
+export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
     const payload = await getPayload({ config })
 
@@ -44,6 +48,10 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant),
     )
     const orderTenantId = String(typeof order.tenant === 'object' ? order.tenant.id : order.tenant)
+
+    const emailSub = await getActivePlanSubscription(payload, orderTenantId)
+    const canSendRefundEmail = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
+
     if (!userTenantIds.includes(orderTenantId)) {
         return NextResponse.json(
             { success: false, error: { code: 'FORBIDDEN' } },
@@ -166,8 +174,11 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
                 { status: 400 })
         }
         // --- refund financially committed via CAS; restock is best-effort ---
+        // Release the redeemed discount slot (F33) — refund frees the promo seat like cancel does.
+        // Runs only on the CAS winner; idempotent + non-throwing (no-op when the order never redeemed).
+        await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
     }
 
@@ -253,17 +264,22 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { stripeAccount: stripeAccountId, idempotencyKey: `refund-${id}` },
         )
 
-        // Restock ONLY after Stripe irreversibly succeeds — retry-safe (CAS blocks 2nd refund).
+        // Restock + discount-slot release ONLY after Stripe irreversibly succeeds — retry-safe
+        // (CAS blocks 2nd refund). Releasing earlier would leak a slot if Stripe fails and the
+        // status rolls back below. releaseDiscountRedemption is idempotent + non-throwing.
+        await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: refund.id }, restock: restockResults })
     } catch (err: any) {
         // 'charge_already_refunded' means the refund exists on Stripe — idempotent success.
         // Covers the network-timeout case where Stripe processed the refund but our request timed out.
         // CAS + idempotencyKey prevent any double-charge.
         if (err?.code === 'charge_already_refunded') {
+            // Refund exists on Stripe → same irreversible-success semantics: release + restock.
+            await releaseDiscountRedemption(payload, Number(order.id))
             const restockResults = await runRestockForItems(order.items)
-            void fireRefundEmail()
+            if (canSendRefundEmail) void fireRefundEmail()
             return NextResponse.json({ success: true, data: { refundId: null }, restock: restockResults })
         }
         // Genuine Stripe failure — roll back our pre-set status.
@@ -288,4 +304,4 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { status: 502 },
         )
     }
-})
+}))

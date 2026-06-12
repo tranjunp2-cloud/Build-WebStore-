@@ -22,6 +22,7 @@ import {
     LogOut,
     Moon,
     Package,
+    Percent,
     Settings,
     ShoppingCart,
     Sun,
@@ -95,6 +96,15 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
             },
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
             { label: { en: 'Orders', ms: 'Pesanan' }, href: '/orders', icon: ShoppingCart },
+            {
+                label: { en: 'Discounts', ms: 'Diskaun' },
+                href: '/discounts',
+                icon: Percent,
+                children: [
+                    { label: { en: 'Discount codes', ms: 'Kod diskaun' }, href: '/discounts' },
+                    { label: { en: 'Usage history', ms: 'Sejarah penggunaan' }, href: '/discounts/usage-history' },
+                ],
+            },
             {
                 label: { en: 'Customers', ms: 'Pelanggan' },
                 href: '/customers',

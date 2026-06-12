@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
 
@@ -14,7 +15,7 @@ const sitemapSchema = z.object({ siteId: z.string().min(1) })
  * Body: { siteId: string }
  * Response: { sitemapUrl: string, pageCount: number }
  */
-export const POST = withAuth(async (_user, request) => {
+export const POST = withFeatureGuard('sitemap_robot_configuration')(withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, sitemapSchema)
         if (errorResponse) return errorResponse
@@ -81,4 +82,4 @@ ${urls}
             { status: 500 }
         )
     }
-})
+}))

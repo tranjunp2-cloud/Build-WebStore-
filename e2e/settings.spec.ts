@@ -37,6 +37,10 @@ test.describe('Settings', () => {
         await page.goto('/settings/staff')
         await page.waitForLoadState('networkidle')
 
+        // F18 phase-04 (#1138): /settings/staff is now the 2-tab Team & Account page,
+        // defaulting to Profile — open the owner-only Staff tab to reach the table.
+        await page.getByRole('tab', { name: 'Staff' }).click()
+
         const headerCells = page.locator('table thead th')
         // Table must be present — fail fast if staff table didn't render
         await expect(headerCells).not.toHaveCount(0)

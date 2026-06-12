@@ -5,12 +5,13 @@
  */
 
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { NextResponse } from 'next/server'
 import { EMAIL_TEMPLATE_TYPES, type EmailTemplateType, type EmailTemplateConfig } from '@/lib/email/types'
 import { templateRegistry } from '@/lib/email/template-registry'
 import { EMAIL_PREVIEW_FIXTURES } from '@/lib/email/preview-fixtures'
 
-export const POST = withAuth(async (_user, req) => {
+export const POST = withFeatureGuard('email_template_configuration')(withAuth(async (_user, req) => {
   let body: unknown
   try {
     body = await req.json()
@@ -47,4 +48,4 @@ export const POST = withAuth(async (_user, req) => {
     console.error('[email-preview] render error for type:', type, err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'Template render failed' }, { status: 500 })
   }
-})
+}))

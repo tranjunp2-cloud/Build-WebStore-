@@ -41,6 +41,13 @@ vi.mock('@/i18n', () => ({
                 },
             },
             dashboard: { overview: {} },
+            common: {
+                subscriptionErrors: {
+                    featureLocked: 'Feature not available on this plan.',
+                    subscriptionExpired: 'Subscription expired.',
+                    genericLocked: 'Action not available on this plan.',
+                },
+            },
         },
         locale: 'en',
         ti: (template: string, vars: Record<string, string>) => {
@@ -295,8 +302,8 @@ describe('Publish and Save Flows (TC-F05)', () => {
         fireEvent.click(screen.getByTestId('save-btn'))
 
         await waitFor(() => {
-            // Verify 409 toast fires with server error message
-            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại')
+            // Verify 409 toast fires with server error message (not generic saveFailed)
+            expect(toast.error).toHaveBeenCalledWith('Version conflict')
         })
     })
 

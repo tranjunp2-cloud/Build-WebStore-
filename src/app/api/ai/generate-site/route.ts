@@ -15,6 +15,8 @@ import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
@@ -163,16 +165,40 @@ export async function POST(req: NextRequest) {
 
             if (existingTenantBySlug.docs.length > 0) {
                 const recoveredTenant = existingTenantBySlug.docs[0]
+                const recoveredId = recoveredTenant.id as number | string
+
+                // Provision FREEMIUM before linking user — keeps failure retry-safe:
+                // if subscription create fails, user stays unlinked and the whole
+                // recovery block re-runs cleanly on the next request.
+                const anySubRow = await payload.find({
+                    collection: 'plan-subscriptions',
+                    where: { and: [{ tenant: { equals: recoveredId } }, { name: { equals: 'main' } }] },
+                    limit: 1,
+                })
+                if (anySubRow.totalDocs === 0) {
+                    await payload.create({
+                        collection: 'plan-subscriptions',
+                        data: {
+                            tenant: recoveredId,
+                            name: 'main',
+                            plan: 'FREEMIUM',
+                            status: 'active',
+                            startsAt: new Date().toISOString(),
+                            endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                            packCode: 'FREEMIUM',
+                        },
+                    })
+                }
 
                 await payload.update({
                     collection: 'users',
                     id: user.id,
                     data: {
-                        tenants: [{ tenant: recoveredTenant.id, role: 'owner' }],
+                        tenants: [{ tenant: recoveredId, role: 'owner' }],
                     } as Record<string, unknown>,
                 })
 
-                resolvedTenantId = recoveredTenant.id as number | string
+                resolvedTenantId = recoveredId
             } else {
                 // Smart slug from business name (F23), prefer user-chosen slug
                 const businessName = businessInfo?.businessName || ''
@@ -187,7 +213,20 @@ export async function POST(req: NextRequest) {
                     data: {
                         name: tenantName,
                         slug: tenantSlug,
-                        aiGenerationsCount: 0,
+                    },
+                })
+                // Provision FREEMIUM subscription so subsequent subscription checks pass for new tenants.
+                // SSO provision normally does this; here we cover non-SSO / legacy-recovery paths.
+                await payload.create({
+                    collection: 'plan-subscriptions',
+                    data: {
+                        tenant: newTenant.id,
+                        name: 'main',
+                        plan: 'FREEMIUM',
+                        status: 'active',
+                        startsAt: new Date().toISOString(),
+                        endsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                        packCode: 'FREEMIUM',
                     },
                 })
                 await payload.update({
@@ -199,6 +238,20 @@ export async function POST(req: NextRequest) {
                 })
                 resolvedTenantId = newTenant.id as number | string
             }
+        }
+
+        const genSub = await getActivePlanSubscription(payload, resolvedTenantId)
+        if (!genSub) {
+            return NextResponse.json(
+                { success: false, error: { code: 'SUBSCRIPTION_EXPIRED', message: 'Subscription expired or not found.' } },
+                { status: 403 }
+            )
+        }
+        if (!await canUse(payload, genSub.plan as PlanCode, 'website_builder')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FEATURE_LOCKED', message: 'Website builder is not available on your current plan.' } },
+                { status: 403 }
+            )
         }
 
         // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
@@ -234,25 +287,6 @@ export async function POST(req: NextRequest) {
             } catch (err) {
                 // Non-critical — slug sync failure shouldn't block site generation
                 payload.logger.error({ err, tenantId: resolvedTenantId }, 'AI generation: Tenant slug sync failed')
-            }
-        }
-
-        // FR-15: Rate Limit - Free tier is limited to 1 AI generation
-        // Bypass in development mode for testing
-        const isDev = process.env.NODE_ENV === 'development'
-        const tenant = typeof payload.findByID === 'function'
-            ? await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
-            : { plan: 'pro', aiGenerationsCount: 0 }
-        if (!isDev && tenant.plan === 'free') {
-            const currentCount = tenant.aiGenerationsCount || 0
-            if (currentCount >= 1) {
-                return NextResponse.json(
-                    {
-                        error: 'Tài khoản Free chỉ được tạo website bằng AI 1 lần duy nhất. Vui lòng nâng cấp gói cước để tiếp tục.',
-                        code: 'PAYMENT_REQUIRED'
-                    },
-                    { status: 402 }
-                )
             }
         }
 
@@ -1046,15 +1080,6 @@ export async function POST(req: NextRequest) {
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
-
-        // FR-15: Increment AI generation count
-        await payload.update({
-            collection: 'tenants',
-            id: resolvedTenantId,
-            data: {
-                aiGenerationsCount: (tenant.aiGenerationsCount || 0) + 1,
-            },
-        })
 
         // Mark generation completed and persist headerBlock so SiteRenderer
         // can read breadcrumbConfig on the public site without requiring a

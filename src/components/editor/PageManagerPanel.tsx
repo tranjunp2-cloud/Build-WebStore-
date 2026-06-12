@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import type { PageData } from '@/store/editorStore'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 
 interface PageManagerPanelProps {
     siteId: string
@@ -109,6 +110,7 @@ export function PageManagerPanel({
 }: PageManagerPanelProps) {
     const { t } = useI18n()
     const pm = t.editor.pageManager
+    const sub = t.common.subscriptionErrors
     const pages = useEditorStore(state => state.pages)
     const activeLocale = useEditorStore(state => state.activeLocale)
     const setPages = useEditorStore(state => state.setPages)
@@ -156,7 +158,8 @@ export function PageManagerPanel({
                     toast.error(t.editor.pageManagerPanel.slugConflict)
                     return
                 }
-                throw new Error(`HTTP ${res.status}`)
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, `HTTP ${res.status}`, sub))
             }
 
             const data = await res.json()
@@ -175,7 +178,7 @@ export function PageManagerPanel({
             onPagesChanged?.()
         } catch (err) {
             console.error('[PageManagerPanel] Create page failed:', err)
-            toast.error(t.editor.pageManagerPanel.createError)
+            toast.error(err instanceof Error ? err.message : t.editor.pageManagerPanel.createError)
         } finally {
             setIsSubmitting(false)
         }
@@ -194,16 +197,19 @@ export function PageManagerPanel({
                 credentials: 'include',
                 body: JSON.stringify({ isVisible: newVisible }),
             })
-            if (!res.ok) throw new Error('Failed to update page')
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, pm.visibilityFailed, sub))
+            }
 
             onPagesChanged?.()
 
             if (!newVisible) {
                 toast(pm.pageHidden)
             }
-        } catch {
+        } catch (err) {
             updatePageInState(page.id, { isVisible: page.isVisible })
-            toast.error(pm.visibilityFailed)
+            toast.error(err instanceof Error ? err.message : pm.visibilityFailed)
         }
     }
 
@@ -222,7 +228,10 @@ export function PageManagerPanel({
                 credentials: 'include',
                 body: JSON.stringify({ deletedAt: now }),
             })
-            if (!res.ok) throw new Error('Failed to delete page')
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, pm.deleteFailed, sub))
+            }
 
             // Switch to homepage if deleted page is currently being viewed
             if (String(page.id) === String(currentPageId)) {
@@ -230,10 +239,10 @@ export function PageManagerPanel({
                 if (homepage) onPageSelected(String(homepage.id))
             }
             onPagesChanged?.()
-        } catch {
+        } catch (err) {
             updatePageInState(page.id, { deletedAt: null })
             setPendingPageId(null)
-            toast.error(pm.deleteFailed)
+            toast.error(err instanceof Error ? err.message : pm.deleteFailed)
             return
         }
 
@@ -248,7 +257,10 @@ export function PageManagerPanel({
                             credentials: 'include',
                             body: JSON.stringify({ deletedAt: null }),
                         })
-                        if (!res.ok) throw new Error('Failed to undo deletion')
+                        if (!res.ok) {
+                            const data = await res.json().catch(() => null)
+                            throw new Error(resolveApiError(data, pm.restoreFailed, sub))
+                        }
 
                         // Refetch pages from server to restore the page in state
                         const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
@@ -260,8 +272,8 @@ export function PageManagerPanel({
                         setPendingPageId(null)
                         onPagesChanged?.()
                         toast.success(pm.restored)
-                    } catch {
-                        toast.error(pm.restoreFailed)
+                    } catch (err) {
+                        toast.error(err instanceof Error ? err.message : pm.restoreFailed)
                     }
                 },
             },

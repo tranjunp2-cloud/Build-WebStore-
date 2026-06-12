@@ -17,6 +17,25 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1',
+        plan: 'PROFESSIONAL_TM_USER',
+        status: 'active',
+        startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    isSubscriptionActive: vi.fn().mockReturnValue(true),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+    recordUsage: vi.fn().mockResolvedValue(undefined),
+    reduceUsage: vi.fn().mockResolvedValue(undefined),
+    getConsumed: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
+
 import { PATCH, DELETE } from '@/app/api/blog-categories/[id]/route'
 
 // ─── TC-F17.020: Category soft-delete fallback ────────────────────────

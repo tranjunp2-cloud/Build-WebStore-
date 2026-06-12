@@ -30,7 +30,14 @@ vi.mock('@/i18n', () => ({
                 errorNoTld: 'Domain must include an extension (e.g., .com, .my)',
                 errorInvalidChars: 'Domain contains invalid characters',
                 errorInvalidFormat: 'Invalid domain format',
-            }
+            },
+            common: {
+                subscriptionErrors: {
+                    featureLocked: 'Feature not available on this plan.',
+                    subscriptionExpired: 'Subscription expired.',
+                    genericLocked: 'Action not available on this plan.',
+                },
+            },
         },
         ti: (key: string) => key,
     }),

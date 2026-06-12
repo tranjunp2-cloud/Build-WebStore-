@@ -4,6 +4,7 @@ import React, { useState, useTransition, useCallback, useRef, useEffect } from '
 import { Globe, Plus, AlertCircle, AlertTriangle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
+import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
 
@@ -259,6 +260,7 @@ export function DomainsClient({
     customDomains: DomainEntry[];
 }) {
     const { t } = useI18n();
+    const sub = t.common.subscriptionErrors;
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isSelectPrimaryOpen, setIsSelectPrimaryOpen] = useState(false);
     const [newDomainInput, setNewDomainInput] = useState('');
@@ -387,7 +389,7 @@ export function DomainsClient({
                     toast.warning(res.warning);
                 }
             } else {
-                toast.error(res.error || t?.Domains?.domainAddFailed || 'Failed to add domain');
+                toast.error(resolveApiError(res, t?.Domains?.domainAddFailed || 'Failed to add domain', sub));
             }
         });
     };

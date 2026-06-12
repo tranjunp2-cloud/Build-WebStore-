@@ -6,6 +6,9 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
@@ -26,7 +29,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * Update order status with workflow validation.
  * Only allows transitions defined in ORDER_STATUS_TRANSITIONS.
  */
-export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
+export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { id } = await ctx.params
         const { data, errorResponse } = await parseRequest(request, orderStatusUpdateSchema)
@@ -101,7 +104,10 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                     ? (order as any).tenant.id
                     : (order as any).tenant
 
-                if (newStatus === 'cancelled' || newStatus === 'confirmed' || newStatus === 'completed') {
+                const emailSub = await getActivePlanSubscription(payload, tenantId)
+                const canSendConfirmation = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
+
+                if (canSendConfirmation && (newStatus === 'cancelled' || newStatus === 'confirmed' || newStatus === 'completed')) {
                     const tenant = tenantId
                         ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : null
@@ -137,6 +143,9 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
+                                discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
@@ -164,7 +173,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
-                                discountAmount: (order as any).discountAmount ?? null,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
                                 discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
@@ -193,6 +203,9 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                                 customerAddress: (order as any).shippingAddress ?? null,
                                 items: orderItems,
                                 subtotal: (order as any).subtotal ?? 0,
+                                // discountAmount snapshot is in sen → /100 for RM (template formats with fp())
+                                discountAmount: (order as any).discountAmount ? (order as any).discountAmount / 100 : null,
+                                discountCode: (order as any).discountCode ?? null,
                                 shippingFee: (order as any).shippingFee ?? 0,
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod ?? 'cod',
@@ -230,7 +243,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 }
         )
     }
-})
+}))
 
 /**
  * GET /api/orders/[id]

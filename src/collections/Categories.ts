@@ -1,5 +1,7 @@
 import type { CollectionConfig, Where } from 'payload'
 import slugify from 'slugify'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 export const Categories: CollectionConfig = {
     slug: 'categories',
@@ -8,8 +10,19 @@ export const Categories: CollectionConfig = {
         description: 'Quản lý Danh mục (Tối đa 3 cấp độ)',
     },
     access: {
-        create: ({ req }) => {
-            return Boolean(req.user);
+        create: async ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
+                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            ) ?? []
+            const tenantId = tenantIds[0]
+            if (!tenantId) return false
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                return await canUse(req.payload, sub.plan as PlanCode, 'product_management')
+            } catch { return false }
         },
         read: ({ req }) => {
             if (!req.user) {
@@ -23,22 +36,34 @@ export const Categories: CollectionConfig = {
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
-        update: ({ req }) => {
+        update: async ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             if (tenantIds.length === 0) return false
+            const tenantId = tenantIds[0]
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
+            } catch { return false }
             return { tenant: { in: tenantIds } }
         },
-        delete: ({ req }) => {
+        delete: async ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             if (tenantIds.length === 0) return false
+            const tenantId = tenantIds[0]
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
+            } catch { return false }
             return { tenant: { in: tenantIds } }
         },
     },

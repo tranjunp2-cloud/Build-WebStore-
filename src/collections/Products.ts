@@ -1,6 +1,8 @@
 import type { CollectionConfig, Where, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
     // If client supplied a value, use it (or slugify it)
@@ -146,7 +148,18 @@ export const Products: CollectionConfig = {
         description: 'Products belong to a site and can be listed in the storefront.',
     },
     access: {
-        create: ({ req }) => Boolean(req.user),
+        create: async ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            const tenantIds = getTenantIds(req.user)
+            const tenantId = tenantIds[0]
+            if (!tenantId) return false
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                return await canUse(req.payload, sub.plan as PlanCode, 'product_management')
+            } catch { return false }
+        },
         read: ({ req }) => {
             // Public read for storefront — only active, non-deleted products
             if (!req.user) {
@@ -161,18 +174,30 @@ export const Products: CollectionConfig = {
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
-        update: ({ req }) => {
+        update: async ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = getTenantIds(req.user)
             if (tenantIds.length === 0) return false
+            const tenantId = tenantIds[0]
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
+            } catch { return false }
             return { tenant: { in: tenantIds } }
         },
-        delete: ({ req }) => {
+        delete: async ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = getTenantIds(req.user)
             if (tenantIds.length === 0) return false
+            const tenantId = tenantIds[0]
+            try {
+                const sub = await getActivePlanSubscription(req.payload, tenantId)
+                if (!sub) return false
+                if (!(await canUse(req.payload, sub.plan as PlanCode, 'product_management'))) return false
+            } catch { return false }
             return { tenant: { in: tenantIds } }
         },
     },

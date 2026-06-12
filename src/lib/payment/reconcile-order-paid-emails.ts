@@ -25,6 +25,9 @@ export interface PaidOrderDoc {
     subtotal: number
     tax: number
     shippingFee?: number
+    discountCode?: string | null
+    /** Discount amount in sen (order snapshot); converted to RM before the email template. */
+    discountAmount?: number | null
     notes?: string | null
     createdAt?: string
     site?: string | number | { id: string | number; locale?: string }
@@ -83,6 +86,9 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 subtotal: order.subtotal,
                 shippingFee: order.shippingFee ?? 0,
                 total: order.total,
+                // Discount line — order snapshot is in sen; template formats RM via fp()
+                discountCode: order.discountCode ?? null,
+                discountAmount: order.discountAmount ? order.discountAmount / 100 : null,
                 paymentMethod: 'stripe',
                 orderDate: order.createdAt ?? new Date().toISOString(),
                 orderPageUrl,
