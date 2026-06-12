@@ -103,16 +103,19 @@ export function DiscountsToolbar({
 
     useEffect(() => { setInput(search) }, [search])
 
-    // Debounced search propagation. The mount run is skipped — it would call onSearch('') which
-    // setPage(1)s in the parent ~400ms after render, clobbering the page restored from ?page=N by
-    // useUrlPagination (Bug #12 AC: reload / shared links keep the page).
-    const searchDebounceReady = useRef(false)
+    // Debounced search propagation. Value-compare guard: onSearch fires only when the input actually
+    // CHANGED from the last propagated value, so the mount run (input === search prop) never reaches
+    // the parent's setPage(1) and clobber the page restored from ?page=N by useUrlPagination (Bug #12
+    // AC). A first-run flag would not survive React Strict Mode's dev double-effect (refs persist
+    // across the simulated remount); comparing values is idempotent. Bonus: typing then reverting to
+    // the same query within the debounce window propagates nothing (no spurious page reset).
+    const lastSentSearch = useRef(search)
     useEffect(() => {
-        if (!searchDebounceReady.current) {
-            searchDebounceReady.current = true
-            return
-        }
-        const timer = setTimeout(() => onSearch(input), 400)
+        if (input === lastSentSearch.current) return
+        const timer = setTimeout(() => {
+            lastSentSearch.current = input
+            onSearch(input)
+        }, 400)
         return () => clearTimeout(timer)
     }, [input, onSearch])
 

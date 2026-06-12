@@ -43,16 +43,17 @@ export function DiscountsUsageHistoryLayout() {
     const [debouncedSearch, setDebouncedSearch] = useState('')
 
     // Debounce the input so each keystroke doesn't hit the API; reset to page 1 on a new query.
-    // The mount run is skipped — it would setPage(1) ~300ms after render and clobber the page
-    // restored from ?page=N by useUrlPagination (Bug #12 AC: reload / shared links keep the page).
-    const searchDebounceReady = useRef(false)
+    // Value-compare guard: setPage(1) fires only when the applied query actually CHANGES, so the
+    // mount run (search '' === applied '') never clobbers the page restored from ?page=N by
+    // useUrlPagination (Bug #12 AC). A first-run flag would not survive React Strict Mode's dev
+    // double-effect (refs persist across the simulated remount); comparing values is idempotent.
+    const appliedSearch = useRef('')
     useEffect(() => {
-        if (!searchDebounceReady.current) {
-            searchDebounceReady.current = true
-            return
-        }
         const id = setTimeout(() => {
-            setDebouncedSearch(search.trim())
+            const next = search.trim()
+            if (next === appliedSearch.current) return
+            appliedSearch.current = next
+            setDebouncedSearch(next)
             setPage(1)
         }, 300)
         return () => clearTimeout(id)
