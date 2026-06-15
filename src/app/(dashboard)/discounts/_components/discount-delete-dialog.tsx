@@ -5,6 +5,7 @@ import {
     Dialog,
     DialogContent,
 } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n'
 
 interface DiscountDeleteDialogProps {
     code: string
@@ -21,6 +22,9 @@ export function DiscountDeleteDialog({
     onConfirm,
     onCancel,
 }: DiscountDeleteDialogProps) {
+    const { t, ti } = useI18n()
+    const d = t.dashboard.discounts
+
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
             <DialogContent
@@ -36,19 +40,19 @@ export function DiscountDeleteDialog({
 
                 {/* Title */}
                 <h2 className="text-[15px] font-semibold" style={{ color: 'var(--dash-text)' }}>
-                    Delete discount &lsquo;{code}&rsquo;?
+                    {ti(d.deleteDialog.title, { code })}
                 </h2>
 
                 {/* Description */}
                 <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--dash-text-muted)' }}>
-                    The code will stop working immediately and won&apos;t be redeemable at checkout.
-                    Its <strong style={{ color: 'var(--dash-text)' }}>usage history is preserved</strong> for audit.
+                    {d.deleteDialog.description}
                 </p>
 
                 {usageCount > 0 && (
                     <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 text-left mt-2">
-                        ⚠ {usageCount} {usageCount === 1 ? 'order has' : 'orders have'} used this code. Deleting it
-                        won&apos;t undo those discounts but the code can&apos;t be reused.
+                        ⚠ {usageCount}{' '}
+                        {usageCount === 1 ? d.deleteDialog.usageWarningOrder : d.deleteDialog.usageWarningOrders}{' '}
+                        {d.deleteDialog.usageWarningSuffix}
                     </div>
                 )}
 
@@ -59,14 +63,14 @@ export function DiscountDeleteDialog({
                         style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
                         onClick={onCancel}
                     >
-                        Cancel
+                        {d.deleteDialog.cancel}
                     </button>
                     <button
                         className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
                         onClick={onConfirm}
                     >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Delete discount
+                        {d.deleteDialog.confirm}
                     </button>
                 </div>
             </DialogContent>

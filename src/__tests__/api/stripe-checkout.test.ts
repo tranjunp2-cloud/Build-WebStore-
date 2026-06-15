@@ -870,4 +870,81 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const hasShipping = lineItems.some((item: any) => item.name === 'Shipping')
         expect(hasShipping).toBe(true)
     })
+
+    // ─── TC-F33-09-04: Discount at-limit blocking (#10 regression) ──────────────
+
+    it('[TC-F33-09-04 regression] Stripe: discount at-limit → HTTP 409 DISCOUNT_EXHAUSTED, no session/order created', async () => {
+        // #10 bug: OLD code silently nulled discount when code's last slot was taken by another buyer.
+        // FIXED: block with 409 DISCOUNT_EXHAUSTED before creating order/session.
+        // Arrange — discount exhausted (usageCount >= usageLimit)
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // mockCreate and mockCreateCheckoutSession NOT called — order/session must not be created
+
+        // Mock discount lookup returning exhausted code
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 7, code: 'STRIMELIMIT', type: 'percentage', value: 25, status: 'active', usageLimit: 5, usageCount: 5, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+            totalDocs: 1,
+        })
+
+        // Act
+        const req = mockRequest({ ...VALID_REQUEST_BODY, discountCode: 'STRIMELIMIT' })
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('DISCOUNT_EXHAUSTED')
+        expect(body.error.message).toContain('usage limit')
+        // CRITICAL: no order or session created
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F33-09-04 regression] Stripe: non-at-limit reasons (inactive) still silent reject → session created at full price', async () => {
+        // BR-03: only 'at-limit' blocks; other reasons (inactive/expired/not-found) silent reject,
+        // session proceeds at full price. Preserves existing behavior.
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // Mock inactive discount
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 8, code: 'INACTIVE', type: 'percentage', value: 50, status: 'inactive', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+            totalDocs: 1,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({ ...VALID_REQUEST_BODY, discountCode: 'INACTIVE' })
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert — session created at full price (100 + 10 flat ship = 110 RM)
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(mockCreate).toHaveBeenCalled()
+        expect(mockCreateCheckoutSession).toHaveBeenCalled()
+        // Order has NO discount fields (silent reject)
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBeUndefined()
+        expect(createData.discountAmount).toBeUndefined()
+    })
 })

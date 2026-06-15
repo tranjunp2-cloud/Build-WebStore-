@@ -105,8 +105,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // Construct updated from the pre-fetched order to avoid an extra DB round trip.
         const updated = { ...(order as any), status: 'cancelled', cancelReason: reason }
 
-        // Release the redeemed discount slot (F33) — runs only on the CAS winner so a concurrent
-        // cancel can't double-release. No-op when the order never redeemed (e.g. Stripe still pending).
+        // Release the reserved discount slot (F33) — runs only on the CAS winner so a concurrent cancel
+        // can't double-release. The slot is reserved at PLACE ORDER for every gateway (incl. pending
+        // Stripe), so this is a real release; idempotent + non-throwing if the order had no discount.
         await releaseDiscountRedemption(payload, Number(orderId))
 
         // Auto-restock inventory (variant-aware).

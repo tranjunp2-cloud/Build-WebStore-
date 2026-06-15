@@ -41,12 +41,20 @@ vi.mock('@/app/api/webhooks/stripe/handlers/verify-account-ownership', () => ({
     verifyConnectedAccountOwnership: vi.fn(() => Promise.resolve(true)),
 }))
 
+// ─── Discount release mock (F33 slot-leak fix) ──────────────────────────
+// Mocked so its raw SQL stays off the shared mockDrizzleExecute (keeps CAS sequences precise);
+// its own behaviour is covered by release-discount-redemption tests.
+const mockReleaseDiscount = vi.fn()
+vi.mock('@/lib/discounts/release-discount-redemption', () => ({
+    releaseDiscountRedemption: (...args: any[]) => mockReleaseDiscount(...args),
+}))
+
 import { handleChargeRefunded } from '@/app/api/webhooks/stripe/handlers/charge-refunded'
 import type { Payload } from 'payload'
 
 // ─── Fixtures ──────────────────────────────────────────────────────────
 const BASE_ORDER = {
-    id: 'order-1',
+    id: '12345', // numeric string so Number(order.id) = 12345
     tenant: { id: 'tenant-1', stripeAccountId: 'acct_test', name: 'Test Shop', slug: 'test-shop' },
     status: 'shipped',
     paymentMethod: 'stripe',
@@ -100,7 +108,7 @@ describe('handleChargeRefunded — inventory restock [TC-F13.160–164]', () => 
             }],
         })
         // Default: CAS succeeds — order not yet refunded
-        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 'order-1' }] })
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: '12345' }] })
         // Default: restock succeeds
         mockRestockItem.mockResolvedValue({ productId: 'prod-1', restocked: 2 })
         // Default: findByID (for verifyConnectedAccountOwnership) returns tenant
@@ -131,7 +139,7 @@ describe('handleChargeRefunded — inventory restock [TC-F13.160–164]', () => 
 
         expect(mockRestockItem).not.toHaveBeenCalled()
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.objectContaining({ orderId: 'order-1' }),
+            expect.objectContaining({ orderId: '12345' }),
             expect.stringContaining('already refunded'),
         )
     })
@@ -150,7 +158,7 @@ describe('handleChargeRefunded — inventory restock [TC-F13.160–164]', () => 
 
         expect(mockRestockItem).not.toHaveBeenCalled()
         expect(mockLogger.error).toHaveBeenCalledWith(
-            expect.objectContaining({ orderId: 'order-1', itemIndex: 0 }),
+            expect.objectContaining({ orderId: '12345', itemIndex: 0 }),
             expect.stringContaining('no product ID'),
         )
     })
@@ -163,7 +171,7 @@ describe('handleChargeRefunded — inventory restock [TC-F13.160–164]', () => 
         await handleChargeRefunded(makePayload(), BASE_EVENT as any)
 
         expect(mockLogger.warn).toHaveBeenCalledWith(
-            expect.objectContaining({ orderId: 'order-1', productId: 'prod-1' }),
+            expect.objectContaining({ orderId: '12345', productId: 'prod-1' }),
             expect.stringContaining('inventory tracking disabled'),
         )
         // null_inventory is warn-only — must NOT trigger ops alert
@@ -180,8 +188,72 @@ describe('handleChargeRefunded — inventory restock [TC-F13.160–164]', () => 
         await handleChargeRefunded(makePayload(), BASE_EVENT as any)
 
         expect(mockLogger.error).toHaveBeenCalledWith(
-            expect.objectContaining({ orderId: 'order-1', productId: 'prod-1', reason: 'write_failed' }),
+            expect.objectContaining({ orderId: '12345', productId: 'prod-1', reason: 'write_failed' }),
             expect.stringContaining('manual inventory reconciliation'),
+        )
+    })
+})
+
+// ─── TC-F33-09: charge-refunded discount slot release (F33 slot-leak fix) ─
+describe('handleChargeRefunded — discount slot release [TC-F33-09]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockFind.mockReset()
+        mockDrizzleExecute.mockReset()
+        mockRestockItem.mockReset()
+        mockReleaseDiscount.mockReset()
+        mockLogger.error.mockReset()
+        mockLogger.warn.mockReset()
+        mockLogger.info.mockReset()
+
+        // Default: order found with discount applied
+        mockFind.mockResolvedValue({
+            docs: [{
+                ...BASE_ORDER,
+                status: 'paid',
+                discountCode: 'SUMMER50',
+                discountAmount: 5000, // 50% of 10000 subtotal
+                items: [{ product: 'prod-1', variant: 'Size M', quantity: 1 }],
+            }],
+        })
+        // Default: CAS succeeds — order not yet refunded (the status != 'refunded' condition wins)
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 'order-1' }] })
+        // Default: restock succeeds
+        mockRestockItem.mockResolvedValue({ productId: 'prod-1', restocked: 1 })
+        // Default: releaseDiscountRedemption succeeds
+        mockReleaseDiscount.mockResolvedValue({ released: true })
+    })
+
+    // ─── TC-F33-09/refund release: CAS winner → releaseDiscountRedemption called once ──
+
+    it('[TC-F33-09] charge.refunded on paid order with discount → releaseDiscountRedemption called once with orderId', async () => {
+        await handleChargeRefunded(makePayload(), BASE_EVENT as any)
+
+        // CAS wins, so releaseDiscountRedemption must be called exactly once
+        expect(mockReleaseDiscount).toHaveBeenCalledOnce()
+        expect(mockReleaseDiscount).toHaveBeenCalledWith(
+            expect.anything(), // payload
+            12345, // orderId = Number(order.id) where order.id = '12345' → 12345
+        )
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.objectContaining({ orderId: '12345' }),
+            expect.stringContaining('marked refunded'),
+        )
+    })
+
+    // ─── TC-F33-09/refund release (concurrent-duplicate): CAS miss → NO releaseDiscountRedemption ──
+
+    it('[TC-F33-09] charge.refunded concurrent-duplicate (CAS miss) → releaseDiscountRedemption NOT called', async () => {
+        // Simulate concurrent duplicate delivery: CAS returns 0 rows (status already refunded)
+        mockDrizzleExecute.mockResolvedValue({ rows: [] })
+
+        await handleChargeRefunded(makePayload(), BASE_EVENT as any)
+
+        // CAS miss → early return before releaseDiscountRedemption
+        expect(mockReleaseDiscount).not.toHaveBeenCalled()
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.objectContaining({ orderId: '12345' }),
+            expect.stringContaining('already refunded'),
         )
     })
 })

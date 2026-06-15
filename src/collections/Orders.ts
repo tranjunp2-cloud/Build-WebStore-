@@ -6,6 +6,7 @@ import {
     revalidateBadgeCountsAfterChange,
     revalidateBadgeCountsAfterDelete,
 } from '@/lib/dashboard/revalidate-badge-counts-hook'
+import { releaseDiscountOnDelete } from './orders-hooks/release-discount-on-delete'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -33,6 +34,9 @@ export const Orders: CollectionConfig = {
         beforeChange: [
             autoLinkCustomer,
             updatePaymentStatus,
+        ],
+        beforeDelete: [
+            releaseDiscountOnDelete,
         ],
         afterChange: [
             async ({ doc, operation, req }) => {

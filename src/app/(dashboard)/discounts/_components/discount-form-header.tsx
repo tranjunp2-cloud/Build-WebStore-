@@ -3,6 +3,7 @@
 import { ArrowLeft, Trash2, UndoDot, Check } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { fmtDate } from '@/lib/discounts/format'
+import { useI18n } from '@/i18n'
 
 interface DiscountFormHeaderProps {
     isNew: boolean
@@ -33,6 +34,9 @@ export function DiscountFormHeader({
     onRevert,
     onDelete,
 }: DiscountFormHeaderProps) {
+    const { t, ti } = useI18n()
+    const d = t.dashboard.discounts.header
+
     const discountIdChip = id ? `disc_${String(id).padStart(5, '0')}` : null
 
     return (
@@ -44,7 +48,7 @@ export function DiscountFormHeader({
                         onClick={onBack}
                         className="flex items-center justify-center h-8 w-8 rounded-md transition-colors shrink-0"
                         style={{ color: 'var(--dash-text-muted)', background: 'var(--dash-surface-hover)' }}
-                        title="Back to discounts"
+                        title={d.backTitle}
                     >
                         <ArrowLeft className="h-4 w-4" />
                     </button>
@@ -55,7 +59,7 @@ export function DiscountFormHeader({
                                 className="text-[15px] font-semibold truncate"
                                 style={{ color: 'var(--dash-text)' }}
                             >
-                                {isNew ? 'Create discount' : (code ?? 'Discount')}
+                                {isNew ? d.createTitle : (code ?? d.defaultTitle)}
                             </h1>
                             {!isNew && status && <DiscountStatusBadge status={status} />}
                         </div>
@@ -72,13 +76,13 @@ export function DiscountFormHeader({
                                 {createdAt && (
                                     <>
                                         <span>·</span>
-                                        <span>Created {fmtDate(createdAt)}</span>
+                                        <span>{ti(d.createdOn, { date: fmtDate(createdAt) })}</span>
                                     </>
                                 )}
                             </div>
                         ) : isNew && tenantName ? (
                             <p className="text-[11px]" style={{ color: 'var(--dash-text-muted)' }}>
-                                New code · {tenantName}
+                                {ti(d.newCode, { tenantName })}
                             </p>
                         ) : null}
                     </div>
@@ -92,7 +96,7 @@ export function DiscountFormHeader({
                         style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)', background: 'transparent' }}
                     >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Delete
+                        {d.deleteBtn}
                     </button>
                 )}
             </div>
@@ -103,7 +107,7 @@ export function DiscountFormHeader({
                     className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
                     style={{ background: 'rgba(234,179,8,0.08)', borderBottom: '1px solid rgba(234,179,8,0.2)', color: 'rgb(234,179,8)' }}
                 >
-                    <span>You have unsaved changes.</span>
+                    <span>{d.unsavedChanges}</span>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onRevert}
@@ -111,7 +115,7 @@ export function DiscountFormHeader({
                             style={{ color: 'rgb(234,179,8)', background: 'rgba(234,179,8,0.12)' }}
                         >
                             <UndoDot className="h-3 w-3" />
-                            Revert
+                            {d.revert}
                         </button>
                         <button
                             onClick={onSave}
@@ -120,7 +124,7 @@ export function DiscountFormHeader({
                             style={{ background: 'var(--brand, #14b8a6)', color: '#fff' }}
                         >
                             <Check className="h-3 w-3" />
-                            Save
+                            {d.save}
                         </button>
                     </div>
                 </div>

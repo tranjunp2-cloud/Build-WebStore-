@@ -36,6 +36,7 @@ export type ApplyResult =
 export function applyDiscount(
     row: DiscountRow | null,
     ctx: { subtotalSen: number; tenantId: string | number; now: Date },
+    opts?: { skipUsageLimit?: boolean },
 ): ApplyResult {
     const { subtotalSen, tenantId, now } = ctx
 
@@ -57,7 +58,11 @@ export function applyDiscount(
         if (!isNaN(expires.getTime()) && expires < now) return { ok: false, reason: 'expired' }
     }
 
-    if (row.usageLimit != null && row.usageCount >= row.usageLimit) {
+    // skipUsageLimit: the caller already holds a reserved slot for this order (e.g. retry-payment, where
+    // the slot was reserved at placement). Re-checking the limit here would count the order's OWN
+    // reservation and falsely drop the discount — so a 1-slot code could never be retried. Authoritative
+    // capacity is still enforced atomically at reserve time in recordDiscountRedemption().
+    if (!opts?.skipUsageLimit && row.usageLimit != null && row.usageCount >= row.usageLimit) {
         return { ok: false, reason: 'at-limit' }
     }
 

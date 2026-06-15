@@ -118,6 +118,19 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string; line1?: string; state?: string; city?: string; postcode?: string }>({})
+
+    // Inline warning shown right below the discount input when Place Order is blocked for an exhausted code.
+    const [discountRejection, setDiscountRejection] = useState<string | null>(null)
+
+    // Race fix (#10): the code's last slot was taken by another buyer between Apply and Place Order. The
+    // order is NOT placed (backend 409). Drop the discount so the total recomputes to full price, and show
+    // the warning inline under the discount field so the buyer reviews the new total before re-submitting —
+    // we never silently charge full price.
+    const handleDiscountExhausted = () => {
+        setAppliedDiscount(null)
+        setDiscountSen(0)
+        setDiscountRejection(ck.discountExhausted)
+    }
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -352,6 +365,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
+        // Clear any prior discount-exhausted warning so re-submitting the SAME exhausted code re-triggers
+        // the inline warning (the field effect keys on a value change, so null→message must transition).
+        setDiscountRejection(null)
         setIsPlacing(true)
         let navigatedToConfirm = false
         // Show overlay after 300ms if API still running (avoids flash on fast responses)
@@ -397,6 +413,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     } else {
                         router.push(confirmUrl)
                     }
+                } else if (data.error?.code === 'DISCOUNT_EXHAUSTED') {
+                    handleDiscountExhausted()
                 } else {
                     toast.error(data.error?.message || 'Failed to initialize payment')
                 }
@@ -437,6 +455,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 } else {
                     router.push(confirmUrl)
                 }
+            } else if (data.error?.code === 'DISCOUNT_EXHAUSTED') {
+                dismissOverlay()
+                handleDiscountExhausted()
             } else {
                 dismissOverlay()
                 toast.error(data.error?.message || 'Failed to place order')
@@ -801,8 +822,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 siteId={siteId}
                                 subtotalSen={Math.round(sub * 100)}
                                 appliedDiscount={appliedDiscount}
-                                onApplied={(discount, sen) => { setAppliedDiscount(discount); setDiscountSen(sen) }}
-                                onRemoved={() => { setAppliedDiscount(null); setDiscountSen(0) }}
+                                externalReject={discountRejection}
+                                onApplied={(discount, sen) => { setAppliedDiscount(discount); setDiscountSen(sen); setDiscountRejection(null) }}
+                                onRemoved={() => { setAppliedDiscount(null); setDiscountSen(0); setDiscountRejection(null) }}
                             />
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
                             {appliedDiscount && discountSen > 0 && (

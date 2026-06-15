@@ -1,9 +1,15 @@
+'use client'
+
+import { useI18n } from '@/i18n'
+
 interface DiscountUsageMeterProps {
     count: number
     limit: number | null
 }
 
 export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
+    const { t } = useI18n()
+    const d = t.dashboard.discounts
     const unlimited = limit === null || limit === undefined
 
     if (unlimited) {
@@ -15,7 +21,7 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                         {count} / ∞
                     </span>
                     <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#38bdf8' }}>
-                        UNLIMITED
+                        {d.badges.unlimited}
                     </span>
                 </div>
                 <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'var(--dash-border)' }}>
@@ -40,7 +46,7 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                 </span>
                 {atLimit && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-red-500/20 text-red-400 tracking-wide">
-                        AT LIMIT
+                        {d.badges.atLimit}
                     </span>
                 )}
             </div>

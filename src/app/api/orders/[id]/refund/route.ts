@@ -174,8 +174,8 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 { status: 400 })
         }
         // --- refund financially committed via CAS; restock is best-effort ---
-        // Release the redeemed discount slot (F33) — refund frees the promo seat like cancel does.
-        // Runs only on the CAS winner; idempotent + non-throwing (no-op when the order never redeemed).
+        // Release the reserved discount slot (F33) — refund frees the promo seat like cancel does.
+        // Runs only on the CAS winner; idempotent + non-throwing (no-op when the order had no discount).
         await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
         if (canSendRefundEmail) void fireRefundEmail()

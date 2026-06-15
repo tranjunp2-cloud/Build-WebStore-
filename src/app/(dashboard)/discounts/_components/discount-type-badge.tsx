@@ -1,12 +1,16 @@
 'use client'
 
 import { Percent, Banknote } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 interface DiscountTypeBadgeProps {
     type: 'percentage' | 'fixed'
 }
 
 export function DiscountTypeBadge({ type }: DiscountTypeBadgeProps) {
+    const { t } = useI18n()
+    const d = t.dashboard.discounts
+
     if (type === 'percentage') {
         return (
             <span
@@ -14,7 +18,7 @@ export function DiscountTypeBadge({ type }: DiscountTypeBadgeProps) {
                 style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
             >
                 <Percent className="h-2.5 w-2.5" />
-                Percentage
+                {d.badges.percentage}
             </span>
         )
     }
@@ -24,7 +28,7 @@ export function DiscountTypeBadge({ type }: DiscountTypeBadgeProps) {
             style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4' }}
         >
             <Banknote className="h-2.5 w-2.5" />
-            Fixed
+            {d.badges.fixed}
         </span>
     )
 }

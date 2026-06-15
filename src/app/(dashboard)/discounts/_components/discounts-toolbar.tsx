@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, Clock, Tag, ChevronDown } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -95,25 +96,39 @@ export function DiscountsToolbar({
     typeFilter,
     onTypeFilter,
 }: DiscountsToolbarProps) {
+    const { t } = useI18n()
+    const tb = t.dashboard.discounts.toolbar
+
     const [input, setInput] = useState(search)
 
     useEffect(() => { setInput(search) }, [search])
 
+    // Debounced search propagation. Value-compare guard: onSearch fires only when the input actually
+    // CHANGED from the last propagated value, so the mount run (input === search prop) never reaches
+    // the parent's setPage(1) and clobber the page restored from ?page=N by useUrlPagination (Bug #12
+    // AC). A first-run flag would not survive React Strict Mode's dev double-effect (refs persist
+    // across the simulated remount); comparing values is idempotent. Bonus: typing then reverting to
+    // the same query within the debounce window propagates nothing (no spurious page reset).
+    const lastSentSearch = useRef(search)
     useEffect(() => {
-        const timer = setTimeout(() => onSearch(input), 400)
+        if (input === lastSentSearch.current) return
+        const timer = setTimeout(() => {
+            lastSentSearch.current = input
+            onSearch(input)
+        }, 400)
         return () => clearTimeout(timer)
     }, [input, onSearch])
 
     const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
-        { key: 'all', label: 'All' },
-        { key: 'active', label: 'Active' },
-        { key: 'inactive', label: 'Inactive' },
+        { key: 'all', label: tb.statusAll },
+        { key: 'active', label: tb.statusActive },
+        { key: 'inactive', label: tb.statusInactive },
     ]
 
     const TYPE_OPTIONS: { key: TypeFilter; label: string }[] = [
-        { key: 'all', label: 'All' },
-        { key: 'percentage', label: 'Percentage' },
-        { key: 'fixed', label: 'Fixed' },
+        { key: 'all', label: tb.typeAll },
+        { key: 'percentage', label: tb.typePercentage },
+        { key: 'fixed', label: tb.typeFixed },
     ]
 
     return (
@@ -124,7 +139,7 @@ export function DiscountsToolbar({
                     type="text"
                     value={input}
                     onChange={e => setInput(e.target.value)}
-                    placeholder="Search code or description..."
+                    placeholder={tb.searchPlaceholder}
                     className="w-full h-[40px] rounded-[10px] pl-9 pr-3 text-[13px] outline-none transition-colors"
                     style={{
                         background: 'var(--dash-surface)',
@@ -136,7 +151,7 @@ export function DiscountsToolbar({
 
             <FilterChip<StatusFilter>
                 icon={Clock}
-                label="Status"
+                label={tb.statusLabel}
                 value={statusFilter}
                 options={STATUS_OPTIONS}
                 onChange={onStatusFilter}
@@ -144,7 +159,7 @@ export function DiscountsToolbar({
 
             <FilterChip<TypeFilter>
                 icon={Tag}
-                label="Type"
+                label={tb.typeLabel}
                 value={typeFilter}
                 options={TYPE_OPTIONS}
                 onChange={onTypeFilter}

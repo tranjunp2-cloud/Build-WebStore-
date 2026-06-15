@@ -592,6 +592,68 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         expect(createdItem.variant).toBe('Red')
     })
 
+    // ─── TC-F33-09-04: Discount at-limit blocking (#10 regression) ──────────────
+
+    it('[TC-F33-09-04 regression] discount at-limit (usageCount >= usageLimit) → HTTP 409 DISCOUNT_EXHAUSTED, no order created', async () => {
+        // #10 bug: OLD code silently nulled the discount and charged full price when a code's last slot
+        // was taken by another buyer. FIXED: block with 409 DISCOUNT_EXHAUSTED before creating order.
+        // Arrange — discount with 1 slot left (usageCount=9, usageLimit=10)
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+            .mockResolvedValueOnce({
+                // Discount at-limit (but buyer A still has valid code from earlier preview)
+                docs: [{ id: 5, code: 'LIMIT1', type: 'percentage', value: 50, status: 'active', usageLimit: 10, usageCount: 10, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        // mockCreate() NOT set — if reached, test will fail (order should NOT be created)
+
+        // Act — post checkout with exhausted code
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'LIMIT1' }))
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('DISCOUNT_EXHAUSTED')
+        expect(body.error.message).toContain('usage limit')
+        // CRITICAL: no order created (mockCreate never called)
+        expect(mockCreate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F33-09-04 regression] non-at-limit reasons (expired/inactive) still silent reject → full price order', async () => {
+        // BR-03: only 'at-limit' blocks; other reasons (expired/inactive/not-found) silent reject,
+        // order proceeds at full price. Preserves existing behavior.
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce(MOCK_TENANT)
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+            .mockResolvedValueOnce({
+                // Discount is inactive (but buyer still has code from earlier)
+                docs: [{ id: 6, code: 'INACTIVE', type: 'percentage', value: 50, status: 'inactive', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+                totalDocs: 1,
+            })
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }], discountCode: 'INACTIVE' }))
+        const body = await res.json()
+
+        // Assert — order created at full price, NO error
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.data.total).toBe(108) // 100 sub + 8 west ship, no discount (silent reject)
+        expect(mockCreate).toHaveBeenCalled()
+        // Order has NO discount fields
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBeUndefined()
+        expect(createData.discountAmount).toBeUndefined()
+    })
+
     it('[TC-F09.227] variant OOS check uses per-variant stock (not aggregate inventory)', async () => {
         // Per-variant stock is now authoritative for variant products.
         // variant.stock=1, aggregate inventory=10, requested qty=2 → OOS on per-variant check
