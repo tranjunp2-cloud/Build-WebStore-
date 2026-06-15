@@ -4694,6 +4694,28 @@ const MIGRATIONS = [
       WHERE sort_order IS NULL;
     `,
   },
+
+  // ── SSO-PW2: Foundation Schema ──
+  {
+    name: 'tenants.migration_status',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS migration_status varchar DEFAULT 'migrated';`,
+  },
+  {
+    name: 'users.migration_status',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_status varchar DEFAULT 'migrated';`,
+  },
+  {
+    name: 'users.customer_id_number',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_id_number varchar;`,
+  },
+  {
+    name: 'users.created_by_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by_id integer;`,
+  },
+  {
+    name: 'users.updated_by_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by_id integer;`,
+  },
 ];
 
 async function runMigrations(pool) {

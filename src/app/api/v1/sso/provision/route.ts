@@ -88,16 +88,19 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // ── 4. Unique Check ──
-        const existingEmail = await payload.find({
+        // ── 4. Unique Check (composite key: email + customerIdNumber when present) ──
+        // AC-09: same email + different customer_id → allowed (creates new user)
+        const existing = await payload.find({
             collection: 'users',
-            where: { email: { equals: email } },
+            where: customerId
+                ? { and: [{ email: { equals: email } }, { customerIdNumber: { equals: String(customerId) } }] }
+                : { email: { equals: email } },
             limit: 1,
         })
 
-        if (existingEmail.docs.length > 0) {
+        if (existing.docs.length > 0) {
             return NextResponse.json(
-                { message: 'User with this email already exists' },
+                { message: 'User already provisioned' },
                 { status: 409 },
             )
         }
@@ -136,6 +139,7 @@ export async function POST(req: NextRequest) {
         // ── 8. Create User (with password from SSO) ──
         const newUser = await payload.create({
             collection: 'users',
+            user: callerUser,  // propagate caller identity to beforeChange hooks (sets createdBy/updatedBy)
             data: {
                 email,
                 password, // SSO provides password → user can login immediately
@@ -149,10 +153,12 @@ export async function POST(req: NextRequest) {
                         role: 'owner',
                     },
                 ],
+                ...(customerId && { customerIdNumber: String(customerId) }),
+                migrationStatus: 'migrated',
             },
         })
 
-        // ── 9. Create PlanSubscription ──
+        // ── 9. Create PlanSubscription (non-blocking — failure does not abort provision) ──
         const startsAt = startDate
             ? new Date(`${dateOnly(startDate)}T00:00:00Z`).toISOString()
             : new Date().toISOString()
@@ -160,24 +166,31 @@ export async function POST(req: NextRequest) {
             ? new Date(`${dateOnly(endDate)}T23:59:59Z`).toISOString()
             : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
 
-        await payload.create({
-            collection: 'plan-subscriptions',
-            data: {
-                tenant: newTenant.id,
-                name: 'main',
-                plan: planCode,
-                status: 'active',
-                startsAt,
-                endsAt,
-                packCode: packCode.toUpperCase(),
-            },
-        })
+        let planSubscription: { id: number; plan: string } | null = null
+        try {
+            const sub = await payload.create({
+                collection: 'plan-subscriptions',
+                data: {
+                    tenant: newTenant.id,
+                    name: 'main',
+                    plan: planCode,
+                    status: 'active',
+                    startsAt,
+                    endsAt,
+                    packCode: packCode.toUpperCase(),
+                },
+            })
+            planSubscription = { id: sub.id as number, plan: sub.plan as string }
+        } catch (err) {
+            console.error('[SSO Provisioning] PlanSubscription creation failed (non-blocking):', err)
+        }
 
         return NextResponse.json(
             {
                 message: 'Provisioning successful',
                 user: { id: newUser.id, email: newUser.email },
                 tenant: { id: newTenant.id, slug: newTenant.slug },
+                planSubscription,
             },
             { status: 201 },
         )

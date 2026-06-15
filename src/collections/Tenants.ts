@@ -214,6 +214,17 @@ export const Tenants: CollectionConfig = {
             ],
         },
         {
+            name: 'migrationStatus',
+            type: 'select',
+            defaultValue: 'migrated',
+            options: [
+                { label: 'Migrated', value: 'migrated' },
+                { label: 'Pending', value: 'pending' },
+                { label: 'Failed', value: 'failed' },
+            ],
+            admin: { description: 'Migration status from legacy SSO system' },
+        },
+        {
             name: 'settings',
             type: 'group',
             fields: [
