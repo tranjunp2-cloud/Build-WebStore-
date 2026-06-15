@@ -180,6 +180,11 @@ function getMigrationColumns() {
         break
       }
     }
+    // Standalone relationship/upload columns (no group prefix) also end in _id.
+    // Register the bare name so toSnakeCase(fieldName) matches, e.g. created_by_id → created_by.
+    if (col.endsWith('_id')) {
+      columns.add(`${table}.${col.slice(0, -3)}`)
+    }
   }
 
   return columns
