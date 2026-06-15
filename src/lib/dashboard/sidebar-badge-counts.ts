@@ -9,7 +9,9 @@ import type { SidebarBadgeKey } from '@/components/dashboard/Sidebar'
  * The Sidebar hides a pill when the count is 0/undefined, so 0 is a safe default.
  *
  * Five badges: orders, products, customers, discounts, leads (Contact Leads).
- * Each is a TOTAL record count for the tenant (all statuses included).
+ * Some are scoped to an actionable subset rather than a raw total:
+ *   - orders   → status='pending' (awaiting the merchant's attention)
+ *   - products → status='active' + not soft-deleted (live products, matching storefront read)
  */
 
 const totalOf = (promise: Promise<{ totalDocs: number }>) =>
@@ -43,8 +45,8 @@ export async function getSidebarBadgeCounts(
     const tenant = { equals: tenantId }
 
     const [orders, products, customers, discounts, leads] = await Promise.all([
-        totalOf(payload.count({ collection: 'orders', where: { tenant } })),
-        totalOf(payload.count({ collection: 'products', where: { tenant } })),
+        totalOf(payload.count({ collection: 'orders', where: { tenant, status: { equals: 'pending' } } })),
+        totalOf(payload.count({ collection: 'products', where: { tenant, status: { equals: 'active' }, deletedAt: { exists: false } } })),
         totalOf(payload.count({ collection: 'customers', where: { tenant } })),
         totalOf(payload.count({ collection: 'discounts', where: { tenant } })),
         countLeads(payload, tenantId),

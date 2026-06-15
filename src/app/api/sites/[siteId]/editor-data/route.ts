@@ -5,6 +5,8 @@ import config from '@payload-config'
 import { sql } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { getCachedSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts-cached'
+import type { SidebarBadgeKey } from '@/config/sidebar-nav'
 
 function normalizeEditorLayout(layout: unknown) {
     if (!Array.isArray(layout)) return []
@@ -57,6 +59,25 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         if (!siteTenantId || !tenantIds.includes(siteTenantId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
+
+        // Matched tenant-membership row (already auth-checked above) — source of role + permissions for
+        // the editor menu drawer's RBAC gate. Same shape the dashboard layout reads (currentTenantInfo).
+        const matchedMembership = rawTenants.find(
+            (t: { tenant: TenantRef }) => resolveTenantId(t.tenant) === siteTenantId,
+        ) as { role?: string; permissions?: string[] } | undefined
+
+        // Sidebar badge counts (orders/products/...) — scoped to the site's tenant, cached 60s per-tenant
+        // (same cost the dashboard pays). Non-fatal: a failure shows no badges, never blanks the editor.
+        let badgeCounts: Partial<Record<SidebarBadgeKey, number>> = {}
+        try {
+            badgeCounts = await getCachedSidebarBadgeCounts(siteTenantId)
+        } catch (err) {
+            console.warn('[editor-data] sidebar badge counts failed:', err)
+        }
+
+        const isSuperAdmin = Boolean((user as { roles?: string[] }).roles?.includes('super-admin'))
+        // Env gate for any future dev-only nav item — mirror the dashboard layout (server-side; not NEXT_PUBLIC).
+        const isProduction = (process.env.VERCEL_ENV ?? process.env.NODE_ENV) === 'production'
 
         let page: NonNullable<Awaited<ReturnType<typeof payload.findByID>>> | null = null
 
@@ -180,8 +201,14 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 email: user.email || null,
                 // avatar is a Payload Media object (depth≥1) or a numeric ID (depth=0) or null
                 avatar: (user as Record<string, unknown>).avatar ?? null,
-                // Role from matched tenant — guaranteed to exist since tenant check at line 56 already returns 403 if no match
-                role: (rawTenants.find((t: { tenant: TenantRef; role?: string }) => resolveTenantId(t.tenant) === siteTenantId) as { role?: string })?.role || 'viewer',
+                // Role from matched tenant — guaranteed to exist since tenant check above returns 403 if no match
+                role: matchedMembership?.role || 'viewer',
+                // RBAC inputs for the editor menu drawer (parity with dashboard sidebar). Restrictive
+                // defaults: empty permissions + non-super-admin never widen visibility.
+                permissions: matchedMembership?.permissions ?? [],
+                isSuperAdmin,
+                isProduction,
+                badgeCounts,
             },
         })
 

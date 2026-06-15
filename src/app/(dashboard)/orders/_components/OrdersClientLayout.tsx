@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { OrdersMetrics } from './OrdersMetrics'
@@ -17,6 +17,14 @@ export function OrdersClientLayout() {
     const { t, ti } = useI18n()
     const o = t.dashboard.orders
     const searchParams = useSearchParams()
+    const router = useRouter()
+
+    // Refresh the orders table/metrics (client) AND re-render server components so the
+    // sidebar pending-orders badge updates without a manual reload (server hook busts its cache).
+    function refreshAfterMutation() {
+        setRefreshCounter(prev => prev + 1)
+        router.refresh()
+    }
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(
         searchParams.get('order')
     )
@@ -80,7 +88,7 @@ export function OrdersClientLayout() {
             }))
             toast.success(ti(t.dashboard.orders.toast.bulkSuccess, { count: pendingCount }))
             setSelectedRows(new Set())
-            setRefreshCounter(prev => prev + 1)
+            refreshAfterMutation()
         } catch (error) {
             toast.error(t.dashboard.orders.toast.loadFailed)
         } finally {
@@ -149,7 +157,7 @@ export function OrdersClientLayout() {
                 <OrderDetailPanel
                     orderId={selectedOrderId}
                     onClose={() => setSelectedOrderId(null)}
-                    onUpdate={() => setRefreshCounter(prev => prev + 1)}
+                    onUpdate={refreshAfterMutation}
                 />
             </div>
         </div>
