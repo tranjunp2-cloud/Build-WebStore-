@@ -20,7 +20,7 @@ export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: Disc
 
     return (
         <div
-            className="fixed bottom-0 left-0 right-0 md:left-[260px] flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
+            className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
             style={{
                 background: 'var(--dash-surface)',
                 borderColor: 'var(--dash-border)',

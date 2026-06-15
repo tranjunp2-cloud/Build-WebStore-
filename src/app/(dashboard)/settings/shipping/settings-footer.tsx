@@ -74,7 +74,7 @@ export function SettingsFooter({ isDirty, isSaving, lastSaveSucceeded, onReset, 
 
             {/* Fixed copy — visible only when natural footer is scrolled off-screen */}
             {showFixed && (
-                <div className={`fixed bottom-4 sm:bottom-6 md:bottom-8 left-4 right-4 sm:left-6 sm:right-6 md:left-[260px] md:right-8 z-50 ${CARD_CLS}`}>
+                <div className={`fixed bottom-4 sm:bottom-6 md:bottom-8 left-4 right-4 sm:left-6 sm:right-6 md:left-[250px] md:right-8 z-50 ${CARD_CLS}`}>
                     {buttons}
                 </div>
             )}

@@ -167,13 +167,19 @@ export function EditorMenuDrawer({
         <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-            <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
+            <aside className="absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
                 <div className="flex h-[65px] items-center justify-between border-b border-dash-border px-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-[12px] font-bold text-white">
-                            P
+                    {/* Logo — matches the dashboard header (TopHeader): real logo image + Prime/Web split */}
+                    <div className="flex items-center gap-2">
+                        <img
+                            src="/images/logo-icon-3c4d76.png"
+                            alt="PrimeWeb Logo"
+                            className="w-[28px] h-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                        />
+                        <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
+                            <span className="text-dash-text">Prime</span>
+                            <span className="text-[#06B6D4]">Web</span>
                         </div>
-                        <span className="text-lg font-semibold text-dash-text">PrimeWeb</span>
                     </div>
                     <button
                         type="button"
@@ -204,7 +210,7 @@ export function EditorMenuDrawer({
                         <Link
                             href="/settings/profile"
                             onClick={guardedNavigate('/settings/profile')}
-                            className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-dash-border pl-[17px] pr-px py-px transition-colors hover:bg-dash-surface-hover"
+                            className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-dash-border pl-4 pr-px py-px transition-colors hover:bg-dash-surface-hover"
                         >
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_rgba(6,182,212,0.3)]">
                                 {userAvatarUrl
@@ -250,7 +256,7 @@ export function EditorMenuDrawer({
                             if (hasUnsavedChanges) { setPendingAction('logout'); return }
                             void handleLogout()
                         }}
-                        className="flex h-[44px] items-center gap-3 rounded-[16px] border border-dash-border pl-4 text-[14px] font-medium text-dash-text transition-colors hover:bg-dash-surface-hover"
+                        className="flex h-[42px] items-center gap-3 rounded-[16px] border border-dash-border pl-4 text-[14px] font-medium text-dash-text transition-colors hover:bg-dash-surface-hover"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
                         <span>{menu.logout}</span>
