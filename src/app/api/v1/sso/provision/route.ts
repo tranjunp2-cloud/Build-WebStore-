@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
         // ── 8. Create User (with password from SSO) ──
         const newUser = await payload.create({
             collection: 'users',
-            user: callerUser,  // propagate caller identity to beforeChange hooks (sets createdBy/updatedBy)
+            overrideAccess: true,
             data: {
                 email,
                 password, // SSO provides password → user can login immediately
@@ -155,6 +155,9 @@ export async function POST(req: NextRequest) {
                 ],
                 ...(customerId && { customerIdNumber: String(customerId) }),
                 migrationStatus: 'migrated',
+                // Audit trail: payload.create() local API has no req.user; set explicitly
+                createdBy: callerUser.id,
+                updatedBy: callerUser.id,
             },
         })
 
