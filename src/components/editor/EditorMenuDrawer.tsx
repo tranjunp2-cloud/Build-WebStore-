@@ -153,7 +153,12 @@ export function EditorMenuDrawer({
                 <Icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="flex-1">{label}</span>
                 {hasCount && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-dash-surface-hover px-1.5 text-[11px] font-semibold leading-none text-dash-text-muted">
+                    <span className={cn(
+                        'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none',
+                        isActive
+                            ? 'bg-[rgba(6,182,212,0.15)] text-[#06B6D4]'
+                            : 'bg-dash-surface-hover text-dash-text-muted'
+                    )}>
                         {formatBadgeCount(count)}
                     </span>
                 )}
