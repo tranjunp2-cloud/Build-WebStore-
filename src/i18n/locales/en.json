@@ -3247,6 +3247,7 @@
             "pageHidden": "Page hidden",
             "visibilityFailed": "Failed to update visibility",
             "deleteFailed": "Failed to delete page",
+            "cannotDeleteLastPage": "Can't delete the last page — a site needs at least one page.",
             "deleteSuccess": "Page deleted. Undo?",
             "undo": "Undo",
             "restored": "Page restored",
