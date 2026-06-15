@@ -18,13 +18,21 @@ interface LanguageToggleProps {
  */
 export function LanguageToggle({ locale, toggleLocale, className }: LanguageToggleProps) {
     return (
-        <div className={cn('flex items-center gap-2', className)}>
-            <Globe className="h-4 w-4 shrink-0 text-dash-text" />
-            <div className="flex flex-1 items-center rounded-[16px] border border-dash-border bg-dash-surface px-1 h-[38px]">
+        // Single full-width box (edge-aligned with the profile/logout rows): leading Globe icon
+        // at the same left inset as the other rows' icons, then the MY/EN segmented control fills.
+        <div
+            className={cn(
+                'flex h-[42px] items-center gap-3 rounded-[16px] border border-dash-border bg-dash-surface pl-4 pr-1',
+                className,
+            )}
+        >
+            <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
+            <div className="flex flex-1 items-center gap-1">
                 <button
+                    type="button"
                     onClick={() => locale !== 'ms' && toggleLocale()}
                     className={cn(
-                        'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
+                        'flex-1 flex items-center justify-center rounded-[12px] h-[30px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                         locale === 'ms'
                             ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                             : 'text-dash-text-muted hover:text-dash-text',
@@ -33,9 +41,10 @@ export function LanguageToggle({ locale, toggleLocale, className }: LanguageTogg
                     MY
                 </button>
                 <button
+                    type="button"
                     onClick={() => locale !== 'en' && toggleLocale()}
                     className={cn(
-                        'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
+                        'flex-1 flex items-center justify-center rounded-[12px] h-[30px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                         locale === 'en'
                             ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                             : 'text-dash-text-muted hover:text-dash-text',

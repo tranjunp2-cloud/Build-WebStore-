@@ -246,7 +246,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         onClick={() => setMobileOpen(false)}
                     />
                     <aside
-                        className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[260px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
+                        className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
                         {renderSidebarContent(false)}
@@ -254,13 +254,13 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 </div>
             )}
 
-            {/* Desktop sidebar — 260px full / 64px mini (phase-02); width transition gated post-hydration */}
+            {/* Desktop sidebar — 250px full / 64px mini (phase-02); width transition gated post-hydration */}
             <aside
                 id="dashboard-sidebar"
                 className={cn(
                     'fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
                     animateCollapse && 'transition-[width] duration-200',
-                    collapsed ? 'w-[64px]' : 'w-[260px]'
+                    collapsed ? 'w-[64px]' : 'w-[250px]'
                 )}
                 style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
             >

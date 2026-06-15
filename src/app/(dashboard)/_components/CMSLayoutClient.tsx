@@ -91,7 +91,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                         className={cn(
                             'flex-1 min-w-0',
                             hydrated && 'transition-[padding] duration-200',
-                            collapsed ? 'md:pl-[64px]' : 'md:pl-[260px]'
+                            collapsed ? 'md:pl-[64px]' : 'md:pl-[250px]'
                         )}
                     >
                         <div className="p-4 sm:p-6 md:p-8">
