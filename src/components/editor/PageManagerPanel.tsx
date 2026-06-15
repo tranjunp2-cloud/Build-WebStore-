@@ -138,7 +138,8 @@ export function PageManagerPanel({
             const el = listScrollRef.current?.querySelector<HTMLElement>(
                 `[data-page-id="${currentPageId}"]`,
             )
-            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            // Optional-call the method too: jsdom (test env) doesn't implement scrollIntoView.
+            el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
         })
         return () => cancelAnimationFrame(raf)
     }, [currentPageId])
