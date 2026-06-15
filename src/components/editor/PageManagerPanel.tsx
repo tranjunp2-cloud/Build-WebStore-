@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -127,6 +127,22 @@ export function PageManagerPanel({
     const [newPageTitle, setNewPageTitle] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [pendingPageId, setPendingPageId] = useState<string | null>(null)
+
+    // Auto-scroll the page being edited into view (#1221 bug 2). rAF waits for the list to paint
+    // (tab switch / mount / data load) before measuring; scrollIntoView cuộn scroll-container nội
+    // bộ (overflow-y-auto), không phải window. `block: 'nearest'` chỉ cuộn khi item bị khuất.
+    const listScrollRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (!currentPageId) return
+        const raf = requestAnimationFrame(() => {
+            const el = listScrollRef.current?.querySelector<HTMLElement>(
+                `[data-page-id="${currentPageId}"]`,
+            )
+            // Optional-call the method too: jsdom (test env) doesn't implement scrollIntoView.
+            el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [currentPageId])
     const [deleteTarget, setDeleteTarget] = useState<PageData | null>(null)
     const [is404SectionOpen, setIs404SectionOpen] = useState(false)
 
@@ -286,7 +302,7 @@ export function PageManagerPanel({
     return (
         <TooltipProvider delayDuration={150}>
         <div data-coach="page-library" className="relative flex h-full flex-col">
-            <div className="border-b border-white/10 px-4 py-4">
+            <div className="border-b border-white/10 px-4 pt-4 pb-2">
                 <div>
                     <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
                     <p className="mt-1 text-xs text-gray-500">
@@ -295,7 +311,7 @@ export function PageManagerPanel({
                 </div>
             </div>
 
-            <div className="space-y-3 border-b border-white/10 p-4">
+            <div className="border-b border-white/10 px-4 py-2">
                 {!isAdding ? (
                     <button
                         type="button"
@@ -339,7 +355,7 @@ export function PageManagerPanel({
 
             </div>
 
-            <div className="min-h-0 flex-1 p-4">
+            <div className="min-h-0 flex-1 px-4 pt-2 pb-4">
                 {isEmptyState ? (
                     <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 text-center">
                         <FileText className="h-8 w-8 text-gray-600" />
@@ -350,7 +366,7 @@ export function PageManagerPanel({
                     </div>
                 ) : (
                     <div className="flex h-full min-h-0 flex-col">
-                        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                        <div ref={listScrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
                         <div className="space-y-3">
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
@@ -373,6 +389,7 @@ export function PageManagerPanel({
                             return (
                                 <div
                                     key={page.id}
+                                    data-page-id={page.id}
                                     className={cn(
                                         'relative rounded-xl border px-[13px] pb-3 pt-[13px] transition-all',
                                         isCurrent
@@ -501,7 +518,7 @@ export function PageManagerPanel({
                         </div>
 
                         {page404 ? (
-                            <div className="shrink-0 pt-6">
+                            <div className="shrink-0 pt-3">
                                 <div className="rounded-[12px] border border-[rgba(59,130,246,0.04)] bg-[#111A2D] p-2">
                                     <button
                                         type="button"
