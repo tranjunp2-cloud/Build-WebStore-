@@ -34,6 +34,7 @@ type InitialSiteData = {
     shippingConfig: ShippingConfig | null
     stripeConnected: boolean
     stripeEnabled: boolean
+    xenditConnected: boolean
     hasPaymentMethods: boolean
 }
 
@@ -78,6 +79,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // showStripe = fully ready to accept payment (selectable)
     const [stripeConnected, setStripeConnected] = useState(initialSiteData?.stripeConnected ?? false)
     const [showStripe, setShowStripe] = useState(initialSiteData?.stripeEnabled ?? false)
+    const [xenditConnected, setXenditConnected] = useState(initialSiteData?.xenditConnected ?? false)
     const [hasPaymentMethods, setHasPaymentMethods] = useState(initialSiteData?.hasPaymentMethods ?? true)
     const [stripeTooltipOpen, setStripeTooltipOpen] = useState(false)
     const stripeTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,11 +93,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [selectedDistrictId, setSelectedDistrictId] = useState('')
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer' | 'stripe'>(() => {
+    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer' | 'stripe' | 'xendit'>(() => {
         // Auto-select first available method from SSR data to avoid invalid default
         if (initialSiteData?.enableCod === false) {
             if (initialSiteData?.enableQrBanking) return 'bank_transfer'
             if (initialSiteData?.stripeEnabled) return 'stripe'
+            if (initialSiteData?.xenditConnected) return 'xendit'
         }
         return 'cod'
     })
@@ -127,16 +130,19 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // success path, so a later fresh checkout visit won't false-trigger.
     useEffect(() => {
         const redirectIfPending = () => {
-            const raw = sessionStorage.getItem('pw_stripe_pending')
-            if (!raw) return false
-            sessionStorage.removeItem('pw_stripe_pending')
-            try {
-                const { orderId, slug: s } = JSON.parse(raw)
-                if (orderId && s) {
-                    window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
-                    return true
-                }
-            } catch { /* malformed flag — ignore */ }
+            // Check Stripe pending first, then Xendit — same confirm-page destination.
+            for (const key of ['pw_stripe_pending', 'pw_xendit_pending']) {
+                const raw = sessionStorage.getItem(key)
+                if (!raw) continue
+                sessionStorage.removeItem(key)
+                try {
+                    const { orderId, slug: s } = JSON.parse(raw)
+                    if (orderId && s) {
+                        window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+                        return true
+                    }
+                } catch { /* malformed flag — ignore */ }
+            }
             return false
         }
         // Fire on mount (fresh load / no-store) and on pageshow (bfcache restore).
@@ -199,6 +205,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 }
                 if (data.stripeConnected === true) setStripeConnected(true)
                 if (data.stripeEnabled === true) setShowStripe(true)
+                if (data.xenditConnected === true) setXenditConnected(true)
                 if (data.hasPaymentMethods != null) setHasPaymentMethods(data.hasPaymentMethods)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
@@ -332,7 +339,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.line1.trim() && form.city && form.postcode && items.length > 0 &&
-        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe')
+        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit')
     )
 
     const dismissOverlay = () => {
@@ -388,6 +395,32 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     } else {
                         router.push(confirmUrl)
                     }
+                } else {
+                    toast.error(data.error?.message || 'Failed to initialize payment')
+                }
+                return
+            }
+
+            if (paymentMethod === 'xendit') {
+                const xenditPayload = {
+                    siteId,
+                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity, variant: i.variantName })),
+                    customer: {
+                        name: form.name, email: form.email, phone: form.phone,
+                        address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
+                    },
+                }
+                const res = await fetch('/api/orders/xendit-checkout', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(xenditPayload),
+                })
+                const data = await res.json()
+                dismissOverlay()
+                if (res.ok && data.success && data.data?.sessionUrl) {
+                    navigatedToConfirm = true
+                    clearCart()
+                    // Set flag so browser-Back from Xendit hosted page redirects to confirm (not checkout)
+                    sessionStorage.setItem('pw_xendit_pending', JSON.stringify({ orderId: data.data.orderId, slug }))
+                    window.location.href = data.data.sessionUrl
                 } else {
                     toast.error(data.error?.message || 'Failed to initialize payment')
                 }
@@ -718,6 +751,21 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                         </button>
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {xenditConnected && (
+                                    <div className={`pm${paymentMethod === 'xendit' ? ' active' : ''}`} onClick={() => setPaymentMethod('xendit')}>
+                                        <div className="pm-row">
+                                            <div className={`pm-rad${paymentMethod === 'xendit' ? ' on' : ''}`} />
+                                            <div className="pm-body">
+                                                <h3 className="pm-title">Pay with Xendit</h3>
+                                                <p className="pm-desc">TNG eWallet, GrabPay, ShopeePay, DuitNow QR, FPX and more — select at checkout</p>
+                                                <div className="pm-pills">
+                                                    <span className="pm-pill teal"><ShieldCheck size={11} /> Secure</span>
+                                                    <span className="pm-pill">Instant Payment</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

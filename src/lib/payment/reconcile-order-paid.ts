@@ -52,6 +52,31 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         RETURNING id
     `)
     if (!transition.rows?.length) {
+        // For webhook source: even when already reconciled, update xenditChannelCode if more specific
+        // and send email (poll skips email, so webhook is the correct email sender for Xendit).
+        if (source === 'webhook' && xenditData?.channelCode) {
+            try {
+                await payload.update({
+                    collection: 'orders',
+                    id: orderId,
+                    data: {
+                        xenditChannelCode: xenditData.channelCode,
+                        paymentMethod: mapChannelToPaymentMethod(xenditData.channelCode),
+                    } as Record<string, unknown>,
+                })
+                const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 })
+                    .catch(() => null) as unknown as PaidOrderDoc | null
+                if (order) {
+                    // Inject channelCode directly so email reflects it even if DB read is stale
+                    ;(order as any).xenditChannelCode = xenditData.channelCode
+                    await sendOrderPaidEmailsAndNotify(payload, order).catch(err =>
+                        console.error(`[Reconcile:webhook] Order ${orderId} email after channel update failed:`, err)
+                    )
+                }
+            } catch (err) {
+                console.error(`[Reconcile:webhook] Order ${orderId} channel update failed (non-critical):`, err)
+            }
+        }
         console.log(`[Reconcile:${source}] Order ${orderId} already transitioned — skipping`)
         return { status: 'already_processed' }
     }
@@ -64,13 +89,19 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
     }
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
 
-    // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
+    // Buyer/seller emails: skip for poll source — webhook will send with specific channel info.
     // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are
     // non-critical and must never abort the reconcile after stock is already decremented.
-    try {
-        await sendOrderPaidEmailsAndNotify(payload, order)
-    } catch (err) {
-        console.error(`[Reconcile:${source}] Order ${orderId} emails/notify failed (non-critical):`, err)
+    if (source !== 'poll') {
+        // For Xendit webhook: inject channelCode directly so email shows specific wallet before DB is updated
+        if (xenditData?.channelCode) {
+            ;(order as any).xenditChannelCode = xenditData.channelCode
+        }
+        try {
+            await sendOrderPaidEmailsAndNotify(payload, order)
+        } catch (err) {
+            console.error(`[Reconcile:${source}] Order ${orderId} emails/notify failed (non-critical):`, err)
+        }
     }
 
     // Display-only metadata LAST: the Stripe round-trip is the slow/failure-prone step, so it runs

@@ -14,6 +14,7 @@ import { TY_CSS } from './confirm-styles'
 import { useI18n } from '@/i18n'
 import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 import { useCartStore } from '@/store/cartStore'
+import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -34,6 +35,8 @@ export type ConfirmOrder = {
     stripePaymentIntentId?: string
     cardBrand?: string | null
     cardLast4?: string | null
+    xenditPaymentRequestId?: string
+    xenditChannelCode?: string | null
     customerName: string
     customerEmail: string
     shippingAddress?: ShippingAddress
@@ -91,6 +94,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const { clearCart } = useCartStore()
     const clearedRef = useRef(false)
     const [livePay, setLivePay] = useState(order.paymentStatus)
+    const [liveXenditChannelCode, setLiveXenditChannelCode] = useState<string | null>(order.xenditChannelCode ?? null)
     const [retrying, setRetrying] = useState(false)
     const [retryError, setRetryError] = useState('')
     const [cancelConfirm, setCancelConfirm] = useState(false)
@@ -168,17 +172,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         try { sessionStorage.removeItem('pw_stripe_pending') } catch {}
     }, [])
 
-    // Show toast when buyer cancels Stripe checkout and is redirected back (AC-1)
-    useEffect(() => {
-        const pm = order.paymentMethod
-        const isStripeOrder = pm !== 'bank_transfer' && pm !== 'cod' && pm !== 'free'
-        if (cancelled && isStripeOrder) {
-            toast.error(t.storefront.checkout.paymentCancelled)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    useEffect(() => {
+useEffect(() => {
         const buttons = document.querySelectorAll<HTMLButtonElement>('[data-copy]')
         const cleanup: Array<() => void> = []
         buttons.forEach(btn => {
@@ -198,12 +192,12 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         return () => cleanup.forEach(fn => fn())
     }, [])
 
-    // Active-reconcile: POST payment-status on mount to heal the DB when the Stripe webhook is late.
-    // Only for Stripe orders not yet paid and not cancelled. The existing SSE handles the UI flip +
-    // clearCart once the DB is healed — DO NOT duplicate that logic here.
+    // Active-reconcile: POST payment-status on mount to heal the DB when the webhook is late.
+    // Works for both Stripe and Xendit orders. If reconcile succeeds, update UI immediately;
+    // SSE handles clearCart once the DB update propagates.
     useEffect(() => {
-        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
-        if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
+        const isOnlinePayment = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer' && order.paymentMethod !== 'free'
+        if (!isOnlinePayment || order.paymentStatus === 'paid' || cancelled) return
 
         let active = true
         let retryCount = 0
@@ -219,7 +213,13 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                 })
                 if (!res.ok || !active) return
                 const data = await res.json()
-                // Stop retrying once healed or definitively non-pending
+                // If reconciled or DB now shows paid, update UI immediately without waiting for SSE
+                if (data.paymentStatus === 'paid' && active) {
+                    if (data.xenditChannelCode) setLiveXenditChannelCode(data.xenditChannelCode)
+                    setLivePay('paid')
+                    return
+                }
+                // Stop retrying once definitively non-pending
                 if (data.reconciled || data.status !== 'pending') return
                 if (retryCount < MAX_RETRIES) {
                     retryCount++
@@ -296,7 +296,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
     const isFree = order.paymentMethod === 'free'
-    const isStripe = !isBT && !isCod && !isFree
+    const isXendit = order.paymentMethod === 'ewallet'
+    const isStripe = !isBT && !isCod && !isFree && !isXendit
     const isPaid = livePay === 'paid'
     // Confirm-page "Method" line: card brand + last4 when captured, else the method name.
     const stripeMethodLabel = order.cardBrand && order.cardLast4
@@ -306,8 +307,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const payFailed = livePay === 'failed' || livePay === 'payment_failed'
     // Stripe payment not completed (buyer cancelled or webhook reported failure) — show retry, not success
     const isStripePending = isStripe && !isPaid && (cancelled || payFailed)
-    // Order still awaiting payment (Stripe failed/cancelled, or BT not yet submitted) → buyer may cancel it
-    const isAwaitingPayment = isStripePending || (isBT && !isPaid && uploadStatus !== 'success')
+    // Xendit payment not completed (buyer cancelled or invoice expired) — show retry, not success
+    const isXenditPending = isXendit && !isPaid && (cancelled || payFailed)
+    // Order still awaiting payment (Stripe/Xendit failed/cancelled, or BT not yet submitted) → buyer may cancel it
+    const isAwaitingPayment = isStripePending || isXenditPending || (isBT && !isPaid && uploadStatus !== 'success')
     // Order is "done" from the confirm page POV: payment confirmed or COD placed.
     // Stripe without isPaid means webhook hasn't fired yet — don't clear token prematurely.
     const isOrderSuccess = isPaid || isCod
@@ -323,22 +326,22 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         : `${fmtEstDay(addBusinessDays(today, 3))} – ${fmtEstDay(addBusinessDays(today, 5))}`
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
-    const heroCheckClass = isPaid ? '' : isStripePending ? 'danger' : isSubmitted ? 'info' : isBT ? 'warning' : ''
-    const heroClass = isPaid ? '' : isStripePending ? ' failed' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
+    const heroCheckClass = isPaid ? '' : isStripePending || isXenditPending ? 'danger' : isSubmitted ? 'info' : isBT ? 'warning' : ''
+    const heroClass = isPaid ? '' : isStripePending || isXenditPending ? ' failed' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
     const heroTitle = isPaid
-        // Stripe paid = "Order Successfully Placed!" (design); BT paid = seller-verified copy.
-        ? (isStripe ? 'Order Successfully Placed!' : 'Order Confirmed — Payment Verified!')
-        : isStripePending
+        // Stripe/Xendit paid = "Order Successfully Placed!"; BT paid = seller-verified copy.
+        ? (isStripe || isXendit ? 'Order Successfully Placed!' : 'Order Confirmed — Payment Verified!')
+        : isStripePending || isXenditPending
             ? 'Payment Failed — Action Required'
             : isSubmitted
                 ? 'The order has been placed — Awaiting seller confirmation.'
                 : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
     const heroSub = isPaid
-        ? (isStripe
+        ? (isStripe || isXendit
             ? 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
             : 'Your payment has been verified by the seller. Your order is now being prepared for shipment.')
-        : isStripePending
-            ? 'We couldn’t process your payment. Your order is being held for you — please retry payment within 24 hours to avoid cancellation.'
+        : isStripePending || isXenditPending
+            ? "We couldn't process your payment. Your order is being held for you — please retry payment within 24 hours to avoid cancellation."
             : isSubmitted
                 ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
                 : isBT
@@ -346,12 +349,12 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     : isCod
                         ? 'Your order is reserved. Our team will verify your address by phone, then dispatch it for cash-on-delivery.'
                         : 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
-    const badgeLabel = isPaid ? 'Payment Verified' : isStripePending ? 'Payment Failed' : isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
-    const badgeTone = isPaid ? 'teal' : isStripePending ? 'red' : isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
-    const badgeIcon = isPaid ? <Check size={11} /> : isStripePending ? <XCircle size={11} /> : isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
+    const badgeLabel = isPaid ? 'Payment Verified' : isStripePending || isXenditPending ? 'Payment Failed' : isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
+    const badgeTone = isPaid ? 'teal' : isStripePending || isXenditPending ? 'red' : isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
+    const badgeIcon = isPaid ? <Check size={11} /> : isStripePending || isXenditPending ? <XCircle size={11} /> : isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
     const heroIcon = isPaid
         ? <Check size={36} strokeWidth={3} />
-        : isStripePending
+        : isStripePending || isXenditPending
             ? <X size={36} strokeWidth={3} />
             : isSubmitted
                 ? <Hourglass size={36} strokeWidth={2} />
@@ -359,7 +362,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
     const sumStatus = isPaid
         ? { tone: 'teal', s1: 'Payment verified · Order confirmed', s2: 'Warehouse is preparing your parcel.' }
-        : isStripePending
+        : isStripePending || isXenditPending
             ? { tone: 'red', s1: 'Payment failed · Action required', s2: 'Retry payment to secure your order.' }
             : isSubmitted
                 ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
@@ -554,7 +557,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                             Upload within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
                                         </div>
                                         <div className="ty-deadline-line2">
-                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
                                         </div>
                                     </div>
                                 </div>
@@ -672,11 +675,24 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         </div>
                     )}
 
-                    {/* ── Stripe: Verifying payment (came from success redirect, webhook not yet received) ── */}
-                    {isStripe && !isPaid && !cancelled && !payFailed && (
-                        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                            <p style={{ fontSize: '18px', fontWeight: 600, marginBottom: 8 }}>{cp.verifyingPayment}</p>
-                            <p style={{ fontSize: '14px', color: 'var(--text-3)' }}>{cp.verifyingHint}</p>
+                    {/* ── Verifying payment — Stripe/Xendit: webhook not yet received after redirect ── */}
+                    {(isStripe || isXendit) && !isPaid && !cancelled && !payFailed && (
+                        <div style={{ background: 'var(--card)', borderRadius: 16, boxShadow: 'var(--sh)', padding: '52px 24px 44px', textAlign: 'center' }}>
+                            <div className="ty-check-wrap" style={{ margin: '0 auto 28px' }}>
+                                <div className="ty-ring" />
+                                <div className="ty-ring r2" />
+                                <div className="ty-check info">
+                                    <span className="ty-spin" style={{ display: 'flex' }}>
+                                        <RefreshCw size={32} />
+                                    </span>
+                                </div>
+                            </div>
+                            <p style={{ fontFamily: 'var(--hf)', fontSize: '20px', fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 10px', color: 'var(--f1)' }}>
+                                {cp.verifyingPayment}
+                            </p>
+                            <p style={{ fontSize: '13.5px', color: 'var(--f3)', margin: 0, lineHeight: 1.6 }}>
+                                {cp.verifyingHint}
+                            </p>
                         </div>
                     )}
 
@@ -686,7 +702,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
                                     <h3>Payment &amp; Order Status</h3>
-                                    <p>Your payment didn’t go through — retry to secure your order before it’s released.</p>
+                                    <p>Your payment didn't go through — retry to secure your order before it's released.</p>
                                 </div>
                                 <span className="ty-step-pill failed">
                                     <XCircle size={11} /> Failed
@@ -699,7 +715,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 </div>
                                 <div className="ty-failed-body">
                                     <p className="ty-failed-title">
-                                        We couldn’t process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'Your card was declined.' : 'You exited before completing checkout.'}
+                                        We couldn't process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'Your card was declined.' : 'You exited before completing checkout.'}
                                     </p>
                                     <p className="ty-failed-sub">No money has been charged. You can retry with the same card or switch to another payment method.</p>
                                 </div>
@@ -713,7 +729,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                             Retry within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
                                         </div>
                                         <div className="ty-deadline-line2">
-                                            We’re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
                                         </div>
                                     </div>
                                 </div>
@@ -782,6 +798,98 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     <span className="val">{stripeMethodLabel}</span>
                                 </li>
                             </ul>
+                            <div className="ty-email-note">
+                                <Mail size={14} />
+                                <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Xendit: Payment Failed / Cancelled → Retry (invoice expired or buyer exited) ── */}
+                    {isXenditPending && (
+                        <div className="ty-bank-block ty-unified ty-failed-block">
+                            <div className="ty-block-head no-num">
+                                <div className="ty-block-titles">
+                                    <h3>Payment &amp; Order Status</h3>
+                                    <p>Your payment didn't go through — retry to secure your order before it's released.</p>
+                                </div>
+                                <span className="ty-step-pill failed">
+                                    <XCircle size={11} /> Failed
+                                </span>
+                            </div>
+
+                            <div className="ty-failed-card">
+                                <div className="ty-failed-icon">
+                                    <CreditCard size={22} />
+                                </div>
+                                <div className="ty-failed-body">
+                                    <p className="ty-failed-title">
+                                        We couldn't process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'The payment session expired.' : 'You exited before completing checkout.'}
+                                    </p>
+                                    <p className="ty-failed-sub">No money has been charged. You can retry payment to create a new checkout session.</p>
+                                </div>
+                            </div>
+
+                            {order.paymentExpiresAt && (
+                                <div className="ty-deadline">
+                                    <div className="ty-deadline-icon"><AlarmClock size={20} /></div>
+                                    <div className="ty-deadline-body">
+                                        <div className="ty-deadline-line1">
+                                            Retry within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
+                                        </div>
+                                        <div className="ty-deadline-line2">
+                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {retryError && <p className="ty-upload-error">{retryError}</p>}
+
+                            <div className="ty-failed-actions">
+                                <button
+                                    className="ty-btn danger lg"
+                                    onClick={handleRetryPayment}
+                                    disabled={retrying}
+                                    aria-busy={retrying}
+                                >
+                                    {retrying
+                                        ? <><span className="ty-spin">↻</span> Redirecting…</>
+                                        : <><RefreshCw size={14} /> Retry Payment</>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Xendit: Payment Confirmed ── */}
+                    {isXendit && isPaid && (
+                        <div className="ty-bank-block ty-unified">
+                            <div className="ty-block-head no-num">
+                                <div className="ty-block-titles">
+                                    <h3>Payment &amp; Order Status</h3>
+                                    <p>Payment captured via {xenditChannelLabel(liveXenditChannelCode)} — your order is now being prepared for shipment.</p>
+                                </div>
+                                <span className="ty-step-pill done"><Check size={11} /> Confirmed</span>
+                            </div>
+                            <div className="ty-paid-card">
+                                <div className="ty-paid-icon"><Check size={22} strokeWidth={3} /></div>
+                                <div className="ty-paid-body">
+                                    <p className="ty-paid-title">Your payment of <strong>{formatPrice(order.total, currency)}</strong> has been processed successfully via {xenditChannelLabel(liveXenditChannelCode)}.</p>
+                                    <p className="ty-paid-sub">Funds settle directly to the merchant's account.</p>
+                                </div>
+                            </div>
+                            {order.xenditPaymentRequestId && (
+                                <ul className="ty-paid-meta">
+                                    <li>
+                                        <span className="lbl"><Hash size={12} /> Invoice ID</span>
+                                        <span className="val mono">{order.xenditPaymentRequestId}</span>
+                                        <button className="copy-btn" data-copy={order.xenditPaymentRequestId} aria-label="Copy invoice ID">
+                                            <CopyIcon /> Copy
+                                        </button>
+                                    </li>
+                                </ul>
+                            )}
                             <div className="ty-email-note">
                                 <Mail size={14} />
                                 <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>

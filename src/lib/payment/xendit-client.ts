@@ -22,10 +22,13 @@ function authHeader(): string {
 
 export async function xenditFetch<T>(
     path: string,
-    init: { method: 'GET' | 'POST'; body?: unknown; forUserId?: string } = { method: 'GET' },
+    init: { method: 'GET' | 'POST'; body?: unknown; forUserId?: string; apiKey?: string } = { method: 'GET' },
 ): Promise<T> {
     const headers: Record<string, string> = {
-        Authorization: authHeader(),
+        // Model C: use merchant's own key; Model B: use ECH master key
+        Authorization: init.apiKey
+            ? `Basic ${Buffer.from(`${init.apiKey}:`).toString('base64')}`
+            : authHeader(),
         'Content-Type': 'application/json',
     }
     if (init.forUserId) headers['for-user-id'] = init.forUserId

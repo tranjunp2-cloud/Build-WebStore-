@@ -36,6 +36,8 @@ export interface PaidOrderDoc {
         variant?: string | null
     }>
     shippingAddress?: Record<string, string>
+    paymentMethod?: string | null
+    xenditChannelCode?: string | null
 }
 
 /**
@@ -83,7 +85,8 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 subtotal: order.subtotal,
                 shippingFee: order.shippingFee ?? 0,
                 total: order.total,
-                paymentMethod: 'stripe',
+                paymentMethod: (order.paymentMethod as any) ?? 'stripe',
+                xenditChannelCode: order.xenditChannelCode ?? null,
                 orderDate: order.createdAt ?? new Date().toISOString(),
                 orderPageUrl,
                 currency: order.currency || 'MYR',

@@ -148,6 +148,9 @@ const MIGRATIONS = [
   { name: 'tenants.payments_xendit_shopeepay', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_shopeepay boolean DEFAULT false;` },
   { name: 'tenants.payments_xendit_boost', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_boost boolean DEFAULT false;` },
   { name: 'tenants.payments_xendit_mae', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_xendit_mae boolean DEFAULT false;` },
+  // Model C: merchant provides own Xendit keys
+  { name: 'tenants.xendit_secret_key', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS xendit_secret_key varchar;` },
+  { name: 'tenants.xendit_callback_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS xendit_callback_token varchar;` },
   // ── Tenants: Business info ──
   {
     name: 'tenants.whatsapp_number',

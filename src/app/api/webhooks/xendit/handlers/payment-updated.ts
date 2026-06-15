@@ -53,10 +53,11 @@ export async function handlePaymentEvent(payload: Payload, event: string, data: 
     const order = await findOrderByPayment(payload, referenceId, paymentRequestId)
     if (!order) {
         console.warn('[Xendit Webhook] No order for payment', { referenceId, paymentRequestId, event })
-        return // 200 — may be a race; Xendit retries will be handled
+        return
     }
 
-    if (event === 'payment.failure') {
+    // payment.failure (v2) | payment_request.expiry (v3) → mark as failed
+    if (event === 'payment.failure' || event === 'payment_request.expiry') {
         await (payload.db.drizzle as any).execute(sql`
             UPDATE orders SET payment_status = 'payment_failed', updated_at = NOW()
             WHERE id = ${order.id} AND status = 'pending'
@@ -65,14 +66,12 @@ export async function handlePaymentEvent(payload: Payload, event: string, data: 
         return
     }
 
-    // payment.capture | payment.authorization → treat as paid
-    // (authorization = pre-auth, capture = final)
-    // Amount guard: assert RM amount matches to prevent tampered/unit-bug reconciliation.
+    // payment.capture | payment.authorization (v2) | payment_request.succeeded (v3) → treat as paid
     if (webhookAmount != null && Math.abs(webhookAmount - order.total) > 0.01) {
         console.error(
             `[Xendit Webhook] Amount mismatch on order ${order.id}: webhook=${webhookAmount} order=${order.total} (RM). Not reconciling.`,
         )
-        return // 200 — do not transition; ops must investigate
+        return
     }
 
     await reconcileOrderPaid(payload, {
@@ -83,4 +82,60 @@ export async function handlePaymentEvent(payload: Payload, event: string, data: 
         },
         source: 'webhook',
     })
+}
+
+/**
+ * Handle Xendit Invoice webhook (POST /v2/invoices flow).
+ * Invoice payloads have no `event` field — detected by presence of `external_id` at root.
+ * external_id = our order.id. status = 'PAID' | 'EXPIRED' | 'PENDING'.
+ */
+export async function handleInvoiceEvent(payload: Payload, body: Record<string, any>): Promise<void> {
+    const invoiceId: string | undefined = body.id           // inv-...
+    const externalId: string | undefined = body.external_id // our order.id
+    const status: string = (body.status ?? '').toUpperCase()
+    // amount is RM major unit
+    const webhookAmount: number | undefined = body.amount != null ? Number(body.amount) : undefined
+
+    const order = await findOrderByPayment(payload, externalId, invoiceId)
+    if (!order) {
+        console.warn('[Xendit Webhook] No order for invoice', { externalId, invoiceId, status })
+        return
+    }
+
+    if (status === 'EXPIRED') {
+        await (payload.db.drizzle as any).execute(sql`
+            UPDATE orders SET payment_status = 'payment_failed', updated_at = NOW()
+            WHERE id = ${order.id} AND status = 'pending'
+        `)
+        console.log(`[Xendit Webhook] Invoice expired → order ${order.id} marked payment_failed`)
+        return
+    }
+
+    if (status === 'PAID') {
+        if (webhookAmount != null && Math.abs(webhookAmount - order.total) > 0.01) {
+            console.error(
+                `[Xendit Webhook] Invoice amount mismatch on order ${order.id}: webhook=${webhookAmount} order=${order.total} (RM). Not reconciling.`,
+            )
+            return
+        }
+        const channelCode = body.paymentChannel ?? body.payment_channel ?? body.paymentMethod ?? body.payment_method ?? ''
+        console.log(`[Xendit Webhook] Invoice PAID order=${order.id} channel=${channelCode}`, {
+            paymentChannel: body.paymentChannel,
+            payment_channel: body.payment_channel,
+            paymentMethod: body.paymentMethod,
+            payment_method: body.payment_method,
+        })
+        await reconcileOrderPaid(payload, {
+            orderId: order.id,
+            xenditData: {
+                paymentRequestId: invoiceId ?? '',
+                channelCode,
+            },
+            source: 'webhook',
+        })
+        return
+    }
+
+    // PENDING or unknown statuses — no action
+    console.log(`[Xendit Webhook] Invoice ${invoiceId} status=${status} — no action`)
 }

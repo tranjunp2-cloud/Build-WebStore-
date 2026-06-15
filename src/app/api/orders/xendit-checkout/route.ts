@@ -3,12 +3,11 @@ import { randomBytes } from 'crypto'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { xenditCheckoutSchema } from '@/lib/validations/orders'
-import { createPaymentRequest, mapChannelToPaymentMethod } from '@/lib/payment/xendit'
+import { createInvoice } from '@/lib/payment/xendit'
 import { XenditError } from '@/lib/payment/xendit-client'
 import { buildOrderItems } from '../stripe-checkout/build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
-import { buildEnabledChannels } from './build-enabled-channels'
 import { decrementOrderStock, restockAll } from './decrement-stock'
 
 interface XenditTenantDoc {
@@ -16,9 +15,7 @@ interface XenditTenantDoc {
     name?: string
     slug?: string
     status?: string
-    xenditAccountId?: string | null
-    xenditOnboardingComplete?: boolean
-    payments?: { xendit_tng?: boolean; xendit_grabpay?: boolean; xendit_duitnow?: boolean; xendit_fpx?: boolean }
+    xenditSecretKey?: string | null
 }
 
 interface XenditSiteDoc {
@@ -36,8 +33,9 @@ function setCookieToken(res: NextResponse, orderId: string | number, orderNumber
 
 /**
  * POST /api/orders/xendit-checkout
- * Creates a pending order + Xendit payment request (for-user-id = tenant sub-account).
- * Returns { type: 'redirect', sessionUrl } for eWallet/FPX/Cards or { type: 'qr', qrString } for DuitNow QR.
+ * Creates a pending order + Xendit Invoice (hosted checkout page).
+ * Buyer is redirected to invoice_url — they pick their own payment method there.
+ * Returns { type: 'redirect', sessionUrl: invoice_url }.
  */
 export async function POST(request: NextRequest) {
     const rawBody = await request.json().catch(() => null)
@@ -51,7 +49,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: { code: 'INVALID_BODY', message: 'Invalid request body' } }, { status: 400 })
     }
 
-    const { siteId, channelCode, items, customer } = parse.data
+    const { siteId, items, customer } = parse.data
 
     try {
         const payload = await getPayload({ config })
@@ -70,16 +68,8 @@ export async function POST(request: NextRequest) {
         if (tenantTyped.status === 'suspended') {
             return NextResponse.json({ success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } }, { status: 403 })
         }
-        if (!tenantTyped.xenditAccountId || !tenantTyped.xenditOnboardingComplete) {
+        if (!tenantTyped.xenditSecretKey) {
             return NextResponse.json({ success: false, error: { code: 'XENDIT_NOT_READY', message: 'Payment temporarily unavailable' } }, { status: 422 })
-        }
-
-        const enabled = buildEnabledChannels(tenantTyped.payments)
-        if (enabled.size === 0) {
-            return NextResponse.json({ success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled any Xendit payment method' } }, { status: 422 })
-        }
-        if (!enabled.has(channelCode)) {
-            return NextResponse.json({ success: false, error: { code: 'CHANNEL_DISABLED', message: `${channelCode} is not enabled by this store` } }, { status: 422 })
         }
 
         const built = await buildOrderItems(payload, items, tenantId)
@@ -96,7 +86,6 @@ export async function POST(request: NextRequest) {
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         const magicLinkSecret = randomBytes(32).toString('hex')
 
-        // Free order (coupon 100% off or zero-priced) — skip Xendit
         if (total <= 0) {
             const freeOrder = await payload.create({
                 collection: 'orders',
@@ -116,8 +105,8 @@ export async function POST(request: NextRequest) {
                 tenant: tenantId, site: siteIdNum, orderNumber, items: orderItems,
                 subtotal, shippingFee, tax, total, currency,
                 status: 'pending', paymentStatus: 'awaiting_payment',
-                paymentProvider: 'xendit', xenditChannelCode: channelCode,
-                paymentMethod: mapChannelToPaymentMethod(channelCode),
+                paymentProvider: 'xendit',
+                paymentMethod: 'ewallet',
                 paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
                 magicLinkSecret,
                 customerEmail: customer.email, customerName: customer.name, customerPhone: customer.phone || '',
@@ -139,20 +128,20 @@ export async function POST(request: NextRequest) {
 
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
+        const shopName = tenantTyped.name ?? siteSlug
 
-        let pr: Awaited<ReturnType<typeof createPaymentRequest>>
+        let invoice: Awaited<ReturnType<typeof createInvoice>>
         try {
-            pr = await createPaymentRequest({
-                forUserId: tenantTyped.xenditAccountId!,
-                referenceId: String(order.id),
-                // Xendit MYR = major unit (RM). order.total already RM. NO sen conversion.
+            invoice = await createInvoice({
+                apiKey: tenantTyped.xenditSecretKey!,
+                externalId: String(order.id),
                 amount: total,
-                channelCode,
-                customerEmail: customer.email,
-                successReturnUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
-                failureReturnUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+                payerEmail: customer.email,
+                description: `Order ${orderNumber} from ${shopName}`,
+                successRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
+                failureRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
             })
-            await payload.update({ collection: 'orders', id: order.id, data: { xenditPaymentRequestId: pr.id } as Record<string, unknown> })
+            await payload.update({ collection: 'orders', id: order.id, data: { xenditPaymentRequestId: invoice.id } as Record<string, unknown> })
         } catch (err) {
             await restockAll(payload, decremented)
             await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
@@ -163,7 +152,6 @@ export async function POST(request: NextRequest) {
         }
 
         // Fire-and-forget buyer confirmation email
-        const shopName = tenantTyped.name ?? siteSlug
         const buyerEmail = orderConfirmationEmail({
             shopName, orderNumber, customerName: customer.name, customerEmail: customer.email,
             customerPhone: customer.phone ?? null, customerAddress: customer.address ?? null,
@@ -175,24 +163,9 @@ export async function POST(request: NextRequest) {
         payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
             .catch((err) => console.error('[xendit-checkout] buyer email failed:', err))
 
-        const presentAction = pr.actions?.find(a => a.action === 'PRESENT_TO_CUSTOMER')
-        const redirectAction = pr.actions?.find(a => a.action === 'REDIRECT')
-
-        if (presentAction?.qr_code) {
-            const res = NextResponse.json({ success: true, data: { type: 'qr', qrString: presentAction.qr_code, amount: total, orderId: order.id, orderNumber } })
-            setCookieToken(res, order.id, orderNumber)
-            return res
-        }
-        if (redirectAction?.url) {
-            const res = NextResponse.json({ success: true, data: { type: 'redirect', sessionUrl: redirectAction.url, orderId: order.id, orderNumber } })
-            setCookieToken(res, order.id, orderNumber)
-            return res
-        }
-
-        // No usable action — compensate
-        await restockAll(payload, decremented)
-        await payload.update({ collection: 'orders', id: order.id, data: { paymentStatus: 'payment_failed' } as Record<string, unknown> }).catch(() => null)
-        return NextResponse.json({ success: false, error: { code: 'XENDIT_NO_ACTION', message: 'No payment action returned.' } }, { status: 502 })
+        const res = NextResponse.json({ success: true, data: { type: 'redirect', sessionUrl: invoice.invoice_url, orderId: order.id, orderNumber } })
+        setCookieToken(res, order.id, orderNumber)
+        return res
 
     } catch (err: unknown) {
         console.error('[xendit-checkout] Unexpected error:', err instanceof Error ? err.message : err)

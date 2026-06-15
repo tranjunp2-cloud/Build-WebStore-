@@ -69,7 +69,10 @@ export async function getOnboardingUrl(accountId: string): Promise<string | null
 export type XenditChannelCode = 'TOUCHNGO' | 'GRABPAY' | 'SHOPEEPAY' | 'BOOST' | 'MAE' | 'CARDS' | 'QR_CODE' | 'FPX'
 
 export interface CreatePaymentRequestParams {
-    forUserId: string           // tenant.xenditAccountId
+    // Model C: merchant's own Xendit key (mutually exclusive with forUserId)
+    apiKey?: string
+    // Model B (XenPlatform): ECH sub-account id header
+    forUserId?: string
     referenceId: string         // String(order.id) — idempotent key
     amount: number              // RM major unit (e.g. 12.50). NOT sen. Order.total is already RM.
     channelCode: XenditChannelCode
@@ -100,6 +103,7 @@ export async function createPaymentRequest(p: CreatePaymentRequestParams): Promi
         method: 'POST',
         body,
         forUserId: p.forUserId,
+        apiKey: p.apiKey,
     })
 }
 
@@ -160,25 +164,82 @@ function buildPaymentMethod(
     }
 }
 
+export interface CreateInvoiceParams {
+    apiKey: string
+    externalId: string          // String(order.id)
+    amount: number              // RM major unit — NOT sen
+    payerEmail: string
+    description: string
+    successRedirectUrl: string
+    failureRedirectUrl: string
+}
+
+export interface XenditInvoice {
+    id: string                  // inv-...
+    invoice_url: string         // hosted checkout page URL
+    status: string              // PENDING | PAID | EXPIRED
+}
+
+/** POST /v2/invoices — create a hosted checkout page (Invoice API).
+ * Customer picks their own payment method on Xendit's page.
+ * Returns invoice_url to redirect the buyer to. */
+export async function createInvoice(p: CreateInvoiceParams): Promise<XenditInvoice> {
+    return xenditFetch<XenditInvoice>('/v2/invoices', {
+        method: 'POST',
+        apiKey: p.apiKey,
+        body: {
+            external_id: p.externalId,
+            amount: Math.round(p.amount * 100) / 100,
+            payer_email: p.payerEmail,
+            description: p.description,
+            currency: 'MYR',
+            success_redirect_url: p.successRedirectUrl,
+            failure_redirect_url: p.failureRedirectUrl,
+        },
+    })
+}
+
+export interface XenditInvoiceStatus {
+    id: string
+    status: string          // PENDING | PAID | SETTLED | EXPIRED
+    payment_method?: string // EWALLET | BANK_TRANSFER | CREDIT_CARD | ...
+    payment_channel?: string // TOUCHNGO | GRABPAY | ALIPAY | FPX | ...
+}
+
+/** GET /v2/invoices/{id} — fetch invoice status. Uses merchant's own API key (Model C). */
+export async function getInvoice(invoiceId: string, apiKey: string): Promise<XenditInvoiceStatus> {
+    return xenditFetch<XenditInvoiceStatus>(`/v2/invoices/${invoiceId}`, { method: 'GET', apiKey })
+}
+
 export interface CreateRefundParams {
-    forUserId: string
-    paymentRequestId: string
+    // Model C (Invoice API): merchant's own key
+    apiKey?: string
+    invoiceId?: string
+    // Model B (Payment Request API): XenPlatform sub-account
+    forUserId?: string
+    paymentRequestId?: string
     amount: number      // RM major unit — full refund = order.total
     reason?: string
 }
 export interface XenditRefund { id: string; status: string }
 
-/** POST /refunds — full/partial refund of a Xendit payment request.
+/** POST /refunds — full/partial refund of a Xendit payment.
+ * Invoice API (Model C): pass apiKey + invoiceId.
+ * Payment Request API (Model B): pass forUserId + paymentRequestId.
  * CRITICAL: amount is RM major unit. Do NOT multiply by 100. */
 export async function createRefund(p: CreateRefundParams): Promise<XenditRefund> {
+    const body: Record<string, unknown> = {
+        amount: Math.round(p.amount * 100) / 100,
+        reason: p.reason ?? 'REQUESTED_BY_CUSTOMER',
+    }
+    if (p.invoiceId) body.invoice_id = p.invoiceId
+    else if (p.paymentRequestId) body.payment_request_id = p.paymentRequestId
+
     return xenditFetch<XenditRefund>('/refunds', {
         method: 'POST',
+        apiKey: p.apiKey,
         forUserId: p.forUserId,
-        body: {
-            payment_request_id: p.paymentRequestId,
-            amount: Math.round(p.amount * 100) / 100,   // RM, NOT *100
-            reason: p.reason ?? 'REQUESTED_BY_CUSTOMER',
-        },
+        body,
     })
 }
 

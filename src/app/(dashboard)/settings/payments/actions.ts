@@ -14,14 +14,6 @@ export type PaymentUpdates = {
     account_holder_name?: string | null;
     bank_name?: string | null;
     account_number?: string | null;
-    // Xendit toggles
-    xendit_tng?: boolean;
-    xendit_grabpay?: boolean;
-    xendit_duitnow?: boolean;
-    xendit_fpx?: boolean;
-    xendit_shopeepay?: boolean;
-    xendit_boost?: boolean;
-    xendit_mae?: boolean;
 };
 
 export async function getPaymentSettings() {
@@ -97,62 +89,6 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
                 paymentsData.payment_fpx = updates.payment_fpx;
             } else {
                 return { success: false, error: 'Invalid type for payment_fpx. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_tng !== undefined) {
-            if (typeof updates.xendit_tng === 'boolean') {
-                paymentsData.xendit_tng = updates.xendit_tng;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_tng. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_grabpay !== undefined) {
-            if (typeof updates.xendit_grabpay === 'boolean') {
-                paymentsData.xendit_grabpay = updates.xendit_grabpay;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_grabpay. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_duitnow !== undefined) {
-            if (typeof updates.xendit_duitnow === 'boolean') {
-                paymentsData.xendit_duitnow = updates.xendit_duitnow;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_duitnow. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_fpx !== undefined) {
-            if (typeof updates.xendit_fpx === 'boolean') {
-                paymentsData.xendit_fpx = updates.xendit_fpx;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_fpx. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_shopeepay !== undefined) {
-            if (typeof updates.xendit_shopeepay === 'boolean') {
-                paymentsData.xendit_shopeepay = updates.xendit_shopeepay;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_shopeepay. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_boost !== undefined) {
-            if (typeof updates.xendit_boost === 'boolean') {
-                paymentsData.xendit_boost = updates.xendit_boost;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_boost. Expected boolean.' };
-            }
-        }
-
-        if (updates.xendit_mae !== undefined) {
-            if (typeof updates.xendit_mae === 'boolean') {
-                paymentsData.xendit_mae = updates.xendit_mae;
-            } else {
-                return { success: false, error: 'Invalid type for xendit_mae. Expected boolean.' };
             }
         }
 
@@ -244,6 +180,54 @@ export async function uploadQrMedia(formData: FormData) {
         return { success: true, doc: media };
     } catch (error: unknown) {
         console.error("Media upload action error:", error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+// Model C: save merchant's own Xendit API keys
+export async function saveXenditKeys(secretKey: string, callbackToken: string) {
+    try {
+        const payload = await getPayload({ config });
+        const tenantId = await getCurrentTenantId();
+
+        if (!tenantId) return { success: false, error: 'Unauthorized' };
+        if (!secretKey || !callbackToken) return { success: false, error: 'Both Secret Key and Callback Token are required.' };
+        if (!secretKey.startsWith('xnd_')) return { success: false, error: 'Invalid Secret Key format. Must start with xnd_' };
+
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: { xenditSecretKey: secretKey.trim(), xenditCallbackToken: callbackToken.trim() } as any,
+            overrideAccess: true,
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        console.error('saveXenditKeys error:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function disconnectXendit() {
+    try {
+        const payload = await getPayload({ config });
+        const tenantId = await getCurrentTenantId();
+
+        if (!tenantId) return { success: false, error: 'Unauthorized' };
+
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                xenditSecretKey: null,
+                xenditCallbackToken: null,
+            } as any,
+            overrideAccess: true,
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        console.error('disconnectXendit error:', error);
         return { success: false, error: 'Internal server error' };
     }
 }

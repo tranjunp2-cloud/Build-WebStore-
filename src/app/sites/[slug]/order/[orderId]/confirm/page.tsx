@@ -102,6 +102,8 @@ export default async function OrderConfirmPage({
                 stripePaymentIntentId: raw.stripePaymentIntentId,
                 cardBrand: raw.cardBrand,
                 cardLast4: raw.cardLast4,
+                xenditPaymentRequestId: raw.xenditPaymentRequestId,
+                xenditChannelCode: raw.xenditChannelCode,
                 customerName: raw.customerName,
                 customerEmail: raw.customerEmail,
                 shippingAddress: raw.shippingAddress,

@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 import { reconcileOrderPaid } from '@/lib/payment/reconcile-order-paid'
 import { retrieveCheckoutSession } from '@/lib/payment/stripe'
-import { getPaymentRequest } from '@/lib/payment/xendit'
+import { getInvoice } from '@/lib/payment/xendit'
 
 /**
  * Reconcile cron (AC-6) — SELF-HEAL ONLY.
@@ -103,19 +103,20 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 50 })
         if (Date.now() > deadline) { timedOut = true; break }
         try {
             const tenant = typeof order.tenant === 'object' ? order.tenant : null
-            const forUserId: string | undefined = (tenant as any)?.xenditAccountId
-            if (!forUserId) { xenditSkipped++; continue }
-            const pr = await getPaymentRequest(order.xenditPaymentRequestId, forUserId)
-            if (pr.status === 'SUCCEEDED' || pr.status === 'CAPTURED') {
+            const xenditSecretKey: string | undefined = (tenant as any)?.xenditSecretKey
+            if (!xenditSecretKey) { xenditSkipped++; continue }
+            const invoice = await getInvoice(order.xenditPaymentRequestId, xenditSecretKey)
+            if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
+                const channelCode = invoice.payment_channel ?? invoice.payment_method ?? ''
                 const r = await reconcileOrderPaid(payload, {
                     orderId: Number(order.id),
-                    xenditData: { paymentRequestId: pr.id, channelCode: order.xenditChannelCode ?? '' },
+                    xenditData: { paymentRequestId: invoice.id, channelCode },
                     source: 'cron',
                 })
                 if (r.status === 'reconciled') xenditReconciled++
                 else xenditSkipped++
             } else {
-                // FAILED/EXPIRED — payment-expiry cron handles cancel+restock.
+                // EXPIRED — payment-expiry cron handles cancel+restock.
                 xenditSkipped++
             }
         } catch (e: unknown) {

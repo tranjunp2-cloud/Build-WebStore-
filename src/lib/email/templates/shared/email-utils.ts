@@ -65,8 +65,13 @@ export function buildAddressString(addr: AddressShape | null | undefined): strin
         .join(', ')
 }
 
-export function paymentMethodLabel(method: string, locale: EmailLocale): string {
+export function xenditChannelLabel(channelCode: string | undefined | null): string {
+    return channelCode || 'Xendit'
+}
+
+export function paymentMethodLabel(method: string, locale: EmailLocale, xenditChannelCode?: string | null): string {
     if (method === 'cod') return 'COD'
     if (method === 'bank_transfer') return locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer'
+    if (method === 'ewallet' || method === 'xendit') return xenditChannelLabel(xenditChannelCode)
     return locale === 'ms' ? 'Kad / FPX' : 'Card / FPX'
 }

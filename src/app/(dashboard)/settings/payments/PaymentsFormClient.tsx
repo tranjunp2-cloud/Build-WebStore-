@@ -3,16 +3,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, CheckCircle2, Save, AlertCircle } from 'lucide-react';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
 import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
-import { TngIcon, GrabPayIcon, ShopeePayIcon, BoostIcon, MaeIcon, DuitNowQrIcon, FpxIcon } from './xendit-brand-icons';
 
 type Media = { id: string | number; url?: string; thumbnailURL?: string };
 
@@ -55,32 +54,15 @@ export function PaymentsFormClient({
     stripeAccountId = null,
     initialCardEnabled = false,
     initialFpxEnabled = false,
-    xenditAccountId = null,
-    xenditAccountStatus = 'NOT_CONNECTED',
-    xenditOnboardingComplete: _xenditOnboardingComplete = false,
-    initialXenditTngEnabled = false,
-    initialXenditGrabpayEnabled = false,
-    initialXenditDuitnowEnabled = false,
-    initialXenditFpxEnabled = false,
-    initialXenditShopeepayEnabled = false,
-    initialXenditBoostEnabled = false,
-    initialXenditMaeEnabled = false,
+    // Model C: xenditConnected = xenditSecretKey is set in DB
+    xenditConnected = false,
 }: {
     tenantId?: string;
     stripeOnboardingComplete?: boolean;
     stripeAccountId?: string | null;
     initialCardEnabled?: boolean;
     initialFpxEnabled?: boolean;
-    xenditAccountId?: string | null;
-    xenditAccountStatus?: string;
-    xenditOnboardingComplete?: boolean;
-    initialXenditTngEnabled?: boolean;
-    initialXenditGrabpayEnabled?: boolean;
-    initialXenditDuitnowEnabled?: boolean;
-    initialXenditFpxEnabled?: boolean;
-    initialXenditShopeepayEnabled?: boolean;
-    initialXenditBoostEnabled?: boolean;
-    initialXenditMaeEnabled?: boolean;
+    xenditConnected?: boolean;
 }) {
     const router = useRouter();
     const [paymentCod, setPaymentCod] = useState(false);
@@ -104,17 +86,8 @@ export function PaymentsFormClient({
     const [isVerifying, setIsVerifying] = useState(false);
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
-    // Xendit Connect states
-    const [xenditStatus, setXenditStatus] = useState(xenditAccountStatus ?? 'NOT_CONNECTED');
-    const [xenditAccountIdState, setXenditAccountIdState] = useState(xenditAccountId ?? null);
-    // Xendit payment method toggles
-    const [tngEnabled, setTngEnabled] = useState(initialXenditTngEnabled ?? false);
-    const [grabpayEnabled, setGrabpayEnabled] = useState(initialXenditGrabpayEnabled ?? false);
-    const [shopeepayEnabled, setShopeepayEnabled] = useState(initialXenditShopeepayEnabled ?? false);
-    const [boostEnabled, setBoostEnabled] = useState(initialXenditBoostEnabled ?? false);
-    const [maeEnabled, setMaeEnabled] = useState(initialXenditMaeEnabled ?? false);
-    const [duitnowEnabled, setDuitnowEnabled] = useState(initialXenditDuitnowEnabled ?? false);
-    const [fpxXenditEnabled, setFpxXenditEnabled] = useState(initialXenditFpxEnabled ?? false);
+    // Xendit Connect states (Model C)
+    const [xenditIsConnected, setXenditIsConnected] = useState(xenditConnected ?? false);
     const [isDirty, setIsDirty] = useState(false);
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
@@ -335,16 +308,17 @@ export function PaymentsFormClient({
     }, []);
 
     const handleXenditDisconnect = async () => {
-        setXenditStatus('NOT_CONNECTED');
-        setXenditAccountIdState(null);
-        setTngEnabled(false);
-        setGrabpayEnabled(false);
-        setShopeepayEnabled(false);
-        setBoostEnabled(false);
-        setMaeEnabled(false);
-        setDuitnowEnabled(false);
-        setFpxXenditEnabled(false);
-        setIsDirty(true);
+        const res = await disconnectXendit();
+        if (!res.success) { toast.error('Failed to disconnect Xendit'); return; }
+        setXenditIsConnected(false);
+        setIsDirty(false);
+    };
+
+    const handleSaveXenditKeys = async (secretKey: string, callbackToken: string) => {
+        const res = await saveXenditKeys(secretKey, callbackToken);
+        if (!res.success) throw new Error(res.error ?? 'Không thể lưu keys.');
+        setXenditIsConnected(true);
+        toast.success('Xendit đã được kết nối thành công!');
     };
 
     const handleSaveAll = async () => {
@@ -367,13 +341,6 @@ export function PaymentsFormClient({
                 account_holder_name: accountHolderName || null,
                 bank_name: bankName || null,
                 account_number: accountNumber || null,
-                xendit_tng: tngEnabled,
-                xendit_grabpay: grabpayEnabled,
-                xendit_shopeepay: shopeepayEnabled,
-                xendit_boost: boostEnabled,
-                xendit_mae: maeEnabled,
-                xendit_duitnow: duitnowEnabled,
-                xendit_fpx: fpxXenditEnabled,
             });
             if (res.success) {
                 setIsDirty(false);
@@ -543,88 +510,16 @@ export function PaymentsFormClient({
                     <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
                 </div>
 
-                {xenditStatus === 'LIVE' ? (
-                    <>
-                        <XenditConnectedBar
-                            accountId={xenditAccountIdState}
-                            tenantId={tenantId ?? ''}
-                            onDisconnect={handleXenditDisconnect}
-                        />
-                        <div className="space-y-[12px]">
-                            <PaymentMethodCard
-                                icon={<TngIcon />}
-                                iconTone=""
-                                title="Touch 'n Go (TNG)"
-                                desc={pt.xenditTngDesc}
-                                on={tngEnabled}
-                                onChange={(v) => { setTngEnabled(v); setIsDirty(true); }}
-                                highlight={tngEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<GrabPayIcon />}
-                                iconTone=""
-                                title="GrabPay"
-                                desc={pt.xenditGrabpayDesc}
-                                on={grabpayEnabled}
-                                onChange={(v) => { setGrabpayEnabled(v); setIsDirty(true); }}
-                                highlight={grabpayEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<ShopeePayIcon />}
-                                iconTone=""
-                                title="ShopeePay"
-                                desc={pt.xenditShopeepayDesc}
-                                on={shopeepayEnabled}
-                                onChange={(v) => { setShopeepayEnabled(v); setIsDirty(true); }}
-                                highlight={shopeepayEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<BoostIcon />}
-                                iconTone=""
-                                title="Boost"
-                                desc={pt.xenditBoostDesc}
-                                on={boostEnabled}
-                                onChange={(v) => { setBoostEnabled(v); setIsDirty(true); }}
-                                highlight={boostEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<MaeIcon />}
-                                iconTone=""
-                                title="MAE by Maybank"
-                                desc={pt.xenditMaeDesc}
-                                on={maeEnabled}
-                                onChange={(v) => { setMaeEnabled(v); setIsDirty(true); }}
-                                highlight={maeEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<DuitNowQrIcon />}
-                                iconTone=""
-                                title="DuitNow QR"
-                                desc={pt.xenditDuitnowDesc}
-                                on={duitnowEnabled}
-                                onChange={(v) => { setDuitnowEnabled(v); setIsDirty(true); }}
-                                highlight={duitnowEnabled}
-                            />
-                            <PaymentMethodCard
-                                icon={<FpxIcon />}
-                                iconTone=""
-                                title="FPX (Xendit)"
-                                desc={pt.xenditFpxDesc}
-                                on={fpxXenditEnabled}
-                                onChange={(v) => { setFpxXenditEnabled(v); setIsDirty(true); }}
-                                highlight={fpxXenditEnabled}
-                            />
-                        </div>
-                    </>
+                {xenditIsConnected ? (
+                    <XenditConnectedBar
+                        accountId={null}
+                        tenantId={tenantId ?? ''}
+                        onDisconnect={handleXenditDisconnect}
+                    />
                 ) : (
                     <XenditConnectBlock
-                        status={xenditStatus as 'NOT_CONNECTED' | 'INVITED' | 'REGISTERED' | 'AWAITING_DOCS' | 'PENDING_VERIFICATION' | 'SUSPENDED'}
                         tenantId={tenantId}
-                        onConnected={(accountId, status) => {
-                            setXenditAccountIdState(accountId);
-                            setXenditStatus(status);
-                        }}
-                        onStatusChange={(newStatus) => setXenditStatus(newStatus)}
+                        onSaveKeys={handleSaveXenditKeys}
                     />
                 )}
             </section>

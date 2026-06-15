@@ -178,8 +178,9 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     // via Xendit dashboard — we log the failure clearly and return 502.
     if (order.paymentProvider === 'xendit') {
         const tenantObj = typeof order.tenant === 'object' ? order.tenant : null
-        const forUserId: string | undefined = (tenantObj as any)?.xenditAccountId
-        if (!forUserId || !order.xenditPaymentRequestId) {
+        // Invoice checkout (Model C) uses merchant's own xenditSecretKey — NOT xenditAccountId/forUserId
+        const xenditSecretKey: string | undefined = (tenantObj as any)?.xenditSecretKey
+        if (!xenditSecretKey || !order.xenditPaymentRequestId) {
             return NextResponse.json(
                 { success: false, error: { code: 'XENDIT_NOT_REFUNDABLE', message: 'Missing Xendit payment info for refund' } },
                 { status: 422 },
@@ -210,9 +211,10 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
         let xenditRefund: { id: string; status: string }
         try {
+            // Invoice API (v2): identify by invoice_id, auth via apiKey (Model C)
             xenditRefund = await createRefund({
-                forUserId,
-                paymentRequestId: order.xenditPaymentRequestId,
+                apiKey: xenditSecretKey,
+                invoiceId: order.xenditPaymentRequestId,
                 // Xendit MYR = major unit (RM). order.total already RM. NO *100.
                 amount: order.total,
                 reason: 'REQUESTED_BY_CUSTOMER',

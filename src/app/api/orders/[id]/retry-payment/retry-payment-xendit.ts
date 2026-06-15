@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import { createPaymentRequest, mapChannelToPaymentMethod, type XenditChannelCode } from '@/lib/payment/xendit'
+import { createInvoice } from '@/lib/payment/xendit'
 import { XenditError } from '@/lib/payment/xendit-client'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import type { Payload } from 'payload'
 
 interface XenditTenantDoc {
     id: string | number
+    name?: string
     slug?: string
-    xenditAccountId?: string | null
-    xenditOnboardingComplete?: boolean
+    xenditSecretKey?: string | null
 }
 
 export async function retryXenditPayment(
@@ -16,33 +16,31 @@ export async function retryXenditPayment(
     tenantDoc: XenditTenantDoc,
     payload: Payload,
 ) {
-    // Guard: tenant must have completed Xendit onboarding
-    const forUserId = tenantDoc.xenditAccountId
-    if (!forUserId || !tenantDoc.xenditOnboardingComplete) {
+    // Guard: tenant must have connected their own Xendit account (Model C)
+    if (!tenantDoc.xenditSecretKey) {
         return NextResponse.json(
             { success: false, error: { code: 'XENDIT_NOT_READY', message: 'Xendit payment temporarily unavailable' } },
             { status: 422 },
         )
     }
 
-    const channelCode = (order.xenditChannelCode ?? 'TOUCHNGO') as XenditChannelCode
     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
     const siteSlug = tenantDoc.slug || String(tenantDoc.id)
+    const shopName = tenantDoc.name ?? siteSlug
 
-    let pr: Awaited<ReturnType<typeof createPaymentRequest>>
+    let invoice: Awaited<ReturnType<typeof createInvoice>>
     try {
-        pr = await createPaymentRequest({
-            forUserId,
-            referenceId: String(order.id),
-            // Xendit MYR = major unit (RM). order.total is already RM. NO *100.
+        invoice = await createInvoice({
+            apiKey: tenantDoc.xenditSecretKey,
+            externalId: String(order.id),
             amount: order.total,
-            channelCode,
-            customerEmail: order.customerEmail,
-            successReturnUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
-            failureReturnUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+            payerEmail: order.customerEmail,
+            description: `Order ${order.orderNumber} from ${shopName}`,
+            successRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
+            failureRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
         })
     } catch (err) {
-        console.error('[retry-payment-xendit] createPaymentRequest error:', err instanceof Error ? err.message : err)
+        console.error('[retry-payment-xendit] createInvoice error:', err instanceof Error ? err.message : err)
         if (err instanceof XenditError) {
             return NextResponse.json(
                 { success: false, error: { code: 'XENDIT_API_ERROR', message: 'Payment service is busy. Please try again.' } },
@@ -55,11 +53,10 @@ export async function retryXenditPayment(
         )
     }
 
-    // Persist new PR id (overwrites old — non-unique index, see phase 01 schema notes)
-    // Reset payment_status to awaiting_payment if order was in failed state
+    // Persist new invoice id; reset a failed order back to awaiting
     const updateData: Record<string, unknown> = {
-        xenditPaymentRequestId: pr.id,
-        paymentMethod: mapChannelToPaymentMethod(channelCode),
+        xenditPaymentRequestId: invoice.id,
+        paymentMethod: 'ewallet',
     }
     if (order.status === 'payment_failed' || order.paymentStatus === 'payment_failed' || order.paymentStatus === 'failed') {
         updateData.status = 'pending'
@@ -72,27 +69,8 @@ export async function retryXenditPayment(
         overrideAccess: true,
     })
 
-    // Refresh ct_ cookie
     const confirmToken = generateConfirmToken(order.id, order.orderNumber)
-
-    // Response branch: QR vs redirect
-    const presentAction = pr.actions?.find((a) => a.action === 'PRESENT_TO_CUSTOMER')
-    const redirectAction = pr.actions?.find((a) => a.action === 'REDIRECT')
-
-    const responseData = presentAction?.qr_code
-        ? { type: 'qr', qrString: presentAction.qr_code, amount: order.total }
-        : redirectAction?.url
-            ? { type: 'redirect', sessionUrl: redirectAction.url }
-            : null
-
-    if (!responseData) {
-        return NextResponse.json(
-            { success: false, error: { code: 'XENDIT_NO_ACTION', message: 'No payment action returned.' } },
-            { status: 502 },
-        )
-    }
-
-    const res = NextResponse.json({ success: true, data: { ...responseData, orderId: order.id } })
+    const res = NextResponse.json({ success: true, data: { type: 'redirect', sessionUrl: invoice.invoice_url, orderId: order.id } })
     res.cookies.set(`ct_${order.id}`, confirmToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

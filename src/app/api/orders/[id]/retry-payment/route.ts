@@ -24,13 +24,14 @@ const RETRYABLE_PAYMENT_STATUSES = new Set(['awaiting_payment', 'failed', 'payme
 /** Minimal tenant shape needed for this flow. */
 interface TenantDoc {
     id: string | number
+    name?: string
     slug?: string
     stripeAccountId?: string | null
     stripeOnboardingComplete?: boolean
     status?: string
     payments?: { payment_card?: boolean; payment_fpx?: boolean }
-    xenditAccountId?: string | null
-    xenditOnboardingComplete?: boolean
+    // Model C: merchant's own Xendit credentials
+    xenditSecretKey?: string | null
 }
 
 /** Minimal site shape needed for this flow. */

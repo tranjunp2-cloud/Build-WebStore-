@@ -236,6 +236,21 @@ export const Tenants: CollectionConfig = {
                 description: 'True once Xendit account.activated webhook fires (status=LIVE).',
             },
         },
+        // Model C: merchant provides their own Xendit keys (self-register flow)
+        {
+            name: 'xenditSecretKey',
+            type: 'text',
+            admin: {
+                description: 'Xendit Secret Key (xnd_development_... or xnd_production_...). Merchant provides via Settings > Payments.',
+            },
+        },
+        {
+            name: 'xenditCallbackToken',
+            type: 'text',
+            admin: {
+                description: 'Xendit Callback Token for webhook signature verification. Merchant copies from Xendit Dashboard > Settings > Configuration.',
+            },
+        },
         {
             name: 'status',
             type: 'select',
