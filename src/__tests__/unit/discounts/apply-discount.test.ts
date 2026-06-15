@@ -757,3 +757,119 @@ describe('applyDiscount — Rejection priority', () => {
         }
     })
 })
+
+// ── NEW: skipUsageLimit option (retry-payment flow) ─────────────────────────
+describe('applyDiscount — skipUsageLimit option (TC-F33-10-06 retry-payment)', () => {
+    it('respects usage limit by default (at-limit case)', () => {
+        // Arrange: normal checkout, discount at limit
+        const row: DiscountRow = {
+            id: '10',
+            code: 'FULL',
+            type: 'percentage',
+            value: 10,
+            status: 'active',
+            usageLimit: 5,
+            usageCount: 5, // at limit
+            startsAt: null,
+            expiresAt: null,
+            tenant: 'tenant1',
+        }
+        const ctx = { subtotalSen: 10000, tenantId: 'tenant1', now: new Date() }
+
+        // Act: no skipUsageLimit
+        const result = applyDiscount(row, ctx)
+
+        // Assert
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+            expect(result.reason).toBe('at-limit')
+        }
+    })
+
+    it('bypasses usage limit when skipUsageLimit:true (retry-payment), so retry can re-apply own slot', () => {
+        // Arrange: TC-F33-10-06 retry-payment case
+        // Order already reserved its slot at original place-order, so the usageCount now includes
+        // its own reservation. When retrying payment, we re-apply discount but DON'T want to count
+        // the order's own reservation against the limit again.
+        const row: DiscountRow = {
+            id: '10',
+            code: 'LAST',
+            type: 'percentage',
+            value: 10,
+            status: 'active',
+            usageLimit: 5,
+            usageCount: 5, // includes this order's reservation
+            startsAt: null,
+            expiresAt: null,
+            tenant: 'tenant1',
+        }
+        const ctx = { subtotalSen: 10000, tenantId: 'tenant1', now: new Date() }
+
+        // Act: skipUsageLimit: true (caller already holds a slot for this order)
+        const result = applyDiscount(row, ctx, { skipUsageLimit: true })
+
+        // Assert
+        expect(result.ok).toBe(true) // NOT rejected as at-limit
+        if (result.ok) {
+            expect(result.discountSen).toBe(1000) // 10% of 10000
+        }
+    })
+
+    it('skipUsageLimit:true still respects other validation (expiry, inactive, tenant)', () => {
+        // Arrange
+        const row: DiscountRow = {
+            id: '10',
+            code: 'EXPIRED_BYPASS',
+            type: 'percentage',
+            value: 10,
+            status: 'active',
+            usageLimit: 5,
+            usageCount: 5,
+            startsAt: null,
+            expiresAt: new Date(Date.now() - 86400000).toISOString(), // expired
+            tenant: 'tenant1',
+        }
+        const ctx = { subtotalSen: 10000, tenantId: 'tenant1', now: new Date() }
+
+        // Act: skipUsageLimit: true but discount is still expired
+        const result = applyDiscount(row, ctx, { skipUsageLimit: true })
+
+        // Assert
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+            expect(result.reason).toBe('expired') // expiry still checked
+        }
+    })
+
+    it('skipUsageLimit default (undefined/false) is same as no option', () => {
+        // Arrange
+        const row: DiscountRow = {
+            id: '10',
+            code: 'DEFAULT',
+            type: 'percentage',
+            value: 10,
+            status: 'active',
+            usageLimit: 1,
+            usageCount: 1, // at limit
+            startsAt: null,
+            expiresAt: null,
+            tenant: 'tenant1',
+        }
+        const ctx = { subtotalSen: 10000, tenantId: 'tenant1', now: new Date() }
+
+        // Act: both should reject
+        const result1 = applyDiscount(row, ctx)
+        const result2 = applyDiscount(row, ctx, {})
+        const result3 = applyDiscount(row, ctx, { skipUsageLimit: false })
+
+        // Assert
+        expect(result1.ok).toBe(false)
+        expect(result2.ok).toBe(false)
+        expect(result3.ok).toBe(false)
+        if (!result1.ok && !result2.ok && !result3.ok) {
+            expect(result1.reason).toBe('at-limit')
+            expect(result2.reason).toBe('at-limit')
+            expect(result3.reason).toBe('at-limit')
+        }
+    })
+})

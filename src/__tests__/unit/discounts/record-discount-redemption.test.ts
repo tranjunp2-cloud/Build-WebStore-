@@ -32,11 +32,11 @@ function createMockPayload(): Payload {
 // ─── TC-F33-06-13: Happy path — redemption recorded ────────────────────────
 
 describe('[TC-F33-06-13] recordDiscountRedemption — happy path', () => {
-    it('returns recorded:true and calls execute once when history row inserted', async () => {
-        // Arrange
+    it('returns recorded:true + status:reserved when history row inserted', async () => {
+        // Arrange: TC-F33-06-13 NEW behavior — atomic reserve returns status
         const payload = createMockPayload()
         const mockExecute = vi.fn().mockResolvedValueOnce({
-            rows: [{ inserted: 1 }],
+            rows: [{ prior_count: 0, bumped: 1 }], // CTE returns: no prior, bump succeeded
         })
         ;(payload.db.drizzle as any).execute = mockExecute
 
@@ -52,8 +52,9 @@ describe('[TC-F33-06-13] recordDiscountRedemption — happy path', () => {
 
         // Assert
         expect(result.recorded).toBe(true)
+        expect(result.status).toBe('reserved')
         expect(mockExecute).toHaveBeenCalledTimes(1)
-        // Verify the SQL structure contains the INSERT guard
+        // Verify the SQL structure contains the CTE + INSERT guard
         expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({ type: 'sql' }))
     })
 })
@@ -262,14 +263,104 @@ describe('[TC-F33-09-04] recordDiscountRedemption — usage cap', () => {
     })
 })
 
+// ─── NEW: Reserve semantics (status outcomes) ────────────────────────────────
+
+describe('[NEW] recordDiscountRedemption — reserve status semantics', () => {
+    it('returns status:already-reserved when order already has history row (idempotent)', async () => {
+        // Arrange: TC-F33-10-07 + race condition awareness
+        const payload = createMockPayload()
+        const mockExecute = vi.fn().mockResolvedValueOnce({
+            rows: [{ prior_count: 1, bumped: 0 }], // Prior exists, bump did NOT fire
+        })
+        ;(payload.db.drizzle as any).execute = mockExecute
+
+        // Act
+        const result = await recordDiscountRedemption(payload, {
+            tenantId: 123,
+            discountId: 456,
+            orderId: 789,
+            amountApplied: 5000,
+            discountCode: 'SUMMER50',
+        })
+
+        // Assert
+        expect(result.recorded).toBe(true) // Recorded in DB (prior to this call)
+        expect(result.status).toBe('already-reserved') // Idempotent, no new bump
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns status:at-limit when discount sold out (usage_count >= usage_limit)', async () => {
+        // Arrange: TC-F33-09-04 at-limit case
+        const payload = createMockPayload()
+        const mockExecute = vi.fn().mockResolvedValueOnce({
+            rows: [{ prior_count: 0, bumped: 0 }], // No prior, but bump did NOT fire (at-limit guard blocked it)
+        })
+        ;(payload.db.drizzle as any).execute = mockExecute
+
+        // Act
+        const result = await recordDiscountRedemption(payload, {
+            tenantId: 123,
+            discountId: 456,
+            orderId: 789,
+            amountApplied: 5000,
+            discountCode: 'LIMIT1',
+        })
+
+        // Assert
+        expect(result.recorded).toBe(false) // Slot NOT taken
+        expect(result.status).toBe('at-limit') // Cannot serve this order
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns status:no-discount when discountId is falsy (no-op)', async () => {
+        // Arrange
+        const payload = createMockPayload()
+        const mockExecute = vi.fn()
+        ;(payload.db.drizzle as any).execute = mockExecute
+
+        // Act
+        const result = await recordDiscountRedemption(payload, {
+            tenantId: 123,
+            discountId: 0,
+            orderId: 789,
+            amountApplied: 5000,
+        })
+
+        // Assert
+        expect(result.recorded).toBe(false)
+        expect(result.status).toBe('no-discount')
+        expect(mockExecute).not.toHaveBeenCalled()
+    })
+
+    it('returns status:error when drizzle execute throws (DB unavailable)', async () => {
+        // Arrange: TC-F33-09-06 atomicity + error handling
+        const payload = createMockPayload()
+        const mockExecute = vi.fn().mockRejectedValueOnce(new Error('Connection pool exhausted'))
+        ;(payload.db.drizzle as any).execute = mockExecute
+
+        // Act
+        const result = await recordDiscountRedemption(payload, {
+            tenantId: 123,
+            discountId: 456,
+            orderId: 789,
+            amountApplied: 5000,
+        })
+
+        // Assert
+        expect(result.recorded).toBe(false)
+        expect(result.status).toBe('error')
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+    })
+})
+
 // ─── TC-F33-03-03: Snapshot survives discount delete ──────────────────────
 
 describe('[TC-F33-03-03] recordDiscountRedemption — discount_code snapshot', () => {
     it('records discount_code even if discount is later deleted (FK SET NULL)', async () => {
-        // Arrange
+        // Arrange: TC-F33-03-03 snapshot persistence
         const payload = createMockPayload()
         const mockExecute = vi.fn().mockResolvedValueOnce({
-            rows: [{ inserted: 1 }],
+            rows: [{ prior_count: 0, bumped: 1 }], // Fresh reserve
         })
         ;(payload.db.drizzle as any).execute = mockExecute
 

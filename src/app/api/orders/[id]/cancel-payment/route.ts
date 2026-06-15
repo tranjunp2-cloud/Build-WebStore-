@@ -83,8 +83,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         )
     }
 
-    // Release the redeemed discount slot (F33) — runs only on the CAS winner. No-op for a Stripe
-    // order still pending (redemption happens at reconcile, so no history row exists yet).
+    // Release the reserved discount slot (F33) — runs only on the CAS winner. The slot is reserved at
+    // PLACE ORDER for every gateway (incl. pending Stripe), so this is a real release, not a no-op.
     await releaseDiscountRedemption(payload, Number(order.id))
 
     // Restock inventory for each order line — stock was decremented at checkout.

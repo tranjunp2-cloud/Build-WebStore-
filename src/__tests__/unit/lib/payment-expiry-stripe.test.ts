@@ -82,13 +82,17 @@ describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
         const result = await paymentExpiryJob(payload as any)
 
         // Assert
-        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1) // only cancel CAS (restockItem mocked)
+        // 2x execute: (1) cancel UPDATE + (2) release discount redemption
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(2)
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
         expect(payload.sendEmail).toHaveBeenCalledWith(
             expect.objectContaining({ to: 'buyer1@test.com' }),
         )
         // Stock restocked — product is included in mock items
         expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-1', null, 1)
+        // Discount slot released on auto-cancel (closes the pre-existing leak)
+        const discountReleaseCall = payload.db.drizzle.execute.mock.calls[1]
+        expect(discountReleaseCall).toBeDefined()
     })
 
     it('[TC-F13.155] cancels expired fpx order with paymentStatus=awaiting_payment', async () => {
@@ -101,7 +105,8 @@ describe('paymentExpiryJob — Stripe card order auto-cancel', () => {
 
         // Assert
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
-        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1)
+        // 2x execute: (1) cancel UPDATE + (2) release discount redemption
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(2)
         expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-2', null, 1)
     })
 
@@ -144,7 +149,8 @@ describe('paymentExpiryJob — Stripe payment_failed order auto-cancel', () => {
 
         // Assert
         expect(result).toEqual({ processed: 1, errors: 0, total: 1 })
-        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(1)
+        // 2x execute: (1) cancel UPDATE + (2) release discount redemption
+        expect(payload.db.drizzle.execute).toHaveBeenCalledTimes(2)
         expect(mockRestockItem).toHaveBeenCalledWith(expect.anything(), 'prod-4', null, 1)
     })
 

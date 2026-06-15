@@ -1,6 +1,7 @@
 'use client'
 
 import { Check, Loader2 } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 interface DiscountSaveBarProps {
     dirty: boolean
@@ -11,7 +12,10 @@ interface DiscountSaveBarProps {
 }
 
 export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: DiscountSaveBarProps) {
-    const statusText = dirty ? 'Unsaved changes' : isNew ? 'New discount' : 'Up to date'
+    const { t } = useI18n()
+    const d = t.dashboard.discounts.saveBar
+
+    const statusText = dirty ? d.unsavedChanges : isNew ? d.newDiscount : d.upToDate
     const saveDisabled = saving || (!dirty && !isNew)
 
     return (
@@ -35,7 +39,7 @@ export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: Disc
                     className="rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50"
                     style={{ color: 'var(--dash-text-muted)', background: 'var(--dash-surface-hover)' }}
                 >
-                    Cancel
+                    {d.cancel}
                 </button>
 
                 <button
@@ -49,7 +53,7 @@ export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: Disc
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         : <Check className="h-3.5 w-3.5" />
                     }
-                    {saving ? 'Saving…' : isNew ? 'Save discount' : 'Save'}
+                    {saving ? d.saving : isNew ? d.saveDiscount : d.save}
                 </button>
             </div>
         </div>

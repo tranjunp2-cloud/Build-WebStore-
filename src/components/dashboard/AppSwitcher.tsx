@@ -11,6 +11,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { ArrowUpRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 import { APP_SWITCHER_APPS, SSO_PORTAL_URL } from '@/config/app-switcher'
 
 /** 9-dot waffle launcher icon (design §3.7 — "lưới 9 chấm"). */
@@ -25,6 +26,7 @@ function WaffleIcon({ className }: { className?: string }) {
 }
 
 export function AppSwitcher() {
+    const { t } = useI18n()
     const [open, setOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
 
@@ -56,7 +58,7 @@ export function AppSwitcher() {
         <div className="relative" ref={menuRef}>
             <button
                 onClick={() => setOpen(!open)}
-                aria-label="Switch app"
+                aria-label={t.cms.appSwitcher.switchApp}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent border-none outline-none hover:bg-dash-surface-hover cursor-pointer transition-colors"
@@ -100,7 +102,7 @@ export function AppSwitcher() {
                             onClick={() => setOpen(false)}
                             className="no-underline flex items-center justify-between gap-2 px-2 h-[36px] text-[12px] font-normal text-dash-text-muted hover:text-dash-text transition-colors"
                         >
-                            <span>Secure SSO redirect</span>
+                            <span>{t.cms.appSwitcher.ssoRedirect}</span>
                             <ArrowUpRight className="h-4 w-4 shrink-0" />
                         </a>
                     </div>

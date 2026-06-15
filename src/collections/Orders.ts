@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
 import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
 import { updatePaymentStatus } from './orders-hooks/update-payment-status'
+import { releaseDiscountOnDelete } from './orders-hooks/release-discount-on-delete'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -29,6 +30,9 @@ export const Orders: CollectionConfig = {
         beforeChange: [
             autoLinkCustomer,
             updatePaymentStatus,
+        ],
+        beforeDelete: [
+            releaseDiscountOnDelete,
         ],
         afterChange: [
             async ({ doc, operation, req }) => {

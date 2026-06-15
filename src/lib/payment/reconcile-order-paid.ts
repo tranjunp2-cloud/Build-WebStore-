@@ -61,18 +61,20 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
     }
     console.log(`[Reconcile:${source}] Order ${orderId} marked as new/paid`)
 
-    // Discount redemption (gap A): the pending order snapshotted discount/discountCode/discountAmount at
-    // checkout but never redeemed. Runs ONLY inside the single-winner block, so a re-delivered webhook /
-    // confirm-poll / cron that early-returns ('already_processed') redeems nothing. The helper's
-    // ON CONFLICT (order_id) makes a concurrent double-fire a no-op. Non-throwing — never aborts the reconcile.
+    // Discount LEGACY BACKSTOP (F33 migration). As of the race fix (#10/#11) the slot is reserved at
+    // PLACE ORDER (stripe-checkout/route.ts), so for new-flow orders this call is an idempotent no-op —
+    // the unique order_id history row makes it return 'already-reserved' without touching usage_count.
+    // It exists for orders placed BEFORE the reserve-at-place-order deploy (old flow redeemed here):
+    // without it, a pre-deploy pending order that pays post-deploy would never hit usage_count or the
+    // audit history. Runs only inside the single-winner block above. 'at-limit' is logged, not blocked —
+    // payment already succeeded, matching the old cap semantics (count stops at the cap, no future order
+    // slips through). Release still happens only on a terminal non-sale (cancel / refund / 24h expiry).
     const dRaw = (order as any).discount
     if (dRaw && Number((order as any).discountAmount) > 0) {
         const discId = typeof dRaw === 'object' ? dRaw.id : dRaw
         const tRaw = (order as any).tenant
         const tId = typeof tRaw === 'object' ? tRaw.id : tRaw
-        // Snapshot type/value from the populated relation (depth:1) while the discount row still exists,
-        // so the audit log keeps full fidelity after a later hard-delete. Null when only an id is present.
-        await recordDiscountRedemption(payload, {
+        const reserve = await recordDiscountRedemption(payload, {
             tenantId: Number(tId),
             discountId: Number(discId),
             orderId,
@@ -82,11 +84,14 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
             discountValue: typeof dRaw === 'object' && dRaw.value != null ? Number(dRaw.value) : null,
             customerEmail: (order as any).customerEmail ?? null,
         })
+        if (reserve.status === 'at-limit') {
+            console.warn(`[Reconcile:${source}] Order ${orderId} paid with a discount past its usage limit (legacy pre-reserve order) — not counted`)
+        }
     }
 
     // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
     // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are
-    // non-critical and must never abort the reconcile after stock is already decremented.
+    // non-critical and must never abort the reconcile after the order is durably marked paid.
     try {
         await sendOrderPaidEmailsAndNotify(payload, order)
     } catch (err) {

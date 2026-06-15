@@ -7,7 +7,9 @@ import { Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DiscountsToolbar } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
+import { useI18n } from '@/i18n'
 import { DiscountsTabNav } from './discounts-tab-nav'
+import { useUrlPagination } from './use-url-pagination'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
@@ -15,17 +17,19 @@ type SortKey = 'code' | 'type' | 'value' | 'usageCount' | 'expiresAt' | 'created
 
 export function DiscountsClientLayout() {
     const router = useRouter()
+    const { t, ti } = useI18n()
+    const d = t.dashboard.discounts.list
 
     const [discounts, setDiscounts] = useState<Discount[]>([])
     const [total, setTotal] = useState(0)
     const [totalPages, setTotalPages] = useState(1)
-    const [page, setPage] = useState(1)
+    // Page + limit synced to URL (?page=N&limit=M); default 10/page (Bug #12 AC, both tabs).
+    const { page, setPage, limit, setLimit } = useUrlPagination(10)
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
     const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
     const [sortBy, setSortBy] = useState<SortKey>('createdAt')
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-    const [limit, setLimit] = useState(25)
     const [loading, setLoading] = useState(true)
     const [isFirstLoad, setIsFirstLoad] = useState(true)
     // Delete-confirm modal target (null = closed). Same styled modal the edit form uses — no native confirm().
@@ -64,22 +68,22 @@ export function DiscountsClientLayout() {
         } catch (err) {
             if (gen !== genRef.current) return
             console.error('[Discounts load]', err)
-            toast.error('Failed to load discounts')
+            toast.error(d.loadFailed)
         } finally {
             if (gen === genRef.current) setLoading(false)
         }
-    }, [search, statusFilter, typeFilter, sortBy, sortDir, page, limit])
+    }, [search, statusFilter, typeFilter, sortBy, sortDir, page, limit, d.loadFailed])
 
     useEffect(() => { load() }, [load])
 
     // Stable handlers — reset page on filter/sort change
-    const handleSearch = useCallback((q: string) => { setSearch(q); setPage(1) }, [])
-    const handleStatusFilter = useCallback((s: StatusFilter) => { setStatusFilter(s); setPage(1) }, [])
-    const handleTypeFilter = useCallback((t: TypeFilter) => { setTypeFilter(t); setPage(1) }, [])
+    const handleSearch       = useCallback((q: string)              => { setSearch(q);        setPage(1) }, [])
+    const handleStatusFilter = useCallback((s: StatusFilter)        => { setStatusFilter(s);  setPage(1) }, [])
+    const handleTypeFilter   = useCallback((tf: TypeFilter)         => { setTypeFilter(tf);   setPage(1) }, [])
 
     const handleSort = useCallback((key: SortKey) => {
         if (sortBy === key) {
-            setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+            setSortDir(dir => dir === 'asc' ? 'desc' : 'asc')
         } else {
             setSortBy(key)
             setSortDir('asc')
@@ -93,11 +97,11 @@ export function DiscountsClientLayout() {
         try {
             const res = await fetch('/api/v1/discounts/export')
             if (res.status === 413) {
-                toast.error('Export limited to 10,000 rows. Please apply a date filter first.')
+                toast.error(d.exportLimitError)
                 return
             }
             if (!res.ok) {
-                toast.error('Export failed. Please try again.')
+                toast.error(d.exportFailed)
                 return
             }
             // Stream → blob → download with the server-provided filename (no raw browser navigation).
@@ -113,9 +117,9 @@ export function DiscountsClientLayout() {
             a.remove()
             URL.revokeObjectURL(url)
         } catch {
-            toast.error('Export failed. Please try again.')
+            toast.error(d.exportFailed)
         }
-    }, [])
+    }, [d.exportLimitError, d.exportFailed])
 
     // Open the styled confirm modal (per F33 design — shared with the edit form, no native confirm()).
     const handleDelete = useCallback((discount: Discount) => { setDeleteTarget(discount) }, [])
@@ -126,21 +130,21 @@ export function DiscountsClientLayout() {
         if (!discount) return
         setDeleteTarget(null)
         // Optimistic remove
-        setDiscounts(prev => prev.filter(d => d.id !== discount.id))
+        setDiscounts(prev => prev.filter(dc => dc.id !== discount.id))
         try {
             const res = await fetch(`/api/v1/discounts/${discount.id}`, {
                 method: 'DELETE',
                 credentials: 'include',
             })
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            toast.success(`Discount "${discount.code}" deleted`)
+            toast.success(ti(d.deleteSuccess, { code: discount.code }))
         } catch (err) {
             console.error('[Discounts delete]', err)
             // Restore on error
             setDiscounts(prev => [discount, ...prev])
-            toast.error(`Failed to delete "${discount.code}"`)
+            toast.error(ti(d.deleteFailed, { code: discount.code }))
         }
-    }, [deleteTarget])
+    }, [deleteTarget, d.deleteSuccess, d.deleteFailed, ti])
 
     const hasFilters = !!(search || statusFilter !== 'all' || typeFilter !== 'all')
     const isEmpty = !loading && discounts.length === 0
@@ -151,10 +155,10 @@ export function DiscountsClientLayout() {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>
-                        Discounts
+                        {d.title}
                     </h1>
-                    <p className="text-[14px] mt-1 w-full" style={{ color: 'var(--dash-text-muted)' }}>
-                        Create and manage promo codes for this store. Customers apply one code at checkout; usage is tracked against each code&apos;s limit. Deleting a code keeps its usage history.
+                    <p className="text-[13px] mt-1 max-w-2xl" style={{ color: 'var(--dash-text-muted)' }}>
+                        {d.subtitle}
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 pt-0.5">
@@ -165,7 +169,7 @@ export function DiscountsClientLayout() {
                         style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                     >
                         <Download className="w-3.5 h-3.5" />
-                        Export CSV
+                        {d.exportCsv}
                     </button>
                     <button
                         type="button"
@@ -174,7 +178,7 @@ export function DiscountsClientLayout() {
                         style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0891b2 100%)' }}
                     >
                         <Plus className="w-3.5 h-3.5" />
-                        Create discount
+                        {d.createDiscount}
                     </button>
                 </div>
             </div>
@@ -198,20 +202,20 @@ export function DiscountsClientLayout() {
                 >
                     {hasFilters ? (
                         <>
-                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>No results found</p>
-                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>Try adjusting your search or filter criteria</p>
+                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>{d.emptyNoResults}</p>
+                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{d.emptyNoResultsSubtitle}</p>
                         </>
                     ) : (
                         <>
-                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>No discounts yet</p>
-                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>Create your first discount code to get started</p>
+                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>{d.emptyNoDiscounts}</p>
+                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{d.emptyNoDiscountsSubtitle}</p>
                             <button
                                 type="button"
                                 onClick={handleNew}
                                 className="mt-2 flex items-center gap-2 h-[40px] px-5 rounded-[10px] text-[13px] font-semibold text-white cursor-pointer"
                                 style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0891b2 100%)' }}
                             >
-                                + Create discount
+                                + {d.createDiscount}
                             </button>
                         </>
                     )}
@@ -237,16 +241,16 @@ export function DiscountsClientLayout() {
                     {/* Left: count + rows per page */}
                     <div className="flex items-center gap-4">
                         <span>
-                            Showing{' '}
+                            {d.showing}{' '}
                             <strong style={{ color: 'var(--dash-text)' }}>
                                 {total === 0 ? 0 : (page - 1) * limit + 1}–{Math.min(page * limit, total)}
                             </strong>{' '}
-                            of{' '}
+                            {d.of}{' '}
                             <strong style={{ color: 'var(--dash-text)' }}>{total}</strong>{' '}
-                            codes
+                            {d.codes}
                         </span>
                         <div className="flex items-center gap-2">
-                            <span>Rows per page:</span>
+                            <span>{d.rowsPerPage}</span>
                             <select
                                 value={limit}
                                 onChange={e => { setLimit(Number(e.target.value)); setPage(1) }}

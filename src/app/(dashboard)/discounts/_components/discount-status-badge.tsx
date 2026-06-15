@@ -1,8 +1,14 @@
+'use client'
+
+import { useI18n } from '@/i18n'
+
 interface DiscountStatusBadgeProps {
     status: string
 }
 
 export function DiscountStatusBadge({ status }: DiscountStatusBadgeProps) {
+    const { t } = useI18n()
+    const d = t.dashboard.discounts
     const isActive = status === 'active'
 
     return (
@@ -17,7 +23,7 @@ export function DiscountStatusBadge({ status }: DiscountStatusBadgeProps) {
                     isActive ? 'bg-green-400' : 'bg-slate-400'
                 }`}
             />
-            {isActive ? 'Active' : 'Inactive'}
+            {isActive ? d.badges.active : d.badges.inactive}
         </span>
     )
 }
