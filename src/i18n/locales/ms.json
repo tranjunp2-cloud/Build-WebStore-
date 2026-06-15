@@ -3247,6 +3247,7 @@
             "pageHidden": "Halaman disembunyikan",
             "visibilityFailed": "Gagal mengemas kini keterlihatan",
             "deleteFailed": "Gagal memadam halaman",
+            "cannotDeleteLastPage": "Tidak boleh memadam halaman terakhir — laman web perlu sekurang-kurangnya satu halaman.",
             "deleteSuccess": "Halaman dipadam. Buat asal?",
             "undo": "Buat Asal",
             "restored": "Halaman dipulihkan",

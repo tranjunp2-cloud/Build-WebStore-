@@ -232,6 +232,12 @@ export function PageManagerPanel({
     const handleDelete = async (page: PageData) => {
         if (SYSTEM_PAGE_SLUGS.has(page.slug) || page.isHomepage) return
 
+        // A site must keep at least one regular page (#1226 AC).
+        if (regularPages.length <= 1) {
+            toast.error(pm.cannotDeleteLastPage)
+            return
+        }
+
         const now = new Date().toISOString()
         updatePageInState(page.id, { deletedAt: now })
         setPendingPageId(page.id)
@@ -261,6 +267,9 @@ export function PageManagerPanel({
             toast.error(err instanceof Error ? err.message : pm.deleteFailed)
             return
         }
+
+        // Clear the pending spinner on the happy path too (catch already clears it).
+        setPendingPageId(null)
 
         toast(pm.deleteSuccess, {
             action: {
