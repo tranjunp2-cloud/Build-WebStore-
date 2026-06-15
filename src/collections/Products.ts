@@ -3,6 +3,10 @@ import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import {
+    revalidateBadgeCountsAfterChange,
+    revalidateBadgeCountsAfterDelete,
+} from '@/lib/dashboard/revalidate-badge-counts-hook'
 
 const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
     // If client supplied a value, use it (or slugify it)
@@ -141,7 +145,8 @@ export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
         beforeChange: [beforeChangeHook],
-        afterChange: [afterChangeHook, lowStockHook],
+        afterChange: [afterChangeHook, lowStockHook, revalidateBadgeCountsAfterChange],
+        afterDelete: [revalidateBadgeCountsAfterDelete],
     },
     admin: {
         useAsTitle: 'name',

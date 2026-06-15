@@ -50,12 +50,21 @@ describe('getSidebarBadgeCounts (TC-F18.10)', () => {
         expect(result).toEqual({ orders: 5, products: 3, customers: 2, discounts: 16, leads: 12 })
     })
 
-    it('scopes orders/products/customers/discounts by tenant and leads by tenant sites', async () => {
+    it('scopes orders by tenant + status=pending, others by tenant, leads by tenant sites', async () => {
         const payload = makePayload({ counts: { orders: 1 }, sites: [{ id: 9 }] })
         await getSidebarBadgeCounts(payload, 't42')
 
+        // Orders badge counts only actionable (pending) orders, not all statuses
         const orders = payload.count.mock.calls.find((c) => c[0].collection === 'orders')?.[0]
-        expect(orders?.where).toMatchObject({ tenant: { equals: 't42' } })
+        expect(orders?.where).toMatchObject({ tenant: { equals: 't42' }, status: { equals: 'pending' } })
+
+        // Products badge counts only live (active, not soft-deleted) products
+        const products = payload.count.mock.calls.find((c) => c[0].collection === 'products')?.[0]
+        expect(products?.where).toMatchObject({
+            tenant: { equals: 't42' },
+            status: { equals: 'active' },
+            deletedAt: { exists: false },
+        })
 
         const sitesFind = payload.find.mock.calls.find((c) => c[0].collection === 'sites')?.[0]
         expect(sitesFind?.where).toMatchObject({ tenant: { equals: 't42' } })

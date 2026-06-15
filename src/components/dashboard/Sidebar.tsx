@@ -20,103 +20,17 @@
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-    LayoutDashboard,
-    Globe,
-    LayoutTemplate,
-    Headphones,
-    LogOut,
-    Package,
-    ShoppingCart,
-    Users,
-    UserPlus,
-    Percent,
-    PenLine,
-    CreditCard,
-    Truck,
-    Bell,
-    UsersRound,
-} from 'lucide-react'
+import { Globe, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { NAV_SECTIONS, filterNavSections, type NavLeaf, type SidebarBadgeKey } from '@/config/sidebar-nav'
+import { isPathActive } from '@/lib/sidebar/is-path-active'
+import { formatBadgeCount } from '@/lib/sidebar/format-badge-count'
+import { LanguageToggle } from '@/components/shared/LanguageToggle'
 
-// ─── Nav Config (flat sections — design §2 table) ───────────────────────
-
-/** Keys the layout can pass counts for; anything absent simply renders no badge. */
-export type SidebarBadgeKey = 'orders' | 'products' | 'discounts' | 'customers' | 'leads'
-
-interface NavLeaf {
-    label: { en: string; ms: string }
-    icon: typeof LayoutDashboard
-    href: string
-    /** RBAC permission id (builder/blog/orders/products/settings) — full-access roles bypass. */
-    permissionId?: string
-    /** CRM items keep the legacy "owner/admin only" gate (parity with the old /customers group). */
-    fullAccessOnly?: boolean
-    superAdminOnly?: boolean
-    /** Dev-only item (Templates Health): hidden on Production, visible on dev/staging/sandbox (phase-03). */
-    devOnly?: boolean
-    badgeKey?: SidebarBadgeKey
-}
-
-interface NavSection {
-    /** null = no header (Dashboard standalone block). */
-    header: { en: string; ms: string } | null
-    items: NavLeaf[]
-}
-
-const NAV_SECTIONS: NavSection[] = [
-    {
-        header: null,
-        items: [
-            { label: { en: 'Dashboard', ms: 'Papan Pemuka' }, icon: LayoutDashboard, href: '/dashboard' },
-        ],
-    },
-    {
-        header: { en: 'Online Store', ms: 'Kedai Online' },
-        // Media intentionally absent — old-version parity (decision 2026-06-11)
-        items: [
-            { label: { en: 'Editor', ms: 'Editor' }, icon: LayoutTemplate, href: '/editor', permissionId: 'builder' },
-            { label: { en: 'Blog', ms: 'Blog' }, icon: PenLine, href: '/blog', permissionId: 'blog' },
-        ],
-    },
-    {
-        header: { en: 'Core Operations', ms: 'Operasi Teras' },
-        items: [
-            { label: { en: 'Orders', ms: 'Pesanan' }, icon: ShoppingCart, href: '/orders', permissionId: 'orders', badgeKey: 'orders' },
-            { label: { en: 'Products', ms: 'Produk' }, icon: Package, href: '/products', permissionId: 'products', badgeKey: 'products' },
-            { label: { en: 'Discounts', ms: 'Diskaun' }, icon: Percent, href: '/discounts', permissionId: 'orders', badgeKey: 'discounts' },
-        ],
-    },
-    {
-        header: { en: 'CRM', ms: 'CRM' },
-        items: [
-            { label: { en: 'All Customers', ms: 'Semua Pelanggan' }, icon: Users, href: '/customers', fullAccessOnly: true, badgeKey: 'customers' },
-            { label: { en: 'Contact Leads', ms: 'Kenalan' }, icon: UserPlus, href: '/contact-leads', fullAccessOnly: true, badgeKey: 'leads' },
-        ],
-    },
-    {
-        header: { en: 'Settings', ms: 'Tetapan' },
-        items: [
-            { label: { en: 'Payments', ms: 'Pembayaran' }, icon: CreditCard, href: '/settings/payments', permissionId: 'settings' },
-            { label: { en: 'Shipping', ms: 'Penghantaran' }, icon: Truck, href: '/settings/shipping', permissionId: 'settings' },
-            { label: { en: 'Domains', ms: 'Domain' }, icon: Globe, href: '/settings/domains', permissionId: 'settings' },
-            { label: { en: 'Email Templates', ms: 'Templat E-mel' }, icon: Bell, href: '/settings/email-templates', permissionId: 'settings' },
-            // Visible to ALL roles: the target page is the 2-tab Profile+Staff merge (phase-04);
-            // the Staff tab is owner-gated inside the page, never here.
-            { label: { en: 'Team & Account', ms: 'Pasukan & Akaun' }, icon: UsersRound, href: '/settings/staff' },
-        ],
-    },
-    {
-        header: { en: 'Support', ms: 'Sokongan' },
-        items: [
-            { label: { en: 'Help Center', ms: 'Pusat Bantuan' }, icon: Headphones, href: '/help' },
-            // Templates Health (dev drift tool) removed from nav 2026-06-11 (Duy Linh): super-admin
-            // page stays reachable by direct URL; showing it to every role on dev/staging was noise.
-        ],
-    },
-]
+// Re-export so badge-count modules (sidebar-badge-counts.ts, -cached.ts) keep importing from here.
+export type { SidebarBadgeKey }
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -147,26 +61,11 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
 
-    // Filter sections per role + custom permissions (flat — same rules as the old accordion filter)
-    const visibleSections = useMemo(() => {
-        const isOwner = currentUserRole === 'owner'
-        // editor/viewer are legacy roles — treat as full access to avoid silently breaking existing staff
-        const hasFullAccess = isOwner || currentUserRole === 'admin' || currentUserRole === 'editor' || currentUserRole === 'viewer'
-
-        return NAV_SECTIONS
-            .map((section) => ({
-                ...section,
-                items: section.items.filter((leaf) => {
-                    if (leaf.devOnly) return !isProduction // env-gate (phase-03), role-independent per design §2
-                    if (leaf.superAdminOnly) return isSuperAdmin
-                    if (leaf.fullAccessOnly) return hasFullAccess
-                    if (!leaf.permissionId) return true
-                    if (hasFullAccess) return true
-                    return permissions.includes(leaf.permissionId)
-                }),
-            }))
-            .filter((section) => section.items.length > 0) // hide header when its whole section is filtered out
-    }, [currentUserRole, permissions, isSuperAdmin, isProduction])
+    // Filter sections per role + custom permissions (shared 5-tier gate — same rules for both sidebars)
+    const visibleSections = useMemo(
+        () => filterNavSections(NAV_SECTIONS, { currentUserRole, permissions, isSuperAdmin, isProduction }),
+        [currentUserRole, permissions, isSuperAdmin, isProduction],
+    )
 
     // Close sidebar on route change
     useEffect(() => {
@@ -215,7 +114,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
     const renderLeaf = (leaf: NavLeaf, mini: boolean) => {
         const Icon = leaf.icon
         const label = locale === 'ms' ? leaf.label.ms : leaf.label.en
-        const isActive = pathname === leaf.href || pathname?.startsWith(leaf.href + '/')
+        const isActive = isPathActive(pathname, leaf.href)
         const count = leaf.badgeKey ? badgeCounts?.[leaf.badgeKey] : undefined
         const hasCount = count != null && count > 0
 
@@ -250,7 +149,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         {/* Badge — neutral pill, hidden when count is 0/undefined (design §2 badge rules) */}
                         {hasCount && (
                             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-dash-surface-hover px-1.5 text-[11px] font-semibold leading-none text-dash-text-muted">
-                                {count > 999 ? '999+' : count}
+                                {formatBadgeCount(count)}
                             </span>
                         )}
                     </>
@@ -322,33 +221,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 className="flex flex-col gap-3 px-3 pt-[17px]"
                 style={{ height: 125, borderTop: '1px solid var(--dash-divider)' }}
             >
-                <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 shrink-0 text-dash-text" />
-                    <div className="flex flex-1 items-center rounded-[16px] border border-dash-border bg-dash-surface px-1 h-[38px]">
-                        <button
-                            onClick={() => locale !== 'ms' && toggleLocale()}
-                            className={cn(
-                                'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
-                                locale === 'ms'
-                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                    : 'text-dash-text-muted hover:text-dash-text'
-                            )}
-                        >
-                            MY
-                        </button>
-                        <button
-                            onClick={() => locale !== 'en' && toggleLocale()}
-                            className={cn(
-                                'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
-                                locale === 'en'
-                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                    : 'text-dash-text-muted hover:text-dash-text'
-                            )}
-                        >
-                            EN
-                        </button>
-                    </div>
-                </div>
+                <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
 
                 <button
                     onClick={handleLogout}

@@ -11,6 +11,7 @@ import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
+import type { SidebarBadgeKey } from '@/config/sidebar-nav'
 import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/EditorSidebar'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
@@ -132,7 +133,16 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [userData, setUserData] = useState<{ name: string; initial: string; role: string; avatarUrl?: string | null } | null>(null)
+    const [userData, setUserData] = useState<{
+        name: string
+        initial: string
+        role: string
+        avatarUrl?: string | null
+        permissions: string[]
+        isSuperAdmin: boolean
+        isProduction: boolean
+        badgeCounts: Partial<Record<SidebarBadgeKey, number>>
+    } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
@@ -306,7 +316,16 @@ export default function EditorPage() {
                     const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
                     const av = data.user.avatar
                     const avatarUrl = av && typeof av === 'object' ? (av.url ?? null) : typeof av === 'string' ? av : null
-                    setUserData({ name, initial: name.charAt(0).toUpperCase(), role: data.user.role || 'viewer', avatarUrl })
+                    setUserData({
+                        name,
+                        initial: name.charAt(0).toUpperCase(),
+                        role: data.user.role || 'viewer',
+                        avatarUrl,
+                        permissions: data.user.permissions ?? [],
+                        isSuperAdmin: Boolean(data.user.isSuperAdmin),
+                        isProduction: Boolean(data.user.isProduction),
+                        badgeCounts: data.user.badgeCounts ?? {},
+                    })
                 }
 
                 if (data.page) {
@@ -2036,6 +2055,10 @@ export default function EditorPage() {
                 userName={userData?.name}
                 userInitial={userData?.initial}
                 userAvatarUrl={userData?.avatarUrl}
+                permissions={userData?.permissions}
+                isSuperAdmin={userData?.isSuperAdmin}
+                isProduction={userData?.isProduction}
+                badgeCounts={userData?.badgeCounts}
                 hasUnsavedChanges={hasUnsavedChanges}
             />
 

@@ -2,6 +2,10 @@ import type { CollectionConfig } from 'payload'
 import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
 import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
 import { updatePaymentStatus } from './orders-hooks/update-payment-status'
+import {
+    revalidateBadgeCountsAfterChange,
+    revalidateBadgeCountsAfterDelete,
+} from '@/lib/dashboard/revalidate-badge-counts-hook'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -51,6 +55,12 @@ export const Orders: CollectionConfig = {
                 return doc
             },
             syncCustomerSnapshot,
+            // Bust the sidebar pending-orders badge cache on any create/update (status change)
+            revalidateBadgeCountsAfterChange,
+        ],
+        afterDelete: [
+            // Deleting a pending order must drop the badge count too
+            revalidateBadgeCountsAfterDelete,
         ],
     },
     admin: {

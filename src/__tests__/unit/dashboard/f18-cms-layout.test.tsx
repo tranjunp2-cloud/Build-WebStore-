@@ -118,9 +118,9 @@ describe('F18 CMS Core Layout', () => {
             rerender(<DashboardSidebar {...defaultProps} />)
             expect(screen.queryByText('384')).toBeNull()
 
-            // Counts above 999 cap at "999+"
+            // Large counts use compact international notation (1500 → "1.5K") so the pill never overflows
             rerender(<DashboardSidebar {...defaultProps} badgeCounts={{ orders: 1500 }} />)
-            expect(screen.getAllByText('999+').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('1.5K').length).toBeGreaterThan(0)
             expect(screen.queryByText('1500')).toBeNull()
         })
 
