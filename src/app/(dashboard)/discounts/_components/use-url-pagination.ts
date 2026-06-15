@@ -18,6 +18,9 @@ export function useUrlPagination(defaultLimit = 10) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
+    // URL params are untrusted — Number('abc') = NaN, Number(null) = 0. Both initialisers reject any
+    // non-conforming value so a tampered `?page=abc&limit=xyz` can never leak NaN into the API query:
+    // page must be a positive integer (else → 1); limit must be an allowed PAGE_SIZES entry (else → default).
     const [page, setPage] = useState(() => {
         const p = Number(searchParams.get('page'))
         return Number.isInteger(p) && p > 0 ? p : 1
