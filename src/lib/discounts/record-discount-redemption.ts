@@ -19,11 +19,21 @@ export interface ReserveResult {
  *
  * ATOMIC GATE (UPDATE-first): the row-lock-serialized `UPDATE discounts ... WHERE usage_count < usage_limit`
  * is the authority — Postgres re-evaluates the WHERE against the latest committed `usage_count` after
- * acquiring the row lock, so two concurrent place-orders on a 1-slot code can NEVER both bump. The history
- * INSERT fires ONLY when the bump fired, so an at-limit attempt leaves NO history row (no phantom reserve).
+ * acquiring the row lock, so two concurrent place-orders for DISTINCT orders on a 1-slot code can NEVER
+ * both bump (capacity is serialized). The history INSERT fires ONLY when the bump fired, so an at-limit
+ * attempt leaves NO history row (no phantom reserve).
  *   - `reserved`        — slot taken now (count bumped, history inserted).
  *   - `already-reserved`— this order already holds a slot (prior history row); idempotent no-op. Safe under
- *                         retries (webhook re-delivery, confirm-poll, cron, double submit).
+ *                         SEQUENTIAL retries (webhook re-delivery, confirm-poll, cron, double submit).
+ *
+ * CALLER CONTRACT (idempotency scope): the `prior` existence check reads the statement's MVCC snapshot, so
+ * it does NOT serialize two CONCURRENT calls for the SAME `order_id` — both could observe empty `prior` and
+ * both bump while only one history row lands. Capacity across distinct orders is still safe (above); only the
+ * per-order idempotency guarantee is sequential-only. Every caller today reserves each `order_id` exactly
+ * once, synchronously (checkout / stripe-checkout / free-order); `reconcileOrderPaid` is gated upstream by a
+ * single-winner `status='pending'` CAS. Do NOT invoke this concurrently for one `order_id`. A truly
+ * concurrent-safe rewrite (claim the unique `order_id` via INSERT-first, then bump only if the insert won)
+ * is tracked as an F33 follow-up.
  *   - `at-limit`        — code sold out; nothing written. Caller MUST block + notify the buyer.
  *   - `no-discount`     — nothing to reserve (no discount / non-positive amount).
  *   - `error`          — unexpected DB error; caller should fail safe (do not let the order through silently).
@@ -58,8 +68,10 @@ export async function recordDiscountRedemption(
 
         // Single atomic statement. `prior` snapshots whether this order already reserved (idempotency).
         // `bump` is the gate: it fires ONLY when capacity remains AND the order has no prior reservation —
-        // row-lock serialized, so concurrent place-orders can't both pass. `ins` records history ONLY when
-        // the bump fired, so an at-limit attempt writes nothing (no phantom slot to leak).
+        // the row-lock serializes capacity across DISTINCT orders (two can't both exceed the limit). Per-order
+        // idempotency is sequential-only: `prior` reads the MVCC snapshot, so the caller MUST not reserve the
+        // same order_id concurrently (see JSDoc CALLER CONTRACT). `ins` records history ONLY when the bump
+        // fired, so an at-limit attempt writes nothing (no phantom slot to leak).
         const res = await db.drizzle.execute(sql`
             WITH prior AS (
                 SELECT 1 FROM discount_usage_history WHERE order_id = ${Number(args.orderId)}

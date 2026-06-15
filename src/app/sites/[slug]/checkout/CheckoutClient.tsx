@@ -413,7 +413,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     } else {
                         router.push(confirmUrl)
                     }
-                } else if (data.error?.code === 'DISCOUNT_EXHAUSTED' || res.status === 409) {
+                } else if (data.error?.code === 'DISCOUNT_EXHAUSTED') {
                     handleDiscountExhausted()
                 } else {
                     toast.error(data.error?.message || 'Failed to initialize payment')
@@ -455,7 +455,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 } else {
                     router.push(confirmUrl)
                 }
-            } else if (data.error?.code === 'DISCOUNT_EXHAUSTED' || res.status === 409) {
+            } else if (data.error?.code === 'DISCOUNT_EXHAUSTED') {
                 dismissOverlay()
                 handleDiscountExhausted()
             } else {

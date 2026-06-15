@@ -59,13 +59,19 @@ export function DiscountsUsageHistoryLayout() {
         return () => clearTimeout(id)
     }, [search])
 
+    // Generation ref — stale-fetch guard (same pattern as discounts-client-layout): rapid page/limit/search
+    // changes can let an earlier slow response overwrite a newer one; only the latest generation commits.
+    const genRef = useRef(0)
+
     // Server-side search across the WHOLE dataset (not just the current page).
     useEffect(() => {
+        const gen = ++genRef.current
         setLoading(true)
         const qs = `limit=${limit}&page=${page}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`
         fetch(`/api/v1/discounts/usage-history?${qs}`)
             .then((r) => r.json())
             .then((json: ApiResponse) => {
+                if (gen !== genRef.current) return
                 if (json.success) {
                     setRows(json.docs ?? [])
                     setTotalPages(json.totalPages ?? 1)
@@ -73,7 +79,7 @@ export function DiscountsUsageHistoryLayout() {
                 }
             })
             .catch(() => {/* silent — empty state shown */})
-            .finally(() => setLoading(false))
+            .finally(() => { if (gen === genRef.current) setLoading(false) })
     }, [page, limit, debouncedSearch])
 
     const hasAnyData = rows.length > 0 || loading
