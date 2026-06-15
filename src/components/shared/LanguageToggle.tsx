@@ -29,6 +29,7 @@ export function LanguageToggle({ locale, toggleLocale, className }: LanguageTogg
             <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
             <div className="flex flex-1 items-center gap-1">
                 <button
+                    type="button"
                     onClick={() => locale !== 'ms' && toggleLocale()}
                     className={cn(
                         'flex-1 flex items-center justify-center rounded-[12px] h-[30px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
@@ -40,6 +41,7 @@ export function LanguageToggle({ locale, toggleLocale, className }: LanguageTogg
                     MY
                 </button>
                 <button
+                    type="button"
                     onClick={() => locale !== 'en' && toggleLocale()}
                     className={cn(
                         'flex-1 flex items-center justify-center rounded-[12px] h-[30px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',

@@ -171,10 +171,12 @@ export function EditorMenuDrawer({
                 <div className="flex h-[65px] items-center justify-between border-b border-dash-border px-4">
                     {/* Logo — matches the dashboard header (TopHeader): real logo image + Prime/Web split */}
                     <div className="flex items-center gap-2">
-                        <img
+                        <Image
                             src="/images/logo-icon-3c4d76.png"
                             alt="PrimeWeb Logo"
-                            className="w-[28px] h-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                            width={28}
+                            height={28}
+                            className="object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                         />
                         <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
                             <span className="text-dash-text">Prime</span>
