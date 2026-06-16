@@ -70,12 +70,21 @@ export async function GET(
         const ttl = order.paymentExpiresAt
             ? Math.max(Math.floor((new Date(order.paymentExpiresAt).getTime() - Date.now()) / 1000), 3600)
             : 86400
+        // Cookie must be readable by the storefront subdomain ({slug}.web-v2.X) which differs
+        // from this CMS domain (web-cms-v2.X). Setting Domain to the shared parent (e.g.
+        // .dev.ecommercehub.my) lets the browser send the cookie to both. On local dev
+        // NEXT_PUBLIC_PLATFORM_DOMAIN is unset so we omit Domain (defaults to localhost).
+        const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN
+        const cookieDomain = platformDomain
+            ? '.' + platformDomain.split('.').slice(1).join('.')
+            : undefined
         response.cookies.set(`ct_${order.id}`, confirmToken, {
             httpOnly: true,
             path: '/',
             maxAge: ttl,
             sameSite: 'lax',
             secure: process.env.NODE_ENV === 'production',
+            ...(cookieDomain ? { domain: cookieDomain } : {}),
         })
         return response
     } catch {
