@@ -14,6 +14,17 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com', roles: ['super-admin'] }),
 }))
 
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+
 // Giả lập OpenAI cho tính năng SEO Fix
 vi.mock('openai', () => {
     const OpenAI = vi.fn()

@@ -207,7 +207,7 @@ export function CustomersDetail({ customer }: Props) {
             {/* Sticky save bar — only on Default tab */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[260px] flex items-center justify-between gap-3 px-6 py-3 border-t border-white/[0.06] z-40"
+                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t border-white/[0.06] z-40"
                     style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)' }}
                 >
                     <span style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>

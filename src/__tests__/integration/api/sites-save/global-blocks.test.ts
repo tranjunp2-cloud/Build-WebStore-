@@ -51,13 +51,34 @@ vi.mock('@/lib/block-normalization', () => ({
     normalizeBlocksForPersistence: vi.fn((b: unknown) => b),
 }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1',
+        plan: 'PROFESSIONAL_TM_USER',
+        status: 'active',
+        startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    isSubscriptionActive: vi.fn().mockReturnValue(true),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+    recordUsage: vi.fn().mockResolvedValue(undefined),
+    reduceUsage: vi.fn().mockResolvedValue(undefined),
+    getConsumed: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
+
 import { PATCH } from '@/app/api/sites/[siteId]/save/route'
 import { getCurrentUser } from '@/lib/auth'
 import { getPayload } from 'payload'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { getActivePlanSubscription, isSubscriptionActive, canUse } from '@/lib/subscriptions/plan-subscription'
 
 const mockGetCurrentUser = vi.mocked(getCurrentUser)
 const mockGetPayload = vi.mocked(getPayload)
+const MOCK_SUB = { id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z' }
 
 const MOCK_USER = {
     id: 'user-1',
@@ -86,6 +107,9 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
         vi.clearAllMocks()
         mockGetCurrentUser.mockResolvedValue(MOCK_USER as never)
         vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, resetAt: Date.now() + 60_000 })
+        vi.mocked(getActivePlanSubscription).mockResolvedValue(MOCK_SUB as any)
+        vi.mocked(isSubscriptionActive).mockReturnValue(true)
+        vi.mocked(canUse).mockResolvedValue(true)
 
         mockPayloadInstance = {
             findByID: vi.fn().mockResolvedValue({

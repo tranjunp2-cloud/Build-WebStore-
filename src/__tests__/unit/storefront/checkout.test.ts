@@ -4,7 +4,6 @@ import {
     validateCheckoutForm,
     validateEmail,
     validatePhone,
-    calculateOrderTotals,
     generateOrderNumber,
     validatePaymentProof,
     PROOF_MAX_SIZE_BYTES,
@@ -134,83 +133,6 @@ describe('[TC-F09.23/TC-F09.24] Checkout Form Validation (validateCheckoutForm)'
         // Assert
         expect(result.valid).toBe(false)
         expect(result.errors).toContain('Name is required')
-    })
-})
-
-// ─── TC-F09.33, TC-F09.51: Order Totals & SST Tax Calculation ───────────────
-describe('[TC-F09.33/TC-F09.51] Order Totals — SST 6% Calculation (calculateOrderTotals)', () => {
-    it('TC-F09.33: calculates SST at exactly 6% of subtotal', () => {
-        // Arrange
-        const items = [{ price: 100, quantity: 1 }]
-
-        // Act
-        const { subtotal, tax, total } = calculateOrderTotals(items)
-
-        // Assert — SST RM 100 -> SST RM 6.00 (TC-F09.33 example)
-        expect(subtotal).toBe(100)
-        expect(tax).toBe(6)
-        expect(total).toBe(106)
-    })
-
-    it('TC-F09.33: handles multiple items with correct SST total', () => {
-        // Arrange
-        const items = [
-            { price: 49.90, quantity: 2 },
-            { price: 29.90, quantity: 1 },
-        ]
-
-        // Act
-        const { subtotal, tax, total } = calculateOrderTotals(items)
-
-        // Assert
-        expect(subtotal).toBeCloseTo(129.70)
-        expect(tax).toBeCloseTo(7.78)
-        expect(total).toBeCloseTo(137.48)
-    })
-
-    it('TC-F09.33: returns zero totals for empty cart', () => {
-        // Arrange + Act
-        const { subtotal, tax, total } = calculateOrderTotals([])
-
-        // Assert
-        expect(subtotal).toBe(0)
-        expect(tax).toBe(0)
-        expect(total).toBe(0)
-    })
-
-    it('TC-F09.51: rounds SST to exactly 2 decimal places (rounding rule)', () => {
-        // Arrange — RM 33.33 * 6% = 1.9998 → rounds to RM 2.00
-        const items = [{ price: 33.33, quantity: 1 }]
-
-        // Act
-        const { tax } = calculateOrderTotals(items)
-
-        // Assert
-        expect(tax).toBe(2)
-    })
-
-    it('TC-F09.51: rounds fractional SST correctly (RM 1.55 * 6% = 0.093 -> RM 0.09)', () => {
-        // Arrange
-        const items = [{ price: 1.55, quantity: 1 }]
-
-        // Act
-        const { tax } = calculateOrderTotals(items)
-
-        // Assert — 0.093 rounds to 0.09
-        expect(tax).toBe(0.09)
-    })
-
-    it('TC-F09.54: handles large cart values (RM 10,000+) without precision errors', () => {
-        // Arrange — simulate large order
-        const items = [{ price: 5000, quantity: 2 }]
-
-        // Act
-        const { subtotal, tax, total } = calculateOrderTotals(items)
-
-        // Assert
-        expect(subtotal).toBe(10000)
-        expect(tax).toBe(600)
-        expect(total).toBe(10600)
     })
 })
 

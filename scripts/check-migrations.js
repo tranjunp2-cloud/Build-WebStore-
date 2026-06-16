@@ -65,6 +65,8 @@ const TRACKED_COLLECTIONS = {
   'BlogCategories.ts': 'blog_categories',
   'Categories.ts': 'categories',
   'Notifications.ts': 'notifications',
+  'Discounts.ts': 'discounts',
+  'DiscountUsageHistory.ts': 'discount_usage_history',
 }
 
 function toSnakeCase(str) {

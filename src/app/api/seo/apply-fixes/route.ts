@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { z } from 'zod'
 import { parseRequest } from '@/lib/validations/helpers'
 
@@ -21,7 +22,7 @@ const applyFixesSchema = z.object({
  * Applies a batch array of SEO metadata updates to Pages and Products.
  * Also acts as the Undo endpoint by sending reversed values.
  */
-export const POST = withAuth(async (_user, request) => {
+export const POST = withFeatureGuard('content_management')(withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, applyFixesSchema)
         if (errorResponse) return errorResponse
@@ -107,4 +108,4 @@ export const POST = withAuth(async (_user, request) => {
             { status: 500 }
         )
     }
-})
+}))

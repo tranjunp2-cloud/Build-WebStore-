@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { createBlogSchema } from '@/lib/validations/blog'
 
@@ -88,7 +89,7 @@ export const GET = withAuth(async (user, req) => {
 /**
  * POST /api/blogs — Create a new blog post
  */
-export const POST = withAuth(async (user, req) => {
+export const POST = withFeatureGuard('content_management')(withAuth(async (user, req) => {
     try {
         const { data, errorResponse } = await parseRequest(req, createBlogSchema)
         if (errorResponse) return errorResponse
@@ -153,4 +154,4 @@ export const POST = withAuth(async (user, req) => {
             { status: 500 }
         )
     }
-})
+}))

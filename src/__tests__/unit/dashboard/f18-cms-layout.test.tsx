@@ -9,7 +9,11 @@ vi.mock('@/i18n', () => ({
         setLocale: vi.fn(),
         toggleLocale: vi.fn(),
         t: {
-            cms: { profile: 'Profile', logout: 'Logout' },
+            cms: {
+                profile: 'Profile',
+                logout: 'Logout',
+                appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' },
+            },
             dashboard: { overview: { greeting: 'Good' } },
         },
         tp: vi.fn(),
@@ -80,29 +84,58 @@ describe('F18 CMS Core Layout', () => {
             permissions: ['builder', 'blog', 'products', 'orders', 'settings'],
         }
 
-        it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {
+        it('[TC-F18.01] Renders Desktop sidebar with flat section headers and links (#1138 IA)', () => {
             render(<DashboardSidebar {...defaultProps} />)
             expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
-            // v1.0: Products/Orders removed — verify "My Website" and Settings group present
-            expect(screen.getAllByText('My Website').length).toBeGreaterThan(0)
-            expect(screen.getAllByRole('button', { name: /Settings/i }).length).toBeGreaterThan(0)
+            // Flat IA: static section headers replace the old accordion groups
+            expect(screen.getAllByText('Online Store').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('Core Operations').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('Settings').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('Support').length).toBeGreaterThan(0)
 
             // Check hrefs
             const dashboardLinks = screen.getAllByRole('link', { name: /Dashboard/i })
             expect(dashboardLinks[0]).toHaveAttribute('href', '/dashboard')
         })
 
-        it('[TC-F18.21] Expands My Website to reveal Editor and Blog', () => {
+        it('[TC-F18.21] Flat IA: Editor and Blog always visible, no accordion to expand (#1138)', () => {
             render(<DashboardSidebar {...defaultProps} />)
 
-            const websiteBtn = screen.getAllByRole('button', { name: /My Website/i })[0]
-            expect(websiteBtn).toHaveAttribute('aria-expanded', 'false')
+            // Section header is a static label — must NOT be a button (no expand/collapse)
+            expect(screen.queryByRole('button', { name: /Online Store/i })).toBeNull()
+            expect(screen.queryByRole('button', { name: /My Website/i })).toBeNull()
 
-            fireEvent.click(websiteBtn)
-            expect(websiteBtn).toHaveAttribute('aria-expanded', 'true')
+            // Leaves render immediately without any click
+            expect(screen.getAllByRole('link', { name: /Editor/i })[0]).toHaveAttribute('href', '/editor')
+            expect(screen.getAllByRole('link', { name: /Blog/i })[0]).toHaveAttribute('href', '/blog')
+        })
 
-            expect(screen.getAllByText('Editor').length).toBeGreaterThan(0)
-            expect(screen.getAllByText('Blog').length).toBeGreaterThan(0)
+        it('[TC-F18.01b] Badge pill renders from badgeCounts prop, hidden when 0/undefined (#1138)', () => {
+            const { rerender } = render(
+                <DashboardSidebar {...defaultProps} badgeCounts={{ orders: 384, products: 0 }} />
+            )
+            // orders=384 → pill visible; products=0 and discounts=undefined → no pill
+            expect(screen.getAllByText('384').length).toBeGreaterThan(0)
+            expect(screen.queryByText('0')).toBeNull()
+
+            // No badgeCounts at all → no pills anywhere (UI-only, no fake data)
+            rerender(<DashboardSidebar {...defaultProps} />)
+            expect(screen.queryByText('384')).toBeNull()
+
+            // Large counts use compact international notation (1500 → "1.5K") so the pill never overflows
+            rerender(<DashboardSidebar {...defaultProps} badgeCounts={{ orders: 1500 }} />)
+            expect(screen.getAllByText('1.5K').length).toBeGreaterThan(0)
+            expect(screen.queryByText('1500')).toBeNull()
+        })
+
+        it('[TC-F18.01c] Relabels: Email Templates keeps the email-templates route; Team & Account points to staff (#1138)', () => {
+            render(<DashboardSidebar {...defaultProps} />)
+            expect(screen.getAllByRole('link', { name: /Email Templates/i })[0]).toHaveAttribute('href', '/settings/email-templates')
+            expect(screen.getAllByRole('link', { name: /Team & Account/i })[0]).toHaveAttribute('href', '/settings/staff')
+            expect(screen.getAllByRole('link', { name: /All Customers/i })[0]).toHaveAttribute('href', '/customers')
+            expect(screen.getAllByRole('link', { name: /Discounts/i })[0]).toHaveAttribute('href', '/discounts')
+            // Media stays out of the nav (old-version parity decision)
+            expect(screen.queryByRole('link', { name: /Media/i })).toBeNull()
         })
 
         it('[TC-F18.10] Toggles Language (MY/EN)', () => {
@@ -111,7 +144,7 @@ describe('F18 CMS Core Layout', () => {
                 locale: 'en', 
                 setLocale: vi.fn(), 
                 toggleLocale: toggleLocaleMock, 
-                t: { cms: { profile: 'Profile', logout: 'Logout' }, dashboard: { overview: { greeting: 'Good' } } } as any,
+                t: { cms: { profile: 'Profile', logout: 'Logout', appSwitcher: { switchApp: 'Switch app', ssoRedirect: 'Secure SSO redirect' } }, dashboard: { overview: { greeting: 'Good' } } } as any,
                 tp: vi.fn(),
                 ti: vi.fn()
             })
@@ -169,6 +202,24 @@ describe('F18 CMS Core Layout', () => {
         it('[TC-F18.08] Renders Notification Bell', () => {
             render(<TopHeader {...defaultProps} />)
             expect(screen.getByTestId('notification-bell')).toBeInTheDocument()
+        })
+
+        it('[TC-F18.43] App Switcher ⊞ opens dropdown with SSO redirect, closes on ESC (#1138 P03)', () => {
+            render(<TopHeader {...defaultProps} />)
+
+            const btn = screen.getByLabelText('Switch app')
+            expect(btn).toHaveAttribute('aria-expanded', 'false')
+
+            // Open → current app (Web Store) is NOT listed; Secure SSO redirect link shown
+            fireEvent.click(btn)
+            expect(btn).toHaveAttribute('aria-expanded', 'true')
+            expect(screen.queryByText('Web Store')).toBeNull()
+            const sso = screen.getByText('Secure SSO redirect')
+            expect(sso.closest('a')).toHaveAttribute('target', '_blank')
+
+            // ESC closes
+            fireEvent.keyDown(document, { key: 'Escape' })
+            expect(screen.queryByText('Secure SSO redirect')).toBeNull()
         })
 
         it('[TC-F18.09] Avatar drops down showing Profile and Logout', () => {

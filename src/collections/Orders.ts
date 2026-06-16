@@ -2,6 +2,11 @@ import type { CollectionConfig } from 'payload'
 import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
 import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
 import { updatePaymentStatus } from './orders-hooks/update-payment-status'
+import {
+    revalidateBadgeCountsAfterChange,
+    revalidateBadgeCountsAfterDelete,
+} from '@/lib/dashboard/revalidate-badge-counts-hook'
+import { releaseDiscountOnDelete } from './orders-hooks/release-discount-on-delete'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -30,6 +35,9 @@ export const Orders: CollectionConfig = {
             autoLinkCustomer,
             updatePaymentStatus,
         ],
+        beforeDelete: [
+            releaseDiscountOnDelete,
+        ],
         afterChange: [
             async ({ doc, operation, req }) => {
                 if (operation !== 'create') return doc
@@ -51,6 +59,12 @@ export const Orders: CollectionConfig = {
                 return doc
             },
             syncCustomerSnapshot,
+            // Bust the sidebar pending-orders badge cache on any create/update (status change)
+            revalidateBadgeCountsAfterChange,
+        ],
+        afterDelete: [
+            // Deleting a pending order must drop the badge count too
+            revalidateBadgeCountsAfterDelete,
         ],
     },
     admin: {
@@ -383,6 +397,23 @@ export const Orders: CollectionConfig = {
             name: 'cancelReason',
             type: 'textarea',
             admin: { description: 'Required reason when order is cancelled' },
+        },
+        // --- Discount ---
+        {
+            name: 'discount',
+            type: 'relationship',
+            relationTo: 'discounts',
+            admin: { readOnly: true, description: 'Applied discount code record' },
+        },
+        {
+            name: 'discountCode',
+            type: 'text',
+            admin: { readOnly: true, description: 'Snapshot of discount code at time of order' },
+        },
+        {
+            name: 'discountAmount',
+            type: 'number',
+            admin: { readOnly: true, description: 'Discount amount in sen' },
         },
         // --- Stripe card details (for confirm-page "Method" line) ---
         {

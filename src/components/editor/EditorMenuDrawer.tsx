@@ -13,36 +13,20 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-    ChevronDown,
-    Globe,
-    Headphones,
-    LayoutDashboard,
-    LayoutTemplate,
-    LogOut,
-    Moon,
-    Package,
-    Settings,
-    ShoppingCart,
-    Sun,
-    Users,
-    X,
-} from 'lucide-react'
+import { LogOut, Moon, Sun, X } from 'lucide-react'
 import { NotificationBell } from '@/components/dashboard/NotificationBell'
+import { LanguageToggle } from '@/components/shared/LanguageToggle'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { useTheme } from '@/providers/theme-provider'
-
-type LocaleLabel = { en: string; ms: string }
-
-type NavItem = {
-    label: LocaleLabel
-    href: string
-    icon?: React.ComponentType<{ className?: string }>
-    children?: { label: LocaleLabel; href: string; roleFilter?: (role: string) => boolean }[]
-    badge?: string
-    roleFilter?: (role: string) => boolean
-}
+import {
+    NAV_SECTIONS,
+    filterNavSections,
+    type NavLeaf,
+    type SidebarBadgeKey,
+} from '@/config/sidebar-nav'
+import { isPathActive } from '@/lib/sidebar/is-path-active'
+import { formatBadgeCount } from '@/lib/sidebar/format-badge-count'
 
 type EditorMenuDrawerProps = {
     siteId: string
@@ -52,17 +36,38 @@ type EditorMenuDrawerProps = {
     userName?: string
     userInitial?: string
     userAvatarUrl?: string | null
+    /** RBAC inputs — same gate as the dashboard sidebar. Restrictive defaults never widen visibility. */
+    permissions?: string[]
+    isSuperAdmin?: boolean
+    isProduction?: boolean
+    badgeCounts?: Partial<Record<SidebarBadgeKey, number>>
     hasUnsavedChanges?: boolean
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, userAvatarUrl, hasUnsavedChanges }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({
+    siteId,
+    open,
+    onClose,
+    // Fail CLOSED while userData loads (props undefined): '' is NOT in hasFullAccess, so with the
+    // default empty permissions the drawer shows only no-gate items until the real role arrives —
+    // never flashes restricted nav (CRM etc.) to a limited user. Dashboard resolves role server-side
+    // so it has no such window; this keeps the two sidebars' visibility consistent.
+    currentUserRole = '',
+    userName,
+    userInitial,
+    userAvatarUrl,
+    permissions = [],
+    isSuperAdmin = false,
+    isProduction = false,
+    badgeCounts,
+    hasUnsavedChanges,
+}: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { t, locale, toggleLocale } = useI18n()
     const { theme, toggle: toggleTheme } = useTheme()
     const isDark = theme === 'dark'
     const menu = t.editor.menu
-    const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
     const [pendingAction, setPendingAction] = useState<{ href: string } | 'logout' | null>(null)
 
     useEffect(() => {
@@ -81,57 +86,15 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         }
     }, [onClose, open])
 
-    const navItems = useMemo<NavItem[]>(() => {
-        const items: NavItem[] = [
-            { label: { en: 'Dashboard', ms: 'Papan Pemuka' }, href: '/dashboard', icon: LayoutDashboard },
-            {
-                label: { en: 'My Website', ms: 'Laman Web Saya' },
-                href: '/editor',
-                icon: LayoutTemplate,
-                children: [
-                    { label: { en: 'Editor', ms: 'Editor' }, href: `/editor/${siteId}` },
-                    { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
-                ],
-            },
-            { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
-            { label: { en: 'Orders', ms: 'Pesanan' }, href: '/orders', icon: ShoppingCart },
-            {
-                label: { en: 'Customers', ms: 'Pelanggan' },
-                href: '/customers',
-                icon: Users,
-                children: [
-                    { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers' },
-                    { label: { en: 'Contact Leads', ms: 'Kenalan' }, href: '/contact-leads' },
-                ],
-            },
-            {
-                label: { en: 'Settings', ms: 'Tetapan' },
-                href: '/settings',
-                icon: Settings,
-                children: [
-                    { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
-                    { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments' },
-                    { label: { en: 'Email Templates', ms: 'Templat E-mel' }, href: '/settings/email-templates' },
-                    { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff', roleFilter: (role) => role === 'owner' },
-                    { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping' },
-                    { label: { en: 'Account Profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
-                ],
-            },
-            { label: { en: 'Help Center', ms: 'Pusat Bantuan' }, href: '/help', icon: Headphones },
-        ]
-        // Filter children by role
-        return items.map(item => {
-            if (!item.children) return item
-            return { ...item, children: item.children.filter(c => !c.roleFilter || c.roleFilter(currentUserRole)) }
-        })
-    }, [siteId, currentUserRole])
+    // Same flat sections + 5-tier RBAC gate as the dashboard sidebar (shared config — no drift).
+    const visibleSections = useMemo(
+        () => filterNavSections(NAV_SECTIONS, { currentUserRole, permissions, isSuperAdmin, isProduction }),
+        [currentUserRole, permissions, isSuperAdmin, isProduction],
+    )
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include',
-            })
+            await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
         } catch (error) {
             console.error('Logout request failed:', error)
         } finally {
@@ -140,6 +103,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         }
     }
 
+    // Editor-only unsaved-changes guard — intercept EVERY nav click + logout while the page is dirty.
     const guardedNavigate = (href: string) => (e: React.MouseEvent) => {
         e.preventDefault()
         if (hasUnsavedChanges) {
@@ -162,124 +126,110 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         }
     }
 
+    // Flat leaf renderer — mirrors dashboard renderLeaf (cyan active + glow, neutral count badge).
+    // The single editor-only special-case: the Editor leaf deep-links to the current site.
+    const renderLeaf = (leaf: NavLeaf) => {
+        const Icon = leaf.icon
+        const href = leaf.href === '/editor' ? `/editor/${siteId}` : leaf.href
+        const label = locale === 'ms' ? leaf.label.ms : leaf.label.en
+        const isActive = isPathActive(pathname, href)
+        const count = leaf.badgeKey ? badgeCounts?.[leaf.badgeKey] : undefined
+        const hasCount = count != null && count > 0
+
+        return (
+            <Link
+                key={href}
+                href={href}
+                onClick={guardedNavigate(href)}
+                className={cn(
+                    // Identical sizing to the dashboard sidebar renderLeaf (1:1 parity)
+                    'no-underline flex items-center gap-3 px-4 rounded-[12px] h-[32px] 2xl:h-[34px] text-[13px] font-medium leading-[1.43] transition-colors',
+                    isActive
+                        ? 'bg-[rgba(6,182,212,0.12)] text-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.25)]'
+                        : 'text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text',
+                )}
+                aria-current={isActive ? 'page' : undefined}
+            >
+                <Icon className="h-[18px] w-[18px] shrink-0" />
+                <span className="flex-1">{label}</span>
+                {hasCount && (
+                    <span className={cn(
+                        'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none',
+                        isActive
+                            ? 'bg-[rgba(6,182,212,0.15)] text-[#06B6D4]'
+                            : 'bg-dash-surface-hover text-dash-text-muted'
+                    )}>
+                        {formatBadgeCount(count)}
+                    </span>
+                )}
+            </Link>
+        )
+    }
+
     if (!open) return null
 
     return (
         <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-            <aside className="absolute left-0 top-0 flex h-full w-[260px] flex-col border-r border-white/[0.08] bg-[#0B1120] shadow-2xl">
-                <div className="flex h-[65px] items-center justify-between border-b border-white/[0.08] px-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-[12px] font-bold text-white">
-                            P
+            <aside className="absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
+                <div className="flex h-[65px] items-center justify-between border-b border-dash-border px-4">
+                    {/* Logo — matches the dashboard header (TopHeader): real logo image + Prime/Web split */}
+                    <div className="flex items-center gap-2">
+                        <Image
+                            src="/images/logo-icon-3c4d76.png"
+                            alt="PrimeWeb Logo"
+                            width={28}
+                            height={28}
+                            className="object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                        />
+                        <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
+                            <span className="text-dash-text">Prime</span>
+                            <span className="text-[#06B6D4]">Web</span>
                         </div>
-                        <span className="text-lg font-semibold text-white">PrimeWeb</span>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl text-dash-text-muted transition-colors hover:bg-dash-surface-hover hover:text-dash-text"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <nav className="flex-1 space-y-1 px-3 pt-6" aria-label="Editor menu">
-                    {navItems.map(item => {
-                        const Icon = item.icon
-                        const isGroup = Boolean(item.children?.length)
-                        const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
-                        const isExpanded = expandedGroups.includes(item.href)
-                        const label = item.label[locale] || item.label.en
-
-                        if (isGroup) {
-                            return (
-                                <div key={item.href}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setExpandedGroups(prev =>
-                                            prev.includes(item.href) ? prev.filter(g => g !== item.href) : [...prev, item.href]
-                                        )}
-                                        className="flex h-[44px] w-full items-center gap-3 rounded-[16px] px-4 text-left text-[14px] font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
-                                    >
-                                        {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
-                                        <span className="flex-1">{label}</span>
-                                        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', isExpanded && 'rotate-180')} />
-                                    </button>
-                                    <div className={cn('overflow-hidden transition-all', isExpanded ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0')}>
-                                        <div className="flex flex-col gap-1 pl-4">
-                                            {item.children?.map(child => {
-                                                const childActive =
-                                                    pathname === child.href ||
-                                                    pathname?.startsWith(child.href + '/')
-                                                const childLabel = child.label[locale] || child.label.en
-
-                                                return (
-                                                    <Link
-                                                        key={child.href}
-                                                        href={child.href}
-                                                        onClick={guardedNavigate(child.href)}
-                                                        className={cn(
-                                                            'flex h-10 items-center gap-3 rounded-[12px] px-4 text-[14px] font-medium transition-colors',
-                                                            childActive
-                                                                ? 'text-[#3B82F6]'
-                                                                : 'text-slate-300 hover:text-white',
-                                                        )}
-                                                    >
-                                                        <span
-                                                            className="h-2 w-2 shrink-0 rounded-full"
-                                                            style={{ backgroundColor: childActive ? '#3B82F6' : 'var(--editor-text-muted)' }}
-                                                        />
-                                                        <span>{childLabel}</span>
-                                                    </Link>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
+                {/* Flat nav — static uppercase section headers, no accordion (parity with dashboard) */}
+                <nav className="sidebar-scroll flex-1 flex flex-col gap-1 overflow-y-auto px-3 pt-6" aria-label="Editor menu">
+                    {visibleSections.map((section, idx) => (
+                        <div key={section.header?.en ?? `section-${idx}`} className="flex flex-col gap-1">
+                            {section.header && (
+                                <div className="px-4 pt-1.5 2xl:pt-2 pb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-dash-text-muted opacity-50 select-none">
+                                    {locale === 'ms' ? section.header.ms : section.header.en}
                                 </div>
-                            )
-                        }
-
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={guardedNavigate(item.href)}
-                                className={cn(
-                                    'flex h-[44px] items-center gap-3 rounded-[16px] px-4 text-[14px] font-medium transition-colors',
-                                    isActive
-                                        ? 'bg-[rgba(59,130,246,0.1)] text-[#3B82F6] shadow-[0_0_20px_rgba(59,130,246,0.3)]'
-                                        : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                                )}
-                            >
-                                {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
-                                <span className="flex-1">{label}</span>
-                                {item.badge ? (
-                                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2DD4BF] px-1.5 text-[12px] font-semibold text-[#0B1120]">
-                                        {item.badge}
-                                    </span>
-                                ) : null}
-                            </Link>
-                        )
-                    })}
+                            )}
+                            {section.items.map((leaf) => renderLeaf(leaf))}
+                        </div>
+                    ))}
                 </nav>
 
-                <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
-                    {/* User info + Notification bell */}
+                <div className="flex flex-col gap-3 border-t border-dash-border px-3 pt-[17px]" style={{ height: 182 }}>
+                    {/* User info + theme toggle + notification bell */}
                     <div className="flex items-center gap-3">
-                        <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden bg-[rgba(255,255,255,0.06)]">
+                        <Link
+                            href="/settings/profile"
+                            onClick={guardedNavigate('/settings/profile')}
+                            className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-dash-border pl-4 pr-px py-px transition-colors hover:bg-dash-surface-hover"
+                        >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_rgba(6,182,212,0.3)]">
                                 {userAvatarUrl
-                                    ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="w-full h-full object-cover" />
-                                    : <span className="text-[12px] font-bold text-white">{userInitial || '?'}</span>
+                                    ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="h-full w-full object-cover" />
+                                    : <span className="text-[12px] font-bold text-dash-text">{userInitial || '?'}</span>
                                 }
                             </div>
                             {/* min-w-0 lets the span shrink inside flex so truncate takes effect */}
                             <TooltipProvider delayDuration={200}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#F8FAFC]">
+                                        <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-dash-text">
                                             {userName || t.editor.menuDrawer.defaultUserName}
                                         </span>
                                     </TooltipTrigger>
@@ -289,15 +239,13 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                 </Tooltip>
                             </TooltipProvider>
                         </Link>
-                        {/* Light/dark theme toggle — matches the dashboard header toggle; sits left of the bell */}
+                        {/* Light/dark theme toggle — amber icon forced inline (bypasses light-mode remap) */}
                         <button
                             type="button"
                             onClick={toggleTheme}
                             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] text-[rgba(248,250,252,0.7)] transition-colors hover:bg-white/5 hover:text-[#F8FAFC]"
+                            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[16px] border border-dash-border text-dash-text-muted transition-colors hover:bg-dash-surface-hover hover:text-dash-text"
                         >
-                            {/* Inline color forces bright amber-400 (#fbbf24) — bypasses the
-                                .editor-shell light-mode remap so the icon stays amber in both themes. */}
                             {isDark
                                 ? <Sun className="h-5 w-5" style={{ color: '#fbbf24' }} />
                                 : <Moon className="h-5 w-5" style={{ color: '#fbbf24' }} />}
@@ -307,36 +255,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                         </div>
                     </div>
 
-                    {/* Language toggle */}
-                    <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4 shrink-0 text-[rgba(248,250,252,0.5)]" />
-                        <div className="flex h-[38px] flex-1 items-center rounded-[16px] border border-white/[0.08] bg-[#1E293B] px-1">
-                            <button
-                                type="button"
-                                onClick={() => locale !== 'ms' && toggleLocale()}
-                                className={cn(
-                                    'flex flex-1 items-center justify-center rounded-[12px] h-[28px] text-[12px] font-semibold transition-all',
-                                    locale === 'ms'
-                                        ? 'bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                        : 'text-[rgba(248,250,252,0.6)] hover:text-white',
-                                )}
-                            >
-                                MY
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => locale !== 'en' && toggleLocale()}
-                                className={cn(
-                                    'flex flex-1 items-center justify-center rounded-[12px] h-[28px] text-[12px] font-semibold transition-all',
-                                    locale === 'en'
-                                        ? 'bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                        : 'text-[rgba(248,250,252,0.6)] hover:text-white',
-                                )}
-                            >
-                                EN
-                            </button>
-                        </div>
-                    </div>
+                    <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
 
                     <button
                         type="button"
@@ -344,7 +263,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             if (hasUnsavedChanges) { setPendingAction('logout'); return }
                             void handleLogout()
                         }}
-                        className="flex h-[44px] items-center gap-3 rounded-[16px] border border-white/[0.08] pl-4 text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
+                        className="flex h-[42px] items-center gap-3 rounded-[16px] border border-dash-border pl-4 text-[14px] font-medium text-dash-text transition-colors hover:bg-dash-surface-hover"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
                         <span>{menu.logout}</span>

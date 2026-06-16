@@ -93,6 +93,8 @@ export default async function OrderConfirmPage({
                 subtotal: raw.subtotal,
                 shippingFee: raw.shippingFee,
                 tax: raw.tax,
+                discountCode: raw.discountCode ?? null,
+                discountAmount: raw.discountAmount ?? 0, // sen — client divides by 100 for RM
                 total: raw.total,
                 currency: raw.currency,
                 paymentMethod: raw.paymentMethod,

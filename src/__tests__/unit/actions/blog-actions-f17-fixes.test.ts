@@ -19,6 +19,14 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+
 import { createBlogCategoryAction, saveBlogAction, listBlogsAction } from '@/app/(dashboard)/blog/actions'
 
 // ─── TC-F17: Category Duplicate Name Check ───────────────────────────

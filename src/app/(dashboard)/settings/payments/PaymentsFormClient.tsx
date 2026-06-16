@@ -7,6 +7,7 @@ import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shie
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
+import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
@@ -94,6 +95,7 @@ export function PaymentsFormClient({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
+    const sub = t.common.subscriptionErrors;
 
     useEffect(() => {
         if (!tenantId) { setIsLoading(false); return; }
@@ -174,7 +176,7 @@ export function PaymentsFormClient({
             if (data.success && data.data?.oauthUrl) {
                 window.location.href = data.data.oauthUrl;
             } else {
-                toast.error(pt.failSaveSettings);
+                toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
         } catch {
             toast.error(pt.failSaveSettings);
@@ -197,7 +199,7 @@ export function PaymentsFormClient({
             if (data.success && data.data?.url) {
                 window.location.href = data.data.url;
             } else {
-                toast.error(pt.failSaveSettings);
+                toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
         } catch {
             toast.error(pt.failSaveSettings);

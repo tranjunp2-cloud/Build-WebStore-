@@ -143,9 +143,9 @@ Dashboard → [My Website] → [CORE OPERATIONS] → [CRM] → [SETTINGS] → (�
 
 ### Badge rules
 
-- Badge là số đếm động, hiển thị bên phải label dưới dạng pill.
-- Khi count = 0 → ẩn badge (không hiện "0").
-- Orders badge dùng style nhấn (đỏ) cho đơn cần xử lý; các badge còn lại dùng style trung tính.
+- Badge là số đếm động, hiển thị bên phải label dưới dạng pill, **xám trung tính** (quyết định 2026-06-11 — KHÔNG dùng đỏ cho Orders).
+- Khi count = 0/undefined → ẩn badge (không hiện "0"). Số > 999 → `999+`.
+- Badge = **TỔNG số record** của tenant, áp cho 5 mục: Orders (mọi status), Products, Discounts, All Customers, Contact Leads (= contact-submissions + subscribers). Counts wire server-side tại `src/lib/dashboard/sidebar-badge-counts.ts`.
 
 ---
 

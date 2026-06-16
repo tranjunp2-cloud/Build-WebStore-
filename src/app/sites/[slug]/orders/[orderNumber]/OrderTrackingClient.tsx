@@ -39,6 +39,8 @@ type OrderData = {
     subtotal: number
     shippingFee: number
     tax: number
+    discountCode?: string | null
+    discountAmount?: number | null
     currency: string
     customerName: string
     customerPhone: string | null
@@ -358,6 +360,7 @@ function OtItems({ order }: { order: OrderData }) {
             {open && (
                 <div className="ot-items-totals">
                     <div className="row"><span className="lbl">Subtotal</span><span className="val">{formatMoney(order.subtotal, order.currency)}</span></div>
+                    {(order.discountAmount ?? 0) > 0 && <div className="row"><span className="lbl">Discount{order.discountCode ? ` (${order.discountCode})` : ''}</span><span className="val">−{formatMoney((order.discountAmount ?? 0) / 100, order.currency)}</span></div>}
                     {order.tax > 0 && <div className="row"><span className="lbl">Tax</span><span className="val">{formatMoney(order.tax, order.currency)}</span></div>}
                     {order.shippingFee > 0 && <div className="row"><span className="lbl">Shipping</span><span className="val">{formatMoney(order.shippingFee, order.currency)}</span></div>}
                     <div className="row total"><span className="lbl">Total Paid</span><span className="val">{formatMoney(order.total, order.currency)}</span></div>

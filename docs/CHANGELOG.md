@@ -15,6 +15,149 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F34 — Subscription Enforcement Error Message i18n
+
+**Malay localization for subscription block errors in editor and dashboard:**
+
+- **i18n resolver utility:** `src/lib/ui/resolve-api-error.ts` new helper maps server error codes (`FEATURE_LOCKED`, `SUBSCRIPTION_EXPIRED`) and error string patterns to localized messages. Supports Pattern A (error object with `code` + `message` fields) and Pattern B (plain English error string) from server actions. Falls back to caller's provided fallback for non-subscription errors. Keyed messages stored under `common.subscriptionErrors` (en/ms parity).
+- **13 handlers audited and wired:** Editor handlers (PageManagerPanel create/visibility/delete/restore, page save, site settings save, page settings) and dashboard handlers (blog list actions, blog editor save, product status/restore/delete, domain add, payment/email-template settings save) now route subscription errors through resolver. Preserves non-subscription fallback behavior.
+- **Tests:** `src/__tests__/unit/lib/resolve-api-error.test.ts` validates resolver logic for both error patterns, locale mapping, fallback passthrough, null safety.
+- **Server untouched:** API routes + server actions still emit English responses (contract/logging stability preserved).
+
+**Impact:** Malay users now see localized subscription enforcement messages instead of hardcoded English throughout editor and dashboard.
+
+---
+
+### F34 — Phase 06 Code Review Fixes (Phase 1–2)
+
+**Feature code corrections + Pattern A enforcement test coverage:**
+
+- **fix(seo): correct feature guards on SEO routes** — `src/app/api/seo/apply-fixes/route.ts` and `src/app/api/seo/fix/route.ts` now use `withFeatureGuard('content_management')` (was incorrectly `sitemap_robot_configuration`). Root cause: `sitemap_robot_configuration` guards only the GET sitemap endpoint (read); SEO meta fixes are content edits (write), scoped to `content_management`. `auto-meta-toggle` remains correctly guarded by `sitemap_robot_configuration` (toggle affects sitemap inclusion). Tests: 4 new TC-IDs (TC-SUB-060..063) validate Pattern A guard dispatch: 401 (no auth), 403 (no subscription), 403 (feature disabled), 200 (allowed). See `src/__tests__/api/feature-guard-enforcement.test.ts`.
+
+- **fix(ai): falsy-0 safety on tenantId check** — `src/app/api/ai/apply-template/route.ts` line ~45 changed `if (tenantId)` → `if (tenantId != null)` to prevent bypass when tenant ID is numeric 0 (edge case but security-sensitive). Defensive guard against type coercion.
+
+**Tests:** New test file `src/__tests__/api/feature-guard-enforcement.test.ts` exercises the real `withFeatureGuard` HOF with mocked internal dependencies. 4 tests (TC-SUB-060..063) covering: no auth (401), no subscription (403), feature disabled (403), allowed (200). All pass.
+
+**Impact:** SEO meta fixes now correctly gated by `content_management` plan feature, not sitemap configuration. Pattern A HOF enforcement validated with comprehensive test coverage.
+
+---
+
+### F34 — Phase 06 Code Review Fixes (Phase 3–5)
+
+**Subscription enforcement guard alignment + SSO validation + staff limit syncing:**
+
+- **fix(subscriptions): align guard tenant resolution to tenants[0]** — `src/lib/subscriptions/feature-guard.ts` now consistently uses `tenants[0]` for subscription lookup (was using `find(owner)` in one code path), eliminating auth-context mismatch that could cause false 403 errors when user is not primary owner. Defensive guard ensures all paths use same tenant selection strategy.
+
+- **fix(sso): add VALID_BASE_CODES validation on provision** — `src/app/api/v1/sso/provision/route.ts` now validates subscription code against known base codes before passing to `getPlanCode()`. Unknown codes return 400 `INVALID_SUBSCRIPTION_CODE` instead of silently fabricating invalid plan states. Prevents SSO onboarding chaos when external systems send malformed pack codes.
+
+- **fix(subscriptions): getPlanCode throws on unknown base code** — `src/lib/subscriptions/plan-subscription.ts` `getPlanCode()` now throws `SubscriptionError` on unknown base code instead of returning fabricated enum values. Requires caller to validate codes pre-call, ensuring fail-fast behavior.
+
+- **fix(subscriptions): sync staff_limit usage on role change** — `src/collections/Users.ts` `update-staff` server action now calls `recountStaffUsage()` when user toggles between owner ↔ non-owner role. Fixes usage counter drift: adding staff when non-owner doesn't increment limit, but later promotion to owner should. Recount resyncs count to match actual non-owner staff count per tenant.
+
+- **test(sso): add rejection test for invalid pack_code** — `src/__tests__/unit/auth/sso-provision.test.ts` now validates SSO endpoint returns 400 when pack_code is unknown (complementary to PR guards). TC-ID reserved.
+
+**Impact:** Subscription enforcement guards are now tenant-context consistent. SSO onboarding rejects malformed codes upfront. Staff limit tracking stays synchronized across role changes. No breaking changes; existing valid flows unaffected.
+
+---
+
+### F34 — Plan Subscription Management Phase 06: Subscription Enforcement Layer
+
+**Features:**
+- **Subscription enforcement HOF:** `src/lib/subscriptions/feature-guard.ts` exports `withFeatureGuard(featureCode)` — higher-order function wrapping route handlers with plan subscription + feature checks. Returns 401 if unauthenticated, 403 if subscription expired or feature disabled/locked.
+- **Numeric limit enforcement:** `src/lib/subscriptions/plan-subscription.ts` new function `canUseWithinLimit(payload, subscriptionId, planCode, featureCode)` — compares consumed usage count against numeric plan limit; returns true if usage < limit, true always for YES/UNLIMITED features, false if limit exceeded or feature missing.
+- **23 protected API routes (per feature code):**
+  - **website_builder:** POST/PATCH sites pages (page save + publish)
+  - **content_management:** POST blogs, POST/GET blog-categories
+  - **email_template_configuration:** POST/GET email templates, GET email-preview endpoint
+  - **payment_integration:** POST Stripe Connect onboard
+  - **order_management:** PATCH/cancel/refund orders, inline email-confirmation send
+  - **sitemap_robot_configuration:** GET SEO sitemap endpoint
+  - **shipping_fee_configuration:** PATCH sites shipping-config
+  - **account_profile:** PATCH users me endpoint
+  - **allowing_buyer_making_order:** POST orders checkout (storefront)
+  - **allowing_buyer_tracking_order:** GET orders track (storefront)
+  - **template_limit:** POST AI apply-template (storefront)
+  - **domain_connection:** Server action addCustomDomain
+- **Collection access guards (async `create` access in collection configs):**
+  - `Products.ts` — `create` access guarded by `product_management` feature
+  - `Categories.ts` — `create` access guarded by `product_management` feature
+  - `Users.ts` — invite/remove staff members call `canUseWithinLimit(payload, sub.id, sub.plan, 'staff_limit')` before `recordUsage()` / `reduceUsage()`
+- **Usage lifecycle:**
+  - `recordUsage(payload, subscriptionId, featureCode, amount?)` — increments usage counter on feature use (staff invite, product create, etc.)
+  - `reduceUsage(payload, subscriptionId, featureCode, amount?)` — decrements usage counter on feature undo (staff remove, product delete, etc.)
+  - `clearUsage(payload, subscriptionId)` — resets all usage counters when plan changes
+  - `recountStaffUsage(payload, subscriptionId, tenantId)` — resyncs staff_limit count post-upgrade/downgrade (non-owner members only)
+
+**Architecture:**
+- Feature codes defined as TypeScript enum in `src/collections/PlanFeatures.ts` (PlanFeatureCode type)
+- Plan codes defined as enum in `src/collections/PlanSubscriptions.ts` (PlanCode type: FREEMIUM, STARTER_TM_USER, STARTER_NON_TM_USER, STANDARD_TM_USER, STANDARD_NON_TM_USER, PROFESSIONAL_TM_USER, PROFESSIONAL_NON_TM_USER)
+- Limit matrix stored in `plan-features` collection: (planCode, featureCode) → value (YES|UNLIMITED|numeric)
+- Usage tracking in `plan-subscription-usages` collection: (subscriptionId, featureCode) → used count
+- Single active plan per tenant stored in `plan-subscriptions` collection (name='main'), auto-activated via Webhook from SSO
+- Pure helpers (`canUse`, `getFeatureValue`, `isSubscriptionActive`) pre-compute before route guard dispatch; no N+1 queries
+
+**Code changes:**
+- New: `src/lib/subscriptions/feature-guard.ts` (HOF wrapper, 62 LOC)
+- New: `canUseWithinLimit()` added to `src/lib/subscriptions/plan-subscription.ts` (14 LOC)
+- Modified: 23 route handlers across `src/app/api/**` and server actions to wrap with `withFeatureGuard()` HOF
+- Modified: `Users.ts`, `Products.ts`, `Categories.ts` collection configs to guard `create` access and call usage helpers
+
+**Mirrors PW1 SubscriptionAbility + SubscriptionUsageManager:**
+- `getPlanCode(code, type)` — SSO code → PlanCode enum
+- `getActivePlanSubscription(payload, tenantId)` — active 'main' subscription lookup
+- `canUse(payload, planCode, featureCode)` — binary feature enablement check
+- `canUseWithinLimit(payload, subscriptionId, planCode, featureCode)` — numeric limit check
+- `recordUsage / reduceUsage / getConsumed` — usage lifecycle management
+- `getFeatureValue / getFeatureSettings` — feature matrix lookups
+
+**Guard order (defensive):**
+1. User authentication check (401)
+2. Active subscription lookup (403)
+3. Feature enablement check (403)
+4. Numeric limit check (per-action, returns false if limit exceeded)
+
+**Non-breaking:** Feature guards are applied transparently; existing no-plan (null subscription) behavior gates all routes to 403 with standardized error codes.
+
+**Related:** F34 Phase 05 (usage tracking), Phase 07 (admin UI enforcement + soft-delete grace period). See `docs/architecture/F34-plan-subscription-management.md`.
+
+---
+
+### F33 — Discount CMS Dashboard UI (Phase 2: Form + Usage History + Stripe Bugfix)
+
+**Dashboard discount create/edit form + cross-tenant usage history page + stripe-checkout free-order bugfix.**
+
+**Code changes (Phase 2 UI + API integration):**
+- New: `src/app/(dashboard)/discounts/new/page.tsx` (RSC create discount page, server-side redirect)
+- New: `src/app/(dashboard)/discounts/[id]/page.tsx` (RSC edit discount page, server-side fetch + error handling)
+- New: `src/app/(dashboard)/discounts/usage-history/page.tsx` (S4 global usage history page, date range filtering)
+- New: `src/app/api/v1/discounts/usage-history/route.ts` (GET cross-discount usage history, tenant-scoped, paginated, sortable)
+- New: `src/app/(dashboard)/discounts/_components/discount-form.tsx` (client form component, edit/create branch logic)
+- New: `src/app/(dashboard)/discounts/_components/discount-form-fields.tsx` (code, type, value, dates, limits fields with validation)
+- New: `src/app/(dashboard)/discounts/_components/discount-form-header.tsx` (header with back button + page title)
+- New: `src/app/(dashboard)/discounts/_components/discount-delete-dialog.tsx` (async delete with success toast)
+- New: `src/app/(dashboard)/discounts/_components/discounts-usage-history-layout.tsx` (client layout with date pickers, table, pagination)
+
+**Bug fix:**
+- **fix(orders): stripe-checkout free-order detection** — `src/app/api/orders/stripe-checkout/route.ts` removed premature `Math.max(0, subtotal - discountRM)` clamping that broke the `total <= 0` check (TC-F13.103). Now correctly detects free orders when discount eliminates cost, enabling COD zero-charge checkout without Stripe session.
+
+**Integration:**
+- Discount form wired to `PATCH /api/v1/discounts/{id}` (update) + `POST /api/v1/discounts` (create)
+- Usage history endpoint scoped to tenant, supports date-range filtering (startsAt/endsAt), pagination (limit/offset), sorting (by usage/date)
+- Form validation matches backend: code 3–50 chars alphanumeric+hyphen, type enum, value bounds, date logic (startsAt < expiresAt)
+- Delete action calls `DELETE /api/v1/discounts/{id}` (soft-delete via beforeDelete hook)
+
+**UX:**
+- Create: empty form, POST to `/api/v1/discounts`, redirect to edit page on success
+- Edit: pre-fill form from `PATCH`, show current usage count + limit meter, delete button with confirmation dialog
+- Usage history: sortable table (order ID, code, discount amount, order total, customer, date), date range filters, per-page limit (25/50/100)
+
+**Non-breaking:**
+- Phase 1 discount list page behavior unchanged
+- Existing orders unaffected; new usage history rows only on fresh orders
+- Stripe checkout correctly handles free-cost orders with or without discount code
+
+**Related:** `docs/qa/F33-discounts.md` (usage history TCs), `docs/prd/F33-discounts.md` (phase 2 spec)
+
 ### GH-1099 — Remove Dead `oversellReview` Flag (US-F13-06 Rework)
 
 **Decision:** Decrement-upfront architecture makes oversell-after-capture impossible; `oversellReview` flag is dead code.
@@ -144,6 +287,73 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 **Tests:** New TC-F10-02-20 added to `src/__tests__/api/orders-checkout.test.ts` covering variant deletion mid-decrement scenario. All 48 tests pass (orders-checkout: 33, orders-cancel: 15).
 
 **Impact:** Race condition now has clear, actionable UX feedback. Type safety improved.
+
+---
+
+### F33 — Discount CMS Dashboard UI (Phase 1: List Page)
+
+**Dashboard discount list page** with sortable table, search, filters, status badge, and usage meter.
+
+**Code changes (Phase 1 UI):**
+- New: `src/lib/discounts/format.ts` (formatting utilities: fmtRM, fmtValue, fmtDate)
+- New: `src/app/(dashboard)/discounts/page.tsx` (RSC shell, force-dynamic)
+- New: `src/app/(dashboard)/discounts/_components/discounts-client-layout.tsx` (client orchestration)
+- New: `src/app/(dashboard)/discounts/_components/discounts-toolbar.tsx` (search + filters + buttons)
+- New: `src/app/(dashboard)/discounts/_components/discounts-table.tsx` (sortable table with type/status/usage cols)
+- New: `src/app/(dashboard)/discounts/_components/discount-status-badge.tsx` (status pill component)
+- New: `src/app/(dashboard)/discounts/_components/discount-usage-meter.tsx` (count/limit progress bar)
+- Modified: `src/components/dashboard/Sidebar.tsx` (add Discounts nav item with children after Orders)
+- Modified: `src/components/editor/EditorMenuDrawer.tsx` (same nav item)
+- Modified: `src/app/api/v1/discounts/route.ts` (add type filter param, sort allowlist, parseInt NaN guard)
+
+---
+
+### F33 — Discount CMS Backend (Phases 1–5 complete)
+
+**Overview:** Discount code engine with admin CRUD API and storefront preview. Supports percentage + fixed discounts, usage limits, date-based activation/expiry, per-tenant isolation, and server-side recomputation at order time.
+
+**Phases 1–4 (Implementation):**
+- **Phase 1:** `applyDiscount()` pure function, Zod validation, Discounts + DiscountUsageHistory collections, DB migrations
+- **Phase 2:** Admin REST API (`POST /api/v1/discounts`, `GET /api/v1/discounts`, `PATCH /api/v1/discounts/:id`)
+- **Phase 3:** Storefront preview endpoint (`POST /api/storefront/discounts/apply`) with rate-limiting (20 req/60s), silent-reject (no reason leakage)
+- **Phase 4:** Order integration — server-side recomputation, usage history row creation, checkout field binding
+
+**Phase 5 (Tests only — this phase):**
+- Unit tests: `src/__tests__/unit/discounts/apply-discount.test.ts` (9 tests, TC-F33-01..09)
+- Unit tests: `src/__tests__/unit/discounts/discount-validation.test.ts` (validates Zod schema, code format, value bounds)
+- Integration tests: `src/__tests__/integration/discounts/discounts-api.test.ts` (4 tests, TC-F33-10..13, 20..23)
+- All tests use TC-IDs from `docs/qa/F33-discounts.md` (22 TCs total, 21 AUTO, 1 MANUAL)
+- All 22 tests passing; 100% coverage on discount modules
+
+**Code changes (Phases 1–4):**
+- New: `src/collections/Discounts.ts`, `src/collections/DiscountUsageHistory.ts` (schema + tenant-scoped access)
+- New: `src/lib/discounts/apply-discount.ts` (pure engine, 9 guard checks), `src/lib/validations/discounts.ts` (Zod)
+- New: `src/app/api/v1/discounts/route.ts` (CRUD, 201/409/403/400 guards)
+- New: `src/app/api/storefront/discounts/apply/route.ts` (public preview, rate-limited, silent-reject)
+- Modified: `src/collections/Orders.ts` (discount_code FK, discountSen field)
+- Modified: `src/app/api/orders/checkout/route.ts`, `/stripe-checkout/route.ts` (recompute discount server-side)
+- Modified: `scripts/db-setup.js` (6 migrations: discounts table, usage-history table, FK, indices, fields)
+
+**Key properties:**
+- **Discount types:** percentage (0–100) | fixed (0–999,999,999 sen)
+- **Validation:** code (3–50 chars, alphanumeric + hyphen), dates (startsAt < expiresAt), rates (0 ≤ value ≤ max)
+- **Clamping:** discount amount never exceeds subtotal; final total ≥ 0
+- **Tenant isolation:** (tenant_id, upper(code)) unique; cross-tenant blocked; case-insensitive lookup
+- **Usage tracking:** usageCount incremented on order creation (idempotent; duplicate orders don't double-count)
+- **Backward compatible:** existing orders unchanged; preview API returns silent reject (no reason leak)
+
+**Security:**
+- Server-side recomputation: client-sent discount amounts never trusted
+- Critical guard order: not-found → expired → not-started → inactive → at-limit → wrong-tenant
+- Storefront API always returns HTTP 200 (no 4xx for invalid codes), preventing enumeration attacks
+- IDOR prevention: all queries scoped to tenant + authenticated user
+
+**Non-breaking:**
+- No changes to existing order fields or checkout UX
+- Discount feature opt-in per order; NULL code allowed
+- All tests pass; zero regression in adjacent modules
+
+**Related:** `docs/qa/F33-discounts.md` (22 TCs + coverage notes), `docs/prd/F33-discounts.md` (phase specs)
 
 ---
 

@@ -22,6 +22,13 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ id: 'u1', email: 'test@example.com' }),
     extractTenantId: vi.fn().mockReturnValue(null),
 }))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
 // Mock dynamic import of getOrCreateCrateCartonIdAction
 vi.mock('@/app/(dashboard)/actions/media', () => ({
     getOrCreateCrateCartonIdAction: mockGetOrCreateCrateCartonId,

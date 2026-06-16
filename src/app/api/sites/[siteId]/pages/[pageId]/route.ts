@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -35,7 +36,7 @@ type PageUpdateData = {
     seo?: { title?: string; description?: string }
 }
 
-export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
+export const PATCH = withFeatureGuard('website_builder')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(ctx.params)
@@ -155,12 +156,28 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         // draft content when only toggling hide/delete.
         const visibilityFields: Record<string, unknown> = {}
         const contentFields: Record<string, unknown> = {}
+        // `deletedAt` (soft-delete / restore) is written straight to the base `pages` row
+        // via raw SQL below — NOT through payload.update({draft}). For a draft page that
+        // path routes the change into the versions table (_pages_v), leaving
+        // pages.deleted_at NULL → slug never frees (409 on re-create) and the delete
+        // doesn't persist (#1226). Raw SQL also skips publish-validation (no 500 on an
+        // invalid layout); the only afterChange hook (SEO auto-gen) is publish-only.
+        let deletedAtChange: string | null | undefined
         for (const [key, val] of Object.entries(updateData)) {
-            if (key === 'deletedAt' || key === 'isVisible') {
+            if (key === 'deletedAt') {
+                deletedAtChange = (val as string | null) ?? null
+            } else if (key === 'isVisible') {
                 visibilityFields[key] = val
             } else {
                 contentFields[key] = val
             }
+        }
+
+        if (deletedAtChange !== undefined) {
+            const db = payload.db.drizzle as { execute: (q: unknown) => Promise<unknown> }
+            await db.execute(sql`
+                UPDATE pages SET deleted_at = ${deletedAtChange}::timestamptz, updated_at = NOW() WHERE id = ${pageId}
+            `)
         }
 
         // Apply visibility changes. Two failure modes we have to sidestep:
@@ -300,4 +317,4 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             { status: 500 },
         )
     }
-})
+}))

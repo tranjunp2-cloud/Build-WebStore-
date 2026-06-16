@@ -55,3 +55,4 @@ try {
     console.log('[postinstall] skipped:', err.message)
 }
 process.exit(0)
+// Trigger redeploy Sun Jun 14 21:15:48 +07 2026

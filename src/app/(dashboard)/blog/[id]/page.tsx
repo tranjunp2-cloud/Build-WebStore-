@@ -20,6 +20,7 @@ import { getBlogCategoriesAction, getCurrentUserAction, saveBlogAction, getBlogB
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { validateImageMagicBytes, MAX_IMAGE_SIZE } from '@/lib/validate-image'
 import { useI18n } from '@/i18n'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CategoryModal } from '../_components/CategoryModal'
 
 const BlogRichEditor = dynamic(
@@ -74,6 +75,7 @@ export default function BlogEditorPage() {
     const params = useParams()
     const router = useRouter()
     const { t, locale } = useI18n()
+    const sub = t.common.subscriptionErrors
     const blogId = params?.id as string
     const isNew = blogId === 'new'
 
@@ -351,7 +353,9 @@ export default function BlogEditorPage() {
                 },
             })
 
-            if (result) {
+            if (result && typeof result === 'object' && 'error' in result && result.error) {
+                toast.error(resolveApiError(result, t.dashboard.blog.editor.saveFailed, sub))
+            } else if (result) {
                 setSuccess(true)
                 localStorage.removeItem(DRAFT_KEY)
                 toast.success(isNew ? t.dashboard.blog.editor.postCreated : t.dashboard.blog.editor.postSaved)

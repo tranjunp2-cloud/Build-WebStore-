@@ -11,6 +11,7 @@ import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
+import type { SidebarBadgeKey } from '@/config/sidebar-nav'
 import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/EditorSidebar'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
@@ -31,6 +32,7 @@ import { useConnectivity } from '@/hooks/useConnectivity'
 import { useTabAuthority } from '@/hooks/useTabAuthority'
 import { OfflineBanner } from '@/components/editor/OfflineBanner'
 import { TabSuspendedOverlay } from '@/components/editor/TabSuspendedOverlay'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 
 type SiteData = {
     id: string
@@ -118,6 +120,7 @@ export default function EditorPage() {
     const selectedPageId = searchParams.get('pageId')
 
     const { t, ti } = useI18n()
+    const sub = t.common.subscriptionErrors
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
     const [selectedGlobalBlockType, setSelectedGlobalBlockType] = useState<string | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
@@ -130,7 +133,16 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [userData, setUserData] = useState<{ name: string; initial: string; role: string; avatarUrl?: string | null } | null>(null)
+    const [userData, setUserData] = useState<{
+        name: string
+        initial: string
+        role: string
+        avatarUrl?: string | null
+        permissions: string[]
+        isSuperAdmin: boolean
+        isProduction: boolean
+        badgeCounts: Partial<Record<SidebarBadgeKey, number>>
+    } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
@@ -304,7 +316,16 @@ export default function EditorPage() {
                     const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
                     const av = data.user.avatar
                     const avatarUrl = av && typeof av === 'object' ? (av.url ?? null) : typeof av === 'string' ? av : null
-                    setUserData({ name, initial: name.charAt(0).toUpperCase(), role: data.user.role || 'viewer', avatarUrl })
+                    setUserData({
+                        name,
+                        initial: name.charAt(0).toUpperCase(),
+                        role: data.user.role || 'viewer',
+                        avatarUrl,
+                        permissions: data.user.permissions ?? [],
+                        isSuperAdmin: Boolean(data.user.isSuperAdmin),
+                        isProduction: Boolean(data.user.isProduction),
+                        badgeCounts: data.user.badgeCounts ?? {},
+                    })
                 }
 
                 if (data.page) {
@@ -476,13 +497,13 @@ export default function EditorPage() {
 
             if (!res.ok) {
                 const payload = await res.json().catch(() => null)
-                const message = typeof payload?.error === 'string'
+                const fallback = typeof payload?.error === 'string'
                     ? payload.error
                     : payload?.error?.details?.formErrors?.[0]
                         || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
                         || payload?.error?.details?.fieldErrors?.blocks?.[0]
                         || `Server returned ${res.status}`
-                throw new Error(message)
+                throw new Error(resolveApiError(payload, fallback, sub))
             }
 
             markSaved()
@@ -501,7 +522,8 @@ export default function EditorPage() {
         } catch (err) {
             // BUG-F05-01: log sanitized error code (no internal details in production console)
             console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
-            toast.error(t.editor.toast.saveFailed)
+            const errMsg = err instanceof Error ? err.message : null
+            toast.error(errMsg || t.editor.toast.saveFailed)
             return false
         } finally {
             isSavingRef.current = false
@@ -700,7 +722,8 @@ export default function EditorPage() {
             })
 
             if (!response.ok) {
-                throw new Error(`Server returned ${response.status}`)
+                const body = await response.json().catch(() => null)
+                throw new Error(resolveApiError(body, `Server returned ${response.status}`, sub))
             }
 
             setSaveSuccess(true)
@@ -719,7 +742,8 @@ export default function EditorPage() {
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
             console.error('Failed to update site settings', error)
-            toast.error('Failed to update site settings', { description: 'Please try again later.' })
+            const errMsg = error instanceof Error ? error.message : null
+            toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
         }
     }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
@@ -1913,12 +1937,11 @@ export default function EditorPage() {
                 body: JSON.stringify(changes),
             })
 
-            if (!res.ok) {
-                const data = await res.json().catch(() => null)
-                throw new Error(data?.error || 'Failed to update page settings')
-            }
+            const data = await res.json().catch(() => null)
 
-            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(resolveApiError(data, 'Failed to update page settings', sub))
+            }
             if (data?.page) {
                 updatePageInState(pageId, {
                     title: data.page.title,
@@ -1936,8 +1959,8 @@ export default function EditorPage() {
                 return data.page as PageData
             }
             return null
-        } catch {
-            toast.error('Failed to update page settings')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : t.editor.toast.saveFailed)
             return null
         }
     }, [siteId, updatePageInState])
@@ -2032,6 +2055,10 @@ export default function EditorPage() {
                 userName={userData?.name}
                 userInitial={userData?.initial}
                 userAvatarUrl={userData?.avatarUrl}
+                permissions={userData?.permissions}
+                isSuperAdmin={userData?.isSuperAdmin}
+                isProduction={userData?.isProduction}
+                badgeCounts={userData?.badgeCounts}
                 hasUnsavedChanges={hasUnsavedChanges}
             />
 
@@ -2385,8 +2412,10 @@ export default function EditorPage() {
                 siteId={siteId}
                 onBeforeApply={async () => {
                     // ALWAYS force-save before template apply — draft/published version
-                    // mismatch means hasUnsavedChanges can be stale
-                    await handleSave({ showToast: false, refreshPreview: false })
+                    // mismatch means hasUnsavedChanges can be stale.
+                    // Throw sentinel if save fails so EditorTemplateModal aborts without a duplicate toast.
+                    const ok = await handleSave({ showToast: false, refreshPreview: false })
+                    if (!ok) throw new Error('PRE_SAVE_FAILED')
                 }}
                 onApplied={async ({ templateName, unmatchedBlocks }: TemplateApplyResult) => {
                     setIsTemplateModalOpen(false)

@@ -18,6 +18,14 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn(),
 }))
 
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+
 const mockFind = vi.fn()
 const mockFindByID = vi.fn()
 const mockCreate = vi.fn()

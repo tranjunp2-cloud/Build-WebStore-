@@ -7,6 +7,8 @@ import OrderTrackingClient from './OrderTrackingClient'
 import { StripeBackRedirectScript } from '@/components/storefront/stripe-back-redirect'
 import { OT_CSS } from './order-tracking-styles'
 import ResendUploadLinkForm from './ResendUploadLinkForm'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 const UPLOAD_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
@@ -30,6 +32,12 @@ export default async function OrderTrackingPage({
     })
     const tenant = tenantResult.docs[0] as any
     if (!tenant) notFound()
+
+    // Pattern C: permissive — only block if tenant has active subscription AND feature disabled
+    const trackSub = await getActivePlanSubscription(payload, tenant.id)
+    if (trackSub && !await canUse(payload, trackSub.plan as PlanCode, 'allowing_buyer_tracking_order')) {
+        notFound()
+    }
 
     const siteResult = await payload.find({
         collection: 'sites',
@@ -125,6 +133,8 @@ export default async function OrderTrackingPage({
         subtotal: order.subtotal ?? 0,
         shippingFee: order.shippingFee ?? 0,
         tax: order.tax ?? 0,
+        discountCode: order.discountCode ?? null,
+        discountAmount: order.discountAmount ?? 0, // sen — client divides by 100 for RM
         currency: order.currency ?? 'MYR',
         customerName: order.customerName ?? '',
         customerPhone: order.customerPhone ?? null,

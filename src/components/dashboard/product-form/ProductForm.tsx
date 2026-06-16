@@ -212,7 +212,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 </div>
 
                 {/* Fixed Footer Actions */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[260px] bg-[#0B1120] border-t border-white/[0.08] px-8 py-[18px]">
+                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-[#0B1120] border-t border-white/[0.08] px-8 py-[18px]">
                     <div className="flex flex-row items-center gap-3 w-full bg-[#0B1120]">
                         <button
                             type="button"

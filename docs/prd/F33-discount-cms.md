@@ -116,7 +116,7 @@ Hiện tại, hệ thống **không có tính năng quản lý discount/khuyến
 ## 7. Business Rules
 
 - **BR-01:** Discount type có 2 loại: **percentage** (0–100%) hoặc **fixed** (sen, tính bằng đơn vị tiền nhỏ nhất).
-- **BR-02:** **Base subtotal only** — discount áp dụng chỉ trên subtotal (tổng giá sản phẩm). Shipping + tax cộng AFTER. Formula: `finalAmount = (subtotal − discountAmount) + shipping + tax`.
+- **BR-02:** **Base subtotal only** — discount áp dụng chỉ trên subtotal (tổng giá sản phẩm). Shipping cộng AFTER. Formula: `finalAmount = (subtotal − discountAmount) + shipping`. *(v1.1 — 2026-06-11: SST tax đã bỏ khỏi checkout, không còn `+ tax`; free-ship gate tính trên subtotal SAU discount.)*
 - **BR-03:** **At-limit behavior — silent reject** — Code đã dùng hết lượt, hết hạn, không active, hoặc sai tenant → đơn hàng tiếp tục nhưng MỤC KHÔNG áp dụng discount (thành `discountAmount = 0`). KHÔNG bao giờ fail checkout vì lý do discount.
 - **BR-04:** **Code unique per tenant** — Cùng code có thể dùng ở tenants khác nhau (partial unique index: `(tenant_id, code)`).
 - **BR-05:** **Code UPPERCASE** — Lưu uppercase canonical; so sánh case-insensitive. Admin form tự động normalize.

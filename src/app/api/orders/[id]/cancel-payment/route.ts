@@ -6,6 +6,7 @@ import { cookies } from 'next/headers'
 import { verifyConfirmToken } from '@/lib/orders/upload-token'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -82,9 +83,12 @@ export async function POST(request: Request, ctx: RouteContext) {
         )
     }
 
-    // Xendit orders: no remote payment request void (KISS — an uncaptured PR expires on Xendit's
+    // Release the reserved discount slot (F33) — runs only on the CAS winner. The slot is reserved at
+    // PLACE ORDER for every gateway (incl. pending Stripe/Xendit), so this is a real release, not a no-op.
+    await releaseDiscountRedemption(payload, Number(order.id))
+
+    // Xendit orders: no remote payment request void (KISS — an uncaptured invoice expires on Xendit's
     // side automatically; a captured one would already be 'paid' and guarded out by CAS above).
-    // If Xendit exposes a cancel endpoint in future, add a best-effort void call here (non-blocking).
 
     // Restock inventory for each order line — stock was decremented at checkout.
     // restockItem is variant-aware and atomic; never throws (returns skipped result on failure).

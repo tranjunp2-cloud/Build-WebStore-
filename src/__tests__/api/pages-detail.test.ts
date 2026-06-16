@@ -10,14 +10,29 @@ vi.mock('@/lib/auth', () => ({
 const mockFind = vi.fn()
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
+// `deletedAt` soft-delete writes straight to the base `pages` row via raw SQL
+// (payload.db.drizzle.execute) — see route.ts #1226. Mock the drizzle handle
+// so that path resolves instead of throwing on an undefined `db`.
+const mockExecute = vi.fn().mockResolvedValue(undefined)
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         find: mockFind,
         findByID: mockFindByID,
         update: mockUpdate,
+        db: { drizzle: { execute: mockExecute } },
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
+}))
 
 import { PATCH } from '@/app/api/sites/[siteId]/pages/[pageId]/route'
 
@@ -136,11 +151,12 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         }))
     })
 
-    // Soft delete shares the visibility-routing code path. Published-clean
-    // page → `draft:false` so live removes it immediately. Never-published
-    // page → `draft:true` (live never served this page anyway; validation
-    // can't throw).
-    it('saves deletedAt to draft when page was never published', async () => {
+    // #1226: soft-delete / restore writes `deleted_at` straight to the base
+    // `pages` row via raw SQL — NOT through payload.update({draft}). On a draft
+    // page the payload path routes the change into the versions table and
+    // pages.deleted_at stays NULL (slug never frees, delete doesn't persist).
+    // Behaviour is now identical regardless of publish status.
+    it('writes deletedAt via raw SQL on a draft (never-published) page', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
         mockFindByID
             .mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About', _status: 'draft' })
@@ -154,15 +170,12 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(200)
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'pages',
-            id: '10',
-            data: expect.objectContaining({ deletedAt: '2026-04-20T10:00:00Z' }),
-            draft: true,
-        }))
+        // deletedAt persisted via raw SQL, not payload.update
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
-    it('publishes deletedAt immediately when page is already published clean', async () => {
+    it('writes deletedAt via raw SQL on an already-published page', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
         mockFindByID
             .mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About', _status: 'published' })
@@ -176,12 +189,8 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(200)
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
-            collection: 'pages',
-            id: '10',
-            data: expect.objectContaining({ deletedAt: '2026-04-20T10:00:00Z' }),
-            draft: false,
-        }))
+        expect(mockExecute).toHaveBeenCalledTimes(1)
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     // Shape mirrors `/api/sites/[siteId]/publish` error envelope so a single

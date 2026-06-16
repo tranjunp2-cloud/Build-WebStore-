@@ -16,6 +16,14 @@ vi.mock('@/app/api/orders/lib/stock-utils', async (importOriginal) => {
     }
 })
 
+// ─── Discount release mock (F33) ──────────────────────────────────────
+// Mocked so its raw SQL stays off the shared mockDrizzleExecute (keeps CAS sequences precise);
+// its own behaviour is covered by release-discount-redemption tests.
+const mockReleaseDiscount = vi.fn()
+vi.mock('@/lib/discounts/release-discount-redemption', () => ({
+    releaseDiscountRedemption: (...args: any[]) => mockReleaseDiscount(...args),
+}))
+
 // ─── Payload mock ──────────────────────────────────────────────────────
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
@@ -47,6 +55,25 @@ vi.mock('@/lib/payment/stripe', () => ({
         refunds: { create: mockRefundsCreate },
         checkout: { sessions: { retrieve: vi.fn() } },
     })),
+}))
+
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1',
+        plan: 'PROFESSIONAL_TM_USER',
+        status: 'active',
+        startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    isSubscriptionActive: vi.fn().mockReturnValue(true),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+    recordUsage: vi.fn().mockResolvedValue(undefined),
+    reduceUsage: vi.fn().mockResolvedValue(undefined),
+    getConsumed: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/subscriptions/feature-guard', () => ({
+    withFeatureGuard: vi.fn(() => (h: any) => h),
 }))
 
 import { POST } from '@/app/api/orders/[id]/refund/route'
@@ -440,6 +467,59 @@ describe('POST /api/orders/[id]/refund — inventory restock [TC-F10.R]', () => 
             1,
         )
         expect(body.restock[0].restocked).toBe(1)
+    })
+
+    // ─── TC-F10.R (F33 ext): refund releases the redeemed discount slot ───
+    // No dedicated QA row yet (the missing release WAS the F33 review gap M1) — grouped under
+    // the refund TC family until docs/qa/F33-discount-cms.md adds one.
+
+    it('[TC-F10.R-F33] bank_transfer: refund releases the discount slot after CAS wins', async () => {
+        mockFindByID.mockResolvedValue({ ...BASE_BT_ORDER, items: [] })
+
+        const res = await POST(makeReq(), ctx as any)
+
+        expect(res.status).toBe(200)
+        expect(mockReleaseDiscount).toHaveBeenCalledOnce()
+    })
+
+    it('[TC-F10.R-F33] bank_transfer: CAS loser (already refunded) does NOT release', async () => {
+        mockFindByID.mockResolvedValue({ ...BASE_BT_ORDER, items: [] })
+        mockDrizzleExecute.mockResolvedValue({ rows: [] }) // CAS misses — concurrent refund won
+
+        const res = await POST(makeReq(), ctx as any)
+
+        expect(res.status).toBe(400)
+        expect(mockReleaseDiscount).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10.R-F33] stripe: refund releases the slot only after Stripe succeeds', async () => {
+        mockFindByID.mockResolvedValue({ ...BASE_STRIPE_ORDER, items: [] })
+
+        const res = await POST(makeReq(), ctx as any)
+
+        expect(res.status).toBe(200)
+        expect(mockReleaseDiscount).toHaveBeenCalledOnce()
+    })
+
+    it('[TC-F10.R-F33] stripe: refund failure (status rolled back) does NOT release', async () => {
+        mockFindByID.mockResolvedValue({ ...BASE_STRIPE_ORDER, items: [] })
+        mockRefundsCreate.mockRejectedValue(Object.assign(new Error('card_declined'), { code: 'processing_error' }))
+
+        const res = await POST(makeReq(), ctx as any)
+
+        expect(res.status).toBe(502)
+        // Status was rolled back to 'shipped' — slot must stay consumed (order is still paid)
+        expect(mockReleaseDiscount).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10.R-F33] stripe: charge_already_refunded (idempotent success) DOES release', async () => {
+        mockFindByID.mockResolvedValue({ ...BASE_STRIPE_ORDER, items: [] })
+        mockRefundsCreate.mockRejectedValue(Object.assign(new Error('already refunded'), { code: 'charge_already_refunded' }))
+
+        const res = await POST(makeReq(), ctx as any)
+
+        expect(res.status).toBe(200)
+        expect(mockReleaseDiscount).toHaveBeenCalledOnce()
     })
 
 })

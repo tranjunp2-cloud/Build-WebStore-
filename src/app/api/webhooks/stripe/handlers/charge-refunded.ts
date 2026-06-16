@@ -5,6 +5,7 @@ import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { restockItem } from '../../../orders/lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -61,6 +62,15 @@ export async function handleChargeRefunded(
     }
 
     payload.logger.info({ orderId: order.id }, '[Stripe Webhook] Order marked refunded via charge.refunded')
+
+    // Release the reserved discount slot (F33) — a Stripe Dashboard refund is a terminal non-sale, same as
+    // the in-app refund route. Runs only on the CAS winner above; idempotent + non-throwing. Without this,
+    // a dashboard refund would leak the slot forever (the slot is reserved at place-order for paid orders).
+    // Safe to call unconditionally (no discountCode guard needed): release is keyed by
+    // discount_usage_history.order_id, NOT discountCode. An order with no discount has no history row, so the
+    // DELETE matches nothing and the keyed UPDATE is gated by `discount_id IS NOT NULL` — a guaranteed no-op
+    // that never touches usage_count. The order_id key is also more robust than reading discountCode here.
+    await releaseDiscountRedemption(payload, Number(order.id))
 
     // Restock inventory (best-effort) — mirrors refund/route.ts for ECH-initiated refunds.
     // This path handles Stripe Dashboard refunds where the refund/route.ts path was not called.

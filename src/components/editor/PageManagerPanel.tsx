@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import type { PageData } from '@/store/editorStore'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
+import { resolveApiError } from '@/lib/ui/resolve-api-error'
 
 interface PageManagerPanelProps {
     siteId: string
@@ -109,6 +110,7 @@ export function PageManagerPanel({
 }: PageManagerPanelProps) {
     const { t } = useI18n()
     const pm = t.editor.pageManager
+    const sub = t.common.subscriptionErrors
     const pages = useEditorStore(state => state.pages)
     const activeLocale = useEditorStore(state => state.activeLocale)
     const setPages = useEditorStore(state => state.setPages)
@@ -125,6 +127,22 @@ export function PageManagerPanel({
     const [newPageTitle, setNewPageTitle] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [pendingPageId, setPendingPageId] = useState<string | null>(null)
+
+    // Auto-scroll the page being edited into view (#1221 bug 2). rAF waits for the list to paint
+    // (tab switch / mount / data load) before measuring; scrollIntoView cuộn scroll-container nội
+    // bộ (overflow-y-auto), không phải window. `block: 'nearest'` chỉ cuộn khi item bị khuất.
+    const listScrollRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (!currentPageId) return
+        const raf = requestAnimationFrame(() => {
+            const el = listScrollRef.current?.querySelector<HTMLElement>(
+                `[data-page-id="${currentPageId}"]`,
+            )
+            // Optional-call the method too: jsdom (test env) doesn't implement scrollIntoView.
+            el?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [currentPageId])
     const [deleteTarget, setDeleteTarget] = useState<PageData | null>(null)
     const [is404SectionOpen, setIs404SectionOpen] = useState(false)
 
@@ -156,7 +174,8 @@ export function PageManagerPanel({
                     toast.error(t.editor.pageManagerPanel.slugConflict)
                     return
                 }
-                throw new Error(`HTTP ${res.status}`)
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, `HTTP ${res.status}`, sub))
             }
 
             const data = await res.json()
@@ -175,7 +194,7 @@ export function PageManagerPanel({
             onPagesChanged?.()
         } catch (err) {
             console.error('[PageManagerPanel] Create page failed:', err)
-            toast.error(t.editor.pageManagerPanel.createError)
+            toast.error(err instanceof Error ? err.message : t.editor.pageManagerPanel.createError)
         } finally {
             setIsSubmitting(false)
         }
@@ -194,21 +213,30 @@ export function PageManagerPanel({
                 credentials: 'include',
                 body: JSON.stringify({ isVisible: newVisible }),
             })
-            if (!res.ok) throw new Error('Failed to update page')
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, pm.visibilityFailed, sub))
+            }
 
             onPagesChanged?.()
 
             if (!newVisible) {
                 toast(pm.pageHidden)
             }
-        } catch {
+        } catch (err) {
             updatePageInState(page.id, { isVisible: page.isVisible })
-            toast.error(pm.visibilityFailed)
+            toast.error(err instanceof Error ? err.message : pm.visibilityFailed)
         }
     }
 
     const handleDelete = async (page: PageData) => {
         if (SYSTEM_PAGE_SLUGS.has(page.slug) || page.isHomepage) return
+
+        // A site must keep at least one regular page (#1226 AC).
+        if (regularPages.length <= 1) {
+            toast.error(pm.cannotDeleteLastPage)
+            return
+        }
 
         const now = new Date().toISOString()
         updatePageInState(page.id, { deletedAt: now })
@@ -222,7 +250,10 @@ export function PageManagerPanel({
                 credentials: 'include',
                 body: JSON.stringify({ deletedAt: now }),
             })
-            if (!res.ok) throw new Error('Failed to delete page')
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                throw new Error(resolveApiError(data, pm.deleteFailed, sub))
+            }
 
             // Switch to homepage if deleted page is currently being viewed
             if (String(page.id) === String(currentPageId)) {
@@ -230,12 +261,15 @@ export function PageManagerPanel({
                 if (homepage) onPageSelected(String(homepage.id))
             }
             onPagesChanged?.()
-        } catch {
+        } catch (err) {
             updatePageInState(page.id, { deletedAt: null })
             setPendingPageId(null)
-            toast.error(pm.deleteFailed)
+            toast.error(err instanceof Error ? err.message : pm.deleteFailed)
             return
         }
+
+        // Clear the pending spinner on the happy path too (catch already clears it).
+        setPendingPageId(null)
 
         toast(pm.deleteSuccess, {
             action: {
@@ -248,7 +282,10 @@ export function PageManagerPanel({
                             credentials: 'include',
                             body: JSON.stringify({ deletedAt: null }),
                         })
-                        if (!res.ok) throw new Error('Failed to undo deletion')
+                        if (!res.ok) {
+                            const data = await res.json().catch(() => null)
+                            throw new Error(resolveApiError(data, pm.restoreFailed, sub))
+                        }
 
                         // Refetch pages from server to restore the page in state
                         const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
@@ -260,8 +297,8 @@ export function PageManagerPanel({
                         setPendingPageId(null)
                         onPagesChanged?.()
                         toast.success(pm.restored)
-                    } catch {
-                        toast.error(pm.restoreFailed)
+                    } catch (err) {
+                        toast.error(err instanceof Error ? err.message : pm.restoreFailed)
                     }
                 },
             },
@@ -274,7 +311,7 @@ export function PageManagerPanel({
     return (
         <TooltipProvider delayDuration={150}>
         <div data-coach="page-library" className="relative flex h-full flex-col">
-            <div className="border-b border-white/10 px-4 py-4">
+            <div className="border-b border-white/10 px-4 pt-4 pb-2">
                 <div>
                     <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
                     <p className="mt-1 text-xs text-gray-500">
@@ -283,7 +320,7 @@ export function PageManagerPanel({
                 </div>
             </div>
 
-            <div className="space-y-3 border-b border-white/10 p-4">
+            <div className="border-b border-white/10 px-4 py-2">
                 {!isAdding ? (
                     <button
                         type="button"
@@ -327,7 +364,7 @@ export function PageManagerPanel({
 
             </div>
 
-            <div className="min-h-0 flex-1 p-4">
+            <div className="min-h-0 flex-1 px-4 pt-2 pb-4">
                 {isEmptyState ? (
                     <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 text-center">
                         <FileText className="h-8 w-8 text-gray-600" />
@@ -338,7 +375,7 @@ export function PageManagerPanel({
                     </div>
                 ) : (
                     <div className="flex h-full min-h-0 flex-col">
-                        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                        <div ref={listScrollRef} className="min-h-0 flex-1 overflow-y-auto pr-1">
                         <div className="space-y-3">
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
@@ -361,6 +398,7 @@ export function PageManagerPanel({
                             return (
                                 <div
                                     key={page.id}
+                                    data-page-id={page.id}
                                     className={cn(
                                         'relative rounded-xl border px-[13px] pb-3 pt-[13px] transition-all',
                                         isCurrent
@@ -489,7 +527,7 @@ export function PageManagerPanel({
                         </div>
 
                         {page404 ? (
-                            <div className="shrink-0 pt-6">
+                            <div className="shrink-0 pt-3">
                                 <div className="rounded-[12px] border border-[rgba(59,130,246,0.04)] bg-[#111A2D] p-2">
                                     <button
                                         type="button"

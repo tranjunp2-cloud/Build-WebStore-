@@ -3,6 +3,7 @@ import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem } from '@/app/api/orders/lib/stock-utils'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 
 export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) {
     const now = new Date().toISOString()
@@ -55,6 +56,11 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                         '[payment-expiry] restock failed',
                     ))
             }
+
+            // Release the discount slot reserved at placement — a terminal auto-cancel must return the slot
+            // to the pool, exactly like restock (#10/#11). Idempotent + non-throwing; a no-op for orders
+            // with no discount. (Closes the pre-existing leak where expired orders kept their slot.)
+            await releaseDiscountRedemption(payload, Number(order.id))
 
             // Slug lives on the tenant, not the site — sites collection has no slug field
             const siteObj = typeof order.site === 'object' ? order.site : null

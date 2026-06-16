@@ -26,6 +26,10 @@ export type ConfirmOrder = {
     subtotal: number
     shippingFee?: number
     tax: number
+    /** Discount code snapshot, if any. */
+    discountCode?: string | null
+    /** Discount amount in sen (snapshot) — divide by 100 for RM display. */
+    discountAmount?: number | null
     total: number
     currency: string
     paymentMethod: string
@@ -978,7 +982,10 @@ useEffect(() => {
                             ))}
                         </ul>
                         <div className="summary-line"><span className="lbl">Subtotal</span><span className="val">{formatPrice(order.subtotal, currency)}</span></div>
-                        <div className="summary-line"><span className="lbl">SST (6%)</span><span className="val">{formatPrice(order.tax, currency)}</span></div>
+                        {/* Discount — snapshot in sen → /100 for RM (F33 phase-02) */}
+                        {(order.discountAmount ?? 0) > 0 && <div className="summary-line"><span className="lbl">Discount{order.discountCode ? ` (${order.discountCode})` : ''}</span><span className="val">−{formatPrice((order.discountAmount ?? 0) / 100, currency)}</span></div>}
+                        {/* SST removed at checkout (F33 phase-06) — show only for historical orders that carry real tax */}
+                        {order.tax > 0 && <div className="summary-line"><span className="lbl">SST (6%)</span><span className="val">{formatPrice(order.tax, currency)}</span></div>}
                         <div className="summary-line"><span className="lbl">Shipping</span><span className="val">{formatPrice(shippingFee, currency)}</span></div>
                         <div className="summary-total">
                             <span className="t-lbl">Total</span>

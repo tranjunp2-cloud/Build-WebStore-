@@ -16,6 +16,9 @@ import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { retryXenditPayment } from './retry-payment-xendit'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { computeOrderTotal } from '@/lib/orders/order-total'
 
 // Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
 // 'payment_failed' (24h auto-cancel cron) — accept both so either path can be retried.
@@ -191,21 +194,42 @@ export async function POST(
         const { checkoutItems, subtotal, orderItems } = built
 
         // Re-price at retry time so the Stripe charge matches what we persist — product prices may
-        // have changed since placement. Mirrors stripe-checkout totals (flat shipping + 6% SST).
+        // have changed since placement. Mirrors stripe-checkout totals (flat shipping, SST removed — F33 phase-06).
         const shippingFee = 10
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
+        const tax = 0 // SST removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated
+        const subtotalSen = Math.round(subtotal * 100)
+        const shippingFeeSen = Math.round(shippingFee * 100)
+
+        // Re-apply the order's discount against the re-priced subtotal (F33). As of the race fix (#10/#11)
+        // the slot was reserved at PLACEMENT and is still held by this order, so we pass skipUsageLimit —
+        // otherwise the limit check would count the order's OWN reservation and falsely drop a 1-slot code
+        // at retry. We still honour expiry/status/deletion: if the discount no longer applies, it drops to
+        // full price AND the held slot is released below (so a dropped discount can't leak its slot).
+        const discountRow = (typeof order.discount === 'object' && order.discount ? order.discount : null) as any
+        let discountSen = 0
+        if (discountRow) {
+            const applied = applyDiscount(discountRow, { subtotalSen, tenantId, now: new Date() }, { skipUsageLimit: true })
+            if (applied.ok) discountSen = applied.discountSen
+        }
+
+        // Shared gateway-agnostic total (F33) — identical formula as stripe-checkout / COD.
+        const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
 
         // Step 7: Create new Stripe Checkout Session
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantDoc.slug || String(tenantId)
         const orderNumber = order.orderNumber
 
-        const allCheckoutItems = [
-            ...checkoutItems,
-            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
-        ]
+        // When a discount applies, use a single consolidated line item so Stripe charges exactly the
+        // discounted total — Stripe forbids negative line items, so a per-item split is not viable
+        // (matches stripe-checkout). No discount → itemized lines + shipping.
+        const finalTotalSen = Math.round(total * 100)
+        const allCheckoutItems = discountSen > 0
+            ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
+            : [
+                ...checkoutItems,
+                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+              ]
 
         let checkout: { sessionId: string; url: string }
         try {
@@ -242,6 +266,19 @@ export async function POST(
             shippingFee,
             tax,
             total,
+        }
+        // Keep the persisted discount snapshot consistent with what Stripe actually charges. The slot was
+        // reserved at placement and is still held; recompute the amount on re-price. If the discount no
+        // longer applies, clear the snapshot AND release the held slot (below) so it returns to the pool.
+        if (discountSen > 0) {
+            updateData.discountAmount = discountSen
+        } else if (order.discount) {
+            // Discount no longer applies (expired / deactivated / deleted). Drop it from the order AND
+            // release the slot reserved at placement so it returns to the pool (idempotent + non-throwing).
+            await releaseDiscountRedemption(payload, Number(order.id))
+            updateData.discount = null
+            updateData.discountCode = null
+            updateData.discountAmount = null
         }
         if (
             order.status === 'payment_failed' ||

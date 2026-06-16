@@ -13,7 +13,12 @@
         "mobile": "Mobile",
         "preview": "Preview",
         "back": "Back",
-        "close": "Close"
+        "close": "Close",
+        "subscriptionErrors": {
+            "featureLocked": "This feature is not available on your current plan.",
+            "subscriptionExpired": "Your subscription has expired or was not found. Please renew to continue.",
+            "genericLocked": "This action is not available on your current plan."
+        }
     },
     "nav": {
         "platform": "Platform",
@@ -1250,7 +1255,6 @@
                 "unnamedProduct": "Unnamed Product",
                 "multipleSkus": "Multiple SKUs",
                 "none": "None",
-                "taxesSst": "Taxes: SST (6%)\nIncl.",
                 "stockLevel": "Stock Level",
                 "centralWarehouse": "Central Warehouse",
                 "unitsAvailable": "Units Available",
@@ -1268,8 +1272,6 @@
                 "skuIdentification": "SKU Identification",
                 "skuLabel": "SKU",
                 "skuFallback": "N/A",
-                "taxConfiguration": "Tax Configuration",
-                "taxesSst": "Taxes: SST (6%) Incl.",
                 "categoryPath": "Category Path",
                 "uncategorized": "Uncategorized",
                 "pricing": "Pricing",
@@ -1681,7 +1683,7 @@
             "subtitle": "Manage store products"
         },
         "customers": {
-            "title": "Customers",
+            "title": "Contact Leads",
             "subtitle": "Contact form submissions & newsletter subscribers",
             "searchPlaceholder": "Search by name or email…",
             "sourceAll": "All Sources",
@@ -1740,7 +1742,7 @@
             "view": "View"
         },
         "shopCustomers": {
-            "title": "Customers",
+            "title": "All Customers",
             "subtitle": "Buyer records for this tenant. Customers are auto-created from incoming orders; you can edit details, manage addresses, and view linked orders here.",
             "loadFailed": "Failed to load customers",
             "exportLimited": "Export limited to first 1,000 of {total} customers",
@@ -2016,7 +2018,6 @@
                 "liveSubtotal": "Subtotal",
                 "liveShipping": "Shipping (West Malaysia)",
                 "liveAddMore": "Add {amount} more for FREE shipping",
-                "liveSst": "SST (6%)",
                 "liveBuyerPays": "Buyer pays",
                 "allSaved": "All changes saved",
                 "resetToDefaults": "Reset to Defaults",
@@ -2109,6 +2110,179 @@
                     "contact-from-seller": "Forward the message to the seller's support inbox.",
                     "newsletter-seller-digest": "Digest of newsletter signups, opens, and click-through rates."
                 }
+            }
+        },
+        "discounts": {
+            "tabs": {
+                "codes": "Discount Codes",
+                "history": "Usage History"
+            },
+            "list": {
+                "title": "Discount Codes",
+                "subtitle": "Create and manage promo codes for this store. Customers apply one code at checkout; usage is tracked against each code's limit. Deleting a code keeps its usage history.",
+                "exportCsv": "Export CSV",
+                "createDiscount": "Create discount",
+                "exportLimitError": "Export limited to 10,000 rows. Please apply a date filter first.",
+                "exportFailed": "Export failed. Please try again.",
+                "loadFailed": "Failed to load discounts",
+                "deleteSuccess": "Discount \"{code}\" deleted",
+                "deleteFailed": "Failed to delete \"{code}\"",
+                "emptyNoResults": "No results found",
+                "emptyNoResultsSubtitle": "Try adjusting your search or filter criteria",
+                "emptyNoDiscounts": "No discounts yet",
+                "emptyNoDiscountsSubtitle": "Create your first discount code to get started",
+                "showing": "Showing",
+                "of": "of",
+                "codes": "codes",
+                "rowsPerPage": "Rows per page:"
+            },
+            "toolbar": {
+                "searchPlaceholder": "Search code or description...",
+                "statusLabel": "Status",
+                "typeLabel": "Type",
+                "statusAll": "All",
+                "statusActive": "Active",
+                "statusInactive": "Inactive",
+                "typeAll": "All",
+                "typePercentage": "Percentage",
+                "typeFixed": "Fixed"
+            },
+            "table": {
+                "code": "Code",
+                "type": "Type",
+                "value": "Value",
+                "usage": "Usage",
+                "expires": "Expires",
+                "status": "Status",
+                "actions": "Actions",
+                "typeFixed": "Fixed",
+                "typePercentage": "Percentage",
+                "editTitle": "Edit",
+                "deleteTitle": "Delete"
+            },
+            "badges": {
+                "active": "Active",
+                "inactive": "Inactive",
+                "percentage": "Percentage",
+                "fixed": "Fixed",
+                "unlimited": "UNLIMITED",
+                "atLimit": "AT LIMIT"
+            },
+            "form": {
+                "codeLabel": "Code",
+                "codeHelp": "Unique per store · UPPERCASE · case-insensitive at checkout.",
+                "codePlaceholder": "SUMMER50",
+                "statusLabel": "Status",
+                "statusHelp": "Inactive codes are silently rejected at checkout.",
+                "statusActive": "Active",
+                "statusInactive": "Inactive",
+                "descriptionLabel": "Description",
+                "descriptionOptional": "(optional · ≤ 500)",
+                "descriptionPlaceholder": "e.g. Summer campaign — sitewide",
+                "typeLabel": "Type",
+                "typePercentage": "Percentage",
+                "typeFixed": "Fixed amount",
+                "valueLabel": "Value",
+                "valueHelpPercentage": "Percent off the subtotal.",
+                "valueHelpFixed": "Enter amount in RM (e.g. 25.00 = RM 25).",
+                "valueRangeHint": "0–100",
+                "valueMaxError": "Max RM {max}",
+                "usageLimitLabel": "Usage limit",
+                "usageLimitPlaceholder": "Leave blank = unlimited",
+                "usageLimitHelp": "Blank = unlimited redemptions.",
+                "usedSoFarLabel": "Used so far",
+                "usedSoFarTitle": "Read-only. Increments per order that redeems this code.",
+                "startsAtLabel": "Starts at",
+                "startsAtHelp": "Normalized to start of day (Asia/Kuala_Lumpur).",
+                "expiresAtLabel": "Expires at",
+                "expiresAtHelp": "End of day. Both blank = always available."
+            },
+            "validation": {
+                "codeRequired": "Code is required.",
+                "valueRequired": "Value is required.",
+                "valueNotNumber": "Enter a number.",
+                "percentageRange": "Percentage must be between 0 and 100.",
+                "fixedNegative": "Fixed amount must be ≥ 0.",
+                "fixedTooLarge": "Fixed amount is too large (max RM {max}).",
+                "usageLimitMin": "Usage limit must be at least 1 (leave blank for unlimited).",
+                "datesOrder": "Start date must be before expiry date."
+            },
+            "toast": {
+                "cannotSave": "Cannot save",
+                "cannotSaveDesc": "Please fix the highlighted fields before saving.",
+                "duplicateCode": "Duplicate code",
+                "duplicateCodeDesc": "Try a different code or append a number.",
+                "duplicateCodeField": "This code is already in use for your tenant. Try a different code or append a number.",
+                "saveFailed": "Failed to save",
+                "created": "Discount created",
+                "saved": "Discount saved",
+                "deleted": "Discount deleted",
+                "deleteFailed": "Failed to delete"
+            },
+            "header": {
+                "createTitle": "Create discount",
+                "defaultTitle": "Discount",
+                "backTitle": "Back to discounts",
+                "deleteBtn": "Delete",
+                "newCode": "New code · {tenantName}",
+                "createdOn": "Created {date}",
+                "unsavedChanges": "You have unsaved changes.",
+                "revert": "Revert",
+                "save": "Save"
+            },
+            "saveBar": {
+                "unsavedChanges": "Unsaved changes",
+                "newDiscount": "New discount",
+                "upToDate": "Up to date",
+                "cancel": "Cancel",
+                "saving": "Saving…",
+                "saveDiscount": "Save discount",
+                "save": "Save"
+            },
+            "deleteDialog": {
+                "title": "Delete discount '{code}'?",
+                "description": "The code will stop working immediately and won't be redeemable at checkout. Its usage history is preserved for audit.",
+                "usageWarningOrder": "order has",
+                "usageWarningOrders": "orders have",
+                "usageWarningSuffix": "used this code. Deleting it won't undo those discounts but the code can't be reused.",
+                "cancel": "Cancel",
+                "confirm": "Delete discount"
+            },
+            "preview": {
+                "heading": "Live Preview",
+                "offSubtotal": "off subtotal",
+                "usageLabel": "Usage",
+                "windowLabel": "Window",
+                "alwaysAvailable": "Always available",
+                "tenantScopedLabel": "Tenant-Scoped",
+                "tenantScopedNamed": "This code is scoped to {tenantName}. The same code can exist for other stores without conflict.",
+                "tenantScopedGeneric": "This code is scoped to your store. The same code can exist for other stores without conflict.",
+                "discountSubtotalNote": "Discount applies to the subtotal only.",
+                "codePlaceholder": "CODE"
+            },
+            "usageHistory": {
+                "title": "Discount Usage History",
+                "subtitle": "Every code redemption, newest first. This log is immutable for audit — no editing or deleting.",
+                "readOnly": "Read-only",
+                "searchPlaceholder": "Search by code or order #…",
+                "clearSearch": "Clear search",
+                "loading": "Loading…",
+                "tableCode": "Code",
+                "tableType": "Type",
+                "tableAmountApplied": "Amount applied",
+                "tableOrderNum": "Order #",
+                "tableCustomerEmail": "Customer email",
+                "tableUsedDate": "Used date",
+                "matchSingular": "match",
+                "matchPlural": "matches",
+                "showingOf": "Showing",
+                "ofTotal": "of",
+                "ofRedemptions": "redemptions",
+                "rowsPerPage": "Rows per page:",
+                "emptyNoDataTitle": "No redemptions yet",
+                "emptyNoDataSubtitle": "When a customer applies a discount code at checkout, a read-only record appears here — one row per order. History is preserved even if the code is later deleted.",
+                "emptyNoResultsTitle": "No redemptions match your search",
+                "emptyNoResultsSubtitle": "Search by discount code or order number. Clear the search to see all redemptions."
             }
         },
         "blog": {
@@ -2457,7 +2631,11 @@
     },
     "cms": {
         "profile": "Profile",
-        "logout": "Logout"
+        "logout": "Logout",
+        "appSwitcher": {
+            "switchApp": "Switch app",
+            "ssoRedirect": "Secure SSO redirect"
+        }
     },
     "plural": {
         "issue": {
@@ -3115,6 +3293,7 @@
             "pageHidden": "Page hidden",
             "visibilityFailed": "Failed to update visibility",
             "deleteFailed": "Failed to delete page",
+            "cannotDeleteLastPage": "Can't delete the last page — a site needs at least one page.",
             "deleteSuccess": "Page deleted. Undo?",
             "undo": "Undo",
             "restored": "Page restored",
@@ -3803,7 +3982,7 @@
             "empty": "Your cart is empty",
             "subtotal": "Subtotal",
             "subtitle": "Curated pieces ready for checkout",
-            "shippingNote": "Shipping fees and SST (6%) are not included. Final total calculated at checkout.",
+            "shippingNote": "Shipping fees are not included. Final total calculated at checkout.",
             "proceedToCheckout": "Proceed to Checkout",
             "checkoutUnavailable": "Checkout feature is coming soon",
             "qty": "Qty:"
@@ -3858,6 +4037,7 @@
             "fileTooLarge": "File size must be under 2MB",
             "uploadFailed": "Failed to upload payment proof",
             "networkError": "Network error. Please try again.",
+            "discountExhausted": "This discount code has reached its usage limit. We've removed it — please review your order total before continuing to payment.",
             "calculatingShipping": "Calculating…",
             "retryShipping": "Retry",
             "estimatedDeliveryEast": "Estimated delivery: 5–7 business days",
@@ -3887,7 +4067,18 @@
             "stripeUnavailableDesc": "This payment method is under maintenance or not yet ready. Please choose another method.",
             "stripeChooseAnother": "Choose another method",
             "checkoutUnavailableTitle": "Checkout unavailable",
-            "checkoutUnavailableDesc": "This store is temporarily unable to accept payments. Please try again later."
+            "checkoutUnavailableDesc": "This store is temporarily unable to accept payments. Please try again later.",
+            "discount": {
+                "placeholder": "Promo or gift card code",
+                "apply": "Apply",
+                "oneCodePerOrder": "One code per order.",
+                "applied": "applied",
+                "remove": "Remove",
+                "percentOff": "{value}% off subtotal",
+                "fixedOff": "{amount} off",
+                "atLimit": "This voucher has reached its usage limit and is no longer available.",
+                "unavailable": "This voucher is no longer available. Please try another voucher."
+            }
         },
         "confirmPage": {
             "leaveWarningBanner": "Action Required — Receipt Not Uploaded",
@@ -3941,6 +4132,12 @@
         "tabs": {
             "general": "General Info",
             "security": "Security"
+        },
+        "teamTabs": {
+            "profile": "Account Profile",
+            "staff": "Staff",
+            "pageTitle": "Team & Account",
+            "pageSubtitle": "Manage your personal profile and your team members."
         },
         "banner": {
             "roleOwner": "Owner",

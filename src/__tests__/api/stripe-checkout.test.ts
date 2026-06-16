@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ─── Mocks ────────────────────────────────────────────────────────────
 
 const mockFindByID = vi.fn()
+const mockFind = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
@@ -11,6 +12,7 @@ const mockDrizzleExecute = vi.fn()
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         findByID: mockFindByID,
+        find: mockFind,
         create: mockCreate,
         update: mockUpdate,
         delete: mockDelete,
@@ -55,6 +57,20 @@ vi.mock('@/lib/validations/orders', () => ({
     stripeCheckoutSchema: {
         safeParse: (data: any) => ({ success: true, data }),
     },
+}))
+vi.mock('@/lib/subscriptions/plan-subscription', () => ({
+    getActivePlanSubscription: vi.fn().mockResolvedValue({
+        id: 'mock-sub-1', plan: 'PROFESSIONAL_TM_USER', status: 'active', startDate: '2026-01-01T00:00:00.000Z',
+    }),
+    canUse: vi.fn().mockResolvedValue(true),
+    canUseWithinLimit: vi.fn().mockResolvedValue(true),
+}))
+
+// recordDiscountRedemption does I/O (drizzle SQL); mock at module level so it
+// never touches the real DB. applyDiscount is a pure function — not mocked.
+const mockRecordRedemption = vi.fn(() => Promise.resolve({ recorded: true }))
+vi.mock('@/lib/discounts/record-discount-redemption', () => ({
+    recordDiscountRedemption: (...args: any[]) => mockRecordRedemption(...args),
 }))
 
 import { POST } from '@/app/api/orders/stripe-checkout/route'
@@ -133,6 +149,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         mockDelete.mockResolvedValue({})
         // Default: non-variant stock CAS succeeds (returns id row)
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
+        // Default: no discount found (discount lookup via payload.find returns empty)
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
     })
 
     // ─── TC-F13.01: FPX checkout success ─────────────────────────────
@@ -743,5 +761,190 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const createCall = mockCreate.mock.calls[0][0]
         expect(createCall.data.paymentExpiresAt).toBeUndefined()
         expect(createCall.data.status).toBe('paid')
+    })
+
+    // ─── TC-F33-07-02: Stripe charges discounted total as consolidated line item ──
+
+    it('[TC-F33-07-02] 50% discount → single consolidated line item at discounted total, no negative items, no Stripe Coupon', async () => {
+        // Arrange:
+        //   subtotal = 100 RM (10000 sen), 50% off → discountSen = 5000
+        //   shippingFee = 10 RM (1000 sen, fixed in route)
+        //   total = (10000 - 5000 + 1000) / 100 = 60 RM
+        //   finalTotalSen = Math.round(60 * 100) = 6000
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 2, unitPrice: 5000 }],
+            checkoutItems: [{ name: 'Widget', price: 5000, quantity: 2, images: [] }],
+            subtotal: 100, // RM (2 × RM 50)
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // Discount: 50% off, active, for tenant-1
+        mockFind.mockResolvedValueOnce({
+            docs: [{
+                id: 10,
+                code: 'HALF50',
+                type: 'percentage',
+                value: 50,
+                status: 'active',
+                usageLimit: null,
+                usageCount: 0,
+                startsAt: null,
+                expiresAt: null,
+                tenant: 'tenant-1',
+            }],
+            totalDocs: 1,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({ ...VALID_REQUEST_BODY, discountCode: 'HALF50' })
+        const res = await POST(req as any)
+        const body = await res.json()
+
+        // Assert — session created successfully
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+
+        // The single consolidated line item replaces per-product items when a discount is applied
+        const sessionCall = mockCreateCheckoutSession.mock.calls[0][0]
+        const lineItems: any[] = sessionCall.items
+        expect(lineItems).toHaveLength(1)
+        expect(lineItems[0].name).toBe('Order total (discount applied)')
+        // price = finalTotalSen = Math.round(60 * 100) = 6000 sen (discounted total, no tax)
+        expect(lineItems[0].price).toBe(6000)
+        expect(lineItems[0].quantity).toBe(1)
+
+        // No negative items (Stripe forbids them)
+        const hasNegativeItem = lineItems.some((item: any) => item.price < 0)
+        expect(hasNegativeItem).toBe(false)
+
+        // No Stripe Coupon object — consolidated approach does NOT use Stripe coupon API
+        expect(sessionCall).not.toHaveProperty('coupon')
+        expect(sessionCall).not.toHaveProperty('discounts')
+
+        // The order was persisted with the discount snapshot fields
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBe('HALF50')
+        expect(createData.discountAmount).toBe(5000) // discountSen
+    })
+
+    it('[TC-F33-07-02b] no discount → per-product line items + shipping line item (original shape preserved)', async () => {
+        // When no discount is applied the route must NOT collapse to a consolidated item —
+        // individual product lines + shipping line are passed to Stripe as before.
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ name: 'Widget', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // No discount code in request → mockFind not called for discounts
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY) // no discountCode field
+        const res = await POST(req as any)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        const sessionCall = mockCreateCheckoutSession.mock.calls[0][0]
+        const lineItems: any[] = sessionCall.items
+
+        // Must contain product item AND shipping item; no consolidated item
+        expect(lineItems.length).toBeGreaterThan(1)
+        const hasConsolidated = lineItems.some((item: any) =>
+            item.name === 'Order total (discount applied)'
+        )
+        expect(hasConsolidated).toBe(false)
+        const hasShipping = lineItems.some((item: any) => item.name === 'Shipping')
+        expect(hasShipping).toBe(true)
+    })
+
+    // ─── TC-F33-09-04: Discount at-limit blocking (#10 regression) ──────────────
+
+    it('[TC-F33-09-04 regression] Stripe: discount at-limit → HTTP 409 DISCOUNT_EXHAUSTED, no session/order created', async () => {
+        // #10 bug: OLD code silently nulled discount when code's last slot was taken by another buyer.
+        // FIXED: block with 409 DISCOUNT_EXHAUSTED before creating order/session.
+        // Arrange — discount exhausted (usageCount >= usageLimit)
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // mockCreate and mockCreateCheckoutSession NOT called — order/session must not be created
+
+        // Mock discount lookup returning exhausted code
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 7, code: 'STRIMELIMIT', type: 'percentage', value: 25, status: 'active', usageLimit: 5, usageCount: 5, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+            totalDocs: 1,
+        })
+
+        // Act
+        const req = mockRequest({ ...VALID_REQUEST_BODY, discountCode: 'STRIMELIMIT' })
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(409)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('DISCOUNT_EXHAUSTED')
+        expect(body.error.message).toContain('usage limit')
+        // CRITICAL: no order or session created
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F33-09-04 regression] Stripe: non-at-limit reasons (inactive) still silent reject → session created at full price', async () => {
+        // BR-03: only 'at-limit' blocks; other reasons (inactive/expired/not-found) silent reject,
+        // session proceeds at full price. Preserves existing behavior.
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        // Mock inactive discount
+        mockFind.mockResolvedValueOnce({
+            docs: [{ id: 8, code: 'INACTIVE', type: 'percentage', value: 50, status: 'inactive', usageLimit: null, usageCount: 0, startsAt: null, expiresAt: null, tenant: 'tenant-1' }],
+            totalDocs: 1,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest({ ...VALID_REQUEST_BODY, discountCode: 'INACTIVE' })
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert — session created at full price (100 + 10 flat ship = 110 RM)
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(mockCreate).toHaveBeenCalled()
+        expect(mockCreateCheckoutSession).toHaveBeenCalled()
+        // Order has NO discount fields (silent reject)
+        const createData = mockCreate.mock.calls[0][0].data
+        expect(createData.discountCode).toBeUndefined()
+        expect(createData.discountAmount).toBeUndefined()
     })
 })

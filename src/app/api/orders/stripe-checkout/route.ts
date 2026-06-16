@@ -8,9 +8,16 @@ import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { applyDiscount } from '@/lib/discounts/apply-discount'
+import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
+import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { discountReserveErrorResponse } from '@/lib/discounts/messages'
+import { computeOrderTotal } from '@/lib/orders/order-total'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
+import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
+import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -131,6 +138,16 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Permissive pattern: only block if sub exists AND feature is explicitly disabled
+        const checkoutSub = await getActivePlanSubscription(payload, tenantId)
+        if (checkoutSub && !await canUse(payload, checkoutSub.plan as PlanCode, 'allowing_buyer_making_order')) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Checkout is currently unavailable' } },
+                { status: 403 },
+            )
+        }
+        const canSendBuyerEmail = !checkoutSub || await canUse(payload, checkoutSub.plan as PlanCode, 'email_confirmation')
+
         // Step 3: Stripe-ready check
         const stripeAccountId = tenantTyped.stripeAccountId
         const onboardingComplete = tenantTyped.stripeOnboardingComplete === true
@@ -180,10 +197,52 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
+        // Calculate totals (flat shipping — #962 will replace shipping calc).
+        // SST tax removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated.
         const shippingFee = 10
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
+        const tax = 0
+        const subtotalSen = Math.round(subtotal * 100)
+
+        // Discount: re-validate server-side from code — client amount is never trusted
+        let discountSen = 0
+        let discountRow: any = null
+        if (parse.data.discountCode) {
+            const code = String(parse.data.discountCode).trim().toUpperCase()
+            const discountResult = await payload.find({
+                collection: 'discounts',
+                // Site scoping (PRD §9): null site = all tenant sites; site-scoped = its own site only.
+                where: {
+                    and: [
+                        { tenant: { equals: tenantId } },
+                        { code: { equals: code } },
+                        { or: [{ site: { exists: false } }, { site: { equals: siteIdNum } }] },
+                    ],
+                },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            discountRow = discountResult.docs[0] ?? null
+            const applied = applyDiscount(discountRow as any, { subtotalSen, tenantId, now: new Date() })
+            if (applied.ok) {
+                discountSen = applied.discountSen
+            } else if (applied.reason === 'at-limit') {
+                // #10: the buyer applied this code (valid at Apply) but its last slot was taken by another
+                // buyer before they placed the order. BLOCK + warn — never silently charge full price. No
+                // order created yet. (The post-create reserve below still guards the tighter concurrent race.)
+                const e = discountReserveErrorResponse('at-limit')
+                return NextResponse.json(
+                    { success: false, error: { code: e.code, message: e.message } },
+                    { status: e.httpStatus },
+                )
+            } else {
+                discountRow = null // other reasons (not-found/expired/inactive): silent reject — full price
+            }
+        }
+        const discountRM = discountSen / 100
+        // Shared gateway-agnostic total (F33) — identical formula as COD/QR so all gateways charge the same.
+        const shippingFeeSen = Math.round(shippingFee * 100)
+        const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
         const magicLinkSecret = randomBytes(32).toString('hex')
@@ -209,8 +268,37 @@ export async function POST(request: NextRequest) {
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
+                    ...(discountRow ? {
+                        discount: discountRow.id,
+                        discountCode: discountRow.code,
+                        discountAmount: discountSen,
+                    } : {}),
                 } as Record<string, unknown>,
             })
+
+            // Reserve the discount slot BEFORE touching stock — a free order is free ONLY because the
+            // discount applies, so if it just sold out we must block (not hand out a free order without a
+            // valid slot). Reserving first means an at-limit block needs no stock compensation. (#10/#11)
+            if (discountRow && discountSen > 0) {
+                const reserve = await recordDiscountRedemption(payload, {
+                    tenantId: Number(tenantId),
+                    discountId: Number(discountRow.id),
+                    orderId: Number(freeOrder.id),
+                    amountApplied: discountSen,
+                    discountCode: discountRow.code,
+                    discountType: discountRow.type,
+                    discountValue: Number(discountRow.value),
+                    customerEmail: customer.email,
+                })
+                if (!reserve.recorded) {
+                    await payload.delete({ collection: 'orders', id: freeOrder.id, overrideAccess: true }).catch(() => null)
+                    const e = discountReserveErrorResponse(reserve.status)
+                    return NextResponse.json(
+                        { success: false, error: { code: e.code, message: e.message } },
+                        { status: e.httpStatus },
+                    )
+                }
+            }
 
             // Decrement stock for free orders — consistent with all payment methods.
             for (const item of orderItems) {
@@ -276,6 +364,11 @@ export async function POST(request: NextRequest) {
                           country: customer.address.country || 'Malaysia',
                       }
                     : undefined,
+                ...(discountRow ? {
+                    discount: discountRow.id,
+                    discountCode: discountRow.code,
+                    discountAmount: discountSen,
+                } : {}),
             } as Record<string, unknown>,
         })
 
@@ -324,16 +417,49 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Reserve the discount slot at PLACE ORDER (after stock is held, before the Stripe session) — like
+        // inventory. If the last slot was just taken by a concurrent buyer, HARD-BLOCK here: restock, delete
+        // the order, and 409 so the storefront can warn the buyer instead of silently charging full price
+        // (#10/#11). Reserved slots are released on the session-creation/persist failures below, and on any
+        // terminal non-sale (cancel / refund / 24h payment-expiry).
+        if (discountRow && discountSen > 0) {
+            const reserve = await recordDiscountRedemption(payload, {
+                tenantId: Number(tenantId),
+                discountId: Number(discountRow.id),
+                orderId: Number(order.id),
+                amountApplied: discountSen,
+                discountCode: discountRow.code,
+                discountType: discountRow.type,
+                discountValue: Number(discountRow.value),
+                customerEmail: customer.email,
+            })
+            if (!reserve.recorded) {
+                for (const d of decremented) {
+                    await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
+                }
+                await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
+                const e = discountReserveErrorResponse(reserve.status)
+                return NextResponse.json(
+                    { success: false, error: { code: e.code, message: e.message } },
+                    { status: e.httpStatus },
+                )
+            }
+        }
+
         // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
 
-        // Include shipping and tax as Stripe line items so buyer is charged the full order total
-        const allCheckoutItems = [
-            ...checkoutItems,
-            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
-            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
-        ]
+        // When discount applied, use a single consolidated line item so Stripe charges
+        // exactly the discounted total. Stripe forbids negative line items, so per-item
+        // proportional split is not viable (Q2 confirmed: consolidated line is acceptable).
+        const finalTotalSen = Math.round(total * 100)
+        const allCheckoutItems = discountRow
+            ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
+            : [
+                ...checkoutItems,
+                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+              ]
 
         let checkout
         try {
@@ -350,10 +476,11 @@ export async function POST(request: NextRequest) {
             })
         } catch (stripeErr: unknown) {
             console.error('[stripe-checkout] Stripe API error:', stripeErr instanceof Error ? stripeErr.message : stripeErr)
-            // Compensate stock — session creation failed, no payment will occur
+            // Compensate stock + discount slot — session creation failed, no payment will occur
             for (const d of decremented) {
                 await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
             }
+            await releaseDiscountRedemption(payload, Number(order.id))
             await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'STRIPE_API_ERROR', message: 'Payment service is busy. Please try again.' } },
@@ -374,6 +501,7 @@ export async function POST(request: NextRequest) {
             for (const d of decremented) {
                 await restockItem(payload, d.productId, d.variantName, d.quantity).catch(() => null)
             }
+            await releaseDiscountRedemption(payload, Number(order.id))
             await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => null)
             return NextResponse.json(
                 { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
@@ -401,14 +529,19 @@ export async function POST(request: NextRequest) {
             subtotal,
             shippingFee,
             total,
+            // Discount line — amount in RM (template formats with the same fp() as subtotal)
+            discountCode: discountRow?.code ?? null,
+            discountAmount: discountRM || null,
             currency,
             paymentMethod: 'stripe',
             event: 'placed',
             orderDate: new Date().toISOString(),
             orderPageUrl,
         })
-        payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
-            .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
+        if (canSendBuyerEmail) {
+            payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
+                .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
+        }
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
         const res = NextResponse.json({

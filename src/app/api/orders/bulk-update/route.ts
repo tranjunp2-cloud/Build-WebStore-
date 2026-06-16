@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderBulkUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
@@ -12,7 +13,7 @@ import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
  * Bulk update order statuses (e.g., confirm multiple pending orders at once).
  * Only processes orders that have valid transitions.
  */
-export const POST = withAuth(async (user, request) => {
+export const POST = withFeatureGuard('order_management')(withAuth(async (user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, orderBulkUpdateSchema)
         if (errorResponse) return errorResponse
@@ -91,4 +92,4 @@ export const POST = withAuth(async (user, request) => {
             { status: 500 }
         )
     }
-})
+}))

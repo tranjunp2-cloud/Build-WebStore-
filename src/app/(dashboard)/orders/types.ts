@@ -24,6 +24,10 @@ export type Order = {
     tax: number
     total: number
     shippingFee?: number
+    /** Discount code applied at checkout (snapshot), if any. */
+    discountCode?: string | null
+    /** Discount amount in sen (snapshot) — divide by 100 for RM display. */
+    discountAmount?: number | null
     currency: string
     status: 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
     paymentMethod: 'cod' | 'qr_banking' | 'stripe'

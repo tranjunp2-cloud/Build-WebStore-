@@ -4270,6 +4270,464 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.email_template_settings_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_email_template_settings_id_idx" ON "payload_locked_documents_rels" ("email_template_settings_id");`,
   },
+  // ── F33: discounts ──
+  {
+    name: 'discounts.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS discounts (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      site_id integer REFERENCES sites(id) ON DELETE SET NULL,
+      code varchar NOT NULL,
+      description text,
+      type varchar NOT NULL,
+      value numeric NOT NULL DEFAULT 0,
+      status varchar NOT NULL DEFAULT 'active',
+      usage_limit integer,
+      usage_count integer NOT NULL DEFAULT 0,
+      starts_at timestamptz,
+      expires_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'discounts.tenant_code_uq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS discounts_tenant_code_uq ON discounts (tenant_id, upper(code));`,
+  },
+  {
+    name: 'discounts.status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discounts_status_idx ON discounts (status);`,
+  },
+  {
+    name: 'discounts.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discounts_tenant_idx ON discounts (tenant_id);`,
+  },
+  {
+    name: 'discounts.alter_columns',
+    sql: `
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS site_id integer REFERENCES sites(id) ON DELETE SET NULL;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS code varchar;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS description text;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS type varchar;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS value numeric NOT NULL DEFAULT 0;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'active';
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS usage_limit integer;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS usage_count integer NOT NULL DEFAULT 0;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS starts_at timestamptz;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE discounts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
+  // ── F33: discount_usage_history ──
+  {
+    name: 'discount_usage_history.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS discount_usage_history (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      discount_id integer REFERENCES discounts(id) ON DELETE SET NULL,
+      order_id integer REFERENCES orders(id) ON DELETE SET NULL,
+      amount_applied numeric NOT NULL DEFAULT 0,
+      customer_email varchar,
+      discount_code varchar,
+      discount_type varchar,
+      discount_value numeric,
+      used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'discount_usage_history.order_uq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS discount_usage_history_order_uq ON discount_usage_history (order_id);`,
+  },
+  {
+    name: 'discount_usage_history.discount_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discount_usage_history_discount_idx ON discount_usage_history (discount_id);`,
+  },
+  {
+    name: 'discount_usage_history.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS discount_usage_history_tenant_idx ON discount_usage_history (tenant_id);`,
+  },
+  {
+    name: 'discount_usage_history.alter_columns',
+    sql: `
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_id integer REFERENCES discounts(id) ON DELETE SET NULL;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS order_id integer REFERENCES orders(id) ON DELETE SET NULL;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS amount_applied numeric NOT NULL DEFAULT 0;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS customer_email varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_code varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_type varchar;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount_value numeric;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS used_at timestamptz;
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
+  // ── F33: orders ALTER — add discount columns ──
+  {
+    name: 'orders.add_discount_columns',
+    sql: `
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_id integer REFERENCES discounts(id) ON DELETE SET NULL;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code varchar;
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount numeric
+    `,
+  },
+  // ── F34: Plan Subscription Management ──
+  {
+    name: 'f-subscription-plans-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plans (
+        id                 SERIAL PRIMARY KEY,
+        code               VARCHAR(50)  NOT NULL UNIQUE,
+        name               VARCHAR(100) NOT NULL,
+        description        TEXT,
+        price              DECIMAL(7,2) NOT NULL DEFAULT 0.00,
+        currency           VARCHAR(10)  NOT NULL DEFAULT 'MYR',
+        interval           VARCHAR(20)  NOT NULL DEFAULT 'month',
+        interval_count     SMALLINT     NOT NULL DEFAULT 1,
+        trial_period_days  SMALLINT,
+        sort_order         SMALLINT,
+        created_at         TIMESTAMPTZ  DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ  DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_plans_code ON plans(code);
+    `,
+  },
+  {
+    name: 'f-subscription-plans-seed',
+    sql: `
+      INSERT INTO plans (code, name, description, price, currency, interval, interval_count, trial_period_days, sort_order)
+      VALUES
+        ('FREEMIUM',                 'Freemium',      'Freemium plan',                       0.00,   'MYR', 'month', 1, 0, 1),
+        ('STARTER_TM_USER',          'Starter',       'Starter plan for TM User',            49.00,  'MYR', 'month', 1, 0, 5),
+        ('STARTER_NON_TM_USER',      'Starter',       'Starter plan for Non TM User',        59.00,  'MYR', 'month', 1, 0, 10),
+        ('STANDARD_TM_USER',         'Standard',      'Standard plan for TM User',           129.00, 'MYR', 'month', 1, 0, 15),
+        ('STANDARD_NON_TM_USER',     'Standard',      'Standard plan for Non TM User',       159.00, 'MYR', 'month', 1, 0, 20),
+        ('PROFESSIONAL_TM_USER',     'Professional',  'Professional plan for TM User',       289.00, 'MYR', 'month', 1, 0, 25),
+        ('PROFESSIONAL_NON_TM_USER', 'Professional',  'Professional plan for Non TM User',   309.00, 'MYR', 'month', 1, 0, 30)
+      ON CONFLICT (code) DO NOTHING;
+    `,
+  },
+  {
+    name: 'f-subscription-plan-subscriptions-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_subscriptions (
+        id          SERIAL PRIMARY KEY,
+        tenant_id   INTEGER NOT NULL REFERENCES tenants(id),
+        name        VARCHAR(50) NOT NULL DEFAULT 'main',
+        plan        VARCHAR(50) NOT NULL,
+        status      VARCHAR(20) NOT NULL DEFAULT 'active',
+        starts_at   TIMESTAMPTZ NOT NULL,
+        ends_at     TIMESTAMPTZ NOT NULL,
+        canceled_at          TIMESTAMPTZ,
+        canceled_immediately BOOLEAN NOT NULL DEFAULT false,
+        pack_code            VARCHAR(100),
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(tenant_id, name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_subscriptions_tenant_id ON plan_subscriptions(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_plan_subscriptions_ends_at ON plan_subscriptions(ends_at);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-subscription-usages-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_subscription_usages (
+        id              SERIAL PRIMARY KEY,
+        subscription_id INTEGER NOT NULL REFERENCES plan_subscriptions(id) ON DELETE CASCADE,
+        feature_code    VARCHAR(100) NOT NULL,
+        used            SMALLINT NOT NULL DEFAULT 0,
+        valid_until     TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(subscription_id, feature_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_sub_usages_subscription_id ON plan_subscription_usages(subscription_id);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-features-table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS plan_features (
+        id           SERIAL PRIMARY KEY,
+        plan_id      INTEGER REFERENCES plans(id) ON DELETE CASCADE,
+        plan_code    VARCHAR(50) NOT NULL,
+        feature_code VARCHAR(100) NOT NULL,
+        value        VARCHAR(100) NOT NULL DEFAULT 'YES',
+        settings     JSONB,
+        sort_order   SMALLINT,
+        created_at   TIMESTAMPTZ DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(plan_code, feature_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_plan_features_plan_code ON plan_features(plan_code);
+    `,
+  },
+  {
+    name: 'f-subscription-plan-features-seed',
+    sql: `
+      INSERT INTO plan_features (plan_id, plan_code, feature_code, value)
+      SELECT p.id, v.plan_code, v.feature_code, v.value
+      FROM (VALUES
+        ('FREEMIUM','website_builder','YES'),
+        ('FREEMIUM','template_limit','YES'),
+        ('FREEMIUM','code_snippet','YES'),
+        ('FREEMIUM','sitemap_robot_configuration','YES'),
+        ('FREEMIUM','live_chat_plugin','YES'),
+        ('FREEMIUM','domain_connection','YES'),
+        ('FREEMIUM','shipping_fee_configuration','YES'),
+        ('FREEMIUM','delivery_provider_limit','YES'),
+        ('FREEMIUM','allowing_buyer_making_order','YES'),
+        ('FREEMIUM','allowing_buyer_tracking_order','YES'),
+        ('FREEMIUM','payment_integration','YES'),
+        ('FREEMIUM','order_management','YES'),
+        ('FREEMIUM','product_management','YES'),
+        ('FREEMIUM','promotion_management','YES'),
+        ('FREEMIUM','content_management','YES'),
+        ('FREEMIUM','email_confirmation','YES'),
+        ('FREEMIUM','email_template_configuration','YES'),
+        ('FREEMIUM','staff_limit','YES'),
+        ('FREEMIUM','account_profile','YES'),
+        ('FREEMIUM','distribution_integration','YES'),
+        ('STARTER_TM_USER','website_builder','YES'),
+        ('STARTER_TM_USER','template_limit','YES'),
+        ('STARTER_TM_USER','code_snippet','YES'),
+        ('STARTER_TM_USER','sitemap_robot_configuration','YES'),
+        ('STARTER_TM_USER','live_chat_plugin','YES'),
+        ('STARTER_TM_USER','domain_connection','YES'),
+        ('STARTER_TM_USER','shipping_fee_configuration','YES'),
+        ('STARTER_TM_USER','delivery_provider_limit','YES'),
+        ('STARTER_TM_USER','allowing_buyer_making_order','YES'),
+        ('STARTER_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STARTER_TM_USER','payment_integration','YES'),
+        ('STARTER_TM_USER','order_management','YES'),
+        ('STARTER_TM_USER','product_management','YES'),
+        ('STARTER_TM_USER','promotion_management','YES'),
+        ('STARTER_TM_USER','content_management','YES'),
+        ('STARTER_TM_USER','email_confirmation','YES'),
+        ('STARTER_TM_USER','email_template_configuration','YES'),
+        ('STARTER_TM_USER','staff_limit','YES'),
+        ('STARTER_TM_USER','account_profile','YES'),
+        ('STARTER_TM_USER','distribution_integration','YES'),
+        ('STARTER_NON_TM_USER','website_builder','YES'),
+        ('STARTER_NON_TM_USER','template_limit','YES'),
+        ('STARTER_NON_TM_USER','code_snippet','YES'),
+        ('STARTER_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('STARTER_NON_TM_USER','live_chat_plugin','YES'),
+        ('STARTER_NON_TM_USER','domain_connection','YES'),
+        ('STARTER_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('STARTER_NON_TM_USER','delivery_provider_limit','YES'),
+        ('STARTER_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('STARTER_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STARTER_NON_TM_USER','payment_integration','YES'),
+        ('STARTER_NON_TM_USER','order_management','YES'),
+        ('STARTER_NON_TM_USER','product_management','YES'),
+        ('STARTER_NON_TM_USER','promotion_management','YES'),
+        ('STARTER_NON_TM_USER','content_management','YES'),
+        ('STARTER_NON_TM_USER','email_confirmation','YES'),
+        ('STARTER_NON_TM_USER','email_template_configuration','YES'),
+        ('STARTER_NON_TM_USER','staff_limit','YES'),
+        ('STARTER_NON_TM_USER','account_profile','YES'),
+        ('STARTER_NON_TM_USER','distribution_integration','YES'),
+        ('STANDARD_TM_USER','website_builder','YES'),
+        ('STANDARD_TM_USER','template_limit','YES'),
+        ('STANDARD_TM_USER','code_snippet','YES'),
+        ('STANDARD_TM_USER','sitemap_robot_configuration','YES'),
+        ('STANDARD_TM_USER','live_chat_plugin','YES'),
+        ('STANDARD_TM_USER','domain_connection','YES'),
+        ('STANDARD_TM_USER','shipping_fee_configuration','YES'),
+        ('STANDARD_TM_USER','delivery_provider_limit','YES'),
+        ('STANDARD_TM_USER','allowing_buyer_making_order','YES'),
+        ('STANDARD_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STANDARD_TM_USER','payment_integration','YES'),
+        ('STANDARD_TM_USER','order_management','YES'),
+        ('STANDARD_TM_USER','product_management','YES'),
+        ('STANDARD_TM_USER','promotion_management','YES'),
+        ('STANDARD_TM_USER','content_management','YES'),
+        ('STANDARD_TM_USER','email_confirmation','YES'),
+        ('STANDARD_TM_USER','email_template_configuration','YES'),
+        ('STANDARD_TM_USER','staff_limit','YES'),
+        ('STANDARD_TM_USER','account_profile','YES'),
+        ('STANDARD_TM_USER','distribution_integration','YES'),
+        ('STANDARD_NON_TM_USER','website_builder','YES'),
+        ('STANDARD_NON_TM_USER','template_limit','YES'),
+        ('STANDARD_NON_TM_USER','code_snippet','YES'),
+        ('STANDARD_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('STANDARD_NON_TM_USER','live_chat_plugin','YES'),
+        ('STANDARD_NON_TM_USER','domain_connection','YES'),
+        ('STANDARD_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('STANDARD_NON_TM_USER','delivery_provider_limit','YES'),
+        ('STANDARD_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('STANDARD_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('STANDARD_NON_TM_USER','payment_integration','YES'),
+        ('STANDARD_NON_TM_USER','order_management','YES'),
+        ('STANDARD_NON_TM_USER','product_management','YES'),
+        ('STANDARD_NON_TM_USER','promotion_management','YES'),
+        ('STANDARD_NON_TM_USER','content_management','YES'),
+        ('STANDARD_NON_TM_USER','email_confirmation','YES'),
+        ('STANDARD_NON_TM_USER','email_template_configuration','YES'),
+        ('STANDARD_NON_TM_USER','staff_limit','YES'),
+        ('STANDARD_NON_TM_USER','account_profile','YES'),
+        ('STANDARD_NON_TM_USER','distribution_integration','YES'),
+        ('PROFESSIONAL_TM_USER','website_builder','YES'),
+        ('PROFESSIONAL_TM_USER','template_limit','YES'),
+        ('PROFESSIONAL_TM_USER','code_snippet','YES'),
+        ('PROFESSIONAL_TM_USER','sitemap_robot_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','live_chat_plugin','YES'),
+        ('PROFESSIONAL_TM_USER','domain_connection','YES'),
+        ('PROFESSIONAL_TM_USER','shipping_fee_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','delivery_provider_limit','YES'),
+        ('PROFESSIONAL_TM_USER','allowing_buyer_making_order','YES'),
+        ('PROFESSIONAL_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('PROFESSIONAL_TM_USER','payment_integration','YES'),
+        ('PROFESSIONAL_TM_USER','order_management','YES'),
+        ('PROFESSIONAL_TM_USER','product_management','YES'),
+        ('PROFESSIONAL_TM_USER','promotion_management','YES'),
+        ('PROFESSIONAL_TM_USER','content_management','YES'),
+        ('PROFESSIONAL_TM_USER','email_confirmation','YES'),
+        ('PROFESSIONAL_TM_USER','email_template_configuration','YES'),
+        ('PROFESSIONAL_TM_USER','staff_limit','YES'),
+        ('PROFESSIONAL_TM_USER','account_profile','YES'),
+        ('PROFESSIONAL_TM_USER','distribution_integration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','website_builder','YES'),
+        ('PROFESSIONAL_NON_TM_USER','template_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','code_snippet','YES'),
+        ('PROFESSIONAL_NON_TM_USER','sitemap_robot_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','live_chat_plugin','YES'),
+        ('PROFESSIONAL_NON_TM_USER','domain_connection','YES'),
+        ('PROFESSIONAL_NON_TM_USER','shipping_fee_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','delivery_provider_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','allowing_buyer_making_order','YES'),
+        ('PROFESSIONAL_NON_TM_USER','allowing_buyer_tracking_order','YES'),
+        ('PROFESSIONAL_NON_TM_USER','payment_integration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','order_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','product_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','promotion_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','content_management','YES'),
+        ('PROFESSIONAL_NON_TM_USER','email_confirmation','YES'),
+        ('PROFESSIONAL_NON_TM_USER','email_template_configuration','YES'),
+        ('PROFESSIONAL_NON_TM_USER','staff_limit','YES'),
+        ('PROFESSIONAL_NON_TM_USER','account_profile','YES'),
+        ('PROFESSIONAL_NON_TM_USER','distribution_integration','YES')
+      ) AS v(plan_code, feature_code, value)
+      JOIN plans p ON p.code = v.plan_code
+      ON CONFLICT (plan_code, feature_code) DO NOTHING;
+      DO $$ BEGIN
+        IF (SELECT COUNT(*) FROM plan_features) < 140 THEN
+          RAISE EXCEPTION 'plan_features seed incomplete: expected >= 140 rows (plans seed may have failed)';
+        END IF;
+      END $$;
+    `,
+  },
+  // ── F34: payload_locked_documents_rels FK columns for plan collections ──
+  {
+    name: 'payload_locked_documents_rels.plan_subscriptions_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_subscriptions_id" integer REFERENCES "public"."plan_subscriptions"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscriptions_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_subscriptions_id_idx" ON "payload_locked_documents_rels" ("plan_subscriptions_id");`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscription_usages_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_subscription_usages_id" integer REFERENCES "public"."plan_subscription_usages"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_subscription_usages_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_subscription_usages_id_idx" ON "payload_locked_documents_rels" ("plan_subscription_usages_id");`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_features_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "plan_features_id" integer REFERENCES "public"."plan_features"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.plan_features_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_plan_features_id_idx" ON "payload_locked_documents_rels" ("plan_features_id");`,
+  },
+  // ── F34: Backfill plan_subscriptions from existing tenants.plan ──
+  // Idempotent: skips tenants that already have any plan_subscription row.
+  // Mapping matches mapPlanCodeToTier() reverse:
+  //   free→FREEMIUM, starter→STARTER_NON_TM_USER,
+  //   pro→STANDARD_NON_TM_USER, business→PROFESSIONAL_NON_TM_USER
+  {
+    name: 'f34-backfill-plan-subscriptions-from-tenants',
+    sql: `
+      INSERT INTO plan_subscriptions (tenant_id, name, plan, status, starts_at, ends_at, created_at, updated_at)
+      SELECT
+        t.id,
+        'main',
+        CASE t.plan
+          WHEN 'free'     THEN 'FREEMIUM'
+          WHEN 'starter'  THEN 'STARTER_NON_TM_USER'
+          WHEN 'pro'      THEN 'STANDARD_NON_TM_USER'
+          WHEN 'business' THEN 'PROFESSIONAL_NON_TM_USER'
+          ELSE 'FREEMIUM'
+        END,
+        'active',
+        t.created_at,
+        '2099-12-31 23:59:59+00',
+        now(),
+        now()
+      FROM tenants t
+      WHERE NOT EXISTS (
+        SELECT 1 FROM plan_subscriptions ps WHERE ps.tenant_id = t.id
+      )
+      ON CONFLICT (tenant_id, name) DO NOTHING;
+    `,
+  },
+  // ── F34: Fix incorrectly backfilled plan codes (pro/business were swapped) ──
+  {
+    name: 'f34-fix-plan-subscriptions-pro-business-mapping',
+    sql: `
+      UPDATE plan_subscriptions
+      SET plan = CASE plan
+        WHEN 'PROFESSIONAL_NON_TM_USER' THEN 'STANDARD_NON_TM_USER'
+        WHEN 'STANDARD_NON_TM_USER'     THEN 'PROFESSIONAL_NON_TM_USER'
+      END
+      WHERE plan IN ('PROFESSIONAL_NON_TM_USER', 'STANDARD_NON_TM_USER')
+        AND name = 'main'
+        AND tenant_id IN (
+          SELECT ps.tenant_id FROM plan_subscriptions ps
+          JOIN tenants t ON t.id = ps.tenant_id
+          WHERE (t.plan = 'pro' AND ps.plan = 'PROFESSIONAL_NON_TM_USER')
+             OR (t.plan = 'business' AND ps.plan = 'STANDARD_NON_TM_USER')
+        );
+    `,
+  },
+  // ── F34: Backfill sort_order for plan_features from PW1 values ──
+  {
+    name: 'f34-backfill-plan-features-sort-order',
+    sql: `
+      UPDATE plan_features SET sort_order = CASE feature_code
+        WHEN 'website_builder'              THEN 1
+        WHEN 'template_limit'               THEN 5
+        WHEN 'code_snippet'                 THEN 10
+        WHEN 'sitemap_robot_configuration'  THEN 15
+        WHEN 'live_chat_plugin'             THEN 20
+        WHEN 'domain_connection'            THEN 25
+        WHEN 'shipping_fee_configuration'   THEN 30
+        WHEN 'delivery_provider_limit'      THEN 35
+        WHEN 'allowing_buyer_making_order'  THEN 40
+        WHEN 'payment_integration'          THEN 50
+        WHEN 'allowing_buyer_tracking_order' THEN 55
+        WHEN 'order_management'             THEN 55
+        WHEN 'product_management'           THEN 60
+        WHEN 'promotion_management'         THEN 65
+        WHEN 'content_management'           THEN 70
+        WHEN 'email_confirmation'           THEN 72
+        WHEN 'email_template_configuration' THEN 75
+        WHEN 'staff_limit'                  THEN 80
+        WHEN 'account_profile'              THEN 85
+        WHEN 'distribution_integration'     THEN 90
+        ELSE sort_order
+      END
+      WHERE sort_order IS NULL;
+    `,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4306,6 +4764,12 @@ const COLLECTION_SLUGS = [
   'template_versions',
   'customers',
   'email-template-settings',
+  'plan-subscriptions',
+  'plan-subscription-usages',
+  'plan-features',
+  'discounts',
+  'discount_usage_history',
+
 ];
 
 /**
@@ -4758,6 +5222,19 @@ async function main() {
   -- F25 phase-03 Relationship Bypass: customer → Payload uses customer_id column;
   -- bare name registered here so check-migrations CI can match the field name.
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer
+
+  -- F33 Relationship Bypass: discount → Payload uses discount_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount
+
+  -- F33 discounts + discount_usage_history Relationship Bypass: Payload uses {field}_id columns
+  -- (tenant_id, site_id, discount_id, order_id — created in their CREATE TABLE bodies above);
+  -- bare field names registered here so check-migrations CI can match them.
+  ALTER TABLE discounts ADD COLUMN IF NOT EXISTS tenant
+  ALTER TABLE discounts ADD COLUMN IF NOT EXISTS site
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS tenant
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS discount
+  ALTER TABLE discount_usage_history ADD COLUMN IF NOT EXISTS order
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments
