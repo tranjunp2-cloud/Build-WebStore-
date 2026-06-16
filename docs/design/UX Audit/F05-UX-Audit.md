@@ -1956,10 +1956,12 @@ Block Breadcrumb đã được đăng ký trong hệ thống nhưng khi chọn v
 ## Mục lục
 
 - [1. Tổng quan vấn đề](#1-tổng-quan-vấn-đề-gap-10)
-- [2. Phân tích chi tiết — 6 pain points](#2-phân-tích-chi-tiết--6-pain-points)
+- [2. Phân tích chi tiết — 9 pain points](#2-phân-tích-chi-tiết--9-pain-points)
 - [3. Ba hướng tiếp cận (Design chọn 1)](#3-ba-hướng-tiếp-cận-design-chọn-1)
 - [4. Wireframe — Approach C (Hybrid, recommended)](#4-wireframe--approach-c-hybrid-recommended)
+- [4b. Hi-fi design states (HTML đính kèm issue) — Approach C refined](#4b-hi-fi-design-states-html-đính-kèm-issue--approach-c-refined)
 - [5. Nguyên tắc đã chốt (áp dụng cho mọi approach)](#5-nguyên-tắc-đã-chốt-áp-dụng-cho-mọi-approach)
+- [5b. Quyết định bổ sung từ review comments](#5b-quyết-định-bổ-sung-từ-review-comments-đã-chốt)
 - [6. Business Rules](#6-business-rules-gap-10)
 - [7. Acceptance Criteria](#7-acceptance-criteria-gap-10)
 - [8. Risks & Mitigation](#8-risks--mitigation)
@@ -1999,7 +2001,9 @@ Tính năng **add sub-menu** trong Navigation block (editor) khó khám phá và
 
 ---
 
-## 2. Phân tích chi tiết — 6 pain points
+## 2. Phân tích chi tiết — 9 pain points
+
+> Pain #1-6 từ issue body; #7-9 bổ sung qua review comments (2026-06-16).
 
 | # | Vấn đề | Mức độ | Hiện trạng |
 |---|--------|:------:|------------|
@@ -2008,7 +2012,10 @@ Tính năng **add sub-menu** trong Navigation block (editor) khó khám phá và
 | 3 | **Toolbar icons khó hiểu** | 🔴 Cao | Cụm 5 icon `+ ↑ ↓ → ←` quá nhỏ (`w-3 h-3`), **không text label**, chỉ tooltip. Non-tech không biết `→` = "make sub-item", `←` = "promote to root". |
 | 4 | **Drag-drop KHÔNG nest được** | 🟠 Trung | Kéo item thành con của item khác → không được. Code chặn cross-parent (`NavigationEditor.tsx:445`). Buộc user dùng nút indent `→` rườm rà. |
 | 5 | **Không có preview dropdown** | 🟡 Thấp | User không biết menu render trên storefront ra sao (sidebar / floating / collapse mobile…). |
-| 6 | **Visual hierarchy parent vs child mờ** | 🟡 Thấp | Border children `border-blue-500/[0.04]` quá nhạt, khó phân biệt level. |
+| 6 | **Visual hierarchy parent vs child mờ** | 🟡 Thấp | Border children `border-blue-500/[0.04]` (~opacity 4%) gần như vô hình, khó phân biệt level. (`NavigationEditor.tsx:307`) |
+| 7 | **Thừa click để vào edit** | 🟠 Trung | Phải click đúng icon bút ✏️ mới mở config (`:219`); đổi tên thì double-click text (`:207`) → thừa bước, chậm khi sửa nhiều link liên tục. _(bổ sung từ comment)_ |
+| 8 | **Parent có submenu vẫn hiện field "Loại liên kết" + "Đường dẫn"** | 🟠 Trung | Parent đã có con chỉ đóng vai trò nhóm/trigger, click không dẫn đi đâu. Nhưng config vẫn hiện Link type + URL → user nhập URL vô tác dụng → bối rối. (`:239-286`) _(bổ sung từ comment)_ |
+| 9 | **Lồng parent-có-con vào parent khác → vượt 2 cấp** | 🟠 Trung | Indent (`indentLinkInTree :382`) hoặc drag B (đã có con) vào A → con của B bị đẩy xuống cấp 3, vượt giới hạn 2 cấp. _(bổ sung từ comment)_ |
 
 **So sánh với competitor (benchmark):**
 
@@ -2153,6 +2160,69 @@ Touch device — popover khó dùng → fallback bottom sheet:
 
 ---
 
+## 4b. Hi-fi design states (HTML đính kèm issue) — Approach C refined
+
+> **File design:** [`F05-nav-submenu-builder-hifi.html`](./F05-nav-submenu-builder-hifi.html) — hi-fi mockup đính kèm trong issue #1204 (comment 2026-06-16 08:19). Dark theme, Tabler icons. Mở file trong browser để xem chi tiết tương tác. File này thể hiện Approach C đã refine sau review code.
+
+### Điểm chốt design từ hi-fi
+
+- **Cụm thao tác menu cha = 1 khối thống nhất (`parent-group`)**: header (grip + chevron + tên + badge `2 submenu`) **gộp chung** với toolbar/config → user biết rõ toolbar đang thao tác cho menu cha nào. Khối có viền xanh + box-shadow khi focus; biến thể `dim` khi mở nhưng không phải mục đang sửa.
+- **Toolbar nút có text label** (Tabler icon + chữ): `↑ Lên`, `↓ Xuống`, `→ Lồng vào`, `← Tách cấp`, `🗑 Xóa`. Nút Xóa luôn đẩy về phải (`margin-left:auto`).
+- **Phân cấp rõ**: `child-wrap` có `border-left: 2px` đậm (`--border-strong`) + indent 16px + badge count trên parent.
+- **State tip inline**: child thiếu URL hiện `· thiếu URL` (màu vàng) ngay cạnh tên.
+- **Add buttons tách biệt**: `+ Thêm submenu` (dashed, trong child-wrap) vs `+ Thêm link` (primary solid xanh, đáy list).
+
+### 6 states trong file hi-fi
+
+| State | Tình huống | Điểm minh hoạ |
+|-------|-----------|----------------|
+| **A** | Menu cha ở giữa list | Toolbar đủ: `↑ Lên`, `↓ Xuống`, `→ Lồng vào`, `🗑 Xóa` |
+| **B** | Menu cha ở trên cùng | Ẩn `↑ Lên` **và** `→ Lồng vào` (không có mục phía trên để lồng) |
+| **C** | Menu cha ở dưới cùng | Ẩn `↓ Xuống`; vẫn hiện `→ Lồng vào` (có mục phía trên) |
+| **D** | Link thường (chưa có submenu) | Hiện đầy đủ field `Loại liên kết` + `Đường dẫn` + `+ Thêm submenu` |
+| **E** | Đang edit menu **con** | Khối cha **vẫn giữ nguyên (dim)** → giữ ngữ cảnh; con dùng `← Tách cấp` (promote về cấp 1) |
+| **F** | Kéo parent-có-con vào parent khác | **Dialog confirm flatten** với preview **Trước / Sau** + nút `Hủy` / `Lồng & san phẳng` |
+
+### Quy tắc ẩn nút theo ngữ cảnh (từ legend hi-fi)
+
+| Nút | Hiển thị khi |
+|-----|--------------|
+| `↑ Lên` | Ẩn khi mục ở **trên cùng** nhóm của nó |
+| `↓ Xuống` | Ẩn khi mục ở **dưới cùng** nhóm của nó |
+| `→ Lồng vào` (indent) | Chỉ cho mục **cấp 1** → lồng vào làm con của mục ngay phía trên. Ẩn khi ở trên cùng. **Disable** khi mục đang chứa submenu (tránh đẩy con xuống cấp 3) |
+| `← Tách cấp` (outdent) | Chỉ cho mục **cấp con** → kéo ra thành cấp 1 |
+| Cả Lên + Xuống | Ẩn cả 2 nếu nhóm chỉ còn **1 mục** |
+| `🗑 Xóa` | **Luôn hiện** |
+
+### Flatten dialog (State F) — chống vượt 2 cấp
+
+```text
+Khi kéo "Startseite" (đang có 2 submenu) thả vào "Über uns":
+
+┌─────────────────────────────────────────────┐
+│  ⚠  Lồng menu này vào sẽ vượt 2 cấp         │
+│                                               │
+│  "Startseite" đang chứa 2 submenu. Menu chỉ  │
+│  hỗ trợ 2 cấp. Khi lồng vào "Über uns", các  │
+│  submenu của Startseite sẽ được đưa lên cùng  │
+│  cấp với nó (làm con của Über uns).          │
+│                                               │
+│  TRƯỚC            │  SAU                      │
+│  📁 Startseite    │  📁 Über uns              │
+│     Preise        │     Team                  │
+│     FAQ           │     Startseite  ⚠         │
+│                   │     Preise      ⚠         │
+│                   │     FAQ         ⚠         │
+│                                               │
+│              [ Hủy ]  [ Lồng & san phẳng ]   │
+└─────────────────────────────────────────────┘
+```
+
+- Confirm **chỉ bật** khi item được lồng có `children.length > 0`; không có con → lồng thẳng, không hỏi.
+- Validate ở **tầng logic khi drop/indent/import** — không chỉ dựa vào ẩn/disable nút.
+
+---
+
 ## 5. Nguyên tắc đã chốt (áp dụng cho mọi approach)
 
 > Đã chốt giữa QC + Dev qua brainstorm. Dù Design chọn A, B hay C — các principle dưới đây bắt buộc.
@@ -2179,6 +2249,35 @@ Touch device — popover khó dùng → fallback bottom sheet:
 
 ---
 
+## 5b. Quyết định bổ sung từ review comments (đã chốt)
+
+> Sau khi review code `NavigationEditor.tsx`, QC + Dev chốt thêm (comment 2026-06-16). Refine Approach C, đối chiếu rõ *mới* vs *cải tiến cái đã có*.
+
+### 5b.1 — 3 quyết định đã chốt (vào phase implementation)
+
+1. **Phân vùng click trên mỗi row = 3 zone rõ ràng:**
+   - `⠿` (drag handle) → kéo, tách bạch hẳn với vùng click-to-edit.
+   - Click vào **tên** → inline rename ngay tại chỗ (kiểu Notion/Trello), không bung cả config.
+   - Click vào **icon bút / vùng còn lại** → mở full config (loại link, URL…).
+2. **Edit UI = side panel bên phải** (KHÔNG popover floating) — luồng edit cần đủ rộng + ổn định vị trí.
+3. **Mở khoá drag-to-nest cross-parent ngay đợt này** — bỏ chặn `:445`, kèm drop indicator Figma-style (line = sibling, highlight viền parent = child). Giữ nút Indent/Outdent làm fallback.
+
+> Nguyên tắc chung: **giảm số click — cho phép edit trực tiếp — phân vùng tương tác rõ ràng (kéo / sửa tên / sửa config)**. Giữ schema `NavLinkItem`, giữ 2 levels.
+
+### 5b.2 — Refinements chi tiết (mới vs cải tiến)
+
+| # | Hạng mục | Mới / Cải tiến | Chi tiết |
+|---|----------|----------------|----------|
+| 1 | Phân cấp parent/child | Cải tiến | Indent guide (kẻ dọc) + tăng thụt lề; nền nhạt/badge "Submenu"; chevron + **count** `Startseite (3)` _(chevron có `:183`, chưa có count)_ |
+| 2 | 2 nút add tách biệt | Cải tiến | `+ Add link` (ngang hàng) vs `+ Add sub-item` (cấp con), có **label chữ** _(hiện 1 nút add root `:554`; nút `+` sub ẩn `:288`)_ |
+| 3 | Bắt buộc nhập tên khi Add | Mới | Add → auto-focus ô tên + bắt nhập tên trước khi tạo (tránh `nav.newLink` rác `:357,520`) |
+| 4 | Toolbar label + tooltip | Cải tiến | Icon-only → icon + text: Move up/down, Indent, Outdent, Delete _(hiện chỉ `title` `:287-301`)_ |
+| 5 | Trạng thái chấm vàng 🟡 | Cải tiến | Badge rõ "Draft" / "Missing URL" _(hiện `title={nv.noDestination}` `:213`)_ |
+| 6 | Ẩn field type/URL cho parent có con | Mới | Parent có submenu → **ẩn hẳn** "Loại liên kết" + "Đường dẫn" (chỉ còn tên + actions). **Không xoá data** — outdent/xoá hết con thì field hiện lại _(`:239-286`)_ |
+| 7 | Label rõ trên field | Cải tiến | Dropdown 1 = "Link type", dropdown 2 = "Select page" _(hiện chỉ `aria-label` `:252,272`)_ |
+
+---
+
 ## 6. Business Rules (GAP-10)
 
 | Rule ID | Mô tả |
@@ -2188,10 +2287,17 @@ Touch device — popover khó dùng → fallback bottom sheet:
 | **BR-NAV-03** | Parent **đã có con** → button `+ Add sub` chỉ hiện khi hover row. |
 | **BR-NAV-04** | Mọi toolbar/menu action phải có **text label** đi kèm icon. |
 | **BR-NAV-05** | Drag-to-nest: line ngang = drop sibling; highlight viền parent = drop child. Drop indicator hiện **trước khi** thả. |
-| **BR-NAV-06** | Drag cho phép **cross-parent** (gỡ guard `NavigationEditor.tsx:445`). Quyết định xử lý parent-có-con khi kéo: **cấm move parent đang có children** (giữ data an toàn) — chốt ở phase implementation. |
+| **BR-NAV-06** | Drag cho phép **cross-parent** (gỡ guard `NavigationEditor.tsx:445`). Xử lý parent-có-con khi kéo vượt 2 cấp → **flatten + confirm** (xem BR-NAV-14, thay cho phương án "cấm move" ban đầu — đã chốt qua review comment). |
 | **BR-NAV-07** | Edit form **không được gây layout shift** cho các row khác trong tree (popover/side panel, không inline đẩy). |
 | **BR-NAV-08** | Schema `NavLinkItem` **giữ nguyên** — không đổi DB, không migration. |
 | **BR-NAV-09** | Touch / mobile: nếu popover khó dùng → fallback full-screen modal hoặc bottom sheet. |
+| **BR-NAV-10** | **3-zone click/row:** `⠿` = kéo (tách bạch); click **tên** = inline rename; click **icon bút / vùng còn lại** = mở config (side panel). |
+| **BR-NAV-11** | **Edit UI = side panel bên phải** (chốt, không popover floating). Tree bên trái giữ nguyên vị trí. |
+| **BR-NAV-12** | Parent **có submenu** → ẩn hẳn field "Loại liên kết" + "Đường dẫn"; config chỉ còn tên + actions. **Không xoá data** URL cũ — outdent/xoá hết con thì field hiện lại. |
+| **BR-NAV-13** | **Button hiding theo ngữ cảnh:** ẩn `↑ Lên` khi top, `↓ Xuống` khi bottom, ẩn cả 2 nếu nhóm chỉ 1 mục; `→ Lồng vào` chỉ cấp 1 (ẩn khi top, **disable** khi mục đang có con); `← Tách cấp` chỉ cấp con; `🗑 Xóa` luôn hiện. |
+| **BR-NAV-14** | **Anti-3-cấp:** kéo parent-có-con vào parent khác → **dialog confirm flatten** (preview Trước/Sau), chọn "Lồng & san phẳng" (con kéo lên cùng cấp) hoặc "Hủy". Confirm chỉ bật khi `children.length > 0`. |
+| **BR-NAV-15** | Flatten logic phải áp dụng **nhất quán** cho cả nút Indent (`indentLinkInTree :382`) lẫn drag-to-nest. Validate ở tầng logic khi drop/indent/import, không chỉ ẩn/disable nút. |
+| **BR-NAV-16** | Add item → auto-focus ô tên + **bắt buộc nhập tên** trước khi tạo (tránh tạo `nav.newLink` rác). |
 
 ---
 
@@ -2268,13 +2374,68 @@ WHEN   user mở edit form
 THEN   form vẫn dùng được (fallback bottom sheet / full-screen modal nếu cần)
 ```
 
-**Test cases bắt buộc (từ issue):**
+### AC-NAV-08: 3-zone click trên row (giảm click)
+
+```gherkin
+GIVEN  một row menu item
+WHEN   user click vào TÊN item
+THEN   tên biến thành ô input inline ngay tại chỗ (rename nhanh, không bung config)
+WHEN   user click vào icon bút / vùng còn lại
+THEN   mở config đầy đủ ở side panel bên phải
+WHEN   user kéo vùng "⠿" drag handle
+THEN   bắt đầu drag, KHÔNG mở edit (zone tách bạch)
+```
+
+### AC-NAV-09: Parent có submenu — ẩn field type/URL
+
+```gherkin
+GIVEN  một parent item đã có ≥ 1 submenu
+WHEN   user mở config của parent đó
+THEN   KHÔNG hiển thị field "Loại liên kết" và "Đường dẫn"
+  AND  chỉ còn tên + actions (add sub / move / delete)
+WHEN   user outdent/xoá hết con của parent đó
+THEN   field "Loại liên kết" + "Đường dẫn" hiện lại (URL cũ không bị mất)
+```
+
+### AC-NAV-10: Flatten khi lồng parent-có-con vượt 2 cấp
+
+```gherkin
+GIVEN  item B đang có ≥ 1 submenu
+WHEN   user Indent B hoặc drag B vào làm con của A
+THEN   hiện dialog confirm "Lồng menu này vào sẽ vượt 2 cấp" + preview Trước/Sau
+WHEN   user chọn "Lồng & san phẳng"
+THEN   B thành con của A, các con cũ của B được kéo lên cùng cấp với B (vẫn 2 cấp, không mất data)
+WHEN   user chọn "Hủy"
+THEN   không thay đổi gì
+GIVEN  item B KHÔNG có con
+WHEN   user Indent/drag B vào A
+THEN   lồng thẳng, KHÔNG hiện dialog confirm
+```
+
+### AC-NAV-11: Context-aware button hiding
+
+```gherkin
+GIVEN  một item trong nhóm
+WHEN   item ở trên cùng nhóm   THEN ẩn "↑ Lên" (và "→ Lồng vào" nếu là cấp 1 ở top)
+WHEN   item ở dưới cùng nhóm   THEN ẩn "↓ Xuống"
+WHEN   nhóm chỉ còn 1 item     THEN ẩn cả "↑ Lên" và "↓ Xuống"
+WHEN   item là cấp 1 đang có submenu  THEN "→ Lồng vào" bị disable
+WHEN   item là cấp con          THEN hiện "← Tách cấp"
+  AND  "🗑 Xóa" luôn hiển thị ở mọi trạng thái
+```
+
+**Test cases bắt buộc (từ issue + comments):**
 
 - [ ] Add sub-link bằng button → success
+- [ ] Add item bắt buộc nhập tên trước khi tạo (không tạo "New Link" rác)
+- [ ] Click tên → inline rename; click icon bút → mở side panel config
 - [ ] Drag item làm con của item khác → success
 - [ ] Outdent (promote sub → root) qua drag → success
 - [ ] Reorder cùng level qua drag → vẫn work như cũ
-- [ ] Edit panel không gây layout shift
+- [ ] Edit panel (side panel) không gây layout shift cho tree
+- [ ] Parent có submenu → ẩn field type/URL; outdent hết con → field hiện lại
+- [ ] Lồng parent-có-con → dialog flatten + preview Trước/Sau hoạt động
+- [ ] Button hiding đúng ngữ cảnh (top/bottom/1-item/disable lồng/tách cấp)
 - [ ] Mobile / touch: edit form vẫn dùng được
 
 ---
@@ -2283,10 +2444,25 @@ THEN   form vẫn dùng được (fallback bottom sheet / full-screen modal nế
 
 | Risk | Mitigation |
 |------|------------|
-| Popover bị cắt khi gần viewport edge | Dùng Floating UI / Radix Popover có auto-flip |
-| Drag cross-parent gây bug với parent có children | Chốt: **cấm move parent đang có con** (BR-NAV-06); cân nhắc flatten nếu cần sau |
-| Mobile / touch: popover khó dùng | Fallback full-screen modal hoặc bottom sheet (Screen J.4) |
+| Popover bị cắt khi gần viewport edge | Dùng Floating UI / Radix Popover auto-flip (nếu chọn popover); side panel thì không gặp |
+| Drag parent-có-con vượt 2 cấp | **Flatten + confirm dialog** preview Trước/Sau (BR-NAV-14); validate ở tầng logic, không chỉ disable nút |
+| Mobile / touch: popover/side panel khó dùng | Fallback full-screen modal hoặc bottom sheet (Screen J.4) |
 | User cũ quen UX hiện tại bị bỡ ngỡ | Add migration hint (1 lần) khi mở editor lần đầu sau update |
+| Ẩn field URL của parent có con gây tưởng mất data | KHÔNG xoá data — chỉ ẩn field; outdent/xoá hết con thì URL hiện lại (BR-NAV-12) |
+
+---
+
+## ⚠️ Open question — cần Design chốt: edit container
+
+3 nguồn trong issue mô tả **3 kiểu container edit khác nhau** → cần Design chốt 1 trước khi Frontend lập plan:
+
+| Nguồn | Edit container |
+|-------|----------------|
+| §3/§4 — Approach C gốc (issue body) | **Popover floating** cạnh row |
+| §5b.1 quyết định #2 (comment 07:02) | **Side panel bên phải** (chốt — không popover) |
+| §4b — hi-fi HTML (comment 08:19) | **Inline unified block** (`parent-group`) mở rộng tại chỗ |
+
+> **Khuyến nghị:** ưu tiên **side panel** (theo decision mới nhất dạng chữ) hoặc thống nhất lại với hi-fi (inline unified block). Cả 2 đều fix pain #2 (no layout shift) nếu inline block không đẩy các row khác. Popover floating đã bị decision #2 loại. **Cần Design xác nhận** để gỡ mâu thuẫn giữa §4 ↔ §4b ↔ §5b.
 
 ---
 
