@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,6 +20,8 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
     const isOwner = useIsOwner()
     const { t } = useI18n()
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${siteSlug}` : ''
     const hasCheckoutRoute = Boolean(siteSlug)
 
     useEffect(() => {
@@ -156,7 +159,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                             </>
                         )}
                         {hasCheckoutRoute && items.length > 0 ? (
-                            <a href={`/sites/${siteSlug}/checkout`}
+                            <a href={`${shopBase}/checkout`}
                                 onClick={() => {
                                     if (siteId) trackEvent({ siteId, event: 'checkout', metadata: { itemCount: items.length, subtotal: subtotal() }, isOwner })
                                 }}
