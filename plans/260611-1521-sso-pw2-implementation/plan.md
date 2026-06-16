@@ -3,7 +3,7 @@ title: "SSO-PW2 Integration — PW2 Implementation"
 description: "Implement toàn bộ PW2-side của SSO↔PW2 integration: schema, endpoints, provision fix, ETL, back button"
 status: pending
 priority: P0
-effort: 10.5h
+effort: 11.5h
 branch: feat/{issue}-sso-pw2-implementation
 tags: [sso, pw2, integration, subscription, schema]
 created: 2026-06-11
@@ -31,6 +31,7 @@ blockedBy:
 | 04 | [Subscription Endpoints + ETL Corrections](./phase-04-subscription-endpoints.md) | 2.5h | F34 merged | pending |
 | 05 | [Back Button (SsoPortalLink)](./phase-05-back-button.md) | 1h | None | pending |
 | 06 | [Audit Trail (createdBy / updatedBy)](./phase-06-audit-trail.md) | 0.5h | Phase 01 | done |
+| 07 | [SSO Authorization Page](./phase-07-sso-authorization-page.md) | 1h | None | done |
 
 ## Implement Order
 
@@ -42,6 +43,7 @@ Phase 01 (Foundation Schema)
         └── Phase 04 (Subscription Endpoints) — requires F34 only
 
 Phase 05 (Back Button) — independent, can start anytime
+Phase 07 (SSO Authorization Page) — independent, can start anytime
 ```
 
 ## New Files (PW2 side)
@@ -54,6 +56,9 @@ Phase 05 (Back Button) — independent, can start anytime
 | `src/app/api/v1/sso/check-email/route.ts` | 02 |
 | `src/app/api/v1/sso/renew/route.ts` | 04 |
 | `src/components/sso-portal-link.tsx` | 05 |
+| `src/app/api/auth/sso-session/route.ts` | 07 |
+| `src/app/sso/authorization/page.tsx` | 07 |
+| `src/app/sso/authorization/_components/SsoAuthorizationClient.tsx` | 07 |
 
 ## Modified Files (PW2 side)
 
