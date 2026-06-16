@@ -36,7 +36,8 @@ export function TenantAccessWatcher() {
             intervalRef.current = setInterval(checkSession, 60_000);
         };
 
-        // Poll every 60s (was 15s — tenant revocation is rare)
+        // Poll every 60s; also check immediately on mount so page refresh doesn't bypass eviction
+        checkSession();
         startPolling();
 
         // Debounced focus handler — prevents burst requests on rapid tab switching
@@ -90,13 +91,19 @@ export function TenantAccessWatcher() {
                 </div>
                 
                 <h2 className="text-xl font-bold text-white mb-2 font-['Inter']">
-                    {evictReason === 'subscription_expired' ? 'Subscription Expired' : 'Access Revoked'}
+                    {evictReason === 'subscription_expired'
+                        ? 'Subscription Expired'
+                        : evictReason === 'Account suspended'
+                            ? 'Account Suspended'
+                            : 'Access Revoked'}
                 </h2>
 
                 <p className="text-[14px] text-[rgba(248,250,252,0.7)] leading-[1.5] mb-6 font-['Inter']">
                     {evictReason === 'subscription_expired'
                         ? 'Your subscription has expired. Please renew your plan to continue. You will now be logged out.'
-                        : 'Your access to this workspace has been removed by the workspace owner. You will now be logged out.'}
+                        : evictReason === 'Account suspended'
+                            ? 'Your account has been suspended. Please contact support. You will now be logged out.'
+                            : 'Your access to this workspace has been removed by the workspace owner. You will now be logged out.'}
                 </p>
 
                 <button
