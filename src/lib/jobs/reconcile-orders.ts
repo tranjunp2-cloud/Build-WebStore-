@@ -102,8 +102,14 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 50 })
     for (const order of xenditResult.docs as any[]) {
         if (Date.now() > deadline) { timedOut = true; break }
         try {
-            const tenant = typeof order.tenant === 'object' ? order.tenant : null
-            const xenditSecretKey: string | undefined = (tenant as any)?.xenditSecretKey
+            const tenantRaw = typeof order.tenant === 'object' ? order.tenant : null
+            const tenantRawId = tenantRaw ? (tenantRaw as any).id : order.tenant
+            // xenditSecretKey has field-level access.read = false; depth-1 populate always strips it.
+            // Fetch tenant separately with overrideAccess to read the key.
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditSecretKey: string | undefined = (tenantWithKeys as any)?.xenditSecretKey
             if (!xenditSecretKey) { xenditSkipped++; continue }
             const invoice = await getInvoice(order.xenditPaymentRequestId, xenditSecretKey)
             if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
