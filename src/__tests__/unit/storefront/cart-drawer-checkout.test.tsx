@@ -6,7 +6,14 @@ import React from 'react'
 let mockItems: import('@/store/cartStore').CartItem[] = []
 let mockIsOpen = false
 
+// ── Mutable state driving usePathname mock ────────────────────────────────
+let mockPathname = '/sites/test-site'
+
 // ── Top-level mocks (vi.mock hoisted before imports) ─────────────────────
+vi.mock('next/navigation', () => ({
+    usePathname: vi.fn(() => mockPathname),
+}))
+
 vi.mock('@/store/cartStore', () => ({
     useCartStore: vi.fn(() => ({
         items: mockItems,
@@ -65,12 +72,14 @@ describe('CartDrawer — checkout routing', () => {
     beforeEach(() => {
         mockItems = []
         mockIsOpen = false
+        mockPathname = '/sites/test-site'
         vi.clearAllMocks()
     })
 
     afterEach(() => {
         mockItems = []
         mockIsOpen = false
+        mockPathname = '/sites/test-site'
     })
 
     // ── TC-F09.219: Empty cart ─────────────────────────────────────────────
@@ -130,9 +139,10 @@ describe('CartDrawer — checkout routing', () => {
     // ── TC-F09.220: Items + siteSlug → checkout link ───────────────────────
     describe('TC-F09.220: Cart has items → checkout renders as link with correct href', () => {
         it('renders checkout as <a> when items exist and siteSlug provided', () => {
-            // Arrange
+            // Arrange — local dev: pathname starts with /sites/
             mockItems = [ITEM_ONE]
             mockIsOpen = true
+            mockPathname = '/sites/bella-bakery'
             // Act
             render(<CartDrawer siteSlug="bella-bakery" />)
             // Assert — link, not button
@@ -141,15 +151,28 @@ describe('CartDrawer — checkout routing', () => {
             expect(link).toHaveAttribute('href', '/sites/bella-bakery/checkout')
         })
 
-        it('includes correct siteSlug in checkout href', () => {
+        it('includes correct siteSlug in checkout href on local dev', () => {
             // Arrange
             mockItems = [ITEM_ONE]
             mockIsOpen = true
+            mockPathname = '/sites/shop-alpha'
             // Act
             render(<CartDrawer siteSlug="shop-alpha" />)
             // Assert
             expect(screen.getByRole('link', { name: /proceed to checkout/i }))
                 .toHaveAttribute('href', '/sites/shop-alpha/checkout')
+        })
+
+        it('uses /checkout (no prefix) on subdomain staging/prod', () => {
+            // Arrange — subdomain: pathname does not start with /sites/
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
+            mockPathname = '/cart'
+            // Act
+            render(<CartDrawer siteSlug="bella-bakery" />)
+            // Assert — no /sites/ prefix on subdomain
+            expect(screen.getByRole('link', { name: /proceed to checkout/i }))
+                .toHaveAttribute('href', '/checkout')
         })
 
         it('shows subtotal section when items exist', () => {
