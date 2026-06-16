@@ -201,6 +201,59 @@ export const Tenants: CollectionConfig = {
             },
         },
         {
+            name: 'xenditAccountId',
+            type: 'text',
+            index: true,
+            admin: {
+                readOnly: true,
+                description: 'Xendit MANAGED sub-account ID returned by POST /v2/accounts',
+            },
+        },
+        {
+            name: 'xenditAccountStatus',
+            type: 'select',
+            defaultValue: 'NOT_CONNECTED',
+            options: [
+                { label: 'Not Connected', value: 'NOT_CONNECTED' },
+                { label: 'Invited', value: 'INVITED' },
+                { label: 'Registered', value: 'REGISTERED' },
+                { label: 'Awaiting Documents', value: 'AWAITING_DOCS' },
+                { label: 'Pending Verification', value: 'PENDING_VERIFICATION' },
+                { label: 'Live', value: 'LIVE' },
+                { label: 'Suspended', value: 'SUSPENDED' },
+            ],
+            admin: {
+                readOnly: true,
+                description: 'Xendit onboarding lifecycle status. Updated by /api/webhooks/xendit.',
+            },
+        },
+        {
+            name: 'xenditOnboardingComplete',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                readOnly: true,
+                description: 'True once Xendit account.activated webhook fires (status=LIVE).',
+            },
+        },
+        // Model C: merchant provides their own Xendit keys (self-register flow)
+        {
+            name: 'xenditSecretKey',
+            type: 'text',
+            access: { read: () => false },
+            admin: {
+                description: 'Xendit Secret Key (xnd_development_... or xnd_production_...). Merchant provides via Settings > Payments.',
+            },
+        },
+        {
+            name: 'xenditCallbackToken',
+            type: 'text',
+            access: { read: () => false },
+            admin: {
+                description: 'Xendit Callback Token for webhook signature verification. Merchant copies from Xendit Dashboard > Settings > Configuration.',
+            },
+        },
+        {
             name: 'status',
             type: 'select',
             required: true,
@@ -277,6 +330,111 @@ export const Tenants: CollectionConfig = {
                         beforeChange: [
                             ({ value, originalDoc }) => {
                                 if (value && originalDoc?.stripeOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_tng',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Touch \'n Go (TNG) via Xendit',
+                    admin: { description: 'Nhận thanh toán TNG e-wallet qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_grabpay',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'GrabPay via Xendit',
+                    admin: { description: 'Nhận thanh toán GrabPay qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_duitnow',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'DuitNow QR via Xendit',
+                    admin: { description: 'Nhận thanh toán DuitNow QR qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_fpx',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'FPX (via Xendit)',
+                    admin: { description: 'Online banking Malaysia qua Xendit (khác Stripe FPX). Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_shopeepay',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'ShopeePay via Xendit',
+                    admin: { description: 'Nhận thanh toán ShopeePay qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_boost',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Boost via Xendit',
+                    admin: { description: 'Nhận thanh toán Boost e-wallet qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'xendit_mae',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'MAE by Maybank via Xendit',
+                    admin: { description: 'Nhận thanh toán MAE (Maybank) qua Xendit. Yêu cầu Xendit onboarding hoàn tất.' },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],

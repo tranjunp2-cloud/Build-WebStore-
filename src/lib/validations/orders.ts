@@ -29,6 +29,30 @@ export const stripeCheckoutSchema = z.object({
     }),
 })
 
+// --- Create Order via Xendit Invoice Checkout ---
+// No channelCode — buyer picks their payment method on Xendit's hosted page (Invoice API).
+export const xenditCheckoutSchema = z.object({
+    siteId: z.union([z.string(), z.number()]),
+    items: z.array(z.object({
+        productId: z.union([z.string(), z.number()]),
+        quantity: z.number().int().min(1).max(100),
+        variant: z.string().optional(),
+    })).min(1).max(MAX_CHECKOUT_ITEMS),
+    customer: z.object({
+        name: z.string().min(1).max(150),
+        email: z.string().email(),
+        phone: z.string().max(30).optional(),
+        address: z.object({
+            line1: z.string().trim().min(1, 'Address line 1 is required'),
+            line2: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            postcode: z.string().optional(),
+            country: z.string().optional(),
+        }),
+    }),
+})
+
 // --- Create Order (manual: COD/QR Banking) ---
 export const orderCreateSchema = z.object({
     siteId: z.union([z.string(), z.number()]),

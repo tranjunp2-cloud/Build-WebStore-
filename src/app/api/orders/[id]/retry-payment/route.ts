@@ -15,6 +15,7 @@ import { verifyOrderToken } from '@/lib/auth/order-token'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
+import { retryXenditPayment } from './retry-payment-xendit'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { computeOrderTotal } from '@/lib/orders/order-total'
@@ -26,11 +27,14 @@ const RETRYABLE_PAYMENT_STATUSES = new Set(['awaiting_payment', 'failed', 'payme
 /** Minimal tenant shape needed for this flow. */
 interface TenantDoc {
     id: string | number
+    name?: string
     slug?: string
     stripeAccountId?: string | null
     stripeOnboardingComplete?: boolean
     status?: string
     payments?: { payment_card?: boolean; payment_fpx?: boolean }
+    // Model C: merchant's own Xendit credentials
+    xenditSecretKey?: string | null
 }
 
 /** Minimal site shape needed for this flow. */
@@ -109,9 +113,10 @@ export async function POST(
             )
         }
 
-        // Stripe-only: retry creates a Stripe Checkout session. Bank-transfer/COD orders use their
-        // own flows (receipt upload / cash) — never convert them to a Stripe charge via this endpoint.
-        if (order.paymentMethod !== 'card' && order.paymentMethod !== 'fpx') {
+        // Stripe-only guard — Xendit dispatch below (after tenant resolve) handles Xendit orders.
+        // Bank-transfer/COD orders use their own flows (receipt upload / cash) — never convert them
+        // to a Stripe charge via this endpoint.
+        if (order.paymentMethod !== 'card' && order.paymentMethod !== 'fpx' && order.paymentProvider !== 'xendit') {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_RETRYABLE', message: 'This payment method cannot be retried online' } },
                 { status: 409 },
@@ -136,6 +141,17 @@ export async function POST(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },
             )
+        }
+
+        // Xendit orders: dispatch to Xendit retry helper before Stripe-specific checks
+        if (order.paymentProvider === 'xendit') {
+            // Fetch tenant with overrideAccess to get xenditSecretKey (field-level access strips it
+            // from depth-1 population even when overrideAccess is set on the parent order query).
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditTenantDoc = { ...tenantDoc, xenditSecretKey: (tenantWithKeys as any)?.xenditSecretKey }
+            return retryXenditPayment(order, xenditTenantDoc, payload)
         }
 
         const stripeAccountId = tenantDoc.stripeAccountId

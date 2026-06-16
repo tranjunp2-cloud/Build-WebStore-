@@ -9,6 +9,7 @@ import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
 import { ShipOrderModal } from './ShipOrderModal'
 import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
+import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
@@ -21,6 +22,7 @@ export interface OrderDetail {
     status: OrderStatus
     paymentStatus: string
     paymentMethod: string
+    xenditChannelCode?: string | null
     paymentProofImage?: string | { url?: string } | null
     paymentReference?: string
     paymentRejectionReason?: string
@@ -428,7 +430,8 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
     )
 }
 
-function fmtPaymentMethod(m: string | null | undefined, labels: Record<string, string>) {
+function fmtPaymentMethod(m: string | null | undefined, labels: Record<string, string>, xenditChannelCode?: string | null) {
+    if (m === 'ewallet') return xenditChannelLabel(xenditChannelCode)
     return labels[m ?? ''] ?? m ?? '—'
 }
 
@@ -532,7 +535,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.method}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                            {fmtPaymentMethod(order.paymentMethod, methodLabels)}
+                            {fmtPaymentMethod(order.paymentMethod, methodLabels, order.xenditChannelCode)}
                         </span>
                     </div>
                 </div>

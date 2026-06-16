@@ -65,8 +65,28 @@ export function buildAddressString(addr: AddressShape | null | undefined): strin
         .join(', ')
 }
 
-export function paymentMethodLabel(method: string, locale: EmailLocale): string {
+const XENDIT_CHANNEL_LABELS: Record<string, string> = {
+    TOUCHNGO: "Touch 'n Go eWallet",
+    GRABPAY: 'GrabPay',
+    SHOPEEPAY: 'ShopeePay',
+    BOOST: 'Boost',
+    MAE: 'MAE',
+    ATOME: 'Atome',
+    QR_CODE: 'DuitNow QR',       // payment_request API channel_code
+    DUITNOW_QR: 'DuitNow QR',   // Invoice API payment_channel value
+    FPX: 'FPX Online Banking',
+    CARDS: 'Credit / Debit Card',
+    CREDIT_CARD: 'Credit / Debit Card',
+}
+
+export function xenditChannelLabel(channelCode: string | undefined | null): string {
+    if (!channelCode) return 'Xendit'
+    return XENDIT_CHANNEL_LABELS[channelCode] ?? channelCode
+}
+
+export function paymentMethodLabel(method: string, locale: EmailLocale, xenditChannelCode?: string | null): string {
     if (method === 'cod') return 'COD'
     if (method === 'bank_transfer') return locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer'
+    if (method === 'ewallet' || method === 'xendit') return xenditChannelLabel(xenditChannelCode)
     return locale === 'ms' ? 'Kad / FPX' : 'Card / FPX'
 }

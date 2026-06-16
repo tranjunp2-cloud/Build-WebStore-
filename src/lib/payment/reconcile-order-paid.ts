@@ -3,12 +3,16 @@ import type { Payload } from 'payload'
 import { getStripeClient } from '@/lib/payment/stripe-client'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { sendOrderPaidEmailsAndNotify, type PaidOrderDoc } from './reconcile-order-paid-emails'
+import { mapChannelToPaymentMethod } from '@/lib/payment/xendit'
 
 export interface ReconcileContext {
     orderId: number
-    /** Full Stripe checkout.session object (must include payment_method_types + payment_intent). */
-    session: Record<string, any>
-    connectedAccountId: string
+    /** Full Stripe checkout.session (Stripe only). Optional for non-Stripe providers. */
+    session?: Record<string, any>
+    /** Stripe Connect account id (Stripe only). Optional for non-Stripe providers. */
+    connectedAccountId?: string
+    /** Xendit payment metadata — optional, Xendit provider only */
+    xenditData?: { paymentRequestId: string; channelCode: string }
     source: 'webhook' | 'poll' | 'cron'
 }
 
@@ -40,7 +44,7 @@ export interface ReconcileResult {
  * confirm-token, cron secret) BEFORE calling. This function trusts the context is already authorized.
  */
 export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext): Promise<ReconcileResult> {
-    const { orderId, session, connectedAccountId, source } = ctx
+    const { orderId, session, connectedAccountId, xenditData, source } = ctx
 
     // Atomic single-winner transition.
     const transition = await payload.db.drizzle.execute(sql`
@@ -49,6 +53,36 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         RETURNING id
     `)
     if (!transition.rows?.length) {
+        // For webhook source: update xenditChannelCode if more specific than stored value.
+        // Only send email when channelCode was previously missing — that means poll() won the CAS
+        // and intentionally skipped email (poll defers to webhook). If channelCode was already set,
+        // the previous webhook already sent the email; sending again = duplicate. See source!=='poll' below.
+        if (source === 'webhook' && xenditData?.channelCode) {
+            try {
+                const existingOrder = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 })
+                    .catch(() => null) as unknown as PaidOrderDoc | null
+                const needsEmail = !existingOrder?.xenditChannelCode
+
+                await payload.update({
+                    collection: 'orders',
+                    id: orderId,
+                    data: {
+                        xenditChannelCode: xenditData.channelCode,
+                        paymentMethod: mapChannelToPaymentMethod(xenditData.channelCode),
+                    } as Record<string, unknown>,
+                })
+
+                if (needsEmail && existingOrder) {
+                    // Inject channelCode directly so email reflects it even if DB read is stale
+                    ;(existingOrder as any).xenditChannelCode = xenditData.channelCode
+                    await sendOrderPaidEmailsAndNotify(payload, existingOrder).catch(err =>
+                        console.error(`[Reconcile:webhook] Order ${orderId} email after channel update failed:`, err)
+                    )
+                }
+            } catch (err) {
+                console.error(`[Reconcile:webhook] Order ${orderId} channel update failed (non-critical):`, err)
+            }
+        }
         console.log(`[Reconcile:${source}] Order ${orderId} already transitioned — skipping`)
         return { status: 'already_processed' }
     }
@@ -89,35 +123,60 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         }
     }
 
-    // Buyer/seller emails + notify (paymentMethod hardcoded 'stripe' — does not need card details).
+    // Buyer/seller emails: skip for poll source — webhook will send with specific channel info.
     // Guarded: this helper does an unguarded user lookup that can throw, so isolate it — emails are
     // non-critical and must never abort the reconcile after the order is durably marked paid.
-    try {
-        await sendOrderPaidEmailsAndNotify(payload, order)
-    } catch (err) {
-        console.error(`[Reconcile:${source}] Order ${orderId} emails/notify failed (non-critical):`, err)
+    if (source !== 'poll') {
+        // For Xendit webhook: inject channelCode directly so email shows specific wallet before DB is updated
+        if (xenditData?.channelCode) {
+            ;(order as any).xenditChannelCode = xenditData.channelCode
+        }
+        try {
+            await sendOrderPaidEmailsAndNotify(payload, order)
+        } catch (err) {
+            console.error(`[Reconcile:${source}] Order ${orderId} emails/notify failed (non-critical):`, err)
+        }
     }
 
     // Display-only metadata LAST: the Stripe round-trip is the slow/failure-prone step, so it runs
     // after all money-critical work is durably committed. A failure here only loses cosmetic card
     // details (stripeSessionId is already persisted at order creation); the order stays correctly paid.
-    try {
-        const { method: paymentMethod, cardBrand, cardLast4 } = await resolveActualPaymentMethod(session, connectedAccountId)
-        await payload.update({
-            collection: 'orders',
-            id: orderId,
-            data: {
-                stripeSessionId: session.id,
-                stripePaymentIntentId: typeof session.payment_intent === 'string'
-                    ? session.payment_intent
-                    : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
-                paymentMethod,
-                ...(cardBrand ? { cardBrand } : {}),
-                ...(cardLast4 ? { cardLast4 } : {}),
-            },
-        })
-    } catch (err) {
-        console.error(`[Reconcile:${source}] Failed to persist Stripe display metadata for order ${orderId} (non-critical):`, err)
+    if (session) {
+        try {
+            const { method: paymentMethod, cardBrand, cardLast4 } = await resolveActualPaymentMethod(session, connectedAccountId)
+            await payload.update({
+                collection: 'orders',
+                id: orderId,
+                data: {
+                    stripeSessionId: session.id,
+                    stripePaymentIntentId: typeof session.payment_intent === 'string'
+                        ? session.payment_intent
+                        : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
+                    paymentMethod,
+                    ...(cardBrand ? { cardBrand } : {}),
+                    ...(cardLast4 ? { cardLast4 } : {}),
+                },
+            })
+        } catch (err) {
+            console.error(`[Reconcile:${source}] Failed to persist Stripe display metadata for order ${orderId} (non-critical):`, err)
+        }
+    }
+
+    if (xenditData) {
+        try {
+            await payload.update({
+                collection: 'orders',
+                id: orderId,
+                data: {
+                    xenditPaymentRequestId: xenditData.paymentRequestId || undefined,
+                    xenditChannelCode: xenditData.channelCode || undefined,
+                    paymentProvider: 'xendit',
+                    paymentMethod: mapChannelToPaymentMethod(xenditData.channelCode),
+                } as Record<string, unknown>,
+            })
+        } catch (err) {
+            console.error(`[Reconcile:${source}] Failed to persist Xendit metadata for order ${orderId} (non-critical):`, err)
+        }
     }
 
     return { status: 'reconciled' }

@@ -3,13 +3,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, CheckCircle2, Save, AlertCircle } from 'lucide-react';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
+import { XenditConnectBlock } from './XenditConnectBlock';
+import { XenditConnectedBar } from './XenditConnectedBar';
 import { PaymentMethodCard } from './PaymentMethodCard';
 
 type Media = { id: string | number; url?: string; thumbnailURL?: string };
@@ -53,12 +55,15 @@ export function PaymentsFormClient({
     stripeAccountId = null,
     initialCardEnabled = false,
     initialFpxEnabled = false,
+    // Model C: xenditConnected = xenditSecretKey is set in DB
+    xenditConnected = false,
 }: {
     tenantId?: string;
     stripeOnboardingComplete?: boolean;
     stripeAccountId?: string | null;
     initialCardEnabled?: boolean;
     initialFpxEnabled?: boolean;
+    xenditConnected?: boolean;
 }) {
     const router = useRouter();
     const [paymentCod, setPaymentCod] = useState(false);
@@ -82,6 +87,8 @@ export function PaymentsFormClient({
     const [isVerifying, setIsVerifying] = useState(false);
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
+    // Xendit Connect states (Model C)
+    const [xenditIsConnected, setXenditIsConnected] = useState(xenditConnected ?? false);
     const [isDirty, setIsDirty] = useState(false);
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
@@ -302,6 +309,20 @@ export function PaymentsFormClient({
         setIsDirty(true);
     }, []);
 
+    const handleXenditDisconnect = async () => {
+        const res = await disconnectXendit();
+        if (!res.success) { toast.error('Failed to disconnect Xendit'); return; }
+        setXenditIsConnected(false);
+        setIsDirty(false);
+    };
+
+    const handleSaveXenditKeys = async (secretKey: string, callbackToken: string) => {
+        const res = await saveXenditKeys(secretKey, callbackToken);
+        if (!res.success) throw new Error(res.error ?? 'Không thể lưu keys.');
+        setXenditIsConnected(true);
+        toast.success('Xendit đã được kết nối thành công!');
+    };
+
     const handleSaveAll = async () => {
         if (!isDirty || isSavingAll) return;
         // Client-side guard: card/fpx cannot be enabled without completed Stripe onboarding
@@ -478,6 +499,30 @@ export function PaymentsFormClient({
                             </PaymentMethodCard>
                         </div>
                     </div>
+                )}
+            </section>
+
+            {/* ─── Xendit (F34) ─── */}
+            <section className="space-y-[14px]">
+                <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
+                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
+                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
+                        {pt.xenditSectionTitle}
+                    </h2>
+                    <span className="ml-auto text-[12px] text-slate-500">{pt.xenditPoweredBy}</span>
+                </div>
+
+                {xenditIsConnected ? (
+                    <XenditConnectedBar
+                        accountId={null}
+                        tenantId={tenantId ?? ''}
+                        onDisconnect={handleXenditDisconnect}
+                    />
+                ) : (
+                    <XenditConnectBlock
+                        tenantId={tenantId}
+                        onSaveKeys={handleSaveXenditKeys}
+                    />
                 )}
             </section>
 

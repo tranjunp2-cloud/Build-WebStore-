@@ -9,6 +9,7 @@
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import { mergeTemplateConfig, applyVariables } from '../merge-template-config'
+import { xenditChannelLabel } from './shared/email-utils'
 import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
@@ -41,8 +42,10 @@ export interface OrderConfirmationData {
     discountCode?: string | null
     shippingFee: number
     total: number
-    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer */
-    paymentMethod: 'cod' | 'stripe' | 'bank_transfer'
+    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer | 'ewallet'/'xendit' = Xendit */
+    paymentMethod: 'cod' | 'stripe' | 'bank_transfer' | 'xendit' | 'ewallet'
+    /** Specific Xendit channel: TOUCHNGO, GRABPAY, DUITNOW_QR, FPX, etc. */
+    xenditChannelCode?: string | null
     shippingProvider?: string | null
     orderDate: string
     orderPageUrl: string
@@ -117,7 +120,7 @@ export function orderConfirmationEmail(
         : isCompleted ? (t as any).orderStatusCompleted
         : t.orderStatusSuccess
 
-    const prepaid = (data.paymentMethod === 'stripe' || data.paymentMethod === 'bank_transfer') ? data.total : 0
+    const prepaid = (data.paymentMethod === 'stripe' || data.paymentMethod === 'bank_transfer' || data.paymentMethod === 'ewallet' || data.paymentMethod === 'xendit') ? data.total : 0
     const cod = data.paymentMethod === 'cod' ? data.total : 0
 
     const itemRows = data.items.map((item) => `
@@ -296,7 +299,7 @@ export function orderConfirmationEmail(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
           <tr>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
-            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? 'COD' : data.paymentMethod === 'bank_transfer' ? (locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer') : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? 'COD' : data.paymentMethod === 'bank_transfer' ? (locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer') : (data.paymentMethod === 'ewallet' || data.paymentMethod === 'xendit') ? xenditChannelLabel(data.xenditChannelCode) : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.buyerNote}</td>
             <td align="right" style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
           </tr>

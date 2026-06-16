@@ -84,8 +84,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Release the reserved discount slot (F33) — runs only on the CAS winner. The slot is reserved at
-    // PLACE ORDER for every gateway (incl. pending Stripe), so this is a real release, not a no-op.
+    // PLACE ORDER for every gateway (incl. pending Stripe/Xendit), so this is a real release, not a no-op.
     await releaseDiscountRedemption(payload, Number(order.id))
+
+    // Xendit orders: no remote payment request void (KISS — an uncaptured invoice expires on Xendit's
+    // side automatically; a captured one would already be 'paid' and guarded out by CAS above).
 
     // Restock inventory for each order line — stock was decremented at checkout.
     // restockItem is variant-aware and atomic; never throws (returns skipped result on failure).

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { OrdersPagination } from './OrdersPagination'
+import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 
 // ───────── TYPES ─────────
 export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
@@ -16,6 +17,7 @@ export interface Order {
     currency: string
     status: OrderStatus
     paymentMethod?: string | null
+    xenditChannelCode?: string | null
     createdAt?: string | null
 }
 
@@ -281,7 +283,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-[12px]">
-                                        <span className="text-[12px] text-slate-400">{methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—'}</span>
+                                        <span className="text-[12px] text-slate-400">{order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}</span>
                                         <span className="text-[12px] text-slate-500">{formatOrderDate(order.createdAt)}</span>
                                     </div>
                                 </div>
@@ -424,7 +426,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 color: 'var(--dash-text-muted)',
                                             }}
                                         >
-                                            {methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—'}
+                                            {order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}
                                         </span>
                                     </td>
                                     <td style={{ padding: `${textPadY}px 24px` }}>

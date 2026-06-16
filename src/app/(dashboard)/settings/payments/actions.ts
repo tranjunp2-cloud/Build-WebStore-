@@ -191,6 +191,59 @@ export async function uploadQrMedia(formData: FormData) {
     }
 }
 
+// Model C: save merchant's own Xendit API keys
+export async function saveXenditKeys(secretKey: string, callbackToken: string) {
+    try {
+        const payload = await getPayload({ config });
+        const tenantId = await getCurrentTenantId();
+
+        if (!tenantId) return { success: false, error: 'Unauthorized' };
+        if (!secretKey || !callbackToken) return { success: false, error: 'Both Secret Key and Callback Token are required.' };
+        if (!secretKey.startsWith('xnd_')) return { success: false, error: 'Invalid Secret Key format. Must start with xnd_' };
+
+        const sub = await getActivePlanSubscription(payload, tenantId);
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {
+            return { success: false, error: 'Payment integration is not available on your current plan.' };
+        }
+
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: { xenditSecretKey: secretKey.trim(), xenditCallbackToken: callbackToken.trim() } as any,
+            overrideAccess: true,
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        console.error('saveXenditKeys error:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
+export async function disconnectXendit() {
+    try {
+        const payload = await getPayload({ config });
+        const tenantId = await getCurrentTenantId();
+
+        if (!tenantId) return { success: false, error: 'Unauthorized' };
+
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                xenditSecretKey: null,
+                xenditCallbackToken: null,
+            } as any,
+            overrideAccess: true,
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        console.error('disconnectXendit error:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+
 export async function disconnectStripe() {
     try {
         const payload = await getPayload({ config });

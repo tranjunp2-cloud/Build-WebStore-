@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { reconcileOrderPaid } from '@/lib/payment/reconcile-order-paid'
 import { retrieveCheckoutSession } from '@/lib/payment/stripe'
+import { getInvoice } from '@/lib/payment/xendit'
 
 /**
  * Reconcile cron (AC-6) — SELF-HEAL ONLY.
@@ -79,5 +80,61 @@ export async function reconcileOrdersJob(payload: Payload, opts = { limit: 50 })
         console.error(`[reconcile-orders] batch limit ${opts.limit} of ${result.totalDocs}`)
     }
 
-    return { reconciled, skipped, errors, timedOut, total: result.totalDocs }
+    // ── Xendit reconcile pass ──
+    // Poll pending Xendit orders whose webhook may have been missed.
+    const xenditResult = await payload.find({
+        collection: 'orders',
+        where: {
+            and: [
+                { status: { equals: 'pending' } },
+                { paymentProvider: { equals: 'xendit' } },
+                { xenditPaymentRequestId: { not_equals: null } },
+                { createdAt: { less_than: fifteenMinAgo } },
+            ],
+        },
+        depth: 1,
+        limit: opts.limit,
+        overrideAccess: true,
+    })
+
+    let xenditReconciled = 0, xenditSkipped = 0, xenditErrors = 0
+
+    for (const order of xenditResult.docs as any[]) {
+        if (Date.now() > deadline) { timedOut = true; break }
+        try {
+            const tenant = typeof order.tenant === 'object' ? order.tenant : null
+            const xenditSecretKey: string | undefined = (tenant as any)?.xenditSecretKey
+            if (!xenditSecretKey) { xenditSkipped++; continue }
+            const invoice = await getInvoice(order.xenditPaymentRequestId, xenditSecretKey)
+            if (invoice.status === 'PAID' || invoice.status === 'SETTLED') {
+                const channelCode = invoice.payment_channel ?? invoice.payment_method ?? ''
+                const r = await reconcileOrderPaid(payload, {
+                    orderId: Number(order.id),
+                    xenditData: { paymentRequestId: invoice.id, channelCode },
+                    source: 'cron',
+                })
+                if (r.status === 'reconciled') xenditReconciled++
+                else xenditSkipped++
+            } else {
+                // EXPIRED — payment-expiry cron handles cancel+restock.
+                xenditSkipped++
+            }
+        } catch (e: unknown) {
+            payload.logger.error({ err: e, orderId: order.id }, 'reconcile-orders xendit failed')
+            xenditErrors++
+        }
+    }
+
+    if (xenditResult.totalDocs > opts.limit) {
+        console.error(`[reconcile-orders] xendit batch limit ${opts.limit} of ${xenditResult.totalDocs}`)
+    }
+
+    return {
+        reconciled,
+        skipped,
+        errors,
+        timedOut,
+        total: result.totalDocs,
+        xendit: { reconciled: xenditReconciled, skipped: xenditSkipped, errors: xenditErrors, total: xenditResult.totalDocs },
+    }
 }

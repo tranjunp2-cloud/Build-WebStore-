@@ -54,7 +54,64 @@ export async function POST(_request: Request, ctx: RouteContext) {
             )
         }
 
-        // Step 3: Already resolved — nothing to heal
+        const tenant = typeof order.tenant === 'object' ? order.tenant : null
+
+        // Step 3: Xendit orders — always fetch invoice to get specific channel code.
+        // Runs before the early-return so paid orders still get xenditChannelCode updated.
+        if (order.paymentProvider === 'xendit') {
+            // Fetch tenant with overrideAccess to bypass field-level access.read on xenditSecretKey.
+            // Depth-1 population strips protected fields even when overrideAccess is set on the parent query.
+            const tenantRawId = tenant ? (tenant as any).id : order.tenant
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditSecretKey: string | undefined = (tenantWithKeys as any)?.xenditSecretKey ?? undefined
+            const invoiceId: string | undefined = order.xenditPaymentRequestId
+            if (!invoiceId || !xenditSecretKey) {
+                return NextResponse.json({ status: order.status, paymentStatus: order.paymentStatus, reconciled: false })
+            }
+            let channelCode: string = order.xenditChannelCode ?? ''
+            let reconcileResult: { status: string } | undefined
+            try {
+                const xRes = await fetch(`https://api.xendit.co/v2/invoices/${invoiceId}`, {
+                    headers: { Authorization: `Basic ${Buffer.from(`${xenditSecretKey}:`).toString('base64')}` },
+                    cache: 'no-store',
+                })
+                if (xRes.ok) {
+                    const invoice = await xRes.json()
+                    if (invoice.status === 'PAID') {
+                        // Prefer snake_case payment_channel (specific) over payment_method (generic category)
+                        channelCode = invoice.payment_channel ?? invoice.paymentChannel ?? invoice.payment_method ?? invoice.paymentMethod ?? channelCode
+                        if (order.status === 'pending') {
+                            // Fresh order — full reconcile (marks paid, saves channel, skips email for poll)
+                            reconcileResult = await reconcileOrderPaid(payload, {
+                                orderId: Number(order.id),
+                                xenditData: { paymentRequestId: invoiceId, channelCode },
+                                source: 'poll',
+                            })
+                        } else if (channelCode && channelCode !== order.xenditChannelCode) {
+                            // Already paid but xenditChannelCode is stale/generic — update silently
+                            await payload.update({
+                                collection: 'orders',
+                                id: orderId,
+                                data: { xenditChannelCode: channelCode } as Record<string, unknown>,
+                            }).catch(() => {})
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('[payment-status] Xendit invoice check failed:', err)
+            }
+            const fresh = await payload.findByID({ collection: 'orders', id: orderId, depth: 0, overrideAccess: true }).catch(() => null) as any
+            return NextResponse.json({
+                status: fresh?.status ?? order.status,
+                paymentStatus: fresh?.paymentStatus ?? order.paymentStatus,
+                reconciled: reconcileResult?.status === 'reconciled',
+                xenditChannelCode: channelCode || null,
+            })
+        }
+
+        // Step 4: Already resolved (non-Xendit) — nothing to heal
         if (order.status !== 'pending') {
             return NextResponse.json({
                 status: order.status,
@@ -63,9 +120,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
             })
         }
 
-        // Step 4: Resolve Stripe identifiers from populated tenant (depth:1)
-        const tenant = typeof order.tenant === 'object' ? order.tenant : null
-        const connectedAccountId: string | undefined = tenant?.stripeAccountId ?? undefined
+        // Step 5: Resolve Stripe identifiers from populated tenant (depth:1)
+        const connectedAccountId: string | undefined = (tenant as any)?.stripeAccountId ?? undefined
         if (!order.stripeSessionId || !connectedAccountId) {
             return NextResponse.json({ status: 'pending', reconciled: false })
         }

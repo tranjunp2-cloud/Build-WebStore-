@@ -12,6 +12,8 @@ export default async function PaymentsPage() {
     let stripeAccountId: string | null = null;
     let cardEnabled = false;
     let fpxEnabled = false;
+    // Model C: connected = xenditSecretKey is set
+    let xenditConnected = false;
 
     if (tenantId) {
         const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
@@ -19,6 +21,7 @@ export default async function PaymentsPage() {
         stripeAccountId = (tenant as any)?.stripeAccountId ?? null;
         cardEnabled = (tenant as any)?.payments?.payment_card ?? false;
         fpxEnabled = (tenant as any)?.payments?.payment_fpx ?? false;
+        xenditConnected = !!((tenant as any)?.xenditSecretKey);
     }
 
     return (
@@ -28,6 +31,7 @@ export default async function PaymentsPage() {
             stripeAccountId={stripeAccountId}
             initialCardEnabled={cardEnabled}
             initialFpxEnabled={fpxEnabled}
+            xenditConnected={xenditConnected}
         />
     );
 }

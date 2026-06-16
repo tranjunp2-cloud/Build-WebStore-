@@ -3,13 +3,16 @@ import type { Payload } from 'payload'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 vi.mock('@/lib/payment/stripe')
+vi.mock('@/lib/payment/xendit')
 vi.mock('@/lib/payment/reconcile-order-paid')
 
 import { reconcileOrdersJob } from '@/lib/jobs/reconcile-orders'
 import * as stripeModule from '@/lib/payment/stripe'
+import * as xenditModule from '@/lib/payment/xendit'
 import * as reconcileModule from '@/lib/payment/reconcile-order-paid'
 
 const mockRetrieveCheckoutSession = vi.mocked(stripeModule.retrieveCheckoutSession)
+const mockGetPaymentRequest = vi.mocked(xenditModule.getPaymentRequest)
 const mockReconcileOrderPaid = vi.mocked(reconcileModule.reconcileOrderPaid)
 
 function createMockPayload(): Payload {
@@ -41,7 +44,10 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('[TC-F13.155] reconciles a pending order when its Stripe session is paid', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({ docs: [pendingOrder()], totalDocs: 1 } as any)
+        // Mock 2 calls: (1) Stripe orders query, (2) Xendit orders query
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({ docs: [pendingOrder()], totalDocs: 1 } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
         mockRetrieveCheckoutSession.mockResolvedValueOnce({ payment_status: 'paid' } as any)
         mockReconcileOrderPaid.mockResolvedValueOnce({ status: 'reconciled' })
 
@@ -56,10 +62,12 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('[TC-F13.155] skips (does NOT cancel) a pending order not yet paid at Stripe — regardless of age', async () => {
         // Arrange — a >24h-old unpaid order is left untouched; cancelling it is payment-expiry's job
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({
-            docs: [pendingOrder({ id: 456, createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })],
-            totalDocs: 1,
-        } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({
+                docs: [pendingOrder({ id: 456, createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })],
+                totalDocs: 1,
+            } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
         mockRetrieveCheckoutSession.mockResolvedValueOnce(null)
 
         // Act
@@ -74,10 +82,12 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('skips an order with no stripeSessionId / connectedAccountId', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({
-            docs: [pendingOrder({ stripeSessionId: null })],
-            totalDocs: 1,
-        } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({
+                docs: [pendingOrder({ stripeSessionId: null })],
+                totalDocs: 1,
+            } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
 
         // Act
         const result = await reconcileOrdersJob(payload)
@@ -90,10 +100,12 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('handles a batch: one healed, one not-paid skipped', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({
-            docs: [pendingOrder({ id: 111, stripeSessionId: 'cs_1' }), pendingOrder({ id: 222, stripeSessionId: 'cs_2' })],
-            totalDocs: 2,
-        } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({
+                docs: [pendingOrder({ id: 111, stripeSessionId: 'cs_1' }), pendingOrder({ id: 222, stripeSessionId: 'cs_2' })],
+                totalDocs: 2,
+            } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
         mockRetrieveCheckoutSession
             .mockResolvedValueOnce({ payment_status: 'paid' } as any)
             .mockResolvedValueOnce(null)
@@ -111,7 +123,9 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('respects the limit option', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
 
         // Act
         await reconcileOrdersJob(payload, { limit: 100 })
@@ -123,7 +137,9 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('counts a Stripe error as an error, not a crash', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({ docs: [pendingOrder({ id: 999 })], totalDocs: 1 } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({ docs: [pendingOrder({ id: 999 })], totalDocs: 1 } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
         mockRetrieveCheckoutSession.mockRejectedValueOnce(new Error('Stripe API error'))
 
         // Act
@@ -137,7 +153,9 @@ describe('reconcileOrdersJob (heal-only)', () => {
     it('filters for pending Stripe (card/fpx) orders only', async () => {
         // Arrange
         const payload = createMockPayload()
-        vi.mocked(payload.find).mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any)
+        vi.mocked(payload.find)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any)
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 } as any) // Xendit query returns empty
 
         // Act
         await reconcileOrdersJob(payload)

@@ -326,6 +326,27 @@ export const Orders: CollectionConfig = {
             index: true,
             admin: { readOnly: true, description: 'Stripe Charge ID (from payment_intent.latest_charge)' },
         },
+        {
+            name: 'xenditPaymentRequestId',
+            type: 'text',
+            index: true,
+            admin: { readOnly: true, description: 'Xendit Payment Request ID (pr-...)' },
+        },
+        {
+            name: 'xenditChannelCode',
+            type: 'text',
+            admin: { readOnly: true, description: 'Xendit channel: TOUCHNGO | GRABPAY | SHOPEEPAY | QR_CODE | FPX | CARDS' },
+        },
+        {
+            name: 'paymentProvider',
+            type: 'select',
+            index: true,
+            options: [
+                { label: 'Stripe', value: 'stripe' },
+                { label: 'Xendit', value: 'xendit' },
+            ],
+            admin: { readOnly: true, description: 'Online payment provider — null for BT/COD/legacy' },
+        },
         // --- Customer ---
         {
             name: 'customerEmail',

@@ -39,6 +39,8 @@ export interface PaidOrderDoc {
         variant?: string | null
     }>
     shippingAddress?: Record<string, string>
+    paymentMethod?: string | null
+    xenditChannelCode?: string | null
 }
 
 /**
@@ -89,7 +91,8 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 // Discount line — order snapshot is in sen; template formats RM via fp()
                 discountCode: order.discountCode ?? null,
                 discountAmount: order.discountAmount ? order.discountAmount / 100 : null,
-                paymentMethod: 'stripe',
+                paymentMethod: (order.paymentMethod as any) ?? 'stripe',
+                xenditChannelCode: order.xenditChannelCode ?? null,
                 orderDate: order.createdAt ?? new Date().toISOString(),
                 orderPageUrl,
                 currency: order.currency || 'MYR',
