@@ -22,6 +22,7 @@ import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementVariantStock, restockItem } from '../lib/stock-utils'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 export const maxDuration = 60
 
@@ -503,7 +504,7 @@ export async function POST(request: Request) {
         const supportEmail = ownerEmails[0] ?? ''
         const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
-        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`)
         const dashboardOrderUrl = `${baseUrl}/orders`
         const siteLocale = (site as any).locale ?? 'ms'
 

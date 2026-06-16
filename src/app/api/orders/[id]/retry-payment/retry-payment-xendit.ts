@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createInvoice } from '@/lib/payment/xendit'
 import { XenditError } from '@/lib/payment/xendit-client'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import type { Payload } from 'payload'
 
 interface XenditTenantDoc {
@@ -24,7 +25,6 @@ export async function retryXenditPayment(
         )
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
     const siteSlug = tenantDoc.slug || String(tenantDoc.id)
     const shopName = tenantDoc.name ?? siteSlug
 
@@ -36,8 +36,8 @@ export async function retryXenditPayment(
             amount: order.total,
             payerEmail: order.customerEmail,
             description: `Order ${order.orderNumber} from ${shopName}`,
-            successRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
-            failureRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+            successRedirectUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm`),
+            failureRedirectUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?cancelled=1`),
         })
     } catch (err) {
         console.error('[retry-payment-xendit] createInvoice error:', err instanceof Error ? err.message : err)

@@ -18,6 +18,7 @@ import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -447,7 +448,6 @@ export async function POST(request: NextRequest) {
         }
 
         // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
-        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
 
         // When discount applied, use a single consolidated line item so Stripe charges
@@ -468,8 +468,8 @@ export async function POST(request: NextRequest) {
                 items: allCheckoutItems,
                 currency: currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: customer.email,
-                successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+                successUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`),
+                cancelUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?cancelled=1`),
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Fire-and-forget: notify buyer of pending Stripe order (mirrors BT awaiting-payment email)
-        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`)
         const shopName = tenantTyped.name ?? siteSlug
         const buyerEmail = orderConfirmationEmail({
             shopName,

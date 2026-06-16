@@ -17,6 +17,7 @@ import { orderCompletedEmail } from '@/lib/email/templates/order-completed'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 // Statuses that trigger a buyer notification email (shipped removed — no email template for it)
 const BUYER_EMAIL_STATUSES = new Set(['confirmed', 'completed', 'cancelled', 'refunded'])
@@ -115,7 +116,6 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                     const ownerEmails = await getTenantOwnerEmails(payload, tenantId ?? '')
                     const supportEmail = ownerEmails[0] ?? ''
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
-                    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
                     const siteLocale = typeof (order as any).site === 'object'
                         ? ((order as any).site?.locale ?? 'ms')
                         : 'ms'
@@ -150,7 +150,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
                                 orderDate: (order as any).createdAt,
-                                orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                                orderPageUrl: buildStorefrontUrl(shopSlug, `/orders/${orderNumber}`),
                                 currency: (order as any).currency ?? 'MYR',
                                 locale: siteLocale,
                                 event: 'confirmed',
@@ -180,7 +180,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 total: (order as any).total ?? 0,
                                 paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
                                 completedDate: new Date().toISOString(),
-                                orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                                orderPageUrl: buildStorefrontUrl(shopSlug, `/orders/${orderNumber}`),
                                 currency: (order as any).currency ?? 'MYR',
                                 buyerNote: (order as any).notes ?? null,
                                 locale: siteLocale,
@@ -212,7 +212,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 orderDate: (order as any).createdAt,
                                 cancellationDate: new Date().toISOString(),
                                 cancellationNote: notes ?? (order as any).cancelReason ?? null,
-                                shopUrl: `${baseUrl}/sites/${shopSlug}`,
+                                shopUrl: buildStorefrontUrl(shopSlug),
                                 currency: (order as any).currency ?? 'MYR',
                                 locale: siteLocale,
                             }, cmsConfig ?? undefined)

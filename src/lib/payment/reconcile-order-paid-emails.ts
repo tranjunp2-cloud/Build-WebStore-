@@ -4,6 +4,7 @@ import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /** Minimal tenant shape for email templates. */
 interface TenantDoc {
@@ -56,9 +57,8 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
     const ownerEmails = await getTenantOwnerEmails(payload, tenantId)
     const supportEmail = ownerEmails[0] ?? ''
     const siteSlug = tenantTyped?.slug ?? ''
-    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
-    const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
-    const dashboardOrderUrl = `${baseUrl}/orders`
+    const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${order.orderNumber}`)
+    const dashboardOrderUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/orders`
     const siteLocale = (typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms') as 'en' | 'ms'
 
     try {

@@ -9,6 +9,7 @@ import { buildOrderItems } from '../stripe-checkout/build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { decrementOrderStock, restockAll } from './decrement-stock'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 interface XenditTenantDoc {
     id: string | number
@@ -126,7 +127,6 @@ export async function POST(request: NextRequest) {
         }
         const { decremented } = stockResult
 
-        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantTyped.slug || String(tenantId)
         const shopName = tenantTyped.name ?? siteSlug
 
@@ -138,8 +138,8 @@ export async function POST(request: NextRequest) {
                 amount: total,
                 payerEmail: customer.email,
                 description: `Order ${orderNumber} from ${shopName}`,
-                successRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm`,
-                failureRedirectUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+                successRedirectUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm`),
+                failureRedirectUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?cancelled=1`),
             })
             await payload.update({ collection: 'orders', id: order.id, data: { xenditPaymentRequestId: invoice.id } as Record<string, unknown> })
         } catch (err) {
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
             items: orderItems.map(i => ({ name: i.productName, variant: i.variant || null, quantity: i.quantity, unitPrice: i.unitPrice, lineTotal: i.quantity * i.unitPrice })),
             subtotal, shippingFee, total, currency, paymentMethod: 'xendit',
             event: 'placed', orderDate: new Date().toISOString(),
-            orderPageUrl: `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`,
+            orderPageUrl: buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`),
         })
         payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
             .catch((err) => console.error('[xendit-checkout] buyer email failed:', err))

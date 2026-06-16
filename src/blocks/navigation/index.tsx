@@ -577,7 +577,10 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
         e.preventDefault()
         const trimmed = orderValue.trim()
         if (!trimmed) { setOrderError(ol.required); return }
-        router.push(`/sites/${slug}/orders/${encodeURIComponent(trimmed)}`)
+        // On subdomain (staging/prod): pathname doesn't start with /sites/ — use /orders/ directly.
+        // On local dev: pathname starts with /sites/{slug}/ — include the prefix.
+        const isLocal = window.location.pathname.startsWith('/sites/')
+        router.push(isLocal ? `/sites/${slug}/orders/${encodeURIComponent(trimmed)}` : `/orders/${encodeURIComponent(trimmed)}`)
         setIsOpen(false)
         setOrderValue('')
         setOrderError('')

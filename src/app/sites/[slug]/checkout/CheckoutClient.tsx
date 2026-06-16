@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import {
@@ -109,6 +109,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const router = useRouter()
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const [mounted, setMounted] = useState(false)
     const [isPlacing, setIsPlacing] = useState(false)
 
@@ -156,7 +158,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 try {
                     const { orderId, slug: s } = JSON.parse(raw)
                     if (orderId && s) {
-                        window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+                        const isLocal = window.location.pathname.startsWith('/sites/')
+                        window.location.replace(isLocal ? `/sites/${s}/order/${orderId}/confirm?cancelled=1` : `/order/${orderId}/confirm?cancelled=1`)
                         return true
                     }
                 } catch { /* malformed flag — ignore */ }
@@ -414,7 +417,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     // Skip the redirect and go straight to the confirm page.
                     navigatedToConfirm = true
                     clearCart()
-                    const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
+                    const confirmUrl = `${shopBase}/order/${data.data.orderId}/confirm`
                     if ('startViewTransition' in document) {
                         document.startViewTransition(() => { router.push(confirmUrl) })
                     } else {
@@ -478,7 +481,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
+                const confirmUrl = `${shopBase}/order/${data.data.orderId}/confirm`
                 dismissOverlay()
                 // Keep isPlacing=true via flag so empty-cart check doesn't trigger before unmount
                 navigatedToConfirm = true
@@ -509,7 +512,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 <AlertCircle size={48} />
                 <h2>{ck.checkoutUnavailableTitle}</h2>
                 <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>{ck.checkoutUnavailableDesc}</p>
-                <Link href={`/sites/${slug}`}>{ck.browseProducts}</Link>
+                <Link href={shopBase || '/'}>{ck.browseProducts}</Link>
                 <style>{`
                   .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
@@ -525,7 +528,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             <div className="ck-empty">
                 <ShoppingBag size={48} />
                 <h2>{ck.cartEmpty}</h2>
-                <Link href={`/sites/${slug}`}>{ck.browseProducts}</Link>
+                <Link href={shopBase || '/'}>{ck.browseProducts}</Link>
                 <style>{`
                   .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
@@ -579,7 +582,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                 {/* ── Header ───────────────────────────────── */}
                 <header className="ck-hd">
-                    <Link href={`/sites/${slug}`} className="ck-back">
+                    <Link href={shopBase || '/'} className="ck-back">
                         <ArrowLeft size={16} />
                     </Link>
                     <h1 className="ck-h1">Checkout</h1>

@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { paymentConfirmedEmail } from '@/lib/email/templates/payment-confirmed'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -100,7 +101,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
         const siteObj = typeof (updated as any)?.site === 'object' ? (updated as any).site : null
         const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
         const siteSlug = tenantObj?.slug ?? ''
-        const orderPageUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/sites/${siteSlug}/orders/${(updated as any)?.orderNumber ?? ''}`
+        const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${(updated as any)?.orderNumber ?? ''}`)
 
         const emailPayload = paymentConfirmedEmail({
             orderNumber: (updated as any)?.orderNumber as string,

@@ -6,6 +6,7 @@ import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { restockItem } from '../../../orders/lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -102,7 +103,6 @@ export async function handleChargeRefunded(
     const tenant = typeof order.tenant === 'object' ? order.tenant : null
     const shopName = tenant?.name ?? 'Shop'
     const siteSlug = tenant?.slug ?? String((tenant as any)?.id ?? '')
-    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
     const cmsConfig = await getTemplateConfig(String(tenantId), 'order-refunded', 'buyer').catch(() => null)
     if (cmsConfig?.enabled === false) return
@@ -128,7 +128,7 @@ export async function handleChargeRefunded(
         paymentMethod: order.paymentMethod ?? 'stripe',
         orderDate: order.createdAt,
         refundDate: new Date().toISOString(),
-        shopUrl: `${baseUrl}/sites/${siteSlug}`,
+        shopUrl: buildStorefrontUrl(siteSlug),
         currency: order.currency ?? 'MYR',
         locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
     }, cmsConfig ?? undefined)

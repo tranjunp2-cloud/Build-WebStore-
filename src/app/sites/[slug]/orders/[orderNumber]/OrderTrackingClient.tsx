@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
@@ -371,6 +372,8 @@ function OtItems({ order }: { order: OrderData }) {
 }
 
 function OtSide({ order, slug }: { order: OrderData; slug: string }) {
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const addr = order.shippingAddress
     const hasAddr = addr?.line1 || addr?.city
 
@@ -397,7 +400,7 @@ function OtSide({ order, slug }: { order: OrderData; slug: string }) {
             )}
 
             <div className="ot-back-row">
-                <Link href={`/sites/${slug}`} className="ot-back-btn">
+                <Link href={shopBase || '/'} className="ot-back-btn">
                     <Store size={14} /> Back to Shop
                 </Link>
             </div>
@@ -426,6 +429,8 @@ export default function OrderTrackingClient({ order, slug }: Props) {
     const [liveOrder, setLiveOrder] = useState(order)
     const [isRetrying, setIsRetrying] = useState(false)
     const statusRef = useRef(order.status)
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
 
     // Browser Back from Stripe (after retry-payment) → confirm Payment Failed. The inline script in
     // page.tsx covers no-store fresh loads; this pageshow handler covers bfcache restores.
@@ -436,7 +441,10 @@ export default function OrderTrackingClient({ order, slug }: Props) {
             sessionStorage.removeItem('pw_stripe_pending')
             try {
                 const { orderId, slug: s } = JSON.parse(raw)
-                if (orderId && s) window.location.replace(`/sites/${s}/order/${orderId}/confirm?cancelled=1`)
+                if (orderId && s) {
+                    const isLocal = window.location.pathname.startsWith('/sites/')
+                    window.location.replace(isLocal ? `/sites/${s}/order/${orderId}/confirm?cancelled=1` : `/order/${orderId}/confirm?cancelled=1`)
+                }
             } catch { /* malformed flag — ignore */ }
         }
         window.addEventListener('pageshow', onPageShow)
@@ -529,7 +537,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                     <ChevronRight size={14} />
                     <strong>{liveOrder.orderNumber}</strong>
                 </div>
-                <Link href={`/sites/${slug}`} className="ot-shop-back">
+                <Link href={shopBase || '/'} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
                 </Link>
             </header>
