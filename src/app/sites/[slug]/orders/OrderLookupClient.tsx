@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Package, ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -14,6 +14,8 @@ export default function OrderLookupClient({ slug, siteName }: Props) {
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
     const router = useRouter()
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const [orderNumber, setOrderNumber] = useState('')
     const [error, setError] = useState('')
 
@@ -25,7 +27,7 @@ export default function OrderLookupClient({ slug, siteName }: Props) {
             return
         }
         setError('')
-        router.push(`/sites/${slug}/orders/${encodeURIComponent(trimmed)}`)
+        router.push(`${shopBase}/orders/${encodeURIComponent(trimmed)}`)
     }
 
     return (
@@ -139,7 +141,7 @@ export default function OrderLookupClient({ slug, siteName }: Props) {
                 {/* Back link */}
                 <p style={{ textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
                     <a
-                        href={`/sites/${slug}`}
+                        href={shopBase || '/'}
                         style={{ fontSize: 13, color: 'var(--f3)', textDecoration: 'none' }}
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--f1)')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'var(--f3)')}

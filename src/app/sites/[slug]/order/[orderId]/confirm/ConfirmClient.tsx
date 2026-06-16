@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { toast, Toaster } from 'sonner'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
@@ -93,6 +93,8 @@ const CopyIcon = () => (
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken, cancelled = false }: Props) {
     const router = useRouter()
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const { t } = useI18n()
     const cp = t.storefront.confirmPage
     const { clearCart } = useCartStore()
@@ -117,7 +119,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             const data = await res.json()
             if (res.ok && data.success) {
                 bypassUnloadGuardRef.current = true // skip the BT leave-prompt on this intentional navigation
-                window.location.href = `/sites/${slug}/orders/${order.orderNumber}`
+                window.location.href = `${shopBase}/orders/${order.orderNumber}`
             } else {
                 setCancelling(false)
                 setCancelConfirm(false)
@@ -290,7 +292,7 @@ useEffect(() => {
         window.history.pushState(null, '', window.location.href)
         const onPop = () => {
             window.history.pushState(null, '', window.location.href)
-            setLeaveHref(`/sites/${slug}`)
+            setLeaveHref(shopBase || '/')
         }
         const onBeforeUnload = (e: BeforeUnloadEvent) => {
             if (bypassUnloadGuardRef.current) return // intentional cancel navigation — don't prompt
@@ -453,9 +455,9 @@ useEffect(() => {
                     className="ty-back"
                     onClick={() => {
                         if (isBT && uploadStatus !== 'success') {
-                            setLeaveHref(`/sites/${slug}`)
+                            setLeaveHref(shopBase || '/')
                         } else {
-                            clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
+                            clearAndNavigate(shopBase || '/', isOrderSuccess)
                         }
                     }}
                 ><ArrowLeft size={16} /></button>
@@ -1017,9 +1019,9 @@ useEffect(() => {
                         <div className="ty-cta-row">
                             <button className="ty-btn primary lg" onClick={() => {
                                 if (isBT && uploadStatus !== 'success') {
-                                    setLeaveHref(`/sites/${slug}`)
+                                    setLeaveHref(shopBase || '/')
                                 } else {
-                                    clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
+                                    clearAndNavigate(shopBase || '/', isOrderSuccess)
                                 }
                             }}>
                                 <ShoppingBag size={15} /> Continue Shopping
@@ -1029,7 +1031,7 @@ useEffect(() => {
                                     <XCircle size={15} /> Cancel Order
                                 </button>
                             ) : (!isBT || isPaid) ? (
-                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.orderNumber}`, isOrderSuccess)}>
+                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`${shopBase}/orders/${order.orderNumber}`, isOrderSuccess)}>
                                     <ReceiptText size={15} /> View My Orders
                                 </button>
                             ) : null}
