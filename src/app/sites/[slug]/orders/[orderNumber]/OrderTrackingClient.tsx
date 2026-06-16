@@ -372,6 +372,8 @@ function OtItems({ order }: { order: OrderData }) {
 }
 
 function OtSide({ order, slug }: { order: OrderData; slug: string }) {
+    const pathname = usePathname()
+    const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
     const addr = order.shippingAddress
     const hasAddr = addr?.line1 || addr?.city
 
