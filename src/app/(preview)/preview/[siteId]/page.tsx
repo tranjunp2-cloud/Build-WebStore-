@@ -264,6 +264,11 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',
+                            // Route blog-list links to /preview/{siteId}/blog/* so clicking
+                            // a blog card stays in the preview namespace instead of navigating
+                            // to the published-only storefront route (fix #1183). Uses a
+                            // dedicated field so product/other blocks are not affected.
+                            blogPreviewPath: `/preview/${siteId}/blog`,
                             imageLibraryS3,
                         }}
                         page={page}
