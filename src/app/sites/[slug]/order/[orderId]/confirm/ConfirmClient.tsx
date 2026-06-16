@@ -152,7 +152,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             setRetryError(cp.retryError)
             setRetrying(false)
         }
-    }, [order.id, cp.retryError])
+    }, [order.id, cp.retryError, slug])
 
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
@@ -251,9 +251,13 @@ useEffect(() => {
     }, [])
 
     // SSE: poll payment status for Stripe orders not yet paid.
+    // Xendit orders are excluded — the active-reconcile poll (above) handles them and returns
+    // xenditChannelCode; the SSE stream does not carry that field so mixing them causes a stale label.
     // Skip when buyer cancelled — order won't become paid via the abandoned session; show Pay Now instead.
     useEffect(() => {
-        const isStripeOrder = order.paymentMethod !== 'cod' && order.paymentMethod !== 'bank_transfer'
+        const isStripeOrder = order.paymentMethod !== 'cod'
+            && order.paymentMethod !== 'bank_transfer'
+            && !order.xenditPaymentRequestId
         if (!isStripeOrder || order.paymentStatus === 'paid' || cancelled) return
 
         let errorCount = 0

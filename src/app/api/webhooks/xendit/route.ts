@@ -73,24 +73,10 @@ async function resolveCallbackToken(
         }
     }
 
-    // Path 2: reference_id is a UUID/non-numeric (e.g. Xendit Dashboard test payload)
-    // Search tenants by matching callback token directly
-    if (incomingToken.length > 0) {
-        try {
-            const { docs } = await payload.find({
-                collection: 'tenants',
-                where: { xenditCallbackToken: { equals: incomingToken } },
-                limit: 1,
-                depth: 0,
-                overrideAccess: true,
-            })
-            if (docs.length > 0) return true
-        } catch {
-            // fall through
-        }
-    }
-
-    // Fallback: master token (platform-level events only — no tenant reference_id)
+    // Real invoice events always have a numeric external_id (String(order.id)).
+    // Non-numeric ids are Xendit Dashboard test pings — only accept via master platform token.
+    // Path 2 (tenant token scan for non-numeric ids) is removed: it allowed any tenant to validate
+    // events for other tenants' orders by supplying their own token with a non-numeric external_id.
     return verifyXenditCallbackToken(incomingToken)
 }
 

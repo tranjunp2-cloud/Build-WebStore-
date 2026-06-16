@@ -188,9 +188,14 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
     // mirroring the Stripe pattern. If the Xendit API call subsequently fails, ops must reconcile
     // via Xendit dashboard — we log the failure clearly and return 502.
     if (order.paymentProvider === 'xendit') {
-        const tenantObj = typeof order.tenant === 'object' ? order.tenant : null
+        // Fetch tenant directly with overrideAccess to bypass field-level access.read on xenditSecretKey.
+        // The order findByID above has no overrideAccess, so depth-populated tenant fields are filtered.
+        const tenantRawId = typeof order.tenant === 'object' ? (order.tenant as any).id : order.tenant
+        const tenantWithKeys = await payload.findByID({
+            collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+        }).catch(() => null)
         // Invoice checkout (Model C) uses merchant's own xenditSecretKey — NOT xenditAccountId/forUserId
-        const xenditSecretKey: string | undefined = (tenantObj as any)?.xenditSecretKey
+        const xenditSecretKey: string | undefined = (tenantWithKeys as any)?.xenditSecretKey
         if (!xenditSecretKey || !order.xenditPaymentRequestId) {
             return NextResponse.json(
                 { success: false, error: { code: 'XENDIT_NOT_REFUNDABLE', message: 'Missing Xendit payment info for refund' } },
