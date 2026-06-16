@@ -18,6 +18,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { verifyOrderToken } from '@/lib/auth/order-token'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,11 +33,11 @@ export async function GET(
     const token = url.searchParams.get('token') ?? ''
 
     const fallback = slug
-        ? `/sites/${slug}/orders`
-        : '/'
+        ? buildStorefrontUrl(slug, '/orders')
+        : (process.env.NEXT_PUBLIC_SERVER_URL ?? '/')
 
     if (!token || !slug) {
-        return NextResponse.redirect(new URL(fallback, url.origin))
+        return NextResponse.redirect(fallback)
     }
 
     try {
@@ -52,20 +53,18 @@ export async function GET(
         const order = result.docs[0] as any
 
         if (!order || !order.magicLinkSecret) {
-            return NextResponse.redirect(new URL(fallback, url.origin))
+            return NextResponse.redirect(fallback)
         }
 
         const verified = await verifyOrderToken({ token, secret: order.magicLinkSecret })
         if (!verified.ok) {
             // Expired or invalid — send to tracking page so they can request a new link
-            const trackingUrl = `/sites/${slug}/orders/${order.orderNumber}`
-            return NextResponse.redirect(new URL(trackingUrl, url.origin))
+            return NextResponse.redirect(buildStorefrontUrl(slug, `/orders/${order.orderNumber}`))
         }
 
         // Token valid — set confirm cookie and redirect to confirm page
         const confirmToken = generateConfirmToken(order.id, order.orderNumber)
-        const confirmUrl = `/sites/${slug}/order/${order.id}/confirm`
-        const response = NextResponse.redirect(new URL(confirmUrl, url.origin))
+        const response = NextResponse.redirect(buildStorefrontUrl(slug, `/order/${order.id}/confirm`))
         // TTL = remaining time until payment expires (max 24h), minimum 1h as fallback.
         // Avoids cutting the buyer's upload window shorter than the payment deadline.
         const ttl = order.paymentExpiresAt
@@ -80,6 +79,6 @@ export async function GET(
         })
         return response
     } catch {
-        return NextResponse.redirect(new URL(fallback, url.origin))
+        return NextResponse.redirect(fallback)
     }
 }
