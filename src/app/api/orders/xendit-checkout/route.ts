@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         }
 
         const shippingFee = 10
-        const tax = Math.round(subtotal * 0.06 * 100) / 100
+        const tax = 0
         const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         const magicLinkSecret = randomBytes(32).toString('hex')

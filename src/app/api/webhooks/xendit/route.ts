@@ -62,6 +62,10 @@ async function resolveCallbackToken(
                     if (tenantToken) {
                         return safeTimingSafeEqual(incomingToken, tenantToken)
                     }
+                    // Tenant found but has no webhook token configured — reject immediately.
+                    // Do NOT fall through to master token; that would bypass per-tenant security.
+                    console.error('[Xendit Webhook] Tenant has no xenditCallbackToken configured — rejecting')
+                    return false
                 }
             }
         } catch {
@@ -86,7 +90,7 @@ async function resolveCallbackToken(
         }
     }
 
-    // Fallback: master token (legacy v2 Model B events)
+    // Fallback: master token (platform-level events only — no tenant reference_id)
     return verifyXenditCallbackToken(incomingToken)
 }
 

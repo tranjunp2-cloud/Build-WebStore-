@@ -201,6 +201,11 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         if (!secretKey || !callbackToken) return { success: false, error: 'Both Secret Key and Callback Token are required.' };
         if (!secretKey.startsWith('xnd_')) return { success: false, error: 'Invalid Secret Key format. Must start with xnd_' };
 
+        const sub = await getActivePlanSubscription(payload, tenantId);
+        if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {
+            return { success: false, error: 'Payment integration is not available on your current plan.' };
+        }
+
         await payload.update({
             collection: 'tenants',
             id: tenantId,

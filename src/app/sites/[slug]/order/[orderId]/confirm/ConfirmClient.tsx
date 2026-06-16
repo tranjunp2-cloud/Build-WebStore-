@@ -140,6 +140,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             })
             const data = await res.json()
             if (res.ok && data.success && data.data?.sessionUrl) {
+                // Set back-button recovery flag before leaving the page
+                const pendingKey = data.data.type === 'redirect' ? 'pw_xendit_pending' : 'pw_stripe_pending'
+                try { sessionStorage.setItem(pendingKey, JSON.stringify({ orderId: order.id, slug })) } catch {}
                 window.location.href = data.data.sessionUrl
             } else {
                 setRetryError(data.error?.message || cp.retryError)
@@ -170,10 +173,13 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const [leaveHref, setLeaveHref] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // The Stripe round-trip concluded (we're on the confirm page) — clear the back-button flag
-    // set by checkout so a later fresh checkout visit doesn't false-redirect here.
+    // The checkout round-trip concluded (we're on the confirm page) — clear back-button flags
+    // set by checkout/retry so a later fresh checkout visit doesn't false-redirect here.
     useEffect(() => {
-        try { sessionStorage.removeItem('pw_stripe_pending') } catch {}
+        try {
+            sessionStorage.removeItem('pw_stripe_pending')
+            sessionStorage.removeItem('pw_xendit_pending')
+        } catch {}
     }, [])
 
 useEffect(() => {

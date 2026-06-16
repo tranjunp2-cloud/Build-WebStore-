@@ -53,10 +53,16 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
         RETURNING id
     `)
     if (!transition.rows?.length) {
-        // For webhook source: even when already reconciled, update xenditChannelCode if more specific
-        // and send email (poll skips email, so webhook is the correct email sender for Xendit).
+        // For webhook source: update xenditChannelCode if more specific than stored value.
+        // Only send email when channelCode was previously missing — that means poll() won the CAS
+        // and intentionally skipped email (poll defers to webhook). If channelCode was already set,
+        // the previous webhook already sent the email; sending again = duplicate. See source!=='poll' below.
         if (source === 'webhook' && xenditData?.channelCode) {
             try {
+                const existingOrder = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 })
+                    .catch(() => null) as unknown as PaidOrderDoc | null
+                const needsEmail = !existingOrder?.xenditChannelCode
+
                 await payload.update({
                     collection: 'orders',
                     id: orderId,
@@ -65,12 +71,11 @@ export async function reconcileOrderPaid(payload: Payload, ctx: ReconcileContext
                         paymentMethod: mapChannelToPaymentMethod(xenditData.channelCode),
                     } as Record<string, unknown>,
                 })
-                const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 1 })
-                    .catch(() => null) as unknown as PaidOrderDoc | null
-                if (order) {
+
+                if (needsEmail && existingOrder) {
                     // Inject channelCode directly so email reflects it even if DB read is stale
-                    ;(order as any).xenditChannelCode = xenditData.channelCode
-                    await sendOrderPaidEmailsAndNotify(payload, order).catch(err =>
+                    ;(existingOrder as any).xenditChannelCode = xenditData.channelCode
+                    await sendOrderPaidEmailsAndNotify(payload, existingOrder).catch(err =>
                         console.error(`[Reconcile:webhook] Order ${orderId} email after channel update failed:`, err)
                     )
                 }

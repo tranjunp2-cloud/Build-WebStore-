@@ -240,6 +240,7 @@ export const Tenants: CollectionConfig = {
         {
             name: 'xenditSecretKey',
             type: 'text',
+            access: { read: () => false },
             admin: {
                 description: 'Xendit Secret Key (xnd_development_... or xnd_production_...). Merchant provides via Settings > Payments.',
             },
@@ -247,6 +248,7 @@ export const Tenants: CollectionConfig = {
         {
             name: 'xenditCallbackToken',
             type: 'text',
+            access: { read: () => false },
             admin: {
                 description: 'Xendit Callback Token for webhook signature verification. Merchant copies from Xendit Dashboard > Settings > Configuration.',
             },
@@ -342,7 +344,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -357,7 +359,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -372,7 +374,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -387,7 +389,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -402,7 +404,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -417,7 +419,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],
@@ -432,7 +434,7 @@ export const Tenants: CollectionConfig = {
                     hooks: {
                         beforeChange: [
                             ({ value, originalDoc }) => {
-                                if (value && originalDoc?.xenditOnboardingComplete !== true) return false
+                                if (value && !originalDoc?.xenditSecretKey) return false
                                 return value
                             },
                         ],

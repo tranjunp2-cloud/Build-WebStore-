@@ -58,7 +58,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
         // Step 3: Xendit orders — always fetch invoice to get specific channel code.
         // Runs before the early-return so paid orders still get xenditChannelCode updated.
-        if (order.paymentMethod === 'ewallet') {
+        if (order.paymentProvider === 'xendit') {
             const xenditSecretKey: string | undefined = (tenant as any)?.xenditSecretKey ?? undefined
             const invoiceId: string | undefined = order.xenditPaymentRequestId
             if (!invoiceId || !xenditSecretKey) {

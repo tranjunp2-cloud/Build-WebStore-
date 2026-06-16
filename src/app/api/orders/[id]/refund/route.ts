@@ -239,8 +239,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
+        await releaseDiscountRedemption(payload, Number(order.id))
         const restockResults = await runRestockForItems(order.items)
-        void fireRefundEmail()
+        if (canSendRefundEmail) void fireRefundEmail()
         return NextResponse.json({ success: true, data: { refundId: xenditRefund.id }, restock: restockResults })
     }
 
