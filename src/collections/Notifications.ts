@@ -129,6 +129,14 @@ export const Notifications: CollectionConfig = {
             admin: { description: 'Whether the user has read this notification' },
         },
         {
+            name: 'dedupeKey',
+            type: 'text',
+            admin: {
+                description:
+                    'Stable per-event idempotency key (e.g. "ORDER_NEW:ORD-123"). Backed by a partial unique index on (tenant, user, dedupeKey) to prevent duplicate rows from multi-path/concurrent notification firing. Null for notifications that opt out of dedupe.',
+            },
+        },
+        {
             name: 'expiresAt',
             type: 'date',
             admin: { description: 'Notification auto-expires after 30 days (set on insert)' },

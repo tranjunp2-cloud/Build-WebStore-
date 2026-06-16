@@ -114,6 +114,7 @@ export async function POST(
             total: String(order.total ?? 0),
             customerName: order.customerName,
         },
+        dedupeKey: `PROOF_UPLOADED:${order.orderNumber}`,
     }).catch((err) => console.error('[upload-proof-direct] notify failed', err))
 
     return NextResponse.json({ success: true })

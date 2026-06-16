@@ -205,3 +205,109 @@ describe('notifyTenantOwners — role targeting [TC-F16.43]', () => {
         }))
     })
 })
+
+describe('notifyTenantOwners — dedupe / idempotency [TC-F16.29]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('skips a recipient who already has the same dedupeKey notification', async () => {
+        // Arrange — 2 owners; user 1 already received this exact event
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 1 }, { id: 2 }], totalDocs: 2 }) // users query
+            .mockResolvedValueOnce({ docs: [{ user: 1 }] })                        // existing notifications
+        mockCreate.mockResolvedValue({})
+
+        // Act
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'ORDER_NEW',
+            title: 'New Order #ORD-001 - MYR 100.00',
+            message: 'Order placed by John',
+            actionUrl: '/orders',
+            dedupeKey: 'ORDER_NEW:ORD-001',
+        })
+
+        // Assert — dedupe query ran on the stable key; only the user WITHOUT an
+        // existing row gets created. dedupeKey is persisted on the new row.
+        expect(mockFind).toHaveBeenCalledTimes(2)
+        expect(mockFind).toHaveBeenLastCalledWith(expect.objectContaining({
+            collection: 'notifications',
+            where: { and: [
+                { tenant: { equals: 10 } },
+                { dedupeKey: { equals: 'ORDER_NEW:ORD-001' } },
+                { user: { in: [1, 2] } },
+            ] },
+        }))
+        expect(mockCreate).toHaveBeenCalledTimes(1)
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ user: 2, dedupeKey: 'ORDER_NEW:ORD-001' }),
+        }))
+    })
+
+    it('creates for all recipients when none have it yet', async () => {
+        // Arrange — no existing notifications
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 1 }, { id: 2 }], totalDocs: 2 })
+            .mockResolvedValueOnce({ docs: [] })
+        mockCreate.mockResolvedValue({})
+
+        // Act
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'ORDER_NEW',
+            title: 'New Order #ORD-002 - MYR 50.00',
+            message: 'Order placed by Jane',
+            actionUrl: '/orders',
+            dedupeKey: 'ORDER_NEW:ORD-002',
+        })
+
+        // Assert
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+
+    it('does NOT run the dedupe query when no dedupeKey (back-compat)', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [{ id: 1 }], totalDocs: 1 })
+        mockCreate.mockResolvedValue({})
+
+        // Act — no dedupeKey
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'ORDER_NEW',
+            title: 'New Order #ORD-003',
+            message: 'Test',
+            actionUrl: '/orders',
+        })
+
+        // Assert — only the users query ran, notification still created without dedupeKey
+        expect(mockFind).toHaveBeenCalledOnce()
+        expect(mockCreate).toHaveBeenCalledTimes(1)
+        expect(mockCreate.mock.calls[0][0].data.dedupeKey).toBeUndefined()
+    })
+
+    it('does not throw when an insert loses the unique-index race (create rejects)', async () => {
+        // Arrange — both recipients pass the pre-check (none existing yet), but a
+        // concurrent firing wins the unique index for user 1, so its create rejects.
+        // This is the race the DB constraint is meant to catch; the batch must survive.
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 1 }, { id: 2 }], totalDocs: 2 }) // users
+            .mockResolvedValueOnce({ docs: [] })                                   // dedupe pre-check: none
+        mockCreate
+            .mockRejectedValueOnce(
+                new Error('duplicate key value violates unique constraint "notifications_tenant_user_dedupe_key_idx"'),
+            )
+            .mockResolvedValueOnce({})
+
+        // Act + Assert — Promise.allSettled swallows the rejected insert; the call
+        // resolves cleanly (no unhandled throw), and the winning row is unaffected.
+        await expect(
+            notifyTenantOwners(mockPayload, 10, {
+                type: 'ORDER_NEW',
+                title: 'New Order #ORD-009 - MYR 9.00',
+                message: 'Order placed by Zoe',
+                actionUrl: '/orders',
+                dedupeKey: 'ORDER_NEW:ORD-009',
+            }),
+        ).resolves.toBeUndefined()
+
+        expect(mockCreate).toHaveBeenCalledTimes(2)
+    })
+})

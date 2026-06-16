@@ -167,7 +167,14 @@ export function NotificationDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [setDropdownOpen])
 
-  const hasMoreItems = data?.items ? data.items.length > 4 : false
+  // Collapsed preview shows whole items only — never a half-clipped sliver.
+  // Render at most PREVIEW_LIMIT complete items; if more exist, show "View all"
+  // (expands to a scrollable full list). Otherwise everything fits → "Close".
+  // PREVIEW_LIMIT = 4 matches the F16 design mockup (4 rows + "View all ▼").
+  const PREVIEW_LIMIT = 4
+  const allItems = data?.items ?? []
+  const visibleItems = isExpanded ? allItems : allItems.slice(0, PREVIEW_LIMIT)
+  const hasMoreItems = allItems.length > PREVIEW_LIMIT
 
   if (!isDropdownOpen) return null
 
@@ -187,7 +194,7 @@ export function NotificationDropdown() {
         </button>
       </div>
 
-      <div className={`flex-1 min-h-0 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : 'max-h-[368px] overflow-hidden'} bg-[#1E293B] transition-all duration-300`}>
+      <div className={`flex-1 min-h-0 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : ''} bg-[#1E293B] transition-all duration-300`}>
         {isLoading && (
             <div className="flex items-center justify-center py-10 bg-[#1E293B]">
                 <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
@@ -210,9 +217,9 @@ export function NotificationDropdown() {
             <NotificationEmptyState />
         )}
 
-        {!isLoading && !isError && data?.items && data.items.length > 0 && (
+        {!isLoading && !isError && visibleItems.length > 0 && (
             <div className="flex flex-col">
-              {data.items.map((item) => (
+              {visibleItems.map((item) => (
                 <NotificationItem key={item.id} notification={item} onClick={handleItemClick} />
               ))}
             </div>
