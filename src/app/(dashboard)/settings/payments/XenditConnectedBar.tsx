@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { Check, ShieldCheck, ExternalLink, Unlink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
+// Xendit MY core payment methods (standard activation, no special onboarding required)
+const XENDIT_MY_METHODS = [
+    'TNG eWallet', 'GrabPay', 'ShopeePay',
+    'DuitNow QR', 'FPX', 'Credit / Debit Card',
+]
+
 interface Props {
     accountId: string | null;
     tenantId: string;
@@ -90,18 +96,15 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                     </div>
                 </div>
 
-                {/* Supported payment methods */}
+                {/* Supported payment methods — static list from Xendit MY official docs */}
                 <div className="px-[16px] py-[11px] border-t border-white/[0.06]">
                     <p className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-[0.06em] m-0 mb-[8px]">Supported payment methods</p>
                     <div className="flex flex-wrap gap-[6px]">
-                        {['TNG eWallet', 'GrabPay', 'ShopeePay', 'DuitNow QR', 'FPX', 'Boost', 'MAE'].map(m => (
-                            <span key={m} className="text-[11.5px] px-[9px] py-[3px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-300">
-                                {m}
+                        {XENDIT_MY_METHODS.map(name => (
+                            <span key={name} className="text-[11.5px] px-[9px] py-[3px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-300">
+                                {name}
                             </span>
                         ))}
-                        <span className="text-[11.5px] px-[9px] py-[3px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-500">
-                            + more
-                        </span>
                     </div>
                 </div>
             </div>

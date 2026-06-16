@@ -249,6 +249,25 @@ export async function getBalance(forUserId: string): Promise<XenditBalance> {
     return xenditFetch<XenditBalance>('/balance', { method: 'GET', forUserId })
 }
 
+export interface XenditPaymentChannel {
+    channel_code: string       // e.g. TOUCHNGO, GRABPAY, ALIPAY
+    channel_name: string       // e.g. "TNG eWallet"
+    channel_category: string   // EWALLET | QR_CODE | VIRTUAL_ACCOUNT | DIRECT_DEBIT
+    is_activated: boolean
+    currency: string
+    country: string
+}
+
+/** GET /payment_channels — list active payment channels for merchant (Model C, apiKey). */
+export async function getPaymentChannels(apiKey: string): Promise<XenditPaymentChannel[]> {
+    const result = await xenditFetch<{ data?: XenditPaymentChannel[] } | XenditPaymentChannel[]>(
+        '/payment_channels',
+        { method: 'GET', apiKey },
+    )
+    // Xendit may return array directly or wrapped in { data: [...] }
+    return Array.isArray(result) ? result : (result.data ?? [])
+}
+
 /** Map raw Xendit account status string → internal XenditAccountStatus. */
 export function mapXenditAccountStatus(raw: string): XenditAccountStatus {
     switch (raw?.toUpperCase()) {
