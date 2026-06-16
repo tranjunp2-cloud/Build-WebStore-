@@ -567,7 +567,7 @@ useEffect(() => {
                                             Upload within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
                                         </div>
                                         <div className="ty-deadline-line2">
-                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                            We&apos;re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
                                         </div>
                                     </div>
                                 </div>
@@ -712,7 +712,7 @@ useEffect(() => {
                             <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
                                     <h3>Payment &amp; Order Status</h3>
-                                    <p>Your payment didn't go through — retry to secure your order before it's released.</p>
+                                    <p>Your payment didn&apos;t go through — retry to secure your order before it&apos;s released.</p>
                                 </div>
                                 <span className="ty-step-pill failed">
                                     <XCircle size={11} /> Failed
@@ -725,7 +725,7 @@ useEffect(() => {
                                 </div>
                                 <div className="ty-failed-body">
                                     <p className="ty-failed-title">
-                                        We couldn't process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'Your card was declined.' : 'You exited before completing checkout.'}
+                                        We couldn&apos;t process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'Your card was declined.' : 'You exited before completing checkout.'}
                                     </p>
                                     <p className="ty-failed-sub">No money has been charged. You can retry with the same card or switch to another payment method.</p>
                                 </div>
@@ -739,7 +739,7 @@ useEffect(() => {
                                             Retry within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
                                         </div>
                                         <div className="ty-deadline-line2">
-                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                            We&apos;re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
                                         </div>
                                     </div>
                                 </div>
@@ -821,7 +821,7 @@ useEffect(() => {
                             <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
                                     <h3>Payment &amp; Order Status</h3>
-                                    <p>Your payment didn't go through — retry to secure your order before it's released.</p>
+                                    <p>Your payment didn&apos;t go through — retry to secure your order before it&apos;s released.</p>
                                 </div>
                                 <span className="ty-step-pill failed">
                                     <XCircle size={11} /> Failed
@@ -834,7 +834,7 @@ useEffect(() => {
                                 </div>
                                 <div className="ty-failed-body">
                                     <p className="ty-failed-title">
-                                        We couldn't process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'The payment session expired.' : 'You exited before completing checkout.'}
+                                        We couldn&apos;t process your payment of <strong>{formatPrice(order.total, currency)}</strong>. {payFailed ? 'The payment session expired.' : 'You exited before completing checkout.'}
                                     </p>
                                     <p className="ty-failed-sub">No money has been charged. You can retry payment to create a new checkout session.</p>
                                 </div>
@@ -848,7 +848,7 @@ useEffect(() => {
                                             Retry within <PaymentCountdown deadline={order.paymentExpiresAt} /> <span className="ty-deadline-unit">left</span>
                                         </div>
                                         <div className="ty-deadline-line2">
-                                            We're holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
+                                            We&apos;re holding your items until <strong>{new Date(order.paymentExpiresAt).toLocaleString('en-MY', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>. After that this order is released and <strong>automatically cancelled</strong>.
                                         </div>
                                     </div>
                                 </div>
@@ -886,7 +886,7 @@ useEffect(() => {
                                 <div className="ty-paid-icon"><Check size={22} strokeWidth={3} /></div>
                                 <div className="ty-paid-body">
                                     <p className="ty-paid-title">Your payment of <strong>{formatPrice(order.total, currency)}</strong> has been processed successfully via {xenditChannelLabel(liveXenditChannelCode)}.</p>
-                                    <p className="ty-paid-sub">Funds settle directly to the merchant's account.</p>
+                                    <p className="ty-paid-sub">Funds settle directly to the merchant&apos;s account.</p>
                                 </div>
                             </div>
                             {order.xenditPaymentRequestId && (
