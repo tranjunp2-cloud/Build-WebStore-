@@ -91,7 +91,6 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (cmsConfig?.enabled === false) return
         const shopName = tenant?.name ?? 'Shop'
         const siteSlug = tenant?.slug ?? ''
-        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
         const email = orderRefundedEmail({
             shopName,
             orderNumber: order.orderNumber,

@@ -481,7 +481,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
+                const confirmUrl = `${shopBase}/order/${data.data.orderId}/confirm`
                 dismissOverlay()
                 // Keep isPlacing=true via flag so empty-cart check doesn't trigger before unmount
                 navigatedToConfirm = true

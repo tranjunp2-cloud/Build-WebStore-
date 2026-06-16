@@ -223,7 +223,6 @@ export async function POST(
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
 
         // Step 7: Create new Stripe Checkout Session
-        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = tenantDoc.slug || String(tenantId)
         const orderNumber = order.orderNumber
 
