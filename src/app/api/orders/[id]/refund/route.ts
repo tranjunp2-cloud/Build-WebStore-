@@ -50,15 +50,15 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
     )
     const orderTenantId = String(typeof order.tenant === 'object' ? order.tenant.id : order.tenant)
 
-    const emailSub = await getActivePlanSubscription(payload, orderTenantId)
-    const canSendRefundEmail = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
-
     if (!userTenantIds.includes(orderTenantId)) {
         return NextResponse.json(
             { success: false, error: { code: 'FORBIDDEN' } },
             { status: 403 },
         )
     }
+
+    const emailSub = await getActivePlanSubscription(payload, orderTenantId)
+    const canSendRefundEmail = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
 
     // Only shipped/completed orders can be refunded — mirrors the dashboard UI gate.
     if (order.status === 'refunded') {

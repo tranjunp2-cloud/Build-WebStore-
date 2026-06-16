@@ -59,7 +59,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
         // Step 3: Xendit orders — always fetch invoice to get specific channel code.
         // Runs before the early-return so paid orders still get xenditChannelCode updated.
         if (order.paymentProvider === 'xendit') {
-            const xenditSecretKey: string | undefined = (tenant as any)?.xenditSecretKey ?? undefined
+            // Fetch tenant with overrideAccess to bypass field-level access.read on xenditSecretKey.
+            // Depth-1 population strips protected fields even when overrideAccess is set on the parent query.
+            const tenantRawId = tenant ? (tenant as any).id : order.tenant
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditSecretKey: string | undefined = (tenantWithKeys as any)?.xenditSecretKey ?? undefined
             const invoiceId: string | undefined = order.xenditPaymentRequestId
             if (!invoiceId || !xenditSecretKey) {
                 return NextResponse.json({ status: order.status, paymentStatus: order.paymentStatus, reconciled: false })

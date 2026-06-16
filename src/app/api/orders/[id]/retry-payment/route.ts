@@ -145,7 +145,13 @@ export async function POST(
 
         // Xendit orders: dispatch to Xendit retry helper before Stripe-specific checks
         if (order.paymentProvider === 'xendit') {
-            return retryXenditPayment(order, tenantDoc, payload)
+            // Fetch tenant with overrideAccess to get xenditSecretKey (field-level access strips it
+            // from depth-1 population even when overrideAccess is set on the parent order query).
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditTenantDoc = { ...tenantDoc, xenditSecretKey: (tenantWithKeys as any)?.xenditSecretKey }
+            return retryXenditPayment(order, xenditTenantDoc, payload)
         }
 
         const stripeAccountId = tenantDoc.stripeAccountId

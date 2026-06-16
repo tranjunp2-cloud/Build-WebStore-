@@ -72,9 +72,11 @@ const XENDIT_CHANNEL_LABELS: Record<string, string> = {
     BOOST: 'Boost',
     MAE: 'MAE',
     ATOME: 'Atome',
-    QR_CODE: 'DuitNow QR',
+    QR_CODE: 'DuitNow QR',       // payment_request API channel_code
+    DUITNOW_QR: 'DuitNow QR',   // Invoice API payment_channel value
     FPX: 'FPX Online Banking',
     CARDS: 'Credit / Debit Card',
+    CREDIT_CARD: 'Credit / Debit Card',
 }
 
 export function xenditChannelLabel(channelCode: string | undefined | null): string {
