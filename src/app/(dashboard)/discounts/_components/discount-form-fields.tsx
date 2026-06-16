@@ -1,6 +1,7 @@
 'use client'
 
 import { Percent, Banknote, Info, CircleAlert } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtRM, MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
 
@@ -227,11 +228,30 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             {/* Used so far (read-only, edit/detail only — hidden on create) */}
             {!isNew && (
                 <div className="flex flex-col gap-1.5">
-                    <label className="flex items-center gap-1" style={labelStyle}>
+                    <label className="flex items-center gap-1.5" style={labelStyle}>
                         {d.usedSoFarLabel}
-                        <span title={d.usedSoFarTitle} style={{ color: 'var(--dash-text-muted)' }}>
-                            <Info className="h-3 w-3" />
-                        </span>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span
+                                    tabIndex={0}
+                                    aria-label={d.usedSoFarTitle}
+                                    className="inline-flex cursor-default rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                                    style={{ color: 'var(--dash-text-muted)' }}
+                                >
+                                    <Info className="h-4 w-4" />
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent
+                                side="top"
+                                align="start"
+                                className="max-w-[260px] whitespace-normal"
+                                // Match the form input palette (per design feedback) instead of the
+                                // default dark popover color.
+                                style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text)' }}
+                            >
+                                {d.usedSoFarTitle}
+                            </TooltipContent>
+                        </Tooltip>
                     </label>
                     <input
                         className={`${inputBase} max-w-[220px] font-mono`}
