@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
                     if (typeof t.tenant === 'object') return String((t.tenant as { id: string | number }).id)
                     return String(t.tenant)
                 })
+                // '0' is Payload's sentinel for an unpopulated relationship at depth:0
                 .filter((tid): tid is string => Boolean(tid) && tid !== '0')
             if (tenantIds.length > 0) {
                 const tenantResults = await Promise.all(
@@ -102,9 +103,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Mirror onboarding page redirect logic (BR-02, AC-5):
-        // has_seen_ai_wizard=true means user already completed wizard → dashboard
-        // Only check onboardingCompleted when wizard hasn't been seen yet
+        // SSO only handles tenant-owner users; staff go through direct Payload login.
+        // has_seen_ai_wizard gate takes precedence over onboardingCompleted.
         const roles: string[] = (user.roles as string[]) || []
         const tenants = user.tenants as { tenant: { onboardingCompleted?: boolean } | string }[] | undefined
         const hasSeenAiWizard = user.has_seen_ai_wizard as boolean | undefined
@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
                 redirectTo = '/onboarding'
             } else {
                 const firstTenant = tenants[0]?.tenant
+                // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
                 if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
                     redirectTo = '/onboarding'
                 }

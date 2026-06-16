@@ -20,6 +20,6 @@
 | **TC-SSOPW2-08** | API | Non-owner role → dashboard | User role=editor or viewer | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | Medium |
 | **TC-SSOPW2-09** | API | Onboarding complete → dashboard | Tenant onboardingCompleted=true, has_seen_ai_wizard=false | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | Medium |
 | **TC-SSOPW2-10** | API | Session cookie set on success | — | POST with valid token | Response sets `payload-token` cookie: httpOnly=true, sameSite=lax, path=/ | High |
-| **TC-SSOPW2-11** | E2E | Full SSO flow — happy path (dashboard) | SSO user with completed onboarding | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/dashboard`, no `/verify-otp` bounce | High |
-| **TC-SSOPW2-12** | E2E | Full SSO flow — new user (onboarding) | SSO user, tenant onboardingCompleted=false, wizard not seen | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/onboarding` | High |
+| **TC-SSOPW2-11** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — happy path (dashboard) | SSO user with completed onboarding | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/dashboard`, no `/verify-otp` bounce | High |
+| **TC-SSOPW2-12** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — new user (onboarding) | SSO user, tenant onboardingCompleted=false, wizard not seen | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/onboarding` | High |
 | **TC-SSOPW2-13** | Security | Client redirect guard | Server returns malicious redirectTo | SsoAuthorizationClient receives `redirectTo: '//evil.com'` | Falls back to `/dashboard` — no external redirect | High |

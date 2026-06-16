@@ -130,6 +130,15 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             expect(mockPayload.auth).not.toHaveBeenCalled()
         })
 
+        it('TC-SSOPW2-02c: returns 401 when decodeJwt throws (malformed non-JWT string)', async () => {
+            // String passes length check but is not a parseable JWT (no base64 header)
+            vi.mocked(decodeJwt).mockImplementationOnce(() => { throw new Error('invalid JWT') })
+            const res = await POST(makeReq({ v2_token: 'notjwt-but-short-enough' }) as any) as any
+            expect(res.status).toBe(401)
+            expect(res.data.error).toBe('invalid_token')
+            expect(mockPayload.auth).not.toHaveBeenCalled()
+        })
+
     })
 
     // ── Rate limiting ─────────────────────────────────────────────────────────
@@ -208,7 +217,7 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
         })
 
-        it('TC-SSOPW2-08: non-owner role (editor) → /dashboard', async () => {
+        it('TC-SSOPW2-08: non-owner role (editor) → /dashboard (SSO only handles tenant-owners)', async () => {
             mockPayload.findByID.mockResolvedValue({ ...BASE_USER, roles: ['editor'] })
             const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
             expect(res.data).toEqual({ ok: true, redirectTo: '/dashboard' })
