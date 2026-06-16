@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F36 EasyParcel Delivery — Interactive UI Demo (Hi-fi)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0B1120;--surface:#161E2E;--surface2:#1a2436;--primary:#3B82F6;--teal:#2DD4BF;--text:#FFFFFF;--muted:#9CA3AF;--border:#1F2937;--border2:#374151;--error:#EF4444;--success:#10B981;--warning:#F59E0B;--info:#3B82F6;--gradient:linear-gradient(135deg,#3B82F6,#2DD4BF);--radius:8px;--radius-lg:12px;--sidebar-w:240px;--header-h:64px;--font:'Inter',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* === CMS CHROME === */
+.cms{display:flex;flex-direction:column;min-height:100vh}
+.header{height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.search{width:280px;max-width:32vw;height:38px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px}
+.header-right{display:flex;align-items:center;gap:16px}
+.avatar-img{width:36px;height:36px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff}
+.body-wrap{display:flex;flex:1}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+.nav-label{font-size:11px;text-transform:uppercase;color:var(--muted);padding:14px 12px 6px;letter-spacing:.5px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius);font-size:14px;color:var(--muted);cursor:pointer;transition:all .15s}
+.nav-item:hover{background:var(--border);color:var(--text)}
+.nav-item.active{background:rgba(59,130,246,.12);color:var(--primary)}
+.nav-item .icon{width:20px;text-align:center}
+.nav-sub{padding-left:30px;font-size:13px}
+.main{flex:1;padding:28px 32px;max-width:100%;overflow-x:hidden}
+.main-inner{max-width:760px;margin:0 auto}
+
+/* === DEMO SWITCHER === */
+.demo-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px;padding:12px 16px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg)}
+.demo-bar-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.screen-tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--border);border-radius:8px;padding:3px}
+.screen-btn{padding:7px 13px;border:none;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font);background:transparent;color:var(--muted)}
+.screen-btn.active{background:var(--primary);color:#fff}
+.screen{display:none}
+.screen.active{display:block;animation:fade .25s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* === PAGE === */
+.crumb{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:2px}
+.page-desc{font-size:13.5px;color:var(--muted);margin-bottom:20px}
+
+/* === TABS (Flat / EasyParcel) === */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border2);margin-bottom:22px}
+.tab{padding:11px 20px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:var(--font);display:flex;align-items:center;gap:7px}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+
+/* === CARD === */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.card-title{font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card-sub{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5}
+.section-label{font-size:13px;font-weight:700;margin:20px 0 10px;display:flex;align-items:center;gap:7px}
+
+/* === FORM === */
+.field{margin-bottom:14px}
+.label{display:block;font-size:12.5px;color:var(--muted);font-weight:500;margin-bottom:6px}
+.form-input{width:100%;height:40px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);padding:0 12px;font-size:14px;color:var(--text);font-family:var(--font);transition:border-color .2s}
+.form-input:focus{outline:none;border-color:var(--primary)}
+.input-pw{position:relative}
+.input-pw .reveal{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px}
+.row{display:flex;gap:12px}
+.row .field{flex:1}
+.row-3{display:flex;gap:10px}
+.dim{width:64px}
+.radio-line{display:flex;gap:20px;align-items:center}
+.radio{display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer}
+.radio input{accent-color:var(--primary);width:16px;height:16px}
+
+/* === SWITCH === */
+.switch-row{display:flex;align-items:center;justify-content:space-between}
+.switch{position:relative;width:42px;height:24px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--border2);border-radius:24px;transition:.2s;cursor:pointer}
+.slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--primary)}
+.switch input:checked+.slider::before{transform:translateX(18px)}
+
+/* === BUTTONS === */
+.btn{height:40px;padding:0 18px;border-radius:var(--radius);font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--font);border:1px solid transparent;display:inline-flex;align-items:center;gap:8px;justify-content:center;transition:all .15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#2f6fe0}
+.btn-outline{background:transparent;border-color:var(--border2);color:var(--text)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-ghost{background:var(--surface2);color:var(--muted)}
+.btn-block{width:100%}
+.btn-sm{height:32px;padding:0 12px;font-size:12.5px}
+.card-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+
+/* === ALERT === */
+.alert{border-radius:var(--radius);padding:12px 14px;font-size:13px;line-height:1.5;display:flex;gap:10px;margin-bottom:16px;border:1px solid}
+.alert .ai{flex-shrink:0}
+.alert-success{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.35);color:#6ee7b7}
+.alert-warn{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.35);color:#fcd34d}
+.alert-error{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35);color:#fca5a5}
+.alert-info{background:rgba(59,130,246,.07);border-color:rgba(59,130,246,.3);color:#93c5fd}
+.alert a{color:inherit;font-weight:600;text-decoration:underline}
+
+/* === COURIER LIST === */
+.courier-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.courier-row:hover{border-color:var(--primary)}
+.courier-row.sel{border-color:var(--primary);background:rgba(59,130,246,.06)}
+.courier-row input{accent-color:var(--primary);width:16px;height:16px}
+.courier-logo{width:34px;height:34px;border-radius:7px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.courier-name{font-size:13.5px;font-weight:600;flex:1}
+.courier-eta{font-size:12px;color:var(--muted)}
+.courier-price{font-size:14px;font-weight:700}
+
+/* === BADGE === */
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.badge-green{background:rgba(16,185,129,.15);color:#6ee7b7}
+.badge-blue{background:rgba(59,130,246,.15);color:#93c5fd}
+.badge-amber{background:rgba(245,158,11,.15);color:#fcd34d}
+.badge-cheap{background:rgba(45,212,191,.15);color:#5eead4}
+
+/* === STOREFRONT (light, buyer-facing) === */
+.storefront{background:#F8FAFC;border-radius:var(--radius-lg);padding:26px;color:#0f172a}
+.sf-badge{font-size:11px;color:#64748b;margin-bottom:12px;display:flex;align-items:center;gap:6px;font-weight:600}
+.sf-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px}
+.sf-panel{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:20px}
+.sf-h{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.sf-input{width:100%;height:38px;border:1px solid #CBD5E1;border-radius:8px;padding:0 12px;font-size:13.5px;color:#0f172a;font-family:var(--font);margin-bottom:12px;background:#fff}
+.sf-courier{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid #E2E8F0;border-radius:9px;margin-bottom:8px;cursor:pointer}
+.sf-courier.sel{border-color:#3B82F6;background:#EFF6FF}
+.sf-courier input{accent-color:#3B82F6;width:16px;height:16px}
+.sf-courier .nm{font-size:13.5px;font-weight:600;flex:1}
+.sf-courier .eta{font-size:12px;color:#64748b}
+.sf-courier .pr{font-size:14px;font-weight:700}
+.sf-logo{width:32px;height:32px;border-radius:7px;background:#F1F5F9;display:flex;align-items:center;justify-content:center;font-size:14px}
+.sf-summary div{display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;color:#334155}
+.sf-summary .tot{font-size:16px;font-weight:700;color:#0f172a;border-top:1px solid #E2E8F0;margin-top:6px;padding-top:10px}
+.sf-place{width:100%;height:44px;background:#3B82F6;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;margin-top:12px;font-family:var(--font)}
+.sf-hint{font-size:11.5px;color:#64748b;margin-top:10px;display:flex;align-items:center;gap:6px}
+.sf-free{color:#059669;font-weight:700}
+
+/* === TRACKING TIMELINE === */
+.track-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.track-row{font-size:13.5px;padding:7px 0;display:flex;justify-content:space-between;color:#334155}
+.track-row .k{color:#64748b}
+.copy-btn{background:#F1F5F9;border:1px solid #E2E8F0;border-radius:6px;padding:4px 8px;font-size:11.5px;cursor:pointer;color:#334155}
+.timeline{margin-top:16px;border-left:2px solid #E2E8F0;padding-left:18px}
+.tl-step{position:relative;padding-bottom:18px}
+.tl-step::before{content:'';position:absolute;left:-25px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #CBD5E1}
+.tl-step.done::before{background:#10B981;border-color:#10B981}
+.tl-step.now::before{background:#3B82F6;border-color:#3B82F6;box-shadow:0 0 0 4px rgba(59,130,246,.15)}
+.tl-title{font-size:13.5px;font-weight:600;color:#0f172a}
+.tl-step.pending .tl-title{color:#94a3b8;font-weight:500}
+.tl-time{font-size:12px;color:#64748b}
+
+/* === MODAL === */
+.modal-frame{background:rgba(2,6,23,.55);border-radius:var(--radius-lg);padding:40px 20px;display:flex;justify-content:center}
+.modal{width:100%;max-width:460px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);overflow:hidden}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.modal-x{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.modal-body{padding:20px}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border)}
+.wallet-box{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:var(--radius);padding:12px 14px;font-size:13px;margin:8px 0 4px}
+.awb{font-family:ui-monospace,monospace;font-size:15px;font-weight:700;letter-spacing:.5px}
+
+.note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.divider{height:1px;background:var(--border);margin:18px 0}
+.modal-switch{display:flex;gap:6px;margin-bottom:16px}
+.modal-switch button{flex:1;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11.5px;font-weight:600;cursor:pointer;font-family:var(--font)}
+.modal-switch button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+@media(max-width:860px){
+  .sidebar{display:none}
+  .sf-grid{grid-template-columns:1fr}
+  .search{display:none}
+}
+</style>
+</head>
+<body>
+<div class="cms">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">ECH Prime</span>
+      <div class="search">🔍 Search...</div>
+    </div>
+    <div class="header-right">
+      <span style="font-size:19px;cursor:pointer">🔔</span>
+      <div class="avatar-img">SA</div>
+    </div>
+  </header>
+
+  <div class="body-wrap">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <span class="nav-label">Main</span>
+      <div class="nav-item"><span class="icon">🏠</span> Dashboard</div>
+      <div class="nav-item"><span class="icon">📦</span> Products</div>
+      <div class="nav-item"><span class="icon">🛒</span> Orders</div>
+      <span class="nav-label">Store</span>
+      <div class="nav-item"><span class="icon">⚙️</span> Settings</div>
+      <div class="nav-item nav-sub">Payments</div>
+      <div class="nav-item nav-sub active">Shipping</div>
+      <div class="nav-item nav-sub">Staff</div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="main-inner">
+        <!-- SCREEN SWITCHER -->
+        <div class="demo-bar">
+          <span class="demo-bar-label">F36 Hi-fi · Screen</span>
+          <div class="screen-tabs">
+            <button class="screen-btn active" data-s="A">A · Settings</button>
+            <button class="screen-btn" data-s="B">B · Checkout</button>
+            <button class="screen-btn" data-s="C">C · Create Label</button>
+            <button class="screen-btn" data-s="D">D · Tracking</button>
+            <button class="screen-btn" data-s="E">E · Returns</button>
+          </div>
+        </div>
+
+        <!-- ============ SCREEN A — SETTINGS ============ -->
+        <section class="screen active" id="screen-A">
+          <div class="crumb">Store Settings › Shipping</div>
+          <div class="page-title">Shipping</div>
+          <div class="page-desc">Cấu hình cước phí giao hàng cho cửa hàng của bạn.</div>
+
+          <div class="tabs">
+            <button class="tab">🏷️ Flat Rate</button>
+            <button class="tab active">🚚 EasyParcel <span class="dot"></span></button>
+          </div>
+
+          <!-- Connect card -->
+          <div class="card">
+            <div class="switch-row">
+              <div class="card-title">🔌 Connect EasyParcel</div>
+              <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+            </div>
+            <div class="card-sub">Mỗi cửa hàng dùng tài khoản EasyParcel riêng. Cước trừ thẳng ví của bạn — platform không giữ tiền, không phụ phí.</div>
+
+            <div class="field">
+              <span class="label">Environment</span>
+              <div class="radio-line">
+                <label class="radio"><input type="radio" name="env"> Demo</label>
+                <label class="radio"><input type="radio" name="env" checked> Production</label>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <span class="label">API Key (api)</span>
+                <div class="input-pw"><input class="form-input" type="password" value="EP-aXk29Lm04Qz" id="k1"><button class="reveal" onclick="tog('k1')">👁</button></div>
+              </div>
+              <div class="field">
+                <span class="label">Auth Key (authentication)</span>
+                <div class="input-pw"><input class="form-input" type="password" value="auth-7f3b9c1d2e" id="k2"><button class="reveal" onclick="tog('k2')">👁</button></div>
+              </div>
+            </div>
+
+            <div class="section-label">🏭 Warehouse (origin)</div>
+            <div class="field"><span class="label">Address line 1</span><input class="form-input" value="No. 12, Jalan Teknologi 3/5"></div>
+            <div class="row-3">
+              <div class="field" style="flex:1.4"><span class="label">City</span><input class="form-input" value="Petaling Jaya"></div>
+              <div class="field"><span class="label">Postcode</span><input class="form-input" value="47810" inputmode="numeric" maxlength="5"></div>
+              <div class="field" style="flex:1.2"><span class="label">State</span>
+                <select class="form-input"><option>Selangor</option><option>Kuala Lumpur</option><option>Johor</option></select>
+              </div>
+            </div>
+
+            <button class="btn btn-outline" onclick="connectOk()" id="testBtn">🔍 Test connection</button>
+          </div>
+
+          <!-- Connected (revealed after test) -->
+          <div class="card" id="connectedCard" style="display:none">
+            <div class="alert alert-success"><span class="ai">✅</span><div><b>Connected</b> — 6 couriers khả dụng. Cấu hình bên dưới.</div></div>
+
+            <div class="section-label">🚚 Couriers <span class="note" style="margin:0">(bật cái muốn hiện ở checkout)</span></div>
+            <label class="courier-row sel"><input type="checkbox" checked><div class="courier-logo">📮</div><span class="courier-name">Pos Laju</span><span class="courier-eta">from</span><span class="courier-price">RM 5.40</span></label>
+            <label class="courier-row sel"><input type="checkbox" checked><div class="courier-logo">🟥</div><span class="courier-name">J&T Express</span><span class="courier-eta">from</span><span class="courier-price">RM 5.42</span></label>
+            <label class="courier-row sel"><input type="checkbox" checked><div class="courier-logo">🟪</div><span class="courier-name">Ninja Van</span><span class="courier-eta">from</span><span class="courier-price">RM 6.00</span></label>
+            <label class="courier-row"><input type="checkbox"><div class="courier-logo">🟨</div><span class="courier-name">DHL eCommerce</span><span class="courier-eta">from</span><span class="courier-price">RM 6.50</span></label>
+            <label class="courier-row"><input type="checkbox"><div class="courier-logo">⚡</div><span class="courier-name">Flash Express</span><span class="courier-eta">from</span><span class="courier-price">RM 5.30</span></label>
+            <label class="courier-row sel"><input type="checkbox" checked><div class="courier-logo">🟩</div><span class="courier-name">City-Link</span><span class="courier-eta">from</span><span class="courier-price">RM 6.20</span></label>
+
+            <div class="section-label">📦 Default parcel <span class="note" style="margin:0">(fallback khi sản phẩm thiếu số đo)</span></div>
+            <div class="row-3">
+              <div class="field"><span class="label">Weight (g)</span><input class="form-input dim" style="width:80px" value="1000"></div>
+              <div class="field"><span class="label">L (cm)</span><input class="form-input dim" value="20"></div>
+              <div class="field"><span class="label">W (cm)</span><input class="form-input dim" value="15"></div>
+              <div class="field"><span class="label">H (cm)</span><input class="form-input dim" value="10"></div>
+            </div>
+
+            <div class="section-label">🏷️ Tạo vận đơn</div>
+            <div class="radio-line" style="flex-direction:column;align-items:flex-start;gap:10px">
+              <label class="radio"><input type="radio" name="lbl" checked> Manual — tôi bấm tạo (mặc định)</label>
+              <label class="radio"><input type="radio" name="lbl"> Auto — tự tạo khi đơn đã thanh toán</label>
+            </div>
+
+            <div class="alert alert-warn" style="margin-top:16px"><span class="ai">⚠️</span><div>Số dư ví EasyParcel: <b>RM 48.00</b>. <a href="#">Nạp ví ↗</a></div></div>
+
+            <div class="card-foot">
+              <button class="btn btn-ghost">Cancel</button>
+              <button class="btn btn-primary">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ SCREEN B — CHECKOUT ============ -->
+        <section class="screen" id="screen-B">
+          <div class="page-title">Checkout — Multi-courier Rate</div>
+          <div class="page-desc">Buyer-facing storefront (light theme). EasyParcel ON → buyer chọn courier giá thật.</div>
+
+          <div class="storefront">
+            <div class="sf-badge">🛍️ Storefront · /sites/acme/checkout</div>
+            <div class="sf-grid">
+              <div class="sf-panel">
+                <div class="sf-h">📍 Shipping Address</div>
+                <input class="sf-input" placeholder="Full name" value="Ahmad bin Ali">
+                <input class="sf-input" placeholder="Address" value="22, Jalan Bukit, Shah Alam">
+                <select class="sf-input"><option>Selangor</option><option>Kuala Lumpur</option></select>
+
+                <div class="sf-h" style="margin-top:18px">🚚 Chọn đơn vị vận chuyển</div>
+                <label class="sf-courier sel"><input type="radio" name="sfc" checked><div class="sf-logo">🟥</div><div class="nm">J&T Express<div class="eta">2–3 ngày</div></div><span class="pr">RM 5.42</span></label>
+                <label class="sf-courier"><input type="radio" name="sfc"><div class="sf-logo">📮</div><div class="nm">Pos Laju <span class="badge badge-cheap">⚡ rẻ nhì</span><div class="eta">1–2 ngày</div></div><span class="pr">RM 6.00</span></label>
+                <label class="sf-courier"><input type="radio" name="sfc"><div class="sf-logo">🟪</div><div class="nm">Ninja Van<div class="eta">2–4 ngày</div></div><span class="pr">RM 6.50</span></label>
+              </div>
+
+              <div class="sf-panel">
+                <div class="sf-h">🛒 Order Summary</div>
+                <div class="sf-summary">
+                  <div><span>Áo Khoác Bò ×1</span><span>RM 50.00</span></div>
+                  <div><span>Subtotal</span><span>RM 50.00</span></div>
+                  <div><span>Shipping (J&T)</span><span>RM 5.42</span></div>
+                  <div><span>SST (6%)</span><span>RM 3.00</span></div>
+                  <div class="tot"><span>Total</span><span>RM 58.42</span></div>
+                </div>
+                <button class="sf-place">Place Order</button>
+                <div class="sf-hint">🔒 Cước EasyParcel raw, không phụ phí</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-info" style="margin-top:18px"><span class="ai">💡</span><div><b>Hybrid fallback:</b> nếu EasyParcel OFF / lỗi / timeout → checkout hiển thị 1 fee flat West/East như F14 (UI cũ không vỡ, không chặn đặt hàng).</div></div>
+        </section>
+
+        <!-- ============ SCREEN C — CREATE LABEL ============ -->
+        <section class="screen" id="screen-C">
+          <div class="page-title">Create Label — ShipOrderModal</div>
+          <div class="page-desc">Order đã paid → merchant 1-click tạo vận đơn (2 bước: submit → pay).</div>
+
+          <div class="modal-frame">
+            <!-- form state -->
+            <div class="modal" id="labelForm">
+              <div class="modal-head"><div class="modal-title">🚚 Tạo vận đơn — Đơn #PRM-1042</div><button class="modal-x">×</button></div>
+              <div class="modal-body">
+                <div class="modal-switch">
+                  <button class="active">EasyParcel</button>
+                  <button>Nhập tracking thủ công</button>
+                </div>
+                <div class="field"><span class="label">Đơn vị vận chuyển</span>
+                  <select class="form-input"><option>J&T Express (buyer đã chọn)</option><option>Pos Laju</option><option>Ninja Van</option></select>
+                </div>
+                <div class="row-3">
+                  <div class="field"><span class="label">Cân nặng (g)</span><input class="form-input" style="width:90px" value="1200"></div>
+                  <div class="field"><span class="label">L</span><input class="form-input dim" value="20"></div>
+                  <div class="field"><span class="label">W</span><input class="form-input dim" value="15"></div>
+                  <div class="field"><span class="label">H</span><input class="form-input dim" value="10"></div>
+                </div>
+                <div class="field"><span class="label">Pickup</span>
+                  <div class="radio-line"><label class="radio"><input type="radio" name="pk" checked> Đặt lấy hàng</label><label class="radio"><input type="radio" name="pk"> Tự gửi (dropoff)</label></div>
+                </div>
+                <div class="field"><span class="label">Ngày lấy hàng</span><input class="form-input" type="date" value="2026-06-17"></div>
+                <div class="wallet-box"><span>💰 Cước dự kiến: <b>RM 5.42</b> — trừ ví EasyParcel</span><span style="color:var(--muted)">Ví: RM 48.00</span></div>
+              </div>
+              <div class="modal-foot">
+                <button class="btn btn-ghost">Hủy</button>
+                <button class="btn btn-primary" onclick="labelDone()">🏷️ Tạo & trừ ví</button>
+              </div>
+            </div>
+
+            <!-- success state -->
+            <div class="modal" id="labelSuccess" style="display:none">
+              <div class="modal-head"><div class="modal-title">✅ Đã tạo vận đơn — Đơn #PRM-1042</div><button class="modal-x" onclick="labelReset()">×</button></div>
+              <div class="modal-body">
+                <div class="wallet-box"><span>AWB</span><span class="awb">631234567890 <button class="copy-btn" style="margin-left:6px">📋 Copy</button></span></div>
+                <div class="track-row"><span class="k" style="color:var(--muted)">Courier</span><span>J&T Express</span></div>
+                <div class="track-row"><span class="k" style="color:var(--muted)">Trạng thái</span><span class="badge badge-blue">Ready to ship</span></div>
+                <div class="divider"></div>
+                <div style="display:flex;gap:10px"><button class="btn btn-outline btn-block">🖨️ In nhãn (PDF)</button><button class="btn btn-outline btn-block">📅 Lịch pickup</button></div>
+                <div class="alert alert-success" style="margin:16px 0 0"><span class="ai">💡</span><div>Đã trừ RM 5.42. Số dư ví: <b>RM 42.58</b>.</div></div>
+              </div>
+              <div class="modal-foot"><button class="btn btn-primary" onclick="labelReset()">Xong</button></div>
+            </div>
+          </div>
+
+          <div class="alert alert-error" style="margin-top:18px"><span class="ai">⚠️</span><div><b>Ví hết tiền / API fail</b> → <code>EASYPARCEL_WALLET_LOW</code>: "Ví không đủ cước (cần RM 5.42, còn RM 2.10). Nạp ví rồi thử lại — <b>đơn chưa thay đổi</b>." · Idempotent: đã có AWB → khoá nút (chống double-charge ở bước <b>pay</b>).</div></div>
+        </section>
+
+        <!-- ============ SCREEN D — TRACKING ============ -->
+        <section class="screen" id="screen-D">
+          <div class="page-title">Buyer Order Tracking</div>
+          <div class="page-desc">Storefront /sites/acme/orders/PRM-1042 — cập nhật qua cron poll 30–60′.</div>
+
+          <div class="storefront" style="max-width:520px">
+            <div class="track-head">
+              <div style="font-size:16px;font-weight:700;color:#0f172a">Đơn #PRM-1042</div>
+              <span class="badge badge-blue">Shipped</span>
+            </div>
+            <div class="sf-h">🚚 Vận chuyển</div>
+            <div class="track-row"><span class="k">Đơn vị</span><span>J&T Express</span></div>
+            <div class="track-row"><span class="k">Mã vận đơn</span><span class="awb" style="font-size:13.5px">631234567890 <button class="copy-btn">📋</button></span></div>
+            <button class="copy-btn" style="margin:8px 0;padding:7px 12px">🔗 Theo dõi trên J&T ↗</button>
+
+            <div class="timeline">
+              <div class="tl-step done"><div class="tl-title">Đã lấy hàng</div><div class="tl-time">16/06 · 10:20</div></div>
+              <div class="tl-step now"><div class="tl-title">Đang trung chuyển</div><div class="tl-time">16/06 · 18:40 · mới nhất</div></div>
+              <div class="tl-step pending"><div class="tl-title">Đang giao</div></div>
+              <div class="tl-step pending"><div class="tl-title">Đã giao</div></div>
+            </div>
+            <div class="sf-hint" style="margin-top:14px">⏱️ Cập nhật mỗi 30–60 phút (polling, không realtime)</div>
+          </div>
+        </section>
+
+        <!-- ============ SCREEN E — RETURNS ============ -->
+        <section class="screen" id="screen-E">
+          <div class="page-title">Returns — Xử lý trả hàng</div>
+          <div class="page-desc">Merchant duyệt return → chọn nhánh; cancel refund phân tier theo trạng thái label.</div>
+
+          <div class="modal-frame">
+            <div class="modal">
+              <div class="modal-head"><div class="modal-title">↩️ Xử lý trả hàng — Đơn #PRM-1042</div><button class="modal-x">×</button></div>
+              <div class="modal-body">
+                <span class="label" style="margin-bottom:10px">Chọn cách trả hàng:</span>
+                <label class="courier-row sel" style="align-items:flex-start"><input type="radio" name="ret" checked style="margin-top:2px"><div><div class="courier-name">Tạo nhãn trả hàng (reverse)</div><div class="note" style="margin-top:3px">EasyParcel tạo đơn mới đảo origin↔dest: kho bạn = nơi nhận.</div></div></label>
+                <label class="courier-row" style="align-items:flex-start"><input type="radio" name="ret" style="margin-top:2px"><div><div class="courier-name">Buyer tự gửi</div><div class="note" style="margin-top:3px">Bạn xác nhận khi nhận được hàng → refund + restock (tái dùng F10).</div></div></label>
+                <div class="wallet-box" style="margin-top:14px"><span>💰 Cước trả ~<b>RM 5.42</b> — trừ ví bạn</span></div>
+              </div>
+              <div class="modal-foot"><button class="btn btn-ghost">Hủy</button><button class="btn btn-primary">Tạo nhãn trả & trừ ví</button></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:18px">
+            <div class="card-title" style="font-size:14px;margin-bottom:14px">↺ Cancel refund — phân tier theo trạng thái label</div>
+            <div class="alert alert-success"><span class="ai">①</span><div><b>Chưa mua label</b> → Refund FULL (hàng + ship) + nhập kho lại ngay.</div></div>
+            <div class="alert alert-warn"><span class="ai">②</span><div><b>Đã mua, chưa pickup</b> → Refund tiền hàng. Cước: hủy đơn trên dashboard EasyParcel để hoàn ví. <a href="#">Đi tới EasyParcel ↗</a></div></div>
+            <div class="alert alert-error" style="margin-bottom:0"><span class="ai">③</span><div><b>Đã pickup</b> → Refund tiền hàng. ⚠️ Cước đã mất (ghi rõ cho merchant).</div></div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// screen switcher
+document.querySelectorAll('.screen-btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.screen-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.getElementById('screen-'+b.dataset.s).classList.add('active');
+});
+// reveal password
+function tog(id){const e=document.getElementById(id);e.type=e.type==='password'?'text':'password';}
+// Screen A: test connection -> reveal connected card
+function connectOk(){
+  const btn=document.getElementById('testBtn');
+  btn.textContent='⏳ Đang kiểm tra...';btn.disabled=true;
+  setTimeout(()=>{document.getElementById('connectedCard').style.display='block';btn.textContent='🔍 Test connection';btn.disabled=false;btn.scrollIntoView({behavior:'smooth',block:'center'});},700);
+}
+// Screen C: create label -> success
+function labelDone(){document.getElementById('labelForm').style.display='none';document.getElementById('labelSuccess').style.display='block';}
+function labelReset(){document.getElementById('labelSuccess').style.display='none';document.getElementById('labelForm').style.display='block';}
+// courier row toggle highlight (checkout)
+document.querySelectorAll('.sf-courier input,.courier-row input[type=radio]').forEach(r=>r.addEventListener('change',function(){
+  const grp=this.name;document.querySelectorAll('input[name="'+grp+'"]').forEach(i=>i.closest('.sf-courier,.courier-row')?.classList.remove('sel'));
+  this.closest('.sf-courier,.courier-row')?.classList.add('sel');
+}));
+</script>
+</body>
+</html>
