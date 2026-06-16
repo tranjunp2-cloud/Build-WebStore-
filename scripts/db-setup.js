@@ -2588,6 +2588,24 @@ const MIGRATIONS = [
     sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata jsonb;`,
   },
 
+  // ── BUG-F16: dedupe_key + partial unique index to stop duplicate notification
+  //    rows (same order firing ORDER_NEW from multiple paths / concurrent retries)
+  //    that inflate the unread badge. Key is stable per logical event
+  //    (e.g. "ORDER_NEW:ORD-123"); the unique index is the source of truth that
+  //    closes the read-then-write race in notifyTenantOwners(). Partial (WHERE NOT
+  //    NULL) so legacy rows (dedupe_key NULL) and non-deduped notifications are
+  //    unconstrained — index creation never conflicts with existing data. ──
+  {
+    name: 'notifications.dedupe_key',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupe_key varchar;`,
+  },
+  {
+    name: 'notifications.dedupe_key_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS notifications_tenant_user_dedupe_key_idx
+      ON notifications (tenant_id, user_id, dedupe_key)
+      WHERE dedupe_key IS NOT NULL;`,
+  },
+
   // ── Industry blocks (Plan 260417-0837 Phase 1.1) ────────────────────────────
   // 6 blocks registered in Pages.ts — composer builds them but they were
   // getting silently dropped by Payload because no schema existed.

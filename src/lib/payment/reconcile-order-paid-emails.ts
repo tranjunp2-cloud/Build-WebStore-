@@ -137,6 +137,7 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
             message: `Order placed by ${order.customerName}`,
             actionUrl: '/orders',
             metadata: { orderNumber: order.orderNumber, currency: order.currency || 'MYR', total: (order.total ?? 0).toFixed(2), customerName: order.customerName },
+            dedupeKey: `ORDER_NEW:${order.orderNumber}`,
         }))
         .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
 }

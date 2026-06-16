@@ -49,6 +49,10 @@ describe('[TC-F16.14] ORDER_NEW trigger — Orders.afterChange', () => {
             message: 'Order placed by Alice',
             actionUrl: '/orders',
             metadata: { orderNumber: 'ORD-001', currency: 'MYR', total: '150.00', customerName: 'Alice' },
+            // Idempotency: same order also fires ORDER_NEW from payment reconcile —
+            // a stable dedupeKey + partial unique index prevents a duplicate row
+            // that would inflate the unread badge (TC-F16.29).
+            dedupeKey: 'ORDER_NEW:ORD-001',
         })
     })
 
