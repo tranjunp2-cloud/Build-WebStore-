@@ -4,6 +4,7 @@ import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem } from '@/app/api/orders/lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) {
     const now = new Date().toISOString()
@@ -68,8 +69,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             const siteSlug = (tenantObj as any)?.slug ?? ''
             const shopName = (tenantObj as any)?.name ?? siteSlug
             const siteLocale = (siteObj as any)?.locale ?? 'ms'
-            const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
-            const reorderUrl = siteSlug ? `${baseUrl}/sites/${siteSlug}/products` : `${baseUrl}/`
+            const reorderUrl = siteSlug ? buildStorefrontUrl(siteSlug, '/products') : `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/`
 
             const cancellationDate = new Date().toISOString()
             const elapsedMs = order.createdAt ? Date.now() - new Date(order.createdAt).getTime() : null

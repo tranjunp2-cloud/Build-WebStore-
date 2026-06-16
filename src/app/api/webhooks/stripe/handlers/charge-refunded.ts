@@ -6,6 +6,7 @@ import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { restockItem } from '../../../orders/lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -128,7 +129,7 @@ export async function handleChargeRefunded(
         paymentMethod: order.paymentMethod ?? 'stripe',
         orderDate: order.createdAt,
         refundDate: new Date().toISOString(),
-        shopUrl: `${baseUrl}/sites/${siteSlug}`,
+        shopUrl: buildStorefrontUrl(siteSlug),
         currency: order.currency ?? 'MYR',
         locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
     }, cmsConfig ?? undefined)

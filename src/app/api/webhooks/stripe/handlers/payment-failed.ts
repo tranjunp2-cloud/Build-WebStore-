@@ -3,6 +3,7 @@ import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 import { signOrderToken } from '@/lib/auth/order-token'
 import { paymentRetryEmail } from '@/lib/email/templates/payment-retry'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /** Minimal shape of an order document used in payment-failed handler (depth:0 lookup). */
 interface OrderDoc {
@@ -132,10 +133,9 @@ async function sendPaymentRetryEmail(
     const tenantObj = typeof full.tenant === 'object' ? full.tenant : null
     const siteSlug = (tenantObj as any)?.slug ?? ''
 
-    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
     const expSec = Math.floor((Date.now() + 24 * 60 * 60 * 1000) / 1000)
 
-    let payUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+    let payUrl = buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`)
 
     if (full.magicLinkSecret) {
         const token = await signOrderToken({

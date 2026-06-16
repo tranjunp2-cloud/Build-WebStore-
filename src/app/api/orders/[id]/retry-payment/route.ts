@@ -19,6 +19,7 @@ import { retryXenditPayment } from './retry-payment-xendit'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { computeOrderTotal } from '@/lib/orders/order-total'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 // Stripe failure paymentStatus is 'failed' (payment_intent.payment_failed webhook) or
 // 'payment_failed' (24h auto-cancel cron) — accept both so either path can be retried.
@@ -244,9 +245,9 @@ export async function POST(
                 items: allCheckoutItems,
                 currency: order.currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: order.customerEmail,
-                successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
+                successUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`),
                 // Cancel/back at Stripe → confirm page "payment not completed" (consistent with place-order)
-                cancelUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?cancelled=1`,
+                cancelUrl: buildStorefrontUrl(siteSlug, `/order/${order.id}/confirm?cancelled=1`),
                 stripeAccountId,
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },

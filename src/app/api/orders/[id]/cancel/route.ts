@@ -11,6 +11,7 @@ import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -170,8 +171,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 } else {
                     const shopName = (tenant as any)?.name ?? ''
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
-                    const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
-                    const shopUrl = `${baseUrl}/sites/${shopSlug}`
+                    const shopUrl = buildStorefrontUrl(shopSlug)
 
                     const cancelEmail = orderCancelledEmail({
                         shopName,

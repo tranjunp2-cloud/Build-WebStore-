@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { verifyUploadToken, generateConfirmToken } from '@/lib/orders/upload-token'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 /** Minimal shape of an order document for the resume-upload flow. */
 interface OrderDoc {
@@ -59,7 +60,7 @@ export async function GET(
         const slug = (tenant as unknown as TenantDoc | null)?.slug ?? ''
         if (!slug) return NextResponse.redirect(`${fallbackUrl}?error=not-found`)
 
-        const confirmPageUrl = `${BASE_URL}/sites/${slug}/order/${orderId}/confirm`
+        const confirmPageUrl = buildStorefrontUrl(slug, `/order/${orderId}/confirm`)
 
         // Set the HttpOnly confirm cookie so the confirm page lets the buyer in
         const confirmToken = generateConfirmToken(orderId, order.orderNumber)

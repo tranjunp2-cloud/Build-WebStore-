@@ -13,6 +13,7 @@ import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import type { User } from 'payload'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -112,7 +113,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             paymentMethod: order.paymentMethod ?? 'stripe',
             orderDate: order.createdAt,
             refundDate: new Date().toISOString(),
-            shopUrl: `${baseUrl}/sites/${siteSlug}`,
+            shopUrl: buildStorefrontUrl(siteSlug),
             currency: order.currency ?? 'MYR',
             locale: refundLocale,
         }, cmsConfig ?? undefined)
