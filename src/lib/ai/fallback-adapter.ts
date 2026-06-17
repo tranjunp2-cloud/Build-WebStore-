@@ -202,6 +202,18 @@ export function composeTemplateResult(
         bizOverride = Object.keys(mapped).length > 0 ? mapped : undefined
     }
 
+    // GH-1184: strip non-ASCII products/tagline from bizOverride when target is English.
+    // language does not propagate into composeFromBlueprint → buildHomePage → buildFeatures,
+    // so this is the earliest point where the filter can be applied.
+    if (language === 'en' && bizOverride) {
+        if (bizOverride.products?.some(p => /[^\x00-\x7F]/.test(p))) {
+            delete bizOverride.products
+        }
+        if (bizOverride.tagline && /[^\x00-\x7F]/.test(bizOverride.tagline)) {
+            delete bizOverride.tagline
+        }
+    }
+
     const templateSeed = composeFromBlueprint(preset, seed, bizOverride, disabledSet)
     if (!templateSeed) {
         console.warn(`[fallback-adapter] composeFromBlueprint returned null for ${preset.category}`)
