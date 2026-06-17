@@ -445,7 +445,7 @@ export function buildUserPrompt(
   if (!resolvedLangName) {
     langInstruction = "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
   } else if (resolvedLangName === 'English') {
-    langInstruction = "Generate ALL content in English."
+    langInstruction = "Generate ALL content in English. If any business information is in another language, translate it to English — do NOT copy non-English product names, descriptions, or user input verbatim into block fields."
   } else {
     langInstruction = `LANGUAGE REQUIREMENT — CRITICAL:
 Generate EVERY word of this website in ${resolvedLangName}. Absolutely no English words anywhere in the output.
@@ -481,7 +481,7 @@ export function buildPersonalizePrompt(
   "seoTitle": "max 60 chars, includes business name",
   "seoDescription": "max 160 chars, compelling meta description"
 }
-Write in ${langLabel}. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
+Write in ${langLabel}. If business information is in another language, translate it to ${langLabel} — do not copy the original language into output. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
     user: `Business: "${info.businessName}"
 Industry: ${info.industry}
 Products/services: ${info.products}
