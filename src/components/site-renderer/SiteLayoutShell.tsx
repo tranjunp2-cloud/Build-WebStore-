@@ -7,6 +7,17 @@ import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { OwnerProvider } from './OwnerContext'
 import type { NavPage, SiteRendererProps } from './SiteRenderer'
 
+// Mirrors NavigationBlock's VARIANT_ALIASES (navigation/index.tsx) — keep in sync when adding new aliases.
+// Maps legacy DB variant names → canonical names used in FIXED_NAV_SPACER.
+const NAV_VARIANT_ALIASES: Record<string, string> = { simple: 'default', 'mega-menu': 'mega', pill: 'floating' }
+
+// Heights for nav variants that use position:fixed (out of document flow).
+// Sticky variants (default, centered, mega) occupy flow naturally — omit them here.
+const FIXED_NAV_SPACER: Record<string, string> = {
+    transparent: '4rem',            // fixed top-0 + h-16 (4rem); rem mirrors Tailwind unit
+    floating: 'calc(1rem + 64px)',  // fixed top-4 (1rem) + min-h-[56px] (56px) + 8px buffer
+}
+
 type SiteLayoutShellProps = {
     site: SiteRendererProps['site']
     pages?: NavPage[]
@@ -131,6 +142,9 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
         }
         : null
 
+    const rawNavVariant = (rawHeader?.variant as string) ?? ''
+    const fixedNavSpacer = FIXED_NAV_SPACER[NAV_VARIANT_ALIASES[rawNavVariant] ?? rawNavVariant]
+
     const renderBlock = (block: Record<string, unknown>, blockType: string) => {
         const BlockComponent = blockRegistry.getComponent(blockType)
         if (!BlockComponent) return null
@@ -165,6 +179,7 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
             `}</style>
 
             {headerBlock && renderBlock(headerBlock, headerBlock.blockType as string || 'navigation')}
+            {fixedNavSpacer && <div style={{ height: fixedNavSpacer }} aria-hidden="true" />}
             {children}
             {footerBlock && renderBlock(footerBlock, footerBlock.blockType as string || 'footer')}
         </OwnerProvider>
