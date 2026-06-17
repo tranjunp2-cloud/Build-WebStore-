@@ -34,11 +34,15 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Build blog base path with 3-tier fallback:
-    //   1. siteBasePath  — enriched by [[...path]]/page.tsx (canonical path)
-    //   2. tenantSlug    — flat prop (legacy enrichment)
-    //   3. site.tenant.slug — populated relation (editor preview / test harness)
+    // Build blog detail base path with 4-tier fallback:
+    //   1. blogPreviewPath — set by preview/[siteId]/page.tsx (preview namespace, fix #1183)
+    //   2. siteBasePath   — enriched by [[...path]]/page.tsx (canonical path)
+    //   3. tenantSlug     — flat prop (legacy enrichment)
+    //   4. site.tenant.slug — populated relation (editor preview / test harness)
+    // Using blogPreviewPath (not siteBasePath) keeps the override scoped to blog links only,
+    // so product/other blocks in the same preview page retain their existing base paths.
     const siteRec = site as Record<string, unknown>
+    const blogPreviewPath = typeof siteRec?.blogPreviewPath === 'string' ? (siteRec.blogPreviewPath as string) : null
     const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
     const tenantSlugRaw =
         siteRec?.tenantSlug ??
@@ -46,7 +50,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
             ? (siteRec.tenant as Record<string, unknown>).slug
             : null)
     const siteBasePath = explicitBase ?? (typeof tenantSlugRaw === 'string' && tenantSlugRaw ? `/sites/${tenantSlugRaw}` : '')
-    const blogBasePath = `${siteBasePath}/blog`
+    const blogBasePath = blogPreviewPath ?? `${siteBasePath}/blog`
 
     useEffect(() => {
         const tenantId = site?.tenant
