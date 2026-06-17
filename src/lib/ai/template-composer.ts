@@ -451,15 +451,23 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
   // product-derived cards instead of canned. Keeps canned count so layout
   // variants (grid-3, grid-4) still render cleanly.
   const userProducts = biz.products ?? []
+  // Skip user-provided product names when target lang is English but products contain
+  // non-ASCII characters (e.g. Vietnamese diacritics). Prevents mixed-language output
+  // like "Ship faster with our Phần mềm quản lý..." (GH-1184).
+  const hasNonAsciiProducts = language === 'en' && userProducts.some(p => /[^\x00-\x7F]/.test(p))
   const features =
-    userProducts.length >= 2
+    userProducts.length >= 2 && !hasNonAsciiProducts
       ? featuresFromProducts(userProducts, category, canned.length)
       : canned.map(localizeFeature)
+  // Skip non-ASCII tagline when target is English — avoids VN subheadline in EN features block (GH-1184).
+  const subheadline = (language === 'en' && biz.tagline && /[^\x00-\x7F]/.test(biz.tagline))
+    ? undefined
+    : biz.tagline
   return {
     blockType: 'features',
     variant: 'grid-3',
     headline: i18n.features.headlineWhyChoose(biz.name),
-    subheadline: biz.tagline,
+    subheadline,
     features,
   }
 }
