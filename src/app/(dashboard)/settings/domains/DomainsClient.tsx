@@ -107,7 +107,7 @@ function SelectPrimaryPanel({
                                         className="flex shrink-0 items-center justify-center h-[20px] w-[20px] rounded-full border-2 transition-all"
                                         style={isSelected
                                             ? { borderColor: '#00D3D4' }
-                                            : { borderColor: 'rgba(255,255,255,0.3)', background: 'transparent' }
+                                            : { borderColor: 'var(--dash-border)', background: 'transparent' }
                                         }
                                     >
                                         {isSelected && (
@@ -527,8 +527,8 @@ export function DomainsClient({
                     <Globe className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                    <h1 className="text-[24px] font-bold text-slate-50">{t?.Domains?.title || 'Domain Management'}</h1>
-                    <p className="mt-1 text-[14px] text-slate-50/60 font-normal">{t?.Domains?.subtitle || 'Manage custom domains for your webstore'}</p>
+                    <h1 className="text-[24px] font-bold text-[var(--dash-text)]">{t?.Domains?.title || 'Domain Management'}</h1>
+                    <p className="mt-1 text-[14px] text-[var(--dash-text-muted)] font-normal">{t?.Domains?.subtitle || 'Manage custom domains for your webstore'}</p>
                 </div>
             </div>
 
@@ -577,7 +577,7 @@ export function DomainsClient({
                                     <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{currentSlug}.{PLATFORM_DOMAIN}</h3>
                                     {!hasCustomPrimary && (
                                         <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                            <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
+                                            <span className="text-[12px] font-semibold text-violet-700 dark:text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                         </div>
                                     )}
                                 </div>
@@ -835,7 +835,7 @@ export function DomainsClient({
                                         </Badge>
                                         {isPrimary && (
                                             <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                                <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
+                                                <span className="text-[12px] font-semibold text-violet-700 dark:text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                             </div>
                                         )}
                                     </div>

@@ -29,10 +29,10 @@ type Props = {
 }
 
 const INPUT_CLS =
-    'min-h-[44px] w-full rounded-[10px] border border-white/[0.12] bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-slate-50 placeholder:text-slate-50/30 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30'
+    'min-h-[44px] w-full rounded-[10px] border border-white/[0.12] bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30'
 
 const CHIP_CLS =
-    'rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[11px] text-slate-400'
+    'rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[11px] text-[var(--dash-text-muted)]'
 
 
 export function ShippingRatesCard({
@@ -62,8 +62,8 @@ export function ShippingRatesCard({
                     <Truck className="h-5 w-5 text-[#2DD4BF]" />
                 </div>
                 <div>
-                    <h3 className="text-[18px] font-semibold text-slate-50">{s.title}</h3>
-                    <p className="mt-1 text-[13px] text-slate-50/50">{s.subtitle}</p>
+                    <h3 className="text-[18px] font-semibold text-[var(--dash-text)]">{s.title}</h3>
+                    <p className="mt-1 text-[13px] text-[var(--dash-text-muted)]">{s.subtitle}</p>
                 </div>
             </div>
 
@@ -72,7 +72,7 @@ export function ShippingRatesCard({
                 {/* West Malaysia */}
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-medium text-slate-200">{s.westMalaysia}</span>
+                        <span className="text-[14px] font-medium text-[var(--dash-text)]">{s.westMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span tabIndex={0} className="cursor-default rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
@@ -83,7 +83,7 @@ export function ShippingRatesCard({
                         </Tooltip>
                     </div>
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">
                             RM
                         </span>
                         <input
@@ -113,8 +113,8 @@ export function ShippingRatesCard({
                         />
                     </div>
                     {westError && <p id="ship-rate-west-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{westError}</p>}
-                    {westWarning && !westError && <p role="status" className="mt-1 text-xs text-slate-300">{westWarning}</p>}
-                    {!westError && !westWarning && <p className="mt-1 text-xs text-slate-400">{helperText}</p>}
+                    {westWarning && !westError && <p role="status" className="mt-1 text-xs text-[var(--dash-text-muted)]">{westWarning}</p>}
+                    {!westError && !westWarning && <p className="mt-1 text-xs text-[var(--dash-text-muted)]">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">
                         {westStates.map(state => (
                             <span key={state} className={CHIP_CLS}>{state}</span>
@@ -123,7 +123,7 @@ export function ShippingRatesCard({
                             <button
                                 type="button"
                                 onClick={() => setWestExpanded(true)}
-                                className={CHIP_CLS + ' cursor-pointer text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors'}
+                                className={CHIP_CLS + ' cursor-pointer text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:border-white/20 transition-colors'}
                             >
                                 {s.moreStates.replace('{count}', String(WEST_STATES_HIDDEN))}
                             </button>
@@ -132,7 +132,7 @@ export function ShippingRatesCard({
                             <button
                                 type="button"
                                 onClick={() => setWestExpanded(false)}
-                                className={CHIP_CLS + ' cursor-pointer text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors'}
+                                className={CHIP_CLS + ' cursor-pointer text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:border-white/20 transition-colors'}
                             >
                                 {s.showLess}
                             </button>
@@ -143,7 +143,7 @@ export function ShippingRatesCard({
                 {/* East Malaysia */}
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-[14px] font-medium text-slate-200">{s.eastMalaysia}</span>
+                        <span className="text-[14px] font-medium text-[var(--dash-text)]">{s.eastMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span tabIndex={0} className="cursor-default rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
@@ -154,7 +154,7 @@ export function ShippingRatesCard({
                         </Tooltip>
                     </div>
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">
                             RM
                         </span>
                         <input
@@ -184,8 +184,8 @@ export function ShippingRatesCard({
                         />
                     </div>
                     {eastError && <p id="ship-rate-east-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{eastError}</p>}
-                    {eastWarning && !eastError && <p role="status" className="mt-1 text-xs text-slate-300">{eastWarning}</p>}
-                    {!eastError && !eastWarning && <p className="mt-1 text-xs text-slate-400">{helperText}</p>}
+                    {eastWarning && !eastError && <p role="status" className="mt-1 text-xs text-[var(--dash-text-muted)]">{eastWarning}</p>}
+                    {!eastError && !eastWarning && <p className="mt-1 text-xs text-[var(--dash-text-muted)]">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">
                         {EAST_STATES_DISPLAY.map(s => (
                             <span key={s} className={CHIP_CLS}>{s}</span>

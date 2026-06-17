@@ -36,35 +36,35 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
     return (
         <div className="mt-1 rounded-[12px] border border-white/[0.08] bg-[#0B1120]/70 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
-                <span className="text-[11px] font-semibold tracking-widest text-slate-400 uppercase">
+                <span className="text-[11px] font-semibold tracking-widest text-[var(--dash-text-muted)] uppercase">
                     {s.livePreview}
                 </span>
-                <span className="text-[11px] text-slate-500">⊙ SELANGOR · MYR 80 CART</span>
+                <span className="text-[11px] text-[var(--dash-text-muted)]">⊙ SELANGOR · MYR 80 CART</span>
             </div>
             <div className="px-4 py-3 space-y-2.5">
                 <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400">{s.liveSubtotal}</span>
-                    <span className="text-slate-200">{formatRm(SIM_CART_SEN)}</span>
+                    <span className="text-[var(--dash-text-muted)]">{s.liveSubtotal}</span>
+                    <span className="text-[var(--dash-text)]">{formatRm(SIM_CART_SEN)}</span>
                 </div>
                 <div className="flex justify-between text-[13px]">
-                    <span className="text-slate-400">{s.liveShipping}</span>
+                    <span className="text-[var(--dash-text-muted)]">{s.liveShipping}</span>
                     {isFree ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold"><PartyPopper className="w-4 h-4 shrink-0" aria-hidden /> FREE</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold"><PartyPopper className="w-4 h-4 shrink-0" aria-hidden /> FREE</span>
                     ) : (
-                        <span className="text-slate-200">{formatRm(shipSen)}</span>
+                        <span className="text-[var(--dash-text)]">{formatRm(shipSen)}</span>
                     )}
                 </div>
                 {gapSen != null && (
                     <div className="flex items-center gap-2 rounded-[8px] border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2">
-                        <Lightbulb className="w-4 h-4 shrink-0 text-emerald-300" aria-hidden />
-                        <span className="text-[13px] text-emerald-300">
+                        <Lightbulb className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                        <span className="text-[13px] text-emerald-700 dark:text-emerald-300">
                             {s.liveAddMore.replace('{amount}', formatRm(gapSen))}
                         </span>
                     </div>
                 )}
                 <div className="flex justify-between items-center pt-1.5 border-t border-white/[0.06]">
-                    <span className="text-[14px] font-bold text-slate-200">{s.liveBuyerPays}</span>
-                    <span className="text-[15px] font-bold text-slate-50">{formatRm(totalSen)}</span>
+                    <span className="text-[14px] font-bold text-[var(--dash-text)]">{s.liveBuyerPays}</span>
+                    <span className="text-[15px] font-bold text-[var(--dash-text)]">{formatRm(totalSen)}</span>
                 </div>
             </div>
         </div>

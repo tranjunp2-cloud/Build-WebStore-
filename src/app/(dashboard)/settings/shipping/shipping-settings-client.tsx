@@ -187,8 +187,8 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     return (
         <div className="w-full pb-4">
             <div className="mb-6">
-                <h1 className="text-[32px] font-black text-[#e1e2eb] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
-                <p className="mt-2 text-[14px] text-slate-400">{s.pageSubtitle}</p>
+                <h1 className="text-[32px] font-black text-[var(--dash-text)] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
+                <p className="mt-2 text-[14px] text-[var(--dash-text-muted)]">{s.pageSubtitle}</p>
             </div>
             <div className="space-y-5">
                 <ShippingRatesCard
