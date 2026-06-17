@@ -69,7 +69,7 @@ describe('getTemplateConfig [TC-F32]', () => {
 
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC: F32-U-02] cache MISS: queries DB and sets cache with 300s TTL', async () => {
+    it('[TC: F32-U-02] cache MISS: queries DB and sets cache with 60s TTL', async () => {
         // Arrange
         const tenantId = 'tenant-001'
         const type = 'otp-verification'
@@ -125,7 +125,7 @@ describe('getTemplateConfig [TC-F32]', () => {
                 ctaLabel: 'Verify',
                 closing: undefined,
             }),
-            { ex: 300 },
+            { ex: 60 },
         )
     })
 
