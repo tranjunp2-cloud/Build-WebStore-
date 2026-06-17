@@ -366,6 +366,19 @@ export async function generateSiteWithAI(
 
                 if (blockRegistry.has(blockType)) {
                     const validation = blockRegistry.validate(blockType, sanitized)
+                    const blockData = validation.success ? validation.data as Record<string, unknown> : sanitized
+
+                    // GH-1219: drop menu-food blocks with empty categories — blank section on page
+                    // !Array.isArray covers the sanitized fallback path; on Zod-success path
+                    // categories is always an array (schema uses .default([]))
+                    if (blockType === 'menu-food') {
+                        const cats = blockData.categories
+                        if (!Array.isArray(cats) || cats.length === 0) {
+                            console.warn('[AI] Dropping "menu-food" block — categories empty (AI failed to generate content)')
+                            continue
+                        }
+                    }
+
                     if (validation.success) {
                         valid.push(validation.data as Record<string, unknown>)
                     } else {

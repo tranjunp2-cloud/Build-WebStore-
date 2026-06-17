@@ -28,6 +28,9 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
 
     const [activeTab, setActiveTab] = useState(0)
 
+    // GH-1219: don't render a blank section when AI generates empty categories
+    if (!categories.length) return null
+
     const TagBadge = ({ tag }: { tag: string }) => (
         <Caption
             className="px-2 py-0.5 rounded-full font-semibold"
