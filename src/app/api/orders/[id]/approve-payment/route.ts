@@ -126,7 +126,12 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
         // The PATCH /api/orders/[id] route (which normally sends this) is blocked by INVALID_TRANSITION
         // after approve-payment already committed the status change via SQL CAS.
         if (newStatus === 'confirmed' && (updated as any)?.customerEmail) {
-            const tenantId = tenantObj ? String((tenantObj as any).id) : null
+            // Resolve tenant: prefer site.tenant (already fetched at depth:2), fall back to order.tenant
+            // so orders without a site relationship still get the email (matches PATCH route behaviour).
+            const resolvedTenant = tenantObj ?? (
+                typeof (updated as any)?.tenant === 'object' ? (updated as any).tenant : null
+            )
+            const tenantId = resolvedTenant ? String((resolvedTenant as any).id) : null
             if (tenantId) {
                 try {
                     const emailSub = await getActivePlanSubscription(payload, tenantId)
@@ -144,7 +149,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 lineTotal: (item.quantity ?? 1) * (item.unitPrice ?? 0),
                             }))
                             const confirmEmail = orderConfirmationEmail({
-                                shopName: (tenantObj as any)?.name ?? '',
+                                shopName: (resolvedTenant as any)?.name ?? '',
                                 supportEmail: ownerEmails[0] ?? '',
                                 orderNumber: (updated as any)?.orderNumber ?? String(orderId),
                                 customerName: (updated as any)?.customerName ?? '',

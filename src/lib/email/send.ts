@@ -31,7 +31,8 @@ export async function sendEmail({ to, subject, html, templateType, recipient, te
             }
         }
 
-        // Retry up to 2 times for transient SMTP/SES failures (500ms, 1000ms backoff)
+        // Retry up to 2 times for transient SMTP/SES failures (500ms, 1000ms backoff).
+        // Last attempt rethrows to outer catch — the unreachable branch after the loop is intentionally absent.
         const MAX_ATTEMPTS = 3
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
@@ -44,6 +45,7 @@ export async function sendEmail({ to, subject, html, templateType, recipient, te
                 await new Promise(r => setTimeout(r, 500 * attempt))
             }
         }
+        /* istanbul ignore next — rethrow on final attempt exits loop via throw, not here */
         return false
     } catch (error) {
         console.error('[Email] Failed after 3 attempts:', error)
