@@ -3,6 +3,7 @@ import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { buildSlugCanonicalMap, resolveInternalUrlPath, rewriteLiveUrl } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { OwnerProvider } from './OwnerContext'
 import type { NavPage, SiteRendererProps } from './SiteRenderer'
@@ -23,6 +24,8 @@ type SiteLayoutShellProps = {
     pages?: NavPage[]
     isOwner?: boolean
     children: React.ReactNode
+    /** true on commerce pages: renders cart widget even when applyGlobalBlock tiers find none */
+    forceCartWidget?: boolean
 }
 
 /** Rewrite all `url` fields in nav links array recursively; filter hidden/deleted page slugs for visitors. */
@@ -79,10 +82,9 @@ function rewriteFooterColumns(
 
 /**
  * Site layout wrapper: applies theme CSS, renders site header block + children + site footer block.
- * Use for pages outside SiteRenderer (e.g. product detail, checkout) that need full site chrome.
- * NOT for use in editor/preview — live mode only.
+ * Use for pages outside SiteRenderer (e.g. product detail, checkout) that need full site chrome. Live mode only.
  */
-export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLayoutShellProps) {
+export function SiteLayoutShell({ site, pages = [], isOwner, children, forceCartWidget }: SiteLayoutShellProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -119,12 +121,22 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
     const rawHeader = site.headerBlock as Record<string, unknown> | null | undefined
     const rawFooter = site.footerBlock as Record<string, unknown> | null | undefined
 
+    // Cart widget: mirrors SiteRenderer's applyGlobalSystemBlocks logic.
+    // gb===null=explicit wipe (suppress fallback); gb===undefined=not configured (allow fallback).
+    // TODO(follow-up): add whatsapp-button + socialWidget injection to match SiteRenderer parity.
+    const gb = site.globalBlocks as Record<string, unknown> | null | undefined
+    const cartEntry = gb === null ? null : (gb as Record<string, unknown> | undefined)?.cartWidget as Record<string, unknown> | null | undefined
+    const cartBlocks = applyGlobalBlock([], 'cartWidget', cartEntry, pages as Array<{ layout?: unknown[] }>, { autoInject: true, siteHeaderBlock: rawHeader as never })
+    const cartWidgetBlock = cartBlocks.find((b: { blockType: string }) => b.blockType === 'cartWidget') ?? null
+    const hasCart = cartWidgetBlock !== null
+
     const rawHeaderCta = rawHeader?.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
     const headerCtaPath = resolveInternalUrlPath(rawHeaderCta?.url, slugCanonical)
     const headerCtaHidden = hiddenSlugs.size > 0 && !!headerCtaPath && hiddenSlugs.has(headerCtaPath)
     const headerBlock: Record<string, unknown> | null = rawHeader
         ? {
             ...rawHeader,
+            _hasCart: hasCart,
             links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs, slugCanonical),
             ctaButton: rawHeaderCta
                 ? headerCtaHidden
@@ -182,6 +194,7 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
             {fixedNavSpacer && <div style={{ height: fixedNavSpacer }} aria-hidden="true" />}
             {children}
             {footerBlock && renderBlock(footerBlock, footerBlock.blockType as string || 'footer')}
+            {cartWidgetBlock ? renderBlock(cartWidgetBlock as Record<string, unknown>, 'cartWidget') : forceCartWidget && renderBlock({ blockType: 'cartWidget' }, 'cartWidget')}
         </OwnerProvider>
     )
 }

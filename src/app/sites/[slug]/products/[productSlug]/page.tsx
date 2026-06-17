@@ -7,7 +7,6 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
-import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
@@ -15,6 +14,7 @@ import { getServerI18n } from '@/i18n/server'
 import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
+import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -202,7 +202,9 @@ export default async function ProductDetailPage({ params }: Props) {
             site={siteWithContext as SiteRendererProps['site']}
             pages={pages as unknown as NavPage[]}
             isOwner={isOwner}
+            forceCartWidget
         >
+            <ScrollToTop />
             <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
             <style>{`
@@ -367,7 +369,6 @@ export default async function ProductDetailPage({ params }: Props) {
                 </div>
             </div>
 
-            <CartDrawer siteSlug={slug} siteId={String(site.id)} />
         </SiteLayoutShell>
     )
 }
