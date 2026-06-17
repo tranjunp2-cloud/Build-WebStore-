@@ -29,8 +29,9 @@ Example: ["pet shop", "cute animals"]`
         const openai = new OpenAI({ apiKey: key })
         
         const controller = new AbortController()
-        // Aggressive 3-second timeout so we don't stall the generation pipeline
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        // 8-second timeout — generous enough for gpt-4o-mini under load while
+        // still bounding the total gen time well within maxDuration (300s).
+        const timeoutId = setTimeout(() => controller.abort(), 8000)
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
