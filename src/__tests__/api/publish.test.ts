@@ -443,6 +443,56 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(promotedIds).toContain(12)
     })
 
+    it('TC-F01-pub-14: promote never writes deletedAt — 2nd-layer guard so a page soft-deleted mid-publish (race) cannot reset deleted_at and trip the unique index', async () => {
+        // Race: a page passes the deletedPageIds query (not yet deleted) but is
+        // soft-deleted DURING the loop. It still reaches promote. The draft snapshot
+        // carries deletedAt=null, so writing it would reset deleted_at→NULL → 500.
+        // Fix: deletedAt is stripped from the promote payload entirely, so the base
+        // row's deleted_at is left untouched regardless of the snapshot value.
+        const { getPayload } = await import('payload')
+        const siteId = '123'
+        mockSiteRecord = { id: siteId, name: 'My Coffee Site', status: 'draft', tenant: 'tenant-1', publishedAt: null }
+
+        // Draft doc explicitly carries deletedAt (null) + a deletedAt-like timestamp to
+        // prove BOTH are dropped, never forwarded to payload.update.
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 20, _status: 'draft', site: siteId, slug: '/about', layout: [], deletedAt: null, title: 'About' },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') { mockSiteRecord = { ...mockSiteRecord, ...data }; return mockSiteRecord }
+            return { id, ...data }
+        })
+        // deletedPageIds query returns empty → page 20 is NOT skipped, it WILL be promoted.
+        const executeSpy = vi.fn().mockResolvedValue({ rows: [] })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+            db: { drizzle: { execute: executeSpy } },
+        })
+
+        const req = makePatchReq(siteId)
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId }) })
+        expect(res.status).toBe(200)
+
+        // Page 20 was promoted...
+        const pageUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'pages' && c[0].id === 20)
+        expect(pageUpdate).toBeDefined()
+        // ...but the promote payload must NOT carry deletedAt — leaving the base row's
+        // soft-delete state untouched even under the mid-publish race.
+        expect(Object.prototype.hasOwnProperty.call(pageUpdate![0].data, 'deletedAt')).toBe(false)
+    })
+
     it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
         // Regression: page with an industry block (doctor-profile, property-card,
         // class-schedule, etc.) whose nested required array row was seeded empty

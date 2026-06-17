@@ -192,8 +192,15 @@ export async function PATCH(
                 try {
                     // Promote full draft doc — strip system/version fields, keep
                     // everything else so published version matches latest draft.
+                    // `deletedAt` is stripped too: soft-delete state lives on the base
+                    // `pages` row (written via raw SQL, never through promote). The
+                    // draft snapshot carries deletedAt=null, so including it would reset
+                    // deleted_at→NULL and trip pages_site_slug_uniq. This is the 2nd
+                    // line of defence behind the deletedPageIds skip: even if a page is
+                    // soft-deleted *mid-publish* (after the deletedPageIds query) and
+                    // still reaches here, promote leaves deleted_at untouched → no 500.
                     const SYSTEM_FIELDS = new Set([
-                        'id', '_status', 'createdAt', 'updatedAt', 'sizes',
+                        'id', '_status', 'createdAt', 'updatedAt', 'sizes', 'deletedAt',
                         '_verificationToken', '_versionID', '_currentVersionId',
                         'publishedDoc', 'version', 'latest',
                     ])
