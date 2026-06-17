@@ -1308,6 +1308,7 @@ enforcer-padded hero subheadline.
 | **TC-F01-W.48** | `block-library-biz.test.ts` | Contact block emits user `phone/email/address` verbatim when provided; features headline includes biz.name | ✅ |
 | **TC-F01-W.49** | `blog-seeds-coverage.test.ts` + `variety-repro.test.ts` | `getBlogSeeds(category, biz?)` substitutes `{business}` / `{product}` placeholders; backward-compat (biz omitted) returns raw strings | ✅ |
 | **TC-F01-W.50** | `seo-generator.test.ts` + `variety-repro.test.ts` | Homepage SEO description prefers `biz.description` over hero subheadline when `biz.description.length > 40`; sub-pages keep legacy mining priority | ✅ |
+| **TC-F01-W.51** | `hero-fallback-category.test.ts` | Hero fallback URL resolves per industry category (14 categories, 2-3 photos each); VN/EN inputs route correctly; old hardcoded office-hallway photo never returned; unknown/empty category falls back to `business` pool | ✅ |
 
 ### Files touched
 
