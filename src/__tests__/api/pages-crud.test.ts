@@ -80,6 +80,31 @@ describe('GET /api/sites/[siteId]/pages [TC-F05.02]', () => {
 
         expect(res.status).toBe(403)
     })
+
+    it('TC-F05-02-17: returns all pages beyond Payload default limit of 10 (queries with limit:0)', async () => {
+        // Regression GH-1222: without an explicit limit Payload defaults to 10, so a
+        // site's 11th+ page (e.g. a just-created page) silently dropped from the list.
+        // Fix: pages query passes limit:0 → all pages returned.
+        const fifteenPages = Array.from({ length: 15 }, (_, i) => ({
+            id: `p${i + 1}`, title: `Page ${i + 1}`, slug: i === 0 ? '/' : `/page-${i + 1}`,
+            _status: 'draft', updatedAt: '2026-04-01',
+        }))
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] }) // sites
+            .mockResolvedValueOnce({ docs: fifteenPages }) // pages
+
+        const req = new Request('http://localhost/api/sites/site-1/pages')
+        const res = await GET(req, ctx as { params: Promise<{ siteId: string }> })
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        // All 15 returned — not truncated to the default 10.
+        expect(body.pages).toHaveLength(15)
+        // The pages query (2nd find call) must request limit:0 — this is the fix.
+        const pagesFindArgs = mockFind.mock.calls[1][0]
+        expect(pagesFindArgs.collection).toBe('pages')
+        expect(pagesFindArgs.limit).toBe(0)
+    })
 })
 
 describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
