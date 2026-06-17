@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SquarePen, Trash2 } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, SquarePen, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
@@ -16,7 +16,13 @@ import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
-import { Pagination } from '@/components/ui/Pagination'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
+import { Button } from '@/components/ui/button'
+import { TablePagination } from '@/components/ui/table-pagination'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { TableSearch } from '@/components/ui/table-search'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
@@ -74,7 +80,7 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     if (!image || typeof image === 'string') return null
     let url = image.url || image.thumbnailURL || null
     if (!url) return null
-    
+
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
         if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
@@ -82,7 +88,7 @@ function getImageUrl(image: ProductImage | string | null): string | null {
             url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
         }
     }
-    
+
     return url
 }
 
@@ -150,7 +156,7 @@ export default function ProductsPage() {
         setError(null)
         try {
             const fetchedDocs = await getProductsAction()
-            
+
             // Fetch categories for filter panel
             try {
                 const catDocs = await getCategoriesAction()
@@ -263,23 +269,23 @@ export default function ProductsPage() {
 
     const confirmDelete = async () => {
         if (!productToDelete) return
-        
+
         const prod = productToDelete
         setIsDeletingProduct(true)
         // Optimistic delete
         setProducts(prev => prev.filter(p => p.id !== prod.id))
-        
+
         try {
             await updateProductFieldAction(prod.id, { deletedAt: new Date().toISOString() })
-            
+
             // Wait for transition before unmounting modal completely if we want, but closing immediately is also fine
             setProductToDelete(null)
-            
+
             // If the deleted product is currently being previewed, close the preview
             if (quickViewProduct?.id === prod.id) {
                 setQuickViewProduct(null)
             }
-            
+
             toast.success(t.dashboard.products.form.productDeleted, {
                 action: {
                     label: t.dashboard.products.form.undo,
@@ -332,20 +338,20 @@ export default function ProductsPage() {
                     </div>
                     <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-[12px]">
                         <div className="w-full md:flex-1 flex items-center bg-[#1E293B] border border-white/[0.08] rounded-[16px] px-4 h-[50px] min-h-[50px] shrink-0 focus-within:border-white focus-within:ring-1 focus-within:ring-white transition-all duration-200">
-                            <input 
-                                value={aiPrompt} 
+                            <input
+                                value={aiPrompt}
                                 onChange={e => setAiPrompt(e.target.value)}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
                                 }}
-                                placeholder={t.dashboard.products.list.aiChatPlaceholder} 
+                                placeholder={t.dashboard.products.list.aiChatPlaceholder}
                                 className="w-full bg-transparent text-[16px] text-[#F8FAFC] outline-none border-none focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none placeholder:text-slate-400"
                             />
                         </div>
-                        <button 
+                        <button
                             onClick={() => {
                                 if (aiPrompt.trim()) handleCreateAi()
-                            }} 
+                            }}
                             className="rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 md:w-[100px] w-full h-[48px] md:h-[50px] flex items-center justify-center text-[16px] font-semibold text-white shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity border-none outline-none focus:outline-none focus:ring-0 focus:ring-offset-0">
                             {t.dashboard.products.list.aiChatBtn}
                         </button>
@@ -363,13 +369,17 @@ export default function ProductsPage() {
                             <h1 className="text-[24px] font-bold leading-none text-[#F8FAFC]">{t.dashboard.products.title}</h1>
                             <span className="block text-[14px] leading-none text-[#F8FAFC]/60">{t.dashboard.products.subtitle}</span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                            <Link href="/products/categories" className="flex items-center justify-center rounded-[16px] border border-solid border-[#F8FAFC]/30 px-6 h-[48px] text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 no-underline transition-colors w-full sm:w-auto md:w-[148px]">
-                                {t.dashboard.products.list.category}
-                            </Link>
-                            <Link href="/products/new" className="flex items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 h-[48px] text-[16px] font-semibold text-white shadow-md hover:opacity-90 hover:no-underline no-underline transition-opacity whitespace-nowrap w-full sm:w-auto">
-                                <Image src="/images/figma/add-product.svg" alt="Add" width={20} height={20} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
-                            </Link>
+                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                            <Button asChild variant="dashSecondary" size="dash" className="w-full sm:w-auto justify-center">
+                                <Link href="/products/categories">
+                                    {t.dashboard.products.list.category}
+                                </Link>
+                            </Button>
+                            <Button asChild variant="dashPrimary" size="dash" className="w-full sm:w-auto justify-center">
+                                <Link href="/products/new">
+                                    <Image src="/images/figma/add-product.svg" alt="Add" width={16} height={16} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
+                                </Link>
+                            </Button>
                         </div>
                     </div>
 
@@ -450,7 +460,8 @@ export default function ProductsPage() {
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
-                                className="w-full h-full bg-[#1E293B] border border-white/[0.08] rounded-[16px] pl-[48px] pr-4 text-[16px] text-white placeholder:text-[#F8FAFC]/40 focus:outline-none focus:border-[#3B82F6]/50 transition-colors"
+                                style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                className="w-full h-full rounded-[16px] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] focus:outline-none transition-colors"
                             />
                         </div>
 
@@ -458,10 +469,8 @@ export default function ProductsPage() {
                         <div className="relative w-full" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className={cn(
-                                    "w-full h-[50px] flex items-center justify-between px-4 bg-[#1E293B] border rounded-[16px] text-[16px] font-medium transition-colors outline-none",
-                                    isDropdownOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC]"
-                                )}
+                                style={{ background: 'transparent', border: isDropdownOpen ? '1px solid rgba(59,130,246,0.5)' : '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                className="w-full h-[50px] flex items-center justify-between px-4 rounded-[16px] text-[16px] font-medium transition-colors outline-none"
                             >
                                 <span>{sortTranslateMap[sortBy]}</span>
                                 <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
@@ -484,10 +493,8 @@ export default function ProductsPage() {
                         {/* Row 3: Filter Button — full-width, centered */}
                         <button
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            className={cn(
-                                "w-full h-[50px] flex items-center justify-center gap-2 bg-[#1E293B] border rounded-[16px] text-[16px] font-medium transition-colors outline-none",
-                                isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC]"
-                            )}
+                            style={{ background: 'transparent', border: isAdvancedFiltersOpen ? '1px solid rgba(59,130,246,0.5)' : '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                            className="w-full h-[50px] flex items-center justify-center gap-2 rounded-[16px] text-[16px] font-medium transition-colors outline-none"
                         >
                             <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             <span>
@@ -500,29 +507,24 @@ export default function ProductsPage() {
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}
                     <div className="hidden md:flex items-center gap-[17px] w-full">
-                        {/* Search Input */}
-                        <div className="relative flex-1 h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                placeholder={t.dashboard.products.list.search}
-                                className="w-full h-full bg-[#1E293B] border border-white/[0.08] rounded-[16px] pl-[36px] pr-4 text-[16px] text-white placeholder:text-[#F8FAFC]/40 focus:outline-none focus:border-[#3B82F6]/50 transition-colors"
-                            />
-                        </div>
+                        {/* Search Input — shared <TableSearch> (GH-1222 DS) */}
+                        <TableSearch
+                            value={searchQuery}
+                            onSearch={setSearchQuery}
+                            debounceMs={0}
+                            placeholder={t.dashboard.products.list.search}
+                        />
 
-                        {/* Sort Dropdown */}
-                        <div className="relative w-[220px] h-[50px]" ref={dropdownRef}>
+                        {/* Sort Dropdown — trigger styled to match DS chips (transparent);
+                            the opened dropdown below is kept as-is. */}
+                        <div className="relative w-[180px]" ref={dropdownRef}>
                             <button
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                className={cn(
-                                    "w-full h-full border rounded-[16px] px-5 flex items-center justify-between transition-colors",
-                                    isDropdownOpen ? "bg-[#1E293B] border-[#3B82F6]/50 text-white" : "bg-[#1E293B] border-white/[0.08] text-[#F8FAFC] hover:bg-white/5"
-                                )}
+                                style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                className="w-full h-9 rounded-md px-3 flex items-center justify-between gap-1.5 text-[13px] font-medium transition-colors"
                             >
-                                <span className="text-[16px] font-medium">{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
+                                <span className="truncate">{sortTranslateMap[sortBy]}</span>
+                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={16} height={16} alt="Sort" className="invert dark:invert-0 shrink-0" />
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 w-[189px] z-20">
@@ -540,15 +542,14 @@ export default function ProductsPage() {
                             )}
                         </div>
 
-                        {/* Filter Button */}
+                        {/* Filter Button — trigger styled to match DS chips (transparent);
+                            the advanced filters panel below is kept as-is. */}
                         <button
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            className={cn(
-                                "flex items-center justify-center gap-2 h-[50px] bg-[#1E293B] border rounded-[16px] px-6 text-[16px] font-medium transition-colors whitespace-nowrap outline-none",
-                                isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC] hover:bg-white/5"
-                            )}
+                            style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                            className="flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-[13px] font-medium transition-colors whitespace-nowrap outline-none"
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
+                            <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
                             {t.dashboard.products.list.filterBtn}
                         </button>
                     </div>
@@ -564,7 +565,7 @@ export default function ProductsPage() {
                                     </svg>
                                     <div className="text-[#F8FAFC] text-[16px] md:text-[18px] font-semibold leading-[28px]">{t.dashboard.products.list.advancedFilters}</div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => { setSelectedCategories([]); setSaleStatus('All Products'); setShowLowStock(false); setIsAdvancedFiltersOpen(false); }}
                                     className="flex items-center gap-[8px] bg-transparent border-none outline-none text-[#F8FAFC]/50 hover:text-[#F8FAFC] transition-colors"
                                 >
@@ -574,9 +575,6 @@ export default function ProductsPage() {
                                     </svg>
                                 </button>
                             </div>
-
-                            {/* Divider */}
-                            {/* <div className="w-full h-[1px] shrink-0 bg-white/10" /> */}
 
                             {/* Filter Sections — stacked on mobile, 3-col on desktop */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-[24px]">
@@ -705,132 +703,135 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table Container (Figma 30882:5856) --- */}
-                        <div className="hidden md:flex flex-col rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 overflow-hidden">
-                            {/* Table Header */}
-                            <div className="grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 items-center bg-[#0B1120]/50 border-b border-white/5 px-6 py-4 text-[12px] font-semibold uppercase tracking-[0.025em] text-[#F8FAFC]/60">
-                                <div>{t.dashboard.products.list.colImg}</div>
-                                <div>{t.dashboard.products.list.colName}</div>
-                                <div>{t.dashboard.products.list.colPrice}</div>
-                                <div>{t.dashboard.products.list.colStock}</div>
-                                <div>{t.dashboard.products.list.colWeight}</div>
-                                <div>{t.dashboard.products.list.colStatus}</div>
-                                <div className="text-left">{t.dashboard.products.list.colActions}</div>
-                            </div>
+                        {/* --- Desktop Table (GH-1222 DS migration) --- */}
+                        {filteredAndSortedProducts.length > 0 && (
+                            <div className="hidden md:block">
+                                <Table
+                                    className="table-fixed w-full"
+                                    minWidth={860}
+                                    footer={
+                                        <TablePagination
+                                            page={currentPage}
+                                            total={filteredAndSortedProducts.length}
+                                            limit={ITEMS_PER_PAGE}
+                                            onPageChange={setCurrentPage}
+                                            labels={{ unit: 'products' }}
+                                        />
+                                    }
+                                >
+                                    <colgroup>
+                                        <col style={{ width: '60px' }} />
+                                        <col style={{ width: '30%' }} />
+                                        <col style={{ width: '16%' }} />
+                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '12%' }} />
+                                        <col style={{ width: '13%' }} />
+                                        <col style={{ width: '86px' }} />
+                                    </colgroup>
 
-                            {/* Table Body */}
-                            <div className="flex flex-col divide-y divide-white/5">
-                                {paginatedProducts.map(product => {
-                                    const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
-                                    const isOutOfStock = product.inventory <= 0
-                                    const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
-                                    const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
-                                    const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
-                                    
-                                    return (
-                                        <div key={product.id} onClick={() => setQuickViewProduct(product as DetailedProduct)} className="group grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors">
-                                            {/* IMG */}
-                                            <div className="h-[48px] w-[48px] rounded-[12px] bg-[#0B1120] border border-white/[0.08] relative shrink-0 overflow-hidden">
-                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="48px" />
-                                            </div>
-                                            
-                                            {/* Name & Variants */}
-                                            <div className="min-w-0 pr-4 flex flex-col gap-[2px]">
-                                                <p className="m-0 truncate text-[14px] leading-[20px] font-medium text-[#F8FAFC]">{product.name}</p>
-                                                {product.category && product.category.length > 0 && (
-                                                    <p className="m-0 text-[12px] leading-[16px] font-normal text-[#2DD4BF] truncate">
-                                                        {product.category.map((c: Category | string) => typeof c === 'object' && c ? c.name : c).join(', ')}
-                                                    </p>
-                                                )}
-                                                {product.sku && (
-                                                    <p className="m-0 text-[12px] leading-[16px] font-normal text-[#F8FAFC]/40 truncate">{t.dashboard.products.list.sku} {product.sku}</p>
-                                                )}
-                                            </div>
-                                            
-                                            {/* Price */}
-                                            <div className="text-[14px] font-medium text-[#F8FAFC]">{priceDisplay}</div>
-                                            
-                                            {/* Stock */}
-                                            <div>
-                                                {(() => {
-                                                    const inv = product.inventory || 0;
-                                                    if (inv === 0) {
-                                                        return (
-                                                            <div className="inline-flex h-[30px] items-center gap-[6px] rounded-[12px] px-[12px]" style={{ backgroundColor: 'rgba(251, 44, 54, 0.1)', border: '1px solid rgba(251, 44, 54, 0.3)' }}>
-                                                                <div className="w-[8px] h-[8px] rounded-full bg-[#FB2C36]" />
-                                                                <span className="text-[14px] font-medium text-[#FF6467] leading-[20px]">{inv}</span>
-                                                            </div>
-                                                        )
-                                                    }
-                                                    if (inv <= 5) {
-                                                        return (
-                                                            <div className="inline-flex h-[30px] items-center gap-[6px] rounded-[12px] px-[12px]" style={{ backgroundColor: 'rgba(255, 105, 0, 0.1)', border: '1px solid rgba(255, 105, 0, 0.3)' }}>
-                                                                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                                    <path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="#FF8904" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                                                                    <path d="M10 7.5V11.6667" stroke="#FF8904" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                                                                    <path d="M10 15H10.0083" stroke="#FF8904" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                                                                </svg>
-                                                                <span className="text-[14px] font-medium text-[#FF8904] leading-[20px]">{inv}</span>
-                                                            </div>
-                                                        )
-                                                    }
-                                                    return (
-                                                        <div className="inline-flex h-[30px] min-w-[40px] items-center justify-center rounded-[12px] px-[12px]" style={{ backgroundColor: 'rgba(0, 201, 80, 0.1)', border: '1px solid rgba(0, 201, 80, 0.3)' }}>
-                                                            <span className="text-[14px] font-medium text-[#05DF72] leading-[20px]">{inv}</span>
-                                                        </div>
-                                                    )
-                                                })()}
-                                            </div>
-                                            
-                                            {/* Weight */}
-                                            <div className="text-[14px] font-medium text-[#F8FAFC]">{weightDisplay}</div>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>{t.dashboard.products.list.colImg}</TableHead>
+                                            <TableHead>{t.dashboard.products.list.colName}</TableHead>
+                                            <TableHead>{t.dashboard.products.list.colPrice}</TableHead>
+                                            <TableHead>{t.dashboard.products.list.colStock}</TableHead>
+                                            <TableHead>{t.dashboard.products.list.colWeight}</TableHead>
+                                            <TableHead>{t.dashboard.products.list.colStatus}</TableHead>
+                                            <TableHead className="text-right">{t.dashboard.products.list.colActions}</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
 
-                                            {/* Status */}
-                                            <div className="flex items-center">
-                                                <div 
-                                                    onClick={(e) => handleUpdateStatus(product, e)}
-                                                    className={cn(
-                                                        "w-[56px] h-[32px] rounded-full p-[4px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden relative",
-                                                        product.status === 'active' ? "border-transparent" : "bg-[#1E293B]"
-                                                    )}
-                                                    style={{
-                                                        border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
-                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #3989F3 7%, #378FEF 14%, #3596EC 21%, #339CE9 29%, #32A2E5 36%, #30A8E1 43%, #2FAEDE 50%, #2EB3DA 57%, #2DB9D6 64%, #2DBFD1 71%, #2CC4CD 79%, #2CC9C9 86%, #2DCFC4 93%, #2DD4BF 100%)" : undefined,
-                                                        boxShadow: product.status === 'active' ? "0px 0px 12px 0px rgba(59, 130, 246, 0.4)" : undefined
-                                                    }}
+                                    <TableBody>
+                                        {paginatedProducts.map(product => {
+                                            const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
+                                            const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
+                                            const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
+                                            const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
+                                            const inv = product.inventory || 0
+
+                                            return (
+                                                <TableRow
+                                                    key={product.id}
+                                                    clickable
+                                                    onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                                 >
-                                                    <div className={cn(
-                                                        "w-[24px] h-[24px] bg-white rounded-full shrink-0 transition-transform duration-300 drop-shadow-md",
-                                                        product.status === 'active' ? "translate-x-[24px]" : "translate-x-0"
-                                                    )} />
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Actions */}
-                                            <div className="flex justify-start gap-2">
-                                                <Link href={`/products/${product.id}`} onClick={e => e.stopPropagation()} className="flex items-center justify-center w-8 h-8 hover:bg-white/10 rounded-lg transition-colors text-[#3B82F6] hover:text-[#3B82F6]/80">
-                                                    <SquarePen className="w-5 h-5" strokeWidth={1.5} />
-                                                </Link>
-                                                <button onClick={e => handleDelete(product, e)} className="flex items-center justify-center w-8 h-8 bg-transparent border-none hover:bg-[#FF6467]/10 rounded-lg transition-colors text-[#FF6467] hover:text-[#FF6467]/80">
-                                                    <Trash2 className="w-5 h-5" strokeWidth={1.5} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                                    {/* Thumbnail */}
+                                                    <TableCell>
+                                                        <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[#0B1120] border border-white/[0.08] overflow-hidden">
+                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="40px" />
+                                                        </div>
+                                                    </TableCell>
 
-                            {/* Desktop Pagination */}
-                            {totalPages > 1 && (
-                                <div className="flex justify-end items-center p-[16px] border-t border-white/[0.08]">
-                                    <Pagination 
-                                        currentPage={currentPage} 
-                                        totalPages={totalPages} 
-                                        onPageChange={setCurrentPage}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                                                    {/* Name + SKU */}
+                                                    <TableCell>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
+                                                                {product.name}
+                                                            </span>
+                                                            {product.sku && (
+                                                                <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
+                                                                    {t.dashboard.products.list.sku} {product.sku}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+
+                                                    {/* Price */}
+                                                    <TableCell>
+                                                        <span className="text-[14px] font-medium tabular-nums" style={{ color: 'var(--dash-text)' }}>
+                                                            {priceDisplay}
+                                                        </span>
+                                                    </TableCell>
+
+                                                    {/* Stock */}
+                                                    <TableCell>
+                                                        {inv === 0 ? (
+                                                            <Badge variant="destructive" dot>{inv}</Badge>
+                                                        ) : inv <= 5 ? (
+                                                            <Badge variant="warning" dot>{inv}</Badge>
+                                                        ) : (
+                                                            <Badge variant="success" dot>{inv}</Badge>
+                                                        )}
+                                                    </TableCell>
+
+                                                    {/* Weight */}
+                                                    <TableCell>
+                                                        <span className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{weightDisplay}</span>
+                                                    </TableCell>
+
+                                                    {/* Status toggle */}
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                                        <Switch
+                                                            checked={product.status === 'active'}
+                                                            onCheckedChange={() => handleUpdateStatus(product, { stopPropagation: () => {} } as React.MouseEvent)}
+                                                        />
+                                                    </TableCell>
+
+                                                    {/* Actions */}
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <TableActionButton
+                                                                onClick={() => router.push(`/products/${product.id}`)}
+                                                                title={t.dashboard.products.list.edit}
+                                                            >
+                                                                <SquarePen className="w-4 h-4" strokeWidth={1.5} />
+                                                            </TableActionButton>
+                                                            <TableActionButton
+                                                                variant="danger"
+                                                                onClick={(e) => handleDelete(product, e)}
+                                                                title={t.dashboard.products.form.delete}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                                                            </TableActionButton>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
 
                         {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
                         <div className="md:hidden flex flex-col gap-3">
@@ -933,7 +934,7 @@ export default function ProductsPage() {
                                                 <SquarePen className="w-[18px] h-[18px]" strokeWidth={2} />
                                                 {t.dashboard.products.list.edit}
                                             </Link>
-                                            
+
                                             {/* Delete Button */}
                                             <button
                                                 onClick={e => handleDelete(product, e)}
@@ -947,19 +948,23 @@ export default function ProductsPage() {
                             })}
                         </div>
 
+                        {/* Empty state — filters produced no results (GH-1222 DS) */}
                         {filteredAndSortedProducts.length === 0 && (
-                            <div className="py-16 text-center text-[15px] text-[#F8FAFC]/40">
-                                {t.dashboard.products.list.noResults}
-                            </div>
+                            <TableEmptyState
+                                icon={<SearchX />}
+                                title={t.dashboard.products.list.noResults}
+                            />
                         )}
 
                         {/* Mobile Pagination */}
                         {totalPages > 1 && (
-                            <div className="md:hidden flex justify-center py-6 border-t border-white/[0.08] mt-2">
-                                <Pagination 
-                                    currentPage={currentPage} 
-                                    totalPages={totalPages} 
+                            <div className="md:hidden py-4">
+                                <TablePagination
+                                    page={currentPage}
+                                    total={filteredAndSortedProducts.length}
+                                    limit={ITEMS_PER_PAGE}
                                     onPageChange={setCurrentPage}
+                                    labels={{ unit: 'products' }}
                                 />
                             </div>
                         )}
@@ -968,7 +973,7 @@ export default function ProductsPage() {
             )}
 
             {showBulkCreate && (
-                <BulkCreateModal 
+                <BulkCreateModal
                     initialPrompt={aiPrompt}
                     onClose={() => setShowBulkCreate(false)}
                     onSuccess={() => {
@@ -981,10 +986,10 @@ export default function ProductsPage() {
             {quickViewProduct && (
                 <>
                     <div className="hidden md:block">
-                        <ProductQuickViewModal 
-                            isOpen={!!quickViewProduct} 
-                            onClose={() => setQuickViewProduct(null)} 
-                            product={quickViewProduct} 
+                        <ProductQuickViewModal
+                            isOpen={!!quickViewProduct}
+                            onClose={() => setQuickViewProduct(null)}
+                            product={quickViewProduct}
                             onDelete={handleDelete}
                         />
                     </div>

@@ -23,14 +23,16 @@ type TopHeaderProps = {
 
 export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSidebarOpen, collapsed, onToggleCollapsed, animateCollapse = false }: TopHeaderProps) {
     return (
-        <header className="fixed top-0 left-0 w-full h-[56px] bg-dash-surface border-b border-dash-border z-50 flex items-center justify-between pr-4 md:pr-6">
+        <header className="fixed top-0 left-0 w-full h-[56px] bg-[var(--dash-sidebar-bg)] [border-bottom:1px_solid_var(--dash-divider)] z-50 flex items-center justify-between pr-4 md:pr-6">
             {/* LEFT segment — visually part of the sidebar: same bg (--dash-sidebar-bg) + right
                 divider, width tracks the sidebar (250px / 64px mini) so it reads as one column. */}
             <div
                 className={cn(
                     'flex items-center h-full gap-2 md:gap-4 pl-4',
-                    // bg + right divider (col) + bottom divider = line between logo and the sidebar below
-                    'md:bg-[var(--dash-sidebar-bg)] dash-col-divider md:[border-bottom:1px_solid_var(--dash-divider)]',
+                    // bg + right divider (col). The header's own full-width border-bottom draws
+                    // the line under the logo too — no separate bottom border here (it sat 1px off
+                    // and doubled the line in the logo region).
+                    'md:bg-[var(--dash-sidebar-bg)] dash-col-divider',
                     animateCollapse && 'md:transition-[width] md:duration-200',
                     collapsed ? 'md:w-[64px] md:pl-0 md:gap-0 md:justify-center' : 'md:w-[250px] md:pr-3',
                 )}

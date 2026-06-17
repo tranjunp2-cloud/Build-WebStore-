@@ -1238,6 +1238,12 @@
                 "submit": "Reject Payment",
                 "submitting": "Rejecting..."
             },
+            "filterLabels": {
+                "date": "Date",
+                "status": "Status",
+                "payment": "Payment",
+                "sort": "Sort"
+            },
             "filterDates": {
                 "allDates": "All Dates",
                 "today": "Today",
@@ -2295,6 +2301,9 @@
                 "allStatus": "All Status",
                 "draft": "Draft",
                 "published": "Published",
+                "statusLabel": "Status",
+                "categoryLabel": "Category",
+                "sortLabel": "Sort",
                 "allCategories": "All Categories",
                 "sortNewest": "Newest",
                 "sortOldest": "Oldest",
@@ -2487,7 +2496,11 @@
             },
             "pagination": {
                 "previous": "Previous",
-                "next": "Next"
+                "next": "Next",
+                "showing": "Showing",
+                "of": "of",
+                "unit": "posts",
+                "rowsPerPage": "Rows per page:"
             },
             "noMatches": "No posts match your filters",
             "resetFilters": "Reset Filters"

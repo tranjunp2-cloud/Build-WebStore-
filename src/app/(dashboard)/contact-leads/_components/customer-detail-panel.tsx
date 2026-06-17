@@ -77,13 +77,13 @@ function StatusDropdown({ status, disabled, onChange }: {
             </button>
 
             {open && (
-                <div className="absolute right-0 top-[calc(100%+4px)] z-10 bg-[#1e293b] border border-white/[0.08] rounded-[12px] overflow-hidden min-w-[130px]">
+                <div className="absolute right-0 top-[calc(100%+4px)] z-10 rounded-[12px] overflow-hidden min-w-[130px]" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
                     {([status, ...ALLOWED_TRANSITIONS[status]] as CustomerStatus[]).map(s => (
                         <button
                             key={s}
                             type="button"
                             onClick={() => { onChange(s); setOpen(false) }}
-                            className={`w-full px-4 py-[10px] text-left text-[14px] transition-colors hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-white' : 'text-white/60'}`}
+                            className={`w-full px-4 py-[10px] text-left text-[14px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'}`}
                         >
                             {statusLabels[s]}
                         </button>
@@ -173,20 +173,20 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
             {/* Panel — bottom sheet on mobile, right sidebar on md+ */}
             <div
-                className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t border-white/[0.08] md:border-l"
+                className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t md:border-l border-solid border-[var(--dash-border)]"
                 style={{ background: 'var(--dash-surface)', backdropFilter: 'blur(20px)' }}
             >
                 {/* Drag handle (mobile only) */}
                 <div className="md:hidden flex justify-center pt-3 pb-0 shrink-0">
-                    <div className="w-12 h-1 rounded-full bg-white/20" />
+                    <div className="w-12 h-1 rounded-full bg-black/20 dark:bg-white/20" />
                 </div>
 
                 {/* Header row: title + close */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] shrink-0">
-                    <h2 className="text-[18px] md:text-[20px] font-bold text-[#f8fafc]">{c.profileTitle}</h2>
+                <div className="flex items-center justify-between px-6 py-5 border-b border-solid border-[var(--dash-border)] shrink-0">
+                    <h2 className="text-[18px] md:text-[20px] font-bold text-[var(--dash-text)]">{c.profileTitle}</h2>
                     <button
                         onClick={onClose}
-                        className="flex items-center justify-center w-9 h-9 rounded-[12px] text-white/50 hover:text-white hover:bg-white/10 transition-colors border-none bg-transparent cursor-pointer"
+                        className="flex items-center justify-center w-9 h-9 rounded-[12px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-black/[0.04] dark:hover:bg-white/10 transition-colors border-none bg-transparent cursor-pointer"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -197,7 +197,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     <div className="flex items-center gap-5">
                         <CustomerAvatar name={record.name} email={record.email} source={record.source} size={60} />
                         <h3
-                            className="text-[24px] font-bold text-[#dde2f8]"
+                            className="text-[24px] font-bold text-[var(--dash-text)]"
                             style={{ letterSpacing: '-0.6px' }}
                         >
                             {displayName}
@@ -211,7 +211,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     >
                         {/* Section header + status */}
                         <div className="flex items-center justify-between">
-                            <p className="text-[12px] font-semibold uppercase tracking-[0.3px] text-white/60">
+                            <p className="text-[12px] font-semibold uppercase tracking-[0.3px] text-[var(--dash-text-muted)]">
                                 {c.infoTitle}
                             </p>
 
@@ -234,8 +234,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <User className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldName}</span>
-                                    <span className="text-[14px] text-[#f8fafc] leading-5">{displayName}</span>
+                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldName}</span>
+                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">{displayName}</span>
                                 </div>
                             </div>
 
@@ -245,8 +245,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <Mail className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldEmail}</span>
-                                    <span className="text-[14px] text-[#f8fafc] leading-5">{record.email}</span>
+                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldEmail}</span>
+                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">{record.email}</span>
                                 </div>
                             </div>
 
@@ -256,8 +256,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <CalendarDays className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldLatestDate}</span>
-                                    <span className="text-[14px] text-[#f8fafc] leading-5">
+                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldLatestDate}</span>
+                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">
                                         {formatLatestDate(record.createdAt)}
                                     </span>
                                 </div>
@@ -269,18 +269,18 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     {record.source === 'contact-form' && (
                         <div className="flex flex-col gap-6">
                             {/* Section title */}
-                            <div className="border-b pb-[17px]" style={{ borderColor: 'var(--dash-border)' }}>
-                                <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#dde2f8]">
+                            <div className="border-b border-solid pb-[17px]" style={{ borderColor: 'var(--dash-border)' }}>
+                                <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[var(--dash-text)]">
                                     {c.timeline}
                                 </p>
                             </div>
 
                             {loadingDetail ? (
                                 <div className="flex justify-center py-6">
-                                    <Loader2 className="w-5 h-5 animate-spin text-white/30" />
+                                    <Loader2 className="w-5 h-5 animate-spin text-[var(--dash-text-muted)]" />
                                 </div>
                             ) : timeline.length === 0 ? (
-                                <p className="text-[13px] text-white/30">{c.noTimeline}</p>
+                                <p className="text-[13px] text-[var(--dash-text-muted)]">{c.noTimeline}</p>
                             ) : (
                                 /* Vertical timeline */
                                 <div className="relative flex flex-col gap-10 pl-[26px]">
@@ -292,7 +292,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                             className={cn(
                                                 'relative',
                                                 // Mask the line below the last bullet using panel bg color
-                                                idx === timeline.length - 1 && "after:content-[''] after:absolute after:left-[-26px] after:top-4 after:bottom-0 after:w-[2px] after:bg-[#0b1120]"
+                                                idx === timeline.length - 1 && "after:content-[''] after:absolute after:left-[-26px] after:top-4 after:bottom-0 after:w-[2px] after:bg-[var(--dash-surface)]"
                                             )}
                                         >
                                             {/* Half-circle (D-shape) bullet — flat side flush with the vertical line */}
@@ -300,7 +300,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                             <div className="flex flex-col gap-2">
                                                 {/* Title + date */}
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[12px] font-bold text-[#dde2f8]">{c.timelineEntry}</span>
+                                                    <span className="text-[12px] font-bold text-[var(--dash-text)]">{c.timelineEntry}</span>
                                                     <span className="text-[10px]" style={{ color: 'var(--dash-text-muted)' }}>
                                                         {formatLatestDate(t.createdAt)}
                                                     </span>
@@ -311,7 +311,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                         className="rounded-[12px] p-[17px] border"
                                                         style={{ background: 'var(--dash-secondary-bg)', borderColor: 'var(--dash-border)' }}
                                                     >
-                                                        <p className="text-[12px] text-[#c2c6d6] leading-[19.5px]">{t.message}</p>
+                                                        <p className="text-[12px] text-[var(--dash-text-muted)] leading-[19.5px]">{t.message}</p>
                                                     </div>
                                                 )}
                                             </div>

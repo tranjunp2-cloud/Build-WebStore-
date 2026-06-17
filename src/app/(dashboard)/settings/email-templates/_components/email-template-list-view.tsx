@@ -15,6 +15,17 @@ import {
     type EmailRecipient,
 } from '@/lib/email/types'
 import type { TemplateRow } from './EmailTemplatesClient'
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+    TableActionButton,
+} from '@/components/ui/table'
+import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
 
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
@@ -61,58 +72,6 @@ function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: st
     return ti(editedAgoTpl, { time: `${Math.floor(hrs / 24)}d` })
 }
 
-function HeaderCell({ children }: { children: React.ReactNode }) {
-    return (
-        <span
-            style={{
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: 12,
-                lineHeight: '1.333em',
-                letterSpacing: '0.025em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--dash-text-muted)',
-            }}
-        >
-            {children}
-        </span>
-    )
-}
-
-function SimpleToggle({ on, locked, onChange }: { on: boolean; locked?: boolean; onChange: (v: boolean) => void }) {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            disabled={locked}
-            onClick={(e) => { e.stopPropagation(); !locked && onChange(!on) }}
-            style={{ width: 36, height: 20 }}
-            className={`relative inline-flex shrink-0 rounded-full transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${on ? 'bg-green-500' : 'bg-slate-300'}`}
-        >
-            <span
-                style={{ width: 16, height: 16, top: 2, left: 2 }}
-                className={`pointer-events-none absolute rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`}
-            />
-        </button>
-    )
-}
-
-function StatusPill({ enabled, label }: { enabled: boolean; label: string }) {
-    const cfg = enabled
-        ? { bg: 'rgba(0,201,80,0.1)', border: 'rgba(0,201,80,0.3)', dot: '#00C950', text: '#05DF72' }
-        : { bg: 'rgba(148,163,184,0.08)', border: 'rgba(148,163,184,0.2)', dot: '#64748b', text: '#94a3b8' }
-    return (
-        <span
-            className="inline-flex items-center rounded-[12px]"
-            style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, gap: 7, padding: '4px 11px' }}
-        >
-            <span className="shrink-0 rounded-full" style={{ width: 7, height: 7, background: cfg.dot }} />
-            <span style={{ fontWeight: 500, fontSize: 13, color: cfg.text, whiteSpace: 'nowrap' as const }}>{label}</span>
-        </span>
-    )
-}
-
 interface Props {
     rows: TemplateRow[]
     audienceTab: 'buyer' | 'seller'
@@ -137,8 +96,8 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
 
     return (
         <div className="w-full">
-            <h1 className="text-2xl font-bold text-white mb-1">{et.title}</h1>
-            <p className="text-sm text-slate-400 mb-6">{et.subtitle}</p>
+            <h1 className="text-2xl font-bold text-[var(--dash-text)] mb-1">{et.title}</h1>
+            <p className="text-sm text-[var(--dash-text-muted)] mb-6">{et.subtitle}</p>
 
             {/* Tabs row — full-width baseline border; blue underline only under the active tab.
                 Preflight is off (tailwind.config.js) so Tailwind border utils have no border-style
@@ -154,14 +113,14 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                 type="button"
                                 onClick={() => onTabChange(tab)}
                                 className={`flex items-center gap-2 px-4 pb-2.5 text-sm font-medium transition-colors -mb-px ${
-                                    isActive ? 'text-white' : 'text-slate-400 hover:text-white'
+                                    isActive ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]'
                                 }`}
                                 style={{ borderBottom: isActive ? '2px solid var(--dash-accent)' : '2px solid transparent' }}
                             >
                                 {tab === 'buyer' ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
                                 {tab === 'buyer' ? et.buyerEmails : et.sellerEmails}
                                 <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
-                                    isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-slate-400'
+                                    isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]'
                                 }`}>
                                     {count}
                                 </span>
@@ -169,36 +128,30 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                         )
                     })}
                 </div>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-[var(--dash-text-muted)]">
                     {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
                 </span>
             </div>
 
             {/* Table */}
-            <div className="rounded-[16px] overflow-hidden border border-white/[0.08] bg-slate-800/60 mb-4">
-                <table className="w-full border-collapse">
+            <div className="mb-4">
+                <Table>
                     <colgroup>
                         <col />
                         <col style={{ width: 200 }} />
                         <col style={{ width: 140 }} />
                         <col style={{ width: 48 }} />
                     </colgroup>
-                    <thead>
-                        <tr style={{ background: 'var(--dash-surface)' }}>
-                            <th className="text-left" style={{ height: 48, padding: '14px 20px' }}>
-                                <HeaderCell>{et.colTemplate}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 48, padding: '14px 20px' }}>
-                                <HeaderCell>{et.colStatus}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 48, padding: '14px 20px' }}>
-                                <HeaderCell>{et.colLastEdited}</HeaderCell>
-                            </th>
-                            <th style={{ height: 48 }} />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {activeTypes.map((type, i) => {
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead style={{ height: 48, padding: '14px 20px' }}>{et.colTemplate}</TableHead>
+                            <TableHead style={{ height: 48, padding: '14px 20px' }}>{et.colStatus}</TableHead>
+                            <TableHead style={{ height: 48, padding: '14px 20px' }}>{et.colLastEdited}</TableHead>
+                            <TableHead style={{ height: 48 }} />
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {activeTypes.map((type) => {
                             const row = findRow(type)
                             const isEnabled = row ? row.enabled : true
                             const isCritical = CRITICAL_TYPES.includes(type)
@@ -206,18 +159,15 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                             const Icon = TEMPLATE_ICONS[type] ?? Mail
 
                             return (
-                                <tr
+                                <TableRow
                                     key={type}
-                                    style={{
-                                        borderBottom: i < activeTypes.length - 1 ? '1px solid var(--dash-border)' : 'none',
-                                        cursor: 'pointer',
-                                    }}
+                                    clickable
+                                    onClick={() => onSelectTemplate(type, recipient)}
                                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--dash-surface-hover)')}
                                     onMouseLeave={e => (e.currentTarget.style.background = '')}
-                                    onClick={() => onSelectTemplate(type, recipient)}
                                 >
                                     {/* Template column */}
-                                    <td style={{ padding: '14px 20px' }}>
+                                    <TableCell style={{ padding: '14px 20px' }}>
                                         <div className="flex items-center gap-3">
                                             <div
                                                 className={`flex items-center justify-center rounded-lg shrink-0 transition-colors ${isEnabled ? 'bg-blue-500/10' : 'bg-slate-500/10'}`}
@@ -259,53 +209,57 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                                 </p>
                                             </div>
                                         </div>
-                                    </td>
+                                    </TableCell>
 
-                                    {/* Status column */}
-                                    <td style={{ padding: '14px 20px' }}>
+                                    {/* Status column — themed Badge replaces old hardcoded StatusPill */}
+                                    <TableCell style={{ padding: '14px 20px' }}>
                                         <div
                                             className="flex items-center gap-2.5"
                                             onClick={e => e.stopPropagation()}
                                         >
-                                            <SimpleToggle
-                                                on={isEnabled}
-                                                locked={isCritical}
-                                                onChange={(val) => onToggleEnabled(type, recipient, val)}
+                                            <Switch
+                                                checked={isEnabled}
+                                                disabled={isCritical}
+                                                onCheckedChange={(val) => onToggleEnabled(type, recipient, val)}
                                             />
-                                            <StatusPill enabled={isEnabled} label={isEnabled ? et.enabled : et.disabled} />
+                                            <Badge
+                                                variant={isEnabled ? 'success' : 'secondary'}
+                                                dot
+                                                className="rounded-full"
+                                            >
+                                                {isEnabled ? et.enabled : et.disabled}
+                                            </Badge>
                                         </div>
-                                    </td>
+                                    </TableCell>
 
                                     {/* Last edited column */}
-                                    <td style={{ padding: '14px 20px' }}>
+                                    <TableCell style={{ padding: '14px 20px' }}>
                                         <span style={{ fontSize: 13, color: 'var(--dash-text-muted)', whiteSpace: 'nowrap' as const }}>
                                             {relTime(row?.updatedAt, et.neverEdited, et.editedAgo, ti)}
                                         </span>
-                                    </td>
+                                    </TableCell>
 
                                     {/* Edit button column */}
-                                    <td style={{ padding: '14px 12px' }}>
-                                        <button
-                                            type="button"
+                                    <TableCell style={{ padding: '14px 12px' }}>
+                                        <TableActionButton
                                             onClick={(e) => { e.stopPropagation(); onSelectTemplate(type, recipient) }}
-                                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
                                             title={et.editTemplate}
                                         >
-                                            <Edit2 style={{ width: 14, height: 14 }} />
-                                        </button>
-                                    </td>
-                                </tr>
+                                            <Edit2 className="h-4 w-4" />
+                                        </TableActionButton>
+                                    </TableCell>
+                                </TableRow>
                             )
                         })}
-                    </tbody>
-                </table>
+                    </TableBody>
+                </Table>
             </div>
 
             {/* Footer tip */}
-            <div className="flex items-start gap-2 rounded-lg bg-white/[0.03] border border-white/[0.08] px-4 py-3 text-xs text-slate-400">
-                <Info className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+            <div className="flex items-start gap-2 rounded-lg px-4 py-3 text-xs" style={{ background: 'var(--dash-surface-hover)', border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}>
+                <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--dash-text-muted)' }} />
                 <span>
-                    <strong className="text-white">{et.footerTitle}</strong>{' '}
+                    <strong className="text-[var(--dash-text)]">{et.footerTitle}</strong>{' '}
                     {et.footerDesc}
                 </span>
             </div>

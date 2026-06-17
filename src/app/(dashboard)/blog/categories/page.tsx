@@ -171,7 +171,7 @@ export default function BlogCategoriesPage() {
                         <div className="flex flex-col w-full space-y-[-1px]">
                             {loading ? (
                                 <div className="flex flex-col p-[12px] gap-[12px] border-[1px] border-[var(--dash-border)] rounded-[12px] animate-pulse h-[52px]">
-                                    <div className="w-[100px] h-[16px] bg-white/10 rounded-[4px] mt-[4px]"></div>
+                                    <div className="w-[100px] h-[16px] bg-[var(--dash-surface-hover)] rounded-[4px] mt-[4px]"></div>
                                 </div>
                             ) : categories.length === 0 ? (
                                 <div className="flex flex-col p-[12px] gap-[12px] border-[1px] border-[var(--dash-border)] rounded-[12px] items-center justify-center py-[24px]">
@@ -186,7 +186,7 @@ export default function BlogCategoriesPage() {
                                     return (
                                         <div
                                             key={cat.id}
-                                            className={`flex flex-col p-[12px] gap-[12px] border-[1px] border-[var(--dash-border)] hover:bg-white/5 transition-colors group ${roundedClass}`}
+                                            className={`flex flex-col p-[12px] gap-[12px] border-[1px] border-[var(--dash-border)] hover:bg-black/[0.03] dark:hover:bg-white/5 transition-colors group ${roundedClass}`}
                                         >
                                             {editingId === cat.id ? (
                                                 <div className="flex flex-row items-center gap-[12px] overflow-hidden">
@@ -200,7 +200,7 @@ export default function BlogCategoriesPage() {
                                                         autoFocus
                                                         className="flex-1 min-w-0 px-[12px] py-[4px] h-[26px] bg-[var(--dash-bg)] border-[1px] border-[var(--dash-border)] rounded-[12px] font-['Inter'] font-[500] text-[12px] text-[var(--dash-text)] outline-none"
                                                     />
-                                                    <button onClick={handleUpdate} disabled={!editName.trim() || isUpdating} className="shrink-0 text-cyan-400 p-[4px] hover:bg-white/10 rounded">
+                                                    <button onClick={handleUpdate} disabled={!editName.trim() || isUpdating} className="shrink-0 text-cyan-400 p-[4px] hover:bg-black/[0.05] dark:hover:bg-white/10 rounded">
                                                         {isUpdating ? <Loader2 className="w-[14px] h-[14px] animate-spin" /> : <Check className="w-[14px] h-[14px]" />}
                                                     </button>
                                                     <button onClick={() => setEditingId(null)} className="shrink-0 text-[var(--dash-text-muted)] p-[4px] hover:bg-[var(--dash-surface-hover)] rounded">
@@ -242,7 +242,7 @@ export default function BlogCategoriesPage() {
                     {/* Add new Category */}
                     {showCreateInput ? (
                         <div className="flex flex-row items-center gap-[12px] w-full mt-[8px] overflow-hidden">
-                            <Plus className="w-[24px] h-[24px] shrink-0 text-white opacity-50" strokeWidth={1.5} />
+                            <Plus className="w-[24px] h-[24px] shrink-0 text-[var(--dash-text-muted)]" strokeWidth={1.5} />
                             <input
                                 value={newName}
                                 onChange={e => setNewName(e.target.value)}
@@ -252,7 +252,7 @@ export default function BlogCategoriesPage() {
                                 className="flex-1 min-w-0 bg-transparent font-['Inter'] font-[600] text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-text-muted)] border-b-[1px] border-b-[var(--dash-border)] pb-[4px]"
                             />
                             <div className="flex shrink-0 gap-[4px]">
-                                <button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="p-[4px] text-cyan-400 hover:bg-white/10 rounded">
+                                <button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="p-[4px] text-cyan-400 hover:bg-black/[0.05] dark:hover:bg-white/10 rounded">
                                     {isCreating ? <Loader2 className="w-[16px] h-[16px] animate-spin" /> : <Check className="w-[16px] h-[16px]" />}
                                 </button>
                                 <button onClick={() => { setShowCreateInput(false); setNewName('') }} className="p-[4px] text-[var(--dash-text-muted)] hover:bg-[var(--dash-surface-hover)] rounded hover:text-[var(--dash-text)]">
@@ -265,7 +265,7 @@ export default function BlogCategoriesPage() {
                             onClick={() => setShowCreateInput(true)}
                             className="flex flex-row items-center w-full gap-[6px] hover:opacity-80 transition-opacity"
                         >
-                            <Plus className="w-[24px] h-[24px] text-white" strokeWidth={1.5} />
+                            <Plus className="w-[24px] h-[24px] text-[var(--dash-text)]" strokeWidth={1.5} />
                             <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[var(--dash-text)]">{cp.addNew}</span>
                         </button>
                     )}
@@ -287,7 +287,7 @@ export default function BlogCategoriesPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-[16px] border border-[var(--dash-border)] bg-[var(--dash-surface)] p-[24px] shadow-2xl">
                         <div className="flex items-center justify-between mb-[16px]">
-                            <h3 className="text-[18px] font-bold text-white flex items-center gap-[8px]">
+                            <h3 className="text-[18px] font-bold text-[var(--dash-text)] flex items-center gap-[8px]">
                                 <AlertTriangle className="w-[20px] h-[20px] text-red-500" />
                                 {cp.deleteTitle}
                             </h3>
@@ -295,7 +295,7 @@ export default function BlogCategoriesPage() {
                                 <X className="w-[20px] h-[20px]" />
                             </button>
                         </div>
-                        <p className="text-[14px] text-gray-400 mb-[8px]">
+                        <p className="text-[14px] text-[var(--dash-text-muted)] mb-[8px]">
                             {cp.deleteConfirm.replace('{name}', deleteTarget.name)}
                         </p>
                         {deleteTarget.publishedCount > 0 && (
@@ -306,7 +306,7 @@ export default function BlogCategoriesPage() {
                                 </p>
                             </div>
                         )}
-                        <p className="text-[13px] text-gray-500 mb-[24px]">
+                        <p className="text-[13px] text-[var(--dash-text-muted)] mb-[24px]">
                             {cp.deleteWarning}
                         </p>
                         <div className="flex justify-end gap-[12px]">

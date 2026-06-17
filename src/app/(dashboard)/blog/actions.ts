@@ -357,6 +357,7 @@ export async function listBlogsAction(params: {
     status?: string
     category?: string
     page?: number
+    limit?: number
     sort?: string
 }) {
     const user = await getCurrentUser()
@@ -386,7 +387,7 @@ export async function listBlogsAction(params: {
         where,
         sort: sortField,
         page: params.page || 1,
-        limit: 10,
+        limit: params.limit || 10,
     })
 
     return JSON.parse(JSON.stringify({
@@ -395,6 +396,7 @@ export async function listBlogsAction(params: {
             totalDocs: result.totalDocs,
             totalPages: result.totalPages,
             page: result.page,
+            limit: result.limit,
             hasNextPage: result.hasNextPage,
             hasPrevPage: result.hasPrevPage,
         },

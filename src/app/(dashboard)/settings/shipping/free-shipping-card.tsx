@@ -4,6 +4,7 @@ import { Gift, Info, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
+import { Switch } from '@/components/ui/switch'
 
 type Props = {
     freeEnabled: boolean
@@ -34,25 +35,12 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                         <p className="mt-1 text-[13px] text-slate-50/50">{s.freeSubtitle}</p>
                     </div>
                 </div>
-                {/* Cyan toggle */}
-                <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-1">
-                    <span className="sr-only">{s.freeTitle}</span>
-                    <input
-                        type="checkbox"
-                        className="peer sr-only"
-                        checked={freeEnabled}
-                        onChange={e => onToggle(e.target.checked)}
-                    />
-                    <div className={cn(
-                        "h-[28px] w-[50px] rounded-full border transition-all",
-                        "after:absolute after:left-[3px] after:top-[3px] after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:transition-all after:content-[''] after:shadow-[0_0_0_1.5px_rgba(0,0,0,0.12)]",
-                        "peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50",
-                        "peer-checked:after:translate-x-[22px]",
-                        freeEnabled
-                            ? "bg-gradient-to-r from-cyan-500 to-teal-400 border-transparent shadow-[0_0_10px_rgba(6,182,212,0.35)]"
-                            : "bg-slate-300 dark:bg-[#0B1120] border-slate-400 dark:border-white/[0.12]"
-                    )} />
-                </label>
+                <Switch
+                    checked={freeEnabled}
+                    onCheckedChange={onToggle}
+                    aria-label={s.freeTitle}
+                    className="mt-1 shrink-0"
+                />
             </div>
 
             {/* Input section */}
