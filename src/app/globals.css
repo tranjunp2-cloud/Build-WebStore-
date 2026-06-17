@@ -126,6 +126,17 @@
 .dash-tab-trigger { border-bottom: 2px solid transparent; }
 .dash-tab-trigger[data-state="active"] { border-bottom-color: var(--dash-accent); }
 
+/* ── Base Table (GH-1222) ───────────────────────────────────────────────────
+   Preflight is OFF, so `border-b`/`divide-y` utilities emit border-width but no
+   border-style and render invisible. Paint row separators here with the full
+   shorthand so every dashboard <table className="dash-table"> shows lines in
+   both themes. `:last-child` drops the trailing line (the wrapper's own border
+   closes the box). Header row + body rows use the themed --dash-border. */
+.dash-table { width: 100%; border-collapse: collapse; }
+.dash-table thead tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr:last-child { border-bottom: none; }
+
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
 /* Dark mode (default — matches current hardcoded values) */
 :root {
@@ -534,8 +545,9 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell .border-white\/\[0\.05\] { border-color: var(--dash-border); }
 
 /* ── TopHeader: force opaque background to prevent scroll overlap ─ */
+/* Top header bg matches the sidebar column so the two read as one surface. */
 .dash-shell header {
-    background-color: var(--dash-surface) !important;
+    background-color: var(--dash-sidebar-bg) !important;
 }
 
 /* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */

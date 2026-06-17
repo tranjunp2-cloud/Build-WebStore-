@@ -13,6 +13,15 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { scanDbTemplates, type DriftFinding } from '@/lib/ai/template-drift-validator'
 import { Badge } from '@/components/ui/badge'
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+} from '@/components/ui/table'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { DriftActions } from './drift-actions.client'
 
 export const dynamic = 'force-dynamic'
@@ -92,42 +101,47 @@ export default async function TemplatesHealthPage() {
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-white">Templates Health</h1>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <h1 className="text-2xl font-semibold" style={{ color: 'var(--dash-text)' }}>Templates Health</h1>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--dash-text-muted)' }}>
                         Drift state for DB templates vs live block registry. Total: {summary.total} · OK: {summary.ok} · Warn: {summary.warn} · Broken: {summary.broken}
                     </p>
                 </div>
                 <DriftActions />
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-[#0F172A] overflow-hidden">
-                {rows.length === 0 ? (
-                    <p className="p-6 text-sm text-gray-400">No templates in DB. Click “Re-seed templates” to populate.</p>
-                ) : (
-                    <table className="w-full text-sm">
-                        <thead className="bg-white/5 text-gray-400">
-                            <tr>
-                                <th className="text-left px-4 py-3 font-medium">Name</th>
-                                <th className="text-left px-4 py-3 font-medium">Category</th>
-                                <th className="text-left px-4 py-3 font-medium">Pages</th>
-                                <th className="text-left px-4 py-3 font-medium">Drift</th>
-                                <th className="text-left px-4 py-3 font-medium">Findings</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5 text-gray-200">
-                            {rows.map((r) => (
-                                <tr key={r.id} className="hover:bg-white/5">
-                                    <td className="px-4 py-3">{r.name}</td>
-                                    <td className="px-4 py-3 text-gray-400">{r.category}</td>
-                                    <td className="px-4 py-3 text-gray-400">{r.pagesCount}</td>
-                                    <td className="px-4 py-3"><Badge variant={badgeVariant(r.status)}>{badgeLabel(r.status)}</Badge></td>
-                                    <td className="px-4 py-3 text-gray-400">{r.findings.length}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            {rows.length === 0 ? (
+                <TableEmptyState
+                    title="No templates in DB"
+                    subtitle="Click &quot;Re-seed templates&quot; to populate."
+                />
+            ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Pages</TableHead>
+                            <TableHead>Drift</TableHead>
+                            <TableHead>Findings</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.map((r) => (
+                            <TableRow key={r.id}>
+                                <TableCell style={{ color: 'var(--dash-text)' }}>{r.name}</TableCell>
+                                <TableCell style={{ color: 'var(--dash-text-muted)' }}>{r.category}</TableCell>
+                                <TableCell style={{ color: 'var(--dash-text-muted)' }}>{r.pagesCount}</TableCell>
+                                <TableCell>
+                                    <Badge variant={badgeVariant(r.status)} dot className="rounded-full">
+                                        {badgeLabel(r.status)}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell style={{ color: 'var(--dash-text-muted)' }}>{r.findings.length}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            )}
         </div>
     )
 }

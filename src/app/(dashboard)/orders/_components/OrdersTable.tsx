@@ -3,8 +3,18 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { OrdersPagination } from './OrdersPagination'
+import { TablePagination } from '@/components/ui/table-pagination'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
 // ───────── TYPES ─────────
 export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
@@ -21,37 +31,44 @@ export interface Order {
     createdAt?: string | null
 }
 
-const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotColor: string; textColor: string }> = {
-    'pending': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
-    'new': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
-    'confirmed': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
-    'ready_to_ship': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
-    'shipped': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
-    'completed': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
-    'cancelled': { bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)', dotColor: '#FB2C36', textColor: '#FF6467' },
-    'refunded': { bg: 'rgba(178,53,74,0.1)', borderColor: '#B2354A', dotColor: '#B2354A', textColor: '#B2354A' },
-    'paid': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
-    'processing': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
-    'payment_failed': { bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)', dotColor: '#FB2C36', textColor: '#FF6467' },
+// Maps OrderStatus → Badge variant + dot color override for statuses that need
+// specific hex values not covered by the four generic badge variants.
+const STATUS_BADGE: Record<OrderStatus, {
+    variant: 'warning' | 'default' | 'success' | 'destructive' | 'secondary'
+    dotColor?: string
+    textColor?: string
+    bg?: string
+    borderColor?: string
+}> = {
+    pending:         { variant: 'warning',     dotColor: '#FF6900', textColor: '#FF8904', bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)' },
+    new:             { variant: 'warning',     dotColor: '#FF6900', textColor: '#FF8904', bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)' },
+    confirmed:       { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
+    ready_to_ship:   { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
+    shipped:         { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
+    completed:       { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
+    cancelled:       { variant: 'destructive', dotColor: '#FB2C36', textColor: '#FF6467', bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)' },
+    refunded:        { variant: 'secondary',   dotColor: '#B2354A', textColor: '#B2354A', bg: 'rgba(178,53,74,0.1)', borderColor: '#B2354A' },
+    paid:            { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
+    processing:      { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
+    payment_failed:  { variant: 'destructive', dotColor: '#FB2C36', textColor: '#FF6467', bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)' },
 }
 
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
     const keyMap: Record<OrderStatus, string> = {
-        'pending': 'pending',
-        'new': 'pending',
-        'confirmed': 'confirmed',
-        'ready_to_ship': 'readyToShip',
-        'shipped': 'shipped',
-        'completed': 'completed',
-        'cancelled': 'cancelled',
-        'refunded': 'refunded',
-        'paid': 'paid',
-        'processing': 'processing',
-        'payment_failed': 'pending',
+        pending:       'pending',
+        new:           'pending',
+        confirmed:     'confirmed',
+        ready_to_ship: 'readyToShip',
+        shipped:       'shipped',
+        completed:     'completed',
+        cancelled:     'cancelled',
+        refunded:      'refunded',
+        paid:          'paid',
+        processing:    'processing',
+        payment_failed:'pending',
     }
-    return (statusLabels as any)[keyMap[status]] || status
+    return (statusLabels as Record<string, string>)[keyMap[status]] || status
 }
-
 
 function formatOrderDate(iso?: string | null): string {
     if (!iso) return '—'
@@ -59,39 +76,31 @@ function formatOrderDate(iso?: string | null): string {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-// ───────── STATUS BADGE COMPONENT ─────────
+// ───────── STATUS BADGE ─────────
+// Uses the shared Badge component; colors preserved via inline style overrides
+// so the exact hex values from the original STATUS_STYLE map are kept.
 function StatusBadge({ status, label }: { status: OrderStatus; label: string }) {
-    const cfg = STATUS_STYLE[status] || STATUS_STYLE['pending']
+    const cfg = STATUS_BADGE[status] ?? STATUS_BADGE['pending']
     return (
-        <span
-            className="inline-flex items-center rounded-[12px]"
+        <Badge
+            variant={cfg.variant}
+            dot
+            className="rounded-full px-2.5 py-0.5 border-solid whitespace-nowrap"
             style={{
                 background: cfg.bg,
-                border: `1px solid ${cfg.borderColor}`,
-                gap: '8px',
-                padding: '5px 13px',
+                borderColor: cfg.borderColor,
+                color: cfg.textColor,
+                // Override the dot span color via currentColor inheritance
             }}
         >
-            <span
-                className="shrink-0 rounded-full"
-                style={{ width: 8, height: 8, background: cfg.dotColor }}
-            />
-            <span
-                style={{
-                    fontFamily: 'Inter, sans-serif',
-                    fontWeight: 500,
-                    fontSize: 14,
-                    lineHeight: '1.4285714285714286em',
-                    color: cfg.textColor,
-                    whiteSpace: 'nowrap',
-                }}
-            >
-                {label}
-            </span>
-        </span>
+            {label}
+        </Badge>
     )
 }
 
+// ───────── CHECKBOX (row selection with indeterminate support) ─────────
+// Kept as a checkbox (not Switch) because it needs indeterminate state for
+// "select all" semantics which Switch does not model.
 function Checkbox({
     checked,
     indeterminate,
@@ -159,44 +168,7 @@ function Checkbox({
     )
 }
 
-function HeaderCell({ children }: { children: React.ReactNode }) {
-    return (
-        <span
-            style={{
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: 600,
-                fontSize: 12,
-                lineHeight: '1.3333333333333333em',
-                letterSpacing: '0.025em',
-                textTransform: 'uppercase',
-                color: 'var(--dash-text-muted)',
-            }}
-        >
-            {children}
-        </span>
-    )
-}
-
-function EmptyOrderState({ text }: { text: string }) {
-    return (
-        <div className="flex flex-col w-full items-center justify-center gap-[16px] py-[64px]">
-            <Package className="w-[64px] h-[64px] text-[rgba(248,250,252,0.2)]" strokeWidth={2} />
-            <span
-                style={{
-                    fontFamily: 'Inter, sans-serif',
-                    fontWeight: 400,
-                    fontSize: 16,
-                    lineHeight: '1.5em',
-                    color: 'var(--dash-text-muted)',
-                }}
-            >
-                {text}
-            </span>
-        </div>
-    )
-}
-
-interface TableProps {
+interface InnerTableProps {
     orders: Order[]
     loading: boolean
     onSelectOrder?: (orderId: string) => void
@@ -204,15 +176,17 @@ interface TableProps {
     selectedRows: Set<string>
     onSelectionChange: (selectedIds: Set<string>) => void
     newOrderIds?: Set<string>
+    /** Pagination row: rendered in the desktop Table card footer + below the mobile cards. */
+    footer?: React.ReactNode
 }
 
-function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange, newOrderIds }: TableProps) {
+function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange, newOrderIds, footer }: InnerTableProps) {
     const { t } = useI18n()
     const o = t.dashboard.orders
     const statusLabels = o.status
-    const methodLabels = (o.detail as any).paymentMethods as Record<string, string>
-    const allSelected = orders.length > 0 && orders.every(o => selectedRows.has(o.id))
-    const someSelected = orders.some(o => selectedRows.has(o.id)) && !allSelected
+    const methodLabels = (o.detail as Record<string, unknown>).paymentMethods as Record<string, string>
+    const allSelected = orders.length > 0 && orders.every(ord => selectedRows.has(ord.id))
+    const someSelected = orders.some(ord => selectedRows.has(ord.id)) && !allSelected
     const allCheckboxRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -224,11 +198,11 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
     function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
         if (e.target.checked) {
             const next = new Set(selectedRows)
-            orders.forEach(o => next.add(o.id))
+            orders.forEach(ord => next.add(ord.id))
             onSelectionChange(next)
         } else {
             const next = new Set(selectedRows)
-            orders.forEach(o => next.delete(o.id))
+            orders.forEach(ord => next.delete(ord.id))
             onSelectionChange(next)
         }
     }
@@ -240,14 +214,17 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
         onSelectionChange(next)
     }
 
+    // Empty state — shown in place of the table (both mobile and desktop) when not loading and no orders.
+    if (!loading && orders.length === 0) {
+        return <TableEmptyState icon={<Package />} title={o.tableHeaders.noOrders} />
+    }
+
     return (
         <div className="w-full">
             {/* Mobile View: Stacked Cards */}
             <div className="flex flex-col md:hidden w-full gap-4">
                 {loading ? (
                     <div className="p-8 text-center text-slate-400">{o.tableHeaders.loading}</div>
-                ) : orders.length === 0 ? (
-                    <EmptyOrderState text={o.tableHeaders.noOrders} />
                 ) : (
                     orders.map((order) => {
                         const isSelected = selectedRows.has(order.id)
@@ -293,73 +270,51 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                 )}
             </div>
 
-            {/* Desktop View: Table */}
-            <div className="hidden md:block w-full overflow-x-auto overflow-y-auto" style={{ maxHeight: 685 }}>
-                <table
-                    className="w-full border-collapse"
-                    style={{ tableLayout: 'fixed', minWidth: 1100 }}
-                >
+            {/* Mobile pager (the desktop pager lives in the Table card footer slot) */}
+            {footer && <div className="md:hidden">{footer}</div>}
+
+            {/* Desktop View: Table — base primitives; pager sits in the card footer slot */}
+            <div className="hidden md:block w-full">
+                <Table minWidth={1100} className="table-fixed w-full" footer={footer}>
+                    {/* table-fixed + % colgroup: 4 middle columns (customer, total, payment,
+                        date) equal width (17%); edge columns (order #, status) 16%. All columns
+                        left-aligned for an even left-to-right rhythm. */}
                     <colgroup>
                         <col style={{ width: '16%' }} />
-                        <col style={{ width: '22%' }} />
-                        <col style={{ width: '13%' }} />
+                        <col style={{ width: '17%' }} />
+                        <col style={{ width: '17%' }} />
+                        <col style={{ width: '17%' }} />
+                        <col style={{ width: '17%' }} />
                         <col style={{ width: '16%' }} />
-                        <col style={{ width: '14%' }} />
-                        <col style={{ width: '19%' }} />
                     </colgroup>
 
-                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                        <tr style={{ background: 'var(--dash-surface)' }}>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.orderNumber}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.customer}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.total}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.paymentMethod}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.orderDate}</HeaderCell>
-                            </th>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
-                                <HeaderCell>{o.tableHeaders.status}</HeaderCell>
-                            </th>
-                        </tr>
-                    </thead>
+                    <TableHeader>
+                        <TableRow style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                            <TableHead>{o.tableHeaders.orderNumber}</TableHead>
+                            <TableHead>{o.tableHeaders.customer}</TableHead>
+                            <TableHead>{o.tableHeaders.total}</TableHead>
+                            <TableHead>{o.tableHeaders.paymentMethod}</TableHead>
+                            <TableHead>{o.tableHeaders.orderDate}</TableHead>
+                            <TableHead>{o.tableHeaders.status}</TableHead>
+                        </TableRow>
+                    </TableHeader>
 
-                    <tbody>
+                    <TableBody>
                         {loading ? (
-                            <tr>
-                                <td colSpan={6} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-[60px]">
                                     <span style={{ color: 'var(--dash-text-muted)' }}>{o.tableHeaders.loading}</span>
-                                </td>
-                            </tr>
-                        ) : orders.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} style={{ padding: 0 }}>
-                                    <EmptyOrderState text={o.tableHeaders.noOrders} />
-                                </td>
-                            </tr>
-                        ) : orders.map((order, i) => {
-                            const isEdgeRow = i === 0 || i === orders.length - 1
-                            const rowHeight = isEdgeRow ? 62 : 63
-                            const textPadY = isEdgeRow ? 21 : 21.5
+                                </TableCell>
+                            </TableRow>
+                        ) : orders.map((order) => {
                             const isSelected = selectedRows.has(order.id)
                             const isDetailOpen = selectedOrderId === order.id
 
                             return (
-                                <tr
+                                <TableRow
                                     key={order.id}
-                                    className="cursor-pointer"
+                                    clickable
                                     style={{
-                                        height: rowHeight,
-                                        borderBottom: i < orders.length - 1
-                                            ? '1px solid var(--dash-border)'
-                                            : 'none',
                                         background: isDetailOpen
                                             ? 'rgba(59,130,246,0.12)'
                                             : newOrderIds?.has(order.id)
@@ -368,89 +323,40 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                         transition: 'background 1s ease-out',
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id))
+                                            (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
                                     }}
                                     onMouseLeave={e => {
-                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = ''
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id))
+                                            (e.currentTarget as HTMLTableRowElement).style.background = ''
                                     }}
                                     onClick={() => {
                                         if (onSelectOrder) onSelectOrder(order.id)
                                     }}
                                 >
-                                    <td style={{ padding: `${textPadY}px 24px` }}>
-                                        <span
-                                            style={{
-                                                fontFamily: 'Inter, sans-serif',
-                                                fontWeight: 600,
-                                                fontSize: 14,
-                                                lineHeight: '1.4285714285714286em',
-                                                color: 'var(--dash-text)',
-                                            }}
-                                        >
-                                            {order.orderNumber}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: `${textPadY}px 24px` }}>
-                                        <span
-                                            style={{
-                                                fontFamily: 'Inter, sans-serif',
-                                                fontWeight: 400,
-                                                fontSize: 14,
-                                                lineHeight: '1.4285714285714286em',
-                                                color: 'var(--dash-text)',
-                                            }}
-                                        >
-                                            {order.customerName || 'N/A'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: `${textPadY}px 24px` }}>
-                                        <span
-                                            style={{
-                                                fontFamily: 'Inter, sans-serif',
-                                                fontWeight: 600,
-                                                fontSize: 14,
-                                                lineHeight: '1.4285714285714286em',
-                                                color: 'var(--dash-text)',
-                                            }}
-                                        >
-                                            {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: `${textPadY}px 24px` }}>
-                                        <span
-                                            style={{
-                                                fontFamily: 'Inter, sans-serif',
-                                                fontWeight: 400,
-                                                fontSize: 14,
-                                                lineHeight: '1.4285714285714286em',
-                                                color: 'var(--dash-text-muted)',
-                                            }}
-                                        >
-                                            {order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: `${textPadY}px 24px` }}>
-                                        <span
-                                            style={{
-                                                fontFamily: 'Inter, sans-serif',
-                                                fontWeight: 400,
-                                                fontSize: 13,
-                                                lineHeight: '1.4285714285714286em',
-                                                color: 'var(--dash-text-muted)',
-                                                whiteSpace: 'nowrap',
-                                            }}
-                                        >
-                                            {formatOrderDate(order.createdAt)}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '16px 24px' }}>
+                                    <TableCell style={{ color: 'var(--dash-text)', fontWeight: 600 }}>
+                                        {order.orderNumber}
+                                    </TableCell>
+                                    <TableCell style={{ color: 'var(--dash-text)' }}>
+                                        {order.customerName || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap" style={{ color: 'var(--dash-text)', fontWeight: 600 }}>
+                                        {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
+                                    </TableCell>
+                                    <TableCell style={{ color: 'var(--dash-text-muted)' }}>
+                                        {order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap" style={{ color: 'var(--dash-text-muted)' }}>
+                                        {formatOrderDate(order.createdAt)}
+                                    </TableCell>
+                                    <TableCell>
                                         <StatusBadge status={order.status} label={getStatusLabel(order.status, statusLabels)} />
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             )
                         })}
-                    </tbody>
-                </table>
+                    </TableBody>
+                </Table>
             </div>
         </div>
     )
@@ -486,8 +392,10 @@ export function OrdersTable({
     const [orders, setOrders] = useState<Order[]>([])
     const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1)
-    const [totalPages, setTotalPages] = useState(1)
+    const [total, setTotal] = useState(0)
+    const [limit, setLimit] = useState(10)
     const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
+    const { t } = useI18n()
 
     // Refs keep latest filter values accessible inside the silentFetch effect without
     // adding them as deps (which would turn silent-refresh into a full reload on every filter change)
@@ -526,7 +434,7 @@ export function OrdersTable({
         async function fetchOrders() {
             try {
                 setLoading(true)
-                let url = `/api/orders?page=${effectivePage}&limit=10&sort=${encodeURIComponent(sortOrder)}`
+                let url = `/api/orders?page=${effectivePage}&limit=${limit}&sort=${encodeURIComponent(sortOrder)}`
                 if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
                 if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
                 if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
@@ -538,7 +446,7 @@ export function OrdersTable({
 
                 if (data.success && data.docs) {
                     setOrders(data.docs)
-                    setTotalPages(data.totalPages || 1)
+                    setTotal(data.totalDocs ?? data.total ?? data.docs.length)
                     if (onOrdersLoaded) onOrdersLoaded(data.docs)
                 }
             } catch (err) {
@@ -548,7 +456,7 @@ export function OrdersTable({
             }
         }
         fetchOrders()
-    }, [page, refreshCounter, searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
+    }, [page, limit, refreshCounter, searchQuery, statusFilter, dateFilter, paymentMethodFilter, sortOrder])
 
     // Silent background merge — only on page 1, no loading spinner, preserves scroll/selection
     useEffect(() => {
@@ -557,7 +465,7 @@ export function OrdersTable({
 
         async function silentFetch() {
             try {
-                let url = `/api/orders?page=1&limit=10&sort=${encodeURIComponent(sortOrderRef.current)}`
+                let url = `/api/orders?page=1&limit=${limit}&sort=${encodeURIComponent(sortOrderRef.current)}`
                 // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
                 if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
                 if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
@@ -575,10 +483,10 @@ export function OrdersTable({
                 // side-effect-in-updater (setNewOrderIds called outside, once, not in updater).
                 let capturedFreshIds: Set<string> | null = null
                 setOrders((prev) => {
-                    const existingIds = new Set(prev.map((o) => o.id))
-                    const fresh = incoming.filter((o) => !existingIds.has(o.id))
+                    const existingIds = new Set(prev.map((ord) => ord.id))
+                    const fresh = incoming.filter((ord) => !existingIds.has(ord.id))
                     if (fresh.length === 0) return prev
-                    capturedFreshIds = new Set(fresh.map((o) => o.id))
+                    capturedFreshIds = new Set(fresh.map((ord) => ord.id))
                     return [...fresh, ...prev]
                 })
                 if (capturedFreshIds) {
@@ -592,7 +500,6 @@ export function OrdersTable({
                         })
                     }, 4000)
                 }
-                setTotalPages(data.totalPages || 1)
                 if (onOrdersLoadedRef.current) onOrdersLoadedRef.current(incoming)
             } catch (err) {
                 console.error('[Orders] Silent refresh failed:', err)
@@ -602,10 +509,10 @@ export function OrdersTable({
     }, [silentRefreshTrigger])
 
     return (
-        <div
-            className="flex flex-col w-full md:rounded-[16px] md:overflow-hidden md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
-        >
-            <Table
+        // No outer card here — the base Table provides the single card; the pager is
+        // passed into its footer slot (and rendered under the mobile cards by Inner).
+        <div className="flex flex-col w-full">
+            <OrdersTableInner
                 orders={orders}
                 loading={loading}
                 onSelectOrder={onSelectOrder}
@@ -613,15 +520,17 @@ export function OrdersTable({
                 selectedRows={selectedRows}
                 onSelectionChange={onSelectionChange || (() => { })}
                 newOrderIds={newOrderIds}
+                footer={total > 0 ? (
+                    <TablePagination
+                        page={page}
+                        total={total}
+                        limit={limit}
+                        onPageChange={(p) => setPage(p)}
+                        onLimitChange={(l) => { setLimit(l); setPage(1) }}
+                        labels={{ unit: t.dashboard.orders.orders }}
+                    />
+                ) : undefined}
             />
-
-            <div className="flex items-center justify-end px-6 py-3">
-                <OrdersPagination
-                    currentPage={page}
-                    totalPages={totalPages}
-                    onPageChange={(p) => setPage(p)}
-                />
-            </div>
         </div>
     )
 }

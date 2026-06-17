@@ -105,7 +105,7 @@ export function CustomersDetail({ customer }: Props) {
                 <button
                     type="button"
                     onClick={() => router.push('/customers')}
-                    className="flex items-center justify-center w-9 h-9 rounded-[10px] text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors border-none bg-transparent cursor-pointer shrink-0"
+                    className="flex items-center justify-center w-9 h-9 rounded-[10px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors border-none bg-transparent cursor-pointer shrink-0"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -142,7 +142,8 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleRevert}
                             disabled={saving}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-white/70 border border-white/[0.1] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-50"
+                            style={{ border: '1px solid var(--dash-border)' }}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-50"
                         >
                             <Undo2 className="w-3 h-3" /> {cd.revert}
                         </button>
@@ -161,7 +162,7 @@ export function CustomersDetail({ customer }: Props) {
             )}
 
             {/* Tab bar */}
-            <div className="flex gap-1 border-b border-white/[0.06]">
+            <div className="flex gap-1" style={{ borderBottom: '1px solid var(--dash-border)' }}>
                 <button
                     type="button"
                     onClick={() => setActiveTab('default')}
@@ -207,8 +208,8 @@ export function CustomersDetail({ customer }: Props) {
             {/* Sticky save bar — only on Default tab */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t border-white/[0.06] z-40"
-                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)' }}
+                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 z-40"
+                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--dash-border)' }}
                 >
                     <span style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
                         {dirty ? cd.unsaved : cd.upToDate}
@@ -220,7 +221,8 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleRevert}
                             disabled={!dirty || saving}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-white/70 border border-white/[0.1] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-40"
+                            style={{ border: '1px solid var(--dash-border)' }}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-40"
                         >
                             <Undo2 className="w-3 h-3" /> {cd.revert}
                         </button>

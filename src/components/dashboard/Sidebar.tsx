@@ -9,7 +9,7 @@
  * - Badges: neutral pill on the right of the label, driven by the `badgeCounts` prop only
  *   (no fake data — nothing renders until the layout wires real counts), hidden when 0/undefined.
  * - Active item: cyan highlight (#06B6D4 — PrimeWeb brand accent, per approved mock).
- * - Footer (language switch + logout) and mobile drawer behavior are unchanged from F18 v1.
+ * - Footer (language switch) and mobile drawer behavior are unchanged from F18 v1.
  * - Collapse/mini mode (phase-02): desktop aside shrinks to 64px icon-only with EN tooltips
  *   and dot badges; the mobile drawer always renders full. State lives in CMSLayoutClient.
  *
@@ -20,7 +20,7 @@
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe, LogOut } from 'lucide-react'
+import { Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -94,21 +94,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
         }
     }, [mobileOpen])
 
-    // ─── Logout (shared by full + mini footer) ───────────────────
-    const handleLogout = async () => {
-        try {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include',
-            })
-        } catch (error) {
-            console.error('Logout failed:', error)
-        } finally {
-            document.cookie =
-                'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
-            window.location.href = '/login'
-        }
-    }
+    // Logout lives in the top-header user menu (UserAvatarMenu) — removed from the sidebar footer.
 
     // ─── Render leaf item ────────────────────────────────────────
     const renderLeaf = (leaf: NavLeaf, mini: boolean) => {
@@ -204,11 +190,11 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 ))}
             </nav>
 
-            {/* Footer — language switch + logout; icon-only when collapsed (phase-02) */}
+            {/* Footer — language switch; icon-only when collapsed (phase-02) */}
             {mini ? (
                 <div
-                    className="flex flex-col items-center gap-3 px-3 pt-[17px]"
-                    style={{ height: 125, borderTop: '1px solid var(--dash-divider)' }}
+                    className="flex flex-col items-center gap-3 px-3 py-[17px]"
+                    style={{ borderTop: '1px solid var(--dash-divider)' }}
                 >
                     <button
                         onClick={toggleLocale}
@@ -217,28 +203,13 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     >
                         <Globe className="h-4 w-4 shrink-0" />
                     </button>
-                    <button
-                        onClick={handleLogout}
-                        aria-label={locale === 'ms' ? 'Log Keluar' : 'Logout'}
-                        className="flex h-[38px] w-[38px] items-center justify-center rounded-[12px] border border-dash-border bg-transparent outline-none text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
-                    >
-                        <LogOut className="h-4 w-4 shrink-0" />
-                    </button>
                 </div>
             ) : (
             <div
-                className="flex flex-col gap-3 px-3 pt-[17px]"
-                style={{ height: 125, borderTop: '1px solid var(--dash-divider)' }}
+                className="flex flex-col gap-3 px-3 py-[17px]"
+                style={{ borderTop: '1px solid var(--dash-divider)' }}
             >
                 <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
-
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 rounded-[16px] border border-dash-border bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
-                >
-                    <LogOut className="h-4 w-4 shrink-0 text-dash-text" />
-                    <span>{locale === 'ms' ? 'Log Keluar' : 'Logout'}</span>
-                </button>
             </div>
             )}
         </>

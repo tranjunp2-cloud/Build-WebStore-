@@ -1238,6 +1238,12 @@
                 "submit": "Tolak Pembayaran",
                 "submitting": "Menolak..."
             },
+            "filterLabels": {
+                "date": "Tarikh",
+                "status": "Status",
+                "payment": "Pembayaran",
+                "sort": "Susun"
+            },
             "filterDates": {
                 "allDates": "Semua Tarikh",
                 "today": "Hari Ini",
@@ -2295,6 +2301,9 @@
                 "allStatus": "Semua Status",
                 "draft": "Draf",
                 "published": "Diterbitkan",
+                "statusLabel": "Status",
+                "categoryLabel": "Kategori",
+                "sortLabel": "Susun",
                 "allCategories": "Semua Kategori",
                 "sortNewest": "Terbaru",
                 "sortOldest": "Tertua",
@@ -2487,7 +2496,11 @@
             },
             "pagination": {
                 "previous": "Sebelumnya",
-                "next": "Seterusnya"
+                "next": "Seterusnya",
+                "showing": "Menunjukkan",
+                "of": "daripada",
+                "unit": "siaran",
+                "rowsPerPage": "Baris setiap halaman:"
             },
             "noMatches": "Tiada kiriman yang sepadan dengan penapis anda",
             "resetFilters": "Set Semula Penapis"

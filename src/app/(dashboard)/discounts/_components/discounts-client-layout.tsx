@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Download, Plus, Percent, SearchX } from 'lucide-react'
+import { TablePagination } from '@/components/ui/table-pagination'
+import { Button } from '@/components/ui/button'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { DiscountsToolbar } from './discounts-toolbar'
 import { DiscountsTable, type Discount } from './discounts-table'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
@@ -162,24 +165,14 @@ export function DiscountsClientLayout() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        className="flex items-center gap-2 h-[36px] px-4 rounded-[10px] text-[13px] font-medium transition-colors hover:bg-white/[0.05] cursor-pointer"
-                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                    >
-                        <Download className="w-3.5 h-3.5" />
+                    <Button variant="dashSecondary" size="dash" onClick={handleExport}>
+                        <Download />
                         {d.exportCsv}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleNew}
-                        className="flex items-center gap-2 h-[36px] px-4 rounded-[10px] text-[13px] font-semibold cursor-pointer text-white"
-                        style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0891b2 100%)' }}
-                    >
-                        <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="dashPrimary" size="dash" onClick={handleNew}>
+                        <Plus />
                         {d.createDiscount}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -196,30 +189,25 @@ export function DiscountsClientLayout() {
 
             {/* Empty states */}
             {isEmpty && !isFirstLoad && (
-                <div
-                    className="flex flex-col items-center justify-center rounded-[12px] py-20 gap-3"
-                    style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }}
-                >
-                    {hasFilters ? (
-                        <>
-                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>{d.emptyNoResults}</p>
-                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{d.emptyNoResultsSubtitle}</p>
-                        </>
-                    ) : (
-                        <>
-                            <p className="text-[16px] font-semibold" style={{ color: 'var(--dash-text)' }}>{d.emptyNoDiscounts}</p>
-                            <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{d.emptyNoDiscountsSubtitle}</p>
-                            <button
-                                type="button"
-                                onClick={handleNew}
-                                className="mt-2 flex items-center gap-2 h-[40px] px-5 rounded-[10px] text-[13px] font-semibold text-white cursor-pointer"
-                                style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0891b2 100%)' }}
-                            >
-                                + {d.createDiscount}
-                            </button>
-                        </>
-                    )}
-                </div>
+                hasFilters ? (
+                    <TableEmptyState
+                        icon={<SearchX />}
+                        title={d.emptyNoResults}
+                        subtitle={d.emptyNoResultsSubtitle}
+                    />
+                ) : (
+                    <TableEmptyState
+                        icon={<Percent />}
+                        title={d.emptyNoDiscounts}
+                        subtitle={d.emptyNoDiscountsSubtitle}
+                        action={
+                            <Button variant="dashPrimary" size="dash" onClick={handleNew}>
+                                <Plus className="w-3.5 h-3.5" />
+                                {d.createDiscount}
+                            </Button>
+                        }
+                    />
+                )
             )}
 
             {/* Table — show while loading or has results */}
@@ -232,76 +220,18 @@ export function DiscountsClientLayout() {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     loading={loading}
+                    // Pagination lives INSIDE the table card (F33 design) — shared <TablePagination>.
+                    footer={(
+                        <TablePagination
+                            page={page}
+                            total={total}
+                            limit={limit}
+                            onPageChange={setPage}
+                            onLimitChange={(n) => { setLimit(n); setPage(1) }}
+                            labels={{ showing: d.showing, of: d.of, unit: d.codes, rowsPerPage: d.rowsPerPage }}
+                        />
+                    )}
                 />
-            )}
-
-            {/* Pagination footer — always visible */}
-            {!loading && (
-                <div className="flex items-center justify-between gap-4 flex-wrap text-[13px]" style={{ color: 'var(--dash-text-muted)' }}>
-                    {/* Left: count + rows per page */}
-                    <div className="flex items-center gap-4">
-                        <span>
-                            {d.showing}{' '}
-                            <strong style={{ color: 'var(--dash-text)' }}>
-                                {total === 0 ? 0 : (page - 1) * limit + 1}–{Math.min(page * limit, total)}
-                            </strong>{' '}
-                            {d.of}{' '}
-                            <strong style={{ color: 'var(--dash-text)' }}>{total}</strong>{' '}
-                            {d.codes}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <span>{d.rowsPerPage}</span>
-                            <select
-                                value={limit}
-                                onChange={e => { setLimit(Number(e.target.value)); setPage(1) }}
-                                className="h-[32px] rounded-[8px] px-2 pr-6 text-[13px] cursor-pointer outline-none appearance-none"
-                                style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                            >
-                                {[10, 25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Right: page navigation */}
-                    <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            disabled={page <= 1}
-                            onClick={() => setPage(p => p - 1)}
-                            className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] transition-colors disabled:opacity-30 cursor-pointer"
-                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                            const p = totalPages <= 7 ? i + 1 : i + Math.max(1, page - 3)
-                            if (p > totalPages) return null
-                            return (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => setPage(p)}
-                                    className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] text-[13px] font-medium transition-colors cursor-pointer"
-                                    style={p === page
-                                        ? { background: '#0891b2', color: '#fff', border: '1px solid #0891b2' }
-                                        : { border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }
-                                    }
-                                >
-                                    {p}
-                                </button>
-                            )
-                        })}
-                        <button
-                            type="button"
-                            disabled={page >= totalPages}
-                            onClick={() => setPage(p => p + 1)}
-                            className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] transition-colors disabled:opacity-30 cursor-pointer"
-                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
             )}
 
             {/* Delete confirmation modal (replaces native confirm; matches the edit-form modal) */}

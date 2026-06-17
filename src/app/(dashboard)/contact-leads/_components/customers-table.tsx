@@ -1,23 +1,26 @@
 'use client'
 
-import { Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { Pagination } from '@/components/ui/Pagination'
+import { Trash2, Users } from 'lucide-react'
+import { useI18n } from '@/i18n'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { CustomerSourceBadge } from './customer-source-badge'
-import { useI18n } from '@/i18n'
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+    TableActionButton,
+} from '@/components/ui/table'
+import { TablePagination } from '@/components/ui/table-pagination'
 import type { CustomerRecord } from '../_lib/customer-record'
-
-// Figma: 7 cols — Profile(237) | Email(flex) | Source(218) | Message(412→flex) | Date(flex) | Status(flex) | Actions(119)
-// Actions=119px per Figma spec (was wrongly coded as 64px which caused header text overflow → spurious scrollbar)
-const COLS = 'grid-cols-[minmax(130px,237px)_minmax(100px,1fr)_minmax(130px,218px)_minmax(120px,1.8fr)_minmax(90px,1fr)_minmax(90px,1fr)_119px]'
-
-const HEADER_TEXT = 'text-[12px] font-semibold uppercase tracking-[0.3px] text-white/60'
-const CELL_PAD = 'px-6 py-5'
 
 type Props = {
     records: CustomerRecord[]
+    loading?: boolean
     total: number
     page: number
     limit: number
@@ -27,103 +30,144 @@ type Props = {
     onPageChange: (page: number) => void
 }
 
-export function CustomersTable({ records, total, page, limit, selectedId, onSelect, onDelete, onPageChange }: Props) {
+function SkeletonRow() {
+    return (
+        <TableRow>
+            <TableCell>
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full animate-pulse shrink-0" style={{ background: 'var(--dash-border)' }} />
+                    <div className="h-3 w-28 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} />
+                </div>
+            </TableCell>
+            <TableCell><div className="h-3 w-32 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+            <TableCell><div className="h-5 w-20 rounded-full animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+            <TableCell><div className="h-3 w-40 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+            <TableCell><div className="h-3 w-20 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+            <TableCell><div className="h-5 w-16 rounded-full animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+            <TableCell><div className="h-8 w-8 rounded-[8px] animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
+        </TableRow>
+    )
+}
+
+export function CustomersTable({ records, loading = false, total, page, limit, selectedId, onSelect, onDelete, onPageChange }: Props) {
     const { t } = useI18n()
     const c = t.dashboard.customers
-    const totalPages = Math.ceil(total / limit)
 
-    if (records.length === 0) {
-        return <div className="py-16 text-center text-[14px] text-white/30">{c.empty}</div>
+    const footer = !loading && total > 0
+        ? (
+            <TablePagination
+                page={page}
+                total={total}
+                limit={limit}
+                onPageChange={onPageChange}
+            />
+        )
+        : undefined
+
+    if (!loading && records.length === 0) {
+        return (
+            <TableEmptyState icon={<Users />} title={c.empty} />
+        )
     }
 
     return (
-        <div className="w-full min-w-0 rounded-[16px] border border-white/[0.08] bg-[#1e293b]/60">
-            {/* Scrollable table area */}
-            <div className="overflow-x-auto">
-                {/* Header */}
-                <div className={cn('min-w-[779px] grid gap-0', COLS, 'bg-[#0b1120]/50 border-b border-white/5')}>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colProfile}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colEmail}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colSource}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colMessage}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colDate}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colStatus}</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colActions}</div>
-                </div>
-
-                {/* Rows */}
-                <div className="min-w-[779px] flex flex-col divide-y divide-white/[0.05]">
-                    {records.map(record => {
+        <Table minWidth={780} className="table-fixed w-full" footer={footer}>
+            {/* table-fixed + % colgroup: even, stable columns. Message (lead text) is
+                widest; Actions stays compact at the edge. */}
+            <colgroup>
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '21%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '6%' }} />
+            </colgroup>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>{c.colProfile}</TableHead>
+                    <TableHead>{c.colEmail}</TableHead>
+                    <TableHead>{c.colSource}</TableHead>
+                    <TableHead>{c.colMessage}</TableHead>
+                    <TableHead>{c.colDate}</TableHead>
+                    <TableHead>{c.colStatus}</TableHead>
+                    <TableHead>{c.colActions}</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {loading
+                    ? Array.from({ length: 8 }, (_, i) => <SkeletonRow key={i} />)
+                    : records.map(record => {
                         const displayName = record.source === 'newsletter'
                             ? (record.name ?? 'Guest') + ' (Newsletter)'
                             : (record.name ?? 'Guest')
 
                         return (
-                            <div
+                            <TableRow
                                 key={record.id}
                                 onClick={() => onSelect(record)}
-                                className={cn(
-                                    'grid gap-0 items-center cursor-pointer transition-colors h-[81px]',
-                                    COLS,
-                                    selectedId === record.id ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]',
-                                )}
+                                clickable
+                                style={selectedId === record.id
+                                    ? { background: 'var(--dash-border)' }
+                                    : undefined
+                                }
                             >
-                                {/* Customer Profile */}
-                                <div className={cn(CELL_PAD, 'flex items-center gap-3 min-w-0')}>
-                                    <CustomerAvatar name={record.name} email={record.email} source={record.source} />
-                                    <span className="text-[14px] font-semibold text-[#f8fafc] truncate">{displayName}</span>
-                                </div>
+                                {/* Profile */}
+                                <TableCell>
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <CustomerAvatar name={record.name} email={record.email} source={record.source} />
+                                        <span title={displayName} className="text-[13px] font-semibold truncate max-w-[140px]" style={{ color: 'var(--dash-text)' }}>
+                                            {displayName}
+                                        </span>
+                                    </div>
+                                </TableCell>
 
                                 {/* Email */}
-                                <div className={cn(CELL_PAD, 'min-w-0')}>
-                                    <p className="text-[14px] text-white/70 truncate">{record.email}</p>
-                                </div>
+                                <TableCell>
+                                    <span title={record.email} className="text-[13px] truncate block max-w-[180px]" style={{ color: 'var(--dash-text-muted)' }}>
+                                        {record.email}
+                                    </span>
+                                </TableCell>
 
-                                {/* Source & Site */}
-                                <div className={CELL_PAD}>
+                                {/* Source */}
+                                <TableCell>
                                     <CustomerSourceBadge source={record.source} />
-                                </div>
+                                </TableCell>
 
                                 {/* Message */}
-                                <div className={cn(CELL_PAD, 'min-w-0')}>
-                                    <p className="text-[14px] text-white/70 truncate">
+                                <TableCell>
+                                    <span title={record.message ?? c.defaultMessage} className="text-[13px] truncate block max-w-[280px]" style={{ color: 'var(--dash-text-muted)' }}>
                                         {record.message ?? c.defaultMessage}
-                                    </p>
-                                </div>
+                                    </span>
+                                </TableCell>
 
-                                {/* Latest Date */}
-                                <div className={CELL_PAD}>
-                                    <p className="text-[14px] text-white/70">
+                                {/* Date */}
+                                <TableCell className="whitespace-nowrap">
+                                    <span className="text-[12px]" style={{ color: 'var(--dash-text-muted)' }}>
                                         {new Date(record.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </p>
-                                </div>
+                                    </span>
+                                </TableCell>
 
                                 {/* Status */}
-                                <div className={CELL_PAD}>
+                                <TableCell>
                                     <CustomerStatusBadge status={record.status} />
-                                </div>
+                                </TableCell>
 
-                                {/* Actions */}
-                                <div className={cn(CELL_PAD, 'flex items-center justify-center')} onClick={e => e.stopPropagation()}>
-                                    <button
+                                {/* Actions — stop propagation so row click doesn't fire */}
+                                <TableCell onClick={e => e.stopPropagation()}>
+                                    <TableActionButton
+                                        variant="danger"
                                         onClick={() => onDelete(record)}
-                                        className="flex items-center justify-center w-8 h-8 rounded-[8px] text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors border-none bg-transparent cursor-pointer"
+                                        title={c.deleteButton}
                                     >
                                         <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
+                                    </TableActionButton>
+                                </TableCell>
+                            </TableRow>
                         )
-                    })}
-                </div>
-            </div>
-
-            {/* Pagination — inside card, right-aligned, matches products layout */}
-            {totalPages > 1 && (
-                <div className="flex justify-end items-center p-[16px] border-t border-white/[0.08]">
-                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
-                </div>
-            )}
-        </div>
+                    })
+                }
+            </TableBody>
+        </Table>
     )
 }

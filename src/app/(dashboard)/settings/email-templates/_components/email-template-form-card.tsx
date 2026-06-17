@@ -4,27 +4,9 @@ import { useI18n } from '@/i18n'
 import { LocaleFlag } from '@/components/locale-flag'
 import { EMAIL_TEMPLATE_VARIABLES, EmailTemplateType } from '@/lib/email/types'
 import type { ContentFields } from '../actions'
+import { Switch } from '@/components/ui/switch'
 
 const LIMITS = { subject: 200, greeting: 500, ctaLabel: 100, closing: 2000 }
-
-function SimpleToggle({ on, locked, onChange }: { on: boolean; locked?: boolean; onChange: (v: boolean) => void }) {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            disabled={locked}
-            onClick={() => !locked && onChange(!on)}
-            style={{ width: 36, height: 20 }}
-            className={`relative inline-flex shrink-0 rounded-full transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${on ? 'bg-green-500' : 'bg-slate-400 dark:bg-slate-600'}`}
-        >
-            <span
-                style={{ width: 16, height: 16, top: 2, left: 2 }}
-                className={`pointer-events-none absolute rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`}
-            />
-        </button>
-    )
-}
 
 function CharCounter({ len, limit }: { len: number; limit: number }) {
     const cls = len > limit ? 'text-red-400' : len > limit * 0.9 ? 'text-amber-400' : 'text-slate-500'
@@ -136,7 +118,11 @@ export function EmailTemplateFormCard({
                     )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <SimpleToggle on={draft.enabled} locked={isCritical} onChange={onEnabledChange} />
+                    <Switch
+                        checked={draft.enabled}
+                        disabled={isCritical}
+                        onCheckedChange={onEnabledChange}
+                    />
                     <span className={`text-xs font-medium ${draft.enabled ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
                         {draft.enabled ? et.enabled : et.disabled}
                     </span>

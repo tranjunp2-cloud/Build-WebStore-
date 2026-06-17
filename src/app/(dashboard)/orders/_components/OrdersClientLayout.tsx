@@ -115,6 +115,7 @@ export function OrdersClientLayout() {
                 pendingCount={pendingCount}
                 onBulkConfirm={handleBulkConfirm}
                 isConfirming={isConfirming}
+                search={searchQuery}
                 onSearch={setSearchQuery}
                 onFilterStatus={setStatusFilter}
                 onFilterDate={setDateFilter}

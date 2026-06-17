@@ -4,6 +4,17 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, WifiOff, RefreshCw, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Badge } from '@/components/ui/badge'
+import { TablePagination } from '@/components/ui/table-pagination'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableHead,
+    TableCell,
+} from '@/components/ui/table'
 import { getCustomerOrdersAction } from '../actions'
 
 type OrderRow = {
@@ -16,37 +27,27 @@ type OrderRow = {
     createdAt: string
 }
 
-const STATUS_COLOURS: Record<string, { bg: string; color: string }> = {
-    pending:        { bg: 'rgba(180,83,9,0.15)',   color: '#d97706' },
-    new:            { bg: 'rgba(3,105,161,0.15)',  color: '#38bdf8' },
-    confirmed:      { bg: 'rgba(29,78,216,0.15)',  color: '#60a5fa' },
-    ready_to_ship:  { bg: 'rgba(109,40,217,0.15)', color: '#a78bfa' },
-    shipped:        { bg: 'rgba(67,56,202,0.15)',  color: '#818cf8' },
-    completed:      { bg: 'rgba(21,128,61,0.15)',  color: '#4ade80' },
-    cancelled:      { bg: 'rgba(220,38,38,0.15)',  color: '#f87171' },
-    refunded:       { bg: 'rgba(107,114,128,0.15)',color: '#9ca3af' },
-}
-
-const PAYMENT_COLOURS: Record<string, { bg: string; color: string }> = {
-    pending:         { bg: 'rgba(180,83,9,0.15)',   color: '#d97706' },
-    processing:      { bg: 'rgba(29,78,216,0.15)',  color: '#60a5fa' },
-    paid:            { bg: 'rgba(21,128,61,0.15)',  color: '#4ade80' },
-    payment_failed:  { bg: 'rgba(220,38,38,0.15)',  color: '#f87171' },
-    refunded:        { bg: 'rgba(124,58,237,0.15)', color: '#a78bfa' },
-}
-
-function Badge({ value, colours, stateLabel }: { value: string; colours: Record<string, { bg: string; color: string }>; stateLabel: Record<string, string> }) {
-    const c = colours[value] ?? { bg: 'rgba(107,114,128,0.15)', color: '#9ca3af' }
-    const label = stateLabel[value] ?? value.replace(/_/g, ' ')
-    return (
-        <span
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
-            style={{ background: c.bg, color: c.color }}
-        >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, flexShrink: 0, display: 'inline-block' }} />
-            {label}
-        </span>
-    )
+// Maps order/payment status values to Badge variants.
+// "success" = completed/paid, "warning" = pending/processing, "destructive" = failed/cancelled/refunded, "secondary" = other.
+function orderStatusVariant(status: string): 'success' | 'warning' | 'destructive' | 'secondary' {
+    switch (status) {
+        case 'completed':
+        case 'paid':
+            return 'success'
+        case 'pending':
+        case 'processing':
+        case 'new':
+        case 'confirmed':
+        case 'ready_to_ship':
+        case 'shipped':
+            return 'warning'
+        case 'cancelled':
+        case 'payment_failed':
+        case 'refunded':
+            return 'destructive'
+        default:
+            return 'secondary'
+    }
 }
 
 function fmtDate(iso: string): string {
@@ -55,7 +56,7 @@ function fmtDate(iso: string): string {
 
 export function CustomersDetailOrdersTab({ customerId }: { customerId: number }) {
     const router = useRouter()
-    const { t, ti } = useI18n()
+    const { t } = useI18n()
     const ot = t.dashboard.shopCustomers.ordersTab
     const STATE_LABEL: Record<string, string> = {
         pending:        ot.statusPending,
@@ -70,12 +71,12 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
         payment_failed: ot.statusPaymentFailed,
         processing:     ot.statusProcessing,
     }
-    const [orders, setOrders]       = useState<OrderRow[]>([])
-    const [page, setPage]           = useState(1)
-    const [total, setTotal]         = useState(0)
+    const [orders, setOrders]         = useState<OrderRow[]>([])
+    const [page, setPage]             = useState(1)
+    const [total, setTotal]           = useState(0)
     const [totalPages, setTotalPages] = useState(1)
-    const [loading, setLoading]     = useState(true)
-    const [error, setError]         = useState(false)
+    const [loading, setLoading]       = useState(true)
+    const [error, setError]           = useState(false)
 
     const fetchOrders = useCallback(async (p: number) => {
         setLoading(true)
@@ -108,12 +109,13 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-                <WifiOff className="w-10 h-10 text-white/20 mb-3" />
-                <p className="text-[14px] text-white/50 mb-4">{ot.loadFailed}</p>
+                <WifiOff className="w-10 h-10 mb-3" style={{ color: 'var(--dash-text-muted)', opacity: 0.4 }} />
+                <p className="text-[14px] mb-4" style={{ color: 'var(--dash-text-muted)' }}>{ot.loadFailed}</p>
                 <button
                     type="button"
                     onClick={() => fetchOrders(page)}
-                    className="flex items-center gap-2 h-9 px-4 rounded-[8px] text-[13px] text-white/70 border border-[var(--cus-border-strong)] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
+                    className="flex items-center gap-2 h-9 px-4 rounded-[8px] text-[13px] bg-transparent transition-colors cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/[0.05]"
+                    style={{ color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}
                 >
                     <RefreshCw className="w-4 h-4" /> {ot.retry}
                 </button>
@@ -122,98 +124,87 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
     }
 
     if (orders.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-                <ShoppingBag className="w-10 h-10 text-white/20 mb-3" />
-                <p className="text-[14px] text-white/50">{ot.noOrders}</p>
-            </div>
-        )
+        return <TableEmptyState compact icon={<ShoppingBag />} title={ot.noOrders} />
     }
 
-    return (
-        <div className="space-y-3">
-            <div
-                className="rounded-[16px] overflow-hidden"
-                style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}
-            >
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse min-w-[540px]">
-                        <thead>
-                            <tr style={{ background: 'var(--cus-surface-header)', borderBottom: '1px solid var(--cus-border-medium)' }}>
-                                {[ot.colOrderNumber, ot.colStatus, ot.colTotal, ot.colPayment, ot.colDate, ''].map((h, i) => (
-                                    <th key={i} className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-white/45 whitespace-nowrap ${i === 2 ? 'text-right' : 'text-left'}`}>
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {orders.map((o, idx) => (
-                                <tr
-                                    key={o.id}
-                                    onClick={() => router.push(`/orders?order=${o.id}`)}
-                                    style={idx < orders.length - 1 ? { borderBottom: '1px solid var(--cus-border-medium)' } : undefined}
-                                    className="cursor-pointer hover:bg-white/[0.03] transition-colors"
-                                >
-                                    <td className="px-4 py-3">
-                                        <code className="text-[13px] font-mono text-white/75 bg-white/[0.05] px-1.5 py-0.5 rounded">
-                                            {o.orderNumber || `#${o.id}`}
-                                        </code>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {o.status ? <Badge value={o.status} colours={STATUS_COLOURS} stateLabel={STATE_LABEL} /> : <span className="text-white/30">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                                        <span className="text-[14px] font-medium tabular-nums text-[#f8fafc]">
-                                            {o.currency || 'MYR'} {o.total.toFixed(2)}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {o.paymentStatus ? <Badge value={o.paymentStatus} colours={PAYMENT_COLOURS} stateLabel={STATE_LABEL} /> : <span className="text-white/30">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3 whitespace-nowrap" title={o.createdAt}>
-                                        <span className="text-[13px] text-white/50">{fmtDate(o.createdAt)}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <ChevronRight className="w-4 h-4 text-white/20 inline-block" />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+    const colHeaders = [ot.colOrderNumber, ot.colStatus, ot.colTotal, ot.colPayment, ot.colDate, '']
 
-                <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: '1px solid var(--cus-border-medium)' }}>
-                        <p className="text-[12px] text-white/40">
-                            {ot.showing}{' '}
-                            <strong className="text-white/60">{total === 0 ? 0 : Math.min((page - 1) * 25 + 1, total)}–{Math.min(page * 25, total)}</strong>
-                            {' '}{ot.of}{' '}
-                            <strong className="text-white/60">{total}</strong>
-                            {' '}{ot.orders}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                disabled={page <= 1}
-                                onClick={() => setPage(p => p - 1)}
-                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-[var(--cus-border-strong)] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
-                            >
-                                {ot.prev}
-                            </button>
-                            <span className="text-[12px] font-semibold text-white/60 px-1">
-                                {ot.page} {page} {ot.of} {totalPages}
+    // Pagination rendered inside the Table card (footer slot) — shared <TablePagination>.
+    // Fixed page size (25), so no rows-per-page selector (onLimitChange omitted).
+    // Shown whenever there are orders (even a single page) for consistency with other tables.
+    const footer = total > 0 ? (
+        <TablePagination
+            page={page}
+            total={total}
+            limit={25}
+            onPageChange={setPage}
+            labels={{ showing: ot.showing, of: ot.of, unit: ot.orders }}
+        />
+    ) : undefined
+
+    return (
+        <Table minWidth={540} className="table-fixed w-full" footer={footer}>
+            {/* table-fixed + % colgroup: even columns. Last col is just the row-chevron, so
+                it's kept narrow. NB: no inter-tag whitespace — colgroup rejects text nodes. */}
+            <colgroup>
+                <col style={{ width: '21%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '8%' }} />
+            </colgroup>
+            <TableHeader>
+                <TableRow>
+                    {colHeaders.map((h, i) => (
+                        <TableHead key={i} className={i === 2 ? 'text-right' : 'text-left'}>
+                            {h}
+                        </TableHead>
+                    ))}
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {orders.map((o) => (
+                    <TableRow
+                        key={o.id}
+                        onClick={() => router.push(`/orders?order=${o.id}`)}
+                        clickable
+                    >
+                        <TableCell>
+                            <code className="text-[13px] font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--dash-text)', background: 'var(--dash-surface)' }}>
+                                {o.orderNumber || `#${o.id}`}
+                            </code>
+                        </TableCell>
+                        <TableCell>
+                            {o.status
+                                ? <Badge variant={orderStatusVariant(o.status)} dot className="rounded-full">
+                                    {STATE_LABEL[o.status] ?? o.status.replace(/_/g, ' ')}
+                                  </Badge>
+                                : <span style={{ color: 'var(--dash-text-muted)', opacity: 0.4 }}>—</span>
+                            }
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-right">
+                            <span className="text-[14px] font-medium tabular-nums" style={{ color: 'var(--dash-text)' }}>
+                                {o.currency || 'MYR'} {o.total.toFixed(2)}
                             </span>
-                            <button
-                                type="button"
-                                disabled={page >= totalPages}
-                                onClick={() => setPage(p => p + 1)}
-                                className="h-7 px-3 rounded-[6px] text-[12px] text-white/60 border border-[var(--cus-border-strong)] bg-transparent disabled:opacity-30 hover:border-white/20 transition-colors cursor-pointer"
-                            >
-                                {ot.next}
-                            </button>
-                        </div>
-                    </div>
-            </div>
-        </div>
+                        </TableCell>
+                        <TableCell>
+                            {o.paymentStatus
+                                ? <Badge variant={orderStatusVariant(o.paymentStatus)} dot className="rounded-full">
+                                    {STATE_LABEL[o.paymentStatus] ?? o.paymentStatus.replace(/_/g, ' ')}
+                                  </Badge>
+                                : <span style={{ color: 'var(--dash-text-muted)', opacity: 0.4 }}>—</span>
+                            }
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap" title={o.createdAt}>
+                            <span className="text-[13px]" style={{ color: 'var(--dash-text-muted)' }}>{fmtDate(o.createdAt)}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                            <ChevronRight className="w-4 h-4 inline-block" style={{ color: 'var(--dash-text-muted)', opacity: 0.4 }} />
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     )
 }

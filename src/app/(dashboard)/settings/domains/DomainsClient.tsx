@@ -5,6 +5,7 @@ import { Globe, Plus, AlertCircle, AlertTriangle, Copy, Check, ChevronRight, Loa
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
+import { Badge } from '@/components/ui/badge';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
 
@@ -47,24 +48,36 @@ function SelectPrimaryPanel({
         <>
             {/* Backdrop */}
             <div
-                className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200"
+                className="fixed inset-0 z-[100] animate-in fade-in duration-200"
+                style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.6)' }}
                 onClick={onClose}
             />
-            {/* Slide-in panel from right — Figma: bg #0B1120, w-592px on desktop */}
-            <div className="fixed right-0 top-0 bottom-0 z-[101] flex flex-col w-full max-w-[448px] sm:max-w-[448px] bg-[#0B1120] animate-in slide-in-from-right duration-300 shadow-[−25px_0_50px_-12px_rgba(0,0,0,0.5)]">
+            {/* Slide-in panel from right — Figma: bg --dash-surface, w-592px on desktop */}
+            <div
+                className="fixed right-0 top-0 bottom-0 z-[101] flex flex-col w-full max-w-[448px] sm:max-w-[448px] animate-in slide-in-from-right duration-300 shadow-[−25px_0_50px_-12px_rgba(0,0,0,0.5)]"
+                style={{ background: 'var(--dash-surface)' }}
+            >
 
                 {/* Close chevron button — Figma circular outlined accent */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full bg-[#0B1120] border border-[#1F2937] text-white hover:bg-[#1E293B] transition-colors shrink-0 z-10"
+                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full transition-colors shrink-0 z-10"
+                    style={{
+                        background: 'var(--dash-surface)',
+                        border: '1px solid var(--dash-border)',
+                        color: 'var(--dash-text)',
+                    }}
                 >
                     <ChevronRight className="h-5 w-5" />
                 </button>
 
                 {/* Content */}
                 <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
-                    <h2 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter'] mb-[24px]">
+                    <h2
+                        className="text-[20px] font-semibold leading-[1.4em] font-['Inter'] mb-[24px]"
+                        style={{ color: 'var(--dash-text)' }}
+                    >
                         {t?.Domains?.selectPrimary || 'Select primary domain'}
                     </h2>
 
@@ -77,22 +90,34 @@ function SelectPrimaryPanel({
                                     key={opt.value ?? '__platform__'}
                                     type="button"
                                     onClick={() => setSelected(opt.value)}
-                                    className={`flex items-center gap-[12px] w-full p-[16px] rounded-[8px] border transition-all text-left font-['Inter'] ${isSelected
-                                        ? 'border-[#00D3D4] bg-[rgba(0,211,212,0.06)]'
-                                        : 'border-[rgba(255,255,255,0.1)] bg-[#0B1120] hover:bg-white/[0.03]'
-                                        }`}
+                                    className="flex items-center gap-[12px] w-full p-[16px] rounded-[8px] transition-all text-left font-['Inter']"
+                                    style={isSelected
+                                        ? { border: '1px solid #00D3D4', background: 'rgba(0,211,212,0.06)' }
+                                        : { border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }
+                                    }
+                                    onMouseEnter={e => {
+                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--dash-surface-hover)';
+                                    }}
+                                    onMouseLeave={e => {
+                                        if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--dash-surface)';
+                                    }}
                                 >
                                     {/* Custom radio */}
-                                    <div className={`flex shrink-0 items-center justify-center h-[20px] w-[20px] rounded-full border-2 transition-all ${isSelected
-                                        ? 'border-[#00D3D4]'
-                                        : 'border-white/30 bg-transparent'
-                                        }`}>
+                                    <div
+                                        className="flex shrink-0 items-center justify-center h-[20px] w-[20px] rounded-full border-2 transition-all"
+                                        style={isSelected
+                                            ? { borderColor: '#00D3D4' }
+                                            : { borderColor: 'rgba(255,255,255,0.3)', background: 'transparent' }
+                                        }
+                                    >
                                         {isSelected && (
-                                            <div className="h-[10px] w-[10px] rounded-full bg-[#00D3D4]" />
+                                            <div className="h-[10px] w-[10px] rounded-full" style={{ background: '#00D3D4' }} />
                                         )}
                                     </div>
-                                    <span className={`text-[16px] font-normal leading-normal truncate ${isSelected ? 'text-white' : 'text-white/70'
-                                        }`}>
+                                    <span
+                                        className="text-[16px] font-normal leading-normal truncate"
+                                        style={{ color: isSelected ? 'var(--dash-text)' : 'var(--dash-text-muted)' }}
+                                    >
                                         {opt.label}
                                     </span>
                                 </button>
@@ -101,18 +126,22 @@ function SelectPrimaryPanel({
                     </div>
 
                     {activeDomains.length === 0 && (
-                        <p className="mt-[16px] text-[13px] text-[rgba(248,250,252,0.4)] font-['Inter']">
+                        <p className="mt-[16px] text-[13px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
                             {t?.Domains?.noVerifiedDomains || 'No verified custom domains yet. Add and verify a custom domain first.'}
                         </p>
                     )}
                 </div>
 
                 {/* Footer buttons — Figma: Cancel ghost + Save gradient, mt-auto */}
-                <div className="flex items-center gap-[12px] px-[32px] pb-[32px] pt-[16px] border-t border-white/[0.06]">
+                <div
+                    className="flex items-center gap-[12px] px-[32px] pb-[32px] pt-[16px]"
+                    style={{ borderTop: '1px solid var(--dash-border)' }}
+                >
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                        className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                     >
                         {t?.Domains?.cancel || 'Cancel'}
                     </button>
@@ -171,66 +200,73 @@ function TxtChallengeCard({
 
     return (
         <div
-            className="mt-4 p-4 sm:p-6 rounded-[16px] border border-[#FFB020]/30 bg-[rgba(255,176,32,0.04)]"
+            className="mt-4 p-4 sm:p-6 rounded-[16px]"
+            style={{ border: '1px solid rgba(255,176,32,0.3)', background: 'rgba(255,176,32,0.04)' }}
             role="region"
             aria-labelledby={`txt-challenge-${domain}`}
         >
             <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle className="h-5 w-5 text-[#FFB020] shrink-0 mt-0.5" aria-hidden="true" />
+                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#FFB020' }} aria-hidden="true" />
                 <div>
-                    <h4 id={`txt-challenge-${domain}`} className="text-[15px] font-semibold text-[#F8FAFC] font-['Inter']">
+                    <h4 id={`txt-challenge-${domain}`} className="text-[15px] font-semibold font-['Inter']" style={{ color: 'var(--dash-text)' }}>
                         Verify domain ownership
                     </h4>
-                    <p className="mt-1 text-[13px] text-[rgba(248,250,252,0.6)] font-['Inter']">
+                    <p className="mt-1 text-[13px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
                         Add this TXT record to your DNS, then click Verify.
                     </p>
                 </div>
             </div>
 
             {verification.map((v, i) => (
-                <div key={`${v.domain}-${i}`} className="mb-4 p-4 rounded-[12px] bg-[#0B1120] border border-white/[0.06]">
-                    <p className="text-[12px] font-medium text-[rgba(248,250,252,0.5)] uppercase tracking-wide font-['Inter'] mb-3">
+                <div
+                    key={`${v.domain}-${i}`}
+                    className="mb-4 p-4 rounded-[12px]"
+                    style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
+                >
+                    <p className="text-[12px] font-medium uppercase tracking-wide font-['Inter'] mb-3" style={{ color: 'var(--dash-text-muted)' }}>
                         TXT Record #{i + 1}
                     </p>
 
-                    <label className="text-[12px] text-[rgba(248,250,252,0.6)] font-['Inter']">Name</label>
+                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Name</label>
                     <div className="flex items-center gap-2 mt-1 mb-3">
-                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] text-[#F8FAFC] font-mono break-all">
+                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.domain}
                         </code>
                         <button
                             type="button"
                             onClick={() => copy(`name-${i}`, v.domain)}
                             aria-label={`Copy TXT record name ${v.domain}`}
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] border border-white/10 text-[rgba(248,250,252,0.6)] hover:bg-white/5 transition-colors"
+                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
                         </button>
                     </div>
 
-                    <label className="text-[12px] text-[rgba(248,250,252,0.6)] font-['Inter']">Value</label>
+                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Value</label>
                     <div className="flex items-center gap-2 mt-1 mb-2">
-                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] text-[#F8FAFC] font-mono break-all">
+                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.value}
                         </code>
                         <button
                             type="button"
                             onClick={() => copy(`value-${i}`, v.value)}
                             aria-label="Copy TXT record value"
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] border border-white/10 text-[rgba(248,250,252,0.6)] hover:bg-white/5 transition-colors"
+                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
                         </button>
                     </div>
 
                     {v.reason && (
-                        <p className="text-[12px] text-[rgba(248,250,252,0.5)] font-['Inter']">Reason: {v.reason}</p>
+                        <p className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Reason: {v.reason}</p>
                     )}
                 </div>
             ))}
 
             {timeAgo && (
-                <p className="text-[12px] text-[rgba(248,250,252,0.4)] font-['Inter'] mb-3" aria-live="polite">
+                <p className="text-[12px] font-['Inter'] mb-3" style={{ color: 'var(--dash-text-muted)' }} aria-live="polite">
                     Last checked: {timeAgo}
                 </p>
             )}
@@ -240,7 +276,8 @@ function TxtChallengeCard({
                 onClick={onVerifyClick}
                 disabled={isVerifying}
                 aria-busy={isVerifying}
-                className="flex items-center justify-center gap-2 h-[44px] px-6 rounded-[12px] bg-[#00D3D4] text-[#0B1120] text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-['Inter']"
+                className="flex items-center justify-center gap-2 h-[44px] px-6 rounded-[12px] text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-['Inter']"
+                style={{ background: '#00D3D4', color: 'var(--dash-surface)' }}
             >
                 {isVerifying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 {isVerifying ? 'Verifying…' : 'Verify Now'}
@@ -497,18 +534,22 @@ export function DomainsClient({
 
             <div className="space-y-[16px]">
                 {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60" style={{ minHeight: '102px' }}>
+                <div
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px]"
+                    style={{ minHeight: '102px', border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                >
                     {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
                     <div className="self-center">
-                        <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">{t?.Domains?.addDomainHeading || 'Add a Domain to your store'}</h2>
-                        <p className="mt-[4px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">{t?.Domains?.addDomainDesc || 'Connect your custom domain to make your store accessible'}</p>
+                        <h2 className="text-[18px] font-semibold leading-[1.556em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>{t?.Domains?.addDomainHeading || 'Add a Domain to your store'}</h2>
+                        <p className="mt-[4px] text-[14px] font-normal leading-[1.429em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.addDomainDesc || 'Connect your custom domain to make your store accessible'}</p>
                     </div>
                     {/* Buttons — stack on mobile, row on desktop */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px] sm:gap-[24px] shrink-0">
                         <button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
-                            className="flex items-center justify-center py-[12px] px-[24px] sm:px-[68px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[14px] sm:text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
+                            className="flex items-center justify-center py-[12px] px-[24px] sm:px-[68px] rounded-[16px] bg-transparent text-[14px] sm:text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
+                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                         >
                             {t?.Domains?.selectPrimary || 'Select primary domain'}
                         </button>
@@ -525,12 +566,15 @@ export function DomainsClient({
                 </div>
 
                 {/* Platform subdomain card — F23: with slug editor */}
-                <div className="flex flex-col pt-[25px] px-[25px] pb-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
+                <div
+                    className="flex flex-col pt-[25px] px-[25px] pb-[25px] rounded-[16px] gap-[16px]"
+                    style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
                         <div className="flex flex-col gap-2">
                             {!isEditingSlug ? (
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{currentSlug}.{PLATFORM_DOMAIN}</h3>
+                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{currentSlug}.{PLATFORM_DOMAIN}</h3>
                                     {!hasCustomPrimary && (
                                         <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
                                             <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
@@ -543,10 +587,19 @@ export function DomainsClient({
                                         type="text"
                                         value={slugInput}
                                         onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
-                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#0B1120]/60 text-[14px] text-[#F8FAFC] font-mono focus:outline-none focus:border-blue-500/50 transition-colors"
+                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] text-[14px] font-mono focus:outline-none transition-colors"
+                                        style={{
+                                            border: '1px solid var(--dash-border)',
+                                            borderRight: 'none',
+                                            background: 'var(--dash-surface)',
+                                            color: 'var(--dash-text)',
+                                        }}
                                         autoFocus
                                     />
-                                    <div className="h-[44px] flex items-center px-3 rounded-r-[12px] border border-l-0 border-white/[0.08] bg-[#0B1120]/40 text-[13px] text-slate-500 whitespace-nowrap">
+                                    <div
+                                        className="h-[44px] flex items-center px-3 rounded-r-[12px] text-[13px] text-slate-500 whitespace-nowrap"
+                                        style={{ border: '1px solid var(--dash-border)', borderLeft: 'none', background: 'var(--dash-surface)' }}
+                                    >
                                         .{PLATFORM_DOMAIN}
                                     </div>
                                     <div className="ml-2">
@@ -558,17 +611,18 @@ export function DomainsClient({
                                     </div>
                                 </div>
                             )}
-                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
-                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{t?.Domains?.connected || 'Connected'}</span>
-                            </div>
+                            {/* "Connected" status badge — theme-aware via Badge success variant */}
+                            <Badge variant="success" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium w-fit">
+                                {t?.Domains?.connected || 'Connected'}
+                            </Badge>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             {!isEditingSlug ? (
                                 <button
                                     type="button"
                                     onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
-                                    className="flex items-center gap-2 py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                    className="flex items-center gap-2 py-[10px] px-[16px] rounded-[12px] bg-transparent text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                    style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     {t?.Domains?.changeSubdomain || 'Change subdomain'}
@@ -578,7 +632,8 @@ export function DomainsClient({
                                     <button
                                         type="button"
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
-                                        className="py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                        className="py-[10px] px-[16px] rounded-[12px] text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                                     >
                                         {t?.Domains?.cancel || 'Cancel'}
                                     </button>
@@ -600,11 +655,18 @@ export function DomainsClient({
                 {/* F23: Slug change confirmation dialog */}
                 {showSlugConfirm && (
                     <>
-                        <div className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200" onClick={() => setShowSlugConfirm(false)} />
-                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-[420px] rounded-[16px] border border-white/[0.08] bg-[#1E293B] p-6 shadow-xl animate-in zoom-in-95 duration-200">
-                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{t?.Domains?.changeSubdomainTitle || 'Change subdomain?'}</h3>
+                        <div
+                            className="fixed inset-0 z-[100] animate-in fade-in duration-200"
+                            style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.6)' }}
+                            onClick={() => setShowSlugConfirm(false)}
+                        />
+                        <div
+                            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-[420px] rounded-[16px] p-6 shadow-xl animate-in zoom-in-95 duration-200"
+                            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                        >
+                            <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{t?.Domains?.changeSubdomainTitle || 'Change subdomain?'}</h3>
                             <div className="mt-3 space-y-2">
-                                <p className="text-[14px] text-[rgba(248,250,252,0.6)]">
+                                <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>
                                     {(t?.Domains?.subdomainRedirectMsg || 'Your current subdomain {old} will redirect to {new} for 30 days.').replace('{old}', currentSlug).replace('{new}', slugInput)}
                                 </p>
                                 <p className="text-[14px] text-orange-400">
@@ -615,7 +677,8 @@ export function DomainsClient({
                                 <button
                                     type="button"
                                     onClick={() => setShowSlugConfirm(false)}
-                                    className="py-[10px] px-[20px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[14px] font-medium hover:bg-white/5 transition-colors"
+                                    className="py-[10px] px-[20px] rounded-[12px] text-[14px] font-medium hover:bg-white/5 transition-colors"
+                                    style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                                 >
                                     {t?.Domains?.cancel || 'Cancel'}
                                 </button>
@@ -640,26 +703,36 @@ export function DomainsClient({
 
                     if (status === 'pending') {
                         return (
-                            <div key={domain} className="flex flex-col p-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+                            <div
+                                key={domain}
+                                className="flex flex-col p-[25px] rounded-[16px] gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300"
+                                style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                            >
                                 <div className="flex flex-col gap-2">
-                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
-                                    <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-orange-500/30 bg-orange-500/10 pl-[12px] pr-[16px]">
-                                        <AlertCircle className="h-4 w-4 text-orange-400" strokeWidth={2.5} />
-                                        <span className="text-[14px] font-medium leading-none text-orange-300">{t?.Domains?.pendingVerification || 'Pending Verification'}</span>
-                                    </div>
+                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
+                                    {/* Pending status — theme-aware warning badge */}
+                                    <Badge variant="warning" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium w-fit">
+                                        {t?.Domains?.pendingVerification || 'Pending Verification'}
+                                    </Badge>
                                 </div>
 
-                                <div className="flex flex-col p-[16px] rounded-[16px] border border-white/[0.08] bg-[#0B1120]/50 gap-4">
-                                    <p className="text-[14px] text-[#F8FAFC]">{t?.Domains?.configureDns || 'Configure these DNS records at your domain registrar:'}</p>
+                                <div
+                                    className="flex flex-col p-[16px] rounded-[16px] gap-4"
+                                    style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }}
+                                >
+                                    <p className="text-[14px]" style={{ color: 'var(--dash-text)' }}>{t?.Domains?.configureDns || 'Configure these DNS records at your domain registrar:'}</p>
                                     <div className="flex flex-col gap-4">
                                         {/* A Record */}
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.aRecord || 'A Record (Static IPs)'}</span>
+                                            <span className="text-[12px] font-medium uppercase tracking-wider" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.aRecord || 'A Record (Static IPs)'}</span>
                                             <div className="flex flex-col gap-2">
                                                 {DNS_A_RECORD.split(',').map((ip, idx) => (
                                                     <div key={idx} className="flex items-center gap-2">
-                                                        <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
-                                                            <span className="text-[14px] text-[#F8FAFC] font-mono">{ip.trim()}</span>
+                                                        <div
+                                                            className="flex-1 h-[44px] flex items-center px-4 rounded-[12px]"
+                                                            style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                                                        >
+                                                            <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{ip.trim()}</span>
                                                         </div>
                                                         <button
                                                             type="button"
@@ -675,10 +748,13 @@ export function DomainsClient({
                                         </div>
                                         {/* CNAME Record */}
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.cnameRecord || 'CNAME Record'}</span>
+                                            <span className="text-[12px] font-medium uppercase tracking-wider" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.cnameRecord || 'CNAME Record'}</span>
                                             <div className="flex items-center gap-2">
-                                                <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
-                                                    <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_CNAME}</span>
+                                                <div
+                                                    className="flex-1 h-[44px] flex items-center px-4 rounded-[12px]"
+                                                    style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                                                >
+                                                    <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{DNS_CNAME}</span>
                                                 </div>
                                                 <button
                                                     type="button"
@@ -690,7 +766,7 @@ export function DomainsClient({
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-[12px] text-[rgba(248,250,252,0.4)]">
+                                    <p className="text-[12px]" style={{ color: 'var(--dash-text-muted)' }}>
                                         {t?.Domains?.cloudflareTip || 'Using Cloudflare? Disable the proxy (orange cloud → grey cloud) before verifying.'}
                                     </p>
                                 </div>
@@ -721,7 +797,8 @@ export function DomainsClient({
                                         type="button"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending}
-                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
+                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
+                                        style={{ border: '1px solid rgba(251,44,54,0.3)' }}
                                     >
                                         {t?.Domains?.remove || 'Remove'}
                                     </button>
@@ -745,14 +822,17 @@ export function DomainsClient({
                         const isPrimary = domainObj.isPrimary;
                         return (
                             <div key={domain} className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
+                                <div
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] gap-[16px]"
+                                    style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                                >
                                 <div className="flex flex-col gap-2 pb-[25px]">
-                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
+                                    <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
                                     <div className="flex flex-wrap gap-2 items-center">
-                                        <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
-                                            <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{t?.Domains?.connectedSecured || 'Connected & Secured'}</span>
-                                        </div>
+                                        {/* Active status — theme-aware success badge */}
+                                        <Badge variant="success" dot className="h-[34px] px-3 rounded-[12px] text-[14px] font-medium">
+                                            {t?.Domains?.connectedSecured || 'Connected & Secured'}
+                                        </Badge>
                                         {isPrimary && (
                                             <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
                                                 <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
@@ -766,7 +846,8 @@ export function DomainsClient({
                                         type="button"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending || isPrimary === true}
-                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] border border-[#FB2C36]/30 bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
+                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
+                                        style={{ border: '1px solid rgba(251,44,54,0.3)' }}
                                         title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
                                     >
                                         {t?.Domains?.removeDomain || 'Remove Domain'}
@@ -783,16 +864,22 @@ export function DomainsClient({
 
             {/* ── Add Domain Modal ──────────────────────────────────────────── */}
             {isAddModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1120]/80 p-4 animate-in fade-in duration-200">
-                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200">
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.8)' }}
+                >
+                    <div
+                        className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200"
+                        style={{ background: 'var(--dash-surface-hover)', border: '1px solid var(--dash-border)' }}
+                    >
                         {/* Heading + Note — Figma: heading y=25 h=28, note y=61 h=20 → gap=8px */}
                         <div className="flex flex-col">
                             {/* Dùng div + m-0 để triệt tiêu mọi margin mặc định từ global CSS (h3 thường tự có margin-bottom) */}
-                            <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
+                            <div className="m-0 p-0 text-[20px] font-semibold leading-[1.4em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>
                                 {t?.Domains?.enterDomainTitle || 'Enter the domain name you own'}
                             </div>
                             {/* Dùng div + mt-[2px] m-0 để triệt tiêu mọi margin từ thẻ p (p thường có margin-top) */}
-                            <div className="m-0 p-0 mt-[2px] text-[14px] font-bold text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
+                            <div className="m-0 p-0 mt-[2px] text-[14px] font-bold leading-[1.428em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
                                 {t?.Domains?.enterDomainNote || 'Note: Make sure you have access to your registrar'}
                             </div>
                         </div>
@@ -804,7 +891,12 @@ export function DomainsClient({
                             onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
                             placeholder="example.com"
                             autoFocus
-                            className={`mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] bg-[#0B1120] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter'] ${domainError ? 'border border-red-500' : 'border border-white/[0.08]'}`}
+                            className="mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] text-[16px] font-normal placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter']"
+                            style={{
+                                background: 'var(--dash-surface)',
+                                color: 'var(--dash-text)',
+                                border: domainError ? '1px solid rgb(239 68 68)' : '1px solid var(--dash-border)',
+                            }}
                         />
                         {domainError && (
                             <p className="text-red-400 text-[13px] mt-[8px]">{domainError}</p>
@@ -814,7 +906,8 @@ export function DomainsClient({
                             <button
                                 type="button"
                                 onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
-                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
+                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
+                                style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
                             </button>
@@ -849,13 +942,19 @@ export function DomainsClient({
 
             {/* ── Remove Domain Confirmation Modal (TC-F19.14 QA) ─────────── */}
             {removingDomain && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1120]/80 p-4 animate-in fade-in duration-200">
-                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200">
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.8)' }}
+                >
+                    <div
+                        className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200"
+                        style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
+                    >
                         <div className="flex flex-col">
-                            <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
+                            <div className="m-0 p-0 text-[20px] font-semibold leading-[1.4em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>
                                 {t?.Domains?.removeDomainTitle || 'Remove domain'}
                             </div>
-                            <div className="m-0 p-0 mt-[8px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
+                            <div className="m-0 p-0 mt-[8px] text-[14px] font-normal leading-[1.428em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
                                 {(t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain)}
                             </div>
                         </div>
@@ -863,7 +962,8 @@ export function DomainsClient({
                             <button
                                 type="button"
                                 onClick={() => setRemovingDomain(null)}
-                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
+                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
+                                style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
                             </button>

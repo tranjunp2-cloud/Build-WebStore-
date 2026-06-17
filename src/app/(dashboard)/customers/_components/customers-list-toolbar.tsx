@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react'
-import { Search, ChevronDown, Download, Award, CalendarDays } from 'lucide-react'
+import { ChevronDown, Download, Award, CalendarDays } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
+import { TableSearch } from '@/components/ui/table-search'
 import { RankBadge } from './customers-shared-ui'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
 
@@ -44,16 +46,16 @@ function FilterChip<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--cus-border-strong)',
-                    color: active ? '#60a5fa' : 'var(--cus-text-secondary)',
+                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--dash-border)',
+                    color: active ? '#60a5fa' : 'var(--dash-text-muted)',
                 }}
             >
                 {icon}
                 <span>
-                    <span className="text-white/50">{prefix}: </span>
+                    <span style={{ color: 'var(--dash-text-muted)' }}>{prefix}: </span>
                     {selected!.label}
                 </span>
                 <ChevronDown
@@ -63,20 +65,20 @@ function FilterChip<T extends string>({
 
             {open && (
                 <div
-                    className="absolute top-[calc(100%+4px)] left-0 min-w-[160px] z-50 rounded-[12px] border border-white/[0.08] overflow-hidden"
-                    style={{ background: 'var(--cus-surface-dropdown)' }}
+                    className="absolute top-[calc(100%+4px)] left-0 min-w-[160px] z-50 rounded-[12px] overflow-hidden"
+                    style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                 >
                     {options.map(o => (
                         <button
                             key={o.key}
                             type="button"
                             onClick={() => { onChange(o.key); setOpen(false) }}
-                            className="w-full px-4 py-[10px] flex items-center justify-between text-left text-[13px] transition-colors hover:bg-white/[0.05] cursor-pointer"
-                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--cus-text-muted)' }}
+                            className="w-full px-4 py-[10px] flex items-center justify-between text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)' }}
                         >
                             {o.badge ?? <span className={o.key === value ? 'font-medium' : ''}>{o.label}</span>}
                             {o.count !== undefined && (
-                                <span className="text-[12px] text-white/40 ml-3">{o.count}</span>
+                                <span className="text-[12px] ml-3" style={{ color: 'var(--dash-text-muted)' }}>{o.count}</span>
                             )}
                         </button>
                     ))}
@@ -86,7 +88,7 @@ function FilterChip<T extends string>({
     )
 }
 
-const DATE_INPUT_CLS = 'h-8 px-2 rounded-[6px] border border-white/[0.08] bg-white/[0.04] text-[12px] text-white outline-none focus:border-blue-500/40 transition-colors w-full'
+const DATE_INPUT_CLS = 'h-8 px-2 rounded-[6px] text-[12px] outline-none transition-colors w-full'
 
 function DateFilterChip({
     value,
@@ -141,16 +143,16 @@ function DateFilterChip({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-[40px] px-3 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--cus-border-strong)',
-                    color: active ? '#60a5fa' : 'var(--cus-text-secondary)',
+                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--dash-border)',
+                    color: active ? '#60a5fa' : 'var(--dash-text-muted)',
                 }}
             >
-                <CalendarDays className="w-3.5 h-3.5 shrink-0 text-white/40" />
+                <CalendarDays className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--dash-text-muted)' }} />
                 <span>
-                    <span className="text-white/50">{datePrefix}: </span>
+                    <span style={{ color: 'var(--dash-text-muted)' }}>{datePrefix}: </span>
                     {chipLabel}
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
@@ -158,16 +160,16 @@ function DateFilterChip({
 
             {open && (
                 <div
-                    className="absolute top-[calc(100%+4px)] left-0 min-w-[180px] z-50 rounded-[12px] border border-white/[0.08] overflow-hidden"
-                    style={{ background: 'var(--cus-surface-dropdown)' }}
+                    className="absolute top-[calc(100%+4px)] left-0 min-w-[180px] z-50 rounded-[12px] overflow-hidden"
+                    style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                 >
                     {dateOptions.filter(o => o.key !== 'customRange').map(o => (
                         <button
                             key={o.key}
                             type="button"
                             onClick={() => { onChange(o.key); setOpen(false) }}
-                            className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-white/[0.05] cursor-pointer"
-                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--cus-text-muted)', fontWeight: o.key === value ? 500 : 400 }}
+                            className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)', fontWeight: o.key === value ? 500 : 400 }}
                         >
                             {o.label}
                         </button>
@@ -175,27 +177,51 @@ function DateFilterChip({
                     <button
                         type="button"
                         onClick={() => onChange('customRange')}
-                        className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-white/[0.05] cursor-pointer border-t border-white/[0.06]"
-                        style={{ color: value === 'customRange' ? '#60a5fa' : 'var(--cus-text-muted)', fontWeight: value === 'customRange' ? 500 : 400 }}
+                        className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                        style={{
+                            color: value === 'customRange' ? '#60a5fa' : 'var(--dash-text-muted)',
+                            fontWeight: value === 'customRange' ? 500 : 400,
+                            borderTop: '1px solid var(--dash-border)',
+                        }}
                     >
                         {dateOptions.find(o => o.key === 'customRange')?.label}
                     </button>
                     {value === 'customRange' && (
-                        <div className="px-4 pb-3 pt-2 space-y-2 border-t border-white/[0.06]">
+                        <div className="px-4 pb-3 pt-2 space-y-2" style={{ borderTop: '1px solid var(--dash-border)' }}>
                             <div className="flex flex-col gap-1">
-                                <label className="text-[11px] text-white/40">{fromLabel}</label>
-                                <input type="date" value={localFrom} onChange={e => setLocalFrom(e.target.value)} className={DATE_INPUT_CLS} />
+                                <label className="text-[11px]" style={{ color: 'var(--dash-text-muted)' }}>{fromLabel}</label>
+                                <input
+                                    type="date"
+                                    value={localFrom}
+                                    onChange={e => setLocalFrom(e.target.value)}
+                                    className={DATE_INPUT_CLS}
+                                    style={{
+                                        background: 'var(--dash-surface-hover)',
+                                        border: '1px solid var(--dash-border)',
+                                        color: 'var(--dash-text)',
+                                    }}
+                                />
                             </div>
                             <div className="flex flex-col gap-1">
-                                <label className="text-[11px] text-white/40">{toLabel}</label>
-                                <input type="date" value={localTo} onChange={e => setLocalTo(e.target.value)} className={DATE_INPUT_CLS} />
+                                <label className="text-[11px]" style={{ color: 'var(--dash-text-muted)' }}>{toLabel}</label>
+                                <input
+                                    type="date"
+                                    value={localTo}
+                                    onChange={e => setLocalTo(e.target.value)}
+                                    className={DATE_INPUT_CLS}
+                                    style={{
+                                        background: 'var(--dash-surface-hover)',
+                                        border: '1px solid var(--dash-border)',
+                                        color: 'var(--dash-text)',
+                                    }}
+                                />
                             </div>
                             <button
                                 type="button"
                                 disabled={!localFrom || !localTo || localFrom > localTo}
                                 onClick={() => { onCustomRangeApply(localFrom, localTo); setOpen(false) }}
-                                className="w-full h-8 rounded-[6px] text-[12px] font-medium text-white border-none cursor-pointer disabled:opacity-40"
-                                style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                                className="w-full h-8 rounded-[6px] text-[12px] font-medium border-none cursor-pointer disabled:opacity-40"
+                                style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)', color: '#fff' }}
                             >
                                 {applyLabel}
                             </button>
@@ -238,15 +264,6 @@ export function CustomersListToolbar({
 }: Props) {
     const { t } = useI18n()
     const tb = t.dashboard.shopCustomers.toolbar
-    const [input, setInput] = useState(search)
-
-    // Sync if parent resets search externally (e.g. a future "clear all filters" button)
-    useEffect(() => { setInput(search) }, [search])
-
-    useEffect(() => {
-        const timer = setTimeout(() => onSearch(input), 300)
-        return () => clearTimeout(timer)
-    }, [input, onSearch])
 
     const rankCounts = useMemo(() => {
         const c: Record<string, number> = { all: records.length, none: 0, bronze: 0, silver: 0, gold: 0, vip: 0 }
@@ -257,7 +274,14 @@ export function CustomersListToolbar({
         return c
     }, [records])
 
-    const unrankedBadge = <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold" style={{ background: 'rgba(107,114,128,0.08)', color: 'var(--cus-text-muted)', border: '1px solid rgba(107,114,128,0.20)' }}>{tb.unranked}</span>
+    const unrankedBadge = (
+        <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold"
+            style={{ background: 'rgba(107,114,128,0.08)', color: 'var(--dash-text-muted)', border: '1px solid rgba(107,114,128,0.20)' }}
+        >
+            {tb.unranked}
+        </span>
+    )
 
     const RANK_OPTIONS: DropdownOption<RankFilter>[] = [
         { key: 'all',    label: tb.allRanks,  count: rankCounts.all },
@@ -280,17 +304,12 @@ export function CustomersListToolbar({
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
-                <input
-                    type="text"
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    placeholder={tb.searchPlaceholder}
-                    className="w-full h-[40px] bg-[#1e293b] border border-white/[0.08] rounded-[10px] pl-9 pr-3 text-[14px] text-white placeholder:text-white/40 outline-none focus:border-blue-500/40 transition-colors"
-                />
-            </div>
+            <TableSearch
+                value={search}
+                onSearch={onSearch}
+                placeholder={tb.searchPlaceholder}
+                className="flex-1 min-w-[200px]"
+            />
 
             <FilterChip<RankFilter>
                 value={rankFilter}
@@ -298,7 +317,7 @@ export function CustomersListToolbar({
                 onChange={onRankFilterChange}
                 active={rankFilter !== 'all'}
                 prefix={tb.rankPrefix}
-                icon={<Award className="w-3.5 h-3.5 shrink-0 text-white/40" />}
+                icon={<Award className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--dash-text-muted)' }} />}
             />
 
             <DateFilterChip
@@ -316,16 +335,10 @@ export function CustomersListToolbar({
 
             <div className="flex-1" />
 
-            <button
-                type="button"
-                onClick={onExport}
-                disabled={exporting}
-                className="flex items-center gap-2 h-[40px] px-4 rounded-[10px] text-[13px] font-medium text-white/80 disabled:opacity-50 transition-colors hover:bg-white/[0.05] shrink-0 cursor-pointer"
-                style={{ background: 'transparent', border: '1px solid var(--cus-border-strong)' }}
-            >
+            <Button variant="dashSecondary" size="dash" onClick={onExport} disabled={exporting} className="shrink-0">
                 <Download className="w-4 h-4" />
                 {exporting ? tb.exporting : tb.exportCsv}
-            </button>
+            </Button>
         </div>
     )
 }

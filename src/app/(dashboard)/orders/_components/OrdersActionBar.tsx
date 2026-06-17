@@ -1,7 +1,10 @@
 "use client"
 
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import { Calendar, Clock, CreditCard, ArrowDownUp } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { TableSearch } from '@/components/ui/table-search'
+import { FilterChip } from '@/components/ui/filter-chip'
 
 const PAYMENT_METHOD_VALUES: Record<string, string> = {
     all: 'all',
@@ -20,10 +23,17 @@ const SORT_VALUES: Record<string, string> = {
     totalLow: 'total',
 }
 
+/**
+ * Orders toolbar — composes the shared <TableSearch> + <FilterChip> primitives
+ * (GH-1222), same as discounts/blog. Search debounce stays in the parent layout
+ * (searchQuery → debouncedSearch), so TableSearch propagates immediately
+ * (debounceMs=0) and only owns the controlled input UI.
+ *
+ * pendingCount/onBulkConfirm/isConfirming are kept for caller API compatibility
+ * (the bulk-confirm CTA is rendered elsewhere).
+ */
 export function OrdersActionBar({
-    pendingCount = 0,
-    onBulkConfirm,
-    isConfirming = false,
+    search = '',
     onSearch,
     onFilterStatus,
     onFilterDate,
@@ -33,6 +43,7 @@ export function OrdersActionBar({
     pendingCount?: number
     onBulkConfirm?: () => void
     isConfirming?: boolean
+    search?: string
     onSearch?: (val: string) => void
     onFilterStatus?: (val: string) => void
     onFilterDate?: (val: string) => void
@@ -42,196 +53,80 @@ export function OrdersActionBar({
     const { t } = useI18n()
     const o = t.dashboard.orders
 
-    const DATES_OPTIONS = useMemo(() => [
-        { value: 'all', label: o.filterDates.allDates },
-        { value: 'today', label: o.filterDates.today },
-        { value: 'thisWeek', label: o.filterDates.thisWeek },
-        { value: 'thisMonth', label: o.filterDates.thisMonth }
+    const DATE_OPTIONS = useMemo(() => [
+        { key: 'all', label: o.filterDates.allDates },
+        { key: 'today', label: o.filterDates.today },
+        { key: 'thisWeek', label: o.filterDates.thisWeek },
+        { key: 'thisMonth', label: o.filterDates.thisMonth },
     ], [o])
 
     const STATUS_OPTIONS = useMemo(() => [
-        { value: 'all', label: o.filterStatus.allStatus },
-        { value: 'pending', label: o.status.pending },
-        { value: 'confirmed', label: o.status.confirmed },
-        { value: 'ready_to_ship', label: o.status.readyToShip },
-        { value: 'shipped', label: o.status.shipped },
-        { value: 'completed', label: o.status.completed },
-        { value: 'cancelled', label: o.status.cancelled },
-        { value: 'refunded', label: o.status.refunded }
+        { key: 'all', label: o.filterStatus.allStatus },
+        { key: 'pending', label: o.status.pending },
+        { key: 'confirmed', label: o.status.confirmed },
+        { key: 'ready_to_ship', label: o.status.readyToShip },
+        { key: 'shipped', label: o.status.shipped },
+        { key: 'completed', label: o.status.completed },
+        { key: 'cancelled', label: o.status.cancelled },
+        { key: 'refunded', label: o.status.refunded },
     ], [o])
 
     const PAYMENT_OPTIONS = useMemo(() => Object.entries(PAYMENT_METHOD_VALUES).map(([key, val]) => ({
-        value: val,
-        label: (o.paymentFilter as any)[key] as string,
+        key: val,
+        label: (o.paymentFilter as Record<string, string>)[key],
     })), [o])
 
     const SORT_OPTIONS = useMemo(() => Object.entries(SORT_VALUES).map(([key, val]) => ({
-        value: val,
-        label: (o.sort as any)[key] as string,
+        key: val,
+        label: (o.sort as Record<string, string>)[key],
     })), [o])
 
-    const [isDatesOpen, setIsDatesOpen] = useState(false)
-    const [selectedDateIdx, setSelectedDateIdx] = useState(0)
-    const datesRef = useRef<HTMLDivElement>(null)
-
-    const [isStatusOpen, setIsStatusOpen] = useState(false)
-    const [selectedStatusIdx, setSelectedStatusIdx] = useState(0)
-    const statusRef = useRef<HTMLDivElement>(null)
-
-    const [isPaymentOpen, setIsPaymentOpen] = useState(false)
-    const [selectedPaymentIdx, setSelectedPaymentIdx] = useState(0)
-    const paymentRef = useRef<HTMLDivElement>(null)
-
-    const [isSortOpen, setIsSortOpen] = useState(false)
-    const [selectedSortIdx, setSelectedSortIdx] = useState(0)
-    const sortRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (datesRef.current && !datesRef.current.contains(event.target as Node)) setIsDatesOpen(false)
-            if (statusRef.current && !statusRef.current.contains(event.target as Node)) setIsStatusOpen(false)
-            if (paymentRef.current && !paymentRef.current.contains(event.target as Node)) setIsPaymentOpen(false)
-            if (sortRef.current && !sortRef.current.contains(event.target as Node)) setIsSortOpen(false)
-        }
-        document.addEventListener("mousedown", handleClickOutside)
-        return () => document.removeEventListener("mousedown", handleClickOutside)
-    }, [])
+    // Selected values (first option is the default; FilterChip highlights when changed).
+    const [dateVal, setDateVal] = useState('all')
+    const [statusVal, setStatusVal] = useState('all')
+    const [paymentVal, setPaymentVal] = useState('all')
+    const [sortVal, setSortVal] = useState('-createdAt')
 
     return (
-        <div className="flex flex-col gap-[22px] w-full">
-            {/* Row 1: Search + Date + Status */}
-            <div className="flex flex-col md:flex-row flex-[1_0_0] items-start md:items-center gap-[12px] self-stretch justify-between w-full">
-                {/* Search Input */}
-                <div className="relative w-full md:flex-1 h-[50px]">
-                    <div className="absolute left-[16px] top-[15px] w-[20px] h-[20px] flex items-center justify-center pointer-events-none">
-                        <svg width="20" height="23" viewBox="0 0 20 23" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9.66667 16.3333C13.3486 16.3333 16.3333 13.3486 16.3333 9.66667C16.3333 5.98477 13.3486 3 9.66667 3C5.98477 3 3 5.98477 3 9.66667C3 13.3486 5.98477 16.3333 9.66667 16.3333Z" stroke="currentColor" strokeOpacity="0.4" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M6.58333 19.9173L3 16.334" stroke="currentColor" strokeOpacity="0.4" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder={o.search}
-                        onChange={(e) => onSearch?.(e.target.value)}
-                        style={{ border: '1px solid var(--dash-border)' }}
-                        className="w-full h-[50px] pl-[48px] pr-[16px] py-[12px] bg-dash-surface rounded-[16px] text-[16px] leading-[1.2102272510528564em] font-normal text-dash-text placeholder:text-dash-text-muted focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
-                    />
-                </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full">
+            <TableSearch
+                value={search}
+                onSearch={(q) => onSearch?.(q)}
+                placeholder={o.search}
+                debounceMs={0}
+                className="w-full md:flex-1 md:max-w-[400px]"
+            />
 
-                {/* Dropdowns Row 1: Date + Status */}
-                <div className="flex items-center gap-[12px] w-full md:w-auto h-[50px]">
-                    <FilterDropdown
-                        ref={datesRef}
-                        isOpen={isDatesOpen}
-                        onToggle={() => setIsDatesOpen(!isDatesOpen)}
-                        selectedIdx={selectedDateIdx}
-                        options={DATES_OPTIONS}
-                        onSelect={(idx) => {
-                            setSelectedDateIdx(idx)
-                            setIsDatesOpen(false)
-                            onFilterDate?.(DATES_OPTIONS[idx].value)
-                        }}
-                        width="md:w-[143px]"
-                    />
-                    <FilterDropdown
-                        ref={statusRef}
-                        isOpen={isStatusOpen}
-                        onToggle={() => setIsStatusOpen(!isStatusOpen)}
-                        selectedIdx={selectedStatusIdx}
-                        options={STATUS_OPTIONS}
-                        onSelect={(idx) => {
-                            setSelectedStatusIdx(idx)
-                            setIsStatusOpen(false)
-                            onFilterStatus?.(STATUS_OPTIONS[idx].value)
-                        }}
-                        width="md:w-[138px]"
-                    />
-                </div>
-            </div>
-
-            {/* Row 2: Payment Method + Sort */}
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-[12px] w-full">
-                <div className="flex items-center gap-[12px] w-full md:w-auto h-[50px]">
-                    <FilterDropdown
-                        ref={paymentRef}
-                        isOpen={isPaymentOpen}
-                        onToggle={() => setIsPaymentOpen(!isPaymentOpen)}
-                        selectedIdx={selectedPaymentIdx}
-                        options={PAYMENT_OPTIONS}
-                        onSelect={(idx) => {
-                            setSelectedPaymentIdx(idx)
-                            setIsPaymentOpen(false)
-                            onFilterPaymentMethod?.(PAYMENT_OPTIONS[idx].value === 'all' ? '' : PAYMENT_OPTIONS[idx].value)
-                        }}
-                        width="md:w-[155px]"
-                        dropdownWidth="w-[155px]"
-                    />
-                    <FilterDropdown
-                        ref={sortRef}
-                        isOpen={isSortOpen}
-                        onToggle={() => setIsSortOpen(!isSortOpen)}
-                        selectedIdx={selectedSortIdx}
-                        options={SORT_OPTIONS}
-                        onSelect={(idx) => {
-                            setSelectedSortIdx(idx)
-                            setIsSortOpen(false)
-                            onSort?.(SORT_OPTIONS[idx].value)
-                        }}
-                        width="md:w-[200px]"
-                        dropdownWidth="w-[200px]"
-                    />
-                </div>
+            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                <FilterChip<string>
+                    icon={Calendar}
+                    label={o.filterLabels.date}
+                    value={dateVal}
+                    options={DATE_OPTIONS}
+                    onChange={(v) => { setDateVal(v); onFilterDate?.(v) }}
+                />
+                <FilterChip<string>
+                    icon={Clock}
+                    label={o.filterLabels.status}
+                    value={statusVal}
+                    options={STATUS_OPTIONS}
+                    onChange={(v) => { setStatusVal(v); onFilterStatus?.(v) }}
+                />
+                <FilterChip<string>
+                    icon={CreditCard}
+                    label={o.filterLabels.payment}
+                    value={paymentVal}
+                    options={PAYMENT_OPTIONS}
+                    onChange={(v) => { setPaymentVal(v); onFilterPaymentMethod?.(v === 'all' ? '' : v) }}
+                />
+                <FilterChip<string>
+                    icon={ArrowDownUp}
+                    label={o.filterLabels.sort}
+                    value={sortVal}
+                    options={SORT_OPTIONS}
+                    onChange={(v) => { setSortVal(v); onSort?.(v) }}
+                />
             </div>
         </div>
     )
 }
-
-// ─── Shared Dropdown Component ───
-const FilterDropdown = React.forwardRef<HTMLDivElement, {
-    isOpen: boolean
-    onToggle: () => void
-    selectedIdx: number
-    options: { value: string; label: string }[]
-    onSelect: (idx: number) => void
-    width?: string
-    dropdownWidth?: string
-}>(({ isOpen, onToggle, selectedIdx, options, onSelect, width = 'md:w-[143px]', dropdownWidth = 'w-[143px]' }, ref) => (
-    <div className={`relative flex-1 md:flex-none`} ref={ref}>
-        <button
-            onClick={onToggle}
-            style={{ border: '1px solid var(--dash-border)' }}
-            className={`flex items-center justify-between w-full ${width} h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0`}
-        >
-            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
-                {options[selectedIdx]?.label}
-            </span>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}>
-                <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        </button>
-
-        {isOpen && (
-            <div className={`absolute top-[calc(100%+4px)] left-0 z-50 flex flex-col items-stretch ${dropdownWidth} py-[4px] drop-shadow-[0px_8px_24px_rgba(25,32,56,0.1)]`}>
-                <div className="flex flex-col w-full items-start px-[22px]">
-                    <svg width="12" height="6" viewBox="16 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="block relative top-[1px] z-10">
-                        <path d="M28 6L22 0L16 6H28Z" fill="var(--dash-secondary-bg)" />
-                    </svg>
-                </div>
-                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
-                    {options.map((option, index) => (
-                        <button
-                            key={option.value}
-                            onClick={() => onSelect(index)}
-                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
-                        >
-                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
-                                {option.label}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-        )}
-    </div>
-))
-FilterDropdown.displayName = 'FilterDropdown'
