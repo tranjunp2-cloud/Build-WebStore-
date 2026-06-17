@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PATCH as PublishPATCH, DELETE as UnpublishDELETE } from '@/app/api/sites/[siteId]/publish/route'
 import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 // ── Auth mock (toggle via mockAuthUser) ──────────────────────────────────────
 let mockAuthUser: any = {
@@ -363,6 +364,83 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(features.features[0]).not.toHaveProperty('id')
         expect(features.features[0]).not.toHaveProperty('_uuid')
         expect(features.features[0].title).toBe('Fast')
+    })
+
+    it('TC-F01-pub-13: skips soft-deleted pages on publish so a deleted-then-recreated slug does not trip the partial unique index (no 500)', async () => {
+        // Regression: user creates page "/about" (id=page-del), deletes it
+        // (soft-delete → deleted_at set), then recreates "/about" (id=page-live).
+        // On publish, the promote loop iterated ALL pages incl. the soft-deleted
+        // one; promoting it reset deleted_at→NULL, so two live rows shared
+        // (site_id, slug) → partial unique index pages_site_slug_uniq → 500.
+        // Fix: resolve soft-deleted ids from pages.deleted_at via raw SQL and
+        // `continue` past them — the deleted page is NEVER promoted.
+        const { getPayload } = await import('payload')
+
+        // Use a NUMERIC siteId — in production sites.id is a serial int, so the route's
+        // `Number(siteId)` must yield a real integer (not NaN). A non-numeric id here
+        // would let Number()→NaN slip through unnoticed and mask a broken WHERE clause.
+        const siteId = '123'
+        mockSiteRecord = { id: siteId, name: 'My Coffee Site', status: 'draft', tenant: 'tenant-1', publishedAt: null }
+
+        // draft:true find returns BOTH pages (it reads version snapshots where
+        // deleted_at is null, so it cannot tell them apart — that's why the raw
+        // deleted_at query is the reliable source).
+        // pages.id is serial int — use numeric ids (id 11 = deleted, id 12 = live).
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 11, _status: 'draft', site: siteId, slug: '/about', layout: [] },
+                { id: 12, _status: 'draft', site: siteId, slug: '/about', layout: [] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // db.drizzle.execute reports id 11 as soft-deleted (deleted_at IS NOT NULL).
+        const executeSpy = vi.fn().mockResolvedValue({ rows: [{ id: 11 }] })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+            db: { drizzle: { execute: executeSpy } },
+        })
+
+        const req = makePatchReq(siteId)
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId }) })
+        const body = await res.json()
+
+        // Publish succeeds — no 500, no partial-failure.
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+
+        // The deleted-id query must target the right column + value — serialize the
+        // drizzle SQL so a broken WHERE clause (wrong column / NaN site_id) fails here
+        // instead of silently passing on the mocked rows.
+        expect(executeSpy).toHaveBeenCalledTimes(1)
+        const { sql: deletedQuerySql, params: deletedQueryParams } = new PgDialect().sqlToQuery(
+            executeSpy.mock.calls[0][0],
+        )
+        expect(deletedQuerySql).toContain('site_id =')
+        expect(deletedQuerySql).toContain('deleted_at IS NOT NULL')
+        expect(deletedQueryParams).toContain(Number(siteId)) // 123, never NaN
+
+        // The soft-deleted page must NEVER be promoted...
+        const pageUpdates = updateSpy.mock.calls.filter(c => c[0].collection === 'pages')
+        const promotedIds = pageUpdates.map(c => c[0].id)
+        expect(promotedIds).not.toContain(11)
+        // ...while the live recreated page IS promoted.
+        expect(promotedIds).toContain(12)
     })
 
     it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
