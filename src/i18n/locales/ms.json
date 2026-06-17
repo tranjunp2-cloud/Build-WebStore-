@@ -3978,7 +3978,9 @@
             "selectVariant": "Pilih varian",
             "allProducts": "Semua Produk",
             "priceRange": "Julat Harga",
-            "applyFilter": "Gunakan Penapis"
+            "applyFilter": "Gunakan Penapis",
+            "stockLimitMessage": "Anda telah menambah stok maksimum yang tersedia ({cartQty}/{inventory}) ke dalam troli",
+            "stockLimitToast": "Kuantiti troli telah mencapai stok maksimum yang tersedia"
         },
         "blog": {
             "title": "Blog",
