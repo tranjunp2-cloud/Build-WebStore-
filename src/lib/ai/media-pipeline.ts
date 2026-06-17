@@ -272,8 +272,9 @@ async function batchFetch(
  * Per-category hero fallback Unsplash photo IDs — landscape 1920×1080.
  * Used when ALL Unsplash search attempts fail so the hero image still reflects
  * the business industry instead of a generic office hallway.
+ * Exported for testing only.
  */
-const HERO_FALLBACK_BY_CATEGORY: Record<string, string[]> = {
+export const HERO_FALLBACK_BY_CATEGORY: Record<string, string[]> = {
     tech:       ['photo-1498050108023-c5249f4df085', 'photo-1460925895917-afdab827c52f', 'photo-1518770660439-4636190af475'],
     restaurant: ['photo-1414235077428-338989a2e8c0', 'photo-1504674900247-0877df9cc836'],
     beauty:     ['photo-1522335789203-aabd1fc54bc9', 'photo-1570172619644-dfd03ed5d881'],
@@ -290,7 +291,8 @@ const HERO_FALLBACK_BY_CATEGORY: Record<string, string[]> = {
     blog:       ['photo-1499750310107-5fef28a66643', 'photo-1456324504439-367cee3b3c32'],
 }
 
-function pickHeroFallbackUrl(rawCategory: string | undefined): string {
+/** Exported for testing only. */
+export function pickHeroFallbackUrl(rawCategory: string | undefined): string {
     const key = resolveComposerCategory(rawCategory ?? '')
     const list = HERO_FALLBACK_BY_CATEGORY[key] ?? HERO_FALLBACK_BY_CATEGORY['business']!
     const photoId = list[Math.floor(Math.random() * list.length)]!
