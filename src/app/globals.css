@@ -63,6 +63,7 @@
   --dash-divider: #CBD5E1;
   --dash-accent: #2563EB;
   --dash-error: #FB2C36;
+  --dash-warning: #B45309;
   --dash-overlay: rgba(0, 0, 0, 0.35);
   --dash-secondary-bg: #F1F5F9;
   --save-bar-bg: rgba(248, 250, 252, 0.92);
@@ -96,6 +97,7 @@
   /* Subtle divider — just above --dash-border (#1F2937), barely lighter than --dash-bg (#0B1120). */
   --dash-divider: #232E3D;
   --dash-accent: #2563EB;
+  --dash-warning: #F5B945;
   --dash-overlay: rgba(0, 0, 0, 0.5);
   --dash-secondary-bg: #1F2937;
   --save-bar-bg: rgba(15, 23, 42, 0.88);

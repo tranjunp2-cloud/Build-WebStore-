@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, GripVertical, Pencil, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react'
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { Plus, Layers } from 'lucide-react'
 import {
     DndContext,
     closestCenter,
@@ -13,24 +13,40 @@ import {
     type DragEndEvent,
 } from '@dnd-kit/core'
 import {
-    arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
-    useSortable,
 } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { useI18n } from '@/i18n'
-import { toast } from 'sonner'
-import { isValidExternalNavigationUrl } from '@/lib/navigation-url'
+import type { NavLinkItem, DropTarget } from './navigation-editor-types'
 
-export type NavLinkItem = {
-    id: string
-    label: string
-    url: string
-    type: 'page' | 'external'
-    children: NavLinkItem[]
-}
+// Inline 2-level-guard confirmation shown at the top of the editor panel.
+type FlattenAsk = {
+    activeId: string
+    targetId: string
+    activeName: string
+    count: number
+    targetName: string
+} | null
+import {
+    generateId,
+    updateLinkInTree,
+    deleteLinkInTree,
+    addChildInTree,
+    findLinkAndParent,
+    moveItemInArray,
+    indentLinkInTree,
+    outdentLinkInTree,
+    nestAsChild,
+    nestWithFlatten,
+    moveAsSibling,
+} from './navigation-tree-helpers'
+import { NavLinkRow, C } from './navigation-link-row'
+
+// Re-export so SettingsPanel can still do: import { NavigationEditor, type NavLinkItem }
+export type { NavLinkItem }
+
+const SYSTEM_PAGE_SLUGS = new Set(['404', '/404'])
 
 interface NavigationEditorProps {
     links: NavLinkItem[]
@@ -38,394 +54,59 @@ interface NavigationEditorProps {
     pages?: { id: string; title: string; slug: string }[]
 }
 
-const LINK_TYPE_OPTIONS = [
-    { value: 'page', icon: FileText },
-    { value: 'external', icon: ExternalLink },
-] as const
-
-const SYSTEM_PAGE_SLUGS = new Set(['404', '/404'])
-
-function generateId() {
-    return `nav_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-}
-
-function normalizePageOptionUrl(slug: string) {
-    if (!slug || slug === '/') return '/'
-    return slug.startsWith('/') ? slug : `/${slug}`
-}
-
-function validateLinkLabel(value: string) {
-    return value.trim().length > 0
-}
-
-function validateLinkUrl(link: NavLinkItem, value: string) {
-    if (link.type === 'page') {
-        return value.trim().length > 0 && value !== '#'
-    }
-    return value.trim().length > 0 && isValidExternalNavigationUrl(value.trim())
-}
-
-type NavTranslations = {
-    internalPage: string
-    externalUrl: string
-    selectPage: string
-    addSubLink: string
-    moveUp: string
-    moveDown: string
-    moveLeft: string
-    makeSubItem: string
-    newLink: string
-    title: string
-    noLinks: string
-    addLink: string
-}
-
-function NavLinkRow({
-    link,
-    depth,
-    onUpdate,
-    onDelete,
-    onAddChild,
-    onMoveUp,
-    onMoveDown,
-    onIndent,
-    onOutdent,
-    isFirst,
-    isLast,
-    pages,
-    nav,
-    openPanelId,
-    onSetOpenPanelId,
-}: {
-    link: NavLinkItem
-    depth: number
-    onUpdate: (id: string, changes: Partial<NavLinkItem>) => void
-    onDelete: (id: string) => void
-    onAddChild: (parentId: string) => void
-    onMoveUp: (id: string) => void
-    onMoveDown: (id: string) => void
-    onIndent: (id: string) => void
-    onOutdent: (id: string) => void
-    isFirst: boolean
-    isLast: boolean
-    pages?: { id: string; title: string; slug: string }[]
-    nav: NavTranslations
-    openPanelId: string | null
-    onSetOpenPanelId: (id: string | null) => void
-}) {
-    const { t } = useI18n()
-    const nv = t.editor.navigationValidation
-    const [isExpanded, setIsExpanded] = useState(true)
-    const [isRenaming, setIsRenaming] = useState(false)
-    const isPanelOpen = openPanelId === link.id
-
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id })
-    const dragStyle = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
-    const setIsPanelOpen = useCallback((val: boolean) => onSetOpenPanelId(val ? link.id : null), [link.id, onSetOpenPanelId])
-    const hasChildren = (link.children || []).length > 0
-
-    const linkTypeOptions = useMemo(() => [
-        { value: 'page', label: nav.internalPage, icon: FileText },
-        { value: 'external', label: nav.externalUrl, icon: ExternalLink },
-    ], [nav])
-
-    const typeIcon = linkTypeOptions.find(o => o.value === link.type)?.icon || ExternalLink
-    const TypeIcon = typeIcon
-
-    useEffect(() => {
-        if (!isPanelOpen && isRenaming) {
-            setIsRenaming(false)
-        }
-    }, [isPanelOpen, isRenaming])
-
-    const handleLabelCommit = useCallback((rawValue: string) => {
-        const value = rawValue.trim()
-        if (!validateLinkLabel(value)) {
-            toast.error(nv.labelRequired)
-            return
-        }
-
-        onUpdate(link.id, { label: value })
-    }, [link.id, onUpdate])
-
-    const handleUrlCommit = useCallback((rawValue: string) => {
-        const value = rawValue.trim()
-        if (!validateLinkUrl(link, value)) {
-            if (link.type === 'page') {
-                toast.error(nv.selectPageError)
-            } else if (!value) {
-                toast.error(nv.urlRequired)
-            } else {
-                toast.error(nv.invalidUrl)
-            }
-            return
-        }
-
-        onUpdate(link.id, { url: value })
-    }, [link, onUpdate])
-
-    return (
-        <div ref={setNodeRef} style={dragStyle} className="select-none">
-            <div
-                className={`group flex items-center gap-2 rounded px-2 hover:bg-white/[0.03] transition-colors ${depth === 0 ? 'h-9' : 'h-8'}`}
-            >
-                {/* Drag handle */}
-                <div
-                    {...attributes}
-                    {...listeners}
-                    className="shrink-0 cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 transition-colors touch-none"
-                    aria-label="Drag to reorder"
-                >
-                    <GripVertical className="w-3.5 h-3.5" />
-                </div>
-
-                {/* Expand/collapse chevron for parent items */}
-                {hasChildren ? (
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 text-slate-500 hover:text-slate-300">
-                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    </button>
-                ) : null}
-
-                {/* Label */}
-                {isRenaming ? (
-                    <input
-                        autoFocus
-                        defaultValue={link.label}
-                        onBlur={(e) => {
-                            handleLabelCommit(e.target.value)
-                            setIsRenaming(false)
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                            if (e.key === 'Escape') setIsRenaming(false)
-                        }}
-                        className="flex-1 min-w-0 bg-white/10 px-1.5 py-0.5 rounded text-sm text-white border border-cyan-500/30 outline-none"
-                    />
-                ) : (
-                    <span
-                        className={`flex-1 min-w-0 truncate cursor-text ${depth === 0 ? 'text-sm text-slate-50' : 'text-xs text-slate-400'}`}
-                        onDoubleClick={() => {
-                            setIsPanelOpen(true)
-                            setIsRenaming(true)
-                        }}
-                    >
-                        {link.label}
-                        {(!link.url || link.url === '#') && (
-                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" title={nv.noDestination} />
-                        )}
-                    </span>
-                )}
-
-                {/* Edit button — always visible per Figma */}
-                <button
-                    type="button"
-                    aria-label="Edit link"
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        setIsPanelOpen(!isPanelOpen)
-                    }}
-                    className="shrink-0 text-xs text-slate-500 hover:text-amber-400 transition-colors"
-                >
-                    <Pencil className="h-3 w-3" aria-hidden />
-                </button>
-            </div>
-
-            {/* Expanded edit panel: URL + type + actions */}
-            {isPanelOpen && (
-                <div
-                    className="px-3 pb-2.5 pt-1 space-y-2"
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <div className="flex items-center gap-1.5">
-                        <div className="relative flex-1 min-w-0">
-                            <TypeIcon className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-cyan-300" />
-                            <select
-                                value={link.type}
-                                onChange={(e) => {
-                                    const nextType = e.target.value as NavLinkItem['type']
-                                    onUpdate(link.id, {
-                                        type: nextType,
-                                        url: nextType === 'page' ? (link.url.startsWith('/') ? link.url : '#') : (link.url === '#' ? '' : link.url),
-                                    })
-                                }}
-                                className="h-7 w-full cursor-pointer appearance-none rounded-md border border-cyan-400/20 bg-slate-900/80 pl-6 pr-6 text-[11px] font-medium text-slate-200 transition-colors hover:border-cyan-300/40 focus:border-cyan-300 focus:outline-none"
-                                aria-label={nv.linkType}
-                            >
-                                {linkTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-cyan-200/70" />
-                        </div>
-                    </div>
-                    {link.type === 'page' && pages ? (
-                        <div className="relative min-w-0">
-                            <select
-                                value={link.url}
-                                onChange={(e) => {
-                                    const value = e.target.value
-                                    if (!validateLinkUrl(link, value)) {
-                                        toast.error(nv.selectPageError)
-                                        return
-                                    }
-                                    onUpdate(link.id, { url: value })
-                                }}
-                                className="h-7 w-full cursor-pointer appearance-none rounded-md border border-white/10 bg-white/[0.05] pl-2.5 pr-6 text-[11px] text-slate-200 transition-colors hover:border-white/20 focus:border-cyan-300 focus:outline-none"
-                                aria-label={nv.pageDestination}
-                            >
-                                <option value="#">{nav.selectPage}</option>
-                                {pages.map(p => <option key={p.id} value={normalizePageOptionUrl(p.slug)}>{p.title}</option>)}
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
-                        </div>
-                    ) : (
-                        <input
-                            defaultValue={link.url}
-                            placeholder={nv.urlPlaceholder}
-                            onBlur={(e) => handleUrlCommit(e.target.value)}
-                            className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-white/[0.05] px-2.5 text-[11px] text-slate-200 outline-none transition-colors placeholder:text-slate-500 hover:border-white/20 focus:border-cyan-300"
-                        />
-                    )}
-                    <div className="flex items-center gap-0.5 pt-0.5">
-                        {depth < 1 && (
-                            <button type="button" onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title={nav.addSubLink} className="p-1 text-slate-500 hover:text-cyan-400 rounded transition-colors">
-                                <Plus className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                        {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowUp className="h-3 w-3" aria-hidden /></button>}
-                        {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowDown className="h-3 w-3" aria-hidden /></button>}
-                        {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowLeft className="h-3 w-3" aria-hidden /></button>}
-                        {depth < 1 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors"><ArrowRight className="h-3 w-3" aria-hidden /></button>}
-                        <div className="flex-1" />
-                        <button type="button" onClick={() => onDelete(link.id)} className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Children with tree connector (left border) per Figma */}
-            {isExpanded && hasChildren && (
-                <div className="ml-6 border-l-2 border-blue-500/[0.04] pl-2.5">
-                    <SortableContext items={link.children.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                        {link.children.map((child, idx) => (
-                            <NavLinkRow
-                                key={child.id}
-                                link={child}
-                                depth={depth + 1}
-                                onUpdate={onUpdate}
-                                onDelete={onDelete}
-                                onAddChild={onAddChild}
-                                onMoveUp={onMoveUp}
-                                onMoveDown={onMoveDown}
-                                onIndent={onIndent}
-                                onOutdent={onOutdent}
-                                isFirst={idx === 0}
-                                isLast={idx === link.children.length - 1}
-                                pages={pages}
-                                nav={nav}
-                                openPanelId={openPanelId}
-                                onSetOpenPanelId={onSetOpenPanelId}
-                            />
-                        ))}
-                    </SortableContext>
-                </div>
-            )}
-        </div>
-    )
-}
-
-// Deep tree helpers
-function updateLinkInTree(links: NavLinkItem[], id: string, changes: Partial<NavLinkItem>): NavLinkItem[] {
-    if (!links) return []
-    return links.map(link => {
-        if (link.id === id) return { ...link, ...changes }
-        if (link.children && link.children.length > 0) return { ...link, children: updateLinkInTree(link.children, id, changes) }
-        return link
-    })
-}
-
-function deleteLinkInTree(links: NavLinkItem[], id: string): NavLinkItem[] {
-    if (!links) return []
-    return links
-        .filter(link => link.id !== id)
-        .map(link => ({ ...link, children: deleteLinkInTree(link.children || [], id) }))
-}
-
-function addChildInTree(links: NavLinkItem[], parentId: string, newLinkLabel: string): NavLinkItem[] {
-    if (!links) return []
-    return links.map(link => {
-        if (link.id === parentId) {
-            return { ...link, children: [...(link.children || []), { id: generateId(), label: newLinkLabel, url: '#', type: 'page' as const, children: [] }] }
-        }
-        if (link.children && link.children.length > 0) return { ...link, children: addChildInTree(link.children, parentId, newLinkLabel) }
-        return link
-    })
-}
-
-function findLinkAndParent(links: NavLinkItem[], id: string, parentId: string | null = null): { link: NavLinkItem; siblings: NavLinkItem[]; index: number, parentId: string | null } | null {
-    for (let i = 0; i < links.length; i++) {
-        if (links[i].id === id) return { link: links[i], siblings: links, index: i, parentId }
-        if (links[i].children && links[i].children.length > 0) {
-            const found = findLinkAndParent(links[i].children, id, links[i].id)
-            if (found) return found
-        }
-    }
-    return null
-}
-
-function moveItemInArray<T>(arr: T[], from: number, to: number): T[] {
-    const next = [...arr]
-    const [item] = next.splice(from, 1)
-    next.splice(to, 0, item)
-    return next
-}
-
-function indentLinkInTree(links: NavLinkItem[], id: string): NavLinkItem[] {
-    if (!links) return []
-    for (let i = 0; i < links.length; i++) {
-        if (links[i].id === id && i > 0) {
-            const target = links[i]
-            const newLinks = links.filter((_, idx) => idx !== i)
-            newLinks[i - 1] = { ...newLinks[i - 1], children: [...(newLinks[i - 1].children || []), target] }
-            return newLinks
-        }
-        if (links[i].children && links[i].children.length > 0) {
-            const result = indentLinkInTree(links[i].children, id)
-            if (result !== links[i].children) {
-                return links.map((l, idx) => idx === i ? { ...l, children: result } : l)
-            }
-        }
-    }
-    return links
-}
-
-function outdentLinkInTree(links: NavLinkItem[], id: string, parentArray: NavLinkItem[] | null = null, parentIndex: number = -1): NavLinkItem[] | null {
-    if (!links) return null
-    for (let i = 0; i < links.length; i++) {
-        if (links[i].children && links[i].children.length > 0) {
-            const childIdx = links[i].children.findIndex(c => c.id === id)
-            if (childIdx !== -1) {
-                const target = links[i].children[childIdx]
-                const newChildren = links[i].children.filter((_, idx) => idx !== childIdx)
-                const newLinks = [...links]
-                newLinks[i] = { ...newLinks[i], children: newChildren }
-                newLinks.splice(i + 1, 0, target)
-                return newLinks
-            }
-            const result = outdentLinkInTree(links[i].children, id, links, i)
-            if (result) {
-                return links.map((l, idx) => idx === i ? { ...l, children: result } : l)
-            }
-        }
-    }
-    return null
-}
-
 export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorProps) {
     const { t } = useI18n()
     const nav = t.editor.navigation
+
     const [openPanelId, setOpenPanelId] = useState<string | null>(null)
+    const [editingNameId, setEditingNameId] = useState<string | null>(null)
+    const [dropTarget, setDropTarget] = useState<DropTarget>(null)
+    const [flattenAsk, setFlattenAsk] = useState<FlattenAsk>(null)
+
+    // 2-level guard: instead of a big modal, surface a compact inline confirm
+    // box at the top of the editor panel.
+    const notifyFlatten = useCallback(
+        (activeId: string, targetId: string, activeName: string, count: number, targetName: string) => {
+            setFlattenAsk({ activeId, targetId, activeName, count, targetName })
+        },
+        [],
+    )
+
+    const handleFlattenConfirm = useCallback(() => {
+        if (!flattenAsk) return
+        // The confirm box is inline (not a blocking modal) — the tree behind it
+        // stays editable. If the user deleted/moved active or target before
+        // confirming, nestWithFlatten would pluck active but fail to re-attach it
+        // (target gone) → subtree lost. Bail out unless both still exist.
+        const activeStillThere = findLinkAndParent(links, flattenAsk.activeId)
+        const targetStillThere = findLinkAndParent(links, flattenAsk.targetId)
+        if (activeStillThere && targetStillThere) {
+            onUpdate(nestWithFlatten(links, flattenAsk.activeId, flattenAsk.targetId))
+        }
+        setFlattenAsk(null)
+    }, [flattenAsk, links, onUpdate])
+
+    // Click outside the builder → close any open config panel + name editor.
+    // Fixes "panel stays stuck open and can't be dismissed".
+    const rootRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (!openPanelId && !editingNameId) return
+        const handler = (e: PointerEvent) => {
+            const target = e.target as HTMLElement | null
+            // Toasts (sonner) render outside rootRef — clicking one must not
+            // close the panel the user is still editing.
+            if (target?.closest('[data-sonner-toaster]')) return
+            if (rootRef.current && !rootRef.current.contains(target as Node)) {
+                setOpenPanelId(null)
+                setEditingNameId(null)
+            }
+        }
+        document.addEventListener('pointerdown', handler)
+        return () => document.removeEventListener('pointerdown', handler)
+    }, [openPanelId, editingNameId])
+
     const linkablePages = useMemo(
-        () => pages?.filter(page => !SYSTEM_PAGE_SLUGS.has(page.slug)),
+        () => pages?.filter(p => !SYSTEM_PAGE_SLUGS.has(p.slug)),
         [pages],
     )
 
@@ -435,97 +116,269 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     )
 
+    // ── DnD: visual hover feedback ────────────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleDragOver = useCallback((event: any) => {
+        const active = event.active as { id: string | number }
+        const over = event.over as { id: string | number } | null
+        if (!over || active.id === over.id) { setDropTarget(null); return }
+        const overFound = findLinkAndParent(links, String(over.id))
+        const activeFound = findLinkAndParent(links, String(active.id))
+        if (!overFound || !activeFound) { setDropTarget(null); return }
+        // "child" intent: root item hovering a root item that already has children
+        if (activeFound.parentId === null && overFound.parentId === null && overFound.link.children.length > 0) {
+            setDropTarget({ id: String(over.id), mode: 'child' })
+        } else {
+            setDropTarget({ id: String(over.id), mode: 'sibling' })
+        }
+    }, [links])
+
+    // ── DnD: apply drop ───────────────────────────────────────────────────────
     const handleDragEnd = useCallback((event: DragEndEvent) => {
+        setDropTarget(null)
         const { active, over } = event
         if (!over || active.id === over.id) return
+
         const activeFound = findLinkAndParent(links, String(active.id))
         const overFound = findLinkAndParent(links, String(over.id))
         if (!activeFound || !overFound) return
-        // Only allow reorder within the same parent; cross-parent moves use indent/outdent buttons
-        if (activeFound.parentId !== overFound.parentId) return
 
-        const reordered = arrayMove(activeFound.siblings, activeFound.index, overFound.index)
+        const activeId = String(active.id)
+        const overId = String(over.id)
+        const activeIsRoot = activeFound.parentId === null
+        const overIsRoot = overFound.parentId === null
 
-        if (activeFound.parentId === null) {
-            onUpdate(reordered)
-        } else {
-            const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
-                items.map(item => {
-                    if (item.id === activeFound.parentId) return { ...item, children: reordered }
-                    if (item.children?.length) return { ...item, children: rebuild(item.children) }
-                    return item
-                })
-            onUpdate(rebuild(links))
+        // Can't drop an item into its own subtree — would orphan + lose it
+        // (nestWithFlatten/moveAsSibling target id no longer exists after pluck).
+        // Max depth is 2, so the only descendant of `active` is a direct child.
+        if (overFound.parentId === activeId) return
+
+        // Root dropped ONTO a root-with-children → NEST as its child.
+        // Mirrors the 'child' drop highlight in handleDragOver; must run BEFORE
+        // the same-parent reorder branch (both are root → parentId null → equal),
+        // otherwise the nest intent silently degrades to a reorder.
+        if (activeIsRoot && overIsRoot && overFound.link.children.length > 0) {
+            // Depth guard: active with children would create level-3 → flatten confirm.
+            if (activeFound.link.children.length > 0) {
+                notifyFlatten(
+                    activeId,
+                    overId,
+                    activeFound.link.label || 'Untitled',
+                    activeFound.link.children.length,
+                    overFound.link.label || 'Untitled',
+                )
+                return
+            }
+            onUpdate(nestAsChild(links, activeId, overId))
+            return
         }
-    }, [links, onUpdate])
 
-    const handleUpdate = useCallback((id: string, changes: Partial<NavLinkItem>) => {
-        onUpdate(updateLinkInTree(links, id, changes))
-    }, [links, onUpdate])
-
-    const handleDelete = useCallback((id: string) => {
-        onUpdate(deleteLinkInTree(links, id))
-    }, [links, onUpdate])
-
-    const handleAddChild = useCallback((parentId: string) => {
-        onUpdate(addChildInTree(links, parentId, nav.newLink))
-    }, [links, onUpdate, nav.newLink])
-
-    const handleMoveUp = useCallback((id: string) => {
-        const found = findLinkAndParent(links, id)
-        if (!found || found.index === 0) return
-        const movedSiblings = moveItemInArray(found.siblings, found.index, found.index - 1)
-        
-        if (found.parentId === null) {
-            onUpdate(movedSiblings)
-        } else {
-            const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
-                items.map(item => {
-                    if (item.id === found.parentId) return { ...item, children: movedSiblings }
-                    if (item.children && item.children.length > 0) return { ...item, children: rebuild(item.children) }
-                    return item
-                })
-            onUpdate(rebuild(links))
+        // Same parent → simple reorder
+        if (activeFound.parentId === overFound.parentId) {
+            const reordered = moveItemInArray(activeFound.siblings, activeFound.index, overFound.index)
+            if (activeFound.parentId === null) {
+                onUpdate(reordered)
+            } else {
+                const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
+                    items.map(item => {
+                        if (item.id === activeFound.parentId) return { ...item, children: reordered }
+                        if (item.children.length) return { ...item, children: rebuild(item.children) }
+                        return item
+                    })
+                onUpdate(rebuild(links))
+            }
+            return
         }
-    }, [links, onUpdate])
 
-    const handleMoveDown = useCallback((id: string) => {
-        const found = findLinkAndParent(links, id)
-        if (!found || found.index >= found.siblings.length - 1) return
-        const movedSiblings = moveItemInArray(found.siblings, found.index, found.index + 1)
-        
-        if (found.parentId === null) {
-            onUpdate(movedSiblings)
-        } else {
-            const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
-                items.map(item => {
-                    if (item.id === found.parentId) return { ...item, children: movedSiblings }
-                    if (item.children && item.children.length > 0) return { ...item, children: rebuild(item.children) }
-                    return item
-                })
-            onUpdate(rebuild(links))
+        // Child → root: promote
+        if (!activeIsRoot && overIsRoot) {
+            onUpdate(moveAsSibling(links, activeId, overId, 'after'))
+            return
         }
-    }, [links, onUpdate])
 
-    const handleIndent = useCallback((id: string) => {
-        onUpdate(indentLinkInTree(links, id))
-    }, [links, onUpdate])
+        // Root → child-wrap: nest (with flatten confirm if active has children)
+        if (activeIsRoot && !overIsRoot) {
+            const overParentId = overFound.parentId!
+            if (activeFound.link.children.length > 0) {
+                const overParentFound = findLinkAndParent(links, overParentId)
+                notifyFlatten(
+                    activeId,
+                    overParentId,
+                    activeFound.link.label || 'Untitled',
+                    activeFound.link.children.length,
+                    overParentFound?.link.label || 'Untitled',
+                )
+                return
+            }
+            onUpdate(moveAsSibling(links, activeId, overId, 'after'))
+            return
+        }
 
-    const handleOutdent = useCallback((id: string) => {
-        const result = outdentLinkInTree(links, id)
-        if (result) onUpdate(result)
-    }, [links, onUpdate])
+        onUpdate(moveAsSibling(links, activeId, overId, 'after'))
+    }, [links, onUpdate, notifyFlatten])
+
+    // ── Tree mutations ────────────────────────────────────────────────────────
+
+    const handleUpdate = useCallback(
+        (id: string, changes: Partial<NavLinkItem>) =>
+            onUpdate(updateLinkInTree(links, id, changes)),
+        [links, onUpdate],
+    )
+
+    const handleDelete = useCallback(
+        (id: string) => {
+            if (openPanelId === id) setOpenPanelId(null)
+            onUpdate(deleteLinkInTree(links, id))
+        },
+        [links, onUpdate, openPanelId],
+    )
+
+    const handleAddChild = useCallback(
+        (parentId: string) => {
+            const newItem: NavLinkItem = { id: generateId(), label: '', url: '#', type: 'page', children: [] }
+            onUpdate(addChildInTree(links, parentId, newItem))
+            setOpenPanelId(newItem.id)
+            setEditingNameId(newItem.id)
+        },
+        [links, onUpdate],
+    )
+
+    const handleMoveUp = useCallback(
+        (id: string) => {
+            const found = findLinkAndParent(links, id)
+            if (!found || found.index === 0) return
+            const moved = moveItemInArray(found.siblings, found.index, found.index - 1)
+            if (found.parentId === null) {
+                onUpdate(moved)
+            } else {
+                const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
+                    items.map(item => {
+                        if (item.id === found.parentId) return { ...item, children: moved }
+                        if (item.children.length) return { ...item, children: rebuild(item.children) }
+                        return item
+                    })
+                onUpdate(rebuild(links))
+            }
+        },
+        [links, onUpdate],
+    )
+
+    const handleMoveDown = useCallback(
+        (id: string) => {
+            const found = findLinkAndParent(links, id)
+            if (!found || found.index >= found.siblings.length - 1) return
+            const moved = moveItemInArray(found.siblings, found.index, found.index + 1)
+            if (found.parentId === null) {
+                onUpdate(moved)
+            } else {
+                const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
+                    items.map(item => {
+                        if (item.id === found.parentId) return { ...item, children: moved }
+                        if (item.children.length) return { ...item, children: rebuild(item.children) }
+                        return item
+                    })
+                onUpdate(rebuild(links))
+            }
+        },
+        [links, onUpdate],
+    )
+
+    const handleIndent = useCallback(
+        (id: string) => {
+            const found = findLinkAndParent(links, id)
+            if (!found || found.index === 0) return
+            const newParent = found.siblings[found.index - 1]
+            if (found.link.children.length > 0) {
+                notifyFlatten(
+                    id,
+                    newParent.id,
+                    found.link.label || 'Untitled',
+                    found.link.children.length,
+                    newParent.label || 'Untitled',
+                )
+                return
+            }
+            onUpdate(indentLinkInTree(links, id))
+        },
+        [links, onUpdate, notifyFlatten],
+    )
+
+    const handleOutdent = useCallback(
+        (id: string) => {
+            const result = outdentLinkInTree(links, id)
+            if (result) onUpdate(result)
+        },
+        [links, onUpdate],
+    )
 
     const handleAddRoot = useCallback(() => {
-        onUpdate([...links, { id: generateId(), label: nav.newLink, url: '#', type: 'page', children: [] }])
-    }, [links, onUpdate, nav.newLink])
+        const newItem: NavLinkItem = { id: generateId(), label: '', url: '#', type: 'page', children: [] }
+        onUpdate([...links, newItem])
+        setOpenPanelId(newItem.id)
+        setEditingNameId(newItem.id)
+    }, [links, onUpdate])
 
+    // ── Render ────────────────────────────────────────────────────────────────
     return (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <div className="flex flex-col gap-2">
-                <div className="rounded-xl border border-blue-500/[0.04] bg-slate-800/30 px-3 pt-3 pb-px">
+        <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+            >
+                {/* No background / no horizontal padding → rows align flush with the
+                    "Navigation Links" section label (SettingsPanel provides the panel chrome). */}
+                <div ref={rootRef}>
+                    {/* 2-level guard — compact inline confirm at top of the panel */}
+                    {flattenAsk && (
+                        <div style={{
+                            marginBottom: 10, padding: 10, borderRadius: 8,
+                            border: '1px solid rgba(245,185,69,0.45)', background: 'rgba(245,185,69,0.10)',
+                            display: 'flex', gap: 8, alignItems: 'flex-start',
+                        }}>
+                            <Layers size={15} color={C.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 3 }}>
+                                    {nav.flattenTitle}
+                                </div>
+                                <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.5, marginBottom: 8 }}>
+                                    {nav.flattenBody
+                                        .replace('{name}', flattenAsk.activeName)
+                                        .replace(/\{count\}/g, String(flattenAsk.count))
+                                        .replace(/\{target\}/g, flattenAsk.targetName)}
+                                </div>
+                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFlattenAsk(null)}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                            border: `1px solid ${C.borderStrong}`, background: 'transparent',
+                                            color: C.text2, cursor: 'pointer',
+                                        }}
+                                    >
+                                        {nav.flattenCancel}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleFlattenConfirm}
+                                        style={{
+                                            padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                                            border: `1px solid ${C.info}`, background: C.info,
+                                            color: '#fff', cursor: 'pointer',
+                                        }}
+                                    >
+                                        {nav.flattenConfirm}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {links.length === 0 ? (
-                        <p className="px-2 py-4 text-center text-xs text-slate-600">{nav.noLinks}</p>
+                        <p style={{ textAlign: 'center', fontSize: 12, color: C.text3, padding: '16px 0' }}>
+                            {nav.noLinks}
+                        </p>
                     ) : (
                         <SortableContext items={links.map(l => l.id)} strategy={verticalListSortingStrategy}>
                             {links.map((link, idx) => (
@@ -533,6 +386,13 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                                     key={link.id}
                                     link={link}
                                     depth={0}
+                                    isFirst={idx === 0}
+                                    isLast={idx === links.length - 1}
+                                    siblingCount={links.length}
+                                    openPanelId={openPanelId}
+                                    editingNameId={editingNameId}
+                                    dropTarget={dropTarget}
+                                    pages={linkablePages}
                                     onUpdate={handleUpdate}
                                     onDelete={handleDelete}
                                     onAddChild={handleAddChild}
@@ -540,25 +400,32 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                                     onMoveDown={handleMoveDown}
                                     onIndent={handleIndent}
                                     onOutdent={handleOutdent}
-                                    isFirst={idx === 0}
-                                    isLast={idx === links.length - 1}
-                                    pages={linkablePages}
-                                    nav={nav}
-                                    openPanelId={openPanelId}
                                     onSetOpenPanelId={setOpenPanelId}
+                                    onSetEditingNameId={setEditingNameId}
                                 />
                             ))}
                         </SortableContext>
                     )}
+
+                    {/* "+ Add link" primary button (.add-btn.primary) */}
+                    <button
+                        type="button"
+                        onClick={handleAddRoot}
+                        style={{
+                            width: '100%', marginTop: 14, padding: 9, borderRadius: 8,
+                            border: `1px solid ${C.info}`,
+                            background: C.infoBg, color: C.info,
+                            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                            transition: 'background 0.12s, border-color 0.12s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(37,99,235,0.20)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = C.infoBg }}
+                    >
+                        <Plus size={14} />
+                        {nav.addLink.replace(/^\+\s*/, '')}
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleAddRoot}
-                    className="w-full h-9 rounded-[10px] border border-blue-500/[0.07] text-sm font-medium text-slate-50 hover:bg-white/[0.03] transition-colors"
-                >
-                    {nav.addLink}
-                </button>
-            </div>
         </DndContext>
     )
 }
