@@ -32,6 +32,8 @@ import type { ImagePool } from './image-pool'
 export interface MediaPipelineContext {
     businessName: string
     tenantId: string
+    // Raw industry string from user input (e.g. "nhà hàng hải sản", "SaaS CRM").
+    // Resolved internally via resolveComposerCategory — do NOT pass a pre-resolved ComposerCategory key.
     category?: string
     // Plan 260414-2249 phase-01: user-supplied products drive primary Unsplash
     // query via deriveKeywords. vi/ms terms are translated at query time.
@@ -274,7 +276,7 @@ async function batchFetch(
  * the business industry instead of a generic office hallway.
  * Exported for testing only.
  */
-export const HERO_FALLBACK_BY_CATEGORY: Record<string, string[]> = {
+export const HERO_FALLBACK_BY_CATEGORY: Readonly<Record<string, readonly string[]>> = {
     tech:       ['photo-1498050108023-c5249f4df085', 'photo-1460925895917-afdab827c52f', 'photo-1518770660439-4636190af475'],
     restaurant: ['photo-1414235077428-338989a2e8c0', 'photo-1504674900247-0877df9cc836'],
     beauty:     ['photo-1522335789203-aabd1fc54bc9', 'photo-1570172619644-dfd03ed5d881'],

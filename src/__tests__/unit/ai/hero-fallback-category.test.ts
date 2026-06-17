@@ -12,7 +12,6 @@ import {
 } from '@/lib/ai/media-pipeline'
 
 const UNSPLASH_BASE = 'https://images.unsplash.com/'
-const HERO_PARAMS = '?w=1920&h=1080&fit=crop&q=80'
 const OLD_HARDCODED_ID = 'photo-1497366216548-37526070297c'
 
 const ALL_CATEGORIES = [
