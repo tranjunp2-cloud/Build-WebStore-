@@ -11,6 +11,7 @@ import {
     useSensor,
     useSensors,
     type DragEndEvent,
+    type DragOverEvent,
 } from '@dnd-kit/core'
 import {
     SortableContext,
@@ -117,10 +118,8 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     )
 
     // ── DnD: visual hover feedback ────────────────────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleDragOver = useCallback((event: any) => {
-        const active = event.active as { id: string | number }
-        const over = event.over as { id: string | number } | null
+    const handleDragOver = useCallback((event: DragOverEvent) => {
+        const { active, over } = event
         if (!over || active.id === over.id) { setDropTarget(null); return }
         const overFound = findLinkAndParent(links, String(over.id))
         const activeFound = findLinkAndParent(links, String(active.id))
