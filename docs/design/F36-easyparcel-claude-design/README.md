@@ -37,4 +37,5 @@ f36/
 
 - Prototype = HTML/CSS/JS, **không phải production code**. Recreate pixel-perfect bằng stack repo (Next.js + shadcn/ui), không copy cấu trúc nội bộ prototype.
 - Đối chiếu PRD `docs/prd/F36-easyparcel-delivery.md` + wireframe `docs/design/F36-easyparcel-delivery-design.md` (PR #1232).
-- Demo tương tác gọn (1 file, không cần CDN): `docs/design/F36-easyparcel-delivery-ui-demo.html`.
+
+> ⚠️ **Spec drift — đọc trước khi implement:** Bundle này dựng theo concept **multi-courier** (Screen B buyer chọn courier; Screen E có reverse label). PRD/design hiện tại (#1232, commit fidelity-fix) đã đổi sang **1 courier/shop** (buyer KHÔNG chọn, checkout không có section vận chuyển) và **cắt reverse label** khỏi MVP. → Dùng bundle làm tham khảo visual/style; **luồng & scope lấy theo PRD #1232 mới**, không theo Screen B/E của bundle.
