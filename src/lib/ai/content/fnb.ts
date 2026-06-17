@@ -122,12 +122,24 @@ export const fnbContent: CategoryContent = {
     {
       blockType: 'menu-food',
       variant: 'classic',
-      title: 'Our Menu',
-      items: [
-        { name: 'Kopi O', description: 'Traditional black coffee brewed the old-school way', price: 'RM 3.50' },
-        { name: 'Kopi Tarik', description: 'Pulled coffee with condensed milk, smooth and rich', price: 'RM 4' },
-        { name: 'Kaya Toast', description: 'Charcoal bread with housemade kaya and butter', price: 'RM 3', tag: 'Bestseller' },
-        { name: 'Half-Boiled Eggs', description: 'Soft eggs with soy sauce and white pepper', price: 'RM 2.50' },
+      headline: 'Our Menu',
+      categories: [
+        {
+          name: 'Drinks',
+          items: [
+            { name: 'Kopi O', description: 'Traditional black coffee brewed the old-school way', price: '3.50', currency: 'RM' },
+            { name: 'Kopi Tarik', description: 'Pulled coffee with condensed milk, smooth and rich', price: '4.00', currency: 'RM' },
+            { name: 'Teh Tarik', description: 'Pulled milk tea, frothy and perfectly sweet', price: '3.50', currency: 'RM' },
+          ],
+        },
+        {
+          name: 'Food',
+          items: [
+            { name: 'Kaya Toast', description: 'Charcoal bread with housemade kaya and butter', price: '3.00', currency: 'RM', tag: 'Bestseller' },
+            { name: 'Half-Boiled Eggs', description: 'Soft eggs with soy sauce and white pepper', price: '2.50', currency: 'RM' },
+            { name: 'Nasi Lemak', description: 'Coconut rice with sambal, ikan bilis, and egg', price: '8.00', currency: 'RM' },
+          ],
+        },
       ],
     },
     {
