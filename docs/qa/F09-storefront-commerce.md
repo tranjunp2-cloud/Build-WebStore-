@@ -528,6 +528,19 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F09.235** | Unit | Critical | OOS guard uses aggregate p.inventory — variant.stock ignored | inventory=0 + variant.stock=10 → 422 OUT_OF_STOCK | GH-1084 Phase03 | [x] |
 | **TC-F09.236** | Unit | High | Non-variant product: base price, no variant guards — happy path | unitPrice=base, variant='', displayName=productName, Stripe price in sen | GH-1084 Phase03 | [x] |
 
+### TC-F09.237–238b: Client variant stock validation (#1179)
+
+> **Bug fix:** Frontend was using aggregate `product.inventory` instead of `selectedVariant.stock` — allows qty > variant stock in cart UI before server CAS catches it at checkout.
+> **Files test:** `src/__tests__/unit/storefront/product-add-to-cart-section.test.tsx`, `src/__tests__/unit/stores/cartStore.test.ts`
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |
+|:---|:---|:---|:---|:---|:---|:---|
+| **TC-F09.237** | Unit | Critical | Selecting variant propagates variant.stock (not aggregate) to AddToCartButton | Red (stock=5) selected on product (inventory=10) → AddToCartButton receives inventory=5 | GH-1179 | [x] |
+| **TC-F09.237b** | Unit | High | Switching variants updates propagated inventory reactively | Select Red(5) → inventory=5; switch to Blue(3) → inventory=3 | GH-1179 | [x] |
+| **TC-F09.237c** | Unit | High | Non-variant product fallback: propagated inventory = product.inventory | No variant selected → AddToCartButton receives product.inventory (regression guard) | GH-1179 | [x] |
+| **TC-F09.238** | Unit | Critical | addItem caps at variant inventory snapshot (not aggregate) | inventory=3 stored in cart item; 4th add is no-op, qty stays 3 | GH-1179 | [x] |
+| **TC-F09.238b** | Unit | High | updateQuantity above variant inventory clamps to variant stock | qty=2 with inventory=3; updateQuantity(10) → qty=3 | GH-1179 | [x] |
+
 ### TC-F09.64: Product component variant guard
 
 | ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs | Status |

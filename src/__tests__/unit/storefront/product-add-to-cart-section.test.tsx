@@ -5,11 +5,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
 
-// Mock AddToCartButton to avoid rendering complexity
+// Mock AddToCartButton — data-inventory exposes the received inventory prop for TC-F09.237
 vi.mock('@/components/storefront/AddToCartButton', () => ({
     AddToCartButton: ({ product, variantName, requireVariant }: any) => (
         <button
             data-testid="add-to-cart-btn"
+            data-inventory={product?.inventory}
             disabled={(product?.inventory <= 0) || (requireVariant && !variantName)}
             title={variantName ? `Variant: ${variantName}` : 'No variant selected'}
         >
@@ -327,6 +328,62 @@ describe('ProductAddToCartSection [TC-F09.64]', () => {
                     compareAtPrice: null,
                 })
             )
+        })
+    })
+
+    // ─── TC-F09.237: Variant stock propagation fix (#1179) ───────────────────
+
+    describe('[TC-F09.237] variant stock propagation (#1179)', () => {
+        it('[TC-F09.237] selected variant.stock overrides aggregate product.inventory', () => {
+            // Arrange: product aggregate inventory=10; Red variant stock=5
+            const { getByTestId } = render(
+                <ProductAddToCartSection
+                    product={{ ...mockProduct, hasVariants: true, variants: mockVariants }}
+                    primaryColor="#000"
+                    siteSlug="test-site"
+                    siteId="s1"
+                />
+            )
+
+            // Act: select Red variant (stock=5, not aggregate 10)
+            fireEvent.click(getByTestId('variant-Red'))
+
+            // Assert: AddToCartButton receives variant stock (5), NOT aggregate (10)
+            expect(Number(getByTestId('add-to-cart-btn').getAttribute('data-inventory'))).toBe(5)
+        })
+
+        it('[TC-F09.237b] switching variants updates propagated inventory Red(5)→Blue(3)', () => {
+            // Arrange
+            const { getByTestId } = render(
+                <ProductAddToCartSection
+                    product={{ ...mockProduct, hasVariants: true, variants: mockVariants }}
+                    primaryColor="#000"
+                    siteSlug="test-site"
+                    siteId="s1"
+                />
+            )
+
+            // Act: Red → Blue
+            fireEvent.click(getByTestId('variant-Red'))
+            expect(Number(getByTestId('add-to-cart-btn').getAttribute('data-inventory'))).toBe(5)
+
+            fireEvent.click(getByTestId('variant-Blue'))
+            expect(Number(getByTestId('add-to-cart-btn').getAttribute('data-inventory'))).toBe(3)
+        })
+
+        it('[TC-F09.237c] non-variant product: inventory = product.inventory (fallback guard)', () => {
+            // Arrange: no variants selected, product.inventory=10
+            const { getByTestId } = render(
+                <ProductAddToCartSection
+                    product={mockProduct}
+                    primaryColor="#000"
+                    siteSlug="test-site"
+                    siteId="s1"
+                />
+            )
+
+            // Assert: falls back to aggregate for non-variant product
+            expect(Number(getByTestId('add-to-cart-btn').getAttribute('data-inventory'))).toBe(10)
         })
     })
 
