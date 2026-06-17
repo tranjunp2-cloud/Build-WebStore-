@@ -67,6 +67,37 @@ Không cần chỉnh sửa cấu trúc. Chỉ cần đảm bảo thông điệp 
 
 ---
 
+### GAP-03: Onboarding Checklist "Get Your Store Ready" + CTA Banner "Almost Ready" (Issue #1224)
+**Độ nghiêm trọng:** TRUNG BÌNH 🟡
+**Component:** `DashboardOnboarding.tsx` (mở rộng 2 → 4 bước, **KHÔNG** tạo file mới), `OverviewView.tsx`
+
+**Bối cảnh:** Issue [#1224](https://github.com/primeproduction/ech-prime-web-v2/issues/1224) yêu cầu thêm checklist 4 bước + CTA banner phía trên Overview Widgets. Spec UI/CTA đã rõ trong issue. Mục dưới đây bổ sung phần **còn thiếu**: **bản đồ nguồn dữ liệu (data-source map)** cho từng bước, vì hiện `DashboardOnboarding` mới nhận `hasWebsite / hasPublishedSite / hasIncompleteSite / aiStatusFailed / siteId` — chưa có dữ liệu cho 2/4 bước.
+
+#### 🔌 Data-source map (server-side, fetch trong `OverviewView.tsx`, truyền prop xuống)
+
+| # | Task (UI) | Điều kiện "done" | Nguồn dữ liệu thật | Trạng thái hiện tại |
+|---|-----------|------------------|--------------------|---------------------|
+| 1 | Add Your First Product | `count(products) > 0` | `payload.find({ collection: 'products', where: { tenant, status: 'active' } })` — **đã fetch** tại `OverviewView.tsx:281` (`productsRes`) | ✅ Có sẵn — chỉ cần truyền prop `productCount` |
+| 2 | Customize Your Store Design | User đã lưu cấu hình giao diện ≥ 1 lần | `Sites.theme` (group: `primaryColor`, `secondaryColor`, `backgroundColor`, `fontHeading`…) | ⚠️ **Cần định nghĩa** — xem ghi chú bên dưới |
+| 3 | Set Up Payment & Shipping | ≥ 1 payment gateway active **VÀ** shipping enabled | Payment: `Tenants.payments.*` (các checkbox `payment_card`, `payment_fpx`, `payment_cod`, `payment_qr`, `xendit_tng`, `xendit_grabpay`, `xendit_duitnow`, `xendit_fpx`, `xendit_shopeepay`, `xendit_boost`, `xendit_mae`) — done khi **bất kỳ** toggle = `true`. Shipping: `Sites.shippingConfig.enabled === true` | ❌ **Chưa fetch** — cần query thêm |
+| 4 | Publish Your Website | site `status === 'published'` | `Sites.status` (`draft` / `published` / `archived`) — **đã có** `hasPublishedSite` tại `OverviewView.tsx:102` | ✅ Có sẵn |
+
+#### 🧠 Công thức tiến độ
+`progressPct = round(doneCount / 4 × 100)` — section ẩn khi `doneCount === 4` (giữ pattern `if (allDone) return null` đang có).
+
+#### 🚩 CTA Banner "Almost Ready"
+- **Hiển thị khi:** Task 3 (Payment & Shipping) chưa done.
+- **"Complete Setup"** → redirect **`/settings/payments`** (route thật, **không** phải `/store-config/payment` như spec gốc ghi nhầm).
+- **"I'll do this later"** → ẩn tạm trong phiên (`sessionStorage`); hiện lại ở lần login sau nếu chưa setup xong.
+
+#### ⚠️ Ghi chú quan trọng cho Task 2 (cần PM/Dev chốt)
+Các field trong `Sites.theme` đều có `defaultValue` (vd `primaryColor='#0ea5e9'`) → **không thể** phân biệt "đã lưu" vs "giá trị mặc định" chỉ bằng việc field có dữ liệu. 3 hướng xử lý (khuyến nghị (a)):
+- **(a) Khuyến nghị:** so sánh `theme` hiện tại với bộ default — nếu khác default ⇒ coi như đã customize. KISS, không cần migration.
+- (b) Thêm flag boolean `Sites.themeCustomized` (cần migration `scripts/db-setup.js`).
+- (c) Dùng mốc `updatedAt` của site sau lần edit builder đầu tiên (kém chính xác).
+
+---
+
 ## 📝 4. Kế hoạch triển khai cho Team Code (Action Plan)
 
 1.  **Fix GAP-02 (Ưu tiên Cao):** Triển khai `DashboardRecoveryBanner` và cập nhật logic State Machine cho `DashboardOnboarding.tsx`.
@@ -77,6 +108,7 @@ Không cần chỉnh sửa cấu trúc. Chỉ cần đảm bảo thông điệp 
     *   Cập nhật trục X/Y, format ngày `dd/mm/yy`.
     *   Triển khai hover interactions và tooltips trên tất cả các Dashboard Charts.
 4.  **An toàn Analytics:** Đảm bảo xử lý lỗi Rate Limit 429 và Empty States trực quan.
+5.  **Fix GAP-03 (Issue #1224):** Mở rộng `DashboardOnboarding` 2 → 4 bước theo data-source map ở trên; fetch thêm payment toggle (`Tenants.payments.*`) + shipping (`Sites.shippingConfig.enabled`) trong `OverviewView.tsx`; chốt cách xác định Task 2 (khuyến nghị so sánh `Sites.theme` với default); redirect "Complete Setup" → `/settings/payments`.
 
 > Kết thúc Audit UX F03
 
