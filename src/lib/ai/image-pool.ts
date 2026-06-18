@@ -73,27 +73,6 @@ export interface BuildPoolCtx {
 const DEFAULT_LANDSCAPE_SIZE = 12
 const DEFAULT_SQUARE_SIZE = 6
 
-/**
- * Unsplash-friendly photography concepts per category.
- * Injected into buildPoolQuery to ensure at least one concrete visual term
- * is present, even when product terms are non-photographic acronyms (SaaS, CRM).
- */
-const CATEGORY_PHOTO_HINTS: Record<string, string> = {
-  tech:       'software team',
-  restaurant: 'restaurant interior',
-  beauty:     'beauty salon',
-  health:     'medical clinic',
-  education:  'classroom learning',
-  fitness:    'gym workout',
-  creative:   'creative studio',
-  business:   'modern office',
-  fnb:        'cafe drinks',
-  realestate: 'property interior',
-  events:     'event venue',
-  travel:     'travel destination',
-  ecommerce:  'online shopping',
-  blog:       'writing workspace',
-}
 
 /**
  * Build the Unsplash search query from the context.
@@ -137,17 +116,10 @@ export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): str
     }
   }
 
-  // Always inject a category photo hint so queries like "saas crm" (brand
-  // acronyms with no Unsplash photos) get a concrete visual anchor term.
-  // The push() deduplicates, so well-formed product terms are unaffected.
-  if (!relaxed) {
-    const hint = CATEGORY_PHOTO_HINTS[ctx.category.toLowerCase()]
-    if (hint) push(hint)
-  }
-
-  // Absolute fallback when no terms at all
+  // Fallback when LLM translation fails and no products supplied — use the
+  // raw category name so Unsplash still gets at least one search term.
   if (terms.length === 0) {
-    push(CATEGORY_PHOTO_HINTS[ctx.category.toLowerCase()] ?? ctx.category)
+    push(ctx.category)
   }
 
   return terms.join(' ').trim()
