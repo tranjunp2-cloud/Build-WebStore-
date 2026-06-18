@@ -210,12 +210,12 @@ Tab theo **4 trạng thái** rõ rệt:
 | Edit-mode lock | `[Re-test]` Primary; courier blur + overlay; Save khóa tới khi re-test OK |
 | Saving | Save → spinner; success Toast "Đã lưu cấu hình EasyParcel" |
 
-> ⚠️ **PENDING DECISION — 4 mục đề xuất MÂU THUẪN PRD #1232 (single-courier, fidelity-fix). CHƯA vẽ vào design, chờ chốt:**
-> 1. **Courier hiển thị giá "From RM 5.40" + checkbox multi-select** — spec hiện = single-select radio, **không show giá** (settings chưa có origin/dest/weight → "from" dễ sai). Re-add = quay lại multi-courier.
-> 2. **Default Parcel Weight/Dimensions form** — đã bỏ; weight/dims lấy từ `Products.*` + hằng số `DEFAULT_PARCEL`.
-> 3. **Fulfillment Mode (auto/manual)** — đã bỏ; luôn manual qua nút "Ready to Ship" (F10).
-> 4. **Environment selector / "Secret Key"** — đã bỏ env selector (auto-detect); key = `api` + `authentication` (không gọi "secret").
-> → Giữ KISS single-courier: **không** vẽ 4 mục này. Muốn rich-settings (đa courier + parcel + fulfilment): mở rộng scope, cập nhật PRD #1232 trước.
+> ✅ **DECISION (chốt 2026-06-18) — giữ KISS single-courier, KHÔNG thêm 4 mục đề xuất sau** (chúng đảo ngược fidelity-fix PRD #1232; đã cân nhắc & loại):
+> 1. **Courier hiển thị giá "From RM 5.40" + checkbox multi-select** → **bỏ.** Giữ single-select radio, **không show giá** (settings chưa có origin/dest/weight → "from" dễ sai).
+> 2. **Default Parcel Weight/Dimensions form** → **bỏ.** Weight/dims lấy từ `Products.*` + hằng số `DEFAULT_PARCEL`.
+> 3. **Fulfillment Mode (auto/manual)** → **bỏ.** Luôn manual qua nút "Ready to Ship" (F10).
+> 4. **Environment selector / "Secret Key"** → **bỏ.** Auto-detect env; key = `api` + `authentication` (không gọi "secret").
+> → Nếu sau này cần rich-settings (đa courier + parcel + fulfilment): phải mở rộng scope + cập nhật PRD #1232 trước khi vẽ.
 
 ---
 
