@@ -833,6 +833,36 @@
             "notLive": "is not live yet.",
             "publishNow": "Publish now →"
         },
+        "onboarding": {
+            "title": "Get Your Store Ready",
+            "subtitle": "Complete these steps to launch your store",
+            "completeLabel": "Complete",
+            "continueBtn": "Continue",
+            "steps": {
+                "products": {
+                    "label": "Add Your First Product",
+                    "description": "Create your product catalog"
+                },
+                "design": {
+                    "label": "Customize Your Store Design",
+                    "description": "Choose colors, fonts, and layout"
+                },
+                "payment": {
+                    "label": "Set Up Payment & Shipping",
+                    "description": "Configure payment methods and shipping options"
+                },
+                "publish": {
+                    "label": "Publish Your Website",
+                    "description": "Make your store live"
+                }
+            },
+            "banner": {
+                "title": "Your Store is Almost Ready!",
+                "description": "Complete the payment setup to publish your website and start selling online.",
+                "completeBtn": "Complete Setup",
+                "dismissBtn": "I'll do this later"
+            }
+        },
         "resetAccount": {
             "dangerZone": "Danger Zone",
             "stagingOnly": "Staging only — not visible in production",
@@ -3550,10 +3580,24 @@
             "phone": "Phone",
             "selectPage": "Select page",
             "addSubLink": "Add sub-link",
-            "moveUp": "Move up",
-            "moveDown": "Move down",
-            "moveLeft": "Move left",
-            "makeSubItem": "Make sub-item",
+            "moveUp": "Up",
+            "moveDown": "Down",
+            "nestIn": "Nest in",
+            "nestInDisabledHint": "This item already has sub-items. Drag it onto another item to nest it — its sub-items move up to keep the menu at 2 levels.",
+            "promote": "Promote",
+            "delete": "Delete",
+            "addSubmenu": "Add submenu",
+            "linkType": "Link type",
+            "pageField": "Page",
+            "urlField": "URL",
+            "missingUrl": "missing URL",
+            "namePlaceholder": "Link name",
+            "submenuCount": "{count} submenu",
+            "submenuCountPlural": "{count} submenus",
+            "flattenTitle": "Nesting this will exceed 2 levels",
+            "flattenBody": "Menus support only 2 levels. The sub-items of \"{name}\" will move up to the same level under \"{target}\".",
+            "flattenCancel": "Cancel",
+            "flattenConfirm": "Nest & flatten",
             "quickLanguage": {
                 "title": "Quick Language",
                 "tooltip": "Enable to translate and display your website in multiple languages for international or multi-ethnic customers.",
@@ -3978,7 +4022,9 @@
             "selectVariant": "Select a variant",
             "allProducts": "All Products",
             "priceRange": "Price Range",
-            "applyFilter": "Apply Filter"
+            "applyFilter": "Apply Filter",
+            "stockLimitMessage": "You have added the maximum available stock ({cartQty}/{inventory}) to your cart",
+            "stockLimitToast": "Cart quantity has reached the maximum available stock"
         },
         "blog": {
             "title": "Blog",

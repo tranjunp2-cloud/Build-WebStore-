@@ -83,6 +83,7 @@ export async function generateSiteWithAI(
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
     referencePrompt?: string,
     blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
+    onEvent?: (e: SSEEvent) => void,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
@@ -91,6 +92,17 @@ export async function generateSiteWithAI(
     const sanitizedExtra = extraInstructions ? (sanitizeBusinessInfo({ extraInstructions }).extraInstructions as string) : extraInstructions
     const sanitizedRef = referencePrompt ? (sanitizeBusinessInfo({ referencePrompt }).referencePrompt as string) : referencePrompt
     const events: SSEEvent[] = []
+    // GH-1190 F3: override push so every event is forwarded to onEvent in real-time.
+    // All downstream callers (generateWithFallback, emitConsistencyEvents) push to this
+    // same array reference and automatically emit via onEvent without further changes.
+    if (onEvent) {
+        const _push = events.push.bind(events)
+        events.push = (...items: SSEEvent[]) => {
+            const n = _push(...items)
+            items.forEach(e => onEvent(e))
+            return n
+        }
+    }
     const promptText = [
         businessInfo.businessName,
         businessInfo.industry,
@@ -366,6 +378,19 @@ export async function generateSiteWithAI(
 
                 if (blockRegistry.has(blockType)) {
                     const validation = blockRegistry.validate(blockType, sanitized)
+                    const blockData = validation.success ? validation.data as Record<string, unknown> : sanitized
+
+                    // GH-1219: drop menu-food blocks with empty categories — blank section on page
+                    // !Array.isArray covers the sanitized fallback path; on Zod-success path
+                    // categories is always an array (schema uses .default([]))
+                    if (blockType === 'menu-food') {
+                        const cats = blockData.categories
+                        if (!Array.isArray(cats) || cats.length === 0) {
+                            console.warn('[AI] Dropping "menu-food" block — categories empty (AI failed to generate content)')
+                            continue
+                        }
+                    }
+
                     if (validation.success) {
                         valid.push(validation.data as Record<string, unknown>)
                     } else {

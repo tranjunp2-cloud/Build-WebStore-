@@ -47,7 +47,7 @@ export function SettingsFooter({ isDirty, isSaving, lastSaveSucceeded, onReset, 
                 <button
                     type="button"
                     onClick={onReset}
-                    className="flex items-center gap-2 h-[38px] px-4 rounded-[8px] border border-white/[0.12] bg-transparent text-[14px] text-slate-300 hover:bg-white/[0.04] transition-colors"
+                    className="flex items-center gap-2 h-[38px] px-4 rounded-[8px] border border-white/[0.12] bg-transparent text-[14px] text-[var(--dash-text-muted)] hover:bg-white/[0.04] transition-colors"
                 >
                     <RotateCcw className="h-4 w-4" />
                     {s.resetToDefaults}

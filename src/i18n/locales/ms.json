@@ -833,6 +833,36 @@
             "notLive": "belum aktif.",
             "publishNow": "Terbitkan sekarang →"
         },
+        "onboarding": {
+            "title": "Sediakan Kedai Anda",
+            "subtitle": "Lengkapkan langkah-langkah ini untuk melancarkan kedai anda",
+            "completeLabel": "Selesai",
+            "continueBtn": "Teruskan",
+            "steps": {
+                "products": {
+                    "label": "Tambah Produk Pertama Anda",
+                    "description": "Buat katalog produk anda"
+                },
+                "design": {
+                    "label": "Sesuaikan Reka Bentuk Kedai",
+                    "description": "Pilih warna, fon, dan susun atur"
+                },
+                "payment": {
+                    "label": "Sediakan Pembayaran & Penghantaran",
+                    "description": "Konfigurasikan kaedah pembayaran dan pilihan penghantaran"
+                },
+                "publish": {
+                    "label": "Terbitkan Laman Web Anda",
+                    "description": "Jadikan kedai anda aktif"
+                }
+            },
+            "banner": {
+                "title": "Kedai Anda Hampir Siap!",
+                "description": "Lengkapkan persediaan pembayaran untuk menerbitkan laman web anda dan mula menjual dalam talian.",
+                "completeBtn": "Lengkapkan Persediaan",
+                "dismissBtn": "Saya akan buat nanti"
+            }
+        },
         "resetAccount": {
             "dangerZone": "Zon Bahaya",
             "stagingOnly": "Hanya untuk staging — tidak kelihatan dalam produksi",
@@ -3550,10 +3580,24 @@
             "phone": "Telefon",
             "selectPage": "Pilih halaman",
             "addSubLink": "Tambah sub-pautan",
-            "moveUp": "Alih ke atas",
-            "moveDown": "Alih ke bawah",
-            "moveLeft": "Alih ke kiri",
-            "makeSubItem": "Jadikan sub-item",
+            "moveUp": "Atas",
+            "moveDown": "Bawah",
+            "nestIn": "Sarangkan",
+            "nestInDisabledHint": "Item ini sudah mempunyai sub-item. Seret ke item lain untuk menyarangkannya — sub-itemnya akan naik supaya menu kekal pada 2 aras.",
+            "promote": "Naik taraf",
+            "delete": "Padam",
+            "addSubmenu": "Tambah submenu",
+            "linkType": "Jenis pautan",
+            "pageField": "Halaman",
+            "urlField": "URL",
+            "missingUrl": "URL tiada",
+            "namePlaceholder": "Nama pautan",
+            "submenuCount": "{count} submenu",
+            "submenuCountPlural": "{count} submenu",
+            "flattenTitle": "Sarang ini akan melebihi 2 aras",
+            "flattenBody": "Menu hanya menyokong 2 aras. Sub-item \"{name}\" akan naik ke aras yang sama di bawah \"{target}\".",
+            "flattenCancel": "Batal",
+            "flattenConfirm": "Sarang & ratakan",
             "quickLanguage": {
                 "title": "Bahasa Pantas",
                 "tooltip": "Aktifkan untuk menterjemah dan memaparkan laman web anda dalam pelbagai bahasa untuk pelanggan antarabangsa atau pelbagai etnik.",
@@ -3978,7 +4022,9 @@
             "selectVariant": "Pilih varian",
             "allProducts": "Semua Produk",
             "priceRange": "Julat Harga",
-            "applyFilter": "Gunakan Penapis"
+            "applyFilter": "Gunakan Penapis",
+            "stockLimitMessage": "Anda telah menambah stok maksimum yang tersedia ({cartQty}/{inventory}) ke dalam troli",
+            "stockLimitToast": "Kuantiti troli telah mencapai stok maksimum yang tersedia"
         },
         "blog": {
             "title": "Blog",

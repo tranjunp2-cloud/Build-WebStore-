@@ -122,12 +122,24 @@ export const restaurantContent: CategoryContent = {
     {
       blockType: 'menu-food',
       variant: 'classic',
-      title: 'Our Menu',
-      items: [
-        { name: 'Nasi Lemak', description: 'Fragrant coconut rice with sambal tumis, ikan bilis, and egg', price: 'RM 12', tag: 'Signature' },
-        { name: 'Roti Canai', description: 'Hand-stretched flatbread served with dhal and curry', price: 'RM 3' },
-        { name: 'Curry Chicken', description: 'Slow-cooked chicken in aromatic coconut curry', price: 'RM 6' },
-        { name: 'Teh Tarik', description: 'Pulled milk tea, frothy and perfectly sweet', price: 'RM 4' },
+      headline: 'Our Menu',
+      categories: [
+        {
+          name: 'Mains',
+          items: [
+            { name: 'Nasi Lemak', description: 'Fragrant coconut rice with sambal tumis, ikan bilis, and egg', price: '12.00', currency: 'RM', tag: 'Signature' },
+            { name: 'Roti Canai', description: 'Hand-stretched flatbread served with dhal and curry', price: '3.00', currency: 'RM' },
+            { name: 'Curry Chicken', description: 'Slow-cooked chicken in aromatic coconut curry', price: '6.00', currency: 'RM' },
+          ],
+        },
+        {
+          name: 'Drinks',
+          items: [
+            { name: 'Teh Tarik', description: 'Pulled milk tea, frothy and perfectly sweet', price: '4.00', currency: 'RM' },
+            { name: 'Kopi O', description: 'Traditional black coffee, bold and aromatic', price: '3.50', currency: 'RM' },
+            { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
+          ],
+        },
       ],
     },
     {
