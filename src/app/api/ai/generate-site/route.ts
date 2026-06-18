@@ -453,16 +453,21 @@ export async function POST(req: NextRequest) {
                 }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
 
-            // Start sample product generation in parallel with site AI generation (non-blocking)
+            // Start sample product generation AFTER imagePool completes to avoid competing
+            // for Unsplash rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
+            // sample products (~7-12s) then run during AI (~30-77s) so await below still
+            // costs ~0ms in the common case. Both phases use separate Unsplash search calls.
             // Note: siteId intentionally omitted — products run before site row is created so site.id
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
             // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-            const sampleProductsPromise = generateSampleProducts(
-                businessInfo,
-                (language as 'en' | 'ms' | 'auto'),
-                String(resolvedTenantId),
-                payload,
+            const sampleProductsPromise = imagePoolPromise.then(() =>
+                generateSampleProducts(
+                    businessInfo,
+                    (language as 'en' | 'ms' | 'auto'),
+                    String(resolvedTenantId),
+                    payload,
+                )
             )
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace

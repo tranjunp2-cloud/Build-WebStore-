@@ -69,8 +69,9 @@ const SIZE_PRESET_BY_BLOCK: Record<string, ImgixParams> = {
 }
 
 const DEFAULT_PRESET: ImgixParams = { w: 1200, h: 800, fit: 'crop' }
-// Pool downloads: CDN has no rate limit — parallelize aggressively (all photos in 1 batch).
-const POOL_CONCURRENCY = 10
+// Pool downloads: CDN has no rate limit — 6 concurrent covers a full gallery block (6-8 photos)
+// in 1 batch while staying conservative enough to avoid CDN 404 bursts on demo keys.
+const POOL_CONCURRENCY = 6
 // Legacy per-block Unsplash search path: keep conservative to avoid search API 429s.
 const SEARCH_CONCURRENCY = 3
 
