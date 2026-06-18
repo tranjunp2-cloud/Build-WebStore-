@@ -47,7 +47,7 @@ export function validateLinkUrl(link: NavLinkItem, value: string) {
 }
 
 // ── Toolbar button (.tbtn — icon + text label, dark bg). iconOnly = icon only. ─
-export function TBtn({ icon: Icon, label, onClick, disabled, danger, mlAuto, iconOnly }: {
+export function TBtn({ icon: Icon, label, onClick, disabled, danger, mlAuto, iconOnly, title }: {
     icon: React.ElementType
     label: string
     onClick: (e: React.MouseEvent) => void
@@ -55,13 +55,15 @@ export function TBtn({ icon: Icon, label, onClick, disabled, danger, mlAuto, ico
     danger?: boolean
     mlAuto?: boolean
     iconOnly?: boolean
+    /** Explicit tooltip — falls back to the label for icon-only buttons. Use to explain a disabled state. */
+    title?: string
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
             disabled={disabled}
-            title={iconOnly ? label : undefined}
+            title={title ?? (iconOnly ? label : undefined)}
             aria-label={iconOnly ? label : undefined}
             style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -256,7 +258,7 @@ export function NavLinkRow({
         <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6, alignItems: 'center' }}>
             {showMoveUp && <TBtn icon={ArrowUp} label={nav.moveUp} onClick={e => { e.stopPropagation(); onMoveUp(link.id) }} />}
             {showMoveDown && <TBtn icon={ArrowDown} label={nav.moveDown} onClick={e => { e.stopPropagation(); onMoveDown(link.id) }} />}
-            {showNestIn && <TBtn icon={ArrowRightToLine} label={nav.nestIn} onClick={e => { e.stopPropagation(); onIndent(link.id) }} disabled={nestInDisabled} />}
+            {showNestIn && <TBtn icon={ArrowRightToLine} label={nav.nestIn} onClick={e => { e.stopPropagation(); onIndent(link.id) }} disabled={nestInDisabled} title={nestInDisabled ? nav.nestInDisabledHint : undefined} />}
             {showPromote && <TBtn icon={ArrowLeftToLine} label={nav.promote} onClick={e => { e.stopPropagation(); onOutdent(link.id) }} />}
             <TBtn icon={Trash2} label={nav.delete} onClick={e => { e.stopPropagation(); onDelete(link.id) }} danger iconOnly mlAuto />
         </div>
@@ -405,7 +407,7 @@ export function NavLinkRow({
                     {/* Submenu count badge (.badge-count) */}
                     {hasChildren && (
                         <span style={{ fontSize: 11, color: C.text2, background: C.bg, borderRadius: 11, padding: '2px 9px', flexShrink: 0 }}>
-                            {nav.submenuCount.replace('{count}', String(link.children.length))}
+                            {(link.children.length === 1 ? nav.submenuCount : nav.submenuCountPlural).replace('{count}', String(link.children.length))}
                         </span>
                     )}
 

@@ -26,7 +26,6 @@ type FlattenAsk = {
     activeId: string
     targetId: string
     activeName: string
-    count: number
     targetName: string
 } | null
 import {
@@ -67,8 +66,8 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     // 2-level guard: instead of a big modal, surface a compact inline confirm
     // box at the top of the editor panel.
     const notifyFlatten = useCallback(
-        (activeId: string, targetId: string, activeName: string, count: number, targetName: string) => {
-            setFlattenAsk({ activeId, targetId, activeName, count, targetName })
+        (activeId: string, targetId: string, activeName: string, targetName: string) => {
+            setFlattenAsk({ activeId, targetId, activeName, targetName })
         },
         [],
     )
@@ -163,7 +162,6 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                     activeId,
                     overId,
                     activeFound.link.label || 'Untitled',
-                    activeFound.link.children.length,
                     overFound.link.label || 'Untitled',
                 )
                 return
@@ -204,7 +202,6 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                     activeId,
                     overParentId,
                     activeFound.link.label || 'Untitled',
-                    activeFound.link.children.length,
                     overParentFound?.link.label || 'Untitled',
                 )
                 return
@@ -226,10 +223,14 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
 
     const handleDelete = useCallback(
         (id: string) => {
-            if (openPanelId === id) setOpenPanelId(null)
+            // Clear both unconditionally: deleting a parent can remove a child whose
+            // panel/name-edit is open, so a conditional `=== id` check would leak
+            // stale openPanelId/editingNameId pointing at a non-existent row.
+            setOpenPanelId(null)
+            setEditingNameId(null)
             onUpdate(deleteLinkInTree(links, id))
         },
-        [links, onUpdate, openPanelId],
+        [links, onUpdate],
     )
 
     const handleAddChild = useCallback(
@@ -292,7 +293,6 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                     id,
                     newParent.id,
                     found.link.label || 'Untitled',
-                    found.link.children.length,
                     newParent.label || 'Untitled',
                 )
                 return
@@ -343,7 +343,6 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                                 <div style={{ fontSize: 11, color: C.text2, lineHeight: 1.5, marginBottom: 8 }}>
                                     {nav.flattenBody
                                         .replace('{name}', flattenAsk.activeName)
-                                        .replace(/\{count\}/g, String(flattenAsk.count))
                                         .replace(/\{target\}/g, flattenAsk.targetName)}
                                 </div>
                                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
