@@ -49,6 +49,16 @@ function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
 }
 
+/** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
+function deriveOgUrl(ogImage: string | number | null | undefined): string | null {
+    if (!ogImage) return null
+    if (typeof ogImage === 'string') return ogImage
+    if (typeof ogImage === 'object' && 'url' in (ogImage as object)) {
+        return (ogImage as { url?: string }).url ?? null
+    }
+    return null
+}
+
 /** Check if input contains HTML/script injection */
 function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
@@ -368,6 +378,18 @@ function SettingsPanelInner({
     const [seoTitleInput, setSeoTitleInput] = useState('')
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
     const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
+    const [ogImageDisplayUrl, setOgImageDisplayUrl] = useState<string | null>(
+        () => deriveOgUrl(site?.seo?.ogImage)
+    )
+
+    useEffect(() => {
+        const val = site?.seo?.ogImage
+        // Skip re-sync when value is a bare numeric ID — that means an optimistic write
+        // is in flight and there is no URL to derive. Leaving the local display URL alone
+        // prevents the image preview from vanishing immediately after upload.
+        if (typeof val === 'number') return
+        setOgImageDisplayUrl(deriveOgUrl(val))
+    }, [site?.seo?.ogImage])
 
     const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -775,9 +797,10 @@ function SettingsPanelInner({
                         <label className={labelCls}>{s.socialImage}</label>
                     </div>
                     <OgImageEditor
-                        currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
-                        onOgImageChange={(url) => {
-                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                        currentOgImage={ogImageDisplayUrl}
+                        onOgImageChange={(mediaId, url) => {
+                            setOgImageDisplayUrl(url)
+                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: mediaId } })
                         }}
                     />
                 </div>
