@@ -1305,11 +1305,15 @@ export async function POST(req: NextRequest) {
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
-                        controller.enqueue(
-                            _encoder.encode(
-                                `event: error\ndata: ${JSON.stringify({ message: errMsg })}\n\n`,
-                            ),
-                        )
+                        // Guard: if stream was canceled (client disconnected), enqueue throws —
+                        // wrap so error recovery below always runs regardless of stream state.
+                        try {
+                            controller.enqueue(
+                                _encoder.encode(
+                                    `event: error\ndata: ${JSON.stringify({ message: errMsg })}\n\n`,
+                                ),
+                            )
+                        } catch { /* stream already canceled — skip SSE write, still recover DB */ }
                         // Error recovery: update site status if site was created before failure
                         if (_site?.id && _payload) {
                             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
@@ -1322,7 +1326,7 @@ export async function POST(req: NextRequest) {
                                 .catch(() => {})
                         }
                     } finally {
-                        controller.close()
+                        try { controller.close() } catch { /* already closed */ }
                     }
                 },
             }), {
