@@ -4,7 +4,9 @@
  * Callers pass (blockType, keywords, count, ctx, payload) and receive Media IDs
  * ready to inject into block fields (hero.backgroundImage, gallery.images[].image, etc).
  *
- * Concurrency limited to 3 parallel downloads (avoid Unsplash 429 + Payload OOM).
+ * Concurrency: pool-based downloads use POOL_CONCURRENCY (10) so all photos for a
+ * block type download in parallel. Legacy search path keeps SEARCH_CONCURRENCY (3)
+ * to avoid Unsplash search 429s. Payload OOM: 10 × ~2MB = 20MB/block, well within limits.
  * Partial failure returns what succeeded; never throws.
  *
  * Alt-text attribution: per validation 2026-04-14 Q1, alt text format is
@@ -67,7 +69,10 @@ const SIZE_PRESET_BY_BLOCK: Record<string, ImgixParams> = {
 }
 
 const DEFAULT_PRESET: ImgixParams = { w: 1200, h: 800, fit: 'crop' }
-const CONCURRENCY = 3
+// Pool downloads: CDN has no rate limit — parallelize aggressively (all photos in 1 batch).
+const POOL_CONCURRENCY = 10
+// Legacy per-block Unsplash search path: keep conservative to avoid search API 429s.
+const SEARCH_CONCURRENCY = 3
 
 /** Minimal semaphore for bounded parallelism without extra deps. */
 class Semaphore {
@@ -225,7 +230,7 @@ export async function batchFetchFromPool(
 ): Promise<BatchFetchResult> {
     const mediaIds: number[] = []
     const failures: BatchFetchResult['failures'] = []
-    const sem = new Semaphore(CONCURRENCY)
+    const sem = new Semaphore(POOL_CONCURRENCY)
     await Promise.all(
         poolPhotos.map((photo) =>
             sem.run(async () => {
@@ -252,7 +257,7 @@ async function batchFetch(
 ): Promise<BatchFetchResult> {
     const mediaIds: number[] = []
     const failures: BatchFetchResult['failures'] = []
-    const sem = new Semaphore(CONCURRENCY)
+    const sem = new Semaphore(SEARCH_CONCURRENCY)
     await Promise.all(
         photos.map((photo) =>
             sem.run(async () => {
