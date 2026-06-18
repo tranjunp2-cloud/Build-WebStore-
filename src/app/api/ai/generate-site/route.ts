@@ -31,6 +31,7 @@ import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
+import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
@@ -115,12 +116,25 @@ export async function POST(req: NextRequest) {
         const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', generationLocale: requestedGenerationLocale, contentBrief: rawContentBrief } = data!
 
         // Normalize text inputs before sending to AI
-        const businessInfo = {
+        const normalizedBusinessInfo = {
             ...rawBusinessInfo,
             businessName: normalizeBusinessInput(rawBusinessInfo.businessName),
             shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
+
+        // Translate user-supplied fields to the selected generation language when
+        // the input language differs (e.g. Vietnamese input + English site language).
+        const targetInputLocale = requestedGenerationLocale || language || 'en'
+        const translatedInputs = await translateUserInputsIfNeeded(
+            {
+                businessName: normalizedBusinessInfo.businessName,
+                shortDescription: normalizedBusinessInfo.shortDescription,
+                products: normalizedBusinessInfo.products,
+            },
+            targetInputLocale,
+        )
+        const businessInfo = { ...normalizedBusinessInfo, ...translatedInputs }
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
