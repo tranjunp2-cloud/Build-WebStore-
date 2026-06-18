@@ -2031,7 +2031,13 @@
                 "xenditMaeDesc": "Dompet digital MAE oleh Maybank",
                 "xenditDuitnowDesc": "Imbas QR — semua bank Malaysia disokong",
                 "xenditFpxDesc": "Perbankan internet — peribadi & perniagaan",
-                "xenditLockTip": "Selesaikan onboarding Xendit untuk aktifkan"
+                "xenditLockTip": "Selesaikan onboarding Xendit untuk aktifkan",
+                "lastMethodWarning": "Sekurang-kurangnya satu kaedah pembayaran mesti kekal aktif.",
+                "cancel": "Batal",
+                "errAccountHolderRequired": "Nama pemegang akaun diperlukan.",
+                "errAccountNumberRequired": "Nombor akaun diperlukan.",
+                "errAccountNumberFormat": "Nombor akaun mesti sekurang-kurangnya 6 digit (nombor sahaja).",
+                "fixBankErrors": "Sila lengkapkan medan pindahan bank yang diperlukan."
             },
             "shipping": {
                 "pageTitle": "Penghantaran",

@@ -93,6 +93,16 @@ export function PaymentsFormClient({
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const bankTransferFormRef = useRef<HTMLDivElement>(null);
+    const firstBankInputRef = useRef<HTMLInputElement>(null);
+    // Guard: only scroll when user-triggered (not on initial data load)
+    const bankFormUserTriggeredRef = useRef(false);
+    const [bankTransferErrors, setBankTransferErrors] = useState<{ accountHolderName?: string; accountNumber?: string }>({});
+    const [serverPaymentValues, setServerPaymentValues] = useState<{
+        paymentCod: boolean; paymentQr: boolean; cardEnabled: boolean; fpxEnabled: boolean;
+        qrImageId: string | number | null; qrPreviewUrl: string | null; qrFileName: string | null;
+        accountHolderName: string; bankName: string; accountNumber: string;
+    } | null>(null);
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const sub = t.common.subscriptionErrors;
@@ -101,22 +111,38 @@ export function PaymentsFormClient({
         if (!tenantId) { setIsLoading(false); return; }
         getPaymentSettings()
             .then(res => {
-                if (res.success && res.payments) {
-                    const d = res.payments;
-                    setPaymentCod(d.payment_cod || false);
-                    setPaymentQr(d.payment_qr || false);
-                    if (d.qr_image) {
-                        const img = d.qr_image;
-                        setQrImageId(typeof img === 'string' ? img : img.id);
-                        setQrPreviewUrl(getImageUrl(img as Media));
-                        if (typeof img === 'object' && (img as any).filename) {
-                            setQrFileName((img as any).filename);
-                        }
-                    }
-                    if (d.account_holder_name) setAccountHolderName(d.account_holder_name as string);
-                    if (d.bank_name) setBankName(d.bank_name as string);
-                    if (d.account_number) setAccountNumber(d.account_number as string);
+                const d = res.success && res.payments ? res.payments : {};
+                const cod = d.payment_cod || false;
+                const qr = d.payment_qr || false;
+                let imgId: string | number | null = null;
+                let imgUrl: string | null = null;
+                let imgName: string | null = null;
+                if (d.qr_image) {
+                    const img = d.qr_image;
+                    imgId = typeof img === 'string' ? img : img.id;
+                    imgUrl = getImageUrl(img as Media);
+                    if (typeof img === 'object' && (img as any).filename) imgName = (img as any).filename;
                 }
+                const holderName = (d.account_holder_name as string) || '';
+                const bank = (d.bank_name as string) || '';
+                const acctNum = (d.account_number as string) || '';
+
+                setPaymentCod(cod);
+                setPaymentQr(qr);
+                if (imgId) setQrImageId(imgId);
+                if (imgUrl) setQrPreviewUrl(imgUrl);
+                if (imgName) setQrFileName(imgName);
+                if (holderName) setAccountHolderName(holderName);
+                if (bank) setBankName(bank);
+                if (acctNum) setAccountNumber(acctNum);
+
+                // Capture server snapshot for Cancel; card/fpx come from props (not server action)
+                setServerPaymentValues({
+                    paymentCod: cod, paymentQr: qr,
+                    cardEnabled: initialCardEnabled, fpxEnabled: initialFpxEnabled,
+                    qrImageId: imgId, qrPreviewUrl: imgUrl, qrFileName: imgName,
+                    accountHolderName: holderName, bankName: bank, accountNumber: acctNum,
+                });
             })
             .catch(console.error)
             .finally(() => setIsLoading(false));
@@ -161,6 +187,19 @@ export function PaymentsFormClient({
 
         router.replace('/settings/payments');
     }, []); // intentionally once on mount
+
+    // Scroll bank transfer form into view when user expands it (Bug 2)
+    // Use ref flag instead of isLoading — React 18 batches setPaymentQr+setIsLoading into one render,
+    // so isLoading is already false when this effect fires after initial data load.
+    useEffect(() => {
+        if (!bankFormUserTriggeredRef.current) return;
+        if (paymentQr || qrWidgetExpanded) {
+            bankFormUserTriggeredRef.current = false;
+            bankTransferFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const timer = setTimeout(() => firstBankInputRef.current?.focus(), 350);
+            return () => clearTimeout(timer);
+        }
+    }, [paymentQr, qrWidgetExpanded]);
 
     // Redirect to Stripe OAuth onboarding (TC-F13.24)
     const handleConnectStripe = async () => {
@@ -238,22 +277,39 @@ export function PaymentsFormClient({
     };
 
     const handleToggleCard = (checked: boolean) => {
+        if (!checked && !paymentCod && !paymentQr && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setCardEnabled(checked);
         setIsDirty(true);
     };
 
     const handleToggleFpx = (checked: boolean) => {
+        if (!checked && !paymentCod && !paymentQr && !cardEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setFpxEnabled(checked);
         setIsDirty(true);
     };
 
     const handleToggleCod = (checked: boolean) => {
+        if (!checked && !paymentQr && !cardEnabled && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setPaymentCod(checked);
         setIsDirty(true);
     };
 
     const handleToggleQr = (checked: boolean) => {
-        if (checked && !qrImageId && !qrPreviewUrl) { setQrWidgetExpanded(true); return; }
+        if (checked && !qrImageId && !qrPreviewUrl) {
+            bankFormUserTriggeredRef.current = true;
+            setQrWidgetExpanded(true);
+            return;
+        }
+        if (!checked && !paymentCod && !cardEnabled && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
+        bankFormUserTriggeredRef.current = checked;
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
         setIsDirty(true);
@@ -297,6 +353,7 @@ export function PaymentsFormClient({
     const handleAccountHolderNameChange = useCallback((val: string) => {
         setAccountHolderName(val);
         setIsDirty(true);
+        if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountHolderName: undefined }));
     }, []);
 
     const handleBankNameChange = useCallback((val: string) => {
@@ -307,7 +364,40 @@ export function PaymentsFormClient({
     const handleAccountNumberChange = useCallback((val: string) => {
         setAccountNumber(val);
         setIsDirty(true);
+        if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountNumber: undefined }));
     }, []);
+
+    const validateBankTransfer = (): { accountHolderName?: string; accountNumber?: string } => {
+        if (!paymentQr) return {};
+        const errs: { accountHolderName?: string; accountNumber?: string } = {};
+        if (!accountHolderName.trim()) errs.accountHolderName = pt.errAccountHolderRequired;
+        const acctTrimmed = accountNumber.trim();
+        if (!acctTrimmed) {
+            errs.accountNumber = pt.errAccountNumberRequired;
+        } else if (!/^\d{6,}$/.test(acctTrimmed)) {
+            errs.accountNumber = pt.errAccountNumberFormat;
+        }
+        return errs;
+    };
+
+    const handleCancel = () => {
+        if (!isDirty) { setQrWidgetExpanded(false); return; }
+        if (serverPaymentValues) {
+            setPaymentCod(serverPaymentValues.paymentCod);
+            setPaymentQr(serverPaymentValues.paymentQr);
+            setCardEnabled(serverPaymentValues.cardEnabled);
+            setFpxEnabled(serverPaymentValues.fpxEnabled);
+            setQrImageId(serverPaymentValues.qrImageId);
+            setQrPreviewUrl(serverPaymentValues.qrPreviewUrl);
+            setQrFileName(serverPaymentValues.qrFileName);
+            setAccountHolderName(serverPaymentValues.accountHolderName);
+            setBankName(serverPaymentValues.bankName);
+            setAccountNumber(serverPaymentValues.accountNumber);
+            if (!serverPaymentValues.paymentQr) setQrWidgetExpanded(false);
+        }
+        setBankTransferErrors({});
+        setIsDirty(false);
+    };
 
     const handleXenditDisconnect = async () => {
         const res = await disconnectXendit();
@@ -332,6 +422,13 @@ export function PaymentsFormClient({
             toast.error(pt.failVerifyStripe);
             return;
         }
+        // Validate required bank transfer fields (Bug 3)
+        const errs = validateBankTransfer();
+        if (Object.keys(errs).length > 0) {
+            setBankTransferErrors(errs);
+            toast.error(pt.fixBankErrors);
+            return;
+        }
         setIsSavingAll(true);
         try {
             const res = await updatePaymentSettings({
@@ -346,6 +443,13 @@ export function PaymentsFormClient({
             });
             if (res.success) {
                 setIsDirty(false);
+                setBankTransferErrors({});
+                // Update server snapshot so Cancel targets the just-saved state
+                setServerPaymentValues({
+                    paymentCod, paymentQr, cardEnabled, fpxEnabled,
+                    qrImageId, qrPreviewUrl, qrFileName,
+                    accountHolderName, bankName, accountNumber,
+                });
                 toast.success(pt.successSave);
             } else {
                 toast.error(pt.failSaveSettings);
@@ -561,7 +665,7 @@ export function PaymentsFormClient({
                         highlight={paymentQr}
                     >
                         {(paymentQr || qrWidgetExpanded) && (
-                            <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
+                            <div ref={bankTransferFormRef} className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
                                 <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
 
                                 {qrPreviewUrl ? (
@@ -631,14 +735,15 @@ export function PaymentsFormClient({
                                     </label>
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                        style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
-                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
+                                        style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)'}` }}
+                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                             <User className="w-[14px] h-[14px] text-dash-text-muted" />
                                         </div>
                                         <input
+                                            ref={firstBankInputRef}
                                             type="text"
                                             value={accountHolderName}
                                             onChange={e => handleAccountHolderNameChange(e.target.value)}
@@ -646,10 +751,14 @@ export function PaymentsFormClient({
                                             className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
-                                        <Info className="w-[12px] h-[12px]" />
-                                        <span>{pt.accountHolderNameHelper}</span>
-                                    </div>
+                                    {bankTransferErrors.accountHolderName ? (
+                                        <p className="text-[12px] text-red-400">{bankTransferErrors.accountHolderName}</p>
+                                    ) : (
+                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                            <Info className="w-[12px] h-[12px]" />
+                                            <span>{pt.accountHolderNameHelper}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Bank name + Account number */}
@@ -676,12 +785,15 @@ export function PaymentsFormClient({
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-[6px]">
-                                        <label className="text-[13px] font-semibold text-slate-300">{pt.accountNumberLabel}</label>
+                                        <label className="flex items-center text-[13px] font-semibold text-slate-300">
+                                            {pt.accountNumberLabel}
+                                            <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">{pt.required}</span>
+                                        </label>
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                            style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
-                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
+                                            style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)'}` }}
+                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                                 MYR
@@ -694,10 +806,14 @@ export function PaymentsFormClient({
                                                 className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                             />
                                         </div>
-                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
-                                            <Shield className="w-[12px] h-[12px]" />
-                                            <span>{pt.accountNumberHelper}</span>
-                                        </div>
+                                        {bankTransferErrors.accountNumber ? (
+                                            <p className="text-[12px] text-red-400">{bankTransferErrors.accountNumber}</p>
+                                        ) : (
+                                            <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                                <Shield className="w-[12px] h-[12px]" />
+                                                <span>{pt.accountNumberHelper}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -725,6 +841,14 @@ export function PaymentsFormClient({
                     )}
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        type="button"
+                        onClick={handleCancel}
+                        disabled={isSavingAll}
+                        className="inline-flex items-center h-[34px] px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {pt.cancel}
+                    </button>
                     <button
                         type="button"
                         onClick={handleSaveAll}

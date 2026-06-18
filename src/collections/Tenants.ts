@@ -454,7 +454,7 @@ export const Tenants: CollectionConfig = {
                 {
                     name: 'payment_cod',
                     type: 'checkbox',
-                    defaultValue: false,
+                    defaultValue: true,
                     label: 'Cash on Delivery (COD)',
                     admin: { description: 'Enable Cash on Delivery' },
                 },
