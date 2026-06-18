@@ -108,64 +108,114 @@ Wave 6 Shipping bao gồm 3 surface chính:
 | Success | `<Toast>` "Shipping settings updated" (3s auto-dismiss) |
 | Validation Error | Input border red + helper text "Rate must be 0 – RM 1,000" |
 
+**[F36] Dynamic state của tab Flat Rate (phụ thuộc trạng thái EasyParcel):**
+
+| EasyParcel | Hiển thị thêm ở tab Flat Rate |
+|---|---|
+| **OFF** (chưa kết nối) | `<Badge>` **Active** (xanh dương) cạnh tiêu đề "Shipping Rates by Region" → báo "cụm cấu hình đang chạy thật ở checkout". + **Upsell** helper/alert-link dưới mô tả: *"Tip: Connect EasyParcel để tự lấy live rates từ J&T, Pos Laju, Ninja Van tại checkout. → Sang tab EasyParcel"* |
+| **ON + Connected** | Amber `<Alert>` đầu thẻ: *"⚠️ Fallback Mode Active — flat rate chỉ dùng khi EasyParcel API timeout/lỗi ở checkout."* (badge Active ẩn) |
+
+```text
+┌──────────────────────────────────────┐
+│ 🚚 Shipping Rates by Region  [Active] │ ◄── badge xanh khi EP OFF
+│ Set flat rates for Malaysian regions │
+│ 💡 Tip: Connect EasyParcel → live    │ ◄── upsell link khi chưa connect
+│    rates · Sang tab EasyParcel ↗     │
+│ ───── HOẶC khi EP ON + Connected: ── │
+│ ⚠️ Fallback Mode Active — flat rate  │ ◄── amber banner (thay badge)
+│   chỉ chạy khi EasyParcel lỗi/timeout │
+└──────────────────────────────────────┘
+```
+
+> **Live Preview sync:** Khi EasyParcel ON + Connected, bảng Live Preview (khối Free Shipping) đổi dòng `Shipping (Flat Rate – West) RM 8.00` → giả lập cước EasyParcel `Shipping (EasyParcel – J&T Express) RM 5.42`, **tổng (Buyer pays) cập nhật theo**. (1 courier shop đã chọn — không phải multi.)
+
 ---
 
 ### 2.1.b Screen A — EasyParcel tab (F36) <a id="screen-a-easyparcel"></a>
 
-> **Nguồn:** F36 EasyParcel PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier). Tab này CẠNH "Flat Rate". Connect UI **mirror F34 Payments** (`XenditConnectBlock`).
+> **Nguồn:** F36 PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier) + **Progressive Disclosure** (chỉ hiện thứ cần ở đúng thời điểm). Connect UI **mirror F34 `XenditConnectBlock`**.
 
 **Path:** `Dashboard > Settings > Shipping > tab "EasyParcel"`
-**Trạng thái:** Disconnected (chưa nhập key) → sau "Test connection" OK mới lộ phần chọn courier.
+
+Tab theo **4 trạng thái** rõ rệt:
+
+**(1) Disconnected — Empty State (Switch OFF):** ẩn toàn bộ form, chỉ 1 banner lớn.
 
 ```text
 ┌──────────────────────────────────────────┐
-│ ┌────────────┬─────────────┐             │
-│ │ Flat Rate  │ EasyParcel ●│ ◄── Tabs    │
-│ └────────────┴─────────────┘             │
-│ ┌──────────────────────────────────────┐ │
-│ │ 🔌 Connect EasyParcel        [●━ ON] │ │
-│ │ Cước trừ thẳng ví bạn — không phụ phí│ │
-│ │ API Key (api)       [•••••••••• 👁]  │ │
-│ │ Auth Key (auth)     [•••••••••• 👁]  │ │ ◄── 2 key, KHÔNG selector env
-│ │ 🏭 Warehouse (origin)                │ │
-│ │ Address line 1  [__________________] │ │
-│ │ State ▼  City/District ▼  Postcode ▼ │ │ ◄── geo cascade /api/geo/*
-│ │        [ 🔍 Test connection ]        │ │
-│ └──────────────────────────────────────┘ │
+│ ┌ Flat Rate ┬ EasyParcel ● ┐             │
+│                  🔌                       │
+│      Connect your EasyParcel Account      │
+│  Offer live, real-time shipping rates     │
+│  from top Malaysian couriers to buyers    │
+│  directly at checkout.                    │
+│         [ Setup Connection ]              │ ◄── bấm = bật Switch → (2)
 └──────────────────────────────────────────┘
 ```
 
-**Sau "Test connection" OK → auto-detect env + lộ chọn 1 courier:**
+**(2) Setup / Editing (Switch ON, chưa test OK):** form hiện. **"Test connection" = Primary button cuối thẻ**; phải test OK mới mở khóa Save tổng.
 
 ```text
-│ ✅ Connected — Production (tự nhận env)  │ ◄── green Alert
-│ 🚚 Courier (chọn 1 cho shop)             │
-│  (•) J&T Express      [Phổ biến SME]     │ ◄── default
-│  ( ) Pos Laju         [Phổ biến SME]     │
-│  ( ) Flash Express    [Phổ biến SME]     │
-│  ＋ Xem thêm courier (3)                 │
-│  (không show giá — giá thật ở checkout)  │
-│                          [Cancel] [Save] │
+│ 🔌 Connect EasyParcel               [●ON] │
+│ API Key (api)      [•••••••••• 👁]        │
+│ Auth Key (auth)    [•••••••••• 👁]        │ ◄── 2 key (KHÔNG env selector — auto-detect)
+│ 🏭 Warehouse (origin)                     │
+│ Address line 1  [______________________] │
+│ State ▼  City/District ▼  Postcode ▼      │ ◄── geo cascade /api/geo/*
+│        [ 🔍 Test connection ]   (Primary) │ ◄── gate Save
+│ ⓘ Chọn courier mở khóa sau khi test OK    │
+└──────────────────────────────────────────┘
+   Footer: [Cancel]  [Save] (disabled tới khi test OK)
 ```
+
+**(3) Connected (test OK):** credentials **khóa read-only** (chống gõ đè làm rớt kết nối); Test → đổi thành **[Edit Credentials]** + **[Disconnect]** (destructive). Lộ chọn **1 courier** (grid 2-col, single-select, no price).
+
+```text
+│ ✅ Connected — Production (tự nhận env)    │
+│ API / Auth / Warehouse   🔒 (read-only)    │
+│         [ Edit Credentials ] [ Disconnect ]│ ◄── thay nút Test
+│ 🚚 Courier (chọn 1 cho shop)               │
+│ ┌(•) J&T [Phổ biến]┐ ┌( ) Pos Laju [Phổ biến]┐ │ ◄── grid 2-col radio
+│ ┌( ) Flash [Phổ biến]┐ ┌ ＋ Xem thêm (3)     ┐ │
+│ (không show giá — giá thật ở checkout)     │
+│                           [Cancel] [Save]  │
+```
+
+**(4) Edit Mode — Temporary Validation Lock (sửa key/kho khi đã connected):** kết nối cũ không còn chắc → **bắt buộc re-test**.
+- Ẩn **[Disconnect]**, thay bằng **[🔍 Re-test Connection]** (Primary).
+- **Blur/disable** phần chọn courier + overlay *"Please re-test your connection to unlock configurations"*.
+- **Khóa Save** footer (không cho lưu cấu hình lỗi ra storefront).
+- Re-test **OK** → restore [Disconnect] + mở khóa courier + Save sáng lại. **FAIL** → giữ khóa + báo lỗi.
 
 **Components (shadcn/ui):**
 - Tabs: `<Tabs>` Flat Rate / EasyParcel
+- Empty state (1): `<Card>` icon + copy + `<Button>` "Setup Connection" (toggle `<Switch>`)
 - Connect: `<Switch>` + 2× `<Input type="password">` (api + authentication) + eye reveal — **mirror `XenditConnectBlock`** (F34)
-- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse `/api/geo/{states,districts,postcodes}`. Warehouse = **Prime source of truth** (dùng cho cả rate + label), KHÔNG sync từ EasyParcel; postcode force-validate ở Test connection
-- Test connection: `<Button variant="outline">` — **auto-detect env** (production trước, fail → demo). KHÔNG có RadioGroup environment
-- Courier: `<RadioGroup>` **single-select** (`selectedCourier` = 1 `courier_id`), default **J&T**; top-3 (J&T/Pos Laju/Flash) + `<Badge>` "Phổ biến SME"; còn lại trong `<Collapsible>` "＋ Xem thêm courier". **KHÔNG show giá**
-- Footer `[Cancel] [Save]` — **dùng chung** với tab Flat Rate (1 dirty-state ở client level)
+- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse `/api/geo/{states,districts,postcodes}`. Warehouse = **Prime source of truth**; postcode force-validate ở Test connection
+- Test/Re-test: `<Button>` **Primary** — auto-detect env (production → demo). **Gate Save**. KHÔNG có RadioGroup environment
+- Disconnect: `<Button variant="destructive">` (chỉ ở state Connected, không Edit-mode)
+- Courier: `<RadioGroup>` **single-select** (`selectedCourier` = 1 `courier_id`) render **grid 2-col** (tiết kiệm chiều cao), default **J&T**; top-3 + `<Badge>` "Phổ biến SME"; còn lại `<Collapsible>` "＋ Xem thêm". **KHÔNG show giá**
+- Footer `[Cancel] [Save]` — dùng chung tab Flat Rate; khóa khi chưa test OK / Edit-mode
 
-**Khác tab Flat Rate (KISS — đã bỏ):** KHÔNG default-parcel (lấy từ `Products.*`), KHÔNG auto/manual label (luôn manual ở F10), KHÔNG hiển thị số dư ví (chỉ báo lỗi khi tạo label thiếu ví).
+**Khác tab Flat Rate (KISS — đã bỏ):** KHÔNG default-parcel (lấy từ `Products.*`), KHÔNG auto/manual label (luôn manual ở F10), KHÔNG hiển thị số dư ví.
 
 **States:**
 | State | UI |
 |-------|-----|
-| Disconnected | Chỉ block Connect; phần chọn courier ẩn |
-| Testing | Test → spinner "Đang kiểm tra…"; form disabled |
-| Connected OK | Green `<Alert>` "Connected — env tự nhận"; lộ courier picker; Save enabled |
-| Invalid | Red `<Alert>` `EASYPARCEL_INVALID_KEY` (sai key) / `EASYPARCEL_INVALID_WAREHOUSE` (sai postcode) — **KHÔNG lưu** |
+| Disconnected | Empty-state banner + `[Setup Connection]`; form ẩn |
+| Setup/Editing | Form; Test = Primary; Save disabled tới khi test OK; courier ẩn |
+| Testing | Spinner "Đang kiểm tra…"; form disabled |
+| Invalid | Red `<Alert>` `EASYPARCEL_INVALID_KEY` / `EASYPARCEL_INVALID_WAREHOUSE` — **KHÔNG lưu** |
+| Connected | Credentials 🔒 read-only; `[Edit][Disconnect]`; courier grid; Save enabled |
+| Edit-mode lock | `[Re-test]` Primary; courier blur + overlay; Save khóa tới khi re-test OK |
 | Saving | Save → spinner; success Toast "Đã lưu cấu hình EasyParcel" |
+
+> ⚠️ **PENDING DECISION — 4 mục đề xuất MÂU THUẪN PRD #1232 (single-courier, fidelity-fix). CHƯA vẽ vào design, chờ chốt:**
+> 1. **Courier hiển thị giá "From RM 5.40" + checkbox multi-select** — spec hiện = single-select radio, **không show giá** (settings chưa có origin/dest/weight → "from" dễ sai). Re-add = quay lại multi-courier.
+> 2. **Default Parcel Weight/Dimensions form** — đã bỏ; weight/dims lấy từ `Products.*` + hằng số `DEFAULT_PARCEL`.
+> 3. **Fulfillment Mode (auto/manual)** — đã bỏ; luôn manual qua nút "Ready to Ship" (F10).
+> 4. **Environment selector / "Secret Key"** — đã bỏ env selector (auto-detect); key = `api` + `authentication` (không gọi "secret").
+> → Giữ KISS single-courier: **không** vẽ 4 mục này. Muốn rich-settings (đa courier + parcel + fulfilment): mở rộng scope, cập nhật PRD #1232 trước.
 
 ---
 
