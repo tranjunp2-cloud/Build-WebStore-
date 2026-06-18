@@ -46,23 +46,23 @@
           {/* ── A · Settings ─────────────────────────────────────────── */}
           <DCSection id="a-settings"
             title="A · EasyParcel Settings — dashboard (dark)"
-            subtitle="Settings › Shipping › tab EasyParcel. Non-custody: cước trừ thẳng ví merchant, không markup. Disconnected shows only the Connect block; a passing Test reveals couriers, default parcel, fulfilment mode & wallet warning.">
-            <DCArtboard id="a-disconnected" label="Disconnected — chỉ block Connect" width={1440} height={1080}>
+            subtitle="Settings › Shipping › tab EasyParcel (beside Flat Rate). Non-custody: cước trừ thẳng ví merchant, không markup. Connect mirrors F34 Payments (2 masked keys + Test). NO env selector (auto-detect). Disconnected shows only the Connect block; a passing Test reveals ONE courier (single-select, default J&T, no price). No default-parcel / fulfilment-mode / wallet UI.">
+            <DCArtboard id="a-disconnected" label="Disconnected — chỉ block Connect" width={1440} height={1000}>
               <SettingsScreen state="disconnected" />
             </DCArtboard>
-            <DCArtboard id="a-testing" label="Testing — form disabled, spinner" width={1440} height={1080}>
+            <DCArtboard id="a-testing" label="Testing — form disabled, spinner" width={1440} height={1000}>
               <SettingsScreen state="testing" />
             </DCArtboard>
-            <DCArtboard id="a-invalid" label="Invalid key — EASYPARCEL_INVALID_KEY" width={1440} height={1180}>
+            <DCArtboard id="a-invalid" label="Invalid — KEY / WAREHOUSE, không lưu" width={1440} height={1080}>
               <SettingsScreen state="invalid" />
             </DCArtboard>
-            <DCArtboard id="a-connected" label="Connected — couriers revealed" width={1440} height={1560}>
+            <DCArtboard id="a-connected" label="Connected — 1 courier/shop (no price)" width={1440} height={1180}>
               <SettingsScreen state="connected" />
             </DCArtboard>
-            <DCArtboard id="a-saving" label="Saving — spinner → toast" width={1440} height={1560}>
+            <DCArtboard id="a-saving" label="Saving — spinner → toast" width={1440} height={1180}>
               <SettingsScreen state="saving" />
             </DCArtboard>
-            <DCArtboard id="a-mobile" label="Mobile 375 — connected" width={375} height={1480}>
+            <DCArtboard id="a-mobile" label="Mobile 375 — connected" width={375} height={1180}>
               <SettingsScreen state="connected" mobile={true} />
             </DCArtboard>
           </DCSection>

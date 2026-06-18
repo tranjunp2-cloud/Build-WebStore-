@@ -38,4 +38,6 @@ f36/
 - Prototype = HTML/CSS/JS, **không phải production code**. Recreate pixel-perfect bằng stack repo (Next.js + shadcn/ui), không copy cấu trúc nội bộ prototype.
 - Đối chiếu PRD `docs/prd/F36-easyparcel-delivery.md` + wireframe `docs/design/F36-easyparcel-delivery-design.md` (PR #1232).
 
-> ⚠️ **Spec drift — đọc trước khi implement:** Bundle này dựng theo concept **multi-courier** (Screen B buyer chọn courier; Screen E có reverse label). PRD/design hiện tại (#1232, commit fidelity-fix) đã đổi sang **1 courier/shop** (buyer KHÔNG chọn, checkout không có section vận chuyển) và **cắt reverse label** khỏi MVP. → Dùng bundle làm tham khảo visual/style; **luồng & scope lấy theo PRD #1232 mới**, không theo Screen B/E của bundle.
+> ⚠️ **Spec drift — đọc trước khi implement:**
+> - **Screen A (Settings)** — ✅ **đã cập nhật** khớp PRD #1232 single-courier: connect mirror F34 Xendit (2 key + Test), auto-detect env (bỏ selector), warehouse geo cascade State→City→Postcode, chọn **1 courier** (default J&T, no price), tab "EasyParcel" cạnh "Flat Rate", footer dùng chung. Đã bỏ default-parcel / fulfilment-mode / wallet UI.
+> - **Screen B (Checkout) + E (Returns)** — ⚠️ **CÒN lệch**: vẫn dựng theo concept **multi-courier** (B buyer chọn courier) và **có reverse label** (E). PRD #1232 đã đổi sang 1 courier/shop (buyer KHÔNG chọn) + **cắt reverse label**. → B/E lấy luồng & scope theo PRD #1232, KHÔNG theo bundle.
