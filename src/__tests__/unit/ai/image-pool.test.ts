@@ -188,6 +188,38 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     const matches = q.match(/candlelit/g) ?? []
     expect(matches.length).toBe(1)
   })
+
+  it('injects category photo hint alongside acronym product terms (GH-1185)', async () => {
+    // Regression: "saas crm" alone returns no Unsplash photos.
+    // Category hint "software team" must be appended to anchor the query.
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    const pool = await buildImagePool({
+      category: 'tech',
+      products: ['saas', 'crm'],
+      seed: 1,
+    })
+    expect(pool.queryUsed).toContain('software team')
+    expect(pool.queryUsed).toContain('saas')
+  })
+
+  it('relaxed query omits category hint (keeps query minimal for retry)', async () => {
+    // Relaxed mode only has product terms — no mood, no category hint.
+    mockSearchPhotos
+      .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // underfill initial
+      .mockResolvedValueOnce(landscapeFixture)               // relaxed retry
+      .mockResolvedValueOnce(squareFixture)
+
+    await buildImagePool({
+      category: 'tech',
+      products: ['saas', 'crm'],
+      seed: 1,
+    })
+
+    const relaxedQuery = mockSearchPhotos.mock.calls[1]![0] as string
+    // Relaxed query should NOT have the category hint
+    expect(relaxedQuery).not.toContain('software team')
+    expect(relaxedQuery).toContain('saas')
+  })
 })
 
 // ── TC-F01-W.15: pickFromPool determinism ───────────────────────────────────

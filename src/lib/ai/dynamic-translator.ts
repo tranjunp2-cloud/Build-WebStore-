@@ -16,14 +16,22 @@ export async function translateToEnglishKeywords(input: TranslatorInput): Promis
 
     const prompt = `You are a search keyword optimization assistant for Unsplash stock photography.
 Given a business industry and products (often in Vietnamese or Malay), extract 1 to 3 highly relevant English search keywords.
-These keywords must be nouns or noun phrases that return great photos of the business concept (e.g. "pet shop", "furniture interior", "car showroom").
-Avoid overly generic words if specific ones are better. Do not use punctuation.
+These keywords MUST be visual concepts that appear in stock photography — nouns or noun phrases representing concrete scenes.
+
+STRICT RULES:
+- NEVER return software acronyms or company-type labels: SaaS, CRM, ERP, API, B2B, MVP, IT, HR — these return no photos on Unsplash.
+- For tech/software businesses: return visual scenes like "software team", "business dashboard", "startup workspace", "developer laptop".
+- For food/restaurant: "restaurant interior", "chef cooking", "delicious food plating".
+- For beauty/spa: "beauty salon", "spa treatment", "skincare routine".
+- Translate Vietnamese/Malay terms to their English photography equivalent.
 
 Industry: ${input.industry ?? 'none'}
 Products: ${input.products ?? 'none'}
 
 Return ONLY a valid JSON array of strings. Do not include markdown formatting or explanation.
-Example: ["pet shop", "cute animals"]`
+Example for SaaS/CRM: ["software team", "business dashboard"]
+Example for restaurant: ["restaurant interior", "chef cooking"]
+Example for spa: ["beauty salon", "spa treatment"]`
 
     try {
         const openai = new OpenAI({ apiKey: key })
