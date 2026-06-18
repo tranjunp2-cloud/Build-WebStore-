@@ -18,6 +18,8 @@ Tài liệu này cung cấp wireframe & UI spec low-fi cho tính năng Shipping 
 ## 1. Feature Summary
 
 > **🚚 Delivery Model:** SELF-DELIVERY — seller tự lo giao hàng. UI không có carrier picker, không có "Print Label", không có tracking URL field. `trackingNumber` chỉ là free-text input trong Order detail (F10), không thuộc F14 scope.
+>
+> **[F36 update — EasyParcel]** Wave 7+ thêm **EasyParcel** (courier aggregator) làm **tab thứ 2** cạnh Flat Rate trong Shipping Settings (§2.1b). Khi tenant bật EasyParcel: checkout dùng **giá courier thật** (1 courier/shop, buyer không chọn); chưa bật / lỗi / timeout → **fallback flat-rate** này (không vỡ). Tab Flat Rate giữ nguyên 100%. Nguồn: PRD `docs/prd/F36-easyparcel-delivery.md`.
 
 Wave 6 Shipping bao gồm 3 surface chính:
 
@@ -49,9 +51,14 @@ Wave 6 Shipping bao gồm 3 surface chính:
 **Path:** `Dashboard > Settings > Shipping` (`/dashboard/settings/shipping`)
 **Trạng thái:** Seller đã đăng nhập, đã cấu hình ban đầu (West RM 8, East RM 15, free toggle off).
 
+> **[F36] Tab wrapper:** Màn Shipping giờ là 2 tab — **Flat Rate** (mặc định, wireframe dưới) + **EasyParcel** (§2.1b). Footer `[Reset] [Save]` dùng chung. Nội dung Flat Rate bên dưới **giữ nguyên** Wave 6.
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │ [≡ Logo]  Search...                           [👤 Admin]│ ◄── Global Header
+│              │ ┌────────────┬─────────────┐             │
+│              │ │ Flat Rate ●│ EasyParcel  │ ◄── Tabs (F36)
+│              │ └────────────┴─────────────┘             │
 ├──────────────┬──────────────────────────────────────────┤
 │ 🏠 Dashboard │ Store Settings > Shipping                │
 │ 📦 Products  │                                          │
@@ -100,6 +107,65 @@ Wave 6 Shipping bao gồm 3 surface chính:
 | Saving | Save button → spinner + label "Saving..." |
 | Success | `<Toast>` "Shipping settings updated" (3s auto-dismiss) |
 | Validation Error | Input border red + helper text "Rate must be 0 – RM 1,000" |
+
+---
+
+### 2.1.b Screen A — EasyParcel tab (F36) <a id="screen-a-easyparcel"></a>
+
+> **Nguồn:** F36 EasyParcel PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier). Tab này CẠNH "Flat Rate". Connect UI **mirror F34 Payments** (`XenditConnectBlock`).
+
+**Path:** `Dashboard > Settings > Shipping > tab "EasyParcel"`
+**Trạng thái:** Disconnected (chưa nhập key) → sau "Test connection" OK mới lộ phần chọn courier.
+
+```text
+┌──────────────────────────────────────────┐
+│ ┌────────────┬─────────────┐             │
+│ │ Flat Rate  │ EasyParcel ●│ ◄── Tabs    │
+│ └────────────┴─────────────┘             │
+│ ┌──────────────────────────────────────┐ │
+│ │ 🔌 Connect EasyParcel        [●━ ON] │ │
+│ │ Cước trừ thẳng ví bạn — không phụ phí│ │
+│ │ API Key (api)       [•••••••••• 👁]  │ │
+│ │ Auth Key (auth)     [•••••••••• 👁]  │ │ ◄── 2 key, KHÔNG selector env
+│ │ 🏭 Warehouse (origin)                │ │
+│ │ Address line 1  [__________________] │ │
+│ │ State ▼  City/District ▼  Postcode ▼ │ │ ◄── geo cascade /api/geo/*
+│ │        [ 🔍 Test connection ]        │ │
+│ └──────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+```
+
+**Sau "Test connection" OK → auto-detect env + lộ chọn 1 courier:**
+
+```text
+│ ✅ Connected — Production (tự nhận env)  │ ◄── green Alert
+│ 🚚 Courier (chọn 1 cho shop)             │
+│  (•) J&T Express      [Phổ biến SME]     │ ◄── default
+│  ( ) Pos Laju         [Phổ biến SME]     │
+│  ( ) Flash Express    [Phổ biến SME]     │
+│  ＋ Xem thêm courier (3)                 │
+│  (không show giá — giá thật ở checkout)  │
+│                          [Cancel] [Save] │
+```
+
+**Components (shadcn/ui):**
+- Tabs: `<Tabs>` Flat Rate / EasyParcel
+- Connect: `<Switch>` + 2× `<Input type="password">` (api + authentication) + eye reveal — **mirror `XenditConnectBlock`** (F34)
+- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse `/api/geo/{states,districts,postcodes}`. Warehouse = **Prime source of truth** (dùng cho cả rate + label), KHÔNG sync từ EasyParcel; postcode force-validate ở Test connection
+- Test connection: `<Button variant="outline">` — **auto-detect env** (production trước, fail → demo). KHÔNG có RadioGroup environment
+- Courier: `<RadioGroup>` **single-select** (`selectedCourier` = 1 `courier_id`), default **J&T**; top-3 (J&T/Pos Laju/Flash) + `<Badge>` "Phổ biến SME"; còn lại trong `<Collapsible>` "＋ Xem thêm courier". **KHÔNG show giá**
+- Footer `[Cancel] [Save]` — **dùng chung** với tab Flat Rate (1 dirty-state ở client level)
+
+**Khác tab Flat Rate (KISS — đã bỏ):** KHÔNG default-parcel (lấy từ `Products.*`), KHÔNG auto/manual label (luôn manual ở F10), KHÔNG hiển thị số dư ví (chỉ báo lỗi khi tạo label thiếu ví).
+
+**States:**
+| State | UI |
+|-------|-----|
+| Disconnected | Chỉ block Connect; phần chọn courier ẩn |
+| Testing | Test → spinner "Đang kiểm tra…"; form disabled |
+| Connected OK | Green `<Alert>` "Connected — env tự nhận"; lộ courier picker; Save enabled |
+| Invalid | Red `<Alert>` `EASYPARCEL_INVALID_KEY` (sai key) / `EASYPARCEL_INVALID_WAREHOUSE` (sai postcode) — **KHÔNG lưu** |
+| Saving | Save → spinner; success Toast "Đã lưu cấu hình EasyParcel" |
 
 ---
 
@@ -335,8 +401,8 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 ## 7. Out of Scope (Wave 7+)
 
-- ❌ Carrier picker dropdown (J&T, Pos Laju, Ninja Van)
-- ❌ Tracking number input + tracking link in order detail
+- ✅ ~~Carrier picker dropdown (J&T, Pos Laju, Ninja Van)~~ → **đã vào scope qua F36 EasyParcel** (1 courier/shop, §2.1b)
+- ✅ ~~Tracking number input + tracking link in order detail~~ → **F36**: AWB tự đổ vào `trackingNumber` + tracking status (F10 drawer)
 - ❌ Estimated delivery days field (per-region days)
 - ❌ Per-product shipping override (ShippingDimensionsSection trong product form sẽ scoped riêng cho carrier integration)
 - ❌ Multi-seller free shipping isolation UI

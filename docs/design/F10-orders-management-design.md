@@ -104,6 +104,23 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
        └────────────────────────────────────────────────┘
 ```
 
+> **[F36 EasyParcel] Drawer bổ sung khi tenant bật EasyParcel** (nguồn: `docs/prd/F36-easyparcel-delivery.md`):
+> - **Action bar** thêm nút **`[ 📦 Ready to Ship ]`** (hiện khi order đã `paid` + `confirmed`). Bấm → tạo vận đơn EasyParcel **2 bước** (`EPSubmitOrderBulk` giữ chỗ → `EPPayOrderBulk` trừ ví), lưu AWB → `trackingNumber`, order → `ready_to_ship`. **KHÔNG mở màn/modal riêng** — gắn vào nút có sẵn. Đã có AWB → nút khóa (idempotent, chống double-charge). Ví thiếu → `EASYPARCEL_WALLET_LOW`, order **không đổi**.
+> - Thêm card **Shipping & Tracking** (dưới Line Items):
+
+```text
+       ┌─ 📦 Shipping & Tracking ─────────────────────┐
+       │ Courier: J&T Express   AWB: 631234567890 [📋]│
+       │ [ 🖨️ In nhãn (PDF) ]   [ 📅 Đặt pickup ]     │
+       │ Tracking: ● Đang trung chuyển · 16/06 18:40  │ ◄── shippingTrackingStatus (cron poll 30–60′)
+       │ Trạng thái đơn: Shipped   [ Đánh dấu hoàn tất ]│ ◄── order.status (manual, TÁCH tracking)
+       └──────────────────────────────────────────────┘
+```
+
+> - **Dual-field:** `order.status` (lifecycle, merchant bấm tay — vd "Đánh dấu hoàn tất") **tách biệt** `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron poll). Delivered → KHÔNG auto-complete; merchant tự bấm.
+> - **Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** nút **`[ Hoàn Tiền ]`** + **`[ Huỷ Đơn ]`** có sẵn (gọi `/refund` + `/cancel`, tự restock, idempotent). Message refund phân tier theo trạng thái label (chưa mua → full; chưa pickup → hủy trên dashboard EasyParcel; đã pickup → cước mất). **Reverse label cắt khỏi MVP.**
+> - **Non-EP tenant:** giữ nguyên nhánh nhập `trackingNumber` thủ công (không có nút Ready to Ship EasyParcel).
+
 ---
 
 ## 2.1. **[v2.2]** Manual Payment Verification Block (Order Detail Drawer)
@@ -265,6 +282,8 @@ Click ảnh proof → open full-screen modal:
 │ [ Huỷ ]      [ XÁC NHẬN ĐƠN]│ ◄── Nút ghim đáy (Sticky Bottom Bar)
 └─────────────────────────────┘
 ```
+
+> **[F36 mobile]** Sticky bottom bar thêm nút **`[ 📦 Ready to Ship ]`** (khi order `paid` + `confirmed`) → mở flow tạo vận đơn như desktop. Card **"📦 Shipping & Tracking"** (AWB + tracking + in nhãn/pickup) stack dọc trong full-page detail. Returns reuse `[ Hoàn Tiền ]`.
 
 ---
 

@@ -147,6 +147,8 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho giao diện côn
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **[F36 EasyParcel] Dòng "Shipping" là hybrid** (nguồn: `docs/prd/F36-easyparcel-delivery.md`): nếu tenant bật EasyParcel → hiển thị **giá courier thật** của 1 courier shop đã chọn (vd `Shipping (J&T): RM 5.42`); chưa bật / lỗi / timeout → giữ flat-rate `Shipping (West MY): RM 8.00` như trên. **Buyer KHÔNG chọn courier** — KHÔNG thêm section "chọn đơn vị vận chuyển", KHÔNG thêm dòng phí mới. Logic ẩn ở `POST /api/orders/calculate-shipping` (hybrid, single-courier). Sau đặt hàng, buyer xem courier + AWB + tracking ở trang đơn (làm giàu `OrderTrackingClient` có sẵn).
+
 ---
 
 ## 5. Mobile Optimized UX (Giao diện 375px)
