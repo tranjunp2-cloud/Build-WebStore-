@@ -35,6 +35,8 @@ Tích hợp **EasyParcel** làm courier aggregator, mỗi merchant kết nối *
 
 > **Decision (kiến trúc):** Codebase đã có `src/lib/shipping/` (flat rate) — giữ nguyên làm **fallback**. Thêm EasyParcel = **file mới** (`src/lib/shipping/easyparcel/*` + API routes), 0 phá flat-rate logic. Per-merchant API key = mirror `echIntegration`. Rủi ro kỹ thuật: **thấp**.
 
+> **Decision (giá flat-rate fallback):** Default hiện tại `SHIPPING_DEFAULTS` (`src/lib/shipping/constants.ts`) = West 800 sen / East 1500 sen (RM8/RM15) là giá 2024–2025, **thấp so với thị trường 2026** (West ~RM7–9 retail, East ~RM10–18). Khi flat-rate kích hoạt (EP OFF / chưa kịp timeline) merchant không có discount EasyParcel → cần khung cao hơn. **Khuyến nghị:** West **1000 sen (RM10)**, East **1600 sen (RM16)**, `freeAbove` giữ 10000 sen (RM100). EasyParcel live rate khi có vẫn override fallback này. Nguồn: `plans/reports/researcher-260618-1344-my-flat-rate-shipping-pricing.md`.
+
 ### Vì sao EasyParcel (so vendor)
 
 | Provider | Courier MY | Auth | Chi phí platform | Marketplace fit | Kết luận |
@@ -209,6 +211,8 @@ B5. Tạo order: lưu shippingCourier + shippingServiceId + shippingFee (RM-floa
 > `EPSubmitOrderBulk`+`EPPayOrderBulk` tạo label (trừ ví). `EPParcelStatusBulk` poll tracking. COD = EasyParcel COD service.
 > **KHÔNG có màn "Tạo vận đơn" riêng.** Mua label gắn thẳng vào nút **"Ready to Ship"** đã có inline trong `OrderDetailPanel` (hiện chỉ flip status confirmed→ready_to_ship). EP tenant: nút này mở modal tạo label; non-EP: giữ flip như cũ. **KHÔNG có tab "nhập tracking thủ công"** — nhánh manual do cấu hình tenant quyết, không phải lựa chọn per-order.
 
+> **Gating nút Ready to Ship — chấp nhận MỌI trạng thái đã-trả-tiền-chưa-ship, KHÔNG chỉ `confirmed`:** đơn Stripe (F13) land ở `status='new'` + `paymentStatus='paid'` (webhook `checkout.session.completed`), KHÔNG phải `confirmed`. Đơn Bank Transfer Approve → `confirmed`. Đơn COD → `pending`/`confirmed`. → Nút tạo label PHẢI hiện khi `status ∈ {new, paid, confirmed}` (hoặc tiêu chí thực dụng hơn: `paymentStatus='paid'` HOẶC COD đã `confirmed`, VÀ chưa có `awbNo`). Nếu chỉ gate `confirmed` → đơn Stripe-paid không tạo được label. Verify danh sách state với `OrderDetailPanel` hiện tại lúc implement.
+
 #### Flow mua label
 
 ```
@@ -296,6 +300,10 @@ Cron /api/cron/sync-tracking (mỗi 30-60 phút)
 
 **Dual-field tracking (decouple courier status khỏi lifecycle):** EasyParcel **normalize mọi courier** (J&T, Pos Laju, Flash, Ninja Van... top 10) về **1 enum 13 status chuẩn** — `EPParcelStatusBulk` không trả status raw của từng hãng → KHÔNG cần xử lý per-courier. Lưu vào field display `shippingTrackingStatus`; `order.status` (lifecycle) vẫn manual. Chỉ 4/13 là gợi ý transition (merchant vẫn bấm tay).
 
+> **`order.status` thật = 11 giá trị** (`src/collections/Orders.ts:189`): **7 fulfillment** `pending → confirmed → ready_to_ship → shipped → completed` + `cancelled` + `refunded`; **4 payment/legacy** `new`, `paid`, `payment_failed`, `processing`. Field thứ 2 riêng `paymentStatus` (8 giá trị). **Delivery (F36) CHỈ gợi ý vào subset fulfillment** — mọi target trong bảng dưới (`shipped`/`completed`/`refunded`/`cancelled`) là enum hợp lệ sẵn có; KHÔNG thêm value mới vào `order.status`.
+
+> **Buyer projection (public, KHÔNG show raw lifecycle):** trang đơn buyer đã có sẵn 1 lớp đơn giản hoá **6 giá trị** — `getTrackingStatus()` type `TrackingStatus` (`OrderTrackingClient.tsx:13`): `processing` (pending/confirmed/new/ready_to_ship/paid) · `in-transit` (shipped) · `delivered` (completed) · `cancelled` · `refunded` · `payment_failed`. **F36 chỉ làm giàu nhánh `in-transit`** bằng sub-timeline courier từ `shippingTrackingStatus`, **collapse 13 EP → nhãn thân thiện** và **ẩn vocab nội bộ**: `Exception`/`On Hold` → "Tạm hoãn"; `Admin Cancel`/`Expired`/`Cancelled` → "Đã huỷ". Buyer KHÔNG thấy từ "Exception/Admin Cancel/Expired" (per NFR-10 — chỉ subset an toàn + nhãn public).
+
 | `shippingTrackingStatus` (13 EasyParcel) | Gợi ý `order.status` (manual) |
 |---|---|
 | Scheduled · Pending For Collection | — (chờ lấy) |
@@ -321,11 +329,13 @@ Cron /api/cron/sync-tracking (mỗi 30-60 phút)
 | **C-6a** | **COD eligibility gating tại checkout:** Tùy chọn COD hiển thị VÀ cho phép chọn CHỈ khi ĐỒNG THỜI: (1) địa chỉ buyer thuộc West Malaysia (state zone='west' từ `/api/geo/lookup/[postcode]`); (2) `selectedCourier` có `cod_service_available=true` trong response EPRateCheckingBulk (J&T, DHL eCommerce, Flash, Aramex — không phải Pos Laju, SPX, City-Link); (3) order grand total ≥ RM5.01 (min COD) VÀ ≤ RM7,000 (max COD của courier). Thiếu bất kỳ điều kiện nào → COD option ẩn hoặc disabled với helper text lý do. **Tenant EP OFF:** COD vẫn khả dụng như cũ (không thay đổi `site.paymentConfig.enableCod`) — chỉ không có automation courier thu hộ. | US-F36-08 |
 | **C-6b** | **`codAmount` snapshot:** Khi buyer chọn COD, `codAmount` = snapshot grand total (sen) tại thời điểm checkout (= subtotal + shippingFee − discount). Lưu nội bộ bằng **sen**; chuyển sang RM khi gửi EasyParcel (`/100`). KHÔNG recalculate sau khi order tạo. **Schema:** cột MỚI `cod_amount` (number, sen) trên `orders` — KHÔNG derive từ `total` (field `total` lưu RM-float, khác đơn vị) → yêu cầu entry `scripts/db-setup.js` MIGRATIONS (NFR-9). | US-F36-08 |
 | **C-6c** | **`codStatus` field (display-only, NOT reconciliation engine):** Thêm field `codStatus` enum vào Orders với 3 giá trị: `pending` (default, tiền chưa thu) → `collected` (merchant xác nhận nhận COD từ courier/EasyParcel settlement) → `settled` (merchant đã rút tiền, đối soát xong). KHÔNG có API đối soát — merchant tự check dashboard EasyParcel. **Schema:** cột scalar `cod_status` varchar trên `orders` → yêu cầu entry trong `scripts/db-setup.js` MIGRATIONS (per NFR-9). | US-F36-08 |
+| **C-6f** | **`codStatus` là TẦNG RIÊNG, KHÔNG thay `paymentStatus` (ranh giới với F10/F13):** `codStatus` chỉ track việc **courier thu tiền mặt + settle về merchant** (tầng giao vận). `paymentStatus` của đơn COD GIỮ NGUYÊN logic có sẵn (đơn COD: `unpaid` → `paid` khi order chuyển `completed`) — F36 KHÔNG đụng. Hai field độc lập: 1 đơn COD có thể `paymentStatus='unpaid'` mà `codStatus='collected'` (courier đã thu, merchant chưa bấm Completed). F36 chỉ THÊM `codStatus`, không ghi đè cơ chế COD/payment hiện hữu; tenant EP OFF → không có `codStatus`, COD chạy y như cũ. | US-F36-08 |
 | **C-6d** | **COD fee disclosure:** Khi buyer chọn COD, hiện thông tin phí COD ước tính (max(flat, 4%) theo courier đã chọn) là INFORMATIONAL — merchant chịu, trừ từ tiền thu hộ; platform RM0. Không hiển thị phí này trong giá buyer thấy (phí là của merchant, không phải buyer). | US-F36-08 |
 | **C-6e** | **Label COD:** Khi tạo label cho order COD (paymentMethod='cod', West MY validated, codAmount trong giới hạn), gửi `cod_enabled=true` + `cod_amount` (RM) trong EPSubmitOrderBulk. **Param name chưa confirmed** — verify trong sandbox trước go-live (§11 item #1). | US-F36-08 |
 | **C-6** | *(Deprecated — xem C-6a..C-6e)* COD: order `paymentMethod='cod'` + `codAmount` → tạo label cờ COD; **West MY only** (validate state). | US-F36-08 |
 | **C-7** | `GET /api/cron/sync-tracking` (cron secret auth) poll `EPParcelStatusBulk` theo batch tenant; cập nhật `shippingTrackingStatus` (1 trong 13 enum chuẩn EasyParcel). | US-F36-09 |
 | **C-8** | Tracking **nhúng vào order detail có sẵn, KHÔNG màn riêng**: buyer = làm giàu `OtShippingCard` + `OtTimeline` trong `OrderTrackingClient` (courier + AWB + trạng thái); merchant = badge tracking trong `OrderDetailPanel`. | US-F36-09 |
+| **C-8a** | **Reuse hook email tracking của F14 (DRY, KHÔNG dựng mới):** email "Shipped" đã hỗ trợ sẵn — có `trackingUrl` → render `<a href>` clickable; chỉ có `trackingNumber` → plain text (F14 BR-09 / TC-F14.121, `src/lib/email`). F36 chỉ cần **truyền `trackingUrl` = deep-link courier** (vd `https://www.tracking.my/...` hoặc URL hãng theo `awbNo`) vào email Shipped có sẵn → buyer có link "Theo dõi" tự động. KHÔNG viết template/email mới. Link courier trên trang đơn buyer (`OrderTrackingClient`) cũng dùng chung URL này. | US-F36-09 |
 | **C-9** | `shipped → completed` **chỉ manual** (merchant bấm). Cron delivered chỉ update `shippingTrackingStatus`, **KHÔNG auto-complete** (giữ manual order lifecycle). | US-F36-09 |
 
 ### 6.D — Phase D: Returns + Refund (reuse refund/cancel có sẵn)
@@ -373,6 +383,7 @@ Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàn
 | **NFR-7** | Ví hết tiền: khi tạo label thất bại → bắt error EasyParcel, hiện `EASYPARCEL_WALLET_LOW` + link nạp; KHÔNG để order kẹt. (KHÔNG show số dư ví chủ động, KHÔNG cron cảnh báo ví — đã bỏ.) | P1 |
 | **NFR-8** | Secrets: không có secret global (key per-merchant trong DB). Chỉ constant base URL (demo/prod) trong code. | P0 |
 | **NFR-9** | Schema: cột mới → `scripts/db-setup.js` MIGRATIONS; CI `check-migrations.js` gate. | P0 |
+| **NFR-10** | **Buyer-safe projection:** endpoint buyer public (`api/orders/track/[orderNumber]`, `api/orders/stream/[orderNumber]`, `OrderTrackingClient`) chỉ trả **subset an toàn**: courier name, `awbNo`/`trackingNumber`, `shippingTrackingStatus`. **TUYỆT ĐỐI không lộ** `labelUrl`, `easyParcelOrderNo`, `codAmount`, `codStatus`, lỗi ví (`EASYPARCEL_WALLET_LOW`) — các field này chỉ cho seller (dashboard, admin session). Public dùng order-number-as-key, không auth → field nhạy cảm rò là lộ dữ liệu merchant. Nguồn: `plans/reports/Explore-260618-1344-f36-delivery-status-buyer-seller-split.md`. | P0 |
 
 ---
 

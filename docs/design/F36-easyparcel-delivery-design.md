@@ -360,7 +360,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - Merchant: thêm 1 `<Badge>` trạng thái tracking trong `OrderDetailPanel` (cạnh `OrderProgress`) — hiện chưa show tracking; thêm `codStatus` badge + codAmount gần block payment info.
 
 **Components:**
-- Lifecycle badge: `<Badge>` theo `order.status` (8 giá trị, merchant bấm tay)
+- Lifecycle badge: `<Badge>` theo `order.status` (11 giá trị: 7 fulfillment `pending→confirmed→ready_to_ship→shipped→completed` +`cancelled`/`refunded` · 4 payment/legacy `new`/`paid`/`payment_failed`/`processing` — verify `src/collections/Orders.ts:189`; merchant bấm tay)
 - Tracking badge/timeline: từ `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron sync — chỉ hiển thị)
 - COD status badge: `<Badge>` theo `codStatus` (pending/collected/settled) — chỉ hiện khi COD order; thủ công update
 - Track link: `<Button variant="link">` (deep-link courier nếu có; else copy AWB)
@@ -369,17 +369,18 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 **Dual-field + mapping (EasyParcel normalize mọi courier về 1 enum 13 giá trị):**
 
 > EasyParcel ẩn toàn bộ từ vựng raw của từng courier (J&T, Pos Laju, Flash, Ninja Van... top 10) → `EPParcelStatusBulk` chỉ trả 13 status chuẩn. KHÔNG map full vào lifecycle; chỉ 4/13 là *gợi ý* cho merchant (vẫn bấm tay).
+> **Cột "Buyer label (public)"** = nhãn buyer thấy trên trang đơn — đã collapse + ẩn vocab nội bộ (`Exception`/`Admin Cancel`/`Expired` KHÔNG render thô, per NFR-10). Buyer còn 1 badge top-level 6 giá trị riêng từ `order.status` (`getTrackingStatus()`, `OrderTrackingClient.tsx:13`): processing/in-transit/delivered/cancelled/refunded/payment_failed.
 
-| EasyParcel `shippingTrackingStatus` (13) | Hiển thị timeline | Gợi ý `order.status` (manual) |
+| EasyParcel `shippingTrackingStatus` (13) | Buyer label (public) | Gợi ý `order.status` (manual, seller) |
 |---|---|---|
 | Scheduled · Pending For Collection | Chờ lấy hàng | — |
 | **Collected** · Drop Off | Đã lấy hàng | → merchant bấm `shipped` |
 | In Transit | Đang trung chuyển | — (chỉ display) |
 | Out for Delivery | Đang giao | — (chỉ display) |
-| Delivery On Hold · Exception | ⚠️ Mốc cảnh báo | — (KHÔNG đổi state) |
+| Delivery On Hold · Exception | Tạm hoãn <span>(soft — "liên hệ shop nếu cần"; KHÔNG show "Exception")</span> | — (KHÔNG đổi state) |
 | **Delivered** | Đã giao ✓ | → merchant tự bấm `completed` (KHÔNG auto) |
 | **Returned** | Hoàn trả | → `refunded` sau khi kiểm |
-| **Cancelled · Admin Cancel · Expired** | Đã huỷ | → `cancelled` |
+| **Cancelled · Admin Cancel · Expired** | Đã huỷ <span>(gộp 3 → 1)</span> | → `cancelled` |
 
 **States:**
 | State | UI |

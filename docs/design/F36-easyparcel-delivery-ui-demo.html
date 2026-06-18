@@ -182,9 +182,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .modal-switch button{flex:1;height:30px;border-radius:6px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-size:11.5px;font-weight:600;cursor:pointer;font-family:var(--font)}
 .modal-switch button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
+/* === DUAL-FLOW (buyer vs seller) === */
+.dual-track{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.flow-head{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:8px 12px;border-radius:var(--radius);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.flow-head.seller{background:rgba(59,130,246,.12);color:#93c5fd}
+.flow-head.buyer{background:rgba(45,212,191,.12);color:#5eead4}
+.drow{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:7px 0;border-bottom:1px solid var(--border)}
+.drow .k{color:var(--muted)}
+.lock{font-size:10px;color:var(--warning);border:1px solid rgba(245,158,11,.4);border-radius:4px;padding:1px 6px;margin-left:6px;font-weight:600;white-space:nowrap}
+.vis-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.vis-table th,.vis-table td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+.vis-table th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.vis-table td.c{text-align:center;font-weight:700}
+.vis-y{color:var(--success)}.vis-n{color:var(--error)}
+
 @media(max-width:860px){
   .sidebar{display:none}
-  .sf-grid{grid-template-columns:1fr}
+  .sf-grid,.dual-track{grid-template-columns:1fr}
   .search{display:none}
 }
 </style>
@@ -402,31 +416,116 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div class="alert alert-error" style="margin-top:18px"><span class="ai">⚠️</span><div><b>Ví hết tiền / API fail</b> → <code>EASYPARCEL_WALLET_LOW</code>: "Ví không đủ cước. Nạp ví rồi thử lại — <b>đơn chưa thay đổi</b>." · Idempotent: đã có AWB → khoá nút (chống double-charge ở bước <b>pay</b>).</div></div>
         </section>
 
-        <!-- ============ SCREEN D — TRACKING ============ -->
+        <!-- ============ SCREEN D — TRACKING (2 luồng) ============ -->
         <section class="screen" id="screen-D">
-          <div class="page-title">Order Tracking (nhúng trong trang đơn)</div>
-          <div class="page-desc">KHÔNG màn riêng — làm giàu component có sẵn của trang đơn buyer (<code>OrderTrackingClient</code>: <code>OtShippingCard</code> + <code>OtTimeline</code>) + badge tracking trong order detail merchant (<code>OrderDetailPanel</code>). Cron poll 30–60′ cập nhật <code>shippingTrackingStatus</code>.</div>
+          <div class="page-title">Order Tracking — 2 luồng tách biệt (Seller / Buyer)</div>
+          <div class="page-desc">KHÔNG màn riêng — làm giàu component có sẵn. <b>Seller</b> = badge + chi tiết tracking trong <code>OrderDetailPanel</code> (dashboard · admin session · full data + control). <b>Buyer</b> = <code>OrderTrackingClient</code> (<code>OtShippingCard</code> + <code>OtTimeline</code>) · public · order-number-as-key · <b>KHÔNG auth</b> → chỉ subset an toàn. Cùng 1 cron poll 30–60′ cập nhật <code>shippingTrackingStatus</code>; mỗi luồng project field khác nhau.</div>
 
-          <div class="alert alert-info" style="margin-bottom:14px"><span class="ai">ℹ️</span><div><b>Dual-field (tách 2 tầng):</b> <code>order.status</code> = lifecycle (8 giá trị, merchant bấm tay) · <code>shippingTrackingStatus</code> = 13 status chuẩn EasyParcel (cron sync, chỉ hiển thị). EasyParcel đã normalize mọi courier (J&T/Pos Laju/Flash...) về 1 enum → KHÔNG xử lý status riêng từng hãng.</div></div>
+          <div class="alert alert-info" style="margin-bottom:12px"><span class="ai">ℹ️</span><div><b>Dual-field (tách 2 tầng):</b> <code>order.status</code> = lifecycle <b>11 giá trị</b> (7 fulfillment: pending→confirmed→ready_to_ship→shipped→completed +cancelled/refunded · 4 payment/legacy: new/paid/payment_failed/processing), merchant bấm tay · <code>shippingTrackingStatus</code> = 13 status chuẩn EasyParcel (cron sync, chỉ hiển thị). Delivery chỉ map vào subset fulfillment. EasyParcel normalize mọi courier (J&T/Pos Laju/Flash...) về 1 enum → KHÔNG xử lý status riêng từng hãng.</div></div>
 
-          <div class="storefront" style="max-width:520px">
-            <div class="track-head">
-              <div style="font-size:16px;font-weight:700;color:#0f172a">Đơn #PRM-1042</div>
-              <span class="badge badge-blue">Shipped</span>
+          <div class="alert alert-warn" style="margin-bottom:18px"><span class="ai">🔒</span><div><b>NFR-10 — Buyer-safe projection:</b> endpoint public (<code>api/orders/track/[orderNumber]</code>, <code>stream/</code>) CHỈ trả courier name + AWB + <code>shippingTrackingStatus</code>. <b>TUYỆT ĐỐI không lộ</b> <code>labelUrl</code>, <code>easyParcelOrderNo</code>, <code>codAmount</code>, <code>codStatus</code>, lỗi ví (<code>WALLET_LOW</code>) — các field <span class="lock">🔒 seller-only</span> chỉ ra dashboard (admin session). Order #PRM-1042 dưới đây là đơn <b>COD</b>: seller thấy codAmount, buyer KHÔNG.</div></div>
+
+          <div class="dual-track">
+            <!-- ===== SELLER FLOW (dark, dashboard) ===== -->
+            <div>
+              <div class="flow-head seller">🧑‍💼 Seller · OrderDetailPanel (admin)</div>
+              <div class="card" style="margin-bottom:0">
+                <div class="card-head" style="margin-bottom:14px">
+                  <div class="card-title" style="font-size:14px">Đơn #PRM-1042 <span class="badge badge-amber">COD</span></div>
+                  <span class="badge badge-blue">Lifecycle: Shipped</span>
+                </div>
+                <div class="drow"><span class="k">Đơn vị</span><span>J&T Express</span></div>
+                <div class="drow"><span class="k">Mã vận đơn (AWB)</span><span class="awb" style="font-size:13px">631234567890 <button class="copy-btn" style="background:var(--surface2);border-color:var(--border2);color:var(--muted)">📋</button></span></div>
+                <div class="drow"><span class="k">Tracking status <span class="note" style="margin:0">(cron)</span></span><span><span class="badge badge-blue">In Transit</span> <span class="note" style="margin:0">16/06 18:40</span></span></div>
+                <div class="drow"><span class="k">EP order no <span class="lock">🔒 seller-only</span></span><span style="font-family:ui-monospace,monospace;font-size:12.5px">EP-OD0K8M2</span></div>
+                <div class="drow"><span class="k">Thu hộ COD <span class="lock">🔒 seller-only</span></span><span>RM 55.42 · <span class="badge badge-amber">codStatus: pending</span></span></div>
+                <div style="display:flex;gap:10px;margin-top:16px">
+                  <button class="btn btn-outline btn-block btn-sm">🖨️ In nhãn (PDF) <span class="lock" style="margin:0">🔒</span></button>
+                  <button class="btn btn-primary btn-block btn-sm">✓ Đánh dấu Completed</button>
+                </div>
+                <div class="note" style="margin-top:12px">Seller thấy <b>full</b> + có quyền hành động (in nhãn, đổi lifecycle). Field <span class="lock">🔒</span> không bao giờ đi ra endpoint buyer. <code>shipped → completed</code> chỉ manual.</div>
+              </div>
             </div>
-            <div class="sf-h">🚚 Vận chuyển</div>
-            <div class="track-row"><span class="k">Đơn vị</span><span>J&T Express</span></div>
-            <div class="track-row"><span class="k">Mã vận đơn</span><span class="awb" style="font-size:13.5px">631234567890 <button class="copy-btn">📋</button></span></div>
-            <button class="copy-btn" style="margin:8px 0;padding:7px 12px">🔗 Theo dõi trên J&T ↗</button>
 
-            <div class="timeline">
-              <div class="tl-step done"><div class="tl-title">Đã lấy hàng <span style="color:#94a3b8;font-weight:400">(Collected)</span></div><div class="tl-time">16/06 · 10:20</div></div>
-              <div class="tl-step now"><div class="tl-title">Đang trung chuyển <span style="color:#94a3b8;font-weight:400">(In Transit)</span></div><div class="tl-time">16/06 · 18:40 · mới nhất</div></div>
-              <div class="tl-step pending"><div class="tl-title">Đang giao <span style="color:#94a3b8;font-weight:400">(Out for Delivery)</span></div></div>
-              <div class="tl-step pending"><div class="tl-title">Đã giao <span style="color:#94a3b8;font-weight:400">(Delivered)</span></div></div>
+            <!-- ===== BUYER FLOW (light, public) ===== -->
+            <div>
+              <div class="flow-head buyer">🛍️ Buyer · trang đơn public (no auth)</div>
+              <div class="storefront" style="padding:20px">
+                <div class="track-head">
+                  <div style="font-size:15px;font-weight:700;color:#0f172a">Đơn #PRM-1042</div>
+                  <span class="badge badge-blue">Shipped</span>
+                </div>
+                <div class="sf-h">🚚 Vận chuyển</div>
+                <div class="track-row"><span class="k">Đơn vị</span><span>J&T Express</span></div>
+                <div class="track-row"><span class="k">Mã vận đơn</span><span class="awb" style="font-size:13px">631234567890 <button class="copy-btn">📋</button></span></div>
+                <button class="copy-btn" style="margin:8px 0;padding:7px 12px">🔗 Theo dõi trên J&T ↗</button>
+                <div class="timeline">
+                  <div class="tl-step done"><div class="tl-title">Đã lấy hàng <span style="color:#94a3b8;font-weight:400">(Collected)</span></div><div class="tl-time">16/06 · 10:20</div></div>
+                  <div class="tl-step now"><div class="tl-title">Đang trung chuyển <span style="color:#94a3b8;font-weight:400">(In Transit)</span></div><div class="tl-time">16/06 · 18:40 · mới nhất</div></div>
+                  <div class="tl-step pending"><div class="tl-title">Đang giao <span style="color:#94a3b8;font-weight:400">(Out for Delivery)</span></div></div>
+                  <div class="tl-step pending"><div class="tl-title">Đã giao <span style="color:#94a3b8;font-weight:400">(Delivered)</span></div></div>
+                </div>
+                <div class="sf-hint" style="margin-top:14px">👁️ Read-only · badge top = 1 trong <b>6 nhãn public</b> (<code>getTrackingStatus()</code>) · timeline = 13 EP collapse về nhãn thân thiện · KHÔNG nút in nhãn / COD / ví / EP order no. Đơn COD nhưng buyer KHÔNG thấy <code>codAmount</code>/<code>codStatus</code> (NFR-10).</div>
+                <div class="sf-hint" style="margin-top:6px">⏱️ Cập nhật mỗi 30–60′ (polling) · Exception/On Hold/Returned → mốc cảnh báo, KHÔNG đổi <code>order.status</code></div>
+              </div>
             </div>
-            <div class="sf-hint" style="margin-top:14px">⏱️ Cập nhật mỗi 30–60 phút (polling, không realtime) · Exception/On Hold/Returned → hiển thị mốc cảnh báo, KHÔNG đổi <code>order.status</code></div>
-            <div class="sf-hint" style="margin-top:6px">📌 Delivered → CHỈ cập nhật tracking; merchant tự bấm <b>Completed</b> (không auto-complete)</div>
+          </div>
+
+          <!-- ===== FIELD VISIBILITY MATRIX (NFR-10) ===== -->
+          <div class="card" style="margin-top:18px">
+            <div class="card-title" style="font-size:14px;margin-bottom:4px">🔐 Field visibility — ranh giới projection (NFR-10)</div>
+            <div class="card-sub">Cùng 1 order, 2 endpoint khác nhau project field khác nhau. Cột Buyer = đúng những gì <code>api/orders/track</code> được phép trả.</div>
+            <table class="vis-table">
+              <thead><tr><th>Field</th><th class="c">Seller (admin)</th><th class="c">Buyer (public)</th></tr></thead>
+              <tbody>
+                <tr><td>courier name</td><td class="c vis-y">✓</td><td class="c vis-y">✓</td></tr>
+                <tr><td>AWB / trackingNumber</td><td class="c vis-y">✓</td><td class="c vis-y">✓</td></tr>
+                <tr><td>shippingTrackingStatus (13 enum)</td><td class="c vis-y">✓</td><td class="c vis-y">✓</td></tr>
+                <tr><td>labelUrl (in nhãn PDF)</td><td class="c vis-y">✓</td><td class="c vis-n">✕</td></tr>
+                <tr><td>easyParcelOrderNo</td><td class="c vis-y">✓</td><td class="c vis-n">✕</td></tr>
+                <tr><td>codAmount / codStatus</td><td class="c vis-y">✓</td><td class="c vis-n">✕</td></tr>
+                <tr><td>lỗi ví (EASYPARCEL_WALLET_LOW)</td><td class="c vis-y">✓</td><td class="c vis-n">✕</td></tr>
+                <tr><td>lifecycle control (đổi status / Completed)</td><td class="c vis-y">✓</td><td class="c vis-n">✕</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ===== BUYER STATUS PROJECTION (public-safe labels) ===== -->
+          <div class="card" style="margin-top:18px">
+            <div class="card-title" style="font-size:14px;margin-bottom:4px">🛍️ Buyer status projection — chỉ show nhãn public</div>
+            <div class="card-sub">Buyer KHÔNG thấy raw 11 lifecycle hay vocab nội bộ EP. 2 lớp: <b>badge top</b> (6 nhãn từ <code>order.status</code>) + <b>timeline</b> (13 EP collapse về nhãn thân thiện).</div>
+
+            <div class="dual-track">
+              <div>
+                <div class="flow-head buyer" style="background:rgba(45,212,191,.1)">Badge top · 6 nhãn (order.status → public)</div>
+                <table class="vis-table">
+                  <tbody>
+                    <tr><td class="k">pending/confirmed/new/ready_to_ship/paid/processing</td><td>Đang xử lý</td></tr>
+                    <tr><td class="k">shipped</td><td>Đang giao</td></tr>
+                    <tr><td class="k">completed</td><td>Đã giao</td></tr>
+                    <tr><td class="k">cancelled</td><td>Đã huỷ</td></tr>
+                    <tr><td class="k">refunded</td><td>Đã hoàn tiền</td></tr>
+                    <tr><td class="k">payment_failed</td><td>Thanh toán lỗi</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <div class="flow-head buyer" style="background:rgba(45,212,191,.1)">Timeline · 13 EP → nhãn buyer (ẩn vocab nội bộ)</div>
+                <table class="vis-table">
+                  <tbody>
+                    <tr><td class="k">Scheduled · Pending For Collection</td><td>Chờ lấy hàng</td></tr>
+                    <tr><td class="k">Collected · Drop Off</td><td>Đã lấy hàng</td></tr>
+                    <tr><td class="k">In Transit</td><td>Đang trung chuyển</td></tr>
+                    <tr><td class="k">Out for Delivery</td><td>Đang giao</td></tr>
+                    <tr><td class="k">On Hold · <s>Exception</s></td><td>Tạm hoãn <span class="lock" style="color:var(--teal);border-color:rgba(45,212,191,.4)">soft</span></td></tr>
+                    <tr><td class="k">Delivered</td><td>Đã giao ✓</td></tr>
+                    <tr><td class="k">Returned</td><td>Hoàn trả</td></tr>
+                    <tr><td class="k"><s>Cancelled · Admin Cancel · Expired</s></td><td>Đã huỷ <span class="note" style="margin:0">(gộp 3→1)</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="note" style="margin-top:12px">🔒 <code>Exception</code> / <code>Admin Cancel</code> / <code>Expired</code> KHÔNG render thô cho buyer — gạch = vocab nội bộ bị giấu. Mọi nhãn buyer là string thân thiện, không lộ chi tiết kỹ thuật courier.</div>
           </div>
         </section>
 
