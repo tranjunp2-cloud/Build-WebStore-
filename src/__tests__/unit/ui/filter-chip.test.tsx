@@ -63,10 +63,11 @@ describe('[TC-DS1222-04-03] FilterChip selection', () => {
 
 // ── TC-DS1222-04-04 — Active highlight when value differs from default ──────
 describe('[TC-DS1222-04-04] FilterChip active highlight', () => {
-    it('uses the active (blue) style when value is not the first/default option', () => {
+    it('uses the active (primary teal) style when value is not the first/default option', () => {
+        // GH-1192: active chip nay dùng token --primary (teal), không còn hardcode blue.
         setup('active')
         const style = screen.getByRole('button').getAttribute('style') ?? ''
-        expect(style).toContain('rgba(59, 130, 246, 0.12)')
+        expect(style).toContain('hsl(var(--primary) / 0.12)')
     })
 
     it('uses the neutral border token when value is the default option', () => {

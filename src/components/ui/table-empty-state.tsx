@@ -37,7 +37,7 @@ export function TableEmptyState({ icon, title, subtitle, action, compact = false
             {icon && (
                 <div
                     className="w-12 h-12 rounded-full mb-4 flex items-center justify-center [&>svg]:w-6 [&>svg]:h-6 [&>svg]:opacity-40"
-                    style={{ background: 'rgba(148,163,184,0.08)', color: 'var(--dash-text-muted)' }}
+                    style={{ background: 'hsl(var(--muted-foreground) / 0.1)', color: 'var(--dash-text-muted)' }}
                 >
                     {icon}
                 </div>

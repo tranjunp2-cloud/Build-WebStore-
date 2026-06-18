@@ -23,8 +23,11 @@ const buttonVariants = cva(
                 // GH-1222 F33 page-header action pair (reference: Discounts screen).
                 // Theme-token colors via arbitrary values: preflight is OFF, so the border
                 // needs the full `[border:1px_solid_…]` shorthand to render. Pair with size="dash".
+                // GH-1192: `!text-white` is intentional — the `.dash-shell .text-white` legacy remap
+                // (globals.css) rewrites plain text-white to --dash-text (dark in light mode). The `!`
+                // keeps white on the blue→teal gradient. Drop the `!` once that remap is removed (Nhánh 2).
                 dashPrimary:
-                    'bg-[linear-gradient(135deg,#0d9488_0%,#0891b2_100%)] text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
+                    'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
                 dashSecondary:
                     '[border:1px_solid_var(--dash-border)] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
             },
@@ -34,7 +37,7 @@ const buttonVariants = cva(
                 lg: 'h-12 rounded-xl px-8 text-base',
                 icon: 'h-9 w-9',
                 // F33 action-button metrics (pairs with dashPrimary / dashSecondary).
-                dash: 'h-[36px] px-4 rounded-[10px] text-[13px]',
+                dash: 'h-[36px] px-4 rounded-[8px] text-[13px]',
             },
         },
         defaultVariants: {
