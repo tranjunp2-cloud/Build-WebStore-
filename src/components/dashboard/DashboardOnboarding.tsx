@@ -1,160 +1,148 @@
 'use client'
 
 import Link from 'next/link'
-import { Wand2, LayoutTemplate, CheckCircle2, Circle, Globe, Rocket, AlertTriangle } from 'lucide-react'
+import { Clock, Circle, CheckCircle2 } from 'lucide-react'
+import { SetupAlertBanner } from './SetupAlertBanner'
+import { useI18n } from '@/i18n'
 
 interface OnboardingStep {
     id: string
     label: string
-    icon: React.ReactNode
+    description: string
     done: boolean
     href: string
 }
 
+type StepState = 'completed' | 'active' | 'locked'
+
 interface DashboardOnboardingProps {
-    hasWebsite: boolean
     hasPublishedSite: boolean
-    hasIncompleteSite?: boolean
-    aiStatusFailed?: boolean
-    siteId?: string | number | null
+    siteId?: string | null
+    hasProducts?: boolean
+    isDesignCustomized?: boolean
+    hasPaymentConfigured?: boolean
+}
+
+function getStepState(index: number, steps: OnboardingStep[]): StepState {
+    if (steps[index].done) return 'completed'
+    const firstIncompleteIdx = steps.findIndex(s => !s.done)
+    return index === firstIncompleteIdx ? 'active' : 'locked'
 }
 
 export function DashboardOnboarding({
-    hasWebsite,
     hasPublishedSite,
-    hasIncompleteSite = false,
-    aiStatusFailed = false,
     siteId,
+    hasProducts = false,
+    isDesignCustomized = false,
+    hasPaymentConfigured = false,
 }: DashboardOnboardingProps) {
+    const { t } = useI18n()
+    const o = t.dashboard.onboarding
     const steps: OnboardingStep[] = [
         {
-            id: 'website',
-            label: 'Create your website',
-            icon: <Globe className="h-4 w-4" />,
-            done: hasWebsite && !hasIncompleteSite,
-            href: '/builder/new',
+            id: 'products',
+            label: o.steps.products.label,
+            description: o.steps.products.description,
+            done: hasProducts,
+            href: '/products/new',
+        },
+        {
+            id: 'design',
+            label: o.steps.design.label,
+            description: o.steps.design.description,
+            done: isDesignCustomized,
+            href: siteId ? `/editor/${siteId}` : '/builder/new',
+        },
+        {
+            id: 'payment',
+            label: o.steps.payment.label,
+            description: o.steps.payment.description,
+            done: hasPaymentConfigured,
+            href: '/settings/payments',
         },
         {
             id: 'publish',
-            label: 'Publish your site',
-            icon: <Rocket className="h-4 w-4" />,
+            label: o.steps.publish.label,
+            description: o.steps.publish.description,
             done: hasPublishedSite,
-            href: hasWebsite ? (siteId ? `/editor/${siteId}` : '#') : '/builder/new',
+            href: siteId ? `/editor/${siteId}` : '/builder/new',
         },
     ]
 
     const completedCount = steps.filter(s => s.done).length
     const progressPct = Math.round((completedCount / steps.length) * 100)
-    const allDone = completedCount === steps.length
 
-    if (allDone) return null
+    if (completedCount === steps.length) return null
 
     return (
-        <div className="space-y-6">
-            {/* AI Incomplete Banner */}
-            {(hasIncompleteSite || aiStatusFailed) && (
-                <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
-                        <AlertTriangle className="h-4 w-4 text-amber-400" />
+        <div className="space-y-[30px]">
+            {/* Get Your Store Ready — 4-step checklist */}
+            <div className="flex flex-col gap-[40px] rounded-2xl border border-white/10 bg-gradient-to-br from-dash-surface-hover to-dash-surface p-[25px] shadow-sm">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-dash-text">{o.title}</h3>
+                        <p className="text-sm text-dash-text-muted">{o.subtitle}</p>
                     </div>
-                    <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-amber-300">AI generation incomplete</h4>
-                        <p className="mt-0.5 text-xs text-amber-400/80">Your website wasn&apos;t fully created. You can retry or choose a template.</p>
-                        <div className="mt-3 flex gap-2">
-                            <Link
-                                href="/builder/new"
-                                className="inline-flex h-8 items-center rounded-lg border border-amber-500/30 px-3 text-xs font-medium text-amber-300 transition-colors hover:bg-amber-500/10"
-                            >
-                                Retry AI
-                            </Link>
-                            <Link
-                                href="/templates"
-                                className="inline-flex h-8 items-center rounded-lg bg-gradient-to-r from-blue-500 to-teal-400 px-3 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                            >
-                                Choose Template
-                            </Link>
-                        </div>
+                    <div className="text-right">
+                        <p className="text-2xl font-bold text-blue-500">{progressPct}%</p>
+                        <p className="text-xs text-dash-text-muted">{o.completeLabel}</p>
                     </div>
                 </div>
-            )}
 
-            {/* Quick Actions — Build or Template */}
-            {(!hasWebsite || hasIncompleteSite) && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Link
-                        href="/builder/new"
-                        className="group relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-600/20 to-purple-600/10 p-6 transition-all hover:border-blue-400/50 hover:shadow-lg hover:shadow-blue-500/10"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25">
-                                <Wand2 className="h-6 w-6 text-white" />
+                <div className="space-y-3">
+                    {steps.map((step, index) => {
+                        const state = getStepState(index, steps)
+                        if (state === 'completed') {
+                            return (
+                                <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-[rgba(0,201,80,0.2)] bg-[rgba(0,201,80,0.1)] px-3 py-3.5">
+                                    <CheckCircle2 className="h-5 w-5 shrink-0 text-[#05df72]" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-[#05df72]">{step.label}</p>
+                                        <p className="text-xs text-dash-text-muted">{step.description}</p>
+                                    </div>
+                                </div>
+                            )
+                        }
+                        if (state === 'active') {
+                            return (
+                                <div key={step.id} className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] p-[13px] shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <Clock className="h-5 w-5 shrink-0 text-blue-400" />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-blue-500">{step.label}</p>
+                                            <p className="text-xs text-dash-text-muted">{step.description}</p>
+                                        </div>
+                                    </div>
+                                    <Link
+                                        href={step.href}
+                                        className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                    >
+                                        {o.continueBtn}
+                                    </Link>
+                                </div>
+                            )
+                        }
+                        return (
+                            <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-dash-border bg-dash-secondary-bg px-3 py-3.5">
+                                <Circle className="h-5 w-5 shrink-0 text-dash-text-muted" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-dash-text-muted">{step.label}</p>
+                                    <p className="text-xs text-dash-text-muted">{step.description}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="font-semibold text-white">Build with AI</h3>
-                                <p className="mt-0.5 text-sm text-gray-400">Describe your business, AI creates your site</p>
-                            </div>
-                        </div>
-                    </Link>
-
-                    <Link
-                        href="/templates"
-                        className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:bg-white/[0.06]"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                                <LayoutTemplate className="h-6 w-6 text-gray-300" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-white">Choose Template</h3>
-                                <p className="mt-0.5 text-sm text-gray-400">Ready-made designs, easy to customize</p>
-                            </div>
-                        </div>
-                    </Link>
+                        )
+                    })}
                 </div>
-            )}
 
-            {/* Setup Checklist */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-white">Setup Guide</h3>
-                    <span className="text-xs text-gray-400">{completedCount}/{steps.length} completed</span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mb-5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-dash-secondary-bg">
                     <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-teal-400 transition-all duration-500"
                         style={{ width: `${progressPct}%` }}
                     />
                 </div>
-
-                {/* Steps */}
-                <div className="space-y-1">
-                    {steps.map((step) => (
-                        <Link
-                            key={step.id}
-                            href={step.done ? '#' : step.href}
-                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
-                                step.done
-                                    ? 'opacity-50 cursor-default'
-                                    : 'hover:bg-white/5 cursor-pointer'
-                            }`}
-                        >
-                            {step.done ? (
-                                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-                            ) : (
-                                <Circle className="h-5 w-5 shrink-0 text-gray-500" />
-                            )}
-                            <span className="flex items-center gap-2 text-sm">
-                                <span className="text-gray-400">{step.icon}</span>
-                                <span className={step.done ? 'text-gray-500 line-through' : 'text-gray-200'}>
-                                    {step.label}
-                                </span>
-                            </span>
-                        </Link>
-                    ))}
-                </div>
             </div>
+
+            <SetupAlertBanner hasPaymentConfigured={hasPaymentConfigured} />
         </div>
     )
 }

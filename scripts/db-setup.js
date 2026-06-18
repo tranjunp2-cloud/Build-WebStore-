@@ -4768,6 +4768,10 @@ const MIGRATIONS = [
     name: 'users.updated_by_id',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by_id integer;`,
   },
+  {
+    name: 'sites.theme_customized.add_column',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_customized boolean DEFAULT false;`,
+  },
 ];
 
 async function runMigrations(pool) {

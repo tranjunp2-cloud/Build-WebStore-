@@ -19,7 +19,6 @@ import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
-import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -99,17 +98,6 @@ export async function OverviewView({ searchParams }: Props) {
         )
     }
 
-    // Check if site is published — for onboarding checklist
-    const hasPublishedSite = tenantId ? (await payload.count({
-        collection: 'sites',
-        where: {
-            and: [
-                { tenant: { equals: tenantId } },
-                { status: { equals: 'published' } },
-            ],
-        },
-    })).totalDocs > 0 : false
-
     const now = new Date()
     let startDate = subDays(startOfDay(now), 7)
     let daysDiff = 7
@@ -149,7 +137,6 @@ export async function OverviewView({ searchParams }: Props) {
     let siteId: string | number | null = null
     const missingSeoItems: MissingSeoItem[] = []
     const seoIssueCounts = { missingTitle: 0, missingPageTitle: 0, missingBlogTitle: 0, missingDesc: 0, missingAlt: 0 }
-
 
     if (tenantId) {
         const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
@@ -281,7 +268,7 @@ export async function OverviewView({ searchParams }: Props) {
                 payload.find({ collection: 'products', where: { tenant: { equals: tenantId }, status: { equals: 'active' } }, limit: 1000, depth: 0 }),
                 payload.find({ collection: 'blogs', where: { tenant: { equals: tenantId }, status: { equals: 'published' } }, limit: 1000, depth: 0 })
             ])
-            
+
             let missingTitleCount = 0
             let missingDescCount = 0
             let missingAltCount = 0
@@ -395,15 +382,6 @@ export async function OverviewView({ searchParams }: Props) {
 
     return (
         <div className="space-y-6 mt-6">
-            {/* Setup Checklist — shown until site is published */}
-            {!hasPublishedSite && (
-                <DashboardOnboarding
-                    hasWebsite={true}
-                    hasPublishedSite={false}
-                    siteId={siteId as string}
-                />
-            )}
-
             {/* Stats Cards */}
                     {/* Main Content Grid: Combined Stats and SEO Health */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">

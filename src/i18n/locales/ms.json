@@ -833,6 +833,36 @@
             "notLive": "belum aktif.",
             "publishNow": "Terbitkan sekarang →"
         },
+        "onboarding": {
+            "title": "Sediakan Kedai Anda",
+            "subtitle": "Lengkapkan langkah-langkah ini untuk melancarkan kedai anda",
+            "completeLabel": "Selesai",
+            "continueBtn": "Teruskan",
+            "steps": {
+                "products": {
+                    "label": "Tambah Produk Pertama Anda",
+                    "description": "Buat katalog produk anda"
+                },
+                "design": {
+                    "label": "Sesuaikan Reka Bentuk Kedai",
+                    "description": "Pilih warna, fon, dan susun atur"
+                },
+                "payment": {
+                    "label": "Sediakan Pembayaran & Penghantaran",
+                    "description": "Konfigurasikan kaedah pembayaran dan pilihan penghantaran"
+                },
+                "publish": {
+                    "label": "Terbitkan Laman Web Anda",
+                    "description": "Jadikan kedai anda aktif"
+                }
+            },
+            "banner": {
+                "title": "Kedai Anda Hampir Siap!",
+                "description": "Lengkapkan persediaan pembayaran untuk menerbitkan laman web anda dan mula menjual dalam talian.",
+                "completeBtn": "Lengkapkan Persediaan",
+                "dismissBtn": "Saya akan buat nanti"
+            }
+        },
         "resetAccount": {
             "dangerZone": "Zon Bahaya",
             "stagingOnly": "Hanya untuk staging — tidak kelihatan dalam produksi",

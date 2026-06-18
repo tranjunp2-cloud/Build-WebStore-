@@ -129,6 +129,7 @@ export async function PATCH(
 
         type SiteUpdateData = Partial<{
             theme: unknown;
+            themeCustomized: boolean;
             name: unknown;
             locale: "en" | "ms";
             shippingConfig: unknown;
@@ -143,6 +144,7 @@ export async function PATCH(
         }>;
         const siteUpdateData: SiteUpdateData = {}
         if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
+        if (theme) siteUpdateData.themeCustomized = true
         if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
         // F26-01: Clear pendingLocaleConfirm when user confirms/dismisses the dialog
