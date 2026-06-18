@@ -12,36 +12,107 @@ export function TenantAccessWatcher() {
     const router = useRouter();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Grace-period and retry counters — useRef to avoid triggering useEffect re-runs
+    const consecutiveFailRef = useRef(0);   // consecutive 'Removed from workspace' hits
+    const lastFailTimestampRef = useRef(0); // timestamp of previous force_logout
+    const retryCountRef = useRef(0);        // consecutive retry:true responses (cap: 3)
+    const mountedRef = useRef(false);           // gate: prevents checks before startup delay
+    const inGracePeriodRef = useRef(false);     // true during 12s grace period — blocks all checks
+    const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null); // tracked to clear on unmount
+    const retryTimerRef = useRef<NodeJS.Timeout | null>(null);       // tracked to clear on unmount
+
     useEffect(() => {
         let debounceId: NodeJS.Timeout | null = null;
-
-        const checkSession = async () => {
-            if (isEvicted) return;
-            try {
-                const res = await fetch('/api/auth/session-check', { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.action === 'force_logout') {
-                        setEvictReason(data.reason ?? '');
-                        setIsEvicted(true);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to check session', error);
-            }
-        };
 
         const startPolling = () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
             intervalRef.current = setInterval(checkSession, 60_000);
         };
 
-        // Poll every 60s; also check immediately on mount so page refresh doesn't bypass eviction
-        checkSession();
+        const checkSession = async () => {
+            if (isEvicted) return;
+            try {
+                const res = await fetch('/api/auth/session-check', { cache: 'no-store' });
+                if (!res.ok) return; // non-2xx (5xx) — skip silently, keep polling
+
+                const data = await res.json();
+
+                if (data.ok === true) {
+                    // Valid session — reset all failure counters including timestamp
+                    consecutiveFailRef.current = 0;
+                    lastFailTimestampRef.current = 0;
+                    retryCountRef.current = 0;
+                    return;
+                }
+
+                if (data.ok === false && data.retry === true) {
+                    // Backend signals transient issue (HMR, token refresh, race condition)
+                    retryCountRef.current += 1;
+                    if (retryCountRef.current < 3) {
+                        console.warn('[TenantAccessWatcher] session-check retry requested', { attempt: retryCountRef.current });
+                        if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+                        retryTimerRef.current = setTimeout(checkSession, 8_000);
+                        return;
+                    }
+                    // Cap reached (3 consecutive retries) — genuine auth failure
+                    console.warn('[TenantAccessWatcher] retry cap reached, treating as auth failure');
+                    setEvictReason('Unauthenticated');
+                    setIsEvicted(true);
+                    return;
+                }
+
+                if (data.action === 'force_logout') {
+                    retryCountRef.current = 0; // clear retry streak on any confirmed force_logout
+                    console.warn('[TenantAccessWatcher] force_logout received', { reason: data.reason });
+
+                    // subscription_expired + Account suspended are DB-verified — show dialog immediately
+                    if (data.reason === 'subscription_expired' || data.reason === 'Account suspended') {
+                        setEvictReason(data.reason);
+                        setIsEvicted(true);
+                        return;
+                    }
+
+                    // 'Removed from workspace' requires 2 confirmed hits ≥10s apart (guards against
+                    // stale tenant cache on the first check after login/SSO token refresh)
+                    const now = Date.now();
+                    const elapsed = now - lastFailTimestampRef.current;
+
+                    if (consecutiveFailRef.current >= 1 && elapsed >= 10_000) {
+                        // Second confirmed hit at least 10s after the first → genuine removal
+                        setEvictReason(data.reason ?? '');
+                        setIsEvicted(true);
+                    } else {
+                        // First hit or burst — enter 12s grace period
+                        consecutiveFailRef.current += 1;
+                        lastFailTimestampRef.current = now;
+                        inGracePeriodRef.current = true;
+                        if (intervalRef.current) clearInterval(intervalRef.current); // pause 60s poll
+                        if (gracePeriodTimerRef.current) clearTimeout(gracePeriodTimerRef.current);
+                        gracePeriodTimerRef.current = setTimeout(() => {
+                            if (!mountedRef.current) return; // component unmounted during grace period
+                            inGracePeriodRef.current = false;
+                            startPolling(); // resume 60s poll
+                            checkSession();
+                        }, 12_000);
+                    }
+                }
+            } catch (error) {
+                console.error('[TenantAccessWatcher] Failed to check session', error);
+            }
+        };
+
+        // Delay initial check 5s — avoids false-positive during HMR reload or React strict-mode
+        // double-mount where getCurrentUser() can transiently return null
+        const startupTimer = setTimeout(() => {
+            mountedRef.current = true;
+            checkSession();
+        }, 5_000);
         startPolling();
 
         // Debounced focus handler — prevents burst requests on rapid tab switching
         const handleFocus = () => {
+            if (!mountedRef.current) return;      // skip during startup delay
+            if (inGracePeriodRef.current) return; // skip during grace period
             if (document.visibilityState !== 'visible') return;
             if (debounceId) clearTimeout(debounceId);
             debounceId = setTimeout(checkSession, 2_000);
@@ -49,6 +120,8 @@ export function TenantAccessWatcher() {
 
         // Pause polling when tab hidden, resume when visible
         const handleVisibility = () => {
+            if (!mountedRef.current) return;      // skip during startup delay
+            if (inGracePeriodRef.current) return; // skip during grace period — scheduled retry handles it
             if (document.visibilityState === 'hidden') {
                 if (intervalRef.current) clearInterval(intervalRef.current);
             } else {
@@ -61,7 +134,11 @@ export function TenantAccessWatcher() {
         document.addEventListener('visibilitychange', handleVisibility);
 
         return () => {
+            mountedRef.current = false; // signal unmount to any in-flight async callbacks
+            clearTimeout(startupTimer);
             if (intervalRef.current) clearInterval(intervalRef.current);
+            if (gracePeriodTimerRef.current) clearTimeout(gracePeriodTimerRef.current);
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
             if (debounceId) clearTimeout(debounceId);
             window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleVisibility);
@@ -89,7 +166,7 @@ export function TenantAccessWatcher() {
                 <div className="h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                     <LogOut className="h-6 w-6 text-red-500" />
                 </div>
-                
+
                 <h2 className="text-xl font-bold text-white mb-2 font-['Inter']">
                     {evictReason === 'subscription_expired'
                         ? 'Subscription Expired'
