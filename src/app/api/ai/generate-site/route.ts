@@ -28,7 +28,7 @@ import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
-import { buildImagePool } from '@/lib/ai/image-pool'
+import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
@@ -418,6 +418,41 @@ export async function POST(req: NextRequest) {
                 }).then((r): string[] => r ?? []).catch((): string[] => [])
                 : Promise.resolve([] as string[])
 
+            // O1: pre-compute sync values and chain imagePool build off translation
+            // so the 2 Unsplash search calls run during AI generation (GH-1190).
+            // translateKeywordsPromise resolves in ~3-5s → buildImagePool starts at ~t=3s
+            // → finishes at ~t=5s — well before AI (~10-30s) completes.
+            // await below costs ~0ms in the common case.
+            const _parsedProductsForPool = !ENABLE_DALLE_HERO
+                ? parseProductsString(businessInfo.products) : []
+            const _presetCategoryForPool = !ENABLE_DALLE_HERO
+                ? resolveComposerCategory(businessInfo.industry) : ''
+            const _themeSeedForPool = !ENABLE_DALLE_HERO ? computeGenSeed(businessInfo) : 0
+            const _themeMoodForPool = !ENABLE_DALLE_HERO
+                ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
+
+            type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
+            const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
+                ? translateKeywordsPromise.then(async (aiKeywords): Promise<_PoolResult> => {
+                    const topProd = _parsedProductsForPool[0]
+                    let kws = aiKeywords.length > 0 ? [...aiKeywords] : []
+                    if (kws.length === 0) {
+                        const dictKw = translateProductTerm(topProd || '')
+                        if (dictKw) kws = [dictKw]
+                    }
+                    const pool = await buildImagePool({
+                        category: _presetCategoryForPool,
+                        mood: _themeMoodForPool,
+                        topProduct: kws[0] || translateProductTerm(topProd || ''),
+                        products: kws.length > 0
+                            ? kws
+                            : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
+                        seed: _themeSeedForPool,
+                    })
+                    return { pool, englishKeywords: kws }
+                }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
+                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
+
             // Start sample product generation in parallel with site AI generation (non-blocking)
             // Note: siteId intentionally omitted — products run before site row is created so site.id
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
@@ -508,49 +543,15 @@ export async function POST(req: NextRequest) {
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
-                    // Plan 260414-2249 phase-01: pass parsed user products into
-                    // media pipeline so deriveKeywords can drive Unsplash queries
-                    // from what the user actually sells (translated vi/ms → en).
-                    const parsedProducts = parseProductsString(businessInfo.products)
-                    // Plan 260414-2249 phase-02: resolve theme mood and pass it
-                    // so deriveKeywords appends mood imagery adjectives (e.g.
-                    // 'candlelit' for elegant, 'minimalist' for serene). Keeps
-                    // Unsplash queries per-mood coherent across all blocks on a site.
-                    const presetCategory = resolveComposerCategory(businessInfo.industry)
-                    const themeSeed = computeGenSeed(businessInfo)
-                    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
 
-                    // Plan 260414-2249 phase-03: build ONE per-site image pool
-                    // before fulfillment so all blocks share the same photographer,
-                    // lighting, mood. 1-2 Unsplash calls total (landscape + square)
-                    // — replaces 6-8 per-block calls and delivers visual cohesion.
-                    //
-                    // Plan 07 — pass top-3 products so two restaurants whose
-                    // first product collides still produce different queries.
-                    const topProduct = parsedProducts[0]
-
-                    // F1: use pre-started promise (GH-1190)
-                    let englishKeywords: string[] = []
-                    const aiTranslation = await translateKeywordsPromise
-                    if (aiTranslation && aiTranslation.length > 0) {
-                        englishKeywords = aiTranslation
+                    // O1: await pre-built pool (GH-1190) — typically 0ms wait since
+                    // buildImagePool completed during AI generation above.
+                    const { pool: imagePool, englishKeywords } = await imagePoolPromise
+                    if (imagePool) {
+                        console.info(
+                            `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
+                        )
                     }
-
-                    if (englishKeywords.length === 0) {
-                        const dictKeyword = translateProductTerm(topProduct || '') 
-                        if (dictKeyword) englishKeywords.push(dictKeyword)
-                    }
-
-                    const imagePool = await buildImagePool({
-                        category: presetCategory,
-                        mood: themeMood,
-                        topProduct: englishKeywords[0] || translateProductTerm(topProduct || ''),
-                        products: englishKeywords.length > 0 ? englishKeywords : parsedProducts.slice(0, 3).map(p => translateProductTerm(p)),
-                        seed: themeSeed,
-                    })
-                    console.info(
-                        `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
-                    )
 
                     await trackPhase('media', () =>
                         fulfillImageNeeds(
@@ -560,9 +561,9 @@ export async function POST(req: NextRequest) {
                                 tenantId: String(resolvedTenantId),
                                 category: businessInfo.industry,
                                 language: resolvedLang,
-                                products: parsedProducts.length > 0 ? parsedProducts : undefined,
-                                mood: themeMood,
-                                pool: imagePool,
+                                products: _parsedProductsForPool.length > 0 ? _parsedProductsForPool : undefined,
+                                mood: _themeMoodForPool,
+                                pool: imagePool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
