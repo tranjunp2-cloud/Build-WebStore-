@@ -29,34 +29,37 @@ Example: ["pet shop", "cute animals"]`
         const openai = new OpenAI({ apiKey: key })
         
         const controller = new AbortController()
-        // Aggressive 3-second timeout so we don't stall the generation pipeline
-        const timeoutId = setTimeout(() => controller.abort(), 3000)
+        // 8-second timeout — generous enough for gpt-4o-mini under load while
+        // still bounding the total gen time well within maxDuration (300s).
+        const timeoutId = setTimeout(() => controller.abort(), 8000)
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-            max_tokens: 30,
-            temperature: 0.1,
-        }, { signal: controller.signal })
-        
-        clearTimeout(timeoutId)
-
-        const content = response.choices[0]?.message?.content?.trim()
-        if (!content) return null
-
-        let parsed: string[]
         try {
-            parsed = JSON.parse(content) as string[]
-        } catch {
-            // Strip markdown code blocks just in case
-            const clean = content.replace(/```json/g, '').replace(/```/g, '').trim()
-            parsed = JSON.parse(clean) as string[]
+            const response = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 30,
+                temperature: 0.1,
+            }, { signal: controller.signal })
+
+            const content = response.choices[0]?.message?.content?.trim()
+            if (!content) return null
+
+            let parsed: string[]
+            try {
+                parsed = JSON.parse(content) as string[]
+            } catch {
+                // Strip markdown code blocks just in case
+                const clean = content.replace(/```json/g, '').replace(/```/g, '').trim()
+                parsed = JSON.parse(clean) as string[]
+            }
+
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed.map(k => k.toLowerCase())
+            }
+            return null
+        } finally {
+            clearTimeout(timeoutId)
         }
-        
-        if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map(k => k.toLowerCase())
-        }
-        return null
 
     } catch (e) {
         // We do not throw. We return null to trigger Tier 2 dictionary fallback.

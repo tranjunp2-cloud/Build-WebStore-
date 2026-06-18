@@ -933,34 +933,42 @@ function buildNewsletter(biz: BusinessSample): Record<string, unknown> {
 
 // ── Industry block builders ─────────────────────────────────────────────────
 
-// GH-1024: menu-display hidden — use menu-food (schema: price: string, tag?: string, no dietaryTags).
+// GH-1024: menu-display hidden — use menu-food (schema: price: string, currency: string, tag?: string, no dietaryTags).
+// GH-1219: prefer library block categories (already in canonical format) over hardcoded fallback.
 function buildMenuFood(content: CategoryContent): Record<string, unknown> {
-  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food')
+  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food') as Record<string, unknown> | undefined
+  const headline = (industryBlock?.headline as string) ?? (industryBlock?.title as string) ?? 'Our Menu'
+  const libCategories = Array.isArray(industryBlock?.categories) && (industryBlock.categories as unknown[]).length > 0
+    ? industryBlock.categories as unknown[]
+    : null
+
   return {
     blockType: 'menu-food',
     variant: 'classic',
-    headline: (industryBlock?.title as string) ?? 'Our Menu',
-    categories: [
+    headline,
+    categories: libCategories ?? [
       {
-        name: 'Nasi & Rice',
+        name: 'Mains',
         items: [
-          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: 'RM 12', tag: 'halal' },
-          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: 'RM 10', tag: 'spicy' },
-          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: 'RM 11', tag: 'halal' },
+          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: '12.00', currency: 'RM', tag: 'halal' },
+          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: '10.00', currency: 'RM', tag: 'spicy' },
+          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: '11.00', currency: 'RM', tag: 'halal' },
         ],
       },
       {
         name: 'Roti & Bread',
         items: [
-          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: 'RM 3', tag: 'vegetarian' },
-          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: 'RM 4', tag: 'halal' },
+          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: '3.00', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: '4.00', currency: 'RM', tag: 'halal' },
+          { name: 'Roti Bakar', description: 'Toasted bread with kaya and butter', price: '3.50', currency: 'RM' },
         ],
       },
       {
         name: 'Beverages',
         items: [
-          { name: 'Teh Tarik', description: 'Pulled milk tea', price: 'RM 3.50', tag: 'vegetarian' },
-          { name: 'Kopi O', description: 'Traditional black coffee', price: 'RM 3', tag: 'vegetarian' },
+          { name: 'Teh Tarik', description: 'Pulled milk tea', price: '3.50', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Kopi O', description: 'Traditional black coffee', price: '3.00', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
         ],
       },
     ],

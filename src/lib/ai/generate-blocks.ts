@@ -643,24 +643,25 @@ function buildMiddleBlock(
                     {
                         name: 'Starters',
                         items: [
-                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: 'RM 12', tag: 'vegetarian' },
-                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: 'RM 18', tag: 'spicy' },
-                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: 'RM 22', tag: 'halal' },
+                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: '12', currency: 'RM', tag: 'vegetarian' },
+                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: '18', currency: 'RM', tag: 'spicy' },
+                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: '22', currency: 'RM', tag: 'halal' },
                         ],
                     },
                     {
                         name: 'Mains',
                         items: [
-                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: 'RM 28', tag: 'halal' },
-                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: 'RM 24' },
-                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: 'RM 22', tag: 'vegan' },
+                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: '28', currency: 'RM', tag: 'halal' },
+                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: '24', currency: 'RM' },
+                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: '22', currency: 'RM', tag: 'vegan' },
                         ],
                     },
                     {
                         name: 'Desserts',
                         items: [
-                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: 'RM 14', tag: 'vegetarian' },
-                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: 'RM 12', tag: 'vegetarian' },
+                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: '14', currency: 'RM', tag: 'vegetarian' },
+                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: '12', currency: 'RM', tag: 'vegetarian' },
+                            { name: 'Bubur Sumsum', description: 'Silky rice flour pudding with palm sugar sauce', price: '10', currency: 'RM', tag: 'vegetarian' },
                         ],
                     },
                 ],

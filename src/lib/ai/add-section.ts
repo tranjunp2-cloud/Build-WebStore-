@@ -542,16 +542,17 @@ export function createAddSectionBlock({
                     {
                         name: 'Main Course',
                         items: [
-                            { name: 'Nasi Lemak Special', description: 'Fragrant rice with sambal, egg, and chicken', price: 'RM 12.90', tag: 'Popular' },
-                            { name: 'Mee Goreng', description: 'Stir-fried noodles with prawns and vegetables', price: 'RM 10.90' },
-                            { name: 'Roti Canai', description: 'Flaky flatbread with curry dipping sauce', price: 'RM 5.90' },
+                            { name: 'Nasi Lemak Special', description: 'Fragrant rice with sambal, egg, and chicken', price: '12.90', currency: 'RM', tag: 'Popular' },
+                            { name: 'Mee Goreng', description: 'Stir-fried noodles with prawns and vegetables', price: '10.90', currency: 'RM' },
+                            { name: 'Roti Canai', description: 'Flaky flatbread with curry dipping sauce', price: '5.90', currency: 'RM' },
                         ],
                     },
                     {
                         name: 'Beverages',
                         items: [
-                            { name: 'Teh Tarik', description: 'Pulled milk tea', price: 'RM 3.50', tag: 'Best Seller' },
-                            { name: 'Kopi O', description: 'Traditional black coffee', price: 'RM 2.90' },
+                            { name: 'Teh Tarik', description: 'Pulled milk tea', price: '3.50', currency: 'RM', tag: 'Best Seller' },
+                            { name: 'Kopi O', description: 'Traditional black coffee', price: '2.90', currency: 'RM' },
+                            { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
                         ],
                     },
                 ],

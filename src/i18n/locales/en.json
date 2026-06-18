@@ -3992,7 +3992,9 @@
             "selectVariant": "Select a variant",
             "allProducts": "All Products",
             "priceRange": "Price Range",
-            "applyFilter": "Apply Filter"
+            "applyFilter": "Apply Filter",
+            "stockLimitMessage": "You have added the maximum available stock ({cartQty}/{inventory}) to your cart",
+            "stockLimitToast": "Cart quantity has reached the maximum available stock"
         },
         "blog": {
             "title": "Blog",

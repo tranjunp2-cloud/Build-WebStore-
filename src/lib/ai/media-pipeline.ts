@@ -25,12 +25,15 @@ import {
     type ImgixParams,
 } from './unsplash-client'
 
+import { resolveComposerCategory } from './composer-category-resolver'
 import type { ThemeMood } from './theme-moods'
 import type { ImagePool } from './image-pool'
 
 export interface MediaPipelineContext {
     businessName: string
     tenantId: string
+    // Raw industry string from user input (e.g. "nhà hàng hải sản", "SaaS CRM").
+    // Resolved internally via resolveComposerCategory — do NOT pass a pre-resolved ComposerCategory key.
     category?: string
     // Plan 260414-2249 phase-01: user-supplied products drive primary Unsplash
     // query via deriveKeywords. vi/ms terms are translated at query time.
@@ -268,16 +271,47 @@ async function batchFetch(
 }
 
 /**
- * Hero fallback: hardcoded generic Unsplash URL, mirrors prior art in openai-image.ts.
- * Only used when Unsplash search returns empty or throws for hero block.
+ * Per-category hero fallback Unsplash photo IDs — landscape 1920×1080.
+ * Used when ALL Unsplash search attempts fail so the hero image still reflects
+ * the business industry instead of a generic office hallway.
+ * Exported for testing only.
+ */
+export const HERO_FALLBACK_BY_CATEGORY: Readonly<Record<string, readonly string[]>> = {
+    tech:       ['photo-1498050108023-c5249f4df085', 'photo-1460925895917-afdab827c52f', 'photo-1518770660439-4636190af475'],
+    restaurant: ['photo-1414235077428-338989a2e8c0', 'photo-1504674900247-0877df9cc836'],
+    beauty:     ['photo-1522335789203-aabd1fc54bc9', 'photo-1570172619644-dfd03ed5d881'],
+    health:     ['photo-1576091160399-112ba8d25d1d', 'photo-1519494026892-80bbd2d6fd0d'],
+    education:  ['photo-1546410531-bb4caa6b424d', 'photo-1503676260728-1c00da094a0b'],
+    fitness:    ['photo-1571019614242-c5c5dee9f50b', 'photo-1534438327276-14e5300c3a48'],
+    creative:   ['photo-1561070791-2526d30994b5', 'photo-1535303311164-664fc9ec6532'],
+    business:   ['photo-1553877522-43269d4ea984', 'photo-1497366412874-3415097a27e7'],
+    fnb:        ['photo-1453614512568-c4024d13c247', 'photo-1495474472287-4d71bcdd2085'],
+    realestate: ['photo-1600596542815-ffad4c1539a9', 'photo-1560448204-e02f11c3d0e2'],
+    events:     ['photo-1519167758481-83f550bb49b3', 'photo-1464366400600-7168b8af9bc3'],
+    travel:     ['photo-1469474968028-56623f02e42e', 'photo-1488646953014-85cb44e25828'],
+    ecommerce:  ['photo-1472851294608-062f824d29cc', 'photo-1441986300917-64674bd600d8'],
+    blog:       ['photo-1499750310107-5fef28a66643', 'photo-1456324504439-367cee3b3c32'],
+}
+
+/** Exported for testing only. */
+export function pickHeroFallbackUrl(rawCategory: string | undefined): string {
+    const key = resolveComposerCategory(rawCategory ?? '')
+    const list = HERO_FALLBACK_BY_CATEGORY[key] ?? HERO_FALLBACK_BY_CATEGORY['business']!
+    const photoId = list[Math.floor(Math.random() * list.length)]!
+    return `https://images.unsplash.com/${photoId}?w=1920&h=1080&fit=crop&q=80`
+}
+
+/**
+ * Hero fallback: picks a category-appropriate Unsplash URL when all search
+ * attempts fail, so every business gets an industry-relevant hero image.
  */
 async function heroFallbackChain(
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
 ): Promise<BatchFetchResult> {
-    const HARDCODED = 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1920&h=1080&fit=crop&q=80'
+    const url = pickHeroFallbackUrl(ctx.category)
     try {
-        const { buffer, mimetype } = await downloadPhotoBuffer(HARDCODED)
+        const { buffer, mimetype } = await downloadPhotoBuffer(url)
         const id = await uploadBufferToMedia(payload, {
             buffer,
             filename: `hero-fallback-${Date.now()}.jpg`,

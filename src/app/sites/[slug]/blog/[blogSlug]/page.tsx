@@ -12,6 +12,7 @@ import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
+import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,6 +131,7 @@ export default async function BlogDetailPage({ params }: Props) {
             pages={pages as unknown as NavPage[]}
             isOwner={isOwner}
         >
+            <ScrollToTop />
             <article className="max-w-3xl mx-auto px-4 py-8">
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm opacity-60 mb-8">

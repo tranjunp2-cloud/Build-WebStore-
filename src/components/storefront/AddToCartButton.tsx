@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
@@ -27,12 +28,19 @@ type AddToCartButtonProps = {
 }
 
 export function AddToCartButton({ product, variantName, requireVariant, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
-    const { addItem, setSiteSlug } = useCartStore()
+    const { addItem, setSiteSlug, items } = useCartStore()
     const isOwner = useIsOwner()
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
+
+    // Cart line identity: productId + (variantName ?? '') — matches cartStore sameLine logic
+    const cartQty = items.find(
+        i => i.productId === product.id && (i.variantName ?? '') === (variantName ?? '')
+    )?.quantity ?? 0
+    const isAtStockLimit = product.inventory > 0 && cartQty >= product.inventory
+
     const isOutOfStock = product.inventory <= 0
     const needsVariant = Boolean(requireVariant) && !variantName
-    const isDisabled = isOutOfStock || needsVariant
+    const isDisabled = isOutOfStock || needsVariant || isAtStockLimit
 
     const handleClick = () => {
         if (isDisabled) return
@@ -66,6 +74,13 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
         }
     }
 
+    // Disabled button swallows onClick — wrapper div intercepts clicks when at stock limit
+    const handleWrapperClick = () => {
+        if (isAtStockLimit) {
+            toast.warning(t.storefront.products.stockLimitToast)
+        }
+    }
+
     const label = needsVariant
         ? t.storefront.products.selectVariant
         : isOutOfStock
@@ -73,25 +88,35 @@ export function AddToCartButton({ product, variantName, requireVariant, primaryC
             : t.storefront.products.addToCart
 
     return (
-        <button
-            onClick={handleClick}
-            disabled={isDisabled}
-            style={{
-                background: primaryColor,
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '14px 32px',
-                fontSize: '16px',
-                fontWeight: 600,
-                cursor: isDisabled ? 'not-allowed' : 'pointer',
-                width: '100%',
-                marginBottom: '24px',
-                opacity: isDisabled ? 0.5 : 1,
-                transition: 'opacity 0.2s',
-            }}
-        >
-            {label}
-        </button>
+        <>
+            {/* role="presentation": purely structural wrapper to capture clicks on disabled button */}
+            <div role="presentation" onClick={handleWrapperClick}>
+                <button
+                    onClick={handleClick}
+                    disabled={isDisabled}
+                    style={{
+                        background: primaryColor,
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '14px 32px',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        width: '100%',
+                        marginBottom: '24px',
+                        opacity: isDisabled ? 0.5 : 1,
+                        transition: 'opacity 0.2s',
+                    }}
+                >
+                    {label}
+                </button>
+            </div>
+            {isAtStockLimit && (
+                <p style={{ fontSize: '13px', color: 'var(--text-muted, #999)', marginTop: '-16px', marginBottom: '16px', textAlign: 'center' }}>
+                    {ti(t.storefront.products.stockLimitMessage, { cartQty, inventory: product.inventory })}
+                </p>
+            )}
+        </>
     )
 }
