@@ -33,7 +33,7 @@ const COMPOSER_TYPE_KEYWORDS: Record<ComposerCategory, string[]> = {
     education:  ['school', 'academy', 'tuition', 'course', 'training', 'kindergarten', 'bootcamp', 'education', 'trung tâm', 'giáo dục'],
     realestate: ['real estate', 'property', 'agent', 'condo', 'apartment', 'listing', 'realty', 'bất động sản', 'nhà đất'],
     fitness:    ['gym', 'fitness', 'yoga', 'pilates', 'crossfit', 'personal trainer', 'workout', 'phòng tập'],
-    fnb:        ['cafe', 'café', 'coffee', 'bakery', 'bubble tea', 'kopitiam', 'dessert', 'juice bar', 'tea', 'quán cafe', 'tiệm bánh', 'trà sữa', 'trà', 'boba', 'nước', 'giải khát', 'sinh tố', 'trà trái cây', 'milk tea', 'smoothie', 'juice'],
+    fnb:        ['cafe', 'café', 'coffee', 'bakery', 'bubble tea', 'kopitiam', 'dessert', 'juice bar', 'tea', 'quán cafe', 'tiệm bánh', 'trà sữa', 'trà', 'boba', 'nước ép', 'nước giải khát', 'giải khát', 'sinh tố', 'trà trái cây', 'milk tea', 'smoothie', 'juice'],
     events:     ['wedding', 'event', 'events', 'party', 'photography', 'venue', 'ceremony', 'planner', 'cưới hỏi', 'sự kiện'],
     travel:     ['travel', 'tour', 'hotel', 'resort', 'homestay', 'agency', 'trip', 'vacation', 'du lịch', 'khách sạn'],
     creative:   ['portfolio', 'photographer', 'designer', 'artist', 'freelance', 'studio', 'illustrator', 'creative'],
