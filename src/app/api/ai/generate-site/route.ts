@@ -123,18 +123,6 @@ export async function POST(req: NextRequest) {
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
 
-        // Translate user-supplied fields to the selected generation language when
-        // the input language differs (e.g. Vietnamese input + English site language).
-        const targetInputLocale = requestedGenerationLocale || language || 'en'
-        const translatedInputs = await translateUserInputsIfNeeded(
-            {
-                businessName: normalizedBusinessInfo.businessName,
-                shortDescription: normalizedBusinessInfo.shortDescription,
-                products: normalizedBusinessInfo.products,
-            },
-            targetInputLocale,
-        )
-        const businessInfo = { ...normalizedBusinessInfo, ...translatedInputs }
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
@@ -163,6 +151,23 @@ export async function POST(req: NextRequest) {
                     },
                 }
             )
+        }
+
+        // Translate user-supplied fields to the selected generation language when
+        // the input language differs (e.g. Vietnamese input + English site language).
+        // Runs after auth + rate-limit — prevents unauthenticated callers from
+        // triggering OpenAI API calls.
+        const targetInputLocale = requestedGenerationLocale || language || 'en'
+        const businessInfo = {
+            ...normalizedBusinessInfo,
+            ...(await translateUserInputsIfNeeded(
+                {
+                    businessName: normalizedBusinessInfo.businessName,
+                    shortDescription: normalizedBusinessInfo.shortDescription,
+                    products: normalizedBusinessInfo.products,
+                },
+                targetInputLocale,
+            ))
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)

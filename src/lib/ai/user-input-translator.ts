@@ -42,6 +42,8 @@ export async function translateUserInputsIfNeeded(
     targetLocale: string,
 ): Promise<TranslatableBusinessInputs> {
     const targetIso = (targetLocale.split('-')[0] ?? 'en').toLowerCase()
+    // 'auto' means let the AI infer the language — do not translate.
+    if (targetIso === 'auto') return inputs
 
     const combined = [inputs.businessName, inputs.shortDescription, inputs.products]
         .filter(Boolean)
@@ -72,7 +74,7 @@ Input: ${JSON.stringify({ businessName: inputs.businessName, shortDescription: i
 
 Return JSON with same three keys.`,
                 }],
-                max_tokens: 300,
+                max_tokens: 600,
                 temperature: 0.1,
             }, { signal: controller.signal })
 
@@ -90,8 +92,9 @@ Return JSON with same three keys.`,
         } finally {
             clearTimeout(timeoutId)
         }
-    } catch {
+    } catch (e) {
         // Non-throwing — return original inputs so downstream pipeline is unaffected.
+        console.warn('[user-input-translator] translation failed:', e instanceof Error ? e.message : String(e))
         return inputs
     }
 }
