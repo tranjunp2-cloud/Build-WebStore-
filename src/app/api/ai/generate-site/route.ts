@@ -9,6 +9,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
 import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
@@ -394,24 +395,47 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Start sample product generation in parallel with site AI generation (non-blocking)
-        // Note: siteId intentionally omitted — products run before site row is created so site.id
-        // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
-        // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
-        // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-        const sampleProductsPromise = generateSampleProducts(
-            businessInfo,
-            (language as 'en' | 'ms' | 'auto'),
-            String(resolvedTenantId),
-            payload,
-        )
+        // ── F3: Real SSE streaming — return response immediately, pipeline runs inside start() ──
+        // GH-1190: Previously entire pipeline ran synchronously before ReadableStream was created.
+        // Now we create the stream first and run the pipeline inside start() so the client
+        // receives SSE events in real-time instead of waiting 60-100s for the first byte.
+        const runGenPipeline = async (onEvent?: (e: SSEEvent) => void): Promise<{
+            result: GenerationResult
+            site: Record<string, unknown>
+            homepagePage: Record<string, unknown>
+            createdPages: Record<string, unknown>[]
+            pageFailures: Array<{ slug: string; title: string; error: string }>
+            productsCreatedCount: number
+            timeMs: number
+            productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+        }> => {
+            // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
+            // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
+            const translateKeywordsPromise: Promise<string[]> = !ENABLE_DALLE_HERO
+                ? translateToEnglishKeywords({
+                    industry: businessInfo.industry,
+                    products: businessInfo.products,
+                }).then((r): string[] => r ?? []).catch((): string[] => [])
+                : Promise.resolve([] as string[])
 
-        // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
-        const { result, events } = await trackPhase('ai', () =>
-            withSentrySpan('ai.generateSite', () =>
-                generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
-            ),
-        )
+            // Start sample product generation in parallel with site AI generation (non-blocking)
+            // Note: siteId intentionally omitted — products run before site row is created so site.id
+            // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
+            // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
+            // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
+            const sampleProductsPromise = generateSampleProducts(
+                businessInfo,
+                (language as 'en' | 'ms' | 'auto'),
+                String(resolvedTenantId),
+                payload,
+            )
+
+            // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
+            const { result, events } = await trackPhase('ai', () =>
+                withSentrySpan('ai.generateSite', () =>
+                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
+                ),
+            )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -505,18 +529,11 @@ export async function POST(req: NextRequest) {
                     // first product collides still produce different queries.
                     const topProduct = parsedProducts[0]
 
-                    // Plan 260424: Dynamic LLM Translation with Tier 2 Fallback
+                    // F1: use pre-started promise (GH-1190)
                     let englishKeywords: string[] = []
-                    try {
-                        const aiTranslation = await translateToEnglishKeywords({
-                            industry: businessInfo.industry,
-                            products: businessInfo.products
-                        })
-                        if (aiTranslation && aiTranslation.length > 0) {
-                            englishKeywords = aiTranslation
-                        }
-                    } catch (e) {
-                        console.warn('[AI Translation] LLM failed, falling back to dictionary', e)
+                    const aiTranslation = await translateKeywordsPromise
+                    if (aiTranslation && aiTranslation.length > 0) {
+                        englishKeywords = aiTranslation
                     }
 
                     if (englishKeywords.length === 0) {
@@ -1229,59 +1246,90 @@ export async function POST(req: NextRequest) {
             void _blogSeedTask()
         }
 
-        const timeMs = Date.now() - startTime
+            const timeMs = Date.now() - startTime
 
-        // Plan 260415 F01-gen-audit — single summary line per gen so ops can
-        // scan Vercel logs for phase breakdown without correlating manually.
-        // Use compact key=value so grep/jq can pull it out easily.
-        const phaseOther = Math.max(
-            0,
-            timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
-        )
-        console.info(
-            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
-        )
+            // Plan 260415 F01-gen-audit — single summary line per gen so ops can
+            // scan Vercel logs for phase breakdown without correlating manually.
+            // Use compact key=value so grep/jq can pull it out easily.
+            const phaseOther = Math.max(
+                0,
+                timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
+            )
+            console.info(
+                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
+            )
 
-        // ── SSE Streaming Response ──
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats }
+        } // end runGenPipeline
+
+        // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
         if (isStreaming) {
-            const encoder = new TextEncoder()
-
-            const stream = new ReadableStream({
-                start(controller) {
-                    // Emit all events with delays for smooth animation
-                    const emitEvents = async () => {
-                        for (const event of events) {
-                            const sseData = `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`
-                            controller.enqueue(encoder.encode(sseData))
-                            // Small delay between events for visual effect
-                            await new Promise(resolve => setTimeout(resolve, 100))
-                        }
-
-                        // Emit products_generated event if any sample products were created
-                        if (productsCreatedCount > 0) {
-                            const productEventData = `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`
-                            controller.enqueue(encoder.encode(productEventData))
-                        }
-
-                        // Final done event with siteId
-                        const doneData = `event: done\ndata: ${JSON.stringify({
-                            siteId: site.id,
-                            pageId: homepagePage.id,
-                            siteName: result.siteName,
-                            siteLanguage: result.language || language,
-                            totalBlocks: result.blocks.length,
-                            totalPages: createdPages.length,
+            const _encoder = new TextEncoder()
+            return new Response(new ReadableStream<Uint8Array>({
+                async start(controller) {
+                    const onEvent = (e: SSEEvent) =>
+                        controller.enqueue(
+                            _encoder.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`),
+                        )
+                    try {
+                        const {
+                            result,
+                            site: _pipeSite,
+                            homepagePage,
+                            createdPages,
+                            productsCreatedCount,
                             timeMs,
-                        })}\n\n`
-                        controller.enqueue(encoder.encode(doneData))
-                        controller.close()
+                        } = await runGenPipeline(onEvent)
+
+                        // products_generated event
+                        if (productsCreatedCount > 0) {
+                            controller.enqueue(
+                                _encoder.encode(
+                                    `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`,
+                                ),
+                            )
+                        }
+
+                        // done event
+                        const doneData =
+                            `event: done\ndata: ${JSON.stringify({
+                                siteId: _pipeSite.id,
+                                pageId: (homepagePage as { id: unknown }).id,
+                                siteName: result.siteName,
+                                siteLanguage: result.language || language,
+                                totalBlocks: result.blocks.length,
+                                totalPages: createdPages.length,
+                                timeMs,
+                            })}\n\n`
+                        controller.enqueue(_encoder.encode(doneData))
+                    } catch (streamErr) {
+                        const errMsg =
+                            streamErr instanceof Error ? streamErr.message : String(streamErr)
+                        // Guard: if stream was canceled (client disconnected), enqueue throws —
+                        // wrap so error recovery below always runs regardless of stream state.
+                        try {
+                            controller.enqueue(
+                                _encoder.encode(
+                                    `event: error\ndata: ${JSON.stringify({ message: errMsg })}\n\n`,
+                                ),
+                            )
+                        } catch { /* stream already canceled — skip SSE write, still recover DB */ }
+                        // Error recovery: update site status if site was created before failure
+                        if (_site?.id && _payload) {
+                            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+                            await _payload
+                                .update({
+                                    collection: 'sites',
+                                    id: _site.id as string | number,
+                                    data: { generationStatus: status },
+                                })
+                                .catch(() => {})
+                        }
+                    } finally {
+                        try { controller.close() } catch { /* already closed */ }
                     }
-
-                    emitEvents().catch(() => controller.close())
                 },
-            })
-
-            return new Response(stream, {
+            }), {
                 headers: {
                     'Content-Type': 'text/event-stream',
                     'Cache-Control': 'no-cache',
@@ -1290,14 +1338,23 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // ── JSON Response (backward compatible) ──
+        // Non-streaming path (legacy — streaming is always used in production)
+        const {
+            result,
+            site,
+            homepagePage,
+            createdPages,
+            productsCreatedCount: _productsCreatedCount,
+            timeMs,
+        } = await runGenPipeline()
+
         return NextResponse.json({
             success: true,
             siteId: site.id,
-            pageId: homepagePage.id,
+            pageId: (homepagePage as { id: unknown }).id,
             siteName: result.siteName,
             siteLanguage: result.language || language,
-            siteType: safeSiteType,
+            siteType: resolveSiteType(result.siteType),
             blockCount: result.blocks.length,
             totalPages: createdPages.length,
             theme: result.theme,
@@ -1306,11 +1363,12 @@ export async function POST(req: NextRequest) {
 
     } catch (error: unknown) {
         // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
-        if (_site?.id && _payload) {
+        const _siteForCatch = _site as Record<string, unknown> | null
+        if (_siteForCatch?.id && _payload) {
             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
             await _payload.update({
                 collection: 'sites',
-                id: _site.id as string | number,
+                id: _siteForCatch.id as string | number,
                 data: { generationStatus: status },
             }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
         }
@@ -1347,7 +1405,7 @@ export async function POST(req: NextRequest) {
             pgTable,
             pgColumn,
             pagesCreated: _createdPagesCount,
-            siteId: _site?.id ?? null,
+            siteId: _siteForCatch?.id ?? null,
         }))
         if (errStack) console.error('[AI Generate Site Error Stack]', debugId, errStack)
 
