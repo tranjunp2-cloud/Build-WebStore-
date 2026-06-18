@@ -314,6 +314,26 @@ describe('TC-F01-W.16 — underfill backoff', () => {
     // Only 2 calls (no retry)
     expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
   })
+
+  it('pool.square borrows from landscape when squarish returns 0', async () => {
+    // TC-F01-W.16 extension: landscape succeeds, squarish returns 0 on both
+    // initial + relaxed retry → square bucket gets landscape photos as fallback.
+    // This prevents media-injector from falling back to legacy search per block.
+    mockSearchPhotos
+      .mockResolvedValueOnce(landscapeFixture) // landscape OK
+      .mockResolvedValueOnce([])               // squarish initial → 0
+      .mockResolvedValueOnce([])               // squarish relaxed retry → 0
+
+    const pool = await buildImagePool(baseCtx({ mood: THEME_MOODS.elegant }))
+
+    expect(pool.underfill).toBe(true)
+    expect(pool.landscape).toHaveLength(12)
+    // Square gets landscape photos as fallback — not empty
+    expect(pool.square.length).toBeGreaterThan(0)
+    // IDs come from landscape fixture
+    const landscapeIds = new Set(landscapeFixture.map((p) => p.id))
+    expect(landscapeIds.has(pool.square[0]!.id)).toBe(true)
+  })
 })
 
 // ── mergePool + poolSize helpers ────────────────────────────────────────────
