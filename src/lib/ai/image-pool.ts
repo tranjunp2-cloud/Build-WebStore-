@@ -87,7 +87,7 @@ const CATEGORY_PHOTO_HINTS: Record<string, string> = {
   fitness:    'gym workout',
   creative:   'creative studio',
   business:   'modern office',
-  fnb:        'coffee shop interior',
+  fnb:        'cafe drinks',
   realestate: 'property interior',
   events:     'event venue',
   travel:     'travel destination',
