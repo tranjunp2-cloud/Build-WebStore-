@@ -4,6 +4,8 @@ import { Trash2 } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 
@@ -38,15 +40,15 @@ export function DiscountDeleteDialog({
                     </div>
                 </div>
 
-                {/* Title */}
-                <h2 className="text-[15px] font-semibold" style={{ color: 'var(--dash-text)' }}>
+                {/* Title (DialogTitle — required by Radix for a11y) */}
+                <DialogTitle className="text-[15px] font-semibold" style={{ color: 'var(--dash-text)' }}>
                     {ti(d.deleteDialog.title, { code })}
-                </h2>
+                </DialogTitle>
 
                 {/* Description */}
-                <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--dash-text-muted)' }}>
+                <DialogDescription className="text-sm leading-relaxed mt-1" style={{ color: 'var(--dash-text-muted)' }}>
                     {d.deleteDialog.description}
-                </p>
+                </DialogDescription>
 
                 {usageCount > 0 && (
                     <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 text-left mt-2">

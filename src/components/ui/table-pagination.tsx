@@ -101,7 +101,7 @@ export function TablePagination({
                             onClick={() => onPageChange(p)}
                             className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] text-[13px] font-medium transition-colors cursor-pointer"
                             style={p === page
-                                ? { background: '#0891b2', color: '#fff', border: '1px solid #0891b2' }
+                                ? { background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))', border: '1px solid hsl(var(--primary))' }
                                 : { border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }
                             }
                         >
