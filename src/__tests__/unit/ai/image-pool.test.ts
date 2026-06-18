@@ -188,6 +188,30 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     const matches = q.match(/candlelit/g) ?? []
     expect(matches.length).toBe(1)
   })
+
+  it('query uses LLM-translated product terms directly (GH-1185)', async () => {
+    // LLM should return visual concepts, not acronyms.
+    // e.g. translateToEnglishKeywords({industry:"SaaS CRM"}) → ["software team", "business dashboard"]
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    const pool = await buildImagePool({
+      category: 'tech',
+      products: ['software team', 'business dashboard'],
+      seed: 1,
+    })
+    expect(pool.queryUsed).toContain('software team')
+    expect(pool.queryUsed).toContain('business dashboard')
+    // Category name must NOT be injected when product terms are present
+    expect(pool.queryUsed).not.toContain('tech')
+  })
+
+  it('falls back to category name only when LLM fails (no products)', async () => {
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    const pool = await buildImagePool({
+      category: 'tech',
+      seed: 1,
+    })
+    expect(pool.queryUsed).toBe('tech')
+  })
 })
 
 // ── TC-F01-W.15: pickFromPool determinism ───────────────────────────────────

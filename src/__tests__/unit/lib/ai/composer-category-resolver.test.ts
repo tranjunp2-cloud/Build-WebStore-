@@ -57,4 +57,15 @@ describe('resolveComposerCategory — edge cases', () => {
         const result = resolveComposerCategory('coffee shop and restaurant')
         expect(['fnb', 'restaurant']).toContain(result)
     })
+
+    it('VN bubble tea business → fnb (regression GH-1185)', () => {
+        // Before fix: "trà sữa nhà làm" scored 0 → fell to "business" → wrong fallback photo
+        expect(resolveComposerCategory('trà sữa nhà làm')).toBe('fnb')
+    })
+
+    it('perfume shop does NOT misclassify as fnb (GH-1185 false-positive guard)', () => {
+        // "nước hoa" must not score fnb — "nước" was too broad, replaced by compound phrases
+        const result = resolveComposerCategory('cửa hàng nước hoa cao cấp')
+        expect(result).not.toBe('fnb')
+    })
 })

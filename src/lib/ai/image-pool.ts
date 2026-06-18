@@ -73,6 +73,7 @@ export interface BuildPoolCtx {
 const DEFAULT_LANDSCAPE_SIZE = 12
 const DEFAULT_SQUARE_SIZE = 6
 
+
 /**
  * Build the Unsplash search query from the context.
  *
@@ -115,7 +116,8 @@ export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): str
     }
   }
 
-  // Category fallback when no product + no mood
+  // Fallback when LLM translation fails and no products supplied — use the
+  // raw category name so Unsplash still gets at least one search term.
   if (terms.length === 0) {
     push(ctx.category)
   }
