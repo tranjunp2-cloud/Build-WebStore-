@@ -134,8 +134,8 @@ describe('[TC-DS1222-01-05] SortableHead affordance reflects active column', () 
     })
 })
 
-// ── TC-DS1222-01-01 (header) — TableHead renders muted label band ───────────
-describe('[TC-DS1222-01-01] TableHead/TableHeader structure', () => {
+// ── TC-DS1222-01-06 — TableHead renders muted label band ────────────────────
+describe('[TC-DS1222-01-06] TableHead renders muted label band', () => {
     it('TableHead renders a <th> with muted text token', () => {
         const { container } = render(
             <table><thead><tr><TableHead>Status</TableHead></tr></thead></table>,

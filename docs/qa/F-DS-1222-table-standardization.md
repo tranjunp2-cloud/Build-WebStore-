@@ -2,7 +2,7 @@
 
 > **Issue:** #1222 [Design System] Standardize base Table component, border tokens & in-table sub-components
 > **Milestone:** v1.1 — Phase 2
-> **Tổng TCs:** 28 (TC-DS1222-01-01 → TC-DS1222-07-04)
+> **Tổng TCs:** 29 (TC-DS1222-01-01 → TC-DS1222-07-04)
 > **Component mẫu:** F33 Discount Codes (team Design)
 
 ## 1. Mục Tiêu
@@ -29,6 +29,7 @@
 | **TC-DS1222-01-03** | `[Positive]` | Footer slot render trong card | Truyền `footer` → nội dung footer hiển thị, có border-top token. |
 | **TC-DS1222-01-04** | `[Positive]` | TableActionButton trung tính mặc định | Variant `default` không có class hover đỏ; variant `danger` có `hover:text-red-400`. |
 | **TC-DS1222-01-05** | `[Positive]` | SortableHead đổi affordance theo cột active | Cột đang sort hiện chevron up/down; cột khác hiện icon mờ; click gọi `onSort(key)`. |
+| **TC-DS1222-01-06** | `[Positive]` | TableHead render muted label band | `<th>` render đúng text + dùng token `var(--dash-text-muted)` cho màu nhãn header. |
 
 ### NHÓM 02 — Switch / Toggle
 
