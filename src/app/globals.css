@@ -92,8 +92,10 @@
   --dash-surface-hover: #1F2937;
   --dash-text: #FFFFFF;
   --dash-text-muted: #9CA3AF;
-  --dash-border: #1F2937;
-  /* Subtle divider — just above --dash-border (#1F2937), barely lighter than --dash-bg (#0B1120). */
+  /* Row/border line — lighter than --dash-surface-hover (#1F2937) so table row
+     separators stay visible while a row is hovered (GH-1222). */
+  --dash-border: #2A3645;
+  /* Subtle structural divider (sidebar/header/tabs) — barely lighter than --dash-bg (#0B1120). */
   --dash-divider: #232E3D;
   --dash-accent: #2563EB;
   --dash-overlay: rgba(0, 0, 0, 0.5);
