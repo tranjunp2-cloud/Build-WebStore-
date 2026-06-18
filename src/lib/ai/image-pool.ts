@@ -214,7 +214,13 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
 
   return {
     landscape: landscapePhotos.map((p) => normalize(p, 'gallery')),
-    square: squarePhotos.map((p) => normalize(p, 'team')),
+    // When squarish search returns 0 (Unsplash has thin coverage for niche queries
+    // like "bubble tea"), reuse landscape photos instead of leaving the bucket empty.
+    // Empty square bucket causes media-injector to fall back to legacy search per
+    // block (extra Unsplash API calls → rate limit pressure on demo keys).
+    square: squarePhotos.length > 0
+      ? squarePhotos.map((p) => normalize(p, 'team'))
+      : landscapePhotos.slice(0, squareSize).map((p) => normalize(p, 'team')),
     // Portrait not populated by default — derived from landscape if needed.
     portrait: [],
     queryUsed: query,
