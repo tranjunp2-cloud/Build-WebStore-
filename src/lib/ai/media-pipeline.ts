@@ -4,9 +4,9 @@
  * Callers pass (blockType, keywords, count, ctx, payload) and receive Media IDs
  * ready to inject into block fields (hero.backgroundImage, gallery.images[].image, etc).
  *
- * Concurrency: pool-based downloads use POOL_CONCURRENCY (10) so all photos for a
- * block type download in parallel. Legacy search path keeps SEARCH_CONCURRENCY (3)
- * to avoid Unsplash search 429s. Payload OOM: 10 × ~2MB = 20MB/block, well within limits.
+ * Concurrency: pool-based downloads use POOL_CONCURRENCY (6) so a full gallery block
+ * (6-8 photos) downloads in 1 batch. Legacy search path keeps SEARCH_CONCURRENCY (3)
+ * to avoid Unsplash search 429s. Payload OOM: 6 × ~2MB = 12MB/block, well within limits.
  * Partial failure returns what succeeded; never throws.
  *
  * Alt-text attribution: per validation 2026-04-14 Q1, alt text format is

@@ -440,15 +440,23 @@ export async function POST(req: NextRequest) {
                         const dictKw = translateProductTerm(topProd || '')
                         if (dictKw) kws = [dictKw]
                     }
-                    const pool = await buildImagePool({
-                        category: _presetCategoryForPool,
-                        mood: _themeMoodForPool,
-                        topProduct: kws[0] || translateProductTerm(topProd || ''),
-                        products: kws.length > 0
-                            ? kws
-                            : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
-                        seed: _themeSeedForPool,
-                    })
+                    // Isolate buildImagePool failure so kws (englishKeywords) is always
+                    // preserved for the fulfillImageNeeds legacy search path even when
+                    // pool build fails (e.g. Unsplash 429 on demo key).
+                    let pool: ImagePool | null = null
+                    try {
+                        pool = await buildImagePool({
+                            category: _presetCategoryForPool,
+                            mood: _themeMoodForPool,
+                            topProduct: kws[0] || translateProductTerm(topProd || ''),
+                            products: kws.length > 0
+                                ? kws
+                                : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
+                            seed: _themeSeedForPool,
+                        })
+                    } catch {
+                        // pool stays null; kws still returned below for legacy search
+                    }
                     return { pool, englishKeywords: kws }
                 }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
