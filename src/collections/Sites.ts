@@ -429,6 +429,12 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'themeCustomized',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'True once user has explicitly saved a theme change from editor' },
+        },
+        {
             name: 'headerBlock',
             type: 'json',
             admin: { description: 'Global header/navigation block — published/live version' },

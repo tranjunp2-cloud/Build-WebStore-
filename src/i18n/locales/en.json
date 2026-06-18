@@ -833,6 +833,36 @@
             "notLive": "is not live yet.",
             "publishNow": "Publish now →"
         },
+        "onboarding": {
+            "title": "Get Your Store Ready",
+            "subtitle": "Complete these steps to launch your store",
+            "completeLabel": "Complete",
+            "continueBtn": "Continue",
+            "steps": {
+                "products": {
+                    "label": "Add Your First Product",
+                    "description": "Create your product catalog"
+                },
+                "design": {
+                    "label": "Customize Your Store Design",
+                    "description": "Choose colors, fonts, and layout"
+                },
+                "payment": {
+                    "label": "Set Up Payment & Shipping",
+                    "description": "Configure payment methods and shipping options"
+                },
+                "publish": {
+                    "label": "Publish Your Website",
+                    "description": "Make your store live"
+                }
+            },
+            "banner": {
+                "title": "Your Store is Almost Ready!",
+                "description": "Complete the payment setup to publish your website and start selling online.",
+                "completeBtn": "Complete Setup",
+                "dismissBtn": "I'll do this later"
+            }
+        },
         "resetAccount": {
             "dangerZone": "Danger Zone",
             "stagingOnly": "Staging only — not visible in production",
