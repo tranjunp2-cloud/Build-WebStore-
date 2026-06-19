@@ -222,30 +222,33 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
         }
 
-        // Xendit sandbox does not enforce permissions — skip the check for development keys.
-        // For production keys, POST with empty body to verify Money-in Write permission:
-        //   400/422 = key valid + has permission (Xendit rejects bad payload, not the key) → proceed
-        //   401 = invalid key, 403 = missing permission → hard block
-        //   Other errors → proceed silently
-        const isProduction = secretKey.trim().startsWith('xnd_production');
-        if (isProduction) {
-            try {
-                await xenditFetch('/v2/payment_requests', { method: 'POST', body: {}, apiKey: secretKey.trim() });
-            } catch (err: unknown) {
-                if (err instanceof XenditError) {
-                    if (err.status === 401) {
-                        return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
-                    }
-                    if (err.status === 403) {
-                        return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
-                    }
-                    if (err.status !== 400 && err.status !== 422) {
-                        console.warn('saveXenditKeys: pre-check unexpected status, proceeding:', err.status);
-                    }
-                } else {
-                    console.warn('saveXenditKeys: pre-check network error, proceeding:', err);
+        // Permission check: POST a minimal payment request body so Xendit validates permissions before payload fields.
+        // With empty body, Xendit does body validation first (returns 400 regardless of permissions).
+        // With a minimal body, Xendit checks permissions first:
+        //   403 = missing Money-in Write permission → hard block
+        //   401 = invalid key → hard block
+        //   400/422/other = key valid + has permission, Xendit rejected the test payload → proceed
+        try {
+            await xenditFetch('/v2/payment_requests', {
+                method: 'POST',
+                body: {
+                    currency: 'MYR',
+                    amount: 100,
+                    payment_method: { type: 'EWALLET' },
+                },
+                apiKey: secretKey.trim(),
+            });
+        } catch (err: unknown) {
+            if (err instanceof XenditError) {
+                if (err.status === 401) {
+                    return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
                 }
+                if (err.status === 403) {
+                    return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
+                }
+                // 400/422 or other = key valid + has permission, payload just got rejected → proceed
             }
+            // Network or unexpected error → proceed silently
         }
 
         await payload.update({
