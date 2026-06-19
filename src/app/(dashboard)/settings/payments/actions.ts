@@ -222,20 +222,15 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
         }
 
-        // Permission check: POST a minimal payment request body so Xendit validates permissions before payload fields.
-        // With empty body, Xendit does body validation first (returns 400 regardless of permissions).
-        // With a minimal body, Xendit checks permissions first:
-        //   403 = missing Money-in Write permission → hard block
+        // Permission check using the same Invoice API endpoint called during actual checkout.
+        // Xendit enforces permissions on /v2/invoices before body validation:
         //   401 = invalid key → hard block
-        //   400/422/other = key valid + has permission, Xendit rejected the test payload → proceed
+        //   403 = missing Money-in permission → hard block
+        //   400/422/other = key valid + has permission, Xendit rejected the minimal test payload → proceed
         try {
-            await xenditFetch('/v2/payment_requests', {
+            await xenditFetch('/v2/invoices', {
                 method: 'POST',
-                body: {
-                    currency: 'MYR',
-                    amount: 100,
-                    payment_method: { type: 'EWALLET' },
-                },
+                body: { external_id: '_perm_check', amount: -1 },
                 apiKey: secretKey.trim(),
             });
         } catch (err: unknown) {
@@ -246,7 +241,7 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
                 if (err.status === 403) {
                     return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
                 }
-                // 400/422 or other = key valid + has permission, payload just got rejected → proceed
+                // 400/422/other = key valid + has permission, minimal payload rejected as expected → proceed
             }
             // Network or unexpected error → proceed silently
         }
