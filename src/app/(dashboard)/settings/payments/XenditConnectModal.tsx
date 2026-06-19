@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, X, Eye, EyeOff, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
@@ -17,7 +17,7 @@ interface SecretFieldProps {
     placeholder: string;
     show: boolean;
     onToggleShow: () => void;
-    steps: string[];
+    steps: React.ReactNode[];
     className?: string;
 }
 
@@ -152,7 +152,12 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         placeholder={pt.xenditSecretKeyPlaceholder}
                         show={showSecret}
                         onToggleShow={() => setShowSecret(v => !v)}
-                        steps={[pt.xenditSecretKeyStep1, pt.xenditSecretKeyStep2, pt.xenditSecretKeyStep3, pt.xenditSecretKeyStep4]}
+                        steps={[
+                            pt.xenditSecretKeyStep1,
+                            pt.xenditSecretKeyStep2,
+                            <span key="s3">Permissions: <span className="text-slate-200 font-medium">Money-in products</span> → select Write — leave others as None</span>,
+                            pt.xenditSecretKeyStep4,
+                        ]}
                         className="mt-[6px]"
                     />
                     <SecretField
