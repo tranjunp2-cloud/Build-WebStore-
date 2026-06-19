@@ -209,7 +209,7 @@ export function PaymentsFormClient({
                             setIsVerified(true);
                             setIsChargesEnabled(true);
                             toast.success(pt.stripeReturnSuccess);
-                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: true });
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: true, accountId: data.data.accountId });
                         } else {
                             if (data.success && data.data.detailsSubmitted) setDetailsSubmitted(true);
                             toast.info(pt.stripeReturnKycPending);
@@ -263,6 +263,7 @@ export function PaymentsFormClient({
                 if (stripePollingRef.current) { clearInterval(stripePollingRef.current); stripePollingRef.current = null }
             } else if (type === 'stripe-verified') {
                 setHasAccount(true)
+                if (accountId) setCurrentAccountId(accountId)
                 if (onboardingComplete) {
                     setIsVerified(true)
                     setIsChargesEnabled(true)
