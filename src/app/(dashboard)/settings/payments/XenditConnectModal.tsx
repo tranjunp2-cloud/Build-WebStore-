@@ -117,20 +117,20 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center gap-3 p-[20px_22px_14px] border-b border-white/[0.08]">
+                <div className="flex items-start gap-3 p-[20px_22px_16px] border-b border-white/[0.08]">
                     <div
-                        className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0"
+                        className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0 mt-[2px]"
                         style={{ border: '1px solid rgba(45,212,191,0.35)', color: '#5eead4', background: 'linear-gradient(135deg, rgba(45,212,191,0.18), rgba(14,165,233,0.18))' }}
                     >
                         <Link className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[18px] font-bold text-slate-50 leading-tight">{pt.xenditModalTitle}</p>
-                        <p className="text-[13px] text-slate-400 leading-[1.45] mt-[3px]">{pt.xenditModalSubtitle}</p>
+                        <p className="text-[20px] font-bold text-slate-50 leading-tight">{pt.xenditModalTitle}</p>
+                        <p className="text-[13px] text-slate-400 leading-[1.5] mt-[5px]">{pt.xenditModalSubtitle}</p>
                     </div>
                     <button
                         type="button" onClick={handleClose} disabled={isSaving}
-                        className="w-[30px] h-[30px] grid place-items-center rounded-[6px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-50 shrink-0"
+                        className="w-[30px] h-[30px] grid place-items-center rounded-[6px] text-slate-500 hover:text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-50 shrink-0 mt-[1px]"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -188,7 +188,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         type="button" onClick={handleSubmit}
                         disabled={!secretKey || !callbackToken || isSaving}
                         className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-                        style={{ background: '#0d9488' }}
+                        style={{ background: '#22c55e' }}
                     >
                         {isSaving
                             ? <><Loader2 className="w-4 h-4 animate-spin" />{pt.xenditSaving}</>
