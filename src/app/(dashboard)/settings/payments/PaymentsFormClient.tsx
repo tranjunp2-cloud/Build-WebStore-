@@ -410,7 +410,7 @@ export function PaymentsFormClient({
         const res = await saveXenditKeys(secretKey, callbackToken);
         if (!res.success) throw new Error(res.error ?? 'Không thể lưu keys.');
         setXenditIsConnected(true);
-        toast.success('Xendit đã được kết nối thành công!');
+        toast.success(pt.xenditConnectSuccess);
     };
 
     const handleSaveAll = async () => {

@@ -6,6 +6,7 @@ import { getCurrentTenantId } from '@/lib/auth';
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
 import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
+import { xenditFetch, XenditError } from '@/lib/payment/xendit-client';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -215,10 +216,35 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         if (!tenantId) return { success: false, error: 'Unauthorized' };
         if (!secretKey || !callbackToken) return { success: false, error: 'Both Secret Key and Callback Token are required.' };
         if (!secretKey.startsWith('xnd_')) return { success: false, error: 'Invalid Secret Key format. Must start with xnd_' };
+        if (secretKey.length > 512 || callbackToken.length > 512) return { success: false, error: 'Key length exceeds maximum allowed.' };
 
         const sub = await getActivePlanSubscription(payload, tenantId);
         if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
+        }
+
+        // Permission check using the same Invoice API endpoint called during actual checkout.
+        // Xendit enforces permissions on /v2/invoices before body validation:
+        //   401 = invalid key → hard block
+        //   403 = missing Money-in permission → hard block
+        //   400/422/other = key valid + has permission, Xendit rejected the minimal test payload → proceed
+        try {
+            await xenditFetch('/v2/invoices', {
+                method: 'POST',
+                body: { external_id: '_perm_check', amount: -1 },
+                apiKey: secretKey.trim(),
+            });
+        } catch (err: unknown) {
+            if (err instanceof XenditError) {
+                if (err.status === 401) {
+                    return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
+                }
+                if (err.status === 403) {
+                    return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
+                }
+                // 400/422/other = key valid + has permission, minimal payload rejected as expected → proceed
+            }
+            // Network or unexpected error → proceed silently
         }
 
         await payload.update({
