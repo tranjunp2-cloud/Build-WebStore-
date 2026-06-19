@@ -18,12 +18,13 @@ interface SecretFieldProps {
     show: boolean;
     onToggleShow: () => void;
     steps: string[];
+    className?: string;
 }
 
-function SecretField({ label, value, onChange, placeholder, show, onToggleShow, steps }: SecretFieldProps) {
+function SecretField({ label, value, onChange, placeholder, show, onToggleShow, steps, className }: SecretFieldProps) {
     return (
-        <div>
-            <div className="flex items-center mb-[8px]">
+        <div className={`flex flex-col gap-[6px]${className ? ` ${className}` : ''}`}>
+            <div className="flex items-center">
                 <label className="text-[13px] font-semibold text-slate-300">{label}</label>
                 <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
             </div>
@@ -49,10 +50,10 @@ function SecretField({ label, value, onChange, placeholder, show, onToggleShow, 
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
             </div>
-            <ol className="mt-[12px] space-y-[8px] list-none m-0 p-0 text-[12.5px] text-slate-500 leading-[1.45]">
+            <ol className="flex flex-col gap-[7px] list-none mt-[10px] mb-[2px] p-0 text-[12px] text-slate-500 leading-[1.4]">
                 {steps.map((step, i) => (
                     <li key={i} className="flex gap-[8px] items-baseline">
-                        <span className="text-slate-500 font-mono shrink-0 select-none">{i + 1}.</span>
+                        <span className="text-slate-500 font-mono shrink-0 select-none tabular-nums">{i + 1}.</span>
                         <span>{step}</span>
                     </li>
                 ))}
@@ -123,7 +124,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-start gap-3 p-[16px_22px_14px] border-b border-white/[0.08]">
+                <div className="flex items-start gap-3 p-[20px_22px_14px] border-b border-white/[0.08]">
                     <div
                         className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0 mt-[2px]"
                         style={{ border: '1px solid rgba(45,212,191,0.35)', color: '#5eead4', background: 'linear-gradient(135deg, rgba(45,212,191,0.18), rgba(14,165,233,0.18))', boxShadow: '0 4px 14px -4px rgba(14,165,233,0.40)' }}
@@ -143,7 +144,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Form body */}
-                <div className="p-[14px_22px_4px] flex flex-col gap-[14px]">
+                <div className="p-[14px_22px_4px] flex flex-col">
                     <SecretField
                         label={pt.xenditSecretKeyLabel}
                         value={secretKey}
@@ -152,6 +153,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         show={showSecret}
                         onToggleShow={() => setShowSecret(v => !v)}
                         steps={[pt.xenditSecretKeyStep1, pt.xenditSecretKeyStep2, pt.xenditSecretKeyStep3, pt.xenditSecretKeyStep4]}
+                        className="mt-[6px]"
                     />
                     <SecretField
                         label={pt.xenditCallbackTokenLabel}
@@ -161,6 +163,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         show={showToken}
                         onToggleShow={() => setShowToken(v => !v)}
                         steps={[pt.xenditCallbackTokenStep1, pt.xenditCallbackTokenStep2, pt.xenditCallbackTokenStep3]}
+                        className="mt-[14px]"
                     />
                     {saveError && (
                         <p className="flex items-center gap-[6px] text-[12.5px] text-red-400">
