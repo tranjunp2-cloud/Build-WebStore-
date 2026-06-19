@@ -24,21 +24,27 @@ function SecretField({ label, value, onChange, placeholder, show, onToggleShow, 
     return (
         <div>
             <div className="flex items-center mb-[8px]">
-                <label className="text-[13px] font-bold text-slate-200">{label}</label>
-                <span className="ml-auto text-[10px] font-semibold uppercase tracking-widest text-slate-400 bg-white/[0.06] border border-white/[0.14] px-[8px] py-[2px] rounded-full">Required</span>
+                <label className="text-[13px] font-semibold text-slate-300">{label}</label>
+                <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
             </div>
-            <div className="relative flex items-center h-[44px] rounded-[10px] bg-white/[0.04] border border-white/[0.12] focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/40 transition-all">
+            <div
+                className="flex items-center rounded-[10px] overflow-hidden transition-all"
+                style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
+                onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
+            >
                 <input
                     type={show ? 'text' : 'password'}
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 h-full px-[14px] bg-transparent font-mono text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
+                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-[44px] text-[13px] text-slate-100 font-mono font-medium placeholder:text-slate-600 dark:placeholder:text-slate-600 min-w-0 focus:outline-none"
                 />
                 <button
                     type="button"
                     onClick={onToggleShow}
-                    className="px-3 h-full border-l border-white/[0.10] text-slate-500 hover:text-slate-300 transition-colors"
+                    className="px-3 h-[44px] grid place-items-center text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                    style={{ borderLeft: '1px solid var(--dash-border)' }}
                 >
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
