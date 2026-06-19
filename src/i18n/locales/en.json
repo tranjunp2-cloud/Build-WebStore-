@@ -2011,7 +2011,7 @@
                 "xenditModalTitle": "Connect your Xendit Account",
                 "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Prime Web. Card, FPX & E-Wallets unlock as soon as we verify.",
                 "xenditConnectAccountBtn": "Connect Account",
-                "xenditLoginPrompt": "Don't have a Xendit account yet?",
+                "xenditLoginPrompt": "Have a Xendit account?",
                 "xenditLoginLink": "Login to Xendit",
                 "xenditSaving": "Saving...",
                 "xenditValidationRequired": "Please fill in both fields.",

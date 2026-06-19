@@ -216,6 +216,7 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         if (!tenantId) return { success: false, error: 'Unauthorized' };
         if (!secretKey || !callbackToken) return { success: false, error: 'Both Secret Key and Callback Token are required.' };
         if (!secretKey.startsWith('xnd_')) return { success: false, error: 'Invalid Secret Key format. Must start with xnd_' };
+        if (secretKey.length > 512 || callbackToken.length > 512) return { success: false, error: 'Key length exceeds maximum allowed.' };
 
         const sub = await getActivePlanSubscription(payload, tenantId);
         if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {

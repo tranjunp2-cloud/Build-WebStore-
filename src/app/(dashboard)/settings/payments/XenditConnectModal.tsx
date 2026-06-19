@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, X, Eye, EyeOff, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
@@ -12,21 +12,22 @@ interface Props {
 
 interface SecretFieldProps {
     label: string;
+    requiredLabel: string;
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
     show: boolean;
     onToggleShow: () => void;
-    steps: React.ReactNode[];
+    steps: string[];
     className?: string;
 }
 
-function SecretField({ label, value, onChange, placeholder, show, onToggleShow, steps, className }: SecretFieldProps) {
+function SecretField({ label, requiredLabel, value, onChange, placeholder, show, onToggleShow, steps, className }: SecretFieldProps) {
     return (
         <div className={`flex flex-col gap-[6px]${className ? ` ${className}` : ''}`}>
             <div className="flex items-center">
                 <label className="text-[13px] font-semibold text-slate-300">{label}</label>
-                <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
+                <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">{requiredLabel}</span>
             </div>
             <div
                 className="flex items-center rounded-[10px] overflow-hidden transition-all"
@@ -147,6 +148,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 <div className="p-[14px_22px_4px] flex flex-col">
                     <SecretField
                         label={pt.xenditSecretKeyLabel}
+                        requiredLabel={pt.required}
                         value={secretKey}
                         onChange={setSecretKey}
                         placeholder={pt.xenditSecretKeyPlaceholder}
@@ -155,13 +157,14 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         steps={[
                             pt.xenditSecretKeyStep1,
                             pt.xenditSecretKeyStep2,
-                            <span key="s3">Permissions: <span className="text-slate-200 font-medium">Money-in products</span> → select Write — leave others as None</span>,
+                            pt.xenditSecretKeyStep3,
                             pt.xenditSecretKeyStep4,
                         ]}
                         className="mt-[6px]"
                     />
                     <SecretField
                         label={pt.xenditCallbackTokenLabel}
+                        requiredLabel={pt.required}
                         value={callbackToken}
                         onChange={setCallbackToken}
                         placeholder={pt.xenditCallbackTokenPlaceholder}
