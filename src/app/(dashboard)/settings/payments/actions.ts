@@ -222,19 +222,20 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
         }
 
-        // Validate the key has Money-in products permission before saving
+        // Validate the key: 401 = invalid key, 403 = missing Money-in permission — both are hard blocks.
+        // All other errors (network, unexpected status) → proceed silently; real failures surface at payment time.
         try {
-            await xenditFetch('/v2/payment_requests?limit=1', { method: 'GET', apiKey: secretKey.trim() });
+            await xenditFetch('/v2/payment_requests', { method: 'GET', apiKey: secretKey.trim() });
         } catch (err: unknown) {
             if (err instanceof XenditError) {
                 if (err.status === 401) {
-                    return { success: false, error: 'Invalid Secret Key. Please check that you copied it correctly from your Xendit dashboard.' };
+                    return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
                 }
                 if (err.status === 403) {
-                    return { success: false, error: 'Secret Key is missing required permissions. Please enable "Money-in products → Write" when creating your API key in Xendit.' };
+                    return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
                 }
             }
-            return { success: false, error: 'Could not verify Secret Key with Xendit. Please try again.' };
+            console.warn('saveXenditKeys: pre-check non-critical error, proceeding:', err);
         }
 
         await payload.update({
