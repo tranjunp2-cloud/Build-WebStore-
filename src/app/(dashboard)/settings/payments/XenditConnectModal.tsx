@@ -175,16 +175,16 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
 
                 {/* Footer */}
                 <div className="flex items-center gap-3 p-[16px_22px_20px] mt-[14px]" style={{ borderTop: '1px solid var(--dash-border)' }}>
-                    <div className="flex flex-col mr-auto">
-                        <span className="text-[12px] text-slate-400">{pt.xenditLoginPrompt}</span>
+                    <div className="flex flex-col gap-[2px] mr-auto">
+                        <span className="text-[12px] text-slate-400 leading-[1.3]" style={{ padding: '0 10px' }}>{pt.xenditLoginPrompt}</span>
                         <a
                             href="https://dashboard.xendit.co/login"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-[4px] text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 transition-colors rounded-[8px]"
-                            style={{ padding: '6px 10px 8px', marginLeft: '-10px' }}
+                            className="inline-flex items-center gap-[7px] text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-[rgba(14,165,233,0.08)] transition-all rounded-[8px]"
+                            style={{ padding: '6px 10px 8px' }}
                         >
-                            <ExternalLink className="w-3 h-3" />
+                            <ExternalLink className="w-[13px] h-[13px] shrink-0" />
                             {pt.xenditLoginLink}
                         </a>
                     </div>
@@ -198,7 +198,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                     <button
                         type="button" onClick={handleSubmit}
                         disabled={!secretKey || !callbackToken || isSaving}
-                        className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                         style={{
                             background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
                             color: '#052e22',
