@@ -50,10 +50,10 @@ function SecretField({ label, value, onChange, placeholder, show, onToggleShow, 
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
             </div>
-            <ol className="flex flex-col gap-[7px] list-none mt-[10px] mb-[2px] p-0 text-[12px] text-slate-500 leading-[1.4]">
+            <ol className="flex flex-col gap-[7px] list-none mt-[10px] mb-[2px] p-0 text-[12.5px] text-slate-400 leading-[1.4]">
                 {steps.map((step, i) => (
                     <li key={i} className="flex gap-[8px] items-baseline">
-                        <span className="text-slate-500 font-mono shrink-0 select-none tabular-nums">{i + 1}.</span>
+                        <span className="font-mono font-semibold shrink-0 select-none tabular-nums" style={{ color: '#5eead4', opacity: 0.75 }}>{i + 1}.</span>
                         <span>{step}</span>
                     </li>
                 ))}
