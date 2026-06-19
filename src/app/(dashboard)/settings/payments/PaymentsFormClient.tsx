@@ -213,7 +213,7 @@ export function PaymentsFormClient({
                         } else {
                             if (data.success && data.data.detailsSubmitted) setDetailsSubmitted(true);
                             toast.info(pt.stripeReturnKycPending);
-                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false });
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false, accountId: data.data?.accountId });
                         }
                     })
                     .catch(() => {
