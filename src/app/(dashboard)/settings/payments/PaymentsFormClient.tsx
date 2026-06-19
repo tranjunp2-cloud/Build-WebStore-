@@ -118,22 +118,26 @@ export function PaymentsFormClient({
 
     // Poll /api/stripe/connect/status after opening a new tab — catches the case where
     // BroadcastChannel doesn't fire (tab closed before redirect, or unsupported browser).
-    const startStripePolling = () => {
+    // mode='connect': stops when account is first connected (OAuth complete).
+    // mode='onboard': stops only when onboardingComplete=true (KYC done) — avoids premature
+    //   toast when account is already connected but KYC is still in progress.
+    const startStripePolling = (mode: 'connect' | 'onboard') => {
         if (!tenantId || stripePollingRef.current) return
         stripePollingRef.current = setInterval(async () => {
             try {
                 const res = await fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
                 const data = await res.json()
-                if (data.success && data.data.connected) {
+                if (!data.success) return
+                if (mode === 'connect' && data.data.connected) {
                     setHasAccount(true)
                     if (data.data.accountId) setCurrentAccountId(data.data.accountId)
-                    if (data.data.onboardingComplete) {
-                        setIsVerified(true)
-                        setIsChargesEnabled(true)
-                        toast.success(pt.stripeReturnSuccess)
-                    } else {
-                        toast.info(pt.stripeReturnKycPending)
-                    }
+                    stopStripePolling()
+                } else if (mode === 'onboard' && data.data.onboardingComplete) {
+                    setHasAccount(true)
+                    setIsVerified(true)
+                    setIsChargesEnabled(true)
+                    if (data.data.accountId) setCurrentAccountId(data.data.accountId)
+                    toast.success(pt.stripeReturnSuccess)
                     stopStripePolling()
                 }
             } catch { /* best-effort — silent on network error */ }
@@ -301,7 +305,7 @@ export function PaymentsFormClient({
             const data = await res.json();
             if (data.success && data.data?.oauthUrl) {
                 window.open(data.data.oauthUrl, '_blank', 'noopener,noreferrer')
-                startStripePolling()
+                startStripePolling('connect')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
@@ -325,7 +329,7 @@ export function PaymentsFormClient({
             const data = await res.json();
             if (data.success && data.data?.url) {
                 window.open(data.data.url, '_blank', 'noopener,noreferrer')
-                startStripePolling()
+                startStripePolling('onboard')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
