@@ -119,12 +119,12 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
             onClick={handleClose}
         >
             <div
-                className="w-full max-w-[520px] rounded-[16px] border border-white/[0.08]"
-                style={{ background: '#141e2e', boxShadow: '0 20px 50px -12px rgba(0,0,0,0.65)' }}
+                className="w-full max-w-[520px] rounded-[16px] overflow-hidden"
+                style={{ background: '#141e2e', border: '1px solid var(--dash-border)', boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset, 0 20px 50px -12px rgba(0,0,0,0.65), 0 8px 24px -8px rgba(0,0,0,0.45)' }}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-start gap-3 p-[20px_22px_14px] border-b border-white/[0.08]">
+                <div className="flex items-start gap-3 p-[20px_22px_14px]" style={{ borderBottom: '1px solid var(--dash-border)' }}>
                     <div
                         className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0 mt-[2px]"
                         style={{ border: '1px solid rgba(45,212,191,0.35)', color: '#5eead4', background: 'linear-gradient(135deg, rgba(45,212,191,0.18), rgba(14,165,233,0.18))', boxShadow: '0 4px 14px -4px rgba(14,165,233,0.40)' }}
@@ -174,7 +174,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center gap-3 p-[16px_22px_20px] border-t border-white/[0.08] mt-[14px]">
+                <div className="flex items-center gap-3 p-[16px_22px_20px] mt-[14px]" style={{ borderTop: '1px solid var(--dash-border)' }}>
                     <div className="flex flex-col mr-auto">
                         <span className="text-[12px] text-slate-400">{pt.xenditLoginPrompt}</span>
                         <a
@@ -190,7 +190,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                     </div>
                     <button
                         type="button" onClick={handleClose} disabled={isSaving}
-                        className="h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.15] hover:bg-white/[0.06] transition-colors disabled:opacity-50 whitespace-nowrap"
+                        className="h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-slate-300 hover:bg-white/[0.06] transition-colors disabled:opacity-50 whitespace-nowrap"
+                        style={{ border: '1px solid var(--dash-border)' }}
                     >
                         {pt.cancel}
                     </button>
