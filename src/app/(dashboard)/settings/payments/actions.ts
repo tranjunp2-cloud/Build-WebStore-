@@ -6,6 +6,7 @@ import { getCurrentTenantId } from '@/lib/auth';
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
 import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
+import { xenditFetch, XenditError } from '@/lib/payment/xendit-client';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -219,6 +220,21 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         const sub = await getActivePlanSubscription(payload, tenantId);
         if (!sub || !await canUse(payload, sub.plan as PlanCode, 'payment_integration')) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
+        }
+
+        // Validate the key has Money-in products permission before saving
+        try {
+            await xenditFetch('/v2/payment_requests?limit=1', { method: 'GET', apiKey: secretKey.trim() });
+        } catch (err: unknown) {
+            if (err instanceof XenditError) {
+                if (err.status === 401) {
+                    return { success: false, error: 'Invalid Secret Key. Please check that you copied it correctly from your Xendit dashboard.' };
+                }
+                if (err.status === 403) {
+                    return { success: false, error: 'Secret Key is missing required permissions. Please enable "Money-in products → Write" when creating your API key in Xendit.' };
+                }
+            }
+            return { success: false, error: 'Could not verify Secret Key with Xendit. Please try again.' };
         }
 
         await payload.update({
