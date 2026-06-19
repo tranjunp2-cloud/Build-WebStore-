@@ -23,17 +23,17 @@ interface SecretFieldProps {
 function SecretField({ label, value, onChange, placeholder, show, onToggleShow, steps }: SecretFieldProps) {
     return (
         <div>
-            <div className="flex items-center mb-[6px]">
-                <label className="text-[12px] font-semibold text-slate-300">{label}</label>
-                <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-red-400/80 bg-red-400/[0.08] px-[6px] py-[2px] rounded-[4px]">Required</span>
+            <div className="flex items-center mb-[8px]">
+                <label className="text-[13px] font-bold text-slate-200">{label}</label>
+                <span className="ml-auto text-[10px] font-semibold uppercase tracking-widest text-slate-400 bg-white/[0.06] border border-white/[0.14] px-[8px] py-[2px] rounded-full">Required</span>
             </div>
-            <div className="relative flex items-center h-[40px] rounded-[8px] bg-white/[0.04] border border-white/[0.10] focus-within:border-cyan-500/50 transition-colors">
+            <div className="relative flex items-center h-[44px] rounded-[10px] bg-white/[0.04] border border-white/[0.12] focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/40 transition-all">
                 <input
                     type={show ? 'text' : 'password'}
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 h-full px-[12px] bg-transparent font-mono text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
+                    className="flex-1 h-full px-[14px] bg-transparent font-mono text-[13px] text-slate-100 placeholder:text-slate-600 focus:outline-none"
                 />
                 <button
                     type="button"
@@ -43,11 +43,11 @@ function SecretField({ label, value, onChange, placeholder, show, onToggleShow, 
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
             </div>
-            <ol className="mt-[10px] space-y-[7px] list-none m-0 p-0 text-[12px] text-slate-500 leading-[1.4]">
+            <ol className="mt-[12px] space-y-[8px] list-none m-0 p-0 text-[12.5px] text-slate-500 leading-[1.45]">
                 {steps.map((step, i) => (
-                    <li key={i} className="pl-[20px] relative">
-                        <span className="absolute left-0 text-slate-500 font-mono">{i + 1}.</span>
-                        {step}
+                    <li key={i} className="flex gap-[8px] items-baseline">
+                        <span className="text-slate-500 font-mono shrink-0 select-none">{i + 1}.</span>
+                        <span>{step}</span>
                     </li>
                 ))}
             </ol>
@@ -125,8 +125,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         <Link className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[15px] font-bold text-slate-50 leading-tight">{pt.xenditModalTitle}</p>
-                        <p className="text-[12px] text-slate-400 leading-[1.45] mt-[2px]">{pt.xenditModalSubtitle}</p>
+                        <p className="text-[18px] font-bold text-slate-50 leading-tight">{pt.xenditModalTitle}</p>
+                        <p className="text-[13px] text-slate-400 leading-[1.45] mt-[3px]">{pt.xenditModalSubtitle}</p>
                     </div>
                     <button
                         type="button" onClick={handleClose} disabled={isSaving}
@@ -137,7 +137,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Form body */}
-                <div className="p-[14px_22px_4px] flex flex-col gap-[14px]">
+                <div className="p-[20px_22px_8px] flex flex-col gap-[20px]">
                     <SecretField
                         label={pt.xenditSecretKeyLabel}
                         value={secretKey}
@@ -165,8 +165,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center gap-2 p-[16px_22px_20px] border-t border-white/[0.08] mt-[10px]">
-                    <div className="flex items-center gap-[6px] mr-auto">
+                <div className="flex items-center gap-3 p-[16px_22px_20px] border-t border-white/[0.08] mt-[4px]">
+                    <div className="flex flex-col gap-[2px] mr-auto">
                         <span className="text-[12px] text-slate-400">{pt.xenditLoginPrompt}</span>
                         <a
                             href="https://dashboard.xendit.co/login"
@@ -174,25 +174,25 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-[4px] text-[12px] text-cyan-400 hover:text-cyan-300 transition-colors"
                         >
-                            {pt.xenditLoginLink}
                             <ExternalLink className="w-3 h-3" />
+                            {pt.xenditLoginLink}
                         </a>
                     </div>
                     <button
                         type="button" onClick={handleClose} disabled={isSaving}
-                        className="h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.12] hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+                        className="h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.15] hover:bg-white/[0.06] transition-colors disabled:opacity-50 whitespace-nowrap"
                     >
                         {pt.cancel}
                     </button>
                     <button
                         type="button" onClick={handleSubmit}
                         disabled={!secretKey || !callbackToken || isSaving}
-                        className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-[#042033] transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
-                        style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)' }}
+                        className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                        style={{ background: '#0d9488' }}
                     >
                         {isSaving
                             ? <><Loader2 className="w-4 h-4 animate-spin" />{pt.xenditSaving}</>
-                            : pt.xenditConnectAccountBtn
+                            : <><Link className="w-3.5 h-3.5" />{pt.xenditConnectAccountBtn}</>
                         }
                     </button>
                 </div>
