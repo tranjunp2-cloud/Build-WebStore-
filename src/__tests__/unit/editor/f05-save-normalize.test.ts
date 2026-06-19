@@ -19,6 +19,7 @@
  *   TC-F05-save-19b → normalizeBlocksForPersistence: non-service-cards block services → NOT coerced
  *   TC-F05-save-20  → normalizeBlocksForPersistence: cta block with invalid ctaStyle → coerced to 'primary' (GH-1283)
  *   TC-F05-save-20b → normalizeBlocksForPersistence: cta block with valid ctaStyle → unchanged
+ *   TC-F05-save-21  → normalizeBlocksForPersistence: contact block with email='' → coerced to null (GH-generate-site)
  *
  * Source:
  *   src/lib/block-normalization.ts
@@ -692,5 +693,41 @@ describe('normalizeBlocksForPersistence — cta ctaStyle coercion (GH-1283)', ()
         // Assert — valid values preserved
         expect(result[0].ctaStyle).toBe('primary')
         expect(result[1].ctaStyle).toBe('outline')
+    })
+})
+
+// TC-F05-save-21: generate-site contact email='' fails Payload email-format validation
+describe('normalizeBlocksForPersistence — contact email coercion (generate-site)', () => {
+    it('TC-F05-save-21: contact block with email="" → coerced to null (prevents Payload email ValidationError on create)', () => {
+        // Arrange — AI gen may produce email: '' on contact block
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — empty string stripped to null so Payload skips format check
+        expect(result[0].email).toBeNull()
+    })
+
+    it('TC-F05-save-21b: contact block with valid email → unchanged', () => {
+        // Arrange
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: 'hello@example.com' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert
+        expect(result[0].email).toBe('hello@example.com')
+    })
+
+    it('TC-F05-save-21c: non-contact block with email="" → NOT coerced', () => {
+        // Arrange — guard is scoped to contact block only
+        const blocks = [{ blockType: 'hero', headline: 'Hello', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — hero block email untouched
+        expect(result[0].email).toBe('')
     })
 })
