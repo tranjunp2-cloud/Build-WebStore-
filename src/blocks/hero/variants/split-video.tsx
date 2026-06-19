@@ -10,10 +10,15 @@ import { CTAButtons, HERO_CONTAINER, VideoControlButton, safeAltText } from '../
 import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
+import { getHeroImage } from '@/lib/images/industry-images'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, videoUrl, image } = block
     const primaryColor = CSS_VARS.primary
+    const isOwner = useIsOwner()
+    const category = (site?.siteType as string) || 'business'
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
@@ -105,7 +110,8 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                                         className="absolute bottom-4 right-4"
                                     />
                                 </div>
-                            ) : (
+                            ) : isOwner ? (
+                                // Editor only: placeholder so the owner can add a video
                                 <div
                                     className="w-full aspect-video rounded-2xl flex items-center justify-center"
                                     style={{
@@ -115,6 +121,17 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                                 >
                                     <p className="opacity-40 text-sm">No video URL provided</p>
                                 </div>
+                            ) : (
+                                // Public render: show image fallback instead of empty placeholder (GH-1266)
+                                <div
+                                    className="w-full aspect-video rounded-2xl bg-cover bg-center"
+                                    style={{
+                                        backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
+                                        boxShadow: `0 25px 50px rgba(var(--brand-primary-rgb), 0.082), 0 10px 20px rgba(0,0,0,0.2)`,
+                                    }}
+                                    role="img"
+                                    aria-label={safeAltText(image?.alt, headline)}
+                                />
                             )}
                         </motion.div>
                     </HeroMediaOverlay>
