@@ -658,8 +658,10 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
         // Assert — hero block services untouched
         expect(services[0].title).toBe('')
     })
+})
 
-    // TC-F05-save-20: GH-1283 — CTA ctaStyle invalid values fail Payload validation on publish
+// TC-F05-save-20: GH-1283 — CTA ctaStyle invalid values fail Payload validation on publish/save
+describe('normalizeBlocksForPersistence — cta ctaStyle coercion (GH-1283)', () => {
     it('TC-F05-save-20: cta block with invalid ctaStyle → coerced to "primary"', () => {
         // Arrange — AI may generate 'ghost', 'secondary', etc. not in CTA Payload enum
         const blocks = [
