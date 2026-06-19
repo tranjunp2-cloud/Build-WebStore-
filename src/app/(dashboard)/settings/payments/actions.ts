@@ -222,10 +222,11 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             return { success: false, error: 'Payment integration is not available on your current plan.' };
         }
 
-        // Validate the key: 401 = invalid key, 403 = missing Money-in permission — both are hard blocks.
-        // All other errors (network, unexpected status) → proceed silently; real failures surface at payment time.
+        // Permission check via POST with empty body — Xendit enforces Write permissions on POST but not GET.
+        // Expected outcomes: 400/422 = key valid + has Money-in Write (Xendit rejects bad payload, not the key).
+        // 401 = invalid key, 403 = missing Money-in Write → hard block. Other errors → proceed silently.
         try {
-            await xenditFetch('/v2/payment_requests', { method: 'GET', apiKey: secretKey.trim() });
+            await xenditFetch('/v2/payment_requests', { method: 'POST', body: {}, apiKey: secretKey.trim() });
         } catch (err: unknown) {
             if (err instanceof XenditError) {
                 if (err.status === 401) {
@@ -234,8 +235,13 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
                 if (err.status === 403) {
                     return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
                 }
+                // 400/422 = key valid + has permission, Xendit rejected empty payload → expected, proceed
+                if (err.status !== 400 && err.status !== 422) {
+                    console.warn('saveXenditKeys: pre-check unexpected status, proceeding:', err.status);
+                }
+            } else {
+                console.warn('saveXenditKeys: pre-check network error, proceeding:', err);
             }
-            console.warn('saveXenditKeys: pre-check non-critical error, proceeding:', err);
         }
 
         await payload.update({
