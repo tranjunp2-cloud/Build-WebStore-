@@ -104,22 +104,60 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
        └────────────────────────────────────────────────┘
 ```
 
-> **[F36 EasyParcel] Drawer bổ sung khi tenant bật EasyParcel** (nguồn: `docs/prd/F36-easyparcel-delivery.md`):
-> - **Action bar** thêm nút **`[ 📦 Ready to Ship ]`** (hiện khi order đã `paid` + `confirmed`). Bấm → tạo vận đơn EasyParcel **2 bước** (`EPSubmitOrderBulk` giữ chỗ → `EPPayOrderBulk` trừ ví), lưu AWB → `trackingNumber`, order → `ready_to_ship`. **KHÔNG mở màn/modal riêng** — gắn vào nút có sẵn. Đã có AWB → nút khóa (idempotent, chống double-charge). Ví thiếu → `EASYPARCEL_WALLET_LOW`, order **không đổi**.
-> - Thêm card **Shipping & Tracking** (dưới Line Items):
+> **[F36 EasyParcel] Fulfillment trên OrderDetailPanel — INLINE, KHÔNG modal** (nguồn: PRD `docs/prd/F36-easyparcel-delivery.md` §6.C, single-courier). Toàn bộ xử lý đưa thẳng vào panel theo trạng thái. **KHÔNG mở modal · KHÔNG tab toggle EasyParcel/manual · KHÔNG dropdown chọn courier** (courier đã cố định ở Settings → `serviceId ← selectedCourier`, hệ thống tự lấy).
+
+**State 1 — Confirmed (chuẩn bị ship):** chỉ **1 nút** trên panel; bấm → chạy thẳng API (không modal), nút tự chuyển spinner đúng 2 bước:
+
+```text
+   [ 📦 Ready to Ship ]                    ◄── 1-click; product đủ số đo → chạy luôn
+        │ bấm
+        ▼
+   [ ⏳ Đang giữ chỗ… ]    (bước 1: EPSubmitOrderBulk — chưa trừ ví)
+   [ ⏳ Đang trừ ví… ]     (bước 2: EPPayOrderBulk — trừ ví, sinh AWB)
+```
+
+**State 2 — Success:** ẩn/khóa nút Ready to Ship (idempotent — chống trừ ví 2 lần), render card cố định:
 
 ```text
        ┌─ 📦 Shipping & Tracking ─────────────────────┐
-       │ Courier: J&T Express   AWB: 631234567890 [📋]│
-       │ [ 🖨️ In nhãn (PDF) ]   [ 📅 Đặt pickup ]     │
+       │ Courier: J&T Express   AWB: MY123456789 [📋] │ ◄── courier từ Settings (KHÔNG chọn lại)
+       │ [ 🖨️ In nhãn (PDF) ]   [ 📅 Đặt pickup ]     │ ◄── labelUrl · collection_date (default ngày làm việc kế)
        │ Tracking: ● Đang trung chuyển · 16/06 18:40  │ ◄── shippingTrackingStatus (cron poll 30–60′)
        │ Trạng thái đơn: Shipped   [ Đánh dấu hoàn tất ]│ ◄── order.status (manual, TÁCH tracking)
        └──────────────────────────────────────────────┘
 ```
 
-> - **Dual-field:** `order.status` (lifecycle, merchant bấm tay — vd "Đánh dấu hoàn tất") **tách biệt** `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron poll). Delivered → KHÔNG auto-complete; merchant tự bấm.
-> - **Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** nút **`[ Hoàn Tiền ]`** + **`[ Huỷ Đơn ]`** có sẵn (gọi `/refund` + `/cancel`, tự restock, idempotent). Message refund phân tier theo trạng thái label (chưa mua → full; chưa pickup → hủy trên dashboard EasyParcel; đã pickup → cước mất). **Reverse label cắt khỏi MVP.**
-> - **Non-EP tenant:** giữ nguyên nhánh nhập `trackingNumber` thủ công (không có nút Ready to Ship EasyParcel).
+**Error handling — INLINE ngay khu vực nút (không thông báo chung chung):**
+
+```text
+⚠️ EASYPARCEL_WALLET_LOW (alert đỏ/vàng dưới nút):
+   "Tài khoản EasyParcel không đủ số dư."  [ Nạp tiền ngay ↗ ]  [ Thử lại ]
+   → order KHÔNG đổi trạng thái
+
+🚫 COD East MY: nút "Ready to Ship" DISABLED ngay từ đầu + note:
+   "EasyParcel chỉ hỗ trợ COD tại khu vực West MY."
+```
+
+**Thiếu dữ liệu parcel (weight/dims) — INLINE input, KHÔNG modal (Option A):** đơn chuẩn (product đủ số đo) vẫn **1-click**. Khi product thiếu số đo → bấm Ready to Ship sẽ **chặn lại + xổ box nhập ngay dưới nút** (tái dùng component Weight/Dimensions cũ):
+
+```text
+   [ 📦 Ready to Ship ]
+   ⚠️ Thiếu thông tin kích thước gói hàng
+   Bổ sung để tạo vận đơn EasyParcel:
+   ┌──────────────────────────────────────┐
+   │ Cân nặng:  [ 600 ] g                 │
+   │ Kích thước: [ L ] x [ W ] x [ H ] cm │
+   └──────────────────────────────────────┘
+   [ Tiếp tục tạo nhãn ]                   ◄── điền xong → chạy tiếp luồng 2 bước
+```
+
+> **Refine PRD #1232:** thay vì âm thầm dùng hằng số `DEFAULT_PARCEL` khi thiếu số đo, **ưu tiên prompt merchant nhập inline** (cước chính xác hơn); const chỉ là last-resort nếu merchant bỏ qua. → cần cập nhật PRD §6.C cho khớp.
+
+**Dual-field:** `order.status` (lifecycle, merchant bấm tay — vd "Đánh dấu hoàn tất") **tách biệt** `shippingTrackingStatus` (13 status EasyParcel, cron poll). Delivered → KHÔNG auto-complete; merchant tự bấm.
+
+**Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** `[ Hoàn Tiền ]` + `[ Huỷ Đơn ]` có sẵn (`/refund` + `/cancel`, tự restock, idempotent); refund phân tier theo trạng thái label (chưa mua → full; chưa pickup → hủy trên dashboard EasyParcel; đã pickup → cước mất). **Reverse label cắt khỏi MVP.**
+
+**Non-EP tenant:** hiển thị ô nhập `trackingNumber` **thủ công ngay trên panel chính** (không có nút Ready to Ship EasyParcel, KHÔNG gộp vào modal/tab).
 
 ---
 
