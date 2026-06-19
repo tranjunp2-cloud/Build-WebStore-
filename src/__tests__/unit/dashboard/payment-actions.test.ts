@@ -104,6 +104,8 @@ describe('Payment Actions', () => {
         it('should update tenant on success', async () => {
             // Arrange
             vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+            // Backend guard fetches current tenant to merge effective payment state
+            mockPayloadContext.findByID.mockResolvedValue({ payments: {} });
             mockPayloadContext.update.mockResolvedValue({});
 
             // Act

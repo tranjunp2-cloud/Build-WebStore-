@@ -2031,7 +2031,13 @@
                 "xenditMaeDesc": "MAE digital wallet by Maybank",
                 "xenditDuitnowDesc": "Scan QR — all Malaysian banks supported",
                 "xenditFpxDesc": "Internet banking — personal & business",
-                "xenditLockTip": "Complete Xendit onboarding to enable"
+                "xenditLockTip": "Complete Xendit onboarding to enable",
+                "lastMethodWarning": "At least one payment method must stay active.",
+                "cancel": "Cancel",
+                "errAccountHolderRequired": "Account holder name is required.",
+                "errAccountNumberRequired": "Account number is required.",
+                "errAccountNumberFormat": "Account number must be at least 6 digits (numbers only).",
+                "fixBankErrors": "Please complete the required bank transfer fields."
             },
             "shipping": {
                 "pageTitle": "Shipping",

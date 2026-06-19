@@ -133,6 +133,21 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             return { success: false, error: 'No valid payment fields provided' };
         }
 
+        // Defence in depth: ensure at least one method stays active after this update.
+        // Must merge with current DB state because paymentsData is a partial update.
+        const currentTenant = await payload.findByID({ collection: 'tenants', id: tenantId });
+        const currentPayments = (currentTenant as any).payments || {};
+        const effective = {
+            payment_cod: currentPayments.payment_cod ?? false,
+            payment_qr: currentPayments.payment_qr ?? false,
+            payment_card: currentPayments.payment_card ?? false,
+            payment_fpx: currentPayments.payment_fpx ?? false,
+            ...paymentsData,
+        };
+        if (!effective.payment_cod && !effective.payment_qr && !effective.payment_card && !effective.payment_fpx) {
+            return { success: false, error: 'At least one payment method must remain active.' };
+        }
+
         await payload.update({
             collection: 'tenants',
             id: tenantId,
