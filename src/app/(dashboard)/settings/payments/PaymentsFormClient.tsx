@@ -97,6 +97,8 @@ export function PaymentsFormClient({
     const firstBankInputRef = useRef<HTMLInputElement>(null);
     // Guard: only scroll when user-triggered (not on initial data load)
     const bankFormUserTriggeredRef = useRef(false);
+    // Holds the setInterval ID while polling Stripe status after opening the connect new tab
+    const stripePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [bankTransferErrors, setBankTransferErrors] = useState<{ accountHolderName?: string; accountNumber?: string }>({});
     const [serverPaymentValues, setServerPaymentValues] = useState<{
         paymentCod: boolean; paymentQr: boolean; cardEnabled: boolean; fpxEnabled: boolean;
@@ -106,6 +108,41 @@ export function PaymentsFormClient({
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const sub = t.common.subscriptionErrors;
+
+    const stopStripePolling = () => {
+        if (stripePollingRef.current) {
+            clearInterval(stripePollingRef.current)
+            stripePollingRef.current = null
+        }
+    }
+
+    // Poll /api/stripe/connect/status after opening a new tab — catches the case where
+    // BroadcastChannel doesn't fire (tab closed before redirect, or unsupported browser).
+    // mode='connect': stops when account is first connected (OAuth complete).
+    // mode='onboard': stops only when onboardingComplete=true (KYC done) — avoids premature
+    //   toast when account is already connected but KYC is still in progress.
+    const startStripePolling = (mode: 'connect' | 'onboard') => {
+        if (!tenantId || stripePollingRef.current) return
+        stripePollingRef.current = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+                const data = await res.json()
+                if (!data.success) return
+                if (mode === 'connect' && data.data.connected) {
+                    setHasAccount(true)
+                    if (data.data.accountId) setCurrentAccountId(data.data.accountId)
+                    stopStripePolling()
+                } else if (mode === 'onboard' && data.data.onboardingComplete) {
+                    setHasAccount(true)
+                    setIsVerified(true)
+                    setIsChargesEnabled(true)
+                    if (data.data.accountId) setCurrentAccountId(data.data.accountId)
+                    toast.success(pt.stripeReturnSuccess)
+                    stopStripePolling()
+                }
+            } catch { /* best-effort — silent on network error */ }
+        }, 5000)
+    }
 
     useEffect(() => {
         if (!tenantId) { setIsLoading(false); return; }
@@ -148,12 +185,18 @@ export function PaymentsFormClient({
             .finally(() => setIsLoading(false));
     }, [tenantId]);
 
-    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28)
+    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28).
+    // Also broadcasts result to parent tab via BroadcastChannel when this page loaded in the new tab
+    // opened by handleConnectStripe / handleOnboardStripe.
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const params = new URLSearchParams(window.location.search);
         const stripeReturn = params.get('stripe');
         if (!stripeReturn) return;
+
+        // Scope channel by tenantId — prevents cross-tenant signal bleed in multi-tenant same-domain sessions
+        const bcName = tenantId ? `stripe-connect-${tenantId}` : 'stripe-connect'
+        const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(bcName) : null;
 
         if (stripeReturn === 'verified') {
             setHasAccount(true);
@@ -166,12 +209,25 @@ export function PaymentsFormClient({
                             setIsVerified(true);
                             setIsChargesEnabled(true);
                             toast.success(pt.stripeReturnSuccess);
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: true, accountId: data.data.accountId });
                         } else {
                             if (data.success && data.data.detailsSubmitted) setDetailsSubmitted(true);
                             toast.info(pt.stripeReturnKycPending);
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false, accountId: data.data?.accountId });
                         }
                     })
-                    .catch(() => toast.warning(pt.stripeReturnRefresh));
+                    .catch(() => {
+                        toast.warning(pt.stripeReturnRefresh);
+                        bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false });
+                    })
+                    .finally(() => {
+                        bc?.close();
+                        // Attempt to close the new tab — works when opened via window.open().
+                        // Silently no-ops if browser blocks (user just sees a second payments tab).
+                        setTimeout(() => window.close(), 300);
+                    });
+            } else {
+                bc?.close();
             }
         } else if (stripeReturn === 'complete') {
             setHasAccount(true); // ensure Verify button is shown
@@ -180,13 +236,49 @@ export function PaymentsFormClient({
             } else {
                 toast.info(pt.stripeReturnKycPending);
             }
+            bc?.postMessage({ type: 'stripe-connected' });
+            bc?.close();
+            setTimeout(() => window.close(), 300);
         } else if (stripeReturn === 'refresh') {
             if (stripeAccountId) setHasAccount(true); // only restore if they had an account before redirect
             toast.warning(pt.stripeReturnRefresh);
+            bc?.close();
         }
 
         router.replace('/settings/payments');
     }, []); // intentionally once on mount
+
+    // Receive Stripe connect result broadcast from the new tab — fires as soon as Stripe redirects
+    // back to /settings/payments?stripe=*, so the parent tab updates without waiting for polling.
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return
+        const bcName = tenantId ? `stripe-connect-${tenantId}` : 'stripe-connect'
+        const channel = new BroadcastChannel(bcName)
+        channel.addEventListener('message', (event: MessageEvent) => {
+            const { type, onboardingComplete, accountId } = event.data ?? {}
+            if (type === 'stripe-connected') {
+                setHasAccount(true)
+                if (accountId) setCurrentAccountId(accountId)
+                toast.info(pt.stripeReturnKycPending)
+                if (stripePollingRef.current) { clearInterval(stripePollingRef.current); stripePollingRef.current = null }
+            } else if (type === 'stripe-verified') {
+                setHasAccount(true)
+                if (accountId) setCurrentAccountId(accountId)
+                if (onboardingComplete) {
+                    setIsVerified(true)
+                    setIsChargesEnabled(true)
+                    toast.success(pt.stripeReturnSuccess)
+                } else {
+                    toast.info(pt.stripeReturnKycPending)
+                }
+                if (stripePollingRef.current) { clearInterval(stripePollingRef.current); stripePollingRef.current = null }
+            }
+        })
+        return () => channel.close()
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Cleanup polling if component unmounts while the Stripe new tab is still open
+    useEffect(() => () => { if (stripePollingRef.current) clearInterval(stripePollingRef.current) }, [])
 
     // Scroll bank transfer form into view when user expands it (Bug 2)
     // Use ref flag instead of isLoading — React 18 batches setPaymentQr+setIsLoading into one render,
@@ -213,7 +305,8 @@ export function PaymentsFormClient({
             });
             const data = await res.json();
             if (data.success && data.data?.oauthUrl) {
-                window.location.href = data.data.oauthUrl;
+                window.open(data.data.oauthUrl, '_blank', 'noopener,noreferrer')
+                startStripePolling('connect')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
@@ -236,7 +329,8 @@ export function PaymentsFormClient({
             });
             const data = await res.json();
             if (data.success && data.data?.url) {
-                window.location.href = data.data.url;
+                window.open(data.data.url, '_blank', 'noopener,noreferrer')
+                startStripePolling('onboard')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
