@@ -2022,6 +2022,7 @@
                 "xenditResendLink": "Resend link",
                 "xenditConnected": "Connected",
                 "xenditConnectedBar": "Xendit account connected",
+                "xenditConnectSuccess": "Xendit connected successfully!",
                 "xenditKybVerified": "API key connected · Payments active",
                 "xenditManage": "Manage in Xendit",
                 "xenditDisconnect": "Disconnect",
