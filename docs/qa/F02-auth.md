@@ -117,6 +117,34 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 
 ---
 
+---
+
+## 3.7. TenantAccessWatcher — Session Guard (Unit Tests)
+
+> Automated unit tests in `src/__tests__/unit/dashboard/tenant-access-watcher.test.tsx`
+> Bug fix: #1270 — "Access Revoked" false-positive on HMR / stale tenant cache
+
+| ID | Loại | Tiêu Đề | Kết Quả Mong Đợi | Ưu Tiên |
+|:---|:---|:---|:---|:---:|
+| **TC-1270-TAW-01** | `Unit` | Không gọi session-check trước 5s startup | `fetch` không được gọi trong 4999ms đầu. | High |
+| **TC-1270-TAW-02** | `Unit` | Gọi session-check đúng 1 lần sau 5s | `fetch` được gọi đúng 1 lần với `/api/auth/session-check`. | High |
+| **TC-1270-TAW-03** | `Unit` | retry:true × 2 rồi ok:true — không hiện dialog | Không hiện dialog "Access Revoked" trong toàn bộ luồng retry. | High |
+| **TC-1270-TAW-04** | `Unit` | retry:true × 3 liên tiếp → hiện "Session Expired" | Dialog hiện "Session Expired" (không phải "Access Revoked"). | Blocker |
+| **TC-1270-TAW-05** | `Unit` | subscription_expired → hiện dialog ngay lập tức | Dialog "Subscription Expired" xuất hiện sau lần check đầu. | Blocker |
+| **TC-1270-TAW-06** | `Unit` | Account suspended → hiện dialog ngay lập tức | Dialog "Account Suspended" xuất hiện sau lần check đầu. | Blocker |
+| **TC-1270-TAW-07** | `Unit` | Removed from workspace × 1 → không hiện dialog | Hit đầu tiên chỉ bắt đầu grace period 12s, chưa hiện dialog. | High |
+| **TC-1270-TAW-08** | `Unit` | Removed from workspace × 2 cách nhau ≥10s → hiện dialog | Dialog "Access Revoked" xuất hiện sau hit thứ hai xác nhận. | Blocker |
+| **TC-1270-TAW-09** | `Unit` | ok:true trong grace period reset counter | Sau recovery, hit đơn tiếp theo không hiện dialog. | High |
+| **TC-1270-TAW-10** | `Unit` | focus trong 5s startup không trigger check | `fetch` không được gọi khi focus trước khi `mountedRef=true`. | Medium |
+| **TC-1270-TAW-11** | `Unit` | focus trong grace period không trigger check | `fetch` không được gọi thêm khi đang trong grace period. | High |
+| **TC-1270-TAW-12** | `Unit` | Unmount trong startup delay hủy timer | `fetch` không được gọi sau khi component unmount. | Medium |
+| **TC-1270-TAW-13** | `Unit` | focus+visibilitychange double-fire chỉ tính 1 check | 5s guard chặn lần thứ hai; `fetch` chỉ được gọi 1 lần. | High |
+| **TC-1270-TAW-14** | `Unit` | expiresAt < 15min → trigger proactive refresh | `POST /api/auth/refresh-token` được gọi khi token gần hết hạn. | High |
+| **TC-1270-TAW-15** | `Unit` | refresh fail → không evict user | Refresh reject chỉ log warning; không hiện bất kỳ dialog eviction nào. | Blocker |
+| **TC-1270-TAW-16** | `Unit` | expiresAt > 15min → không refresh | `POST /api/auth/refresh-token` không được gọi khi token còn nhiều thời gian. | Medium |
+
+---
+
 ## 4. End-to-End User Flow (Acceptance Test)
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

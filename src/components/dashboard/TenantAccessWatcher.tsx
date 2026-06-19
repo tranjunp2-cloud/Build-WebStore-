@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
+
+const REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 min before expiry
 
 export function TenantAccessWatcher() {
     const [isEvicted, setIsEvicted] = useState(false);
     const [evictReason, setEvictReason] = useState<string>('');
     const [isLoggingOut, setIsLoggingOut] = useState(false);
-    const router = useRouter();
+    const { t } = useI18n();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Grace-period and retry counters — useRef to avoid triggering useEffect re-runs
@@ -20,6 +21,11 @@ export function TenantAccessWatcher() {
     const inGracePeriodRef = useRef(false);     // true during 12s grace period — blocks all checks
     const gracePeriodTimerRef = useRef<NodeJS.Timeout | null>(null); // tracked to clear on unmount
     const retryTimerRef = useRef<NodeJS.Timeout | null>(null);       // tracked to clear on unmount
+    // Minimum interval between checks — prevents double-fire from simultaneous
+    // focus + visibilitychange events burning the retry count within seconds.
+    const lastCheckAtRef = useRef(0);
+    // Tracks last proactive refresh — debounces to one refresh per REFRESH_THRESHOLD window.
+    const lastRefreshAtRef = useRef(0);
 
     useEffect(() => {
         let debounceId: NodeJS.Timeout | null = null;
@@ -31,6 +37,11 @@ export function TenantAccessWatcher() {
 
         const checkSession = async () => {
             if (isEvicted) return;
+            // Guard: skip if a check ran within 5s — prevents focus+visibilitychange
+            // double-fire from consuming 2 retries in rapid succession.
+            const checkAt = Date.now();
+            if (checkAt - lastCheckAtRef.current < 5_000) return;
+            lastCheckAtRef.current = checkAt;
             try {
                 const res = await fetch('/api/auth/session-check', { cache: 'no-store' });
                 if (!res.ok) return; // non-2xx (5xx) — skip silently, keep polling
@@ -42,6 +53,21 @@ export function TenantAccessWatcher() {
                     consecutiveFailRef.current = 0;
                     lastFailTimestampRef.current = 0;
                     retryCountRef.current = 0;
+
+                    // Proactive refresh: fire before the token expires to prevent session disruption.
+                    // Fire-and-forget — failure only warns; the current token stays valid until expiresAt.
+                    const expiresAt = data.expiresAt as number | undefined;
+                    const now = Date.now();
+                    if (
+                        expiresAt &&
+                        expiresAt - now < REFRESH_THRESHOLD &&
+                        now - lastRefreshAtRef.current > REFRESH_THRESHOLD
+                    ) {
+                        lastRefreshAtRef.current = now;
+                        fetch('/api/auth/refresh-token', { method: 'POST', cache: 'no-store' }).catch(
+                            (err) => console.warn('[TenantAccessWatcher] token refresh failed', err),
+                        );
+                    }
                     return;
                 }
 
@@ -169,18 +195,22 @@ export function TenantAccessWatcher() {
 
                 <h2 className="text-xl font-bold text-white mb-2 font-['Inter']">
                     {evictReason === 'subscription_expired'
-                        ? 'Subscription Expired'
+                        ? t.dashboard.tenantAccessWatcher.subscriptionExpiredTitle
                         : evictReason === 'Account suspended'
-                            ? 'Account Suspended'
-                            : 'Access Revoked'}
+                            ? t.dashboard.tenantAccessWatcher.accountSuspendedTitle
+                            : evictReason === 'Unauthenticated'
+                                ? t.dashboard.tenantAccessWatcher.sessionExpiredTitle
+                                : t.dashboard.tenantAccessWatcher.accessRevokedTitle}
                 </h2>
 
                 <p className="text-[14px] text-[rgba(248,250,252,0.7)] leading-[1.5] mb-6 font-['Inter']">
                     {evictReason === 'subscription_expired'
-                        ? 'Your subscription has expired. Please renew your plan to continue. You will now be logged out.'
+                        ? t.dashboard.tenantAccessWatcher.subscriptionExpiredBody
                         : evictReason === 'Account suspended'
-                            ? 'Your account has been suspended. Please contact support. You will now be logged out.'
-                            : 'Your access to this workspace has been removed by the workspace owner. You will now be logged out.'}
+                            ? t.dashboard.tenantAccessWatcher.accountSuspendedBody
+                            : evictReason === 'Unauthenticated'
+                                ? t.dashboard.tenantAccessWatcher.sessionExpiredBody
+                                : t.dashboard.tenantAccessWatcher.accessRevokedBody}
                 </p>
 
                 <button
@@ -188,7 +218,7 @@ export function TenantAccessWatcher() {
                     disabled={isLoggingOut}
                     className="w-full h-11 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-[12px] font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
-                    {isLoggingOut ? 'Logging out...' : 'Acknowledge'}
+                    {isLoggingOut ? t.dashboard.tenantAccessWatcher.loggingOut : t.dashboard.tenantAccessWatcher.acknowledge}
                 </button>
             </div>
         </div>

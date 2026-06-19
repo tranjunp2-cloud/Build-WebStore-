@@ -1007,7 +1007,7 @@ export const Users: CollectionConfig = {
                 const { SignJWT } = await import('jose')
                 const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
                 const secretKey = new TextEncoder().encode(secret)
-                const expSeconds = 60 * 60 * 24 // 24 hours
+                const expSeconds = 60 * 60 * 24
                 const now = Math.floor(Date.now() / 1000)
 
                 const token = await new SignJWT({

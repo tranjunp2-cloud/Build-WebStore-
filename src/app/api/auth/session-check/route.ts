@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import { getCurrentUser } from '@/lib/auth';
@@ -83,7 +84,22 @@ export async function GET() {
             );
         }
 
-        const response = NextResponse.json({ ok: true });
+        // Decode JWT exp to let the client proactively refresh before expiry.
+        // Best-effort: failure returns null, not a 500.
+        const cookieStore = await cookies();
+        const rawToken = cookieStore.get('payload-token')?.value;
+        let expiresAt: number | null = null;
+        if (rawToken) {
+            try {
+                const parts = rawToken.split('.');
+                const jwtPayload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+                expiresAt = typeof jwtPayload.exp === 'number' ? jwtPayload.exp * 1000 : null;
+            } catch {
+                // non-fatal: return ok:true without a usable expiresAt
+            }
+        }
+
+        const response = NextResponse.json({ ok: true, expiresAt });
         response.headers.set('Cache-Control', 'private, max-age=30');
         return response;
     } catch (error) {
