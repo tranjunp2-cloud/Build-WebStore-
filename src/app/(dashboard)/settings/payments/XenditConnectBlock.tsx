@@ -18,20 +18,13 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
     return (
         <>
             <div
-                className="relative grid items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] border overflow-hidden"
+                className="relative grid items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] overflow-hidden"
                 style={{
                     gridTemplateColumns: '56px 1fr auto',
-                    borderColor: 'rgba(45,212,191,0.32)',
-                    background: 'radial-gradient(circle at 0% 0%, rgba(45,212,191,0.12) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(14,165,233,0.08) 0%, transparent 52%), var(--dash-surface)',
-                    boxShadow: '0 0 0 1px rgba(45,212,191,0.06), 0 16px 40px -16px rgba(45,212,191,0.35)',
+                    background: 'var(--dash-surface)',
+                    border: '1px solid var(--dash-border)',
                 }}
             >
-                {/* Decorative glow */}
-                <div
-                    className="absolute pointer-events-none blur-[20px]"
-                    aria-hidden="true"
-                    style={{ inset: '-40% -10% auto auto', width: 380, height: 220, background: 'radial-gradient(ellipse at center, rgba(45,212,191,0.18), transparent 60%)' }}
-                />
 
                 {/* Icon */}
                 <div
