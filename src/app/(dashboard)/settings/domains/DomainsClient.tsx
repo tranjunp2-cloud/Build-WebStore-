@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
 
@@ -92,7 +95,7 @@ function SelectPrimaryPanel({
                                     onClick={() => setSelected(opt.value)}
                                     className="flex items-center gap-[12px] w-full p-[16px] rounded-[8px] transition-all text-left font-['Inter']"
                                     style={isSelected
-                                        ? { border: '1px solid #00D3D4', background: 'rgba(0,211,212,0.06)' }
+                                        ? { border: '1px solid hsl(var(--primary))', background: 'hsl(var(--primary)/0.06)' }
                                         : { border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }
                                     }
                                     onMouseEnter={e => {
@@ -106,12 +109,12 @@ function SelectPrimaryPanel({
                                     <div
                                         className="flex shrink-0 items-center justify-center h-[20px] w-[20px] rounded-full border-2 transition-all"
                                         style={isSelected
-                                            ? { borderColor: '#00D3D4' }
+                                            ? { borderColor: 'hsl(var(--primary))' }
                                             : { borderColor: 'var(--dash-border)', background: 'transparent' }
                                         }
                                     >
                                         {isSelected && (
-                                            <div className="h-[10px] w-[10px] rounded-full" style={{ background: '#00D3D4' }} />
+                                            <div className="h-[10px] w-[10px] rounded-full" style={{ background: 'hsl(var(--primary))' }} />
                                         )}
                                     </div>
                                     <span
@@ -137,24 +140,24 @@ function SelectPrimaryPanel({
                     className="flex items-center gap-[12px] px-[32px] pb-[32px] pt-[16px]"
                     style={{ borderTop: '1px solid var(--dash-border)' }}
                 >
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
-                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                        variant="dashSecondary"
+                        className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
                     >
                         {t?.Domains?.cancel || 'Cancel'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         disabled={isPending}
                         onClick={() => onSave(selected)}
-                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                        className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50"
+                        variant="dashPrimary"
+                        className="flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter']"
                     >
                         {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                         {t?.Domains?.save || 'Save'}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </>
@@ -201,12 +204,12 @@ function TxtChallengeCard({
     return (
         <div
             className="mt-4 p-4 sm:p-6 rounded-[16px]"
-            style={{ border: '1px solid rgba(255,176,32,0.3)', background: 'rgba(255,176,32,0.04)' }}
+            style={{ border: '1px solid hsl(var(--warning)/0.3)', background: 'hsl(var(--warning)/0.04)' }}
             role="region"
             aria-labelledby={`txt-challenge-${domain}`}
         >
             <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: '#FFB020' }} aria-hidden="true" />
+                <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'hsl(var(--warning))' }} aria-hidden="true" />
                 <div>
                     <h4 id={`txt-challenge-${domain}`} className="text-[15px] font-semibold font-['Inter']" style={{ color: 'var(--dash-text)' }}>
                         Verify domain ownership
@@ -239,7 +242,7 @@ function TxtChallengeCard({
                             className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
-                            {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
+                            {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
                         </button>
                     </div>
 
@@ -255,7 +258,7 @@ function TxtChallengeCard({
                             className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
-                            {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
+                            {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
                         </button>
                     </div>
 
@@ -271,17 +274,17 @@ function TxtChallengeCard({
                 </p>
             )}
 
-            <button
+            <Button
                 type="button"
                 onClick={onVerifyClick}
                 disabled={isVerifying}
                 aria-busy={isVerifying}
-                className="flex items-center justify-center gap-2 h-[44px] px-6 rounded-[12px] text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-['Inter']"
-                style={{ background: '#00D3D4', color: 'var(--dash-surface)' }}
+                variant="dashPrimary"
+                className="h-[44px] px-6 rounded-[12px] text-[14px] font-['Inter']"
             >
                 {isVerifying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                 {isVerifying ? 'Verifying…' : 'Verify Now'}
-            </button>
+            </Button>
         </div>
     );
 }
@@ -523,8 +526,8 @@ export function DomainsClient({
         <div className="w-full space-y-[28px]">
             {/* Page Header */}
             <div className="flex items-center gap-4">
-                <div className="hidden sm:flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-blue-500/10 border border-blue-500/20 shrink-0">
-                    <Globe className="h-6 w-6 text-blue-500" />
+                <div className="hidden sm:flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">
+                    <Globe className="h-6 w-6 text-[hsl(var(--primary))]" />
                 </div>
                 <div>
                     <h1 className="text-[24px] font-bold text-[var(--dash-text)]">{t?.Domains?.title || 'Domain Management'}</h1>
@@ -545,23 +548,25 @@ export function DomainsClient({
                     </div>
                     {/* Buttons — stack on mobile, row on desktop */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px] sm:gap-[24px] shrink-0">
-                        <button
+                        <Button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
-                            className="flex items-center justify-center py-[12px] px-[24px] sm:px-[68px] rounded-[16px] bg-transparent text-[14px] sm:text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
-                            style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                            variant="dashSecondary"
+                            size="dash"
+                            className="whitespace-nowrap font-['Inter']"
                         >
                             {t?.Domains?.selectPrimary || 'Select primary domain'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
                             onClick={() => { setIsAddModalOpen(true); setDomainError(''); setNewDomainInput(''); }}
-                            style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                            className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[14px] sm:text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                            variant="dashPrimary"
+                            size="dash"
+                            className="whitespace-nowrap font-['Inter']"
                         >
-                            <Plus className="h-5 w-5" />
+                            <Plus className="h-4 w-4" />
                             <span>{t?.Domains?.addCustomDomain || 'Add Custom Domain'}</span>
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -576,8 +581,8 @@ export function DomainsClient({
                                 <div className="flex flex-wrap items-center gap-3">
                                     <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{currentSlug}.{PLATFORM_DOMAIN}</h3>
                                     {!hasCustomPrimary && (
-                                        <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                            <span className="text-[12px] font-semibold text-violet-700 dark:text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
+                                        <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[hsl(var(--info)/0.3)] bg-[hsl(var(--info)/0.2)]">
+                                            <span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                         </div>
                                     )}
                                 </div>
@@ -604,9 +609,9 @@ export function DomainsClient({
                                     </div>
                                     <div className="ml-2">
                                         {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
-                                        {slugStatus === 'available' && <Check className="h-4 w-4 text-[#05DF72]" />}
+                                        {slugStatus === 'available' && <Check className="h-4 w-4 text-[hsl(var(--success))]" />}
                                         {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
-                                            <span className="text-[12px] text-[#FF6467]">{slugMessage}</span>
+                                            <span className="text-[12px] text-[hsl(var(--destructive))]">{slugMessage}</span>
                                         )}
                                     </div>
                                 </div>
@@ -618,34 +623,34 @@ export function DomainsClient({
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             {!isEditingSlug ? (
-                                <button
+                                <Button
                                     type="button"
                                     onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
-                                    className="flex items-center gap-2 py-[10px] px-[16px] rounded-[12px] bg-transparent text-[13px] font-medium hover:bg-white/5 transition-colors"
-                                    style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                    variant="dashSecondary"
+                                    className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px] font-medium"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     {t?.Domains?.changeSubdomain || 'Change subdomain'}
-                                </button>
+                                </Button>
                             ) : (
                                 <div className="flex items-center gap-2">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
-                                        className="py-[10px] px-[16px] rounded-[12px] text-[13px] font-medium hover:bg-white/5 transition-colors"
-                                        style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                        variant="dashSecondary"
+                                        className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px] font-medium"
                                     >
                                         {t?.Domains?.cancel || 'Cancel'}
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         type="button"
                                         disabled={slugStatus !== 'available' || slugInput === currentSlug}
                                         onClick={() => setShowSlugConfirm(true)}
-                                        className="py-[10px] px-[16px] rounded-[12px] text-white text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-                                        style={{ background: slugStatus === 'available' ? 'linear-gradient(90deg, #3B82F6, #2DD4BF)' : '#374151' }}
+                                        variant="dashPrimary"
+                                        className="py-[10px] px-[16px] h-auto rounded-[12px] text-[13px]"
                                     >
                                         {t?.Domains?.save || 'Save'}
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </div>
@@ -669,29 +674,29 @@ export function DomainsClient({
                                 <p className="text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>
                                     {(t?.Domains?.subdomainRedirectMsg || 'Your current subdomain {old} will redirect to {new} for 30 days.').replace('{old}', currentSlug).replace('{new}', slugInput)}
                                 </p>
-                                <p className="text-[14px] text-orange-400">
+                                <p className="text-[14px] text-warning">
                                     {t?.Domains?.subdomainWarning || 'After 30 days, the old link will stop working. Update your marketing materials.'}
                                 </p>
                             </div>
                             <div className="mt-5 flex justify-end gap-3">
-                                <button
+                                <Button
                                     type="button"
                                     onClick={() => setShowSlugConfirm(false)}
-                                    className="py-[10px] px-[20px] rounded-[12px] text-[14px] font-medium hover:bg-white/5 transition-colors"
-                                    style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                    variant="dashSecondary"
+                                    className="py-[10px] px-[20px] h-auto rounded-[12px] text-[14px] font-medium"
                                 >
                                     {t?.Domains?.cancel || 'Cancel'}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
                                     disabled={savingSlug}
                                     onClick={handleSaveSlug}
-                                    className="flex items-center gap-2 py-[10px] px-[20px] rounded-[12px] text-white text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
-                                    style={{ background: 'linear-gradient(90deg, #3B82F6, #2DD4BF)' }}
+                                    variant="dashPrimary"
+                                    className="py-[10px] px-[20px] h-auto rounded-[12px] text-[14px]"
                                 >
                                     {savingSlug && <Loader2 className="h-4 w-4 animate-spin" />}
                                     {t?.Domains?.confirmChange || 'Confirm change'}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </>
@@ -737,7 +742,7 @@ export function DomainsClient({
                                                         <button
                                                             type="button"
                                                             onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }}
-                                                            className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
+                                                            className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
                                                         >
                                                             <Copy className="h-5 w-5" />
                                                         </button>
@@ -759,7 +764,7 @@ export function DomainsClient({
                                                 <button
                                                     type="button"
                                                     onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success(t?.Domains?.copied || 'Copied!'); }}
-                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
+                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
                                                 >
                                                     <Copy className="h-5 w-5" />
                                                 </button>
@@ -773,9 +778,9 @@ export function DomainsClient({
 
                                 {/* Error banner */}
                                 {verifyErrors[domain] && (
-                                    <div className="flex items-start gap-[12px] w-full p-[16px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)] animate-in fade-in duration-200">
-                                        <AlertCircle className="h-5 w-5 text-[#FF6467] shrink-0 mt-[1px]" strokeWidth={1.67} />
-                                        <span className="text-[14px] font-normal leading-[1.43em] text-[#FFC9C9] font-['Inter']">
+                                    <div className="flex items-start gap-[12px] w-full p-[16px] rounded-[16px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] animate-in fade-in duration-200">
+                                        <AlertCircle className="h-5 w-5 text-[hsl(var(--destructive))] shrink-0 mt-[1px]" strokeWidth={1.67} />
+                                        <span className="text-[14px] font-normal leading-[1.43em] text-[hsl(var(--destructive))] font-['Inter']">
                                             {verifyErrors[domain]}
                                         </span>
                                     </div>
@@ -783,22 +788,22 @@ export function DomainsClient({
 
                                 {/* Action buttons */}
                                 <div className="flex flex-col sm:flex-row w-full gap-[12px]">
-                                    <button
+                                    <Button
                                         type="button"
                                         onClick={() => handleVerify(domain)}
                                         disabled={isPending || !!verifyingDomain}
-                                        className="w-full sm:flex-1 flex items-center justify-center h-[50px] rounded-[16px] hover:opacity-90 text-white text-[16px] font-semibold font-['Inter'] transition-opacity gap-[8px] shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] disabled:opacity-70"
-                                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                                        variant="dashPrimary"
+                                        className="w-full sm:flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter'] gap-[8px]"
                                     >
                                         {verifyingDomain === domain ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
                                         {verifyingDomain === domain ? (t?.Domains?.verifying || 'Verifying...') : (t?.Domains?.verifyConnection || 'Verify Connection')}
-                                    </button>
+                                    </Button>
                                     <button
                                         type="button"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending}
-                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
-                                        style={{ border: '1px solid rgba(251,44,54,0.3)' }}
+                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
+                                        style={{ border: '1px solid hsl(var(--destructive)/0.3)' }}
                                     >
                                         {t?.Domains?.remove || 'Remove'}
                                     </button>
@@ -834,8 +839,8 @@ export function DomainsClient({
                                             {t?.Domains?.connectedSecured || 'Connected & Secured'}
                                         </Badge>
                                         {isPrimary && (
-                                            <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                                <span className="text-[12px] font-semibold text-violet-700 dark:text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
+                                            <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[hsl(var(--info)/0.3)] bg-[hsl(var(--info)/0.2)]">
+                                                <span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                             </div>
                                         )}
                                     </div>
@@ -846,8 +851,8 @@ export function DomainsClient({
                                         type="button"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending || isPrimary === true}
-                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
-                                        style={{ border: '1px solid rgba(251,44,54,0.3)' }}
+                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] bg-transparent text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)] text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
+                                        style={{ border: '1px solid hsl(var(--destructive)/0.3)' }}
                                         title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
                                     >
                                         {t?.Domains?.removeDomain || 'Remove Domain'}
@@ -884,44 +889,39 @@ export function DomainsClient({
                             </div>
                         </div>
                         {/* Input — Figma: y=105, note bottom=81 → gap=24px */}
-                        <input
+                        <Input
                             type="text"
                             value={newDomainInput}
                             onChange={(e) => { setNewDomainInput(e.target.value); setDomainError(''); }}
                             onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
                             placeholder="example.com"
                             autoFocus
-                            className="mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] text-[16px] font-normal placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter']"
-                            style={{
-                                background: 'var(--dash-surface)',
-                                color: 'var(--dash-text)',
-                                border: domainError ? '1px solid rgb(239 68 68)' : '1px solid var(--dash-border)',
-                            }}
+                            className={cn("mt-[24px] h-[50px] py-[12px] px-[16px] rounded-[16px] text-[16px] font-normal font-['Inter']", domainError && "border-[hsl(var(--destructive))]")}
                         />
                         {domainError && (
-                            <p className="text-red-400 text-[13px] mt-[8px]">{domainError}</p>
+                            <p className="text-destructive text-[13px] mt-[8px]">{domainError}</p>
                         )}
                         {/* Buttons — Figma: y=179, input bottom=155 → gap=24px */}
                         <div className="mt-[24px] flex items-center gap-[12px]">
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
-                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
-                                style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                variant="dashSecondary"
+                                className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
-                            </button>
+                            </Button>
                             {/* Figma: dim gradient when empty, full gradient when input has value */}
-                            <button
+                            <Button
                                 type="button"
                                 onClick={handleAddDomain}
                                 disabled={isPending}
-                                style={{ background: 'linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)' }}
-                                className={`flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] transition-all shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] ${newDomainInput.trim() ? 'opacity-100 hover:opacity-90' : 'opacity-50'} ${isPending ? 'opacity-50' : ''}`}
+                                variant="dashPrimary"
+                                className={cn("flex-1 h-[50px] rounded-[16px] text-[16px] font-['Inter']", !newDomainInput.trim() && 'opacity-50')}
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                                 {t?.Domains?.addDomain || 'Add Domain'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -959,19 +959,19 @@ export function DomainsClient({
                             </div>
                         </div>
                         <div className="mt-[24px] flex items-center gap-[12px]">
-                            <button
+                            <Button
                                 type="button"
                                 onClick={() => setRemovingDomain(null)}
-                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
-                                style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
+                                variant="dashSecondary"
+                                className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
-                            </button>
+                            </Button>
                             <button
                                 type="button"
                                 onClick={handleRemoveConfirm}
                                 disabled={isPending}
-                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] border border-[#FB2C36]/30 bg-[#FB2C36]/10 text-[#FF6467] text-[16px] font-semibold leading-[1.5em] hover:bg-[#FB2C36]/20 transition-colors font-['Inter'] disabled:opacity-50"
+                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] text-[hsl(var(--destructive))] text-[16px] font-semibold leading-[1.5em] hover:bg-[hsl(var(--destructive)/0.2)] transition-colors font-['Inter'] disabled:opacity-50"
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                                 {t?.Domains?.removeDomain || 'Remove Domain'}

@@ -63,7 +63,7 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       data-testid={`customize-item-${id}`}
-      className="flex items-center gap-4 px-[17px] py-[14px] h-[70px] rounded-[12px] border border-solid border-[rgba(255,255,255,0.08)] bg-[rgba(11,17,32,0.5)] hover:bg-[#1C263B] transition-colors"
+      className="flex items-center gap-4 px-[17px] py-[14px] h-[70px] rounded-[12px] border border-solid border-white/[0.08] bg-[hsl(var(--background)/0.5)] hover:bg-[hsl(var(--secondary))] transition-colors"
     >
       {/* Drag Handle — desktop only */}
       <div
@@ -78,15 +78,15 @@ function SortableItem({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggle(id); }}
-        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 border-solid transition-colors duration-200 cursor-pointer ${visible ? 'border-blue-400 bg-[#8EBAFF]' : ''}`}
+        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 border-solid transition-colors duration-200 cursor-pointer ${visible ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]' : ''}`}
         style={!visible ? { borderColor: 'var(--dash-text-muted)', background: 'var(--dash-secondary-bg)' } : {}}
       >
-        {visible && <Check className="h-3.5 w-3.5 text-white stroke-[3px]" />}
+        {visible && <Check className="h-3.5 w-3.5 !text-white stroke-[3px]" />}
       </button>
 
       {/* Text Content */}
       <div className="flex flex-col flex-1 text-left leading-tight">
-        <span className="text-[14px] font-medium text-[#F8FAFC]">{label}</span>
+        <span className="text-[14px] font-medium text-[hsl(var(--foreground))]">{label}</span>
         <span className="text-[12px] font-normal text-slate-400 mt-0.5">{value}</span>
       </div>
 
@@ -198,7 +198,7 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
 
   return (
     <>
-      <button data-testid="customize-dashboard-btn" onClick={() => setIsOpen(true)} className="flex items-center gap-[6px] rounded-[8px] border border-solid border-[#1F2937] bg-transparent px-[16px] py-[8px] text-[13px] font-semibold text-white hover:bg-[#1F2937] transition-all leading-none">
+      <button data-testid="customize-dashboard-btn" onClick={() => setIsOpen(true)} className="flex items-center gap-[6px] rounded-[8px] border border-solid border-[hsl(var(--border))] bg-transparent px-[16px] py-[8px] text-[13px] font-semibold text-white hover:bg-[hsl(var(--secondary))] transition-all leading-none">
         <Settings className="w-4 h-4 shrink-0" aria-hidden />
         <span>{t.dashboard.overview.customize}</span>
       </button>
@@ -216,11 +216,11 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-            className="w-full max-w-[672px] rounded-[16px] border border-solid border-white/10 bg-[#1E293B] shadow-2xl flex flex-col max-h-[90vh]"
+            className="w-full max-w-[672px] rounded-[16px] border border-solid border-white/10 bg-[hsl(var(--secondary))] shadow-2xl flex flex-col max-h-[90vh]"
           >
             {/* Header */}
             <div className="shrink-0 p-6 pb-6 border-b border-solid border-white/5 flex flex-col gap-1.5">
-              <h2 className="text-[20px] sm:text-[22px] font-bold text-[#F8FAFC] leading-tight">{t.dashboard.overview.customizeModal.title}</h2>
+              <h2 className="text-[20px] sm:text-[22px] font-bold text-[hsl(var(--foreground))] leading-tight">{t.dashboard.overview.customizeModal.title}</h2>
               <p className="text-[14px] text-slate-400">{t.dashboard.overview.customizeModal.description}</p>
             </div>
             
@@ -252,7 +252,7 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
             <div className="mt-auto flex shrink-0 justify-end gap-3 px-6 py-4 border-t border-solid border-white/5">
               <button 
                 onClick={() => setIsOpen(false)} 
-                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-[#172033] border border-solid border-white/10 text-[14px] font-medium text-[#FAFAFA] hover:bg-white/10 transition-colors" 
+                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-[hsl(var(--card))] border border-solid border-white/10 text-[14px] font-medium text-[hsl(var(--foreground))] hover:bg-white/10 transition-colors"
                 disabled={isPending}
               >
                 {t.dashboard.overview.customizeModal.cancel}
@@ -260,7 +260,7 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
               <button 
                 onClick={handleSave} 
                 disabled={isPending} 
-                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] text-[14px] font-medium text-white hover:bg-blue-400 disabled:opacity-50 transition-colors"
+                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-[hsl(var(--primary))] shadow-[0_0_15px_hsl(var(--primary)/0.3)] text-[14px] font-medium !text-white hover:bg-[hsl(var(--primary)/0.9)] disabled:opacity-50 transition-colors"
               >
                 {isPending ? t.dashboard.overview.customizeModal.saving : t.dashboard.overview.customizeModal.save}
               </button>

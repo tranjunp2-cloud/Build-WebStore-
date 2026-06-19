@@ -56,11 +56,11 @@ export function TableSearch({
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder={placeholder}
-                className="w-full h-9 rounded-md pl-9 pr-3 text-[13px] outline-none transition-colors"
+                autoComplete="off"
+                className="w-full h-9 rounded-md pl-9 pr-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                 style={{
-                    // Transparent fill to match the FilterChip pills (same border + height).
+                    // Transparent fill to match the FilterChip pills (same height).
                     background: 'transparent',
-                    border: '1px solid var(--dash-border)',
                     color: 'var(--dash-text)',
                 }}
             />

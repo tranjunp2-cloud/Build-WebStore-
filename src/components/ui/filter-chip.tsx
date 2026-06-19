@@ -47,7 +47,7 @@ export function FilterChip<T extends string>({
                 className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
                     background: active ? 'hsl(var(--primary) / 0.12)' : 'transparent',
-                    border: active ? '1px solid hsl(var(--primary) / 0.4)' : '1px solid var(--dash-border)',
+                    border: active ? '1px solid hsl(var(--primary) / 0.4)' : '1px solid hsl(var(--input-border))',
                     color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                 }}
             >

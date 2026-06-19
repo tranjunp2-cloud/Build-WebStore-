@@ -29,7 +29,7 @@ const buttonVariants = cva(
                 dashPrimary:
                     'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
                 dashSecondary:
-                    '[border:1px_solid_var(--dash-border)] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
+                    '[border:1px_solid_hsl(var(--input-border))] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
             },
             size: {
                 default: 'h-10 px-5 py-2',

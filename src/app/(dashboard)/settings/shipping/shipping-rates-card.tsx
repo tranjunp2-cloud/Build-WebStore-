@@ -6,6 +6,8 @@ import { useI18n } from '@/i18n'
 import { WEST_MY_STATES } from '@/lib/shipping'
 import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { LivePreviewPanel } from './live-preview-panel'
 
 const WEST_STATES_PREVIEW = WEST_MY_STATES.slice(0, 5)
@@ -28,8 +30,8 @@ type Props = {
     helperText: string
 }
 
-const INPUT_CLS =
-    'min-h-[44px] w-full rounded-[10px] border border-white/[0.12] bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/30'
+// Geometry only — colors/border/focus inherited from shared <Input> primitive
+const INPUT_CLS = 'min-h-[44px] rounded-[10px] pl-10 pr-3 text-[15px]'
 
 const CHIP_CLS =
     'rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[11px] text-[var(--dash-text-muted)]'
@@ -55,11 +57,11 @@ export function ShippingRatesCard({
     const [westExpanded, setWestExpanded] = useState(false)
     const westStates = westExpanded ? WEST_MY_STATES : WEST_STATES_PREVIEW
     return (
-        <div className="flex flex-col p-6 rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-5">
+        <div className="flex flex-col p-6 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] gap-5">
             {/* Card header */}
             <div className="flex items-start gap-4">
-                <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 shrink-0">
-                    <Truck className="h-5 w-5 text-[#2DD4BF]" />
+                <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">
+                    <Truck className="h-5 w-5 text-[hsl(var(--primary))]" />
                 </div>
                 <div>
                     <h3 className="text-[18px] font-semibold text-[var(--dash-text)]">{s.title}</h3>
@@ -75,7 +77,7 @@ export function ShippingRatesCard({
                         <span className="text-[14px] font-medium text-[var(--dash-text)]">{s.westMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span tabIndex={0} className="cursor-default rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
+                                <span tabIndex={0} className="cursor-default rounded-full bg-[hsl(var(--info)/0.15)] border border-[hsl(var(--info)/0.3)] px-2.5 py-0.5 text-[11px] font-semibold text-[hsl(var(--info))] tracking-wide">
                                     {s.westBadge}
                                 </span>
                             </TooltipTrigger>
@@ -86,14 +88,14 @@ export function ShippingRatesCard({
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">
                             RM
                         </span>
-                        <input
+                        <Input
                             id="ship-rate-west"
                             type="text"
                             inputMode="decimal"
                             aria-label={s.westMalaysia}
                             aria-invalid={westError ? true : undefined}
                             aria-describedby={westError ? 'ship-rate-west-err' : undefined}
-                            className={INPUT_CLS + (westError ? ' border-destructive' : '')}
+                            className={cn(INPUT_CLS, westError && 'border-[hsl(var(--destructive))]')}
                             placeholder="8.00"
                             value={westRateRm}
                             onChange={e => {
@@ -112,7 +114,7 @@ export function ShippingRatesCard({
                             }}
                         />
                     </div>
-                    {westError && <p id="ship-rate-west-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{westError}</p>}
+                    {westError && <p id="ship-rate-west-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{westError}</p>}
                     {westWarning && !westError && <p role="status" className="mt-1 text-xs text-[var(--dash-text-muted)]">{westWarning}</p>}
                     {!westError && !westWarning && <p className="mt-1 text-xs text-[var(--dash-text-muted)]">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">
@@ -146,7 +148,7 @@ export function ShippingRatesCard({
                         <span className="text-[14px] font-medium text-[var(--dash-text)]">{s.eastMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span tabIndex={0} className="cursor-default rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
+                                <span tabIndex={0} className="cursor-default rounded-full bg-[hsl(var(--primary)/0.15)] border border-[hsl(var(--primary)/0.3)] px-2.5 py-0.5 text-[11px] font-semibold text-[hsl(var(--primary))] tracking-wide">
                                     {s.eastBadge}
                                 </span>
                             </TooltipTrigger>
@@ -157,14 +159,14 @@ export function ShippingRatesCard({
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">
                             RM
                         </span>
-                        <input
+                        <Input
                             id="ship-rate-east"
                             type="text"
                             inputMode="decimal"
                             aria-label={s.eastMalaysia}
                             aria-invalid={eastError ? true : undefined}
                             aria-describedby={eastError ? 'ship-rate-east-err' : undefined}
-                            className={INPUT_CLS + (eastError ? ' border-destructive' : '')}
+                            className={cn(INPUT_CLS, eastError && 'border-[hsl(var(--destructive))]')}
                             placeholder="15.00"
                             value={eastRateRm}
                             onChange={e => {
@@ -183,7 +185,7 @@ export function ShippingRatesCard({
                             }}
                         />
                     </div>
-                    {eastError && <p id="ship-rate-east-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400"><AlertCircle className="h-4 w-4 shrink-0" />{eastError}</p>}
+                    {eastError && <p id="ship-rate-east-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive"><AlertCircle className="h-4 w-4 shrink-0" />{eastError}</p>}
                     {eastWarning && !eastError && <p role="status" className="mt-1 text-xs text-[var(--dash-text-muted)]">{eastWarning}</p>}
                     {!eastError && !eastWarning && <p className="mt-1 text-xs text-[var(--dash-text-muted)]">{helperText}</p>}
                     <div className="flex flex-wrap gap-1.5">

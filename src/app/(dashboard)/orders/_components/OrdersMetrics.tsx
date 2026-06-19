@@ -42,32 +42,32 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
         {
             label: o.metrics.pending,
             value: counts.pending,
-            icon: <Clock className="w-5 h-5 text-[#FF8904]" />,
-            iconBg: 'bg-[rgba(255,105,0,0.1)]',
+            icon: <Clock className="w-5 h-5 text-[hsl(var(--warning))]" />,
+            iconBg: 'bg-[hsl(var(--warning)/0.1)]',
         },
         {
             label: o.metrics.readyToShip,
             value: counts.readyToShip,
-            icon: <Package className="w-5 h-5 text-blue-500" />,
-            iconBg: 'bg-blue-500/10',
+            icon: <Package className="w-5 h-5 text-[hsl(var(--info))]" />,
+            iconBg: 'bg-[hsl(var(--info)/0.1)]',
         },
         {
             label: o.status.confirmed,
             value: counts.confirmed,
-            icon: <CheckCircle2 className="w-5 h-5 text-blue-500" />,
-            iconBg: 'bg-blue-500/10',
+            icon: <CheckCircle2 className="w-5 h-5 text-[hsl(var(--info))]" />,
+            iconBg: 'bg-[hsl(var(--info)/0.1)]',
         },
         {
             label: o.metrics.shipped,
             value: counts.shipped,
-            icon: <Truck className="w-5 h-5 text-[#05DF72]" />,
-            iconBg: 'bg-[rgba(0,201,80,0.1)]',
+            icon: <Truck className="w-5 h-5 text-[hsl(var(--success))]" />,
+            iconBg: 'bg-[hsl(var(--success)/0.1)]',
         },
         {
             label: o.metrics.cancelled,
             value: counts.cancelled,
-            icon: <XCircle className="w-5 h-5 text-[#FF6467]" />,
-            iconBg: 'bg-[rgba(251,44,54,0.1)]',
+            icon: <XCircle className="w-5 h-5 text-[hsl(var(--destructive))]" />,
+            iconBg: 'bg-[hsl(var(--destructive)/0.1)]',
         },
     ]
 

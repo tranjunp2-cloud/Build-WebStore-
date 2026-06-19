@@ -38,7 +38,7 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-xl font-bold text-white">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] text-xl font-bold text-white">
                             {fullName.charAt(0).toUpperCase()}
                         </div>
                         <div>

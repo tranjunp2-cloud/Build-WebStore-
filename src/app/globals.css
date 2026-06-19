@@ -61,8 +61,8 @@
   --dash-accent: hsl(var(--primary));        /* GH-1192: nay = TEAL (đổi từ #2563EB) */
   --dash-secondary-bg: hsl(var(--secondary));
   /* Specialized — không có semantic tương đương (vẫn override theo .dark bên dưới) */
-  --dash-sidebar-bg: #F8FAFC;
-  --dash-col-divider-color: var(--dash-divider);
+  --dash-sidebar-bg: #FFFFFF;
+  --dash-col-divider-color: transparent; /* light: bỏ viền dọc giữa sidebar/header và content (dark đã transparent) */
   --dash-divider: #CBD5E1;
   --dash-error: #FB2C36;
   --dash-warning: #B45309;
@@ -117,7 +117,7 @@
 :root {
   /* ── Primitive palette (lưu dạng "H S% L%" để semantic dùng hsl(var(--x) / <a>)) ── */
   --p-teal-400: 172.46 66.01% 50.39%;  /* #2DD4BF (HSL decimal → khớp hex chính xác) */
-  --p-teal-600: 174.67 83.85% 31.57%;  /* #0D9488 (HSL decimal → khớp hex chính xác) */
+  --p-teal-600: 180.28 100% 41.57%;  /* #00D3D4 (light brand teal — GH-1192 update; HSL decimal khớp hex) */
   --p-blue-500: 217.22 91.22% 59.8%;   /* #3B82F6 */
   --p-blue-600: 221.21 83.19% 53.33%;  /* #2563EB */
   --p-slate-50: 210 40% 98.04%;        /* #F8FAFC */
@@ -138,19 +138,20 @@
 
   /* ── Semantic — Light ── */
   --background: var(--p-slate-50);
-  --foreground: var(--p-slate-900);
+  --foreground: 208.96 29.9% 19.02%;       /* #22313F — chữ body light (GH-1192) */
   --card: 0 0% 100%;
   --card-foreground: var(--p-slate-900);
   --popover: 0 0% 100%;
   --popover-foreground: var(--p-slate-900);
-  --primary: var(--p-teal-600);            /* Teal #0D9488 */
-  --primary-foreground: 0 0% 100%;
+  --primary: var(--p-teal-600);            /* Teal #00D3D4 (light) */
+  --primary-foreground: var(--p-slate-900); /* #0F172A — chữ đậm trên teal sáng (WCAG ~9:1, GH-1192) */
   --secondary: var(--p-slate-100);
   --secondary-foreground: var(--p-slate-900);
   --muted: var(--p-slate-100);
-  --muted-foreground: var(--p-slate-500);
+  --muted-foreground: 208.96 29.9% 19.02%;  /* #22313F (light — GH-1192; trước là #64748B) */
   --border: var(--p-slate-200);            /* #E2E8F0 */
   --input: var(--p-slate-200);
+  --input-border: 210 7% 72%;              /* #B3B8BD = rgba(1,18,34,0.30) trên nền trắng — viền input (GH-1192) */
   --ring: var(--p-teal-600);
   /* --radius: 0.5rem đã khai ở :root phía trên */
   --success: var(--p-emerald-600);    --success-foreground: 0 0% 100%;
@@ -177,6 +178,7 @@
   --muted-foreground: var(--p-gray-400);   /* #9CA3AF */
   --border: 213.33 24.32% 21.76%;                   /* #2A3645 — fix #1222 (table row border hover) đã về staging */
   --input: 213.33 24.32% 21.76%;
+  --input-border: 213.33 24.32% 21.76%;             /* #2A3645 — dark giữ nguyên (viền input) */
   --ring: var(--p-teal-400);
   --success: var(--p-emerald-500);
   --warning: var(--p-amber-500);
@@ -459,6 +461,11 @@ html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color
 /* Design System §3: card shadow — Light: subtle / Dark: deeper */
 .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1); }
 .dark .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.5); }
+/* GH-1192: dark shadow boost cho util to (md/lg/xl/2xl) theo doc §3 — opacity 0.6→0.8 */
+.dark .dash-shell .shadow-md  { box-shadow: 0 4px 6px -1px rgb(0 0 0/0.6), 0 2px 4px -2px rgb(0 0 0/0.6); }
+.dark .dash-shell .shadow-lg  { box-shadow: 0 10px 15px -3px rgb(0 0 0/0.7), 0 4px 6px -4px rgb(0 0 0/0.7); }
+.dark .dash-shell .shadow-xl  { box-shadow: 0 20px 25px -5px rgb(0 0 0/0.8), 0 8px 10px -6px rgb(0 0 0/0.8); }
+.dark .dash-shell .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0/0.8); }
 
 /* ── Text color sweep — Design System §1 ─────────────────────────────────── */
 /* Dark text values (fine in light, invisible in dark → remap to dash-text) */
@@ -620,6 +627,9 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell header {
     background-color: var(--dash-sidebar-bg) !important;
 }
+/* Light mode: bỏ viền ngang dưới header (TopHeader dùng --dash-divider trực tiếp).
+   Dark giữ nguyên đường viền header. */
+html:not(.dark) .dash-shell header { border-bottom-color: transparent; }
 
 /* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
 .dash-shell .text-slate-300,
@@ -1049,14 +1059,14 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
     color: inherit;
   }
 
-  /* Override Chrome/Safari autofill backgrounds — dark mode only */
-  .dark input:-webkit-autofill,
-  .dark input:-webkit-autofill:hover,
-  .dark input:-webkit-autofill:focus,
-  .dark input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 1000px #0F172A inset !important;
-    -webkit-text-fill-color: #fff !important;
-    caret-color: #fff;
+  /* Override Chrome/Safari autofill backgrounds — theme-aware (GH-1192) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px hsl(var(--card)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
     transition: background-color 5000s ease-in-out 0s;
   }
 

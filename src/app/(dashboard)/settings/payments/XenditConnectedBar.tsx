@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Check, ShieldCheck, ExternalLink, Unlink } from 'lucide-react';
 import { useI18n } from '@/i18n';
+import { Button } from '@/components/ui/button';
 
 // Xendit MY core payment methods (standard activation, no special onboarding required)
 const XENDIT_MY_METHODS = [
@@ -45,7 +46,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
     return (
         <>
             <div
-                className="rounded-[12px] border border-emerald-500/[0.26] overflow-hidden"
+                className="rounded-[12px] border border-success/[0.26] overflow-hidden"
                 style={{
                     background: 'var(--dash-surface)',
                     boxShadow: '0 1px 0 rgba(255,255,255,0.02) inset',
@@ -54,10 +55,10 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                 {/* Connected header row */}
                 <div
                     className="flex items-center gap-[14px] px-[16px] py-[12px]"
-                    style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.02) 60%, transparent 100%)' }}
+                    style={{ background: 'linear-gradient(90deg, hsl(var(--success)/0.10) 0%, hsl(var(--success)/0.02) 60%, transparent 100%)' }}
                 >
-                    <span className="anim-scb-pulse w-2 h-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
-                    <div className="w-8 h-8 rounded-[9px] bg-emerald-500/[0.12] border border-emerald-500/[0.28] text-emerald-400 grid place-items-center shrink-0">
+                    <span className="anim-scb-pulse w-2 h-2 rounded-full bg-success shrink-0" aria-hidden="true" />
+                    <div className="w-8 h-8 rounded-[9px] bg-success/[0.12] border border-success/[0.28] text-success grid place-items-center shrink-0">
                         <Check className="w-[15px] h-[15px]" />
                     </div>
                     <div className="flex flex-col gap-[2px] min-w-0 flex-1">
@@ -116,9 +117,9 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                     aria-modal="true"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
                 >
-                    <div className="w-full max-w-[440px] bg-[#141e2e] border border-white/[0.08] rounded-[16px] overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.65)]">
+                    <div className="w-full max-w-[440px] bg-[hsl(var(--card))] border border-white/[0.08] rounded-[16px] overflow-hidden shadow-[0_20px_50px_-12px_rgba(0,0,0,0.65)]">
                         <div className="p-6 pb-2 flex gap-4 items-start">
-                            <div className="w-10 h-10 rounded-[12px] bg-red-500/10 border border-red-500/[0.24] text-red-400 grid place-items-center shrink-0">
+                            <div className="w-10 h-10 rounded-[12px] bg-destructive/10 border border-destructive/[0.24] text-destructive grid place-items-center shrink-0">
                                 <Unlink className="w-[18px] h-[18px]" />
                             </div>
                             <div>
@@ -127,12 +128,13 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 p-[18px_22px_22px]">
-                            <button
+                            <Button
                                 onClick={() => setShowModal(false)}
-                                className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.08] hover:bg-white/[0.04] transition-all"
+                                variant="dashSecondary"
+                                className="h-9 px-[14px] rounded-[8px] text-[13px] font-semibold"
                             >
                                 {pt.xenditDisconnectKeep}
-                            </button>
+                            </Button>
                             <button
                                 onClick={async () => {
                                     setIsDisconnecting(true);
@@ -141,7 +143,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                                 }}
                                 disabled={isDisconnecting}
                                 className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-wait"
-                                style={{ background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 0 0 1px rgba(239,68,68,0.45) inset, 0 6px 16px -4px rgba(239,68,68,0.45)' }}
+                                style={{ background: 'linear-gradient(180deg, hsl(var(--destructive)) 0%, hsl(var(--destructive)) 100%)', boxShadow: '0 0 0 1px hsl(var(--destructive)/0.45) inset, 0 6px 16px -4px hsl(var(--destructive)/0.45)' }}
                             >
                                 {pt.xenditDisconnect}
                             </button>

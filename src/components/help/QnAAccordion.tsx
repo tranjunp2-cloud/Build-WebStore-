@@ -36,21 +36,21 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
     };
 
     return (
-        <div className={`transition-all duration-200 ${!isLast ? 'border-b border-solid border-[#1F2937]' : ''}`}>
+        <div className={`transition-all duration-200 ${!isLast ? 'border-b border-solid border-[hsl(var(--border))]' : ''}`}>
             <div
                 role="button"
                 tabIndex={0}
                 aria-expanded={isOpen}
                 onClick={onToggle}
                 onKeyDown={handleKeyDown}
-                className="flex items-center justify-between w-full px-5 py-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500 hover:bg-[#1F2937] transition-colors"
+                className="flex items-center justify-between w-full px-5 py-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] hover:bg-[hsl(var(--secondary))] transition-colors"
                 style={{ userSelect: 'none' }}
             >
                 <div className="text-[14px] font-semibold text-white pr-4">
                     {question}
                 </div>
                 <div
-                    className={`shrink-0 transition-transform duration-250 ease-in-out text-[#9CA3AF] ${isOpen ? 'rotate-180' : 'rotate-0'
+                    className={`shrink-0 transition-transform duration-250 ease-in-out text-[hsl(var(--muted-foreground))] ${isOpen ? 'rotate-180' : 'rotate-0'
                         }`}
                 >
                     <ChevronDown className="w-3.5 h-3.5" aria-hidden />
@@ -67,7 +67,7 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                         className="overflow-hidden"
                     >
                         <div
-                            className="px-5 pb-4 text-[14px] text-[#9CA3AF] leading-[22px] [&_strong]:text-[var(--dash-text)] [&_strong]:font-semibold"
+                            className="px-5 pb-4 text-[14px] text-[hsl(var(--muted-foreground))] leading-[22px] [&_strong]:text-[var(--dash-text)] [&_strong]:font-semibold"
                             dangerouslySetInnerHTML={{ 
                                 __html: DOMPurify.sanitize(answer, { 
                                     ALLOWED_TAGS: ['strong', 'br', 'a', 'p', 'ul', 'ol', 'li', 'em', 'u'], 

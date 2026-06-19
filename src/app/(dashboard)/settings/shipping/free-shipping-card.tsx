@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
 
 type Props = {
     freeEnabled: boolean
@@ -23,12 +24,12 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
     const showHelper = freeEnabled && freeAboveRm !== '' && !isNaN(parsedAmount)
 
     return (
-        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 overflow-hidden">
+        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
             {/* Card header: icon + title + subtitle + toggle — separated by border-b */}
             <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
                 <div className="flex items-start gap-4">
-                    <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-amber-500/10 border border-amber-500/20 shrink-0">
-                        <Gift className="h-5 w-5 text-amber-400" />
+                    <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-warning/10 border border-warning/20 shrink-0">
+                        <Gift className="h-5 w-5 text-warning" />
                     </div>
                     <div>
                         <h3 className="text-[18px] font-semibold text-[var(--dash-text)]">{s.freeTitle}</h3>
@@ -50,7 +51,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--dash-text-muted)] select-none pointer-events-none">
                         RM
                     </span>
-                    <input
+                    <Input
                         id="ship-free-threshold"
                         type="text"
                         inputMode="decimal"
@@ -58,10 +59,8 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                         aria-invalid={freeAboveError ? true : undefined}
                         aria-describedby={freeAboveError ? 'ship-free-threshold-err' : undefined}
                         className={cn(
-                            "min-h-[44px] w-full rounded-[10px] border bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:outline-none focus:ring-1 disabled:cursor-not-allowed",
-                            freeAboveError
-                                ? "border-destructive focus:border-destructive focus:ring-destructive/30"
-                                : "border-white/[0.12] focus:border-cyan-500/50 focus:ring-cyan-500/30"
+                            "min-h-[44px] rounded-[10px] pl-10 pr-3 text-[15px]",
+                            freeAboveError && "border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))] focus-visible:ring-[hsl(var(--destructive)/0.3)]"
                         )}
                         placeholder="100.00"
                         value={freeAboveRm}
@@ -82,13 +81,13 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                     />
                 </div>
                 {freeAboveError && (
-                    <p id="ship-free-threshold-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-red-400">
+                    <p id="ship-free-threshold-err" role="alert" className="mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive">
                         <AlertCircle className="h-4 w-4 shrink-0" />
                         {freeAboveError}
                     </p>
                 )}
                 {freeAboveWarning && !freeAboveError && (
-                    <p role="status" className="mt-1 text-xs text-amber-400">{freeAboveWarning}</p>
+                    <p role="status" className="mt-1 text-xs text-warning">{freeAboveWarning}</p>
                 )}
                 {showHelper && !freeAboveError && (
                     <p className="flex items-center gap-1.5 text-[13px] text-[var(--dash-text-muted)]">

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
+import { Button } from '@/components/ui/button';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
@@ -363,8 +364,8 @@ export function PaymentsFormClient({
         <div className="w-full space-y-[32px]">
             {/* Page header */}
             <div className="flex items-center gap-4">
-                <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-sky-500/[0.12] border border-sky-500/[0.20] shrink-0">
-                    <CreditCard className="w-[22px] h-[22px] text-sky-400" />
+                <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-[hsl(var(--info)/0.12)] border border-[hsl(var(--info)/0.20)] shrink-0">
+                    <CreditCard className="w-[22px] h-[22px] text-[hsl(var(--info))]" />
                 </div>
                 <div>
                     <h1 className="text-[28px] font-bold text-slate-50 tracking-[-0.015em]">{pt.title}</h1>
@@ -374,8 +375,8 @@ export function PaymentsFormClient({
 
             {/* P0 warning: no payment method at all — buyers can't checkout */}
             {!paymentCod && !paymentQr && !cardEnabled && !fpxEnabled && (
-                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-red-500/[0.30] bg-red-500/[0.07]">
-                    <div className="w-10 h-10 rounded-[10px] bg-red-500/[0.12] border border-red-500/[0.28] text-red-400 grid place-items-center shrink-0">
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-destructive/[0.30] bg-destructive/[0.07]">
+                    <div className="w-10 h-10 rounded-[10px] bg-destructive/[0.12] border border-destructive/[0.28] text-destructive grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
                     <div>
@@ -385,8 +386,8 @@ export function PaymentsFormClient({
                 </div>
             )}
             {isChargesEnabled && isVerified && !cardEnabled && !fpxEnabled && (paymentCod || paymentQr) && (
-                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
-                    <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-warning/[0.24] bg-warning/[0.06]">
+                    <div className="w-10 h-10 rounded-[10px] bg-warning/[0.12] border border-warning/[0.22] text-warning grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
                     <div>
@@ -398,7 +399,7 @@ export function PaymentsFormClient({
 
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--info))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--info))' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
@@ -489,7 +490,7 @@ export function PaymentsFormClient({
                                             <button
                                                 type="button"
                                                 onClick={() => setShowAllBanks(v => !v)}
-                                                className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-sky-400 hover:bg-sky-500/[0.12] hover:border-sky-500/[0.24] transition-all cursor-pointer"
+                                                className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-[hsl(var(--info))] hover:bg-[hsl(var(--info)/0.12)] hover:border-[hsl(var(--info)/0.24)] transition-all cursor-pointer"
                                             >
                                                 {showAllBanks ? '−' : `+${FPX_BANKS.length - 10}`} {showAllBanks ? 'Show less' : 'more'}
                                             </button>
@@ -505,7 +506,7 @@ export function PaymentsFormClient({
             {/* ─── Xendit (F34) ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary))' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
                         {pt.xenditSectionTitle}
                     </h2>
@@ -529,7 +530,7 @@ export function PaymentsFormClient({
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-purple-400 shrink-0" style={{ boxShadow: '0 0 10px #c084fc' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--warning))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--warning))' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.manualSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.manualSectionDesc}</span>
                 </div>
@@ -565,7 +566,7 @@ export function PaymentsFormClient({
                                 <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
 
                                 {qrPreviewUrl ? (
-                                    <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[#0d1525]">
+                                    <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[hsl(var(--background))]">
                                         {/* QR thumb */}
                                         <div className="w-[76px] h-[76px] rounded-[10px] shrink-0 overflow-hidden border-[4px] border-white bg-white">
                                             <NextImage
@@ -587,7 +588,7 @@ export function PaymentsFormClient({
                                             <button
                                                 type="button"
                                                 onClick={handleRemoveImage}
-                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] text-slate-400 border border-white/[0.08] hover:bg-red-500/[0.12] hover:text-red-400 hover:border-red-500/[0.24] transition-all"
+                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] text-slate-400 border border-white/[0.08] hover:bg-destructive/[0.12] hover:text-destructive hover:border-destructive/[0.24] transition-all"
                                                 title="Remove"
                                             >
                                                 <Trash2 className="w-[14px] h-[14px]" />
@@ -605,15 +606,15 @@ export function PaymentsFormClient({
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'hsl(var(--info)/0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--info)/0.04)';
                                         }}
                                         onMouseLeave={e => {
                                             (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
                                             (e.currentTarget as HTMLDivElement).style.background = 'transparent';
                                         }}
                                     >
-                                        <div className="w-[48px] h-[48px] rounded-full bg-sky-500/[0.10] text-sky-400 grid place-items-center mb-[12px]">
+                                        <div className="w-[48px] h-[48px] rounded-full bg-[hsl(var(--info)/0.10)] text-[hsl(var(--info))] grid place-items-center mb-[12px]">
                                             <UploadCloud className="w-5 h-5" />
                                         </div>
                                         <p className="text-[13px] font-semibold text-slate-100 mb-[2px]">{pt.uploadQrSub}</p>
@@ -632,7 +633,7 @@ export function PaymentsFormClient({
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                         style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -659,7 +660,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
@@ -680,7 +681,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -714,30 +715,27 @@ export function PaymentsFormClient({
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>
-                            <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
-                            <span className="text-amber-300 font-medium">{pt.unsavedChanges}</span>
+                            <AlertCircle className="w-[14px] h-[14px] text-warning shrink-0" />
+                            <span className="text-warning font-medium">{pt.unsavedChanges}</span>
                         </>
                     ) : (
                         <>
-                            <CheckCircle2 className="w-[14px] h-[14px] text-emerald-400 shrink-0" />
+                            <CheckCircle2 className="w-[14px] h-[14px] text-success shrink-0" />
                             <span className="text-slate-400">{pt.savesAutomatic}</span>
                         </>
                     )}
                 </div>
                 <div className="flex gap-2">
-                    <button
+                    <Button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={!isDirty || isSavingAll}
-                        className="inline-flex items-center gap-[6px] h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
-                        style={{
-                            background: 'linear-gradient(135deg, #2563eb 0%, #9333ea 100%)',
-                            boxShadow: isDirty ? '0 6px 18px rgba(37,99,235,0.35)' : 'none',
-                        }}
+                        variant="dashPrimary"
+                        className="h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold gap-[6px]"
                     >
                         <Save className="w-[13px] h-[13px]" />
                         {isSavingAll ? pt.saving : pt.saveChanges}
-                    </button>
+                    </Button>
                 </div>
             </div>
 

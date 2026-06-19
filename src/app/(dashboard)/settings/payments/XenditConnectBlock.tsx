@@ -82,16 +82,16 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
         <div
             className="relative rounded-[18px] border overflow-hidden mb-[18px]"
             style={{
-                borderColor: 'rgba(6,182,212,0.32)',
-                background: 'radial-gradient(circle at 0% 0%, rgba(14,165,233,0.18) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(6,182,212,0.14) 0%, transparent 55%), var(--dash-surface)',
-                boxShadow: '0 0 0 1px rgba(6,182,212,0.06), 0 16px 40px -16px rgba(6,182,212,0.35)',
+                borderColor: 'hsl(var(--primary)/0.32)',
+                background: 'radial-gradient(circle at 0% 0%, hsl(var(--info)/0.18) 0%, transparent 55%), radial-gradient(circle at 100% 100%, hsl(var(--primary)/0.14) 0%, transparent 55%), var(--dash-surface)',
+                boxShadow: '0 0 0 1px hsl(var(--primary)/0.06), 0 16px 40px -16px hsl(var(--primary)/0.35)',
             }}
         >
             {/* Decorative glow */}
             <div
                 className="absolute pointer-events-none blur-[20px]"
                 aria-hidden="true"
-                style={{ inset: '-40% -10% auto auto', width: 380, height: 220, background: 'radial-gradient(ellipse at center, rgba(6,182,212,0.18), transparent 60%)' }}
+                style={{ inset: '-40% -10% auto auto', width: 380, height: 220, background: 'radial-gradient(ellipse at center, hsl(var(--primary)/0.18), transparent 60%)' }}
             />
 
             <div className="relative grid items-start gap-[22px] p-[22px_26px]" style={{ gridTemplateColumns: '56px 1fr' }}>
@@ -99,10 +99,10 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                 <div
                     className="w-[48px] h-[48px] rounded-[14px] grid place-items-center shrink-0"
                     style={{
-                        border: '1px solid rgba(6,182,212,0.35)',
-                        color: '#67e8f9',
-                        background: 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(6,182,212,0.18))',
-                        boxShadow: '0 8px 20px -6px rgba(6,182,212,0.40)',
+                        border: '1px solid hsl(var(--primary)/0.35)',
+                        color: 'hsl(var(--primary))',
+                        background: 'linear-gradient(135deg, hsl(var(--info)/0.18), hsl(var(--primary)/0.18))',
+                        boxShadow: '0 8px 20px -6px hsl(var(--primary)/0.40)',
                     }}
                 >
                     <Link className="w-5 h-5" />
@@ -122,7 +122,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         {/* Secret Key */}
                         <div>
                             <label className="block text-[12px] font-semibold text-slate-300 mb-[6px]">
-                                {pt.xenditSecretKeyLabel} <span className="text-red-400">*</span>
+                                {pt.xenditSecretKeyLabel} <span className="text-destructive">*</span>
                             </label>
                             <div className="relative">
                                 <input
@@ -130,7 +130,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                                     value={secretKey}
                                     onChange={e => setSecretKey(e.target.value)}
                                     placeholder={pt.xenditSecretKeyPlaceholder}
-                                    className="w-full h-[38px] px-[12px] pr-[40px] rounded-[8px] text-[13px] text-slate-100 placeholder:text-slate-600 bg-white/[0.04] border border-white/[0.10] focus:outline-none focus:border-cyan-500/[0.50] transition-colors"
+                                    className="w-full h-[38px] px-[12px] pr-[40px] rounded-[8px] text-[13px] text-slate-100 placeholder:text-slate-600 bg-white/[0.04] border border-white/[0.10] focus:outline-none focus:border-[hsl(var(--primary))] transition-colors"
                                 />
                                 <button
                                     type="button"
@@ -150,7 +150,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         {/* Callback Token */}
                         <div>
                             <label className="block text-[12px] font-semibold text-slate-300 mb-[6px]">
-                                {pt.xenditCallbackTokenLabel} <span className="text-red-400">*</span>
+                                {pt.xenditCallbackTokenLabel} <span className="text-destructive">*</span>
                             </label>
                             <div className="relative">
                                 <input
@@ -158,7 +158,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                                     value={callbackToken}
                                     onChange={e => setCallbackToken(e.target.value)}
                                     placeholder={pt.xenditCallbackTokenPlaceholder}
-                                    className="w-full h-[38px] px-[12px] pr-[40px] rounded-[8px] text-[13px] text-slate-100 placeholder:text-slate-600 bg-white/[0.04] border border-white/[0.10] focus:outline-none focus:border-cyan-500/[0.50] transition-colors"
+                                    className="w-full h-[38px] px-[12px] pr-[40px] rounded-[8px] text-[13px] text-slate-100 placeholder:text-slate-600 bg-white/[0.04] border border-white/[0.10] focus:outline-none focus:border-[hsl(var(--primary))] transition-colors"
                                 />
                                 <button
                                     type="button"
@@ -176,7 +176,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         </div>
 
                         {saveError && (
-                            <p className="text-[12.5px] text-red-400 flex items-center gap-[5px]">
+                            <p className="text-[12.5px] text-destructive flex items-center gap-[5px]">
                                 <AlertTriangle className="w-3 h-3 shrink-0" />
                                 {saveError}
                             </p>
@@ -188,10 +188,10 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                                 type="button"
                                 onClick={handleSave}
                                 disabled={isSaving || !tenantId || !secretKey || !callbackToken}
-                                className="inline-flex items-center gap-2 h-[40px] px-[18px] rounded-[10px] text-[13.5px] font-semibold text-[#042033] transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 h-[40px] px-[18px] rounded-[10px] text-[13.5px] font-semibold !text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
                                 style={{
-                                    background: 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                                    boxShadow: '0 4px 14px rgba(14,165,233,0.30)',
+                                    background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)',
+                                    boxShadow: '0 4px 14px hsl(var(--info)/0.30)',
                                 }}
                             >
                                 {isSaving

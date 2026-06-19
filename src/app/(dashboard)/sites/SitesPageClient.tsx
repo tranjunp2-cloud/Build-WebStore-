@@ -75,7 +75,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                         <p className="mt-1 text-sm" style={{ color: 'var(--dash-text-muted)' }}>{t.dashboard.sites.noSitesDesc}</p>
                         <Link
                             href="/onboarding"
-                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all"
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:opacity-90 transition-all"
                         >
                             <Sparkles className="h-4 w-4" /> {t.dashboard.sites.createWebsite}
                         </Link>
@@ -101,7 +101,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                 </div>
                 <Link
                     href="/onboarding"
-                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all"
+                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:opacity-90 transition-all"
                 >
                     <Plus className="h-4 w-4" /> {t.dashboard.sites.newSite}
                 </Link>
@@ -156,7 +156,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                         <>
                                             <Link
                                                 href="/builder/new"
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-400 hover:bg-blue-600/25 transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--primary)/0.15)] px-3 py-2 text-xs font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.25)] transition-colors"
                                             >
                                                 <RefreshCw className="h-3 w-3" /> {t.dashboard.sites.retryAi}
                                             </Link>
@@ -172,7 +172,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                         <>
                                             <Link
                                                 href={`/editor/${site.id}`}
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-400 hover:bg-blue-600/25 transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--primary)/0.15)] px-3 py-2 text-xs font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.25)] transition-colors"
                                             >
                                                 <Pencil className="h-3 w-3" /> {t.dashboard.sites.edit}
                                             </Link>

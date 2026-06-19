@@ -2,6 +2,7 @@ import React, { ChangeEvent, useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { sanitizeText } from '@/utils/sanitize';
+import { Input } from '@/components/ui/input';
 
 interface QnASearchProps {
     onDebouncedSearch: (searchTerm: string) => void;
@@ -37,9 +38,9 @@ export const QnASearch: React.FC<QnASearchProps> = ({
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Search className="w-[18px] h-[18px] text-slate-400" aria-hidden />
             </div>
-            <input
+            <Input
                 type="text"
-                className="w-full bg-[#161E2E] border border-[#1F2937] rounded-lg py-3 pl-11 pr-11 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm [&::-ms-clear]:hidden [&::-webkit-search-cancel-button]:hidden"
+                className="h-auto py-3 pl-11 pr-11 rounded-lg shadow-sm [&::-ms-clear]:hidden [&::-webkit-search-cancel-button]:hidden"
                 placeholder={placeholder}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

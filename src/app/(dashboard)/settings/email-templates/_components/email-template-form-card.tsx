@@ -5,11 +5,14 @@ import { LocaleFlag } from '@/components/locale-flag'
 import { EMAIL_TEMPLATE_VARIABLES, EmailTemplateType } from '@/lib/email/types'
 import type { ContentFields } from '../actions'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
 
 const LIMITS = { subject: 200, greeting: 500, ctaLabel: 100, closing: 2000 }
 
 function CharCounter({ len, limit }: { len: number; limit: number }) {
-    const cls = len > limit ? 'text-red-400' : len > limit * 0.9 ? 'text-amber-400' : 'text-slate-500'
+    const cls = len > limit ? 'text-destructive' : len > limit * 0.9 ? 'text-warning' : 'text-slate-500'
     return <span className={`text-xs tabular-nums ${cls}`}>{len}/{limit}</span>
 }
 
@@ -28,28 +31,27 @@ interface FieldRowProps {
 
 function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, variables = [], insertVarLabel, onChange }: FieldRowProps) {
     const len = value.length
-    const inputCls = 'w-full rounded-lg border border-slate-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20'
     return (
         <div className="space-y-1.5">
             <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+                    {label}{required && <span className="text-destructive ml-0.5">*</span>}
                 </label>
                 <CharCounter len={len} limit={limit} />
             </div>
             {textarea ? (
-                <textarea
+                <Textarea
                     rows={rows}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
-                    className={`${inputCls} resize-none`}
+                    className="text-sm"
                 />
             ) : (
-                <input
+                <Input
                     type="text"
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
-                    className={inputCls}
+                    className="text-sm"
                 />
             )}
             {hint && <p className="text-xs text-slate-500 dark:text-slate-500">{hint}</p>}
@@ -61,7 +63,7 @@ function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, var
                             type="button"
                             onClick={() => onChange(value + `{${v}}`)}
                             title={insertVarLabel ? insertVarLabel.replace('{var}', `{${v}}`) : `Insert {${v}}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.05] px-2 py-0.5 font-mono text-[11px] text-slate-600 dark:text-slate-400 hover:border-blue-400/60 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-white/[0.1] bg-slate-50 dark:bg-white/[0.05] px-2 py-0.5 font-mono text-[11px] text-slate-600 dark:text-slate-400 hover:border-[hsl(var(--primary)/0.6)] hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))] transition-colors"
                         >
                             +{`{${v}}`}
                         </button>
@@ -105,7 +107,7 @@ export function EmailTemplateFormCard({
     const vars = EMAIL_TEMPLATE_VARIABLES[templateType] ?? []
 
     return (
-        <div className="self-start rounded-xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[#1a2540] p-6 space-y-5">
+        <div className="self-start rounded-xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[hsl(var(--card))] p-6 space-y-5">
             {/* Status row */}
             <div className="flex items-start justify-between rounded-lg border border-slate-100 dark:border-white/[0.06] bg-slate-50 dark:bg-white/[0.03] px-4 py-3">
                 <div>
@@ -114,7 +116,7 @@ export function EmailTemplateFormCard({
                         {draft.enabled ? et.statusLive : et.statusPaused}
                     </p>
                     {isCritical && (
-                        <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">{et.statusCritical}</p>
+                        <p className="text-xs text-warning dark:text-warning mt-1">{et.statusCritical}</p>
                     )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -123,7 +125,7 @@ export function EmailTemplateFormCard({
                         disabled={isCritical}
                         onCheckedChange={onEnabledChange}
                     />
-                    <span className={`text-xs font-medium ${draft.enabled ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    <span className={`text-xs font-medium ${draft.enabled ? 'text-success dark:text-success' : 'text-slate-500 dark:text-slate-400'}`}>
                         {draft.enabled ? et.enabled : et.disabled}
                     </span>
                 </div>
@@ -205,23 +207,27 @@ export function EmailTemplateFormCard({
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
                     {isDirty && (
-                        <button
+                        <Button
                             type="button"
                             onClick={onRevert}
                             disabled={isSaving}
-                            className="flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-white/[0.1] bg-white dark:bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.08] disabled:opacity-50 transition-colors"
+                            variant="dashSecondary"
+                            size="dash"
+                            className="text-xs"
                         >
                             {et.revert}
-                        </button>
+                        </Button>
                     )}
-                    <button
+                    <Button
                         type="button"
                         onClick={onSave}
                         disabled={!isDirty || isSaving}
-                        className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                        variant="dashPrimary"
+                        size="dash"
+                        className="text-xs"
                     >
                         {isSaving ? et.saving : et.saveChanges}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

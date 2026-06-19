@@ -2,6 +2,7 @@
 
 import { Check, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 
 interface DiscountSaveBarProps {
     dirty: boolean
@@ -42,19 +43,19 @@ export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: Disc
                     {d.cancel}
                 </button>
 
-                <button
+                <Button
                     type="button"
                     onClick={onSave}
                     disabled={saveDisabled}
-                    className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-40"
-                    style={{ background: 'var(--brand, #14b8a6)', color: '#fff' }}
+                    variant="dashPrimary"
+                    size="sm"
                 >
                     {saving
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         : <Check className="h-3.5 w-3.5" />
                     }
                     {saving ? d.saving : isNew ? d.saveDiscount : d.save}
-                </button>
+                </Button>
             </div>
         </div>
     )

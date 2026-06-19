@@ -15,9 +15,9 @@
 |-------|---------------------|------------|
 | **Background** | `#0B1120` | `#F8FAFC` |
 | **Surface** | `#161E2E` | `#FFFFFF` |
-| **Primary Teal** | `#2DD4BF` | `#0D9488` |
+| **Primary Teal** | `#2DD4BF` | `#00D3D4` |// sửa lại theo yêu cầu design
 
-> **Brand primary = Teal** (focus ring, link/active, toggle, text nhấn dùng teal `#0D9488`/`#2DD4BF`). **Blue** (`#3B82F6`/`#2563EB`) KHÔNG còn là màu primary — dùng làm **accent / AI / Info**. Riêng **nút Primary** dùng **gradient Blue→Teal** (AI signature) — blue ở đây là màu trang trí gradient, không phải vai trò primary.
+**Brand primary = Teal** (focus ring, link/active, toggle, text nhấn dùng teal `#0D9488`/`#2DD4BF`). **Blue** (`#3B82F6`/`#2563EB`) KHÔNG còn là màu primary — dùng làm **accent / AI / Info**. Riêng **nút Primary** dùng **gradient Blue→Teal** (AI signature) — blue ở đây là màu trang trí gradient, không phải vai trò primary.
 
 ### Neutral Scale
 | Token | Dark Mode | Light Mode | Usage |
@@ -223,24 +223,24 @@ Copy và paste đoạn mã sau vào file `src/app/globals.css`. Các giá trị 
   :root {
     /* Light Mode */
     --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --foreground: 209 30% 19%;       /* #22313F — chữ body light (GH-1192) */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 174 84% 32%;          /* Teal #0D9488 — brand primary */
+    --primary: 180 100% 42%;         /* Teal #00D3D4 — brand primary (light, GH-1192) */
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 209 30% 19%;     /* #22313F — chữ phụ light (GH-1192) */
     --accent: 221 83% 53%;           /* Blue #2563EB — accent phụ / AI / Info */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 174 84% 32%;             /* Teal — focus ring khớp primary */
+    --ring: 180 100% 42%;            /* Teal #00D3D4 — focus ring khớp primary */
     --radius: 0.5rem;
   }
 
