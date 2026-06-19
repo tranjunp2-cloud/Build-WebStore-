@@ -38,12 +38,12 @@ function SecretField({ label, value, onChange, placeholder, show, onToggleShow, 
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     placeholder={placeholder}
-                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-[44px] text-[13px] text-slate-100 font-mono font-medium placeholder:text-slate-600 dark:placeholder:text-slate-600 min-w-0 focus:outline-none"
+                    className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[13px] text-slate-100 font-mono font-medium placeholder:text-slate-600 dark:placeholder:text-slate-600 min-w-0 focus:outline-none"
                 />
                 <button
                     type="button"
                     onClick={onToggleShow}
-                    className="px-3 h-[44px] grid place-items-center text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+                    className="px-3 h-[40px] grid place-items-center text-slate-500 hover:text-slate-300 transition-colors shrink-0"
                     style={{ borderLeft: '1px solid var(--dash-border)' }}
                 >
                     {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -123,16 +123,16 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-start gap-3 p-[20px_22px_16px] border-b border-white/[0.08]">
+                <div className="flex items-start gap-3 p-[16px_22px_14px] border-b border-white/[0.08]">
                     <div
                         className="w-9 h-9 rounded-[10px] grid place-items-center shrink-0 mt-[2px]"
-                        style={{ border: '1px solid rgba(45,212,191,0.35)', color: '#5eead4', background: 'linear-gradient(135deg, rgba(45,212,191,0.18), rgba(14,165,233,0.18))' }}
+                        style={{ border: '1px solid rgba(45,212,191,0.35)', color: '#5eead4', background: 'linear-gradient(135deg, rgba(45,212,191,0.18), rgba(14,165,233,0.18))', boxShadow: '0 4px 14px -4px rgba(14,165,233,0.40)' }}
                     >
                         <Link className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[20px] font-bold text-slate-50 leading-tight">{pt.xenditModalTitle}</p>
-                        <p className="text-[13px] text-slate-400 leading-[1.5] mt-[5px]">{pt.xenditModalSubtitle}</p>
+                        <p className="text-[17px] font-bold text-slate-50 leading-tight" style={{ letterSpacing: '-0.005em', marginBottom: '4px' }}>{pt.xenditModalTitle}</p>
+                        <p className="text-[12.5px] text-slate-400 leading-[1.5]">{pt.xenditModalSubtitle}</p>
                     </div>
                     <button
                         type="button" onClick={handleClose} disabled={isSaving}
@@ -143,7 +143,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Form body */}
-                <div className="p-[20px_22px_8px] flex flex-col gap-[20px]">
+                <div className="p-[14px_22px_4px] flex flex-col gap-[14px]">
                     <SecretField
                         label={pt.xenditSecretKeyLabel}
                         value={secretKey}
@@ -171,14 +171,15 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center gap-3 p-[16px_22px_20px] border-t border-white/[0.08] mt-[4px]">
-                    <div className="flex flex-col gap-[2px] mr-auto">
+                <div className="flex items-center gap-3 p-[16px_22px_20px] border-t border-white/[0.08] mt-[14px]">
+                    <div className="flex flex-col mr-auto">
                         <span className="text-[12px] text-slate-400">{pt.xenditLoginPrompt}</span>
                         <a
                             href="https://dashboard.xendit.co/login"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-[4px] text-[12px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                            className="inline-flex items-center gap-[4px] text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 transition-colors rounded-[8px]"
+                            style={{ padding: '6px 10px 8px', marginLeft: '-10px' }}
                         >
                             <ExternalLink className="w-3 h-3" />
                             {pt.xenditLoginLink}
@@ -193,8 +194,12 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                     <button
                         type="button" onClick={handleSubmit}
                         disabled={!secretKey || !callbackToken || isSaving}
-                        className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
-                        style={{ background: '#22c55e' }}
+                        className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                        style={{
+                            background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
+                            color: '#052e22',
+                            boxShadow: '0 0 0 1px rgba(16,185,129,0.40) inset, 0 6px 16px -4px rgba(16,185,129,0.40)',
+                        }}
                     >
                         {isSaving
                             ? <><Loader2 className="w-4 h-4 animate-spin" />{pt.xenditSaving}</>
