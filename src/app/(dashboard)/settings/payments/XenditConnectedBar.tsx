@@ -45,17 +45,11 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
     return (
         <>
             <div
-                className="rounded-[12px] border border-emerald-500/[0.26] overflow-hidden"
-                style={{
-                    background: 'var(--dash-surface)',
-                    boxShadow: '0 1px 0 rgba(255,255,255,0.02) inset',
-                }}
+                className="rounded-[12px] overflow-hidden"
+                style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
             >
                 {/* Connected header row */}
-                <div
-                    className="flex items-center gap-[14px] px-[16px] py-[12px]"
-                    style={{ background: 'linear-gradient(90deg, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.02) 60%, transparent 100%)' }}
-                >
+                <div className="flex items-center gap-[14px] px-[16px] py-[12px]">
                     <span className="anim-scb-pulse w-2 h-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
                     <div className="w-8 h-8 rounded-[9px] bg-emerald-500/[0.12] border border-emerald-500/[0.28] text-emerald-400 grid place-items-center shrink-0">
                         <Check className="w-[15px] h-[15px]" />
@@ -64,7 +58,7 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                         <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-50">
                             {pt.xenditConnectedBar}
                             {accountId && (
-                                <span className="font-mono text-[12.5px] font-medium text-slate-300 px-2 py-[2px] bg-white/[0.04] border border-white/[0.08] rounded-[6px] tracking-tight">
+                                <span className="font-mono text-[12.5px] font-medium text-slate-300 px-2 py-[2px] bg-white/[0.04] rounded-[6px] tracking-tight" style={{ border: '1px solid var(--dash-border)' }}>
                                     {accountId}
                                 </span>
                             )}
@@ -74,12 +68,13 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                             {businessName || pt.xenditKybVerified}
                         </div>
                     </div>
-                    <div className="flex gap-[6px] shrink-0">
+                    <div className="flex gap-[6px] shrink-0 ml-auto">
                         <a
                             href="https://dashboard.xendit.co"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-dash-text-muted border border-dash-border rounded-[8px] hover:bg-dash-surface-hover hover:text-dash-text transition-all"
+                            className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
+                            style={{ border: '1px solid var(--dash-border)' }}
                         >
                             <ExternalLink className="w-3 h-3" />
                             {pt.xenditManage}
@@ -87,7 +82,8 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                         {onDisconnect && (
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-dash-text-muted border border-dash-border rounded-[8px] hover:bg-dash-surface-hover hover:text-dash-text transition-all"
+                                className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-400 rounded-[8px] hover:bg-white/[0.04] hover:text-slate-200 transition-all"
+                                style={{ border: '1px solid var(--dash-border)' }}
                             >
                                 <Unlink className="w-3 h-3" />
                                 {pt.xenditDisconnect}
@@ -97,11 +93,11 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                 </div>
 
                 {/* Supported payment methods — static list from Xendit MY official docs */}
-                <div className="px-[16px] py-[11px] border-t border-white/[0.06]">
-                    <p className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-[0.06em] m-0 mb-[8px]">Supported payment methods</p>
+                <div className="px-[16px] py-[12px] pb-[14px]" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                    <p className="text-[10.5px] font-semibold text-slate-500 uppercase tracking-[0.08em] m-0 mb-[10px]">Supported payment methods</p>
                     <div className="flex flex-wrap gap-[6px]">
                         {XENDIT_MY_METHODS.map(name => (
-                            <span key={name} className="text-[11.5px] px-[9px] py-[3px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-300">
+                            <span key={name} className="text-[11px] font-medium px-[10px] py-[4px] rounded-full bg-white/[0.04] text-slate-400" style={{ border: '1px solid var(--dash-border)' }}>
                                 {name}
                             </span>
                         ))}
