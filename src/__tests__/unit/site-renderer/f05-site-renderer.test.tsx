@@ -1308,3 +1308,80 @@ describe('[TC-NAV-EDITOR] SiteRenderer nav offset for overlay variants (editor v
         expect(heroWrapper.style.paddingTop).toBe('calc(var(--nav-height, 64px) + 1rem)')
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
+// Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F04-SR-07a: navigation block in page.layout gets _logoHref: "/" in non-editor mode', () => {
+        // Arrange — capture block props to verify _logoHref injection
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with navigation block in page.layout
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{
+                    layout: [
+                        {
+                            blockType: 'navigation',
+                            links: [
+                                { label: 'Home', url: '/' },
+                                { label: 'About', url: '/about' },
+                            ],
+                        },
+                    ],
+                }}
+            />
+        )
+
+        // Assert — navigation block should receive _logoHref property injected
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/')
+    })
+
+    it('TC-F04-SR-07b: site.headerBlock also gets _logoHref: "/" injected', () => {
+        // Arrange — capture block props to verify _logoHref injection on headerBlock
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with site.headerBlock
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [
+                            { label: 'Services', url: '/services' },
+                            { label: 'Contact', url: '/contact' },
+                        ],
+                    },
+                }}
+                page={{ layout: [] }}
+            />
+        )
+
+        // Assert — headerBlock navigation should receive _logoHref property injected
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/')
+    })
+})

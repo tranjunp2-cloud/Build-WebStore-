@@ -64,9 +64,10 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
     const resolveHref = useLocalHref()
     if (!url) return null
     const isBrokenUrl = url.startsWith(BROKEN_URL_PREFIX)
-    const href = resolveHref(isBrokenUrl ? '#' : url)
+    const rawUrl = isBrokenUrl ? '#' : url
+    const href = resolveHref(rawUrl)
     const isPrimary = style === 'primary'
-    const linkAttrs = getLinkAttrs(href)
+    const linkAttrs = getLinkAttrs(rawUrl)
 
     const buttonStyle: React.CSSProperties = isPrimary
         ? onInverseBg
@@ -127,8 +128,9 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
     const isOwner = useIsOwner()
     const resolveHref = useLocalHref()
     const isBrokenUrl = url.startsWith(BROKEN_URL_PREFIX)
-    const href = resolveHref(isBrokenUrl ? '#' : url)
-    const linkAttrs = getLinkAttrs(href)
+    const rawUrl = isBrokenUrl ? '#' : url
+    const href = resolveHref(rawUrl)
+    const linkAttrs = getLinkAttrs(rawUrl)
 
     const handleClick = () => {
         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, role: 'secondary' }, isOwner })

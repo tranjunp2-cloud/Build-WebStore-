@@ -109,6 +109,15 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 
 ---
 
+### NHÓM 8: Logo Href Injection — Navigation Block URL Rewriting
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F04-SR-07a** | `GH-1278` | `Func` | **[Positive]** Navigation block trong page.layout nhận _logoHref: "/" | 1. Render SiteRenderer với navigation block trong page.layout.<br>2. Capture block props. | - Block nhận `_logoHref: "/"` được inject bởi SiteRenderer.<br>- Logo link có thể được rewrite cho local dev context nếu cần. | High | [x] |
+| **TC-F04-SR-07b** | `GH-1278` | `Func` | **[Positive]** Site.headerBlock cũng nhận _logoHref: "/" | 1. Render SiteRenderer với site.headerBlock navigation.<br>2. Capture block props từ headerBlock. | - HeaderBlock navigation nhận `_logoHref: "/"` được inject.<br>- Logo link consistent giữa page.layout và global header. | High | [x] |
+
+---
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

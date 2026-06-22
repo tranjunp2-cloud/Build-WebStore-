@@ -76,12 +76,6 @@ function NavLogo({
     )
 }
 
-// ── Local href resolver ──────────────────────────────────────────────────────
-// Resolves internal paths for the current render context:
-// - Local dev (/sites/{slug}/...): prepends /sites/{slug} to all internal paths
-// - Editor preview (/preview/...): paths already rewritten by SiteRenderer — pass through
-// - Live/staging: no-op (paths are already correct)
-
 // ── Logo Link ───────────────────────────────────────────────────────────────
 
 function NavLogoLink({
@@ -98,7 +92,7 @@ function NavLogoLink({
     const resolveHref = useLocalHref()
     const injectedHref = block?._logoHref as string | undefined
     return (
-        <Link href={resolveHref(injectedHref ?? '/')} className={className} onClick={onClick}>
+        <Link href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
             {children}
         </Link>
     )
@@ -219,8 +213,9 @@ function NavCTAButton({
     const resolveHref = useLocalHref()
     const cls = `${className} rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
-    const href = resolveHref(isBroken ? '#' : rawHref)
-    const isExternal = href.startsWith('http://') || href.startsWith('https://')
+    const rawUrl = isBroken ? '#' : rawHref
+    const href = resolveHref(rawUrl)
+    const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
         <BrokenLinkWarning url={rawHref}>
             <motion.a

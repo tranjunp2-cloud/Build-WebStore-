@@ -21,6 +21,8 @@ export function useLocalHref() {
             /^https?:\/\//.test(href) ||
             href.startsWith('//') ||
             href.startsWith('#') ||
+            href.startsWith('mailto:') ||
+            href.startsWith('tel:') ||
             href.startsWith('/preview/') ||
             href.startsWith('/sites/') ||
             href.startsWith(BROKEN_URL_PREFIX)

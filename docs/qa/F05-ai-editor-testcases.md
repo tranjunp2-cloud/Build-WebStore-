@@ -304,6 +304,32 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+### GH-1278: useLocalHref Hook — Storefront Logo Redirect Fix (15 Cases)
+
+| TC-ID | Layer | Description | Assertion |
+|-------|-------|-------------|-----------|
+| **TC-F05-1278-01** | Unit | Non-local context: https:// passes through unchanged | `href === 'https://external.com/page'` → result unchanged |
+| **TC-F05-1278-02** | Unit | Non-local context: undefined → '#' | `href === undefined` → result `'#'` |
+| **TC-F05-1278-02b** | Unit | Non-local context: empty string → '#' | `href === ''` → result `'#'` |
+| **TC-F05-1278-03** | Unit | Non-local context: /about passes through unchanged | `href === '/about'` → result unchanged (not prefixed) |
+| **TC-F05-1278-04** | Unit | Local dev: /about → /sites/mystore/about | `pathname === '/sites/mystore/home'`, `href === '/about'` → `/sites/mystore/about` |
+| **TC-F05-1278-05** | Unit | Local dev: nested path /services/consulting → /sites/mystore/services/consulting | `pathname === '/sites/mystore/home'`, `href === '/services/consulting'` → `/sites/mystore/services/consulting` |
+| **TC-F05-1278-06** | Unit | Local dev: bare relative 'about' (no slash) → /sites/mystore/about | `pathname === '/sites/mystore/home'`, `href === 'about'` → `/sites/mystore/about` (normalized) |
+| **TC-F05-1278-07** | Unit | Local dev: https://external.com passes through | `pathname === '/sites/mystore/home'`, `href === 'https://external.com'` → result unchanged |
+| **TC-F05-1278-08** | Unit | Local dev: //cdn.example.com passes through | `pathname === '/sites/mystore/home'`, `href === '//cdn.example.com/img.jpg'` → result unchanged |
+| **TC-F05-1278-09** | Unit | Local dev: #section passes through | `pathname === '/sites/mystore/home'`, `href === '#section'` → result unchanged |
+| **TC-F05-1278-10** | Unit | Local dev: mailto:contact@example.com passes through **(CRITICAL BUG FIX GH-1278)** | `pathname === '/sites/mystore/home'`, `href === 'mailto:contact@example.com'` → result unchanged (not prefixed) |
+| **TC-F05-1278-11** | Unit | Local dev: tel:+1234567890 passes through | `pathname === '/sites/mystore/home'`, `href === 'tel:+1234567890'` → result unchanged |
+| **TC-F05-1278-12** | Unit | Local dev: /preview/abc123 passes through | `pathname === '/sites/mystore/home'`, `href === '/preview/abc123'` → result unchanged |
+| **TC-F05-1278-13** | Unit | Local dev: /sites/another-store/page passes through | `pathname === '/sites/mystore/home'`, `href === '/sites/another-store/page'` → result unchanged |
+| **TC-F05-1278-14** | Unit | Local dev: BROKEN_URL_PREFIX + '/test' passes through | `href === '_broken_url_:/test'` → result unchanged (passthrough) |
+| **TC-F05-1278-15** | Unit | Local dev: undefined → '#' | `pathname === '/sites/mystore/home'`, `href === undefined` → result `'#'` |
+| **TC-F05-1278-16** | Unit | Local dev: empty string → '#' | `pathname === '/sites/mystore/home'`, `href === ''` → result `'#'` |
+| **TC-F05-1278-17** | Unit | SSR/null pathname: /about passes through | `pathname === null`, `href === '/about'` → result unchanged (non-local branch) |
+| **TC-F05-1278-18** | Unit | SSR/null pathname: undefined → '#' | `pathname === null`, `href === undefined` → result `'#'` |
+
+---
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |
