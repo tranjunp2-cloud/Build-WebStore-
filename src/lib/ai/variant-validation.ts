@@ -6,11 +6,13 @@
 
 /** Minimum content items required per variant — if below, fallback to simpler variant */
 export const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
-    testimonials: { carousel: 3, masonry: 4, 'avatar-row': 3, 'video-text': 2, spotlight: 1, cards: 2, simple: 1, 'minimal-quote': 1 },
+    // cards = 3-col grid → needs 3 items (GH-1252: was 2, caused empty cell on non-English sites)
+    testimonials: { carousel: 3, masonry: 4, 'avatar-row': 3, 'video-text': 2, spotlight: 1, cards: 3, simple: 1, 'minimal-quote': 1 },
     features: { 'grid-4': 4, 'grid-3': 3, 'grid-2': 2, carousel: 3, zigzag: 2, list: 2, 'icon-top': 2, 'icon-left': 2 },
     gallery: { masonry: 6, carousel: 3, grid: 4, lightbox: 4, filmstrip: 3, justified: 4 },
     pricing: { comparison: 2, table: 2, slider: 3, cards: 2, horizontal: 2, toggle: 2, tiered: 2, minimal: 1 },
-    team: { grid: 2, list: 2 },
+    // grid = 3-col → needs 3 items (GH-1252: was 2, caused empty cell on non-English sites)
+    team: { grid: 3, list: 2 },
     stats: { grid: 3, cards: 3, 'chart-bars': 3, row: 2, highlight: 1, 'inline-text': 1 },
 }
 
