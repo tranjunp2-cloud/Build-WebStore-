@@ -376,7 +376,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 </motion.div>
 
                 {/* Desktop Links */}
-                <NavDesktopLinks links={links} className="hidden md:flex flex-1" />
+                <NavDesktopLinks links={links} className="hidden md:flex gap-1 flex-1" />
 
                 {/* Desktop CTA + Language Switcher + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
@@ -460,7 +460,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                 {/* Desktop Links */}
                 <NavDesktopLinks
                     links={links}
-                    className="hidden md:flex absolute left-1/2 -translate-x-1/2 w-[60%]"
+                    className="hidden md:flex gap-1 absolute left-1/2 -translate-x-1/2 w-[60%]"
                 />
 
                 {/* CTA + Language Switcher + Mobile */}

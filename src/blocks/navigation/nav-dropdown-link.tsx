@@ -55,8 +55,8 @@ export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         transition={{ duration: 0.15 }}
                         className={`absolute left-0 top-full ${NAV_Z_CLASS.dropdown} mt-1 min-w-[180px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg`}
                         style={{
-                            background: `color-mix(in srgb, var(--surface, #111111) 95%, transparent)`,
-                            border: `1px solid color-mix(in srgb, var(--text, #fafafa) 10%, transparent)`,
+                            background: `color-mix(in srgb, var(--background, #09090b) 97%, transparent)`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), 0.12)`,
                             color: NAV_SURFACE_TEXT,
                         }}
                     >

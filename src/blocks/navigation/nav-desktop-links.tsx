@@ -144,7 +144,7 @@ export function NavDesktopLinks({ links, className, budgetOffset = 0 }: NavDeskt
     return (
         <div
             ref={containerRef}
-            className={`flex items-center gap-1 min-w-0 ${className ?? ''}`}
+            className={`flex items-center min-w-0 ${className ?? ''}`}
         >
             {/* Hidden measurement layer — always renders all links so itemRefs
                 are never null and measure() can correctly expand visibleCount.

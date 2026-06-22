@@ -25,7 +25,7 @@ export function useNavOverflow(links: NavLink[], budgetOffset: number = 0) {
 
     // Track labels so measure re-fires when a label changes width (e.g. user edits
     // a link label in the CMS editor), not just when the link count changes.
-    const linksSignature = links.map(l => l.label).join('\0')
+    const linksSignature = links.map(l => `${l.label}:${l.children?.length ?? 0}`).join('\0')
 
     const measure = useCallback(() => {
         const container = containerRef.current
