@@ -125,6 +125,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     invoiceId: xenditPaymentRequestId,
                     amount: (order as any).total,
                     reason: 'REQUESTED_BY_CUSTOMER',
+                    // Idempotency key scoped to this order — Xendit returns cached result
+                    // for duplicate requests within 24h, preventing double-refund on retry.
+                    idempotencyKey: `cancel-${orderId}`,
                 })
                 xenditRefundId = xenditRefund.id
             } catch (xenditErr) {

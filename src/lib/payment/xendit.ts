@@ -220,6 +220,9 @@ export interface CreateRefundParams {
     paymentRequestId?: string
     amount: number      // RM major unit — full refund = order.total
     reason?: string
+    // Prevents double-refund on retry (e.g. network timeout): Xendit returns cached result
+    // for duplicate requests with the same key within 24h.
+    idempotencyKey?: string
 }
 export interface XenditRefund { id: string; status: string }
 
@@ -239,6 +242,7 @@ export async function createRefund(p: CreateRefundParams): Promise<XenditRefund>
         method: 'POST',
         apiKey: p.apiKey,
         forUserId: p.forUserId,
+        idempotencyKey: p.idempotencyKey,
         body,
     })
 }

@@ -22,7 +22,7 @@ function authHeader(): string {
 
 export async function xenditFetch<T>(
     path: string,
-    init: { method: 'GET' | 'POST'; body?: unknown; forUserId?: string; apiKey?: string } = { method: 'GET' },
+    init: { method: 'GET' | 'POST'; body?: unknown; forUserId?: string; apiKey?: string; idempotencyKey?: string } = { method: 'GET' },
 ): Promise<T> {
     const headers: Record<string, string> = {
         // Model C: use merchant's own key; Model B: use ECH master key
@@ -32,6 +32,7 @@ export async function xenditFetch<T>(
         'Content-Type': 'application/json',
     }
     if (init.forUserId) headers['for-user-id'] = init.forUserId
+    if (init.idempotencyKey) headers['idempotency-key'] = init.idempotencyKey
     if (path.startsWith('/v3/')) headers['api-version'] = '2024-11-11'
 
     const res = await fetch(`${XENDIT_BASE_URL}${path}`, {
