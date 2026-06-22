@@ -34,7 +34,7 @@ export function ImageToolbar({ onImageSelect, isProcessing }: ImageToolbarProps)
     }
 
     return (
-        <div className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5 pointer-events-auto">
+        <div className="flex items-center gap-1 bg-[var(--editor-surface-elevated)] border border-white/10 shadow-2xl rounded-lg p-1.5 pointer-events-auto">
             <input 
                 type="file" 
                 className="hidden" 

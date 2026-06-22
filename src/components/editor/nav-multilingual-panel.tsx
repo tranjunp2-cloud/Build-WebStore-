@@ -5,6 +5,7 @@ import * as Tooltip from '@radix-ui/react-tooltip'
 import { cn } from '@/lib/utils'
 import { getLocaleLabel } from '@/lib/locale-labels'
 import { LocaleFlag } from '@/components/locale-flag'
+import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 
 interface NavMultilingualPanelProps {
@@ -176,21 +177,7 @@ export function NavMultilingualPanel({
                         </span>
                     )}
                 </div>
-                <button
-                    type="button" role="switch" aria-checked={enabled}
-                    onClick={() => onToggle(!enabled)}
-                    className={cn(
-                        'relative shrink-0 inline-flex h-[18px] w-[30px] rounded-full transition-colors duration-200',
-                        // ON = emerald (both modes). OFF: light needs a neutral gray track
-                        // (bg-white/20 is not remapped → invisible on white sidebar); dark keeps white/20.
-                        enabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/20',
-                    )}
-                >
-                    <span className={cn(
-                        'pointer-events-none inline-block h-[14px] w-[14px] rounded-full bg-white shadow mt-[2px] transition-transform duration-200',
-                        enabled ? 'translate-x-[14px]' : 'translate-x-[2px]',
-                    )} />
-                </button>
+                <Switch checked={enabled} onCheckedChange={onToggle} />
             </label>
 
             {enabled && (

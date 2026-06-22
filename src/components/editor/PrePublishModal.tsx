@@ -38,22 +38,22 @@ export function PrePublishModal({
     const secondaryCard = hasUnsavedChanges
         ? {
             icon: AlertTriangle,
-            borderClassName: 'border-[rgba(240,177,0,0.3)]',
-            backgroundClassName: 'bg-[rgba(240,177,0,0.1)]',
-            iconClassName: 'text-[#F0B100]',
-            titleClassName: 'text-[#FFF085]',
-            descriptionClassName: 'text-[rgba(255,240,133,0.7)]',
+            borderClassName: 'border-[hsl(var(--warning)/0.3)]',
+            backgroundClassName: 'bg-[hsl(var(--warning)/0.1)]',
+            iconClassName: 'text-[hsl(var(--warning))]',
+            titleClassName: 'text-[hsl(var(--warning))]',
+            descriptionClassName: 'text-[hsl(var(--warning)/0.7)]',
             title: pm.unsavedChanges,
             description: pm.unsavedChangesDesc,
         }
         : hasSeoWarning
             ? {
                 icon: AlertTriangle,
-                borderClassName: 'border-[rgba(240,177,0,0.3)]',
-                backgroundClassName: 'bg-[rgba(240,177,0,0.1)]',
-                iconClassName: 'text-[#F0B100]',
-                titleClassName: 'text-[#FFF085]',
-                descriptionClassName: 'text-[rgba(255,240,133,0.7)]',
+                borderClassName: 'border-[hsl(var(--warning)/0.3)]',
+                backgroundClassName: 'bg-[hsl(var(--warning)/0.1)]',
+                iconClassName: 'text-[hsl(var(--warning))]',
+                titleClassName: 'text-[hsl(var(--warning))]',
+                descriptionClassName: 'text-[hsl(var(--warning)/0.7)]',
                 title: pm.seoNeeded,
                 description: missingSeoPages.length > 1
                     ? pm.seoMissingMany.replace('{count}', String(missingSeoPages.length))
@@ -61,11 +61,11 @@ export function PrePublishModal({
             }
             : {
                 icon: CheckCircle2,
-                borderClassName: 'border-[rgba(0,201,80,0.3)]',
-                backgroundClassName: 'bg-[rgba(0,201,80,0.1)]',
-                iconClassName: 'text-[#00C950]',
-                titleClassName: 'text-[#B9F8CF]',
-                descriptionClassName: 'text-[rgba(185,248,207,0.7)]',
+                borderClassName: 'border-[hsl(var(--success)/0.3)]',
+                backgroundClassName: 'bg-[hsl(var(--success)/0.1)]',
+                iconClassName: 'text-[hsl(var(--success))]',
+                titleClassName: 'text-[hsl(var(--primary))]',
+                descriptionClassName: 'text-[hsl(var(--primary)/0.7)]',
                 title: pm.seoSet,
                 description: pm.seoSetDesc,
             }
@@ -92,20 +92,20 @@ export function PrePublishModal({
                                 transition={{ duration: 0.18, ease: 'easeOut' }}
                                 className="fixed inset-0 z-50 grid place-items-center p-4 focus:outline-none"
                             >
-                                <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(59,130,246,0.15)] dark:bg-[rgba(30,41,59,0.6)] bg-white dark:backdrop-blur-[25px] backdrop-blur-none p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
-                                    <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal dark:text-[#F8FAFC] text-slate-900">
+                                <div className={`editor-portal ${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[hsl(var(--info)/0.15)] bg-[var(--editor-surface)] backdrop-blur-[25px] p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)]`}>
+                                    <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal text-[var(--editor-text)]">
                                         <Rocket className="mr-2 inline-block h-5 w-5 align-text-bottom" aria-hidden />
                                         {pm.title}
                                     </Dialog.Title>
 
                                     <div className="mt-4 flex flex-col gap-3">
-                                        <div className="flex min-h-[62px] items-start gap-3 rounded-[12px] border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.1)] px-[13px] pb-px pt-[13px]">
-                                            <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#00C950]" />
+                                        <div className="flex min-h-[62px] items-start gap-3 rounded-[12px] border border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.1)] px-[13px] pb-px pt-[13px]">
+                                            <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[hsl(var(--success))]" />
                                             <div className="min-w-0">
-                                                <p className="text-[14px] font-medium leading-5 text-[#B9F8CF]">
+                                                <p className="text-[14px] font-medium leading-5 text-[hsl(var(--primary))]">
                                                     {pm.homepageReady}
                                                 </p>
-                                                <p className="text-[12px] leading-4 text-[rgba(185,248,207,0.7)]">
+                                                <p className="text-[12px] leading-4 text-[hsl(var(--primary)/0.7)]">
                                                     {pm.homepageReadyDesc}
                                                 </p>
                                             </div>
@@ -128,7 +128,7 @@ export function PrePublishModal({
                                         <Dialog.Close asChild>
                                             <button
                                                 type="button"
-                                                className="h-[42px] flex-1 rounded-[12px] border dark:border-[rgba(59,130,246,0.07)] border-[rgba(0,0,0,0.1)] text-[14px] font-medium dark:text-[#F8FAFC] text-slate-700 transition-colors dark:hover:bg-white/[0.04] hover:bg-slate-50"
+                                                className="h-[42px] flex-1 rounded-[12px] border border-[hsl(var(--info)/0.07)] text-[14px] font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)]"
                                             >
                                                 {pm.cancel}
                                             </button>
@@ -138,7 +138,7 @@ export function PrePublishModal({
                                             type="button"
                                             onClick={onPublish}
                                             disabled={isPublishing}
-                                            className="h-[42px] flex-1 rounded-[12px] bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] text-[14px] font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-95 disabled:opacity-60"
+                                            className="h-[42px] flex-1 rounded-[12px] bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] text-[14px] font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-95 disabled:opacity-60"
                                         >
                                             {isPublishing ? (
                                                 <span className="inline-flex items-center gap-2">

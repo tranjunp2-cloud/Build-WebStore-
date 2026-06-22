@@ -75,8 +75,8 @@ function getStatusBadge(
     menuPageIds?: Set<string>,
 ) {
     const isPageLive = page.status === 'published' && siteStatus === 'published'
-    const liveCls = 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]'
-    const liveDot = 'bg-[#00c950]'
+    const liveCls = 'border border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.2)] text-[hsl(var(--primary))]'
+    const liveDot = 'bg-[hsl(var(--success))]'
 
     if (isPageLive) {
         if (page.isVisible === false) {
@@ -93,7 +93,7 @@ function getStatusBadge(
     return {
         label: labels.draft,
         sublabel: null,
-        className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
+        className: 'border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] text-[var(--editor-text-muted)]',
         dotClassName: '',
         tooltip: draftBecauseSite ? labels.tooltipDraftSite : labels.tooltipDraft,
     }
@@ -325,7 +325,7 @@ export function PageManagerPanel({
                     <button
                         type="button"
                         onClick={() => setIsAdding(true)}
-                        className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] px-4 text-[14px] font-medium text-white shadow-[0_10px_20px_rgba(45,212,191,0.12)] transition-opacity hover:opacity-95"
+                        className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 text-[14px] font-medium text-white shadow-[0_10px_20px_rgba(45,212,191,0.12)] transition-opacity hover:opacity-95"
                     >
                         <Plus className="h-4 w-4" />
                         {pm.addNewPage}
@@ -403,11 +403,11 @@ export function PageManagerPanel({
                                         'relative rounded-xl border px-[13px] pb-3 pt-[13px] transition-all',
                                         isCurrent
                                             ? 'border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_0_1px_rgba(34,211,238,0.15),0_4px_12px_rgba(34,211,238,0.08)]'
-                                            : 'border-white/[0.06] bg-[#1E293B] hover:border-white/[0.12]',
+                                            : 'border-white/[0.06] bg-[var(--editor-surface-elevated)] hover:border-white/[0.12]',
                                     )}
                                 >
                                     {isCurrent && (
-                                        <div className="absolute -left-px top-3 bottom-3 w-[3px] rounded-r-full bg-gradient-to-b from-[#3B82F6] to-[#2DD4BF]" />
+                                        <div className="absolute -left-px top-3 bottom-3 w-[3px] rounded-r-full bg-gradient-to-b from-[hsl(var(--info))] to-[hsl(var(--primary))]" />
                                     )}
                                     <button
                                         type="button"
@@ -417,11 +417,11 @@ export function PageManagerPanel({
                                         <div className="flex min-h-[42px] items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <div className="truncate text-sm font-medium text-[#F8FAFC]">
+                                                    <div className="truncate text-sm font-medium text-[var(--editor-text)]">
                                                         {getDisplayPageTitle(page, activeLocale)}
                                                     </div>
                                                     {page.isHomepage ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] px-2 py-[3px] text-[12px] font-semibold leading-4 text-[#b9f8cf]">
+                                                        <span className="inline-flex items-center gap-1 rounded-[4px] border border-[hsl(var(--success)/0.3)] bg-[hsl(var(--success)/0.2)] px-2 py-[3px] text-[12px] font-semibold leading-4 text-[hsl(var(--primary))]">
                                                             <House className="h-3 w-3" />
                                                             {pm.home}
                                                         </span>
@@ -452,11 +452,11 @@ export function PageManagerPanel({
                                                         </Tooltip>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 flex items-center gap-2 text-xs leading-4 text-[#94A3B8]">
+                                                <div className="mt-1 flex items-center gap-2 text-xs leading-4 text-[var(--editor-text-muted)]">
                                                     <span className="truncate">{getPagePath(page)}</span>
                                                     {page.updatedAt && (
                                                         <>
-                                                            <span className="text-[#475569]">·</span>
+                                                            <span className="text-[var(--editor-text-muted)]">·</span>
                                                             <span className="shrink-0">{new Date(page.updatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
                                                         </>
                                                     )}
@@ -470,7 +470,7 @@ export function PageManagerPanel({
                                         <button
                                             type="button"
                                             onClick={() => onEditPage?.(page.id)}
-                                            className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                                            className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                             {pm.editWithAI}
@@ -483,7 +483,7 @@ export function PageManagerPanel({
                                             onClick={() => handleToggleVisibility(page)}
                                             disabled={isProtectedPage}
                                             className={cn(
-                                                'flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[rgba(255,255,255,0.05)] px-3 text-[12px] font-medium leading-4 text-[#F8FAFC] transition-colors',
+                                                'flex h-8 min-w-0 flex-1 items-center justify-center gap-2 rounded-[4px] border border-[hsl(var(--primary)/0.04)] bg-[var(--editor-overlay-bg)] px-3 text-[12px] font-medium leading-4 text-[var(--editor-text)] transition-colors',
                                                 isProtectedPage
                                                     ? 'opacity-60'
                                                     : 'hover:border-cyan-500/20 hover:bg-white/10',
@@ -503,12 +503,12 @@ export function PageManagerPanel({
                                             onClick={() => setDeleteTarget(page)}
                                             disabled={pendingPageId === page.id || isProtectedPage}
                                             className={cn(
-                                                'flex h-8 w-[85px] shrink-0 items-center justify-center gap-2 rounded-[4px] border border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)] px-3 text-[12px] font-medium leading-4 text-[#FFC9C9] transition-colors',
+                                                'flex h-8 w-[85px] shrink-0 items-center justify-center gap-2 rounded-[4px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-3 text-[12px] font-medium leading-4 text-[hsl(var(--destructive))] transition-colors',
                                                 pendingPageId === page.id
                                                     ? 'opacity-70'
                                                     : isProtectedPage
                                                         ? 'opacity-50'
-                                                        : 'hover:bg-[rgba(251,44,54,0.16)]',
+                                                        : 'hover:bg-[hsl(var(--destructive)/0.16)]',
                                             )}
                                             title={isProtectedPage ? pm.homeProtected : pm.deletePage}
                                         >
@@ -528,32 +528,32 @@ export function PageManagerPanel({
 
                         {page404 ? (
                             <div className="shrink-0 pt-3">
-                                <div className="rounded-[12px] border border-[rgba(59,130,246,0.04)] bg-[#111A2D] p-2">
+                                <div className="rounded-[12px] border border-[hsl(var(--primary)/0.04)] bg-[var(--editor-bg)] p-2">
                                     <button
                                         type="button"
                                         onClick={() => setIs404SectionOpen(open => !open)}
                                         className="flex h-9 w-full items-center justify-between rounded-[10px] px-3 text-left transition-colors hover:bg-white/[0.03]"
                                     >
                                         <div className="flex items-center gap-2">
-                                            <Settings2 className="h-3.5 w-3.5 text-[#94A3B8]" />
-                                            <p className="text-[12px] font-medium leading-4 text-[#F8FAFC]">{pm.customPage}</p>
+                                            <Settings2 className="h-3.5 w-3.5 text-[var(--editor-text-muted)]" />
+                                            <p className="text-[12px] font-medium leading-4 text-[var(--editor-text)]">{pm.customPage}</p>
                                         </div>
                                         {is404SectionOpen ? (
-                                            <ChevronDown className="h-4 w-4 text-[#94A3B8]" />
+                                            <ChevronDown className="h-4 w-4 text-[var(--editor-text-muted)]" />
                                         ) : (
-                                            <ChevronRight className="h-4 w-4 text-[#94A3B8]" />
+                                            <ChevronRight className="h-4 w-4 text-[var(--editor-text-muted)]" />
                                         )}
                                     </button>
 
                                     {is404SectionOpen ? (
-                                        <div className="mt-2 rounded-[8px] bg-[#1E293B] px-3 py-3">
-                                            <p className="text-[10px] font-normal leading-4 text-[#64748B]">
+                                        <div className="mt-2 rounded-[8px] bg-[var(--editor-surface-elevated)] px-3 py-3">
+                                            <p className="text-[10px] font-normal leading-4 text-[var(--editor-text-muted)]">
                                                 {pm.customPage}
                                             </p>
                                             <button
                                                 type="button"
                                                 onClick={() => onPageSelected(page404.id)}
-                                                className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
+                                                className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[hsl(var(--primary)/0.04)] bg-[var(--editor-surface-elevated)] text-[12px] font-medium text-[var(--editor-text)] transition-colors hover:border-cyan-500/20 hover:bg-[var(--editor-surface-elevated)]"
                                             >
                                                 <Pencil className="h-4 w-4" aria-hidden />
                                                 {pm.edit404Page}
@@ -568,7 +568,7 @@ export function PageManagerPanel({
             </div>
 
             {deleteTarget ? (
-                <div className="absolute inset-0 z-30 bg-[rgba(11,17,32,0.72)] backdrop-blur-[2px]">
+                <div className="absolute inset-0 z-30 bg-[rgba(11,17,32,0.72)] backdrop-blur-[2px]">{/* intentional dark scrim — modal backdrop stays dim in both themes (like a black overlay) */}
                     <div
                         className="absolute inset-0"
                         onClick={() => setDeleteTarget(null)}
@@ -576,8 +576,8 @@ export function PageManagerPanel({
                     />
 
                     <div className="relative flex h-full items-center justify-center px-4 py-6">
-                        <div className="w-full max-w-[347px] rounded-[18px] border border-[rgba(59,130,246,0.16)] dark:bg-[linear-gradient(180deg,rgba(20,30,48,0.98)_0%,rgba(11,17,32,0.98)_100%)] bg-white px-[25px] pb-[25px] pt-[25px] shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(251,44,54,0.28)] bg-[rgba(127,29,29,0.22)] text-[#FCA5A5]">
+                        <div className="w-full max-w-[347px] rounded-[18px] border border-[hsl(var(--primary)/0.16)] bg-[var(--editor-surface)] px-[25px] pb-[25px] pt-[25px] shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
+                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[hsl(var(--destructive)/0.28)] bg-[hsl(var(--destructive)/0.22)] text-[hsl(var(--destructive))]">
                                 <AlertTriangle className="h-8 w-8" />
                             </div>
 
@@ -585,13 +585,13 @@ export function PageManagerPanel({
                                 <p className="text-[28px] font-semibold leading-7 text-white">
                                     {pm.deleteConfirmTitle}
                                 </p>
-                                <p className="mt-3 text-[14px] leading-6 text-[#CBD5E1]">
+                                <p className="mt-3 text-[14px] leading-6 text-[var(--editor-text-muted)]">
                                     {pm.deleteConfirmMsg}
                                     {' '}
-                                    <span className="text-[#2DD4BF]">&quot;{deleteTarget.title}&quot;</span>
+                                    <span className="text-[hsl(var(--primary))]">&quot;{deleteTarget.title}&quot;</span>
                                     ?
                                 </p>
-                                <p className="text-[14px] leading-5 text-[#94A3B8]">
+                                <p className="text-[14px] leading-5 text-[var(--editor-text-muted)]">
                                     {pm.deleteConfirmDesc}
                                 </p>
                             </div>
@@ -600,7 +600,7 @@ export function PageManagerPanel({
                                 <button
                                     type="button"
                                     onClick={() => setDeleteTarget(null)}
-                                    className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[rgba(255,255,255,0.05)] text-[14px] font-medium text-white transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                                    className="flex h-11 items-center justify-center rounded-[10px] border border-[hsl(var(--primary)/0.04)] bg-[var(--editor-overlay-bg)] text-[14px] font-medium text-white transition-colors hover:bg-[var(--editor-overlay-hover)]"
                                 >
                                     {pm.cancel}
                                 </button>
@@ -608,7 +608,7 @@ export function PageManagerPanel({
                                     type="button"
                                     disabled={pendingPageId === deleteTarget.id}
                                     onClick={() => void handleDelete(deleteTarget)}
-                                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[rgba(251,44,54,0.4)] bg-[#FF1F3D] text-[14px] font-medium text-white transition-colors hover:bg-[#ff3550] disabled:opacity-70"
+                                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive))] text-[14px] font-medium text-white transition-colors hover:bg-[hsl(var(--destructive))] hover:opacity-90 disabled:opacity-70"
                                 >
                                     {pendingPageId === deleteTarget.id ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />

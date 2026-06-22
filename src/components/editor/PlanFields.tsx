@@ -20,8 +20,8 @@ interface PlanFieldsProps {
     pages?: PageData[]
 }
 
-const selectClass = 'w-full h-9 rounded-lg bg-[#0f1923] border border-white/10 text-white text-xs px-2 outline-none focus:border-blue-500/50'
-const labelClass = 'text-[12px] font-medium text-[#94a3b8]'
+const selectClass = 'w-full h-9 rounded-lg bg-[var(--editor-bg)] border border-white/10 text-white text-xs px-2 outline-none focus:border-blue-500/50'
+const labelClass = 'text-[12px] font-medium text-[var(--editor-text-muted)]'
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
     return <p className={labelClass}>{children}</p>
@@ -127,7 +127,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
             )}
 
             {/* CTA Settings — collapsible */}
-            <div className="bg-[#1e293b] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[var(--editor-border)] rounded-xl overflow-hidden">
                 <button
                     type="button"
                     onClick={() => setCtaOpen(o => !o)}

@@ -332,7 +332,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                     {flattenAsk && (
                         <div style={{
                             marginBottom: 10, padding: 10, borderRadius: 8,
-                            border: '1px solid rgba(245,185,69,0.45)', background: 'rgba(245,185,69,0.10)',
+                            border: '1px solid hsl(var(--warning)/0.45)', background: 'hsl(var(--warning)/0.10)',
                             display: 'flex', gap: 8, alignItems: 'flex-start',
                         }}>
                             <Layers size={15} color={C.warning} style={{ flexShrink: 0, marginTop: 1 }} />
@@ -363,7 +363,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                                         style={{
                                             padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
                                             border: `1px solid ${C.info}`, background: C.info,
-                                            color: '#fff', cursor: 'pointer',
+                                            color: 'hsl(var(--info-foreground))', cursor: 'pointer',
                                         }}
                                     >
                                         {nav.flattenConfirm}
@@ -417,7 +417,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                             transition: 'background 0.12s, border-color 0.12s',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(37,99,235,0.20)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'hsl(var(--primary)/0.20)' }}
                         onMouseLeave={e => { e.currentTarget.style.background = C.infoBg }}
                     >
                         <Plus size={14} />

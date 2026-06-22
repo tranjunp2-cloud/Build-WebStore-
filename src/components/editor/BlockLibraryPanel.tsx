@@ -185,7 +185,7 @@ export function BlockLibraryPanel({
 
     return (
         <TooltipProvider delayDuration={200}>
-        <div className="flex h-full flex-col bg-[#0F172A]">
+        <div className="flex h-full flex-col bg-[var(--editor-surface)]">
             <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -194,7 +194,7 @@ export function BlockLibraryPanel({
                         value={query}
                         onChange={event => setQuery(event.target.value)}
                         placeholder={bl.searchPlaceholder}
-                        className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[#1E293B] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]"
+                        className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[var(--editor-surface-elevated)] focus:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]"
                     />
                 </div>
             </div>
@@ -265,14 +265,14 @@ export function BlockLibraryPanel({
                                                                 {item.scope === 'global' ? (
                                                                     <span
                                                                         className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
+                                                                        style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}
                                                                     >
                                                                         🌐 {bl.globalScopeLabel}
                                                                     </span>
                                                                 ) : (
                                                                     <span
                                                                         className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
-                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: '#94a3b8' }}
+                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: 'var(--editor-text-muted)' }}
                                                                     >
                                                                         📄 {bl.pageScopeLabel}
                                                                     </span>
@@ -312,7 +312,7 @@ export function BlockLibraryPanel({
                 </div>
             </div>
 
-            <div className="border-t border-white/[0.06] bg-[#0B1120]/60 px-4 py-3">
+            <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
                 <p className="text-center text-[11px] text-slate-500">
                     {bl.footerHint}
                 </p>

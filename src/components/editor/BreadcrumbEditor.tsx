@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 
@@ -103,25 +104,13 @@ export function BreadcrumbEditor({ homeLabel, separator, showOnAllPages, pageSlu
                     <span className="text-[12px] font-medium text-slate-400">{s.breadcrumbShowOnAllPages}</span>
                     <span className="text-[12px] text-slate-400/70 leading-4">{s.breadcrumbShowOnAllPagesDesc}</span>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => {
-                        const next = !localShowOnAllPages
+                <Switch
+                    checked={localShowOnAllPages}
+                    onCheckedChange={(next) => {
                         setLocalShowOnAllPages(next)
                         onChange({ showOnAllPages: next })
                     }}
-                    className={cn(
-                        'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                        localShowOnAllPages ? 'bg-blue-500' : 'bg-white/10'
-                    )}
-                >
-                    <span
-                        className={cn(
-                            'absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-colors',
-                            localShowOnAllPages ? 'left-[26px]' : 'left-1'
-                        )}
-                    />
-                </button>
+                />
             </div>
 
             {/* Preview */}

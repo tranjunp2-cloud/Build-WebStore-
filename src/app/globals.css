@@ -71,12 +71,14 @@
 
   /* Editor semantic tokens — light mode */
   --editor-bg: #F1F5F9;
+  --editor-bg-rgb: 241 245 249;            /* GH-1192: channel-split for /opacity glass overlays */
   --editor-surface: #FFFFFF;
   --editor-surface-deep: #F8FAFC;
   --editor-surface-elevated: #FFFFFF;
-  --editor-text: #0F172A;
-  --editor-text-muted: #64748B;
-  --editor-text-subtle: #94A3B8;
+  --editor-surface-elevated-rgb: 255 255 255;
+  --editor-text: #22313F;         /* GH-1192: CHÍNH — khớp dashboard --foreground (orders/discounts) */
+  --editor-text-muted: #475569;   /* GH-1192: PHỤ — slate-600, đậm dễ đọc ở light */
+  --editor-text-subtle: #475569;  /* GH-1192: gộp = phụ (bỏ cấp 3 cho đỡ lộn xộn) */
   --editor-border: rgba(0, 0, 0, 0.08);
   --editor-border-subtle: rgba(0, 0, 0, 0.05);
   --editor-overlay-bg: rgba(0, 0, 0, 0.04);
@@ -96,9 +98,11 @@
 
   /* Editor semantic tokens — dark mode */
   --editor-bg: #0B1120;
+  --editor-bg-rgb: 11 17 32;               /* GH-1192: channel-split for /opacity glass overlays */
   --editor-surface: #0F172A;
   --editor-surface-deep: #0B1120;
   --editor-surface-elevated: #1E293B;
+  --editor-surface-elevated-rgb: 30 41 59;
   --editor-text: #F8FAFC;
   --editor-text-muted: #94A3B8;
   --editor-text-subtle: #64748B;
@@ -793,6 +797,22 @@ html:not(.dark) .editor-shell .hover\:text-\[\#5EEAD4\]:hover { color: #0e7490; 
 .editor-shell .border-white\/\[0\.08\],
 .editor-shell .border-white\/20 { border-color: var(--editor-border); }
 .editor-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+/* GH-1192 Phase 2 — remap gaps */
+.editor-shell .border-\[\#1F2937\],
+.editor-shell .border-\[\#1f2937\],
+.editor-shell .border-\[\#25324A\],
+.editor-shell .border-\[\#25324a\] { border-color: var(--editor-border); }
+.editor-shell .text-\[\#9CA3AF\],
+.editor-shell .text-\[\#9ca3af\],
+.editor-shell .text-\[\#64748B\],
+.editor-shell .text-\[\#64748b\] { color: var(--editor-text-muted); }
+/* dark hex text — invisible in dark → editor-text */
+.editor-shell .text-\[\#202124\] { color: var(--editor-text); }
+/* pale accent text → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#ff9b8f\],
+html:not(.dark) .editor-shell .text-\[\#FF9B8F\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[\#4ede9f\],
+html:not(.dark) .editor-shell .text-\[\#4EDE9F\] { color: #15803d; }
 
 /* hover:text → remap to readable values in light mode */
 .editor-shell .hover\:text-white:hover,
