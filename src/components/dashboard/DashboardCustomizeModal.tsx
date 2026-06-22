@@ -23,6 +23,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { updateDashboardPreferences } from '@/app/(dashboard)/actions'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 
 function SortableItem({
   id,
@@ -63,11 +64,11 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       data-testid={`customize-item-${id}`}
-      className="flex items-center gap-4 px-[17px] py-[14px] h-[70px] rounded-[12px] border border-solid border-white/[0.08] bg-[hsl(var(--background)/0.5)] hover:bg-[hsl(var(--secondary))] transition-colors"
+      className="flex items-center gap-4 px-[17px] py-[14px] h-[70px] rounded-[12px] border border-solid border-[hsl(var(--border))] bg-[hsl(var(--background)/0.5)] hover:bg-[hsl(var(--secondary))] transition-colors"
     >
       {/* Drag Handle — desktop only */}
       <div
-        className="hidden md:flex shrink-0 items-center justify-center text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing w-8 h-10 -ml-1 touch-none"
+        className="hidden md:flex shrink-0 items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] cursor-grab active:cursor-grabbing w-8 h-10 -ml-1 touch-none"
         {...attributes}
         {...listeners}
       >
@@ -87,7 +88,7 @@ function SortableItem({
       {/* Text Content */}
       <div className="flex flex-col flex-1 text-left leading-tight">
         <span className="text-[14px] font-medium text-[hsl(var(--foreground))]">{label}</span>
-        <span className="text-[12px] font-normal text-slate-400 mt-0.5">{value}</span>
+        <span className="text-[12px] font-normal text-[hsl(var(--muted-foreground))] mt-0.5">{value}</span>
       </div>
 
       {/* Mobile Up/Down arrows — right side, horizontal per Figma FR-18 */}
@@ -96,7 +97,7 @@ function SortableItem({
         data-testid={`move-down-${id}`}
         disabled={isLast}
         onClick={(e) => { e.stopPropagation(); onMoveDown(id) }}
-        className="flex md:hidden items-center justify-center shrink-0 size-5 text-slate-500 hover:text-slate-300 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+        className="flex md:hidden items-center justify-center shrink-0 size-5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
       >
         <ArrowDown className="size-5" />
       </button>
@@ -105,7 +106,7 @@ function SortableItem({
         data-testid={`move-up-${id}`}
         disabled={isFirst}
         onClick={(e) => { e.stopPropagation(); onMoveUp(id) }}
-        className="flex md:hidden items-center justify-center shrink-0 size-5 text-slate-500 hover:text-slate-300 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+        className="flex md:hidden items-center justify-center shrink-0 size-5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
       >
         <ArrowUp className="size-5" />
       </button>
@@ -198,7 +199,7 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
 
   return (
     <>
-      <button data-testid="customize-dashboard-btn" onClick={() => setIsOpen(true)} className="flex items-center gap-[6px] rounded-[8px] border border-solid border-[hsl(var(--border))] bg-transparent px-[16px] py-[8px] text-[13px] font-semibold text-white hover:bg-[hsl(var(--secondary))] transition-all leading-none">
+      <button data-testid="customize-dashboard-btn" onClick={() => setIsOpen(true)} className="flex items-center gap-[6px] rounded-[8px] border border-solid border-[hsl(var(--border))] bg-transparent px-[16px] py-[8px] text-[13px] font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))] transition-all leading-none">
         <Settings className="w-4 h-4 shrink-0" aria-hidden />
         <span>{t.dashboard.overview.customize}</span>
       </button>
@@ -216,12 +217,12 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
-            className="w-full max-w-[672px] rounded-[16px] border border-solid border-white/10 bg-[hsl(var(--secondary))] shadow-2xl flex flex-col max-h-[90vh]"
+            className="w-full max-w-[672px] rounded-[16px] border border-solid border-[hsl(var(--border))] bg-[hsl(var(--popover))] shadow-2xl flex flex-col max-h-[90vh]"
           >
             {/* Header */}
-            <div className="shrink-0 p-6 pb-6 border-b border-solid border-white/5 flex flex-col gap-1.5">
+            <div className="shrink-0 p-6 pb-6 border-b border-solid border-[hsl(var(--border))] flex flex-col gap-1.5">
               <h2 className="text-[20px] sm:text-[22px] font-bold text-[hsl(var(--foreground))] leading-tight">{t.dashboard.overview.customizeModal.title}</h2>
-              <p className="text-[14px] text-slate-400">{t.dashboard.overview.customizeModal.description}</p>
+              <p className="text-[14px] text-[hsl(var(--muted-foreground))]">{t.dashboard.overview.customizeModal.description}</p>
             </div>
             
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -249,21 +250,23 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
             </DndContext>
 
             {/* Footer */}
-            <div className="mt-auto flex shrink-0 justify-end gap-3 px-6 py-4 border-t border-solid border-white/5">
-              <button 
-                onClick={() => setIsOpen(false)} 
-                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-[hsl(var(--card))] border border-solid border-white/10 text-[14px] font-medium text-[hsl(var(--foreground))] hover:bg-white/10 transition-colors"
+            <div className="mt-auto flex shrink-0 justify-end gap-3 px-6 py-4 border-t border-solid border-[hsl(var(--border))]">
+              <Button
+                variant="dashSecondary"
+                size="dash"
+                onClick={() => setIsOpen(false)}
                 disabled={isPending}
               >
                 {t.dashboard.overview.customizeModal.cancel}
-              </button>
-              <button 
-                onClick={handleSave} 
-                disabled={isPending} 
-                className="flex h-[40px] px-5 items-center justify-center rounded-[8px] bg-[hsl(var(--primary))] shadow-[0_0_15px_hsl(var(--primary)/0.3)] text-[14px] font-medium !text-white hover:bg-[hsl(var(--primary)/0.9)] disabled:opacity-50 transition-colors"
+              </Button>
+              <Button
+                variant="dashPrimary"
+                size="dash"
+                onClick={handleSave}
+                disabled={isPending}
               >
                 {isPending ? t.dashboard.overview.customizeModal.saving : t.dashboard.overview.customizeModal.save}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>

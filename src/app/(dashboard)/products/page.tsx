@@ -161,7 +161,7 @@ export default function ProductsPage() {
             try {
                 const catDocs = await getCategoriesAction()
                 setCategories(catDocs as Category[] || [])
-            } catch (ignore) {}
+            } catch (ignore) { }
 
             setProducts(fetchedDocs as Product[])
         } catch (err) {
@@ -254,7 +254,7 @@ export default function ProductsPage() {
             await updateProductFieldAction(id, { deletedAt: null })
             toast.success(t.dashboard.products.form.restored)
             loadProducts()
-        } catch(e: unknown) {
+        } catch (e: unknown) {
             toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedRestore, sub))
         }
     }
@@ -293,7 +293,7 @@ export default function ProductsPage() {
                 },
                 duration: 5000,
             })
-        } catch(e: unknown) {
+        } catch (e: unknown) {
             toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedDelete, sub))
             setProductToDelete(null)
             loadProducts()
@@ -388,7 +388,7 @@ export default function ProductsPage() {
                         {/* All tab */}
                         <button onClick={() => setFilterStatus('all')}
                             className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <Image src="/images/figma/all-tab.svg" width={14} height={14} alt="All" className={cn("transition-all shrink-0", filterStatus !== 'all' && "grayscale opacity-60")} />
+
                             <span className={cn("text-[13px] font-medium", filterStatus === 'all' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
                                 {t.dashboard.products.list.filterAll}
                             </span>
@@ -561,7 +561,7 @@ export default function ProductsPage() {
                             <div className="flex justify-between items-center w-full">
                                 <div className="flex items-center gap-[10px]">
                                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M18.3333 2.5H1.66667L8.33333 10.3833V15.8333L11.6667 17.5V10.3833L18.3333 2.5Z" stroke="hsl(var(--primary))" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <path d="M18.3333 2.5H1.66667L8.33333 10.3833V15.8333L11.6667 17.5V10.3833L18.3333 2.5Z" stroke="hsl(var(--primary))" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                     <div className="text-foreground text-[16px] md:text-[18px] font-semibold leading-[28px]">{t.dashboard.products.list.advancedFilters}</div>
                                 </div>
@@ -571,7 +571,7 @@ export default function ProductsPage() {
                                 >
                                     <span className="text-[13px] font-medium leading-[20px]">{t.dashboard.products.list.clearAll}</span>
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
                                 </button>
                             </div>
@@ -592,7 +592,7 @@ export default function ProductsPage() {
                                                     onClick={(e) => { e.preventDefault(); setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]); }}>
                                                     {isSelected ? (
                                                         <div className="w-5 h-5 flex shrink-0 items-center justify-center rounded-[4px] bg-[hsl(var(--primary))] group-hover:opacity-80 transition-opacity">
-                                                            <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M4.00004 7.8L1.20004 5L0.266708 5.93333L4.00004 9.66667L12 1.66667L11.0667 0.733337L4.00004 7.8Z" fill="white"/></svg>
+                                                            <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M4.00004 7.8L1.20004 5L0.266708 5.93333L4.00004 9.66667L12 1.66667L11.0667 0.733337L4.00004 7.8Z" fill="white" /></svg>
                                                         </div>
                                                     ) : (
                                                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="shrink-0 stroke-[hsl(var(--input-border))] group-hover:stroke-[hsl(var(--primary))]/50 transition-colors">
@@ -672,7 +672,7 @@ export default function ProductsPage() {
                                     <span className="text-[hsl(var(--primary))] text-[14px] font-medium leading-[20px] pb-px">{cat}</span>
                                     <span role="button" onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))} className="w-[20px] h-[20px] rounded-[4px] text-[hsl(var(--primary))]/60 hover:text-[hsl(var(--primary))] hover:bg-[#3B82F6]/20 transition-colors cursor-pointer flex items-center justify-center">
                                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
                                     </span>
                                 </div>
@@ -682,7 +682,7 @@ export default function ProductsPage() {
                                     <span className="text-[hsl(var(--destructive))] text-[14px] font-medium leading-[20px] pb-px">{saleStatus === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}{saleStatus === 'On Sale' && ' 🔥'}</span>
                                     <span role="button" onClick={() => setSaleStatus('All Products')} className="w-[20px] h-[20px] rounded-[4px] text-[hsl(var(--destructive))]/60 hover:text-[hsl(var(--destructive))] hover:bg-[#FB2C36]/20 transition-colors cursor-pointer flex items-center justify-center">
                                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
                                     </span>
                                 </div>
@@ -692,7 +692,7 @@ export default function ProductsPage() {
                                     <span className="text-[hsl(var(--warning))] text-[14px] font-medium leading-[20px] pb-px">{t.dashboard.products.list.showLowStock.split('/')[0]}</span>
                                     <span role="button" onClick={() => setShowLowStock(false)} className="w-[20px] h-[20px] rounded-[4px] text-[hsl(var(--warning))]/60 hover:text-[hsl(var(--warning))] hover:bg-[#FF8904]/20 transition-colors cursor-pointer flex items-center justify-center">
                                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M8 2L2 8M2 2L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
                                     </span>
                                 </div>
@@ -803,7 +803,7 @@ export default function ProductsPage() {
                                                     <TableCell onClick={(e) => e.stopPropagation()}>
                                                         <Switch
                                                             checked={product.status === 'active'}
-                                                            onCheckedChange={() => handleUpdateStatus(product, { stopPropagation: () => {} } as React.MouseEvent)}
+                                                            onCheckedChange={() => handleUpdateStatus(product, { stopPropagation: () => { } } as React.MouseEvent)}
                                                         />
                                                     </TableCell>
 
