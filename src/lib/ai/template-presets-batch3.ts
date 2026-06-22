@@ -241,7 +241,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'video' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'team', variant: 'spotlight', count: 3 },
           { blockType: 'features', variant: 'icon-grid', count: 8 },
@@ -390,7 +390,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'video' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid', count: 4 },
           { blockType: 'countdown-timer', variant: 'dramatic' },
@@ -975,7 +975,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'video' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'stats', variant: 'large', count: 4 },
           { blockType: 'gallery', variant: 'masonry', count: 8 },

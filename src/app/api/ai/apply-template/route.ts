@@ -20,6 +20,7 @@ import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -310,6 +311,7 @@ export const POST = withAuth(async (user, req) => {
                 ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
                 : blocks
             const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
+            coerceVideoVariants(sanitizedTemplateBlocks) // GH-1266
 
             // Extract structural + visual fields per blockType from template (first match wins)
             // These fields define the template's look — user content (headlines, text, images) is preserved
@@ -384,6 +386,7 @@ export const POST = withAuth(async (user, req) => {
                 const templateBlocksClean = sanitizeBlocks(
                     templateHomepageLayout.length ? templateHomepageLayout : blocks,
                 )
+                coerceVideoVariants(templateBlocksClean) // GH-1266
 
                 // Hoisted outside page loop — same values for every page
                 const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])

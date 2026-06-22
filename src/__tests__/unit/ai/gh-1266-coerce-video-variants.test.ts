@@ -10,8 +10,10 @@
  * "No video URL provided" placeholder from leaking onto generated public homepages.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { PAGES_SCHEMA } from '@/lib/ai/pages-schema'
+import { enforcePageVariety } from '@/lib/ai/page-variety'
 
 type BlockLike = { [key: string]: unknown }
 
@@ -377,6 +379,77 @@ describe('[TC-1266] coerceVideoVariants', () => {
             // Assert
             expect(blockRef.variant).toBe('split-left') // Same reference modified
             expect(blockRef).toBe(blocks[0])
+        })
+    })
+
+    describe('TC-1266-07: generate-site multi-page path — result.pages[].blocks coerced', () => {
+        it('coerces blocks in each page bucket as done in generate-site multi-page loop', () => {
+            // Arrange — simulate result.pages[] as returned by the AI generator
+            const pages: Array<{ blocks: BlockLike[] }> = [
+                { blocks: [{ blockType: 'navigation', variant: 'default' }, { blockType: 'hero', variant: 'split-video' }] },
+                { blocks: [{ blockType: 'hero', variant: 'video' }, { blockType: 'footer', variant: 'default' }] },
+            ]
+
+            // Act — same loop that generate-site/route.ts now applies (GH-1266 multi-page fix)
+            for (const page of pages) {
+                coerceVideoVariants(page.blocks)
+            }
+
+            // Assert
+            expect(pages[0]!.blocks[1]!.variant).toBe('split-left')  // split-video → split-left
+            expect(pages[1]!.blocks[0]!.variant).toBe('fullscreen')  // video → fullscreen
+            expect(pages[0]!.blocks[0]!.variant).toBe('default')     // nav untouched
+            expect(pages[1]!.blocks[1]!.variant).toBe('default')     // footer untouched
+        })
+    })
+
+    describe('TC-1266-08: PAGES_SCHEMA excludes video hero variants (GH-1266 root prevention)', () => {
+        it('does not include video in PAGES_SCHEMA.hero.values', () => {
+            expect(PAGES_SCHEMA['hero']?.values).not.toContain('video')
+        })
+        it('does not include split-video in PAGES_SCHEMA.hero.values', () => {
+            expect(PAGES_SCHEMA['hero']?.values).not.toContain('split-video')
+        })
+    })
+
+    describe('TC-1266-09: page-variety variant cycle excludes video hero variants (GH-1266 root prevention)', () => {
+        it('hero variant swap from enforcePageVariety never produces video or split-video', () => {
+            // Arrange: two identical pages → 100% overlap → forces variant swap on hero block
+            const makeLayout = () => [
+                { blockType: 'navigation', variant: 'default' },
+                { blockType: 'hero', variant: 'fullscreen' },
+                { blockType: 'footer', variant: 'default' },
+            ]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const pages = [{ layout: makeLayout() }, { layout: makeLayout() }] as any[]
+
+            // Act
+            const result = enforcePageVariety(pages)
+
+            // Assert: swapped hero variant is safe (not video/split-video)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const swappedHero = result[1].layout.find((b: any) => b.blockType === 'hero')
+            expect(swappedHero?.variant).not.toBe('video')
+            expect(swappedHero?.variant).not.toBe('split-video')
+        })
+    })
+
+    describe('TC-1266-06: apply-template context — split-video without videoUrl coerced', () => {
+        it('coerces template blocks as used in apply-template route (no videoUrl → split-left)', () => {
+            // Arrange — simulate template blocks loaded from DB in apply-template/route.ts
+            const templateBlocks: BlockLike[] = [
+                { blockType: 'navigation', variant: 'default' },
+                { blockType: 'hero', variant: 'split-video' }, // no videoUrl
+                { blockType: 'features', variant: 'grid-3' },
+            ]
+
+            // Act — same call that apply-template/route.ts makes (GH-1266)
+            coerceVideoVariants(templateBlocks)
+
+            // Assert
+            expect(templateBlocks[1]!.variant).toBe('split-left') // hero coerced
+            expect(templateBlocks[0]!.variant).toBe('default')    // nav untouched
+            expect(templateBlocks[2]!.variant).toBe('grid-3')     // features untouched
         })
     })
 })

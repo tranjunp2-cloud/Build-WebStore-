@@ -821,7 +821,18 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Pass 3 (GH-1266): coerce video/split-video variants that have no videoUrl to safe fallbacks
+        // Pass 3 (GH-1266): coerce video/split-video variants that have no videoUrl to safe fallbacks.
+        // Must run on ALL block arrays: buildGeneratedPages uses result.pages[].blocks directly
+        // (multi-page AI response path) and ignores sanitizedBlocks, so coercing only sanitizedBlocks
+        // has no effect on the blocks that actually get saved to DB for multi-page sites.
+        // Same pattern as image-injection collectAllBlockBuckets (see route.ts:544-558).
+        if (Array.isArray(result.pages)) {
+            for (const page of result.pages as Array<{ blocks?: unknown[] }>) {
+                if (Array.isArray(page.blocks)) {
+                    coerceVideoVariants(page.blocks as Record<string, unknown>[])
+                }
+            }
+        }
         coerceVideoVariants(sanitizedBlocks)
 
         const rawPageDefinitions = buildGeneratedPages({
@@ -1558,7 +1569,7 @@ function createPageHero(baseHero: AIBlock | null, options: {
     hero.blockType = 'hero'
     // Validate variant against registry — AI may produce invalid variants
     const heroMeta = blockRegistry.getBlockMeta('hero')
-    const validVariants = heroMeta?.variants || ['centered', 'split', 'video', 'minimal']
+    const validVariants = heroMeta?.variants || ['centered', 'split-left', 'split-right', 'fullscreen', 'minimal']
     hero.variant = (typeof hero.variant === 'string' && validVariants.includes(hero.variant))
         ? hero.variant
         : 'centered'
