@@ -187,9 +187,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget')
     const rawBlocks = _preprocessedBlocks.map(b => {
         if (b.blockType === 'navigation') {
-            // _logoHref: rewritten via rewriteUrl so editor iframe gets /preview/{siteId}?pageId=...
-            // instead of hardcoded '/' which would navigate outside the preview context.
-            return { ...b, _hasCart, _logoHref: rewriteUrl('/') }
+            return { ...b, _hasCart }
         }
         if (b.blockType !== 'breadcrumb') return b
         // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
@@ -366,6 +364,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         ? { ...rawCta, show: false }
                         : { ...rawCta, url: markBrokenUrl(rawCta.url, rewriteUrl(rawCta.url)) }
                     : b.ctaButton,
+                // rewritten so editor iframe navigates to homepage pageId, not bare '/'
+                _logoHref: rewriteUrl('/'),
             }
         }
         if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
