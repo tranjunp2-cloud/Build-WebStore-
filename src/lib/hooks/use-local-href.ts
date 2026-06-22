@@ -13,7 +13,7 @@ import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 export function useLocalHref() {
     const pathname = usePathname()
     const localMatch = pathname?.match(/^\/sites\/([^/]+)/)
-    if (!localMatch) return (href: string | undefined) => href ?? '#'
+    if (!localMatch) return (href: string | undefined) => href || '#'
     const localSlug = localMatch[1]
     return (href: string | undefined): string => {
         if (!href) return '#'

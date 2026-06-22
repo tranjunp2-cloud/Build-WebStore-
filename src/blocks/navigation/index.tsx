@@ -90,7 +90,6 @@ function NavLogoLink({
     className,
     onClick,
 }: {
-    slug?: string
     block?: Record<string, unknown>
     children: ReactNode
     className?: string
@@ -403,7 +402,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
@@ -485,7 +484,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
                     <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
                         <NavLogo
                             logo={mergedBlock.logo}
@@ -610,7 +609,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                         >
                             {/* Close + Logo */}
                             <div className="flex items-center justify-between p-6">
-                                <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="font-bold text-xl font-heading cursor-pointer" onClick={() => setIsOpen(false)}>
+                                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-xl font-heading cursor-pointer" onClick={() => setIsOpen(false)}>
                                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                                 </NavLogoLink>
                                 <button
@@ -839,7 +838,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                     {/* Center logo — absolute so it never shifts the flex layout */}
                     <div className="absolute left-1/2 -translate-x-1/2">
-                        <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                        <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
                             <motion.div
                                 ref={logoRef}
                                 whileHover={{ scale: 1.02 }}
@@ -874,7 +873,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                 {/* Mobile: logo left, hamburger right */}
                 <div className="flex md:hidden items-center justify-between h-full">
-                    <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                    <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
                         <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
                             <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                         </motion.div>
@@ -946,7 +945,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"
@@ -1120,7 +1119,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 }}
             >
                 {/* Logo */}
-                <NavLogoLink slug={slug} block={mergedBlock as Record<string, unknown>} className="font-bold text-lg font-heading cursor-pointer shrink-0">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-lg font-heading cursor-pointer shrink-0">
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
                 </NavLogoLink>
 
