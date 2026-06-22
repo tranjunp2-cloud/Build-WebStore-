@@ -9,7 +9,7 @@ import { useI18n } from '@/i18n'
 
 interface OgImageEditorProps {
     currentOgImage?: string | null
-    onOgImageChange: (url: string | null) => void
+    onOgImageChange: (mediaId: number | null, url: string | null) => void
 }
 
 const ACCEPTED = 'image/jpeg,image/png,image/webp'
@@ -36,7 +36,8 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
             formData.append('alt', oi.alt)
             const uploaded = await uploadMediaAction(formData)
             if (!uploaded?.url) throw new Error('Upload returned no URL')
-            onOgImageChange(uploaded.url as string)
+            if (!uploaded?.id) throw new Error('Upload returned no media ID')
+            onOgImageChange(uploaded.id as number, uploaded.url as string)
             toast.success(oi.success)
         } catch (err) {
             console.error('OG image upload failed', err)
@@ -47,7 +48,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
         }
     }
 
-    const handleRemove = () => onOgImageChange(null)
+    const handleRemove = () => onOgImageChange(null, null)
 
     return (
         <div className="space-y-2">

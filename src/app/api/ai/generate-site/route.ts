@@ -42,7 +42,9 @@ import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -820,6 +822,9 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Pass 3 (GH-1266): coerce video/split-video variants that have no videoUrl to safe fallbacks
+        coerceVideoVariants(sanitizedBlocks)
+
         const rawPageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
@@ -889,9 +894,11 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? stripArrayItemIds(
-                    stripNavOffset(
-                        sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                ? normalizeBlocksForPersistence(
+                    stripArrayItemIds(
+                        stripNavOffset(
+                            sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                        ) as Record<string, unknown>[]
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed

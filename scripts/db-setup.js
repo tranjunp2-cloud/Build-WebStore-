@@ -4772,6 +4772,11 @@ const MIGRATIONS = [
     name: 'sites.theme_customized.add_column',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_customized boolean DEFAULT false;`,
   },
+  // GH-1225: COD defaults ON — new tenants get a valid payment method out of the box
+  {
+    name: 'tenants.payments_payment_cod.default_true',
+    sql: `ALTER TABLE tenants ALTER COLUMN payments_payment_cod SET DEFAULT true;`,
+  },
 ];
 
 async function runMigrations(pool) {

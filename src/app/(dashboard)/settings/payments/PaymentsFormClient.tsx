@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
 import { resolveApiError } from '@/lib/ui/resolve-api-error';
-import { Button } from '@/components/ui/button';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
 import { XenditConnectBlock } from './XenditConnectBlock';
@@ -94,41 +93,110 @@ export function PaymentsFormClient({
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const bankTransferFormRef = useRef<HTMLDivElement>(null);
+    const firstBankInputRef = useRef<HTMLInputElement>(null);
+    // Guard: only scroll when user-triggered (not on initial data load)
+    const bankFormUserTriggeredRef = useRef(false);
+    // Holds the setInterval ID while polling Stripe status after opening the connect new tab
+    const stripePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [bankTransferErrors, setBankTransferErrors] = useState<{ accountHolderName?: string; accountNumber?: string }>({});
+    const [serverPaymentValues, setServerPaymentValues] = useState<{
+        paymentCod: boolean; paymentQr: boolean; cardEnabled: boolean; fpxEnabled: boolean;
+        qrImageId: string | number | null; qrPreviewUrl: string | null; qrFileName: string | null;
+        accountHolderName: string; bankName: string; accountNumber: string;
+    } | null>(null);
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const sub = t.common.subscriptionErrors;
+
+    const stopStripePolling = () => {
+        if (stripePollingRef.current) {
+            clearInterval(stripePollingRef.current)
+            stripePollingRef.current = null
+        }
+    }
+
+    // Poll /api/stripe/connect/status after opening a new tab — catches the case where
+    // BroadcastChannel doesn't fire (tab closed before redirect, or unsupported browser).
+    // mode='connect': stops when account is first connected (OAuth complete).
+    // mode='onboard': stops only when onboardingComplete=true (KYC done) — avoids premature
+    //   toast when account is already connected but KYC is still in progress.
+    const startStripePolling = (mode: 'connect' | 'onboard') => {
+        if (!tenantId || stripePollingRef.current) return
+        stripePollingRef.current = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+                const data = await res.json()
+                if (!data.success) return
+                if (mode === 'connect' && data.data.connected) {
+                    setHasAccount(true)
+                    if (data.data.accountId) setCurrentAccountId(data.data.accountId)
+                    stopStripePolling()
+                } else if (mode === 'onboard' && data.data.onboardingComplete) {
+                    setHasAccount(true)
+                    setIsVerified(true)
+                    setIsChargesEnabled(true)
+                    if (data.data.accountId) setCurrentAccountId(data.data.accountId)
+                    toast.success(pt.stripeReturnSuccess)
+                    stopStripePolling()
+                }
+            } catch { /* best-effort — silent on network error */ }
+        }, 5000)
+    }
 
     useEffect(() => {
         if (!tenantId) { setIsLoading(false); return; }
         getPaymentSettings()
             .then(res => {
-                if (res.success && res.payments) {
-                    const d = res.payments;
-                    setPaymentCod(d.payment_cod || false);
-                    setPaymentQr(d.payment_qr || false);
-                    if (d.qr_image) {
-                        const img = d.qr_image;
-                        setQrImageId(typeof img === 'string' ? img : img.id);
-                        setQrPreviewUrl(getImageUrl(img as Media));
-                        if (typeof img === 'object' && (img as any).filename) {
-                            setQrFileName((img as any).filename);
-                        }
-                    }
-                    if (d.account_holder_name) setAccountHolderName(d.account_holder_name as string);
-                    if (d.bank_name) setBankName(d.bank_name as string);
-                    if (d.account_number) setAccountNumber(d.account_number as string);
+                const d = res.success && res.payments ? res.payments : {};
+                const cod = d.payment_cod || false;
+                const qr = d.payment_qr || false;
+                let imgId: string | number | null = null;
+                let imgUrl: string | null = null;
+                let imgName: string | null = null;
+                if (d.qr_image) {
+                    const img = d.qr_image;
+                    imgId = typeof img === 'string' ? img : img.id;
+                    imgUrl = getImageUrl(img as Media);
+                    if (typeof img === 'object' && (img as any).filename) imgName = (img as any).filename;
                 }
+                const holderName = (d.account_holder_name as string) || '';
+                const bank = (d.bank_name as string) || '';
+                const acctNum = (d.account_number as string) || '';
+
+                setPaymentCod(cod);
+                setPaymentQr(qr);
+                if (imgId) setQrImageId(imgId);
+                if (imgUrl) setQrPreviewUrl(imgUrl);
+                if (imgName) setQrFileName(imgName);
+                if (holderName) setAccountHolderName(holderName);
+                if (bank) setBankName(bank);
+                if (acctNum) setAccountNumber(acctNum);
+
+                // Capture server snapshot for Cancel; card/fpx come from props (not server action)
+                setServerPaymentValues({
+                    paymentCod: cod, paymentQr: qr,
+                    cardEnabled: initialCardEnabled, fpxEnabled: initialFpxEnabled,
+                    qrImageId: imgId, qrPreviewUrl: imgUrl, qrFileName: imgName,
+                    accountHolderName: holderName, bankName: bank, accountNumber: acctNum,
+                });
             })
             .catch(console.error)
             .finally(() => setIsLoading(false));
     }, [tenantId]);
 
-    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28)
+    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28).
+    // Also broadcasts result to parent tab via BroadcastChannel when this page loaded in the new tab
+    // opened by handleConnectStripe / handleOnboardStripe.
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const params = new URLSearchParams(window.location.search);
         const stripeReturn = params.get('stripe');
         if (!stripeReturn) return;
+
+        // Scope channel by tenantId — prevents cross-tenant signal bleed in multi-tenant same-domain sessions
+        const bcName = tenantId ? `stripe-connect-${tenantId}` : 'stripe-connect'
+        const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(bcName) : null;
 
         if (stripeReturn === 'verified') {
             setHasAccount(true);
@@ -141,12 +209,25 @@ export function PaymentsFormClient({
                             setIsVerified(true);
                             setIsChargesEnabled(true);
                             toast.success(pt.stripeReturnSuccess);
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: true, accountId: data.data.accountId });
                         } else {
                             if (data.success && data.data.detailsSubmitted) setDetailsSubmitted(true);
                             toast.info(pt.stripeReturnKycPending);
+                            bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false, accountId: data.data?.accountId });
                         }
                     })
-                    .catch(() => toast.warning(pt.stripeReturnRefresh));
+                    .catch(() => {
+                        toast.warning(pt.stripeReturnRefresh);
+                        bc?.postMessage({ type: 'stripe-verified', onboardingComplete: false });
+                    })
+                    .finally(() => {
+                        bc?.close();
+                        // Attempt to close the new tab — works when opened via window.open().
+                        // Silently no-ops if browser blocks (user just sees a second payments tab).
+                        setTimeout(() => window.close(), 300);
+                    });
+            } else {
+                bc?.close();
             }
         } else if (stripeReturn === 'complete') {
             setHasAccount(true); // ensure Verify button is shown
@@ -155,13 +236,62 @@ export function PaymentsFormClient({
             } else {
                 toast.info(pt.stripeReturnKycPending);
             }
+            bc?.postMessage({ type: 'stripe-connected' });
+            bc?.close();
+            setTimeout(() => window.close(), 300);
         } else if (stripeReturn === 'refresh') {
             if (stripeAccountId) setHasAccount(true); // only restore if they had an account before redirect
             toast.warning(pt.stripeReturnRefresh);
+            bc?.close();
         }
 
         router.replace('/settings/payments');
     }, []); // intentionally once on mount
+
+    // Receive Stripe connect result broadcast from the new tab — fires as soon as Stripe redirects
+    // back to /settings/payments?stripe=*, so the parent tab updates without waiting for polling.
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return
+        const bcName = tenantId ? `stripe-connect-${tenantId}` : 'stripe-connect'
+        const channel = new BroadcastChannel(bcName)
+        channel.addEventListener('message', (event: MessageEvent) => {
+            const { type, onboardingComplete, accountId } = event.data ?? {}
+            if (type === 'stripe-connected') {
+                setHasAccount(true)
+                if (accountId) setCurrentAccountId(accountId)
+                toast.info(pt.stripeReturnKycPending)
+                if (stripePollingRef.current) { clearInterval(stripePollingRef.current); stripePollingRef.current = null }
+            } else if (type === 'stripe-verified') {
+                setHasAccount(true)
+                if (accountId) setCurrentAccountId(accountId)
+                if (onboardingComplete) {
+                    setIsVerified(true)
+                    setIsChargesEnabled(true)
+                    toast.success(pt.stripeReturnSuccess)
+                } else {
+                    toast.info(pt.stripeReturnKycPending)
+                }
+                if (stripePollingRef.current) { clearInterval(stripePollingRef.current); stripePollingRef.current = null }
+            }
+        })
+        return () => channel.close()
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Cleanup polling if component unmounts while the Stripe new tab is still open
+    useEffect(() => () => { if (stripePollingRef.current) clearInterval(stripePollingRef.current) }, [])
+
+    // Scroll bank transfer form into view when user expands it (Bug 2)
+    // Use ref flag instead of isLoading — React 18 batches setPaymentQr+setIsLoading into one render,
+    // so isLoading is already false when this effect fires after initial data load.
+    useEffect(() => {
+        if (!bankFormUserTriggeredRef.current) return;
+        if (paymentQr || qrWidgetExpanded) {
+            bankFormUserTriggeredRef.current = false;
+            bankTransferFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const timer = setTimeout(() => firstBankInputRef.current?.focus(), 350);
+            return () => clearTimeout(timer);
+        }
+    }, [paymentQr, qrWidgetExpanded]);
 
     // Redirect to Stripe OAuth onboarding (TC-F13.24)
     const handleConnectStripe = async () => {
@@ -175,7 +305,8 @@ export function PaymentsFormClient({
             });
             const data = await res.json();
             if (data.success && data.data?.oauthUrl) {
-                window.location.href = data.data.oauthUrl;
+                window.open(data.data.oauthUrl, '_blank', 'noopener,noreferrer')
+                startStripePolling('connect')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
@@ -198,7 +329,8 @@ export function PaymentsFormClient({
             });
             const data = await res.json();
             if (data.success && data.data?.url) {
-                window.location.href = data.data.url;
+                window.open(data.data.url, '_blank', 'noopener,noreferrer')
+                startStripePolling('onboard')
             } else {
                 toast.error(resolveApiError(data, pt.failSaveSettings, sub));
             }
@@ -239,22 +371,39 @@ export function PaymentsFormClient({
     };
 
     const handleToggleCard = (checked: boolean) => {
+        if (!checked && !paymentCod && !paymentQr && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setCardEnabled(checked);
         setIsDirty(true);
     };
 
     const handleToggleFpx = (checked: boolean) => {
+        if (!checked && !paymentCod && !paymentQr && !cardEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setFpxEnabled(checked);
         setIsDirty(true);
     };
 
     const handleToggleCod = (checked: boolean) => {
+        if (!checked && !paymentQr && !cardEnabled && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
         setPaymentCod(checked);
         setIsDirty(true);
     };
 
     const handleToggleQr = (checked: boolean) => {
-        if (checked && !qrImageId && !qrPreviewUrl) { setQrWidgetExpanded(true); return; }
+        if (checked && !qrImageId && !qrPreviewUrl) {
+            bankFormUserTriggeredRef.current = true;
+            setQrWidgetExpanded(true);
+            return;
+        }
+        if (!checked && !paymentCod && !cardEnabled && !fpxEnabled) {
+            toast.error(pt.lastMethodWarning); return;
+        }
+        bankFormUserTriggeredRef.current = checked;
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
         setIsDirty(true);
@@ -298,6 +447,7 @@ export function PaymentsFormClient({
     const handleAccountHolderNameChange = useCallback((val: string) => {
         setAccountHolderName(val);
         setIsDirty(true);
+        if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountHolderName: undefined }));
     }, []);
 
     const handleBankNameChange = useCallback((val: string) => {
@@ -308,7 +458,40 @@ export function PaymentsFormClient({
     const handleAccountNumberChange = useCallback((val: string) => {
         setAccountNumber(val);
         setIsDirty(true);
+        if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountNumber: undefined }));
     }, []);
+
+    const validateBankTransfer = (): { accountHolderName?: string; accountNumber?: string } => {
+        if (!paymentQr) return {};
+        const errs: { accountHolderName?: string; accountNumber?: string } = {};
+        if (!accountHolderName.trim()) errs.accountHolderName = pt.errAccountHolderRequired;
+        const acctTrimmed = accountNumber.trim();
+        if (!acctTrimmed) {
+            errs.accountNumber = pt.errAccountNumberRequired;
+        } else if (!/^\d{6,}$/.test(acctTrimmed)) {
+            errs.accountNumber = pt.errAccountNumberFormat;
+        }
+        return errs;
+    };
+
+    const handleCancel = () => {
+        if (!isDirty) { setQrWidgetExpanded(false); return; }
+        if (serverPaymentValues) {
+            setPaymentCod(serverPaymentValues.paymentCod);
+            setPaymentQr(serverPaymentValues.paymentQr);
+            setCardEnabled(serverPaymentValues.cardEnabled);
+            setFpxEnabled(serverPaymentValues.fpxEnabled);
+            setQrImageId(serverPaymentValues.qrImageId);
+            setQrPreviewUrl(serverPaymentValues.qrPreviewUrl);
+            setQrFileName(serverPaymentValues.qrFileName);
+            setAccountHolderName(serverPaymentValues.accountHolderName);
+            setBankName(serverPaymentValues.bankName);
+            setAccountNumber(serverPaymentValues.accountNumber);
+            if (!serverPaymentValues.paymentQr) setQrWidgetExpanded(false);
+        }
+        setBankTransferErrors({});
+        setIsDirty(false);
+    };
 
     const handleXenditDisconnect = async () => {
         const res = await disconnectXendit();
@@ -321,7 +504,7 @@ export function PaymentsFormClient({
         const res = await saveXenditKeys(secretKey, callbackToken);
         if (!res.success) throw new Error(res.error ?? 'Không thể lưu keys.');
         setXenditIsConnected(true);
-        toast.success('Xendit đã được kết nối thành công!');
+        toast.success(pt.xenditConnectSuccess);
     };
 
     const handleSaveAll = async () => {
@@ -331,6 +514,13 @@ export function PaymentsFormClient({
             setCardEnabled(false);
             setFpxEnabled(false);
             toast.error(pt.failVerifyStripe);
+            return;
+        }
+        // Validate required bank transfer fields (Bug 3)
+        const errs = validateBankTransfer();
+        if (Object.keys(errs).length > 0) {
+            setBankTransferErrors(errs);
+            toast.error(pt.fixBankErrors);
             return;
         }
         setIsSavingAll(true);
@@ -347,6 +537,13 @@ export function PaymentsFormClient({
             });
             if (res.success) {
                 setIsDirty(false);
+                setBankTransferErrors({});
+                // Update server snapshot so Cancel targets the just-saved state
+                setServerPaymentValues({
+                    paymentCod, paymentQr, cardEnabled, fpxEnabled,
+                    qrImageId, qrPreviewUrl, qrFileName,
+                    accountHolderName, bankName, accountNumber,
+                });
                 toast.success(pt.successSave);
             } else {
                 toast.error(pt.failSaveSettings);
@@ -364,8 +561,8 @@ export function PaymentsFormClient({
         <div className="w-full space-y-[32px]">
             {/* Page header */}
             <div className="flex items-center gap-4">
-                <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-[hsl(var(--info)/0.12)] border border-[hsl(var(--info)/0.20)] shrink-0">
-                    <CreditCard className="w-[22px] h-[22px] text-[hsl(var(--info))]" />
+                <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-sky-500/[0.12] border border-sky-500/[0.20] shrink-0">
+                    <CreditCard className="w-[22px] h-[22px] text-sky-400" />
                 </div>
                 <div>
                     <h1 className="text-[28px] font-bold text-slate-50 tracking-[-0.015em]">{pt.title}</h1>
@@ -375,8 +572,8 @@ export function PaymentsFormClient({
 
             {/* P0 warning: no payment method at all — buyers can't checkout */}
             {!paymentCod && !paymentQr && !cardEnabled && !fpxEnabled && (
-                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-destructive/[0.30] bg-destructive/[0.07]">
-                    <div className="w-10 h-10 rounded-[10px] bg-destructive/[0.12] border border-destructive/[0.28] text-destructive grid place-items-center shrink-0">
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-red-500/[0.30] bg-red-500/[0.07]">
+                    <div className="w-10 h-10 rounded-[10px] bg-red-500/[0.12] border border-red-500/[0.28] text-red-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
                     <div>
@@ -386,8 +583,8 @@ export function PaymentsFormClient({
                 </div>
             )}
             {isChargesEnabled && isVerified && !cardEnabled && !fpxEnabled && (paymentCod || paymentQr) && (
-                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-warning/[0.24] bg-warning/[0.06]">
-                    <div className="w-10 h-10 rounded-[10px] bg-warning/[0.12] border border-warning/[0.22] text-warning grid place-items-center shrink-0">
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
+                    <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
                     <div>
@@ -399,7 +596,7 @@ export function PaymentsFormClient({
 
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--info))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--info))' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
@@ -490,7 +687,7 @@ export function PaymentsFormClient({
                                             <button
                                                 type="button"
                                                 onClick={() => setShowAllBanks(v => !v)}
-                                                className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-[hsl(var(--info))] hover:bg-[hsl(var(--info)/0.12)] hover:border-[hsl(var(--info)/0.24)] transition-all cursor-pointer"
+                                                className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-sky-400 hover:bg-sky-500/[0.12] hover:border-sky-500/[0.24] transition-all cursor-pointer"
                                             >
                                                 {showAllBanks ? '−' : `+${FPX_BANKS.length - 10}`} {showAllBanks ? 'Show less' : 'more'}
                                             </button>
@@ -506,7 +703,7 @@ export function PaymentsFormClient({
             {/* ─── Xendit (F34) ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary))' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
                         {pt.xenditSectionTitle}
                     </h2>
@@ -530,7 +727,7 @@ export function PaymentsFormClient({
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--warning))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--warning))' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-purple-400 shrink-0" style={{ boxShadow: '0 0 10px #c084fc' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.manualSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.manualSectionDesc}</span>
                 </div>
@@ -562,11 +759,11 @@ export function PaymentsFormClient({
                         highlight={paymentQr}
                     >
                         {(paymentQr || qrWidgetExpanded) && (
-                            <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
+                            <div ref={bankTransferFormRef} className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
                                 <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
 
                                 {qrPreviewUrl ? (
-                                    <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[hsl(var(--background))]">
+                                    <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[#0d1525]">
                                         {/* QR thumb */}
                                         <div className="w-[76px] h-[76px] rounded-[10px] shrink-0 overflow-hidden border-[4px] border-white bg-white">
                                             <NextImage
@@ -588,7 +785,7 @@ export function PaymentsFormClient({
                                             <button
                                                 type="button"
                                                 onClick={handleRemoveImage}
-                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] text-slate-400 border border-white/[0.08] hover:bg-destructive/[0.12] hover:text-destructive hover:border-destructive/[0.24] transition-all"
+                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] text-slate-400 border border-white/[0.08] hover:bg-red-500/[0.12] hover:text-red-400 hover:border-red-500/[0.24] transition-all"
                                                 title="Remove"
                                             >
                                                 <Trash2 className="w-[14px] h-[14px]" />
@@ -606,15 +803,15 @@ export function PaymentsFormClient({
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'hsl(var(--info)/0.45)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--info)/0.04)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
                                         }}
                                         onMouseLeave={e => {
                                             (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
                                             (e.currentTarget as HTMLDivElement).style.background = 'transparent';
                                         }}
                                     >
-                                        <div className="w-[48px] h-[48px] rounded-full bg-[hsl(var(--info)/0.10)] text-[hsl(var(--info))] grid place-items-center mb-[12px]">
+                                        <div className="w-[48px] h-[48px] rounded-full bg-sky-500/[0.10] text-sky-400 grid place-items-center mb-[12px]">
                                             <UploadCloud className="w-5 h-5" />
                                         </div>
                                         <p className="text-[13px] font-semibold text-slate-100 mb-[2px]">{pt.uploadQrSub}</p>
@@ -632,14 +829,15 @@ export function PaymentsFormClient({
                                     </label>
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                        style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
-                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
+                                        style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)'}` }}
+                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                             <User className="w-[14px] h-[14px] text-dash-text-muted" />
                                         </div>
                                         <input
+                                            ref={firstBankInputRef}
                                             type="text"
                                             value={accountHolderName}
                                             onChange={e => handleAccountHolderNameChange(e.target.value)}
@@ -647,10 +845,14 @@ export function PaymentsFormClient({
                                             className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
-                                        <Info className="w-[12px] h-[12px]" />
-                                        <span>{pt.accountHolderNameHelper}</span>
-                                    </div>
+                                    {bankTransferErrors.accountHolderName ? (
+                                        <p className="text-[12px] text-red-400">{bankTransferErrors.accountHolderName}</p>
+                                    ) : (
+                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                            <Info className="w-[12px] h-[12px]" />
+                                            <span>{pt.accountHolderNameHelper}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Bank name + Account number */}
@@ -660,7 +862,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
@@ -677,12 +879,15 @@ export function PaymentsFormClient({
                                         </div>
                                     </div>
                                     <div className="flex flex-col gap-[6px]">
-                                        <label className="text-[13px] font-semibold text-slate-300">{pt.accountNumberLabel}</label>
+                                        <label className="flex items-center text-[13px] font-semibold text-slate-300">
+                                            {pt.accountNumberLabel}
+                                            <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">{pt.required}</span>
+                                        </label>
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                            style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--primary)), 0 0 0 4px hsl(var(--primary)/0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
-                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
+                                            style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)'}` }}
+                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                                 MYR
@@ -695,10 +900,14 @@ export function PaymentsFormClient({
                                                 className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                             />
                                         </div>
-                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
-                                            <Shield className="w-[12px] h-[12px]" />
-                                            <span>{pt.accountNumberHelper}</span>
-                                        </div>
+                                        {bankTransferErrors.accountNumber ? (
+                                            <p className="text-[12px] text-red-400">{bankTransferErrors.accountNumber}</p>
+                                        ) : (
+                                            <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                                <Shield className="w-[12px] h-[12px]" />
+                                                <span>{pt.accountNumberHelper}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -715,27 +924,38 @@ export function PaymentsFormClient({
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>
-                            <AlertCircle className="w-[14px] h-[14px] text-warning shrink-0" />
-                            <span className="text-warning font-medium">{pt.unsavedChanges}</span>
+                            <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
+                            <span className="text-amber-300 font-medium">{pt.unsavedChanges}</span>
                         </>
                     ) : (
                         <>
-                            <CheckCircle2 className="w-[14px] h-[14px] text-success shrink-0" />
+                            <CheckCircle2 className="w-[14px] h-[14px] text-emerald-400 shrink-0" />
                             <span className="text-slate-400">{pt.savesAutomatic}</span>
                         </>
                     )}
                 </div>
                 <div className="flex gap-2">
-                    <Button
+                    <button
+                        type="button"
+                        onClick={handleCancel}
+                        disabled={isSavingAll}
+                        className="inline-flex items-center h-[34px] px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {pt.cancel}
+                    </button>
+                    <button
                         type="button"
                         onClick={handleSaveAll}
                         disabled={!isDirty || isSavingAll}
-                        variant="dashPrimary"
-                        className="h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold gap-[6px]"
+                        className="inline-flex items-center gap-[6px] h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
+                        style={{
+                            background: 'linear-gradient(135deg, #2563eb 0%, #9333ea 100%)',
+                            boxShadow: isDirty ? '0 6px 18px rgba(37,99,235,0.35)' : 'none',
+                        }}
                     >
                         <Save className="w-[13px] h-[13px]" />
                         {isSavingAll ? pt.saving : pt.saveChanges}
-                    </Button>
+                    </button>
                 </div>
             </div>
 
