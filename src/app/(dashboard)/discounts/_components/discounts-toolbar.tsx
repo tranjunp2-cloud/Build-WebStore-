@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
 
-type StatusFilter = 'all' | 'active' | 'inactive'
+export type StatusFilter = 'all' | 'active' | 'inactive'
 type TypeFilter = 'all' | 'percentage' | 'fixed'
 
 interface DiscountsToolbarProps {

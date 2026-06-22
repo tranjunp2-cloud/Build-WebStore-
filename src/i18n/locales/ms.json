@@ -2253,7 +2253,9 @@
                 "fixedNegative": "Amaun tetap mesti ≥ 0.",
                 "fixedTooLarge": "Amaun tetap terlalu besar (maks RM {max}).",
                 "usageLimitMin": "Had penggunaan mesti sekurang-kurangnya 1 (kosongkan untuk tanpa had).",
-                "datesOrder": "Tarikh mula mesti sebelum tarikh tamat."
+                "datesOrder": "Tarikh mula mesti sebelum tarikh tamat.",
+                "expiredCannotActivate": "Diskaun ini telah tamat tempoh — lanjutkan tarikh tamat untuk tetapkan Aktif semula.",
+                "atLimitCannotActivate": "Had penggunaan telah dicapai — naikkan had untuk tetapkan Aktif semula."
             },
             "toast": {
                 "cannotSave": "Tidak dapat menyimpan",

@@ -2253,7 +2253,9 @@
                 "fixedNegative": "Fixed amount must be ≥ 0.",
                 "fixedTooLarge": "Fixed amount is too large (max RM {max}).",
                 "usageLimitMin": "Usage limit must be at least 1 (leave blank for unlimited).",
-                "datesOrder": "Start date must be before expiry date."
+                "datesOrder": "Start date must be before expiry date.",
+                "expiredCannotActivate": "This discount has expired — extend the expiry date to set it Active again.",
+                "atLimitCannotActivate": "Usage limit already reached — raise the limit to set it Active again."
             },
             "toast": {
                 "cannotSave": "Cannot save",

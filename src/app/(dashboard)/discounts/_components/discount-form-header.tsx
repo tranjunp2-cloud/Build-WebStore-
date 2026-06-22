@@ -9,6 +9,10 @@ interface DiscountFormHeaderProps {
     isNew: boolean
     code?: string
     status?: string
+    startsAt?: string | null
+    expiresAt?: string | null
+    usageLimit?: number | null
+    usageCount?: number | null
     id?: string
     createdAt?: string
     tenantName?: string
@@ -24,6 +28,10 @@ export function DiscountFormHeader({
     isNew,
     code,
     status,
+    startsAt,
+    expiresAt,
+    usageLimit,
+    usageCount,
     id,
     createdAt,
     tenantName,
@@ -61,7 +69,15 @@ export function DiscountFormHeader({
                             >
                                 {isNew ? d.createTitle : (code ?? d.defaultTitle)}
                             </h1>
-                            {!isNew && status && <DiscountStatusBadge status={status} />}
+                            {!isNew && status && (
+                                <DiscountStatusBadge
+                                    status={status}
+                                    startsAt={startsAt}
+                                    expiresAt={expiresAt}
+                                    usageLimit={usageLimit}
+                                    usageCount={usageCount}
+                                />
+                            )}
                         </div>
 
                         {/* Meta row */}

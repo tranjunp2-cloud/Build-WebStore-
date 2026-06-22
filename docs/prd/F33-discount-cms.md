@@ -64,7 +64,7 @@ Hiện tại, hệ thống **không có tính năng quản lý discount/khuyến
 ### In Scope (F33)
 - **Discount CRUD (admin-side):** Tạo, sửa, xoá, danh sách, search, filter.
 - **Type:** Percentage (0–100%) hoặc Fixed amount (tính bằng sen).
-- **Status:** Active/Inactive.
+- **Status:** Active/Inactive (tự động chuyển Inactive khi hết hạn hoặc hết lượt — xem BR-10).
 - **Fields:** Code (unique per tenant, uppercase), description, type, value, usage limit, usage count (read-only), start date, expiry date.
 - **Tenant scoping:** Mỗi tenant chỉ quản lý discount của mình.
 - **Checkout apply — tất cả payment method:** COD/QR + Stripe, qua shared `computeOrderTotal()` → `finalAmount`.
@@ -124,6 +124,11 @@ Hiện tại, hệ thống **không có tính năng quản lý discount/khuyến
 - **BR-07:** **Usage history immutable** — `discount_usage_history` là audit trail, không được edit/delete (trừ GDPR).
 - **BR-08:** **usageCount read-only in admin** — Admin không thể sửa lợi dụng. Hook chỉ khi order place thành công.
 - **BR-09:** **Subscription promo codes (TC-F15.14–17) out of scope** — Platform-level, super-admin manage riêng.
+- **BR-10:** **Auto-deactivate on expiry, hết hạn/hết lượt hiển thị Inactive (GH-1282)** — discount hết hạn hoặc hết lượt KHÔNG còn dùng được nên phải hiện **Inactive**. Cách xử lý khác nhau giữa hai loại (decision B):
+  - **Hiển thị (tức thì):** Admin badge tính *effective status* on-the-fly (`computeEffectiveDiscountStatus`) — hết hạn / hết lượt → **Inactive** ngay, không chờ job. Badge chỉ 2 trạng thái: Active / Inactive. *Scheduled* (chưa tới ngày) vẫn **Active** (cố tình hẹn lịch).
+  - **Hết hạn → flip DB (`discountAutoInactiveJob`):** cron sweep (gắn vào `payment-expiry` mỗi 15 phút — không thêm Vercel cron) flip `status='inactive'` cho mã `expires_at < now()`. Monotonic, không đảo ngược. Idempotent, mọi tenant, 1 UPDATE atomic. Giúp filter/list nhất quán.
+  - **Hết lượt → KHÔNG flip DB:** `status` giữ `active`. Vì slot có thể được **trả lại** (refund/cancel/payment-expiry → `releaseDiscountRedemption`); nếu flip inactive thì mã sẽ kẹt khi capacity mở lại. Thay vào đó hết lượt chỉ hiển thị Inactive qua **badge** (tự về Active khi còn slot) + chặn ở **form guard**. Checkout vẫn silent-reject at-limit (BR-03).
+  - **Form enforce (editor):** mở discount **hết hạn** → dropdown Status = **Inactive**. Cố đổi sang **Active**: Save báo đỏ ô tương ứng — **Expires At** ("hết hạn, gia hạn ngày") hoặc **Usage limit** ("đã đạt giới hạn"). Chỉ lưu Active được sau khi gia hạn ngày / tăng limit. Guard dùng **end-of-day KL** (khớp `beforeValidate` pin `expiresAt`) nên discount hết hạn *cùng ngày* vẫn hiệu lực tới 23:59 KL.
 
 ---
 

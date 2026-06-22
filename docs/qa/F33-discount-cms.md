@@ -249,6 +249,42 @@ Bộ testcase này kiểm thử đầy đủ F33 — hệ thống quản lý mã
 | **TC-F33-10-19** | FR-15 | `[Edge]` | Super-admin export KHÔNG kèm ?tenantId → behavior chính thức | 1. Super-admin login.<br>2. `GET /api/v1/discounts/export` không có query. | - Định: trả ALL tenants (super power) HOẶC 400 yêu cầu tenantId.<br>- Confirm với BA: behavior nào.<br>- Test verify chính xác. | Medium | [x] |
 | **TC-F33-10-20** | Design §4.1, §7 A11y | `[A11y]` | Status badge có text label + color (không chỉ color) | 1. Inspect badge active row.<br>2. Inspect badge inactive row. | - Active badge: text `"Active"` + green bg.<br>- Inactive: text `"Inactive"` + slate bg.<br>- Contrast ratio ≥ 4.5:1 (WCAG AA).<br>- aria-label đúng. | Medium | [x] |
 
+### NHÓM 11 — GH-1282: Effective status (badge), auto-inactive cron & form guards (16 TCs)
+
+> **Bối cảnh:** `status` là toggle tay; không tự đồng bộ với `expiresAt`/`usageCount`. Badge tính *effective status* (chỉ Active/Inactive), cron flip DB, form enforce. **Inactive khi: raw inactive HOẶC hết hạn HOẶC hết lượt. Scheduled (chưa tới ngày) vẫn Active.** Mốc thời gian: `expiresAt` được pin **cuối ngày KL** (BR-10, hook `beforeValidate`).
+
+#### 11.1 — Effective badge (display, tức thì)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F33-11-01** | BR-10 | `[Positive]` | Hết hạn → badge Inactive | 1. Discount `status=active`, `expiresAt` < hôm nay.<br>2. Mở list `/discounts`. | Badge cột Status = **Inactive** (không phải Active). | Blocker | [x] |
+| **TC-F33-11-02** | BR-10 | `[Positive]` | Hết lượt → badge Inactive | 1. Discount `status=active`, `usageCount >= usageLimit`.<br>2. Mở list. | Badge = **Inactive**. | Blocker | [x] |
+| **TC-F33-11-03** | BR-10 | `[Positive]` | Scheduled → badge vẫn Active | 1. `status=active`, `startsAt` tương lai.<br>2. Mở list. | Badge = **Active** (cố tình hẹn lịch). | High | [x] |
+| **TC-F33-11-04** | BR-10, KL-TZ | `[BVA]` | Hết hạn **hôm nay** vẫn Active đến cuối ngày KL | 1. `status=active`, `expiresAt` = hôm nay (đã pin 23:59:59 KL).<br>2. Mở list lúc 17:00 KL. | Badge = **Active** (chưa qua cuối ngày KL). | Blocker | [x] |
+| **TC-F33-11-05** | BR-10 | `[Positive]` | Đang chạy bình thường → Active | `status=active`, trong cửa sổ ngày, under limit. | Badge = **Active**. | High | [x] |
+| **TC-F33-11-06** | BR-10 | `[BVA]` | `expiresAt` đúng = now → chưa hết hạn (strict `<`) | Helper với `expiresAt === now`. | Trả `active` (không expired). | Medium | [x] |
+
+#### 11.2 — Cron auto-inactive (DB flip, eventually-consistent)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F33-12-01** | BR-10 | `[Positive]` | Cron flip **CHỈ hết hạn** → DB `inactive` | 1. Seed discount active hết hạn + 1 active hết lượt.<br>2. Gọi `discountAutoInactiveJob` (qua cron payment-expiry).<br>3. Query DB. | Chỉ mã **hết hạn** `status='inactive'`; mã **hết lượt** vẫn `status='active'`. | Blocker | [x] |
+| **TC-F33-12-02** | BR-10 | `[Negative]` | Cron KHÔNG flip scheduled / hết lượt | 1. Discount active `startsAt` tương lai + 1 active hết lượt.<br>2. Chạy job. | Cả hai `status` vẫn `active` (không nằm trong WHERE expiry). | High | [x] |
+| **TC-F33-12-03** | BR-10 | `[Idempotent]` | Chạy lần 2 không flip gì | Chạy job 2 lần. | Lần 2 `flipped=0`. | High | [x] |
+| **TC-F33-12-04** | BR-10 decision B | `[Edge]` | Hết lượt → trả slot (refund) **tự dùng lại được** | 1. Mã hết lượt (DB vẫn `active`, badge Inactive).<br>2. Refund 1 đơn → `releaseDiscountRedemption` giảm `usageCount`.<br>3. Mở list / checkout. | Badge tự về **Active**; checkout chấp nhận lại (DB chưa từng bị flip). | High | [ ] |
+| **TC-F33-12-05** | BR-10 | `[Edge]` | Job lỗi không abort payment-expiry | Mock job throw. | Route trả `success:true` + `discountAutoInactive:{error}`; payment-expiry vẫn chạy. | Medium | [ ] |
+
+#### 11.3 — Form enforce (dropdown reflect + reactivation guard)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F33-13-01** | BR-10 | `[UI]` | Mở detail discount hết hạn → dropdown Status = Inactive | 1. Discount active hết hạn.<br>2. Mở `/discounts/[id]`. | Ô Status dropdown hiển thị **Inactive**; không có thanh "unsaved changes". | High | [ ] |
+| **TC-F33-13-02** | BR-10 | `[Negative]` | Cố đổi Active khi hết hạn → đỏ ở ô Expires At | 1. Discount hết hạn.<br>2. Đổi dropdown → Active.<br>3. Save. | Lỗi đỏ dưới **Expires At**: "đã hết hạn — gia hạn ngày để Active lại". Không lưu. | Blocker | [x] |
+| **TC-F33-13-03** | BR-10 | `[Negative]` | Cố để Active khi hết lượt → đỏ dưới Usage limit | 1. Discount hết lượt.<br>2. Để Active, Save. | Lỗi đỏ dưới **Usage limit**: "đã đạt giới hạn — tăng limit". Không lưu. | Blocker | [x] |
+| **TC-F33-13-04** | BR-10, KL-TZ | `[BVA]` | Hết hạn **hôm nay** + Active → **KHÔNG** báo lỗi | 1. `expiresAt` = hôm nay.<br>2. Để Active, Save. | Lưu thành công (còn hạn đến cuối ngày KL); guard dùng `endOfDayKL`. | Blocker | [x] |
+| **TC-F33-13-05** | BR-10 | `[Positive]` | Gia hạn ngày tương lai + Active → lưu OK | 1. Discount hết hạn.<br>2. Sửa Expires At → tương lai, dropdown Active.<br>3. Save. | Lưu thành công, `status=active`. | High | [ ] |
+| **TC-F33-13-06** | BR-10 | `[Positive]` | Inactive bình thường (chưa hết hạn) → bật Active OK | 1. Discount `inactive`, còn hạn.<br>2. Đổi Active, Save. | Lưu thành công, không lỗi. | High | [x] |
+
 ---
 
 ## 5. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
@@ -321,7 +357,8 @@ _Mô tả 3 kịch bản tổng thể qua các vai trò chính._
 | US-F33-08 | TC-F33-08-01 → TC-F33-08-07 | 7 |
 | Cross-cutting | TC-F33-09-01 → TC-F33-09-12 | 12 |
 | Spec Coverage Supplements | TC-F33-10-01 → TC-F33-10-20 | 20 |
-| **TỔNG** | | **106** |
+| Effective status / auto-inactive (GH-1282) | TC-F33-11-01 → TC-F33-13-06 | 16 |
+| **TỔNG** | | **122** |
 
 ---
 

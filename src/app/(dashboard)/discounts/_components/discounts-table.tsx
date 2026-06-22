@@ -177,9 +177,15 @@ export function DiscountsTable({
                             {fmtDate(discount.expiresAt)}
                         </TableCell>
 
-                        {/* Status */}
+                        {/* Status — effective lifecycle state (expired/scheduled/used-up), not raw DB status */}
                         <TableCell>
-                            <DiscountStatusBadge status={discount.status} />
+                            <DiscountStatusBadge
+                                status={discount.status}
+                                startsAt={discount.startsAt}
+                                expiresAt={discount.expiresAt}
+                                usageLimit={discount.usageLimit}
+                                usageCount={discount.usageCount}
+                            />
                         </TableCell>
 
                         {/* Actions — stopPropagation so row-click doesn't fire */}
