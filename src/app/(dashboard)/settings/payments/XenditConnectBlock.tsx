@@ -18,7 +18,7 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
     return (
         <>
             <div
-                className="relative grid items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] overflow-hidden"
+                className="anim-pay-hero relative grid items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] overflow-hidden"
                 style={{
                     gridTemplateColumns: '56px 1fr auto',
                     background: 'var(--dash-surface)',
@@ -41,16 +41,16 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
 
                 {/* Body */}
                 <div className="min-w-0">
-                    <h4 className="text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
+                    <h4 className="text-[17px] font-bold tracking-tight mt-[2px] mb-[6px]" style={{ color: 'var(--dash-text)' }}>
                         {pt.xenditConnectTitle}
                     </h4>
-                    <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]">
+                    <p className="text-[13.5px] leading-[1.55] mb-[12px] max-w-[540px]" style={{ color: 'var(--dash-text-muted)' }}>
                         {pt.xenditConnectDesc}
                     </p>
                     <ul className="flex flex-wrap gap-[14px_24px] list-none m-0 p-0">
                         {[pt.xenditStep1, pt.xenditStep2, pt.xenditStep3].map((step, i) => (
-                            <li key={i} className="inline-flex items-center gap-2 text-[12.5px] text-slate-300">
-                                <span className="w-5 h-5 rounded-full border border-cyan-500/[0.28] bg-cyan-500/[0.12] text-cyan-300 font-mono text-[11px] font-bold grid place-items-center shrink-0">
+                            <li key={i} className="inline-flex items-center gap-2 text-[12.5px]" style={{ color: 'var(--dash-text)' }}>
+                                <span className="w-5 h-5 rounded-full border border-cyan-500/[0.28] bg-cyan-500/[0.12] text-cyan-600 dark:text-cyan-300 font-mono text-[11px] font-bold grid place-items-center shrink-0">
                                     {i + 1}
                                 </span>
                                 {step}
@@ -74,8 +74,8 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         {pt.xenditConnectCta}
                         <ArrowRight className="w-4 h-4" />
                     </button>
-                    <div className="inline-flex items-center gap-[6px] text-[11.5px] text-slate-500 whitespace-nowrap">
-                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    <div className="inline-flex items-center gap-[6px] text-[11.5px] whitespace-nowrap" style={{ color: 'var(--dash-text-muted)' }}>
+                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
                         {pt.xenditTrust}
                     </div>
                 </div>
