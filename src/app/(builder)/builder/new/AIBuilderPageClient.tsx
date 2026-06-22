@@ -426,13 +426,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             case 'done':
                 setStatus('done')
                 setGenerationTimeMs(data.timeMs || 0)
-                setSiteId(data.siteId)
+                setSiteId(String(data.siteId))
                 setSiteName(data.siteName)
                 // BUG-F01-26: Don't mark dirty — gen route already saved pages correctly.
                 // Setting 'dirty' here triggers auto-save which overwrites processed
                 // homepage layout (with nav, images, page split) with raw SSE blocks.
                 hasUserEditsRef.current = false
-                void trackBuilderEvent(data.siteId, 'builder_generation_completed', {
+                void trackBuilderEvent(String(data.siteId), 'builder_generation_completed', {
                     totalBlocks: data.totalBlocks,
                     totalPages: data.totalPages || 1,
                     timeMs: data.timeMs || 0,
