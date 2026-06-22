@@ -54,7 +54,7 @@ interface BuilderMobilePreviewShellProps {
     siteId?: string | null
 }
 
-function BuilderMobilePreviewShell({ siteId }: BuilderMobilePreviewShellProps) {
+function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShellProps) {
     // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
     const vRef = useRef(Date.now())
     // Track which siteId the iframe has finished loading for.
@@ -97,9 +97,7 @@ function BuilderMobilePreviewShell({ siteId }: BuilderMobilePreviewShellProps) {
                         )}
                     </div>
                 ) : (
-                    <div className="flex h-full items-center justify-center">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
-                    </div>
+                    <>{children}</>
                 )}
             </div>
             <div className="absolute bottom-2 left-1/2 h-1 w-32 -translate-x-1/2 rounded-full bg-white/30" />
@@ -119,6 +117,7 @@ interface BuilderPreviewSurfaceProps {
 export function BuilderPreviewSurface({
     mode,
     variant,
+    children,
     siteId,
 }: BuilderPreviewSurfaceProps) {
     // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
@@ -139,7 +138,7 @@ export function BuilderPreviewSurface({
     if (mode === 'mobile') {
         return (
             <div className="flex h-full items-center justify-center">
-                <BuilderMobilePreviewShell siteId={siteId} />
+                <BuilderMobilePreviewShell siteId={siteId}>{children}</BuilderMobilePreviewShell>
             </div>
         )
     }
@@ -162,16 +161,14 @@ export function BuilderPreviewSurface({
             )}
         </div>
     ) : (
-        <div className="flex h-full items-center justify-center bg-[#06090F]">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-white/50" />
-        </div>
+        <>{children}</>
     )
 
     if (variant === 'fullwidth') {
         return (
             <div className="flex h-full items-start justify-center px-10 pt-8">
                 <div className="h-full max-h-[5094px] w-full max-w-[1280px] overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-                    <div className="h-full overflow-hidden rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]">
+                    <div className={cn("h-full rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]", siteId ? "overflow-hidden" : "overflow-y-auto")}>
                         {desktopContent}
                     </div>
                 </div>
