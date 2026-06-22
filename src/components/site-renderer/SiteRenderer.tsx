@@ -187,7 +187,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const _hasCart = _preprocessedBlocks.some(b => b.blockType === 'cartWidget')
     const rawBlocks = _preprocessedBlocks.map(b => {
         if (b.blockType === 'navigation') {
-            return { ...b, _hasCart }
+            // _logoHref: rewritten via rewriteUrl so editor iframe gets /preview/{siteId}?pageId=...
+            // instead of hardcoded '/' which would navigate outside the preview context.
+            return { ...b, _hasCart, _logoHref: rewriteUrl('/') }
         }
         if (b.blockType !== 'breadcrumb') return b
         // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
