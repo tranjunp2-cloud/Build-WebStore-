@@ -711,7 +711,7 @@ export default function BlogListPage() {
             {/* Delete Confirmation Modal — AC-2, Figma: 31958-7172 */}
             {
                 deleteTarget && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
@@ -785,7 +785,7 @@ export default function BlogListPage() {
             {/* Bulk Delete Confirmation Modal — TC-F17-01-12, Figma: 31958-7197 */}
             {
                 showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{

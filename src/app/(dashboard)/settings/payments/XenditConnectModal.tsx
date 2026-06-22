@@ -115,8 +115,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
 
     return (
         <div
-            className="fixed inset-0 grid place-items-center p-6 z-[100]"
-            style={{ background: 'rgba(2,6,18,0.62)', backdropFilter: 'blur(8px)' }}
+            className="fixed inset-0 grid place-items-center p-6 z-[100] bg-black/60 backdrop-blur-sm"
             onClick={handleClose}
         >
             <div
