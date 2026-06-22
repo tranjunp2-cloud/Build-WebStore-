@@ -140,9 +140,9 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         })
 
         // Assert
-        // 1. Tab Builder (🚀 AI Website Builder) phải ở trạng thái active color (bg-[#3B82F6])
+        // 1. Tab Builder (🚀 AI Website Builder) phải ở trạng thái active color (bg-[hsl(var(--primary))])
         const builderTab = screen.getByRole('button', { name: /AI Website Builder/i })
-        expect(builderTab).toHaveClass('bg-[#3B82F6]')
+        expect(builderTab).toHaveClass('bg-[hsl(var(--primary))]')
 
         // 2. Element builder phải được scrollIntoView
         expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })

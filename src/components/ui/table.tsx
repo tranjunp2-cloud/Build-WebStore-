@@ -171,13 +171,12 @@ const TableActionButton = React.forwardRef<
         ref={ref}
         type="button"
         className={cn(
-            'flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors cursor-pointer',
+            'flex h-8 w-8 items-center justify-center rounded-[8px] border-none bg-transparent text-[var(--dash-text-muted)] transition-colors cursor-pointer',
             variant === 'danger'
-                ? 'hover:bg-red-500/10 hover:text-red-400'
-                : 'hover:bg-black/[0.05] dark:hover:bg-white/[0.06]',
+                ? 'hover:bg-[hsl(var(--destructive)/0.1)] hover:text-[hsl(var(--destructive))]'
+                : 'hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))]',
             className,
         )}
-        style={{ color: 'var(--dash-text-muted)', background: 'transparent', border: 'none' }}
         {...props}
     >
         {children}

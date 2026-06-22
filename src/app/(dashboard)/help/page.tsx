@@ -36,8 +36,8 @@ export default function GuidelinePage() {
   ];
 
   return (
-    // PANEL: OVERVIEW — bg:#161E2E, border:1px #1F2937, border-radius:12px, padding:24px
-    <div className="w-full bg-[#161E2E] border border-[#1F2937] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-6">
+    // PANEL: OVERVIEW — bg:card, border:1px border, border-radius:12px, padding:24px
+    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-6">
       <div className="flex flex-col gap-[17px]">
 
         {/* Section 1: Welcome */}
@@ -45,7 +45,7 @@ export default function GuidelinePage() {
           <h2 className="text-[24px] font-bold text-white leading-[32px] m-0 p-0 tracking-tight">
             {t.help.overview.welcomeTitle}
           </h2>
-          <p className="text-[14px] font-normal text-[#9CA3AF] leading-[22px] m-0 p-0">
+          <p className="text-[14px] font-normal text-[hsl(var(--muted-foreground))] leading-[22px] m-0 p-0">
             {t.help.overview.welcomeDesc}
           </p>
         </div>
@@ -68,20 +68,20 @@ export default function GuidelinePage() {
                 href={item.href}
                 className={[
                   'group relative flex flex-row items-start gap-[12px] p-[20px]',
-                  'bg-[#1F2937] border border-[#1F2937] rounded-[8px]',
+                  'bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] rounded-[8px]',
                   'shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]',
                   'transition-all duration-200',
-                  'hover:-translate-y-0.5 hover:bg-[#243042] hover:border-slate-600 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)]',
+                  'hover:-translate-y-0.5 hover:border-slate-600 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)]',
                 ].join(' ')}
               >
                 {/* Affordance: arrow hints the card is a link to the feature */}
                 <ArrowUpRight
-                  className="absolute top-[16px] right-[16px] w-4 h-4 text-[#6B7280] group-hover:text-blue-400 transition-colors"
+                  className="absolute top-[16px] right-[16px] w-4 h-4 text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--primary))] transition-colors"
                   aria-hidden
                 />
-                {/* Icon box: 40x40, bg:#161E2E, centered — matches demo .feature-icon */}
+                {/* Icon box: 40x40, bg:card, centered — matches demo .feature-icon */}
                 <div
-                  className="flex items-center justify-center rounded-[8px] bg-[#161E2E] shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] shrink-0 text-blue-400"
+                  className="flex items-center justify-center rounded-[8px] bg-[hsl(var(--card))] shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] shrink-0 text-[hsl(var(--primary))]"
                   style={{ width: 40, height: 40 }}
                   aria-hidden="true"
                 >
@@ -89,10 +89,10 @@ export default function GuidelinePage() {
                 </div>
                 {/* Text group (pr-5 keeps copy clear of the arrow) */}
                 <div className="flex flex-col gap-[4px] flex-1 min-w-0 pr-5">
-                  <h4 className="text-[14px] font-semibold text-white leading-[22px] m-0 p-0 tracking-tight group-hover:text-blue-300 transition-colors">
+                  <h4 className="text-[14px] font-semibold text-white leading-[22px] m-0 p-0 tracking-tight group-hover:text-[hsl(var(--primary))] transition-colors">
                     {item.title}
                   </h4>
-                  <p className="text-[12px] font-normal text-[#9CA3AF] leading-[18px] m-0 p-0">
+                  <p className="text-[12px] font-normal text-[hsl(var(--muted-foreground))] leading-[18px] m-0 p-0">
                     {item.desc}
                   </p>
                 </div>
@@ -109,13 +109,13 @@ export default function GuidelinePage() {
               {t.help.overview.needHelpTitle}
             </h3>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-[8px] border border-[#1F2937] bg-[#1F2937]/40 p-[16px]">
-            <p className="text-[14px] font-normal text-[#9CA3AF] leading-[22px] m-0 p-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-[8px] border border-[hsl(var(--border))] bg-[hsl(var(--secondary)/0.4)] p-[16px]">
+            <p className="text-[14px] font-normal text-[hsl(var(--muted-foreground))] leading-[22px] m-0 p-0">
               {t.help.overview.needHelpDesc}
             </p>
             <a
               href="mailto:support@echprime.com"
-              className="inline-flex shrink-0 items-center gap-2 rounded-[8px] bg-blue-500 px-4 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-blue-600"
+              className="inline-flex shrink-0 items-center gap-2 rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2 text-[14px] font-semibold !text-white transition-colors hover:bg-[hsl(var(--primary)/0.9)]"
             >
               <Mail className="w-4 h-4 shrink-0" aria-hidden />
               support@echprime.com

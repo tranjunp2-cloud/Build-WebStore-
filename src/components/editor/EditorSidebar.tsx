@@ -29,8 +29,8 @@ export function EditorSidebar({
 }: EditorSidebarProps) {
     if (compact) {
         return (
-            <aside className="flex h-full flex-1 flex-col bg-[#0F172A]">
-                <div className="border-b border-white/[0.06] bg-[#0B1120]/60">
+            <aside className="flex h-full flex-1 flex-col bg-[var(--editor-surface)]">
+                <div className="border-b border-white/[0.06] bg-[var(--editor-bg)]/60">
                     <div className="flex items-stretch px-1 pt-1">
                         {tabs.map(tab => {
                             const isActive = tab.id === activeTab
@@ -43,7 +43,7 @@ export function EditorSidebar({
                                     className={cn(
                                         'relative flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-t-lg px-2 text-[11px] font-medium tracking-wide transition-all',
                                         isActive
-                                            ? 'bg-[#0F172A] text-white'
+                                            ? 'bg-[var(--editor-surface)] text-white'
                                             : 'text-slate-500 hover:text-slate-300',
                                     )}
                                 >
@@ -52,7 +52,7 @@ export function EditorSidebar({
                                         {tab.label}
                                     </span>
                                     {isActive ? (
-                                        <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF]" />
+                                        <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-[hsl(var(--primary))]" />
                                     ) : null}
                                 </button>
                             )
@@ -67,10 +67,10 @@ export function EditorSidebar({
 
     return (
         <aside
-            className="flex h-full shrink-0 flex-col border-r border-white/[0.06] bg-[#0F172A]"
+            className="flex h-full shrink-0 flex-col border-r border-white/[0.06] bg-[var(--editor-surface)]"
             style={{ width: EDITOR_SIDEBAR_WIDTH }}
         >
-            <div className="border-b border-white/[0.06] bg-[#0B1120]/60">
+            <div className="border-b border-white/[0.06] bg-[var(--editor-bg)]/60">
                 <div className="flex items-stretch px-2 pt-1">
                     {tabs.map(tab => {
                         const isActive = tab.id === activeTab
@@ -83,7 +83,7 @@ export function EditorSidebar({
                                 className={cn(
                                     'relative flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-t-lg px-3 text-[12px] font-medium tracking-wide transition-all',
                                     isActive
-                                        ? 'bg-[#0F172A] text-white'
+                                        ? 'bg-[var(--editor-surface)] text-white'
                                         : 'text-slate-500 hover:text-slate-300',
                                 )}
                             >
@@ -92,7 +92,7 @@ export function EditorSidebar({
                                     {tab.label}
                                 </span>
                                 {isActive ? (
-                                    <span className="absolute inset-x-4 bottom-0 h-[2px] rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF]" />
+                                    <span className="absolute inset-x-4 bottom-0 h-[2px] rounded-full bg-[hsl(var(--primary))]" />
                                 ) : null}
                             </button>
                         )
@@ -100,7 +100,7 @@ export function EditorSidebar({
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 bg-[#0F172A]">{children}</div>
+            <div className="min-h-0 flex-1 bg-[var(--editor-surface)]">{children}</div>
         </aside>
     )
 }

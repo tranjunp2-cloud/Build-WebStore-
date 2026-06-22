@@ -213,14 +213,14 @@ export function DiscountsUsageHistoryLayout() {
                                             ? fmtValue(u.discount.type, u.discount.value)
                                             : '—'}
                                 </TableCell>
-                                <TableCell className="font-mono text-green-400">
+                                <TableCell className="font-mono text-[hsl(var(--success))]">
                                     −{fmtRM(u.amountApplied)}
                                 </TableCell>
                                 <TableCell>
                                     {u.order ? (
                                         <a
                                             href={`/orders?order=${u.order.id}`}
-                                            className="inline-flex items-center gap-1 text-sky-500 transition-opacity hover:opacity-80 dark:text-sky-400"
+                                            className="inline-flex items-center gap-1 text-[hsl(var(--info))] transition-opacity hover:opacity-80 dark:text-[hsl(var(--info))]"
                                         >
                                             {/* Order # as a kbd-key box (muted mono pill); the ↗ arrow sits OUTSIDE in the link color */}
                                             <span

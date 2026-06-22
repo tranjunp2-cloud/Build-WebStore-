@@ -119,9 +119,7 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                             >
                                 {tab === 'buyer' ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
                                 {tab === 'buyer' ? et.buyerEmails : et.sellerEmails}
-                                <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
-                                    isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]'
-                                }`}>
+                                <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
                                     {count}
                                 </span>
                             </button>
@@ -170,11 +168,11 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                     <TableCell style={{ padding: '14px 20px' }}>
                                         <div className="flex items-center gap-3">
                                             <div
-                                                className={`flex items-center justify-center rounded-lg shrink-0 transition-colors ${isEnabled ? 'bg-blue-500/10' : 'bg-slate-500/10'}`}
+                                                className={`flex items-center justify-center rounded-lg shrink-0 transition-colors ${isEnabled ? 'bg-[hsl(var(--primary)/0.1)]' : 'bg-slate-500/10'}`}
                                                 style={{ width: 36, height: 36 }}
                                             >
                                                 <Icon
-                                                    className={`transition-colors ${isEnabled ? 'text-blue-400' : 'text-slate-500'}`}
+                                                    className={`transition-colors ${isEnabled ? 'text-[hsl(var(--primary))]' : 'text-slate-500'}`}
                                                     style={{ width: 18, height: 18 }}
                                                 />
                                             </div>
@@ -190,7 +188,7 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                                                         {toLabel(type)}
                                                     </span>
                                                     {isCustomized && (
-                                                        <span className="shrink-0 text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">
+                                                        <span className="shrink-0 text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]">
                                                             {et.customized}
                                                         </span>
                                                     )}

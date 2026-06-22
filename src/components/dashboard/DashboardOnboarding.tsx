@@ -84,7 +84,7 @@ export function DashboardOnboarding({
                         <p className="text-sm text-dash-text-muted">{o.subtitle}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-2xl font-bold text-blue-500">{progressPct}%</p>
+                        <p className="text-2xl font-bold text-[hsl(var(--primary))]">{progressPct}%</p>
                         <p className="text-xs text-dash-text-muted">{o.completeLabel}</p>
                     </div>
                 </div>
@@ -94,27 +94,27 @@ export function DashboardOnboarding({
                         const state = getStepState(step)
                         if (state === 'completed') {
                             return (
-                                <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-[rgba(0,201,80,0.2)] bg-[rgba(0,201,80,0.1)] px-3 py-3.5">
-                                    <CheckCircle2 className="h-5 w-5 shrink-0 text-[#05df72]" />
+                                <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-[hsl(var(--success)/0.2)] bg-[hsl(var(--success)/0.1)] px-3 py-3.5">
+                                    <CheckCircle2 className="h-5 w-5 shrink-0 text-[hsl(var(--success))]" />
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-[#05df72]">{step.label}</p>
+                                        <p className="text-sm font-medium text-[hsl(var(--success))]">{step.label}</p>
                                         <p className="text-xs text-dash-text-muted">{step.description}</p>
                                     </div>
                                 </div>
                             )
                         }
                         return (
-                            <div key={step.id} className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] p-[13px] shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <div key={step.id} className="flex items-center justify-between rounded-xl border border-[hsl(var(--primary)/0.3)] bg-[hsl(var(--primary)/0.1)] p-[13px] shadow-[0_0_15px_hsl(var(--primary)/0.2)]">
                                 <div className="flex min-w-0 items-center gap-3">
-                                    <Clock className="h-5 w-5 shrink-0 text-blue-400" />
+                                    <Clock className="h-5 w-5 shrink-0 text-[hsl(var(--primary))]" />
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium text-blue-500">{step.label}</p>
+                                        <p className="text-sm font-medium text-[hsl(var(--primary))]">{step.label}</p>
                                         <p className="text-xs text-dash-text-muted">{step.description}</p>
                                     </div>
                                 </div>
                                 <Link
                                     href={step.href}
-                                    className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                    className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3 text-xs font-medium !text-white transition-opacity hover:opacity-90"
                                 >
                                     {o.continueBtn}
                                 </Link>
@@ -125,7 +125,7 @@ export function DashboardOnboarding({
 
                 <div className="h-2 w-full overflow-hidden rounded-full bg-dash-secondary-bg">
                     <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-teal-400 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] transition-all duration-500"
                         style={{ width: `${progressPct}%` }}
                     />
                 </div>

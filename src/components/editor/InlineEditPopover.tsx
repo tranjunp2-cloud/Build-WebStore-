@@ -73,7 +73,7 @@ export function InlineEditPopover({
     }
 
     return (
-        <div className={`w-full bg-[#0F172A] p-4 shadow-2xl shadow-black/40 border border-cyan-500/30 ${isMobile ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
+        <div className={`w-full bg-[var(--editor-surface)] p-4 shadow-2xl shadow-black/40 border border-cyan-500/30 ${isMobile ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
@@ -121,7 +121,7 @@ export function InlineEditPopover({
                         }
                     }}
                     placeholder={ie.placeholder}
-                    className="mt-2 min-h-[100px] w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-3 py-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-cyan-500/40"
+                    className="mt-2 min-h-[100px] w-full resize-none rounded-xl border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-cyan-500/40"
                 />
                 <div className="mt-1 text-right text-[11px] text-gray-500">
                     {instruction.length}/{MAX_INSTRUCTION_LENGTH}

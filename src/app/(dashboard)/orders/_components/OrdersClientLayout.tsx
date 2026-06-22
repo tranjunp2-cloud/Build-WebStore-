@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -137,30 +138,35 @@ export function OrdersClientLayout() {
                 sortOrder={sortOrder}
             />
 
-            {isOpen && (
-                <div
-                    className="fixed inset-0 z-40"
-                    style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(2px)', top: 56 }}
-                    onClick={() => setSelectedOrderId(null)}
-                />
+            {/* Backdrop + panel via portal — escapes ancestor stacking contexts so backdrop covers sidebar */}
+            {typeof document !== 'undefined' && createPortal(
+                <>
+                    {isOpen && (
+                        <div
+                            className="fixed inset-0 z-40"
+                            style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(2px)' }}
+                            onClick={() => setSelectedOrderId(null)}
+                        />
+                    )}
+                    {/* Order Detail Panel — fixed overlay, slides in from right on md, fullscreen on mobile */}
+                    <div
+                        className={`fixed z-50 overflow-y-auto transition-transform duration-300 shadow-2xl right-0 w-full top-0 h-[100dvh] md:w-[488px] md:top-[80px] md:h-[calc(100vh-80px)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                        style={{
+                            background: 'var(--dash-surface)',
+                            borderLeft: '1px solid var(--dash-border)',
+                            borderTop: '1px solid var(--dash-border)',
+                            backdropFilter: 'blur(20px)',
+                        }}
+                    >
+                        <OrderDetailPanel
+                            orderId={selectedOrderId}
+                            onClose={() => setSelectedOrderId(null)}
+                            onUpdate={refreshAfterMutation}
+                        />
+                    </div>
+                </>,
+                document.body
             )}
-
-            {/* Order Detail Panel — fixed overlay, slides in from right on md, fullscreen on mobile */}
-            <div
-                className={`fixed z-50 overflow-y-auto transition-transform duration-300 shadow-2xl right-0 w-full top-0 h-[100dvh] md:w-[488px] md:top-[80px] md:h-[calc(100vh-80px)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-                style={{
-                    background: 'var(--dash-surface)',
-                    borderLeft: '1px solid var(--dash-border)',
-                    borderTop: '1px solid var(--dash-border)',
-                    backdropFilter: 'blur(20px)',
-                }}
-            >
-                <OrderDetailPanel
-                    orderId={selectedOrderId}
-                    onClose={() => setSelectedOrderId(null)}
-                    onUpdate={refreshAfterMutation}
-                />
-            </div>
         </div>
     )
 }

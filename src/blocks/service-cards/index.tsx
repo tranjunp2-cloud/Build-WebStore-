@@ -8,28 +8,30 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
+function ServiceCTA({ cta, resolveHref }: { cta: ServiceItem['cta']; resolveHref: (href: string | undefined) => string }) {
+    if (!cta) return null
+    return (
+        <a
+            href={resolveHref(cta?.url)}
+            className={`inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80 ${TOUCH_TARGET.min}`}
+            style={{ color: 'var(--brand-primary)' }}
+        >
+            {cta.label}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+        </a>
+    )
+}
+
 export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCardsConfig>) {
     void _theme
+    const resolveHref = useLocalHref()
     const { headline, subheadline, services = [], variant = 'grid' } = block
-
-    const ServiceCTA = ({ cta }: { cta: ServiceItem['cta'] }) => {
-        if (!cta) return null
-        return (
-            <a
-                href={cta?.url}
-                className={`inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80 ${TOUCH_TARGET.min}`}
-                style={{ color: 'var(--brand-primary)' }}
-            >
-                {cta.label}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-            </a>
-        )
-    }
 
     /* Plan 260415 service-cards-bugfix — stable keys + opacity WCAG fix + truncate price */
     const renderGridCard = (service: ServiceItem, i: number) => (
@@ -54,7 +56,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     {service.priceUnit && <RichText text={service.priceUnit} as="span" className="text-sm font-normal opacity-70 ml-1" />}
                 </p>
             )}
-            <ServiceCTA cta={service.cta} />
+            <ServiceCTA cta={service.cta} resolveHref={resolveHref} />
         </div>
     )
 
@@ -74,7 +76,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
             <div className="flex-1 w-full sm:w-auto text-center sm:text-left min-w-0">
                 <Heading level={3} className="mb-2 break-words">{service.title}</Heading>
                 <Body size="small" className="opacity-70 leading-relaxed break-words">{service.description}</Body>
-                <ServiceCTA cta={service.cta} />
+                <ServiceCTA cta={service.cta} resolveHref={resolveHref} />
             </div>
             {service.price && (
                 <div className="shrink-0 text-center sm:text-right">
@@ -111,7 +113,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     )}
                     {featured.cta && (
                         <a
-                            href={featured.cta?.url}
+                            href={resolveHref(featured.cta?.url)}
                             className={`inline-flex items-center justify-center mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >

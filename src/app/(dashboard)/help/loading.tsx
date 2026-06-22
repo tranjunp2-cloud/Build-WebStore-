@@ -1,6 +1,6 @@
 export default function HelpLoading() {
   return (
-    <div className="w-full bg-[#161E2E] border border-slate-800 rounded-xl p-6 md:p-8 shadow-sm animate-pulse">
+    <div className="w-full bg-[hsl(var(--card))] border border-slate-800 rounded-xl p-6 md:p-8 shadow-sm animate-pulse">
       <div className="flex flex-col gap-10 max-w-5xl">
         <section className="flex flex-col gap-4">
           <div className="h-8 w-64 bg-slate-800 rounded-md" />

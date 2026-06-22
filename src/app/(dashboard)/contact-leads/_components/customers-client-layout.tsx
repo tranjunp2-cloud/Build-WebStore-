@@ -173,12 +173,13 @@ export function CustomersClientLayout() {
                     className="max-w-[360px] rounded-[20px] p-6 gap-0"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
-                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal */}
-                    <div className="dash-shell">
+                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal.
+                        bg transparent: tránh .dash-shell{background:--dash-bg} đè lên nền --dash-surface của DialogContent (gây "2 màu"). */}
+                    <div className="dash-shell" style={{ background: 'transparent' }}>
                     <DialogHeader className="mb-3">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                                <Trash2 className="w-5 h-5 text-red-400" />
+                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--destructive)/0.12)' }}>
+                                <Trash2 className="w-5 h-5 text-[hsl(var(--destructive))]" />
                             </div>
                             <DialogTitle className="text-[18px] font-bold" style={{ color: 'var(--dash-text)' }}>
                                 {c.deleteTitle}
@@ -197,15 +198,15 @@ export function CustomersClientLayout() {
                             type="button"
                             onClick={() => setPendingDelete(null)}
                             className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium bg-transparent hover:opacity-80 transition-opacity cursor-pointer"
-                            style={{ color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}
+                            style={{ color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--input-border))' }}
                         >
                             {c.cancel}
                         </button>
                         <button
                             type="button"
                             onClick={confirmDelete}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
-                            style={{ background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' }}
+                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium !text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
+                            style={{ background: 'hsl(var(--destructive))' }}
                         >
                             {c.deleteButton}
                         </button>

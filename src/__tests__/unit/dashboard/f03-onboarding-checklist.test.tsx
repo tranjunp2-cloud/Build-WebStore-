@@ -116,8 +116,8 @@ describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed, no 
         const productsLink = continueLinks.find(l => l.getAttribute('href') === '/products/new')
         expect(productsLink).toBeTruthy()
 
-        // Step 2 is completed — green CheckCircle2 styling
-        expect(screen.getByText('Customize Your Store Design')).toHaveClass('text-[#05df72]')
+        // Step 2 is completed — green CheckCircle2 styling (design token)
+        expect(screen.getByText('Customize Your Store Design')).toHaveClass('text-[hsl(var(--success))]')
 
         // No locked/gray step rows — only progress bar track uses bg-dash-secondary-bg, not step items
         const stepDivs = document.querySelectorAll('div.rounded-xl')
@@ -138,12 +138,12 @@ describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed, no 
             />
         )
 
-        // Completed step: CheckCircle2 green svg
-        const completedSvg = container.querySelector('svg.text-\\[\\#05df72\\]')
+        // Completed step: CheckCircle2 with success design token class
+        const completedSvg = container.querySelector('svg.text-\\[hsl\\(var\\(--success\\)\\)\\]')
         expect(completedSvg).toBeInTheDocument()
 
-        // Active steps: multiple Clock blue-400 svgs (3 active steps)
-        const activeSvgs = container.querySelectorAll('svg.text-blue-400')
+        // Active steps: Clock svgs with primary token class (3 active, no locked state)
+        const activeSvgs = container.querySelectorAll('svg.text-\\[hsl\\(var\\(--primary\\)\\)\\]')
         expect(activeSvgs.length).toBe(3)
     })
 
@@ -230,8 +230,8 @@ describe('[TC-F03.59b] DashboardOnboarding — Independent Steps (no locked stat
 
         // Step 3 is still active (not done), shows Continue
         const paymentText = screen.getByText('Set Up Payment & Shipping')
-        expect(paymentText).not.toHaveClass('text-[#05df72]')
-        expect(paymentText).toHaveClass('text-blue-500')
+        expect(paymentText).not.toHaveClass('text-[hsl(var(--success))]')
+        expect(paymentText).toHaveClass('text-[hsl(var(--primary))]')
     })
 })
 
@@ -335,7 +335,7 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
 
         // 1/4 = 25%
         const progressBarFill = container.querySelector(
-            'div.bg-gradient-to-r.from-blue-500.to-teal-400'
+            'div.bg-gradient-to-r.from-\\[hsl\\(var\\(--info\\)\\)\\].to-\\[hsl\\(var\\(--primary\\)\\)\\]'
         ) as HTMLElement
         expect(progressBarFill).toHaveStyle({ width: '25%' })
     })
@@ -410,7 +410,7 @@ describe('[TC-F03.62] SetupAlertBanner — Renders when !hasPaymentConfigured', 
 
         const banner = container.querySelector('div[class*="rounded-2xl"]')
         expect(banner).toBeInTheDocument()
-        expect(banner).toHaveClass('border-blue-400')
+        expect(banner).toHaveClass('border-[hsl(var(--info)/0.4)]')
     })
 })
 

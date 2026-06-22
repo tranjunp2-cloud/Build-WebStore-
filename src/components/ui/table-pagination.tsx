@@ -101,8 +101,8 @@ export function TablePagination({
                             onClick={() => onPageChange(p)}
                             className="h-[32px] w-[32px] flex items-center justify-center rounded-[8px] text-[13px] font-medium transition-colors cursor-pointer"
                             style={p === page
-                                ? { background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))', border: '1px solid hsl(var(--primary))' }
-                                : { border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }
+                                ? { background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)', color: '#fff', border: 'none' }
+                                : { border: '1px solid hsl(var(--input-border))', color: 'var(--dash-text-muted)' }
                             }
                         >
                             {p}

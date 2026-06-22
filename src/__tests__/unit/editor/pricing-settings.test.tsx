@@ -244,8 +244,8 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             render(<PricingSettings block={blockWith2Plans} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
             const plan1Tab = screen.getByRole('button', { name: 'Plan 1' })
-            expect(plan1Tab).toHaveClass('bg-[rgba(77,142,255,0.1)]')
-            expect(plan1Tab).toHaveClass('text-[#adc6ff]')
+            expect(plan1Tab).toHaveClass('bg-[hsl(var(--info)/0.1)]')
+            expect(plan1Tab).toHaveClass('text-[hsl(var(--info))]')
         })
     })
 

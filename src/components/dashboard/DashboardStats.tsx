@@ -29,17 +29,17 @@ type DashboardStatsProps = {
 const TrendBadge = ({ change = 0 }: { change?: number }) => {
     if (change > 0) {
         return (
-            <div className="flex items-center gap-1 px-2 py-[2px] h-[26px] bg-[#00C950] bg-opacity-10 border border-[#00C950]/20 rounded-[12px]">
-                <TrendingUp className="w-3 h-3 text-[#05DF72]" strokeWidth={2.5} />
-                <span className="text-[12px] font-semibold text-[#05DF72] leading-none">+{change.toFixed(1)}%</span>
+            <div className="flex items-center gap-1 px-2 py-[2px] h-[26px] bg-[hsl(var(--success)/0.1)] border border-[hsl(var(--success)/0.2)] rounded-[12px]">
+                <TrendingUp className="w-3 h-3 text-[hsl(var(--success))]" strokeWidth={2.5} />
+                <span className="text-[12px] font-semibold text-[hsl(var(--success))] leading-none">+{change.toFixed(1)}%</span>
             </div>
         )
     }
     if (change < 0) {
         return (
-            <div className="flex items-center gap-1 px-2 py-[2px] h-[26px] bg-[#FB2C36] bg-opacity-10 border border-[#FB2C36]/20 rounded-[12px]">
-                <TrendingDown className="w-3 h-3 text-[#FF6467]" strokeWidth={2.5} />
-                <span className="text-[12px] font-semibold text-[#FF6467] leading-none">{change.toFixed(1)}%</span>
+            <div className="flex items-center gap-1 px-2 py-[2px] h-[26px] bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.2)] rounded-[12px]">
+                <TrendingDown className="w-3 h-3 text-[hsl(var(--destructive))]" strokeWidth={2.5} />
+                <span className="text-[12px] font-semibold text-[hsl(var(--destructive))] leading-none">{change.toFixed(1)}%</span>
             </div>
         )
     }
@@ -84,15 +84,15 @@ export function DashboardStats(props: DashboardStatsProps) {
     const order = (props.preferences || defaultOrder).filter(key => key !== 'revenue')
     
     // Custom container styles matching the Figma UI exactly
-    const cardClassName = "relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-white/10 bg-[#1E293B] p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 cursor-pointer overflow-hidden min-h-[260px]"
+    const cardClassName = "relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-white/10 bg-[hsl(var(--secondary))] p-5 shadow-sm transition-colors duration-200 hover:border-[hsl(var(--primary))] cursor-pointer overflow-hidden min-h-[260px]"
 
     const STAT_CARDS = {
       views: (
         <div className={cardClassName} key="views" data-testid="stat-card-views">
             {/* Top Row: Icon Container and Badge */}
             <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2563EB] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
-                    <Eye className="h-6 w-6 text-white" strokeWidth={2.5} />
+                <div className="w-12 h-12 rounded-[16px] bg-[hsl(var(--info))] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                    <Eye className="h-6 w-6 !text-white" strokeWidth={2.5} />
                 </div>
                 <TrendBadge change={props.viewsChange} />
             </div>
@@ -100,7 +100,7 @@ export function DashboardStats(props: DashboardStatsProps) {
             {/* Middle Row: Text and Value */}
             <div className="flex flex-col gap-2 mb-4 relative z-10">
                 <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.views}</span>
-                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.views.toLocaleString()}</span>
+                <span className="text-[48px] font-bold text-[hsl(var(--foreground))] tracking-tight leading-none">{props.views.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
@@ -113,8 +113,8 @@ export function DashboardStats(props: DashboardStatsProps) {
         <div className={cardClassName} key="leads" data-testid="stat-card-leads">
             {/* Top Row: Icon Container and Badge */}
             <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#2DD4BF] to-[#14B8A6] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
-                    <MousePointerClick className="h-6 w-6 text-white" strokeWidth={2.5} />
+                <div className="w-12 h-12 rounded-[16px] bg-[hsl(var(--primary))] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                    <MousePointerClick className="h-6 w-6 !text-white" strokeWidth={2.5} />
                 </div>
                 <TrendBadge change={props.leadsChange} />
             </div>
@@ -122,12 +122,12 @@ export function DashboardStats(props: DashboardStatsProps) {
             {/* Middle Row: Text and Value */}
             <div className="flex flex-col gap-2 mb-4 relative z-10">
                 <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.leads}</span>
-                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.leads.toLocaleString()}</span>
+                <span className="text-[48px] font-bold text-[hsl(var(--foreground))] tracking-tight leading-none">{props.leads.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
             <div className="mt-auto -mx-5 -mb-5 relative">
-                <Sparkline data={props.leadsSeries || []} color="#ef4444" />
+                <Sparkline data={props.leadsSeries || []} color="#2dd4bf" />
             </div>
         </div>
       ),
@@ -135,8 +135,8 @@ export function DashboardStats(props: DashboardStatsProps) {
         <div className={cardClassName} key="engagement" data-testid="stat-card-engagement">
             {/* Top Row: Icon Container and Badge */}
             <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#A29BFE] to-[#6C5CE7] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
-                    <ShoppingBag className="h-6 w-6 text-white" strokeWidth={2.5} />
+                <div className="w-12 h-12 rounded-[16px] bg-[hsl(var(--warning))] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                    <ShoppingBag className="h-6 w-6 !text-white" strokeWidth={2.5} />
                 </div>
                 <TrendBadge change={props.engagementChange} />
             </div>
@@ -144,12 +144,12 @@ export function DashboardStats(props: DashboardStatsProps) {
             {/* Middle Row: Text and Value */}
             <div className="flex flex-col gap-2 mb-4 relative z-10">
                 <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.engagement}</span>
-                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.engagement.toLocaleString()}</span>
+                <span className="text-[48px] font-bold text-[hsl(var(--foreground))] tracking-tight leading-none">{props.engagement.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
             <div className="mt-auto -mx-5 -mb-5 relative">
-                <Sparkline data={props.engagementSeries || []} color="#a29bfe" />
+                <Sparkline data={props.engagementSeries || []} color="#f59e0b" />
             </div>
         </div>
       ),
@@ -158,8 +158,8 @@ export function DashboardStats(props: DashboardStatsProps) {
         <div className={cardClassName} key="revenue" data-testid="stat-card-revenue">
             {/* Top Row: Icon Container and Badge */}
             <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#10B981] to-[#059669] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-white" strokeWidth={2.5} />
+                <div className="w-12 h-12 rounded-[16px] bg-[hsl(var(--success))] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 !text-white" strokeWidth={2.5} />
                 </div>
                 <TrendBadge change={props.revenueChange} />
             </div>
@@ -167,7 +167,7 @@ export function DashboardStats(props: DashboardStatsProps) {
             {/* Middle Row: Text and Value */}
             <div className="flex flex-col gap-2 mb-4 relative z-10">
                 <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.revenue}</span>
-                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">
+                <span className="text-[48px] font-bold text-[hsl(var(--foreground))] tracking-tight leading-none">
                     {new Intl.NumberFormat('ms-MY', { style: 'currency', currency: props.currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(props.revenue || 0)}
                 </span>
             </div>

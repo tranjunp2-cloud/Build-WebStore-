@@ -8,6 +8,7 @@ import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
 import { getSocialIcon } from '../shared/social-icons'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body, Caption } from '../shared/Typography'
 import {
@@ -165,6 +166,7 @@ type LinkColumnProps = {
  * (≥4.5:1 ratio trên bg thường). Hover vẫn tăng lên 100%.
  */
 function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
+    const resolveHref = useLocalHref()
     const ulSpacing = spacing === 'tight' ? 'space-y-2.5' : 'space-y-3'
     return (
         <div>
@@ -175,7 +177,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
                     return (
                         <li key={`${link?.label || 'link'}-${j}`}>
                             <a
-                                href={link?.url}
+                                href={resolveHref(link?.url)}
                                 target={ext ? '_blank' : undefined}
                                 rel={ext ? 'noopener noreferrer' : undefined}
                                 className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
@@ -195,6 +197,7 @@ const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rg
 
 export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterConfig>) {
     void _theme
+    const resolveHref = useLocalHref()
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
     const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
     const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
@@ -241,7 +244,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                                 return (
                                                     <a
                                                         key={`${link?.label || 'link'}-${j}`}
-                                                        href={link?.url}
+                                                        href={resolveHref(link?.url)}
                                                         target={ext ? '_blank' : undefined}
                                                         rel={ext ? 'noopener noreferrer' : undefined}
                                                         className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
@@ -346,7 +349,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                     return (
                                     <a
                                         key={`${link?.label || 'link'}-${i}`}
-                                        href={link?.url}
+                                        href={resolveHref(link?.url)}
                                         target={ext ? '_blank' : undefined}
                                         rel={ext ? 'noopener noreferrer' : undefined}
                                         className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"

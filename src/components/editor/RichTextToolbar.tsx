@@ -252,11 +252,11 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                                 />
                             ))}
                         </div>
-                        <div style={{ height: 1, backgroundColor: '#374151', marginBottom: 8 }} />
+                        <div style={{ height: 1, backgroundColor: 'var(--editor-border)', marginBottom: 8 }} />
                         <div className="flex items-center gap-2">
                             <label
                                 className="shrink-0 cursor-pointer rounded-md overflow-hidden"
-                                style={{ width: 28, height: 28, border: '1px solid #374151', boxShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                                style={{ width: 28, height: 28, border: '1px solid var(--editor-border)', boxShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
                                 title="Pick custom color"
                             >
                                 <span className="block w-full h-full" style={{ backgroundColor: activeColor }} />

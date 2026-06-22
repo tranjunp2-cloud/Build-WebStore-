@@ -83,8 +83,8 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
             {/* Tenant-scoped card */}
             <div className="rounded-lg border p-4" style={cardStyle}>
                 <div className="flex items-center gap-2 mb-2">
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: '#06b6d4' }} />
-                    <span style={{ ...labelStyle, color: '#06b6d4' }}>{d.tenantScopedLabel}</span>
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--info))' }} />
+                    <span style={{ ...labelStyle, color: 'hsl(var(--info))' }}>{d.tenantScopedLabel}</span>
                 </div>
                 <p className="text-[12px] leading-relaxed" style={{ color: 'var(--dash-text-muted)' }}>
                     {tenantName

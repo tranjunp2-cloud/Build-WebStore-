@@ -61,7 +61,7 @@ export function DiscountsTable({
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20" style={{ color: 'var(--dash-text-muted)' }}>
-                <div className="h-6 w-6 rounded-full border-2 border-t-transparent border-blue-400 animate-spin" />
+                <div className="h-6 w-6 rounded-full border-2 border-t-transparent border-[hsl(var(--primary))] animate-spin" />
             </div>
         )
     }
@@ -145,12 +145,12 @@ export function DiscountsTable({
                         {/* Type badge */}
                         <TableCell>
                             {discount.type === 'fixed' ? (
-                                <span className="inline-flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-[3px] text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300">
+                                <span className="inline-flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-[3px] text-[11px] font-semibold bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]">
                                     <Banknote className="w-3 h-3 shrink-0" />
                                     {d.typeFixed}
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-[3px] text-[11px] font-semibold bg-violet-600/10 text-violet-700 dark:text-violet-300">
+                                <span className="inline-flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-[3px] text-[11px] font-semibold bg-[hsl(var(--info)/0.15)] text-[hsl(var(--info))]">
                                     <Percent className="w-3 h-3 shrink-0" />
                                     {d.typePercentage}
                                 </span>

@@ -55,7 +55,7 @@ export function MobileUndoRedoButtons({ className }: { className?: string }) {
                 aria-label={`${ur.undo}${undoCount > 0 ? ` (${undoCount})` : ''}`}
                 className={cn(
                     'relative flex h-12 w-16 items-center justify-center rounded-full transition-all duration-150 touch-manipulation',
-                    'bg-white/5 text-[#F8FAFC]',
+                    'bg-white/5 text-[var(--editor-text)]',
                     isUndoEnabled
                         ? 'opacity-100 active:scale-95 active:bg-white/10'
                         : 'opacity-40 cursor-not-allowed',
@@ -78,7 +78,7 @@ export function MobileUndoRedoButtons({ className }: { className?: string }) {
                 aria-label={`${ur.redo}${redoCount > 0 ? ` (${redoCount})` : ''}`}
                 className={cn(
                     'relative flex h-12 w-16 items-center justify-center rounded-full transition-all duration-150 touch-manipulation',
-                    'bg-white/5 text-[#F8FAFC]',
+                    'bg-white/5 text-[var(--editor-text)]',
                     isRedoEnabled
                         ? 'opacity-100 active:scale-95 active:bg-white/10'
                         : 'opacity-40 cursor-not-allowed',

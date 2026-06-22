@@ -4,6 +4,7 @@ import { ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { removeStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
+import { Button } from '@/components/ui/button';
 
 interface RemoveStaffModalProps {
     isOpen: boolean;
@@ -53,8 +54,8 @@ export function RemoveStaffModal({
                 <div className="flex flex-col px-[24px] pt-[24px] pb-[32px] gap-[24px]">
                     {/* Icon — warning amber, intentional status color, unchanged in both modes */}
                     <div className="flex justify-center">
-                        <div className="w-[64px] h-[64px] rounded-full flex items-center justify-center bg-[rgba(240,177,0,0.1)] border-[2px] border-[rgba(240,177,0,0.3)]">
-                            <ShieldAlert className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={1.5} />
+                        <div className="w-[64px] h-[64px] rounded-full flex items-center justify-center bg-[hsl(var(--warning)/0.1)] border-[2px] border-[hsl(var(--warning)/0.3)]">
+                            <ShieldAlert className="w-[32px] h-[32px] text-[hsl(var(--warning))]" strokeWidth={1.5} />
                         </div>
                     </div>
 
@@ -77,7 +78,7 @@ export function RemoveStaffModal({
                             ) : (
                                 <div
                                     className="h-[40px] w-[40px] shrink-0 rounded-[33px] flex items-center justify-center text-white text-[14px] font-semibold font-['Inter']"
-                                    style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(45, 212, 191, 1) 100%)' }}
+                                    style={{ background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)' }}
                                 >
                                     {displayName.substring(0, 2).toUpperCase()}
                                 </div>
@@ -98,22 +99,23 @@ export function RemoveStaffModal({
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px] bg-dash-surface border-t border-dash-border">
-                    <button
+                    <Button
                         type="button"
                         onClick={onClose}
                         disabled={isPending}
-                        className="flex items-center justify-center h-[46px] px-[24px] rounded-[12px] bg-dash-secondary-bg border border-dash-border text-[16px] font-medium text-dash-text hover:bg-dash-surface-hover transition-colors focus:outline-none"
+                        variant="dashSecondary"
+                        className="h-[46px] px-[24px] rounded-[12px] text-[16px] font-medium"
                     >
                         {t?.Staff?.removeModal?.cancel || 'Cancel'}
-                    </button>
+                    </Button>
                     <button
                         type="button"
                         onClick={handleConfirm}
                         disabled={isPending}
                         className="flex items-center justify-center gap-[8px] h-[44px] px-[28px] rounded-[12px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity focus:outline-none"
                         style={{
-                            background: 'linear-gradient(135deg, rgba(231, 0, 11, 1) 0%, rgba(193, 0, 7, 1) 100%)',
-                            boxShadow: '0px 4px 6px -4px rgba(251, 44, 54, 0.3), 0px 10px 15px -3px rgba(251, 44, 54, 0.3)'
+                            background: 'hsl(var(--destructive))',
+                            boxShadow: '0px 4px 6px -4px hsl(var(--destructive)/0.3), 0px 10px 15px -3px hsl(var(--destructive)/0.3)'
                         }}
                     >
                         {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

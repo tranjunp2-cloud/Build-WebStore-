@@ -78,7 +78,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                             <button
                                 onClick={() => onSelect(record)}
                                 className="flex items-center justify-center gap-2 flex-1 h-[37px] rounded-[12px] text-[14px] font-medium border-none cursor-pointer transition-opacity hover:opacity-80"
-                                style={{ background: 'rgba(0,201,80,0.1)', color: '#05df72' }}
+                                style={{ background: 'hsl(var(--success)/0.1)', color: 'hsl(var(--success))' }}
                             >
                                 <Eye className="w-4 h-4" />
                                 {c.view}
@@ -86,7 +86,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                             <button
                                 onClick={() => onDelete(record)}
                                 className="flex items-center justify-center gap-2 flex-1 h-[37px] rounded-[12px] text-[14px] font-medium border-none cursor-pointer transition-opacity hover:opacity-80"
-                                style={{ background: 'rgba(251,44,54,0.1)', color: '#ff6467' }}
+                                style={{ background: 'hsl(var(--destructive)/0.1)', color: 'hsl(var(--destructive))' }}
                             >
                                 <Trash2 className="w-4 h-4" />
                                 {c.deleteButton}

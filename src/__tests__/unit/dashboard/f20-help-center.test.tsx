@@ -153,7 +153,7 @@ describe('[TC-F20.01] HelpCenterNav — Active tab highlight on /help', () => {
         renderNav()
 
         const qnaLinks = screen.getAllByRole('link', { name: /Q&A/i })
-        expect(qnaLinks[0].className).toContain('text-blue-500')
+        expect(qnaLinks[0].className).toContain('text-[hsl(var(--primary))]')
     })
 })
 

@@ -108,7 +108,7 @@ function ResetPasswordForm() {
                     <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 24 }}>
                         <Link
                             href="/login"
-                            className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                            className="inline-flex items-center justify-center gap-[8px] text-primary hover:text-primary/80 transition-colors"
                             style={{
                                 fontFamily: 'Inter, sans-serif',
                                 fontSize: '14px',
@@ -117,7 +117,7 @@ function ResetPasswordForm() {
                                 textDecoration: 'none',
                             }}
                         >
-                            <ArrowLeft className="h-4 w-4 text-[#3B82F6]" />
+                            <ArrowLeft className="h-4 w-4 text-primary" />
                             {t.auth.reset.backToSignIn}
                         </Link>
 
@@ -224,7 +224,7 @@ function ResetPasswordForm() {
                         {t.auth.reset.newPassword}
                     </label>
                     <div
-                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
+                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
                         style={{
                             marginTop: 4,
                             background: 'var(--auth-input-bg)',
@@ -294,7 +294,7 @@ function ResetPasswordForm() {
                         {t.auth.reset.confirmPassword}
                     </label>
                     <div
-                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.confirmPassword ? 'ring-2 ring-red-500/50' : ''}`}
+                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.confirmPassword ? 'ring-2 ring-red-500/50' : ''}`}
                         style={{
                             marginTop: 4,
                             background: 'var(--auth-input-bg)',
@@ -384,7 +384,7 @@ function ResetPasswordForm() {
             <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 32 }}>
                 <Link
                     href="/login"
-                    className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                    className="inline-flex items-center justify-center gap-[8px] text-primary hover:text-primary/80 transition-colors"
                     style={{
                         fontFamily: 'Inter, sans-serif',
                         fontSize: '14px',
@@ -393,7 +393,7 @@ function ResetPasswordForm() {
                         textDecoration: 'none',
                     }}
                 >
-                    <ArrowLeft className="h-4 w-4 text-[#3B82F6]" />
+                    <ArrowLeft className="h-4 w-4 text-primary" />
                     {t.auth.reset.backLogin}
                 </Link>
 
@@ -409,7 +409,7 @@ export default function ResetPasswordPage() {
     return (
         <Suspense fallback={
             <div className="w-full min-h-[300px] flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         }>
             <ResetPasswordForm />

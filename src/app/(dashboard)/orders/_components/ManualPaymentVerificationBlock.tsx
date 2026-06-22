@@ -174,8 +174,8 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                                     fontFamily: 'monospace',
                                     fontSize: 15,
                                     fontWeight: 700,
-                                    color: '#2DD4BF',
-                                    background: 'rgba(45, 212, 191, 0.08)',
+                                    color: 'hsl(var(--primary))',
+                                    background: 'hsl(var(--primary)/0.08)',
                                     borderRadius: 8,
                                     padding: '6px 12px',
                                     letterSpacing: '0.05em',
@@ -208,7 +208,7 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <span style={{ ...labelStyle, fontSize: 11 }}>{pv.amountExpected}</span>
-                            <span style={{ ...valueStyle, fontWeight: 700, color: '#2DD4BF', fontSize: 16 }}>
+                            <span style={{ ...valueStyle, fontWeight: 700, color: 'hsl(var(--primary))', fontSize: 16 }}>
                                 {formatCurrency(order.total, order.currency)}
                             </span>
                         </div>
@@ -227,13 +227,12 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                             height: 48,
                             width: '100%',
                             borderRadius: 12,
-                            background: isApproving
-                                ? 'rgba(16, 185, 129, 0.4)'
-                                : 'linear-gradient(90deg, #10B981 0%, #059669 100%)',
+                            background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 15,
                             color: '#FFFFFF',
+                            opacity: isApproving ? 0.5 : 1,
                             cursor: isApproving ? 'not-allowed' : 'pointer',
                         }}
                     >
@@ -249,12 +248,12 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                             height: 48,
                             width: '100%',
                             borderRadius: 12,
-                            border: '1px solid rgba(251, 44, 54, 0.4)',
+                            border: '1px solid hsl(var(--destructive)/0.4)',
                             background: 'transparent',
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 15,
-                            color: '#FF6467',
+                            color: 'hsl(var(--destructive))',
                             cursor: isApproving ? 'not-allowed' : 'pointer',
                             opacity: isApproving ? 0.4 : 1,
                         }}
@@ -299,17 +298,17 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                         alignItems: 'center',
                         gap: 6,
                         padding: '6px 12px',
-                        background: 'rgba(16, 185, 129, 0.1)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        background: 'hsl(var(--success)/0.1)',
+                        border: '1px solid hsl(var(--success)/0.3)',
                         borderRadius: 8,
                         alignSelf: 'flex-start',
                     }}
                 >
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <circle cx="8" cy="8" r="6.666" stroke="#10B981" strokeWidth="1.33" />
-                        <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="8" cy="8" r="6.666" stroke="hsl(var(--success))" strokeWidth="1.33" />
+                        <path d="M5.333 8L7.333 10L11.333 5.333" stroke="hsl(var(--success))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: '#10B981' }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: 'hsl(var(--success))' }}>
                         {pv.verified}
                     </span>
                 </div>

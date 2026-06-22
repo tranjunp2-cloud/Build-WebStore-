@@ -84,7 +84,7 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
 
     return (
         <div className="mb-3">
-            <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[var(--editor-border)] rounded-xl overflow-hidden">
                 <button
                     type="button"
                     onClick={() => setIsOpen(!isOpen)}
@@ -97,8 +97,8 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
                     <div className="px-3 pb-3">
                         <div className="flex gap-4 items-center">
                             <div className="w-[100px] shrink-0">
-                                <p className="text-[12px] font-medium text-[#94a3b8] leading-4">{s.numberOfFaqs}</p>
-                                <p className="text-[10px] text-[#94a3b8] leading-4">{s.faqsMinMax}</p>
+                                <p className="text-[12px] font-medium text-[var(--editor-text-muted)] leading-4">{s.numberOfFaqs}</p>
+                                <p className="text-[10px] text-[var(--editor-text-muted)] leading-4">{s.faqsMinMax}</p>
                             </div>
                             <div className="flex flex-1 items-center justify-center gap-2">
                                 <button
@@ -106,9 +106,9 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
                                     aria-label="Decrease FAQ count"
                                     disabled={count <= 3}
                                     onClick={handleRemoveLast}
-                                    className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/5 transition-colors"
+                                    className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/5 transition-colors"
                                 >−</button>
-                                <div className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1f2937] flex items-center justify-center text-white text-sm font-medium">
+                                <div className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] flex items-center justify-center text-white text-sm font-medium">
                                     {count}
                                 </div>
                                 <button
@@ -116,7 +116,7 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
                                     aria-label="Increase FAQ count"
                                     disabled={count >= 10}
                                     onClick={handleAdd}
-                                    className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/10 transition-colors"
+                                    className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-bg)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/10 transition-colors"
                                 >+</button>
                             </div>
                         </div>

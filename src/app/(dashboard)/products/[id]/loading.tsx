@@ -13,13 +13,13 @@ export default function ProductDetailLoading() {
             <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
                 {/* Main content */}
                 <div className="space-y-6">
-                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 space-y-4">
                         <Skeleton className="h-4 w-20" />
                         <Skeleton className="h-10 w-full rounded-lg" />
                         <Skeleton className="h-4 w-28" />
                         <Skeleton className="h-24 w-full rounded-lg" />
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 space-y-4">
                         <Skeleton className="h-4 w-16" />
                         <div className="grid grid-cols-2 gap-4">
                             <Skeleton className="h-10 rounded-lg" />
@@ -30,11 +30,11 @@ export default function ProductDetailLoading() {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 space-y-4">
                         <Skeleton className="h-4 w-16" />
                         <Skeleton className="h-10 w-full rounded-lg" />
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 space-y-4">
                         <Skeleton className="h-32 w-full rounded-lg" />
                     </div>
                 </div>
