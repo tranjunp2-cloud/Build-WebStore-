@@ -420,14 +420,12 @@ describe('[TC-1266] coerceVideoVariants', () => {
                 { blockType: 'hero', variant: 'fullscreen' },
                 { blockType: 'footer', variant: 'default' },
             ]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const pages = [{ layout: makeLayout() }, { layout: makeLayout() }] as any[]
 
             // Act
             const result = enforcePageVariety(pages)
 
             // Assert: swapped hero variant is safe (not video/split-video)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const swappedHero = result[1].layout.find((b: any) => b.blockType === 'hero')
             expect(swappedHero?.variant).not.toBe('video')
             expect(swappedHero?.variant).not.toBe('split-video')
