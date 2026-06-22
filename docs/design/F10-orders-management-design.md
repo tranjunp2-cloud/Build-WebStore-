@@ -159,6 +159,59 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
 
 **Non-EP tenant:** hiển thị ô nhập `trackingNumber` **thủ công ngay trên panel chính** (không có nút Ready to Ship EasyParcel, KHÔNG gộp vào modal/tab).
 
+#### User Flow — Tạo vận đơn (Phase C)
+
+```text
+Actor: Merchant — tiền đề: order paid + confirmed, tenant EasyParcel ON
+
+1. Merchant → mở OrderDetailPanel → bấm [📦 Ready to Ship]
+   System   → check product weight/dims:
+              ├─ đủ    → chạy luôn (bước 2)
+              └─ thiếu → xổ inline input weight/L×W×H → điền → [Tiếp tục tạo nhãn]
+   (COD + buyer East MY → nút DISABLED từ đầu + note "COD chỉ West MY")
+
+2. System   → POST /api/orders/[id]/create-label (2 bước, inline spinner):
+   ① EPSubmitOrderBulk → "Đang giữ chỗ…"  (chưa trừ ví)
+   ② EPPayOrderBulk    → "Đang trừ ví…"   (trừ ví, sinh AWB)
+   ├─ OK       → lưu awbNo + labelUrl; trackingNumber = awbNo; order → ready_to_ship
+   └─ ví thiếu → EASYPARCEL_WALLET_LOW (inline) + [Nạp tiền][Thử lại]; order KHÔNG đổi
+
+3. System   → ẩn/khóa nút (idempotent) → render card "Shipping & Tracking"
+4. Merchant → [🖨️ In nhãn PDF] + [📅 Đặt pickup] (collection_date, default ngày kế)
+              → bấm "Ship Order" (có sẵn) → order → shipped
+```
+
+#### User Flow — Theo dõi giao hàng (Tracking)
+
+```text
+Actors: System (cron) + Merchant + Buyer
+
+1. Cron     → /api/cron/sync-tracking (30–60′) → EPParcelStatusBulk theo batch tenant
+   System   → cập nhật shippingTrackingStatus (13 status) — KHÔNG đụng order.status
+
+2. Merchant → xem tracking trong card "Shipping & Tracking" (drawer)
+   Buyer    → xem timeline trang đơn (OrderTrackingClient: OtShippingCard + OtTimeline)
+
+3. shippingTrackingStatus = Delivered
+   System   → KHÔNG auto-complete
+   Merchant → tự bấm "Đánh dấu hoàn tất" → order → completed
+```
+
+#### User Flow — Trả hàng / Hoàn tiền (Phase D)
+
+```text
+Actor: Merchant — KHÔNG có RMA UI mới, reuse nút có sẵn
+
+1. Buyer/Merchant → yêu cầu trả/hủy
+2. Merchant → bấm [Huỷ Đơn] hoặc [Hoàn Tiền] trên drawer (nút có sẵn)
+   System   → /cancel hoặc /refund (idempotent, tự restock)
+3. System   → refund phân tier theo trạng thái label:
+   ├─ chưa mua label     → refund FULL (hàng + ship) + restock
+   ├─ đã mua, chưa pickup → refund tiền hàng; cước: hủy trên dashboard EasyParcel hoàn ví
+   └─ đã pickup          → refund tiền hàng; ⚠️ cước mất (ghi rõ)
+   (Reverse label: KHÔNG hỗ trợ ở MVP)
+```
+
 ---
 
 ## 2.1. **[v2.2]** Manual Payment Verification Block (Order Detail Drawer)

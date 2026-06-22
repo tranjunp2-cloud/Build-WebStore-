@@ -217,6 +217,33 @@ Tab theo **4 trạng thái** rõ rệt:
 > 4. **Environment selector / "Secret Key"** → **bỏ.** Auto-detect env; key = `api` + `authentication` (không gọi "secret").
 > → Nếu sau này cần rich-settings (đa courier + parcel + fulfilment): phải mở rộng scope + cập nhật PRD #1232 trước khi vẽ.
 
+#### User Flow — Kết nối EasyParcel (Phase A)
+
+```text
+Actor: Merchant (seller)
+
+1. Merchant → Settings › Shipping › tab "EasyParcel"
+   System   → Switch OFF: empty-state "Connect your EasyParcel Account" + [Setup Connection]
+
+2. Merchant → bấm [Setup Connection] (hoặc gạt Switch ON)
+   System   → hiện form: API Key + Auth Key + Warehouse (State→City→Postcode cascade)
+              Save KHÓA; [🔍 Test connection] = Primary
+
+3. Merchant → nhập 2 key + địa chỉ kho → bấm [Test connection]
+   System   → EPRateCheckingBulk (auto-detect env: prod→demo) bằng key + warehouse postcode
+              ├─ OK            → ✅ "Connected — Production"; lộ phần chọn courier
+              ├─ key sai       → ❌ EASYPARCEL_INVALID_KEY — KHÔNG lưu
+              └─ postcode sai  → ❌ EASYPARCEL_INVALID_WAREHOUSE — KHÔNG lưu
+
+4. Merchant → chọn 1 courier (radio, default J&T) → [Save]
+   System   → lưu tenant.easyParcelIntegration (key masked, selectedCourier); Toast "Đã lưu"
+              → Phase B (checkout) mở khoá cho site
+
+   [Edit sau khi connected] Merchant sửa key/kho
+   System   → khóa courier (overlay) + đổi nút → [Re-test Connection] + khóa Save
+              re-test OK → mở khoá lại; FAIL → giữ khóa
+```
+
 ---
 
 ### 2.2. Screen B — Checkout Shipping <a id="screen-b-checkout-shipping"></a>
