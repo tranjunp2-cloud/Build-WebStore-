@@ -99,7 +99,11 @@ export async function generateSiteWithAI(
         const _push = events.push.bind(events)
         events.push = (...items: SSEEvent[]) => {
             const n = _push(...items)
-            items.forEach(e => onEvent(e))
+            // Do not forward internal 'done' — route.ts sends authoritative done
+            // after image pipeline + DB writes with correct siteId, pageId, siteName.
+            // Guard: if stream is canceled (client disconnected), controller.enqueue throws —
+            // catch here so the generator continues accumulating events and completes DB writes.
+            items.forEach(e => { if (e.event !== 'done') { try { onEvent(e) } catch { /* stream closed */ } } })
             return n
         }
     }

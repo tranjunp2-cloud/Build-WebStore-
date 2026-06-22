@@ -274,6 +274,57 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         const blockTypes = result.blocks.map((b: any) => b.blockType)
         expect(blockTypes).not.toContain('nonexistent_block')
     })
+
+    // TC-F01-EVT.01: GH-1269 — onEvent must NOT forward internal 'done' events
+    // Background: Before fix, generateSiteWithAI() forwarded all SSE events (including internal 'done')
+    // via onEvent, causing client to receive TWO 'done' events (internal + route.ts's authoritative done).
+    // Fix: Filter out 'done' from forwarded events while keeping all others.
+    it('does NOT forward internal done event via onEvent [TC-F01-EVT.01]', async () => {
+        const OpenAI = (await import('openai')).default as any
+        OpenAI.mockImplementation(() => ({
+            chat: {
+                completions: {
+                    create: vi.fn().mockResolvedValue({
+                        choices: [{
+                            message: {
+                                content: JSON.stringify({
+                                    siteName: 'Test Site',
+                                    theme: { primaryColor: '#D97706' },
+                                    seo: { title: 'Test', description: 'Test site' },
+                                    language: 'en',
+                                    blocks: [
+                                        { blockType: 'hero', variant: 'centered', headline: 'Welcome' },
+                                    ],
+                                }),
+                            },
+                        }],
+                    }),
+                },
+            },
+        }))
+
+        // Arrange: Collect all events via onEvent callback
+        const forwardedEvents: string[] = []
+        const onEvent = (e: any) => {
+            forwardedEvents.push(e.event)
+        }
+
+        // Act: Generate site with onEvent callback
+        const { events: internalEvents } = await generateSiteWithAI(businessInfo, undefined, 'en', undefined, undefined, onEvent)
+
+        // Assert: Internal events array contains 'done'
+        const internalDoneCount = internalEvents.filter(e => e.event === 'done').length
+        expect(internalDoneCount).toBeGreaterThan(0)
+
+        // Assert: Forwarded events via onEvent should NOT include 'done'
+        const forwardedDoneCount = forwardedEvents.filter(e => e === 'done').length
+        expect(forwardedDoneCount).toBe(0)
+
+        // Assert: Other events (like theme_set, step) ARE forwarded
+        expect(forwardedEvents.length).toBeGreaterThan(0)
+        const hasOtherEvents = forwardedEvents.some(e => e !== 'done' && e !== '')
+        expect(hasOtherEvents).toBe(true)
+    })
 })
 
 // ─── TC-F05.XX: Test sanitizeBlockData ───────────────────────────────
