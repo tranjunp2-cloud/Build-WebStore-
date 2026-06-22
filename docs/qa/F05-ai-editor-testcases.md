@@ -327,6 +327,9 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-1278-16** | Unit | Local dev: empty string → '#' | `pathname === '/sites/mystore/home'`, `href === ''` → result `'#'` |
 | **TC-F05-1278-17** | Unit | SSR/null pathname: /about passes through | `pathname === null`, `href === '/about'` → result unchanged (non-local branch) |
 | **TC-F05-1278-18** | Unit | SSR/null pathname: undefined → '#' | `pathname === null`, `href === undefined` → result `'#'` |
+| **TC-F05-1278-19** | Unit | Local dev: whatsapp://send?phone=60123456789 passes through | `pathname === '/sites/mystore/home'`, `href === 'whatsapp://send?phone=60123456789'` → result unchanged (protocol passthrough) |
+| **TC-F05-1278-20** | Unit | Local dev: sms:+60123456789 passes through | `pathname === '/sites/mystore/home'`, `href === 'sms:+60123456789'` → result unchanged (protocol passthrough) |
+| **TC-F05-1278-21** | Unit | Local dev: http://insecure.example.com/page passes through | `pathname === '/sites/mystore/home'`, `href === 'http://insecure.example.com/page'` → result unchanged (http protocol passthrough) |
 
 ---
 

@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 
-// ── Mocks — must be at top, before all imports ─────────────────────────────
+// ── Mocks — Vitest automatically hoists vi.mock() calls regardless of source position ──
 
 vi.mock('next/navigation', () => ({
     usePathname: vi.fn(),
@@ -242,6 +242,42 @@ describe('[TC-F05-1278] useLocalHref hook', () => {
 
             // Assert
             expect(resolved).toBe('#')
+        })
+
+        it('[TC-F05-1278-19] whatsapp://send?phone=60123456789 passes through unchanged', () => {
+            // Arrange
+            const { result } = renderHook(() => useLocalHref())
+            const href = 'whatsapp://send?phone=60123456789'
+
+            // Act
+            const resolved = result.current(href)
+
+            // Assert
+            expect(resolved).toBe('whatsapp://send?phone=60123456789')
+        })
+
+        it('[TC-F05-1278-20] sms:+60123456789 passes through unchanged', () => {
+            // Arrange
+            const { result } = renderHook(() => useLocalHref())
+            const href = 'sms:+60123456789'
+
+            // Act
+            const resolved = result.current(href)
+
+            // Assert
+            expect(resolved).toBe('sms:+60123456789')
+        })
+
+        it('[TC-F05-1278-21] http://insecure.example.com/page passes through unchanged', () => {
+            // Arrange
+            const { result } = renderHook(() => useLocalHref())
+            const href = 'http://insecure.example.com/page'
+
+            // Act
+            const resolved = result.current(href)
+
+            // Assert
+            expect(resolved).toBe('http://insecure.example.com/page')
         })
     })
 

@@ -236,10 +236,14 @@ function NavCTAButton({
 /** Mobile drawer CTA — full-width, centered, min-h 44px. */
 function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
     const resolveHref = useLocalHref()
-    const href = resolveHref(rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref)
+    const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
+    const rawUrl = isBroken ? '#' : rawHref
+    const href = resolveHref(rawUrl)
+    const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
         <a
             href={href}
+            {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
             style={{ background: CTA_GRADIENT_BACKGROUND }}
             onClick={onClick}
@@ -540,6 +544,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
     const [orderError, setOrderError] = useState('')
     const router = useRouter()
     const resolveHref = useLocalHref()
+    const ctaIsExternal = (ctaButton?.url ?? '').startsWith('http://') || (ctaButton?.url ?? '').startsWith('https://')
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
 
@@ -684,6 +689,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                 {ctaButton?.show && (
                                     <a
                                         href={resolveHref(ctaButton.url || '#')}
+                                        {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
@@ -1089,6 +1095,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const resolveHref = useLocalHref()
+    const ctaIsExternal = (ctaButton?.url ?? '').startsWith('http://') || (ctaButton?.url ?? '').startsWith('https://')
 
     return (
         <motion.nav
@@ -1127,6 +1134,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                     {ctaButton?.show && (
                         <a
                             href={resolveHref(ctaButton.url || '#')}
+                            {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                             className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
@@ -1177,6 +1185,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                             {ctaButton?.show && (
                                 <a
                                     href={resolveHref(ctaButton.url || '#')}
+                                    {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                     className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}

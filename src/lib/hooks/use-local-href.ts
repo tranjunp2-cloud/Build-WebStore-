@@ -23,6 +23,8 @@ export function useLocalHref() {
             href.startsWith('#') ||
             href.startsWith('mailto:') ||
             href.startsWith('tel:') ||
+            href.startsWith('whatsapp:') ||
+            href.startsWith('sms:') ||
             href.startsWith('/preview/') ||
             href.startsWith('/sites/') ||
             href.startsWith(BROKEN_URL_PREFIX)

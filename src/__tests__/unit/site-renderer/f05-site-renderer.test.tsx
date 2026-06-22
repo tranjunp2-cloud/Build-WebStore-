@@ -1384,4 +1384,65 @@ describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks',
         expect(capturedBlocks.length).toBeGreaterThan(0)
         expect(capturedBlocks[0]._logoHref).toBe('/')
     })
+
+    it('TC-F04-SR-07c: SiteRenderer in editor mode injects _logoHref pointing to preview URL', () => {
+        // Arrange — capture block props to verify preview URL injection in editor mode
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with isEditor=true and homepage
+        render(
+            <SiteRenderer
+                site={{ ...defaultSite, id: 'site-abc' }}
+                page={{
+                    id: 'page-xyz',
+                    slug: '/',
+                    isHomepage: true,
+                    layout: [{ blockType: 'navigation', links: [{ label: 'Home', url: '/' }] }],
+                }}
+                pages={[{ id: 'page-xyz', slug: '/', isHomepage: true }]}
+                isEditor={true}
+            />
+        )
+
+        // Assert — navigation block should receive preview URL in _logoHref
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/preview/site-abc?pageId=page-xyz')
+    })
+
+    it('TC-F04-SR-07d: SiteRenderer in editor mode with no homepage page → _logoHref = "#" (safe fallback)', () => {
+        // Arrange — capture block props to verify fallback behavior when no homepage
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with isEditor=true but empty pages array (no homepage found)
+        render(
+            <SiteRenderer
+                site={{ ...defaultSite, id: 'site-abc' }}
+                page={{
+                    id: 'page-xyz',
+                    slug: '/about',
+                    layout: [{ blockType: 'navigation', links: [{ label: 'About', url: '/about' }] }],
+                }}
+                pages={[]}
+                isEditor={true}
+            />
+        )
+
+        // Assert — navigation block should receive safe fallback "#" when homepage not found
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('#')
+    })
 })
