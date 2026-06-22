@@ -429,6 +429,7 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: number
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+            normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
             // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
             // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
@@ -1299,7 +1300,7 @@ export async function POST(req: NextRequest) {
                 `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
             )
 
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats }
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1319,6 +1320,7 @@ export async function POST(req: NextRequest) {
                             createdPages,
                             productsCreatedCount,
                             timeMs,
+                            normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
                         // products_generated event
@@ -1340,6 +1342,7 @@ export async function POST(req: NextRequest) {
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
                                 timeMs,
+                                normalizedNavLinks: normalizedPageLinks,
                             })}\n\n`
                         controller.enqueue(_encoder.encode(doneData))
                     } catch (streamErr) {
