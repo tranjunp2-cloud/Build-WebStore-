@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { BlockProps } from '../types'
@@ -14,6 +14,7 @@ import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { NavLangSwitcherPlaceholder } from './language-switcher-placeholder'
 import { NavOrderSearch } from './NavOrderSearch'
 import { useI18n } from '@/i18n'
@@ -77,24 +78,6 @@ function NavLogo({
 // - Local dev (/sites/{slug}/...): prepends /sites/{slug} to all internal paths
 // - Editor preview (/preview/...): paths already rewritten by SiteRenderer — pass through
 // - Live/staging: no-op (paths are already correct)
-
-function useLocalHref() {
-    const pathname = usePathname()
-    const localMatch = pathname?.match(/^\/sites\/([^/]+)/)
-    if (!localMatch) return (href: string | undefined) => href ?? '#'
-    const localSlug = localMatch[1]
-    return (href: string | undefined): string => {
-        if (!href) return '#'
-        // Pass through: external, anchor, preview context, already-prefixed, broken URL marker
-        if (/^https?:\/\//.test(href) || href.startsWith('//') ||
-            href.startsWith('#') || href.startsWith('/preview/') ||
-            href.startsWith('/sites/') || href.startsWith(BROKEN_URL_PREFIX)) {
-            return href
-        }
-        const normalized = href.startsWith('/') ? href : `/${href}`
-        return `/sites/${localSlug}${normalized}`
-    }
-}
 
 // ── Logo Link ───────────────────────────────────────────────────────────────
 

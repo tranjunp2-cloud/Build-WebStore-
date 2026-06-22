@@ -8,18 +8,20 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
 export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCardsConfig>) {
     void _theme
+    const resolveHref = useLocalHref()
     const { headline, subheadline, services = [], variant = 'grid' } = block
 
     const ServiceCTA = ({ cta }: { cta: ServiceItem['cta'] }) => {
         if (!cta) return null
         return (
             <a
-                href={cta?.url}
+                href={resolveHref(cta?.url)}
                 className={`inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80 ${TOUCH_TARGET.min}`}
                 style={{ color: 'var(--brand-primary)' }}
             >
@@ -111,7 +113,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     )}
                     {featured.cta && (
                         <a
-                            href={featured.cta?.url}
+                            href={resolveHref(featured.cta?.url)}
                             className={`inline-flex items-center justify-center mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >

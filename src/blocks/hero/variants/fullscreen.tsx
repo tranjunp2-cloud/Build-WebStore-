@@ -9,8 +9,10 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 import { HERO_CONTAINER, HERO_MIN_HEIGHT } from '../shared'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
+    const resolveHref = useLocalHref()
     const { headline, subheadline, ctaButtons = [] } = block
 
     return (
@@ -30,7 +32,7 @@ export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
                 {ctaButtons.length > 0 && (
                     <div className="flex flex-wrap gap-4 justify-center">
                         {ctaButtons.map((btn, i) => (
-                            <motion.a key={i} href={btn?.url}
+                            <motion.a key={i} href={resolveHref(btn?.url)}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.98 }}
                                 className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
