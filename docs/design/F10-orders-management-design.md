@@ -104,6 +104,8 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
        └────────────────────────────────────────────────┘
 ```
 
+> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html — open `F36 EasyParcel Delivery.html` (project PW2-Design). Dev action: import qua `claude_design` MCP → đọc README → implement theo hi-fi.
+>
 > **[F36 EasyParcel] Fulfillment trên OrderDetailPanel — INLINE, KHÔNG modal** (nguồn: PRD `docs/prd/F36-easyparcel-delivery.md` §6.C, single-courier). Toàn bộ xử lý đưa thẳng vào panel theo trạng thái. **KHÔNG mở modal · KHÔNG tab toggle EasyParcel/manual · KHÔNG dropdown chọn courier** (courier đã cố định ở Settings → `serviceId ← selectedCourier`, hệ thống tự lấy).
 
 **State 1 — Confirmed (chuẩn bị ship):** chỉ **1 nút** trên panel; bấm → chạy thẳng API (không modal), nút tự chuyển spinner đúng 2 bước:

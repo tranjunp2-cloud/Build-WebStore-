@@ -133,6 +133,10 @@ Wave 6 Shipping bao gồm 3 surface chính:
 
 ### 2.1.b Screen A — EasyParcel tab (F36) <a id="screen-a-easyparcel"></a>
 
+> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html
+> - Open file: `F36 EasyParcel Delivery.html` (project **PW2-Design**) — visual reference hi-fi cho Screen A (Settings) + các screen F36 khác.
+> - **Dev action:** import qua `claude_design` MCP (cần `/design-login` nếu chưa cấp scope) → đọc README → implement theo `F36 EasyParcel Delivery.html`. Wireframe ASCII bên dưới là low-fi; UI cuối phải khớp hi-fi.
+>
 > **Nguồn:** F36 PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier) + **Progressive Disclosure** (chỉ hiện thứ cần ở đúng thời điểm). Connect UI **mirror F34 `XenditConnectBlock`**.
 
 **Path:** `Dashboard > Settings > Shipping > tab "EasyParcel"`

@@ -147,6 +147,8 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho giao diện côn
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html — open `F36 EasyParcel Delivery.html` (project PW2-Design). Dev action: import qua `claude_design` MCP → đọc README → implement theo hi-fi.
+>
 > **[F36 EasyParcel] Dòng "Shipping" là hybrid** (nguồn: `docs/prd/F36-easyparcel-delivery.md`): nếu tenant bật EasyParcel → hiển thị **giá courier thật** của 1 courier shop đã chọn (vd `Shipping (J&T): RM 5.42`); chưa bật / lỗi / timeout → giữ flat-rate `Shipping (West MY): RM 8.00` như trên. **Buyer KHÔNG chọn courier** — KHÔNG thêm section "chọn đơn vị vận chuyển", KHÔNG thêm dòng phí mới. Logic ẩn ở `POST /api/orders/calculate-shipping` (hybrid, single-courier). Sau đặt hàng, buyer xem courier + AWB + tracking ở trang đơn (làm giàu `OrderTrackingClient` có sẵn).
 
 #### User Flow — Cước ship ở Checkout (hybrid, F36)
