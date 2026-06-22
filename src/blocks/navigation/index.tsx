@@ -72,14 +72,33 @@ function NavLogo({
     )
 }
 
+// ── Local href resolver ──────────────────────────────────────────────────────
+// Resolves internal paths for the current render context:
+// - Local dev (/sites/{slug}/...): prepends /sites/{slug} to all internal paths
+// - Editor preview (/preview/...): paths already rewritten by SiteRenderer — pass through
+// - Live/staging: no-op (paths are already correct)
+
+function useLocalHref() {
+    const pathname = usePathname()
+    const localMatch = pathname?.match(/^\/sites\/([^/]+)/)
+    if (!localMatch) return (href: string | undefined) => href ?? '#'
+    const localSlug = localMatch[1]
+    return (href: string | undefined): string => {
+        if (!href) return '#'
+        // Pass through: external, anchor, preview context, already-prefixed, broken URL marker
+        if (/^https?:\/\//.test(href) || href.startsWith('//') ||
+            href.startsWith('#') || href.startsWith('/preview/') ||
+            href.startsWith('/sites/') || href.startsWith(BROKEN_URL_PREFIX)) {
+            return href
+        }
+        const normalized = href.startsWith('/') ? href : `/${href}`
+        return `/sites/${localSlug}${normalized}`
+    }
+}
+
 // ── Logo Link ───────────────────────────────────────────────────────────────
-// Handles 3 URL contexts for logo click:
-// - Local dev (/sites/{slug}/...): routes to /sites/{slug}/ to stay in storefront
-// - Editor preview: uses _logoHref injected by SiteRenderer (rewritten to /preview/{siteId}?pageId=...)
-// - Live/staging: injectedHref = '/' from SiteRenderer or fallback '/'
 
 function NavLogoLink({
-    slug,
     block,
     children,
     className,
@@ -91,13 +110,10 @@ function NavLogoLink({
     className?: string
     onClick?: () => void
 }) {
-    const pathname = usePathname()
+    const resolveHref = useLocalHref()
     const injectedHref = block?._logoHref as string | undefined
-    const href = pathname.startsWith('/sites/') && slug
-        ? `/sites/${slug}/`
-        : (injectedHref ?? '/')
     return (
-        <Link href={href} className={className} onClick={onClick}>
+        <Link href={resolveHref(injectedHref ?? '/')} className={className} onClick={onClick}>
             {children}
         </Link>
     )
@@ -109,13 +125,14 @@ function NavLogoLink({
 
 function DropdownLink({ link, i }: { link: NavLink; i: number }) {
     const [open, setOpen] = useState(false)
+    const resolveHref = useLocalHref()
     const hasChildren = link.children && link.children.length > 0
 
     if (!hasChildren) {
         return (
             <motion.a
                 key={i}
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 whileHover={{ y: -1 }}
                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
             >
@@ -159,7 +176,7 @@ function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         {link.children!.map((child, ci) => (
                             <a
                                 key={ci}
-                                href={child.url}
+                                href={resolveHref(child.url)}
                                 className="block rounded-lg px-3 py-2 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] transition-all"
                             >
                                 {child.label}
@@ -181,12 +198,13 @@ function MobileNavItem({
     onNavigate: () => void
     depth?: number
 }) {
+    const resolveHref = useLocalHref()
     const hasChildren = Boolean(link.children?.length)
 
     return (
         <div>
             <a
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
@@ -218,12 +236,13 @@ function SidebarNavItem({
     onNavigate: () => void
     depth?: number
 }) {
+    const resolveHref = useLocalHref()
     const hasChildren = Boolean(link.children?.length)
 
     return (
         <div>
             <a
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
@@ -275,9 +294,10 @@ function NavCTAButton({
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
+    const resolveHref = useLocalHref()
     const cls = `${className} rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
-    const href = isBroken ? '#' : rawHref
+    const href = resolveHref(isBroken ? '#' : rawHref)
     const isExternal = href.startsWith('http://') || href.startsWith('https://')
     return (
         <BrokenLinkWarning url={rawHref}>
@@ -298,7 +318,8 @@ function NavCTAButton({
 
 /** Mobile drawer CTA — full-width, centered, min-h 44px. */
 function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
-    const href = rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref
+    const resolveHref = useLocalHref()
+    const href = resolveHref(rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref)
     return (
         <a
             href={href}
@@ -606,6 +627,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
     const [orderValue, setOrderValue] = useState('')
     const [orderError, setOrderError] = useState('')
     const router = useRouter()
+    const resolveHref = useLocalHref()
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
 
@@ -749,7 +771,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                 )}
                                 {ctaButton?.show && (
                                     <a
-                                        href={ctaButton.url || '#'}
+                                        href={resolveHref(ctaButton.url || '#')}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
@@ -878,6 +900,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
     const scrolled = useScrollShrink(50)
+    const resolveHref = useLocalHref()
 
     const getSubLinks = (link?: NavLink) => {
         const children = link?.children ?? []
@@ -941,7 +964,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                         ) : (
                             <motion.a
                                 key={i}
-                                href={link?.url}
+                                href={resolveHref(link?.url)}
                                 whileHover={{ y: -1 }}
                                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
                             >
@@ -999,7 +1022,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                         {col.map((subLink, si) => (
                                             <a
                                                 key={si}
-                                                href={subLink?.url}
+                                                href={resolveHref(subLink?.url)}
                                                 className="block px-3 py-2.5 rounded-lg text-sm opacity-60 hover:opacity-100 hover:bg-white/[0.04] transition-all duration-200"
                                             >
                                                 {subLink.label}
@@ -1035,6 +1058,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
     showOrderSearch?: boolean
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const resolveHref = useLocalHref()
 
     return (
         <motion.nav
@@ -1076,7 +1100,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <a
-                            href={ctaButton.url || '#'}
+                            href={resolveHref(ctaButton.url || '#')}
                             className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
@@ -1126,7 +1150,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                             )}
                             {ctaButton?.show && (
                                 <a
-                                    href={ctaButton.url || '#'}
+                                    href={resolveHref(ctaButton.url || '#')}
                                     className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}
