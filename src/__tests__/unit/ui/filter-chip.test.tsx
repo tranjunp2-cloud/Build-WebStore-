@@ -73,6 +73,6 @@ describe('[TC-DS1222-04-04] FilterChip active highlight', () => {
     it('uses the neutral border token when value is the default option', () => {
         setup('all')
         const style = screen.getByRole('button').getAttribute('style') ?? ''
-        expect(style).toContain('var(--dash-border)')
+        expect(style).toContain('hsl(var(--input-border))')
     })
 })
