@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, X, Eye, EyeOff, AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
@@ -79,6 +80,9 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
     const [showToken, setShowToken] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         if (!open) {
@@ -117,9 +121,9 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
         }
     };
 
-    if (!open) return null;
+    if (!open || !mounted) return null;
 
-    return (
+    return createPortal(
         <div
             className="fixed inset-0 grid place-items-center p-6 z-[100] bg-black/60 backdrop-blur-sm"
             onClick={handleClose}
@@ -226,6 +230,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
