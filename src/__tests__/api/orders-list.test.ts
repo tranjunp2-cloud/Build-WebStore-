@@ -44,7 +44,7 @@ describe('GET /api/orders [TC-F10.20, TC-F10.23]', () => {
         expect(body.docs).toHaveLength(1)
     })
 
-    it('filters by status query param', async () => {
+    it('filters by status group key — expands to all statuses in group', async () => {
         // Arrange
         mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
 
@@ -52,10 +52,44 @@ describe('GET /api/orders [TC-F10.20, TC-F10.23]', () => {
         const req = new Request('http://localhost/api/orders?status=pending')
         await GET(req, {} as any)
 
-        // Assert
+        // Assert — 'pending' is a group key: expands to ['pending','new','payment_failed']
         expect(mockFind).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: expect.objectContaining({ status: { equals: 'pending' } }),
+                where: expect.objectContaining({
+                    status: { in: ['pending', 'new', 'payment_failed'] },
+                }),
+            }),
+        )
+    })
+
+    it('filters by raw DB status when not a group key (fallback path)', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+
+        // Act — 'processing' is a valid DB status but has no group in ORDER_STATUS_GROUPS
+        const req = new Request('http://localhost/api/orders?status=processing')
+        await GET(req, {} as any)
+
+        // Assert — fallback to equals filter
+        expect(mockFind).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ status: { equals: 'processing' } }),
+            }),
+        )
+    })
+
+    it('prototype key in status param does not crash — falls back to equals', async () => {
+        // Arrange
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+
+        // Act — Object.hasOwn guard prevents __proto__ from returning Object.prototype
+        const req = new Request('http://localhost/api/orders?status=__proto__')
+        await GET(req, {} as any)
+
+        // Assert — treated as unknown key, falls through to equals
+        expect(mockFind).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ status: { equals: '__proto__' } }),
             }),
         )
     })

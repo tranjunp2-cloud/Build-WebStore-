@@ -15,9 +15,10 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
 
 // ───────── TYPES ─────────
-export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type { OrderStatus }
 
 export interface Order {
     id: string
@@ -54,20 +55,7 @@ const STATUS_BADGE: Record<OrderStatus, {
 }
 
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
-    const keyMap: Record<OrderStatus, string> = {
-        pending:       'pending',
-        new:           'pending',
-        confirmed:     'confirmed',
-        ready_to_ship: 'readyToShip',
-        shipped:       'shipped',
-        completed:     'completed',
-        cancelled:     'cancelled',
-        refunded:      'refunded',
-        paid:          'paid',
-        processing:    'processing',
-        payment_failed:'pending',
-    }
-    return (statusLabels as Record<string, string>)[keyMap[status]] || status
+    return (statusLabels as Record<string, string>)[ORDER_STATUS_LABEL_KEY[status]] || status
 }
 
 function formatOrderDate(iso?: string | null): string {
