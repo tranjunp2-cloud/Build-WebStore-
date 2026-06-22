@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, User, Mail, Loader2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerAvatar } from './customer-avatar'
@@ -162,11 +163,13 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
         ? (record.name ?? 'Guest') + ' (Newsletter)'
         : (record.name ?? 'Guest')
 
-    return (
+    if (typeof document === 'undefined') return null
+
+    return createPortal(
         <>
-            {/* Backdrop — full screen on mobile, offset below header on md+ */}
+            {/* Backdrop — rendered via portal at document.body to escape ancestor stacking contexts */}
             <div
-                className="fixed inset-0 z-40 md:top-[56px]"
+                className="fixed inset-0 z-40"
                 style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
                 onClick={onClose}
             />
@@ -337,6 +340,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     </div>
                 )}
             </div>
-        </>
+        </>,
+        document.body
     )
 }

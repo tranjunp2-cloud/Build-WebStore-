@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Globe, Plus, AlertCircle, AlertTriangle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
@@ -44,9 +45,11 @@ function SelectPrimaryPanel({
         ...activeDomains.map(d => ({ label: d.domain, value: d.domain })),
     ];
 
-    return (
+    if (typeof document === 'undefined') return null
+
+    return createPortal(
         <>
-            {/* Backdrop */}
+            {/* Backdrop — rendered via portal at document.body to escape ancestor stacking context */}
             <div
                 className="fixed inset-0 z-[100] animate-in fade-in duration-200"
                 style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.6)' }}
@@ -157,7 +160,8 @@ function SelectPrimaryPanel({
                     </button>
                 </div>
             </div>
-        </>
+        </>,
+        document.body
     );
 }
 
@@ -653,7 +657,7 @@ export function DomainsClient({
                 </div>
 
                 {/* F23: Slug change confirmation dialog */}
-                {showSlugConfirm && (
+                {showSlugConfirm && typeof document !== 'undefined' && createPortal(
                     <>
                         <div
                             className="fixed inset-0 z-[100] animate-in fade-in duration-200"
@@ -694,7 +698,8 @@ export function DomainsClient({
                                 </button>
                             </div>
                         </div>
-                    </>
+                    </>,
+                    document.body
                 )}
 
                 {/* Custom Domain Cards */}
@@ -863,7 +868,7 @@ export function DomainsClient({
             </div>
 
             {/* ── Add Domain Modal ──────────────────────────────────────────── */}
-            {isAddModalOpen && (
+            {isAddModalOpen && typeof document !== 'undefined' && createPortal(
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
                     style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.8)' }}
@@ -924,7 +929,8 @@ export function DomainsClient({
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ── Select Primary Domain Panel ───────────────────────────────── */}
@@ -941,7 +947,7 @@ export function DomainsClient({
             )}
 
             {/* ── Remove Domain Confirmation Modal (TC-F19.14 QA) ─────────── */}
-            {removingDomain && (
+            {removingDomain && typeof document !== 'undefined' && createPortal(
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
                     style={{ background: 'rgba(var(--dash-surface-rgb, 11,17,32), 0.8)' }}
@@ -978,7 +984,8 @@ export function DomainsClient({
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
