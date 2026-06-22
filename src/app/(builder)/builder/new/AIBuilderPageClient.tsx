@@ -432,17 +432,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 // Setting 'dirty' here triggers auto-save which overwrites processed
                 // homepage layout (with nav, images, page split) with raw SSE blocks.
                 hasUserEditsRef.current = false
-                // GH-1269: patch nav block with normalized page links so LivePreview nav
-                // matches the iframe before it becomes visible — eliminates the nav jump.
-                if (Array.isArray(data.normalizedNavLinks) && data.normalizedNavLinks.length > 0) {
-                    setBlocks(
-                        useBuilderStore.getState().blocks.map((block: any) =>
-                            block.blockType === 'navigation'
-                                ? { ...block, links: data.normalizedNavLinks }
-                                : block,
-                        ),
-                    )
-                }
                 void trackBuilderEvent(String(data.siteId), 'builder_generation_completed', {
                     totalBlocks: data.totalBlocks,
                     totalPages: data.totalPages || 1,
@@ -461,7 +450,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             default:
                 break
         }
-    }, [addBlock, addMessage, setBlocks, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
+    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
 
     const clearGenerationTimers = useCallback(() => {
         if (elapsedIntervalRef.current) {
@@ -814,14 +803,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         </div>
     )
 
+    // GH-1269: keep generation screen visible for the entire streaming phase
+    // (including when blocks arrive). Preview only shows after done + iframe ready.
     const shouldShowGenerationScreen =
         step === 'chat' &&
-        status === 'streaming' &&
-        blocks.length === 0
+        status === 'streaming'
 
-    const shouldShowPreviewScreen =
-        status === 'done' ||
-        (step === 'chat' && status === 'streaming' && blocks.length > 0 && !!theme)
+    const shouldShowPreviewScreen = status === 'done'
 
     const saveStatusLabel =
         draftSaveState === 'saving'
