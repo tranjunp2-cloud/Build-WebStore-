@@ -372,6 +372,12 @@ export const Sites: CollectionConfig = {
                     type: 'number',
                     admin: { description: 'Free shipping above X sen (null = no free shipping)' },
                 },
+                {
+                    name: 'shippingSetupConfirmed',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    admin: { description: 'Set true when user explicitly saves shipping settings' },
+                },
             ],
         },
         {

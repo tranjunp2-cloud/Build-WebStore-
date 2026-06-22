@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, Circle, CheckCircle2 } from 'lucide-react'
+import { Clock, CheckCircle2 } from 'lucide-react'
 import { SetupAlertBanner } from './SetupAlertBanner'
 import { useI18n } from '@/i18n'
 
@@ -13,7 +13,7 @@ interface OnboardingStep {
     href: string
 }
 
-type StepState = 'completed' | 'active' | 'locked'
+type StepState = 'completed' | 'active'
 
 interface DashboardOnboardingProps {
     hasPublishedSite: boolean
@@ -21,12 +21,11 @@ interface DashboardOnboardingProps {
     hasProducts?: boolean
     isDesignCustomized?: boolean
     hasPaymentConfigured?: boolean
+    hasShippingConfigured?: boolean
 }
 
-function getStepState(index: number, steps: OnboardingStep[]): StepState {
-    if (steps[index].done) return 'completed'
-    const firstIncompleteIdx = steps.findIndex(s => !s.done)
-    return index === firstIncompleteIdx ? 'active' : 'locked'
+function getStepState(step: OnboardingStep): StepState {
+    return step.done ? 'completed' : 'active'
 }
 
 export function DashboardOnboarding({
@@ -35,6 +34,7 @@ export function DashboardOnboarding({
     hasProducts = false,
     isDesignCustomized = false,
     hasPaymentConfigured = false,
+    hasShippingConfigured = false,
 }: DashboardOnboardingProps) {
     const { t } = useI18n()
     const o = t.dashboard.onboarding
@@ -57,8 +57,8 @@ export function DashboardOnboarding({
             id: 'payment',
             label: o.steps.payment.label,
             description: o.steps.payment.description,
-            done: hasPaymentConfigured,
-            href: '/settings/payments',
+            done: hasPaymentConfigured && hasShippingConfigured,
+            href: '/settings/shipping',
         },
         {
             id: 'publish',
@@ -90,8 +90,8 @@ export function DashboardOnboarding({
                 </div>
 
                 <div className="space-y-3">
-                    {steps.map((step, index) => {
-                        const state = getStepState(index, steps)
+                    {steps.map((step) => {
+                        const state = getStepState(step)
                         if (state === 'completed') {
                             return (
                                 <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-[rgba(0,201,80,0.2)] bg-[rgba(0,201,80,0.1)] px-3 py-3.5">
@@ -103,32 +103,21 @@ export function DashboardOnboarding({
                                 </div>
                             )
                         }
-                        if (state === 'active') {
-                            return (
-                                <div key={step.id} className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] p-[13px] shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <Clock className="h-5 w-5 shrink-0 text-blue-400" />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-blue-500">{step.label}</p>
-                                            <p className="text-xs text-dash-text-muted">{step.description}</p>
-                                        </div>
-                                    </div>
-                                    <Link
-                                        href={step.href}
-                                        className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
-                                    >
-                                        {o.continueBtn}
-                                    </Link>
-                                </div>
-                            )
-                        }
                         return (
-                            <div key={step.id} className="flex h-16 items-center gap-3 rounded-xl border border-dash-border bg-dash-secondary-bg px-3 py-3.5">
-                                <Circle className="h-5 w-5 shrink-0 text-dash-text-muted" />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-dash-text-muted">{step.label}</p>
-                                    <p className="text-xs text-dash-text-muted">{step.description}</p>
+                            <div key={step.id} className="flex items-center justify-between rounded-xl border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] p-[13px] shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <Clock className="h-5 w-5 shrink-0 text-blue-400" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-blue-500">{step.label}</p>
+                                        <p className="text-xs text-dash-text-muted">{step.description}</p>
+                                    </div>
                                 </div>
+                                <Link
+                                    href={step.href}
+                                    className="ml-3 inline-flex h-7 shrink-0 items-center rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-3 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                >
+                                    {o.continueBtn}
+                                </Link>
                             </div>
                         )
                     })}

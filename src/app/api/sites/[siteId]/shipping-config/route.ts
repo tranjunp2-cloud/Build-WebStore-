@@ -129,7 +129,7 @@ export const PATCH = withFeatureGuard('shipping_fee_configuration')(withAuth<Rou
         const updated = await payload.update({
             collection: 'sites',
             id: siteId,
-            data: { shippingConfig: { enabled: !!enabled, westRate, eastRate, freeAbove } } as any,
+            data: { shippingConfig: { enabled: !!enabled, westRate, eastRate, freeAbove, shippingSetupConfirmed: true } } as any,
         })
 
         return NextResponse.json({

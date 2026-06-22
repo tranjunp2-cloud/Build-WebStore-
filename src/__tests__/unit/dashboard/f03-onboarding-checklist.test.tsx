@@ -2,7 +2,8 @@
  * Onboarding Checklist & Setup Alert Tests — F03 Dashboard
  * Coverage Map (QA Doc Traceability):
  *   TC-F03.58  → DashboardOnboarding returns null when all 4 tasks done
- *   TC-F03.59  → First incomplete step shows "Continue" button; completed steps show CheckCircle2
+ *   TC-F03.59  → All incomplete steps independently show "Continue"; completed steps show CheckCircle2
+ *   TC-F03.59b → Independent steps: all pending show Continue, no locked/gray state
  *   TC-F03.60  → Progress % = (completedCount / 4) * 100
  *   TC-F03.61  → SetupAlertBanner rendered when hasPaymentConfigured=false
  *   TC-F03.62  → SetupAlertBanner renders when hasPaymentConfigured=false
@@ -67,11 +68,11 @@ describe('[TC-F03.58] DashboardOnboarding — Null when all tasks complete', () 
     it('returns null when all 4 tasks are done', () => {
         const { container } = render(
             <DashboardOnboarding
-
                 hasPublishedSite={true}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={true}
             />
         )
 
@@ -81,11 +82,11 @@ describe('[TC-F03.58] DashboardOnboarding — Null when all tasks complete', () 
     it('renders checklist when at least 1 task incomplete', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={true}
             />
         )
 
@@ -94,67 +95,66 @@ describe('[TC-F03.58] DashboardOnboarding — Null when all tasks complete', () 
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed/locked)', () => {
-    it('first incomplete step shows "Continue" button; completed steps show CheckCircle2; locked steps have no button', () => {
-        // Arrange: first step incomplete (hasProducts=false), step 2 complete, step 3+ locked
-        const { container } = render(
+describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed, no locked)', () => {
+    it('all incomplete steps show "Continue" independently; completed steps show CheckCircle2', () => {
+        // step 1 incomplete, step 2 completed, steps 3+4 incomplete — all pending show Continue
+        render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={false}
                 isDesignCustomized={true}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
-        // Act & Assert: step 1 (active/incomplete) has "Continue" button
-        const continueButton = screen.getByRole('link', { name: /continue/i })
-        expect(continueButton).toBeInTheDocument()
-        expect(continueButton).toHaveAttribute('href', '/products/new')
+        // All 3 incomplete steps independently show Continue buttons
+        const continueLinks = screen.getAllByRole('link', { name: /continue/i })
+        expect(continueLinks.length).toBe(3)
 
-        // step 2 is completed, should have green CheckCircle2 and green text styling
-        expect(screen.getByText('Customize Your Store Design')).toBeInTheDocument()
-        const customizeText = screen.getByText('Customize Your Store Design')
-        expect(customizeText).toHaveClass('text-[#05df72]')
+        // Step 1 Continue button points to /products/new
+        const productsLink = continueLinks.find(l => l.getAttribute('href') === '/products/new')
+        expect(productsLink).toBeTruthy()
 
-        // step 3 is locked (comes after first incomplete), should have gray/disabled styling and no button
-        const paymentDiv = screen.getByText('Set Up Payment & Shipping').closest('div[class*="rounded-xl"]')
-        expect(paymentDiv).toHaveClass('bg-dash-secondary-bg')
-        expect(paymentDiv).not.toContainHTML('button')
+        // Step 2 is completed — green CheckCircle2 styling
+        expect(screen.getByText('Customize Your Store Design')).toHaveClass('text-[#05df72]')
+
+        // No locked/gray step rows — only progress bar track uses bg-dash-secondary-bg, not step items
+        const stepDivs = document.querySelectorAll('div.rounded-xl')
+        stepDivs.forEach(div => {
+            expect(div).not.toHaveClass('bg-dash-secondary-bg')
+        })
     })
 
-    it('completed step uses CheckCircle2 (green svg), active uses Clock (blue svg), locked uses Circle (muted svg)', () => {
-        // hasProducts=false (active), isDesignCustomized=true (completed), others=false (locked)
+    it('completed step uses CheckCircle2 (green svg), active steps use Clock (blue svg)', () => {
+        // step 2 completed, steps 1+3+4 active
         const { container } = render(
             <DashboardOnboarding
                 hasPublishedSite={false}
                 hasProducts={false}
                 isDesignCustomized={true}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
-        // Completed step: svg with green text class (CheckCircle2)
+        // Completed step: CheckCircle2 green svg
         const completedSvg = container.querySelector('svg.text-\\[\\#05df72\\]')
         expect(completedSvg).toBeInTheDocument()
 
-        // Active step: svg with blue-400 text class (Clock)
-        const activeSvg = container.querySelector('svg.text-blue-400')
-        expect(activeSvg).toBeInTheDocument()
-
-        // Locked step: svg with muted text class (Circle)
-        const lockedSvg = container.querySelector('svg.text-dash-text-muted')
-        expect(lockedSvg).toBeInTheDocument()
+        // Active steps: multiple Clock blue-400 svgs (3 active steps)
+        const activeSvgs = container.querySelectorAll('svg.text-blue-400')
+        expect(activeSvgs.length).toBe(3)
     })
 
     it('renders all 4 step labels in correct order', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={false}
                 isDesignCustomized={false}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
@@ -167,16 +167,71 @@ describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed/lock
     it('all completed steps show CheckCircle2 green styling', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={true}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={true}
             />
         )
 
-        // When all complete, component returns null
-        // This is tested in TC-F03.58
+        // When all complete, component returns null — tested in TC-F03.58
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('[TC-F03.59b] DashboardOnboarding — Independent Steps (no locked state)', () => {
+    it('all 4 steps incomplete → all 4 show Continue buttons', () => {
+        render(
+            <DashboardOnboarding
+                hasPublishedSite={false}
+                hasProducts={false}
+                isDesignCustomized={false}
+                hasPaymentConfigured={false}
+                hasShippingConfigured={false}
+            />
+        )
+
+        const continueLinks = screen.getAllByRole('link', { name: /continue/i })
+        expect(continueLinks).toHaveLength(4)
+        // No locked/gray step rows — step divs must not have bg-dash-secondary-bg
+        const stepDivs = document.querySelectorAll('div.rounded-xl')
+        stepDivs.forEach(div => {
+            expect(div).not.toHaveClass('bg-dash-secondary-bg')
+        })
+    })
+
+    it('1 step done → 3 remaining steps all show Continue independently', () => {
+        render(
+            <DashboardOnboarding
+                hasPublishedSite={false}
+                hasProducts={true}
+                isDesignCustomized={false}
+                hasPaymentConfigured={false}
+                hasShippingConfigured={false}
+            />
+        )
+
+        const continueLinks = screen.getAllByRole('link', { name: /continue/i })
+        expect(continueLinks).toHaveLength(3)
+    })
+
+    it('step 3 (payment+shipping) needs both flags to be completed', () => {
+        // payment=true but shipping=false → step 3 still active
+        render(
+            <DashboardOnboarding
+                hasPublishedSite={false}
+                hasProducts={true}
+                isDesignCustomized={true}
+                hasPaymentConfigured={true}
+                hasShippingConfigured={false}
+            />
+        )
+
+        // Step 3 is still active (not done), shows Continue
+        const paymentText = screen.getByText('Set Up Payment & Shipping')
+        expect(paymentText).not.toHaveClass('text-[#05df72]')
+        expect(paymentText).toHaveClass('text-blue-500')
     })
 })
 
@@ -185,11 +240,11 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
     it('displays 0% when no tasks completed', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={false}
                 isDesignCustomized={false}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
@@ -199,11 +254,11 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
     it('displays 25% when 1/4 tasks completed', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={false}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
@@ -213,25 +268,25 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
     it('displays 50% when 2/4 tasks completed', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
         expect(screen.getByText('50%')).toBeInTheDocument()
     })
 
-    it('displays 75% when 3/4 tasks completed', () => {
+    it('displays 75% when 3/4 tasks completed (step 3 needs both payment + shipping)', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={true}
             />
         )
 
@@ -241,25 +296,40 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
     it('returns null (component hidden) when 4/4 tasks completed (100%)', () => {
         const { container } = render(
             <DashboardOnboarding
-
                 hasPublishedSite={true}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={true}
             />
         )
 
         expect(container.firstChild).toBeNull()
     })
 
+    it('step 3 counts as incomplete when only payment configured (shipping missing)', () => {
+        render(
+            <DashboardOnboarding
+                hasPublishedSite={false}
+                hasProducts={true}
+                isDesignCustomized={true}
+                hasPaymentConfigured={true}
+                hasShippingConfigured={false}
+            />
+        )
+
+        // Only 2 done (products + design); step 3 not done because shipping=false
+        expect(screen.getByText('50%')).toBeInTheDocument()
+    })
+
     it('progress bar width matches percentage', () => {
         const { container } = render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={false}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
@@ -285,11 +355,11 @@ describe('[TC-F03.61] DashboardOnboarding — SetupAlertBanner Integration', () 
     it('renders SetupAlertBanner when hasPaymentConfigured=false', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={false}
+                hasShippingConfigured={false}
             />
         )
 
@@ -300,15 +370,15 @@ describe('[TC-F03.61] DashboardOnboarding — SetupAlertBanner Integration', () 
     it('does not render SetupAlertBanner when hasPaymentConfigured=true', () => {
         render(
             <DashboardOnboarding
-
                 hasPublishedSite={false}
                 hasProducts={true}
                 isDesignCustomized={true}
                 hasPaymentConfigured={true}
+                hasShippingConfigured={false}
             />
         )
 
-        // SetupAlertBanner should not be visible
+        // SetupAlertBanner condition is payment-only — hides when payment configured
         expect(screen.queryByText(/Your Store is Almost Ready/)).not.toBeInTheDocument()
     })
 })
