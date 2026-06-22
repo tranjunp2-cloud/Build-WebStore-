@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Link, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Link, ArrowRight } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { XenditConnectModal } from './XenditConnectModal';
 
@@ -74,10 +74,6 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
                         {pt.xenditConnectCta}
                         <ArrowRight className="w-4 h-4" />
                     </button>
-                    <div className="inline-flex items-center gap-[6px] text-[11.5px] whitespace-nowrap" style={{ color: 'var(--dash-text-muted)' }}>
-                        <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                        {pt.xenditTrust}
-                    </div>
                 </div>
             </div>
 

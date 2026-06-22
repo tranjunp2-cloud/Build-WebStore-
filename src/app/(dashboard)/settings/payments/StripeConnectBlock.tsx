@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck, Unlink } from 'lucide-react';
+import { Link, ArrowRight, Loader2, BadgeCheck, Unlink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 interface Props {
@@ -166,10 +166,6 @@ export function StripeConnectBlock({
                         {isVerifying ? pt.stripeVerifying : pt.stripeOnboardSecondary}
                     </button>
                 )}
-                <div className="inline-flex items-center gap-[6px] text-[11.5px] text-slate-500 whitespace-nowrap">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    {pt.stripeTrust}
-                </div>
             </div>
         </div>
     );
