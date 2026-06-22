@@ -65,7 +65,7 @@ Platform **không đụng** cả 3 luồng → sạch liability, RM0 chi phí.
 | **API** (rate / order / tracking) | — | **Miễn phí hoàn toàn** |
 | Cước ship | **Merchant** | trừ ví prepaid; 1kg West MY ~**RM4-8** (J&T từ RM5.42) |
 | Nạp ví | Merchant | tùy ý từ RM20, credit hạn 365 ngày, **không có API topup** |
-| COD phí | Merchant | max(flat, 4%) trừ vào tiền thu hộ; Flash RM5, DHL RM6, J&T RM7, Aramex RM10; **West MY only**; Pos Laju/SPX/City-Link không hỗ trợ |
+| COD phí | Merchant | max(flat, 4%) trừ vào tiền thu hộ; Flash RM5, DHL RM6, J&T RM7, Aramex RM10; **West MY only**; chỉ 4 courier này hỗ trợ (Pos Laju/Ninja/SPX/City-Link không). Hạn mức + settlement T+X KHÁC theo courier → xem bảng **COD per-courier reference §6.C** |
 | **Platform** | — | **RM0** (vs Xendit RM7.50/merchant/tháng) |
 
 > EasyParcel kiếm tiền bằng margin gộp sẵn trong giá cước (mua sỉ volume) — merchant thường trả **rẻ hơn** đi thẳng courier. Giá rate-check = giá all-in.
@@ -109,7 +109,7 @@ Buyer xem tracking trên trang đơn
   - **Recommend (DRY):** tách cascade inline của `CheckoutAddressForm.tsx` thành component dùng chung (`AddressCascadeFields`) cho cả checkout + warehouse; né rủi ro đụng checkout → F36 gọi thẳng 4 endpoint trên.
   > **Ranh giới native vs build mới:** 4 geo endpoint + dataset = **reuse**. Backend EasyParcel (test-connection, save `easyParcelIntegration`, rate/label/tracking) = **build mới** (chưa có dòng easyparcel nào trong `src/`).
 
-**File mới:** `src/lib/shipping/easyparcel/{client,types,normalize}.ts`, `src/lib/shipping/get-rates.ts`, `src/app/api/orders/[id]/create-label/route.ts`, `src/app/api/cron/sync-tracking/route.ts`. Mở rộng: `calculate-shipping/route.ts`, settings shipping, `CheckoutClient.tsx`, `OrderDetailPanel` (gắn tạo label vào nút "Ready to Ship" + nút reverse label cạnh Refund), `ShipOrderModal.tsx` (giữ nhánh manual non-EP). **Reuse 0 đổi:** `api/orders/[id]/{refund,cancel}/route.ts`.
+**File mới:** `src/lib/shipping/easyparcel/{client,types,normalize}.ts`, `src/lib/shipping/get-rates.ts`, `src/app/api/orders/[id]/create-label/route.ts`, `src/app/api/cron/sync-tracking/route.ts`. Mở rộng: `calculate-shipping/route.ts`, settings shipping, `CheckoutClient.tsx`, `OrderDetailPanel` (gắn tạo label vào nút "Ready to Ship"), `ShipOrderModal.tsx` (giữ nhánh manual non-EP). **Reuse 0 đổi:** `api/orders/[id]/{refund,cancel}/route.ts`.
 
 **Routing key:** mọi call EasyParcel dùng **API key của merchant** (`api` param) lấy từ `tenant.easyParcelIntegration.apiKey` → cước vào đúng ví merchant.
 
@@ -129,7 +129,7 @@ Phase A (Connect) ─▶ Phase B (Rate@Checkout) ─▶ Phase C (Fulfillment) �
 | **A** | Connect + Settings | Dán API key + warehouse + chọn 1 courier + test connection | Tự dựng UI EasyParcel · auto label · default parcel |
 | **B** | Rate @ Checkout | Real-time rate (đúng 1 courier shop chọn) + lưu order; hybrid fallback flat | Markup cước · buyer chọn courier |
 | **C** | Fulfillment | Mua label gắn vào nút "Ready to Ship" có sẵn + in label + pickup/dropoff + COD + tracking sync cron | Multi-warehouse · auto label · auto-complete · show số dư ví · màn tạo vận đơn riêng · tab toggle manual |
-| **D** | Returns + Refund | Reverse label (nút mới cạnh Refund) + reuse `/refund` & `/cancel` + restock có sẵn; cancel refund theo trạng thái label | Auto refund cước · RMA collection · buyer return-request UI |
+| **D** | Returns + Refund | Reuse `/refund` & `/cancel` + restock có sẵn (return = buyer tự gửi về → merchant bấm Refund); cancel refund theo trạng thái label | **Reverse label (nhãn trả hàng EP)** · Auto refund cước · RMA collection · buyer return-request UI |
 
 ### Out of Scope (toàn feature)
 - **Markup cước** (giá hiển thị = raw EasyParcel).
@@ -138,6 +138,7 @@ Phase A (Connect) ─▶ Phase B (Rate@Checkout) ─▶ Phase C (Fulfillment) �
 - API nạp ví (EasyParcel không hỗ trợ — merchant tự nạp trên dashboard EasyParcel).
 - Multi-warehouse per merchant (1 origin/merchant cho MVP).
 - COD ngoài West Malaysia (giới hạn của EasyParcel COD).
+- **Reverse label / nhãn trả hàng EasyParcel** (đảo origin↔dest) — **cắt khỏi MVP**, defer post-MVP; return = buyer tự gửi hàng về (chuẩn BA/design F10 #1238).
 
 ---
 
@@ -159,6 +160,8 @@ A3. Bấm "Test connection" → backend tự dò env: thử EPRateCheckingBulk b
       ├─ FAIL key (cả 2 env) → báo lỗi rõ (`EASYPARCEL_INVALID_KEY`), KHÔNG lưu
       └─ FAIL warehouse postcode (key OK nhưng origin invalid) → `EASYPARCEL_INVALID_WAREHOUSE`, KHÔNG lưu
 A4. Merchant chọn **1 courier** cho shop (radio single-select; default J&T)
+      • **CHẶN CỨNG khi shop bật COD** (`site.paymentConfig.enableCod=true`): courier picker CHỈ list courier có `cod_service_available=true` (Flash/DHL/J&T/Aramex — đọc live từ response, KHÔNG hardcode). Courier ngoài nhóm COD bị **disable + hint** "Tắt COD trong Payment settings để chọn courier này". Shop TẮT COD → list full (60+ courier).
+      • Cache `selectedCourier.codAvailable` (+ codFee, codMin/Max nếu có) từ response → checkout khỏi gọi lại API để gate COD.
 A5. enabled=true → Phase B mở khoá cho site của tenant
 ```
 
@@ -166,7 +169,7 @@ A5. enabled=true → Phase B mở khoá cho site của tenant
 |---|---|---|
 | **A-1** | Tab "EasyParcel" trong `settings/shipping`: input API key (api + auth), form warehouse address. Warehouse = **Prime SoT**, dùng cho cả rate + label/pickup; **KHÔNG sync từ EP** (API không có endpoint đọc address). Form dùng **geo cascade NATIVE có sẵn** (State → City → Postcode = 3 dropdown qua `/api/geo/{states,districts,postcodes}` + reverse `/api/geo/lookup/[postcode]`, dataset `malaysia_*` đã seed — reuse, KHÔNG build mới; xem §4); chỉ `line1/2` free text. Cascade trả `zone` (west/east) → tái dùng cho COD West-MY (C-7). **KHÔNG có selector environment** — env auto-detect ở bước test. | US-F36-01 |
 | **A-2** | "Test connection" gọi `EPRateCheckingBulk` bằng key + **chính warehouse postcode**, **tự dò env** (production trước, fail → demo); OK → lưu key + `detectedEnv` + warehouse (đã validate) + trả list courier. FAIL key → `EASYPARCEL_INVALID_KEY`; FAIL warehouse postcode → `EASYPARCEL_INVALID_WAREHOUSE`. **Force validate: sai → KHÔNG lưu.** | US-F36-01 |
-| **A-3** | Chọn **1 courier** cho shop (`selectedCourier` = single `courier_id`, **radio single-select, KHÔNG hasMany** — chỉ 1 courier active mỗi lúc) từ list khả dụng. Default = **J&T** (#1 SME); top 3 (J&T, Pos Laju, Flash) có badge "Phổ biến SME"; còn lại gập "＋ Xem thêm courier". **KHÔNG show giá cước ở settings** (chưa có origin/dest/weight → "from RM X" dễ sai/nhầm); giá thật chỉ ở checkout (B). List chỉ name + logo + badge; list thật từ response EasyParcel. Nguồn top-3: `plans/reports/researcher-260617-1150-my-sme-top-couriers.md`. | US-F36-02 |
+| **A-3** | Chọn **1 courier** cho shop (`selectedCourier` = single `courier_id`, **radio single-select, KHÔNG hasMany** — chỉ 1 courier active mỗi lúc) từ list khả dụng. Default = **J&T** (#1 SME); top 3 (J&T, Pos Laju, Flash) có badge "Phổ biến SME"; còn lại gập "＋ Xem thêm courier". **KHÔNG show giá cước ở settings** (chưa có origin/dest/weight → "from RM X" dễ sai/nhầm); giá thật chỉ ở checkout (B). List chỉ name + logo + badge; list thật từ response EasyParcel. Nguồn top-3: `plans/reports/researcher-260617-1150-my-sme-top-couriers.md`. **Khi shop bật COD → list LỌC còn courier COD-eligible (chặn cứng, xem A4); gắn badge "COD" + settlement ETA per-courier (xem §6.C bảng COD reference).** **Hint seller:** COD payout lần đầu cần eKYC + verify bank trên EasyParcel (Prime chỉ hiện hint, KHÔNG build verify). | US-F36-02 |
 | **A-4** | API key lưu trong `tenant.easyParcelIntegration.apiKey`; **PATCH yêu cầu auth + IDOR check** (chỉ owner tenant sửa được, mirror `hasSiteAccess`). | US-F36-01 |
 | **A-5** | `enabled=false` hoặc thiếu key/warehouse → checkout dùng **flat rate fallback** (không vỡ). | US-F36-03 |
 | **A-6** | EasyParcel API lỗi → log + error code, không lộ key, tenant không kẹt trạng thái sai. | US-F36-01 |
@@ -242,18 +245,37 @@ Merchant tạo label với cờ COD + codAmount (RM) → EasyParcel
    → EasyParcel settle phần còn lại về merchant (platform KHÔNG đụng)
 ```
 
+#### COD per-courier reference (nguồn sự thật cho UI/UX)
+
+> **Hiển thị + gating COD phải đọc LIVE từ `EPRateCheckingBulk` response** (`cod_service_available`, `cod_service_min/max_cod_amount`, phí) — **KHÔNG hardcode** danh sách courier. Bảng dưới là baseline thiết kế UI + đặt kỳ vọng; **min/max + settlement phải verify sandbox** (§11 #1). EasyParcel có thể đổi courier COD bất kỳ lúc → data-driven bắt buộc.
+
+| Courier | COD? | Phí COD | COD min–max (thu hộ) | Settlement → merchant | UI/UX note |
+|---|---|---|---|---|---|
+| **Flash Express** | ✅ | RM5 / 4% (lấy cao hơn) | ~RM5.01 – **RM7,000** | **T+1–3 ngày** | ⭐ Default khuyến nghị cho shop cần COD: payout nhanh nhất, hạn mức cao nhất |
+| **DHL eCommerce** | ✅ | RM6 / 4% | chưa rõ → đọc từ API | T+1–3 ngày | Payout nhanh; hạn mức chưa public → lấy `cod_service_max` |
+| **J&T Express** | ✅ | RM7 / 4% | ~RM7.01 – **RM1,000** | T+7–12 ngày | ⚠️ Hạn mức COD CHỈ RM1,000 (khác Flash); payout chậm; hợp đơn giá trị thấp |
+| **Aramex** | ✅ | RM10 / 4% | chưa rõ → đọc từ API | **~T+30 ngày** | ⚠️ Ôm tiền ~1 tháng → cảnh báo seller; KHÔNG nên default |
+| Pos Laju · Ninja Van · City-Link · SkyNet · SPX · Best · Redbox · Teleport · Lalamove | ❌ | — | — | — | Không có đường COD qua EasyParcel API |
+
+**Ràng buộc chung COD (mọi courier):**
+- 🌏 **West Malaysia only** — Sabah/Sarawak (`zone='east'`) KHÔNG có COD. Courier vẫn giao East cho đơn **prepaid**; chỉ COD service giới hạn West.
+- 🔐 **Prerequisite kích hoạt COD payout (seller):** EasyParcel yêu cầu **eKYC (NRIC mặt trước/sau + selfie) + verify tài khoản ngân hàng** trước lần rút COD đầu. Payout chỉ qua **bank transfer**, **withdraw thủ công** trên dashboard EP (statuses: Pending → To Release → Released). **KHÔNG có API/webhook settlement** → Prime KHÔNG track payout, chỉ lưu `codStatus` display-only.
+- 💸 Phí COD trừ thẳng tiền thu hộ (merchant nhận net); đơn giao thất bại → **sender (merchant) chịu cước trả hàng**.
+
+> **Hệ quả — COD max KHÁC nhau theo courier:** J&T cap **RM1,000**, Flash cap **RM7,000**. → Gating C-6a điều kiện (3) phải dùng **`cod_service_max_cod_amount` per-courier từ API**, KHÔNG dùng hằng số RM7,000 chung. Settlement T+X cũng khác → UI nên báo seller kỳ vọng nhận tiền. Nguồn: `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`.
+
 #### Use Cases — COD
 
 **Normal Flow (West MY, courier hỗ trợ COD, trong giới hạn):**
 
 ```
-1. Buyer ở West MY nhập địa chỉ → checkout tính đủ điều kiện COD (state West MY + courier COD-enabled + total [RM5.01, RM7000])
+1. Buyer ở West MY nhập địa chỉ → checkout tính đủ điều kiện COD (state West MY + courier COD-enabled + total trong [min, max] per-courier từ API)
 2. Buyer chọn COD → order tạo: paymentMethod='cod', codAmount=grand total, codStatus='pending', paymentStatus='unpaid'
    → "confirmed but unpaid" — tiền CHƯA thu tại đây
 3. Merchant mở order → tạo label → EPSubmitOrderBulk gửi cod_enabled=true + cod_amount (RM) →
    cần verify param name trong sandbox (§11 item #1)
 4. Courier giao hàng → thu tiền mặt từ buyer → trừ phí COD max(flat, 4%) → settle phần còn lại về EasyParcel
-5. EasyParcel settle về merchant (1–30 ngày tuỳ courier; merchant tự withdraw trên dashboard EasyParcel)
+5. EasyParcel settle về merchant — **thời gian KHÁC theo courier** (Flash/DHL T+1–3, J&T T+7–12, Aramex ~T+30); merchant **withdraw thủ công** trên dashboard EasyParcel (cần eKYC + bank verified). KHÔNG có API settlement
 6. Merchant nhận tiền → đánh dấu codStatus='collected' (display-only); bấm "Completed" thủ công
 ```
 
@@ -273,8 +295,8 @@ Merchant tạo label với cờ COD + codAmount (RM) → EasyParcel
 - Địa chỉ buyer thuộc Sabah/Sarawak → hệ thống ẩn/disable tùy chọn COD với helper text.
 - Buyer phải chọn phương thức thanh toán khác (online/bank transfer).
 
-**Exception E2 — Tổng đơn vượt RM7,000:**
-- codAmount > RM7,000 → COD option ẩn/disable với message; buyer không thể chọn COD.
+**Exception E2 — Tổng đơn vượt hạn mức COD của courier:**
+- codAmount > `cod_service_max_cod_amount` của courier đang chọn (J&T RM1,000 / Flash RM7,000 / khác theo API) → COD option ẩn/disable với message nêu đúng hạn mức courier đó; buyer không thể chọn COD.
 
 **Exception E3 — Courier shop chọn không hỗ trợ COD:**
 - selectedCourier là Pos Laju, SPX, City-Link hoặc courier không có `cod_service_available=true` → COD option ẩn/disable.
@@ -326,7 +348,7 @@ Cron /api/cron/sync-tracking (mỗi 30-60 phút)
 | **C-4d** | **Khóa 2 lớp, 1 nguồn sự thật (DRY):** 1 helper `earliestPickupDate(courier, nowMYT)` (skip cut-off + T7/CN) dùng cho **CẢ** render picker (`min`/`default`) **LẪN** server validate lúc submit. **Server (create-label route) BẮT BUỘC re-tính `earliest` theo MYT tại thời điểm request — KHÔNG tin `collection_date` client gửi.** Nếu `collection_date < earliest` (vd merchant mở modal trước cut-off, bấm sau cut-off) → **clamp lên `earliest` + trả về ngày đã dời** để UI báo "đã dời sang DD/MM" (không gửi same-day sai SLA). Đây là chốt chặn đúng SLA courier — picker client chỉ là UX. | US-F36-07 |
 | **C-4b** | Weight/dims trong modal: weight prefill = `order.parcelWeight` (snapshot, sửa được); dims = **thùng thật merchant gói** (prefill `DEFAULT_PARCEL` box; đơn 1 món → `Products.dimensions`) — **KHÔNG cộng dims đa-SP**. | US-F36-06 |
 | **C-5** | Modal "Ready to Ship" (EP): **KHÔNG hiển thị courier** (đã khoá 1 courier; dùng `selectedCourier` ngầm), weight/dims prefill (sửa được), pickup date (rule C-4), nút tạo label; sau OK → AWB + nút in label. Non-EP: `ShipOrderModal` hiện tại (trackingNumber free-text) giữ NGUYÊN — nhánh manual do **config tenant** quyết, **KHÔNG phải tab toggle** per-order. | US-F36-06 |
-| **C-6a** | **COD eligibility gating tại checkout:** Tùy chọn COD hiển thị VÀ cho phép chọn CHỈ khi ĐỒNG THỜI: (1) địa chỉ buyer thuộc West Malaysia (state zone='west' từ `/api/geo/lookup/[postcode]`); (2) `selectedCourier` có `cod_service_available=true` trong response EPRateCheckingBulk (J&T, DHL eCommerce, Flash, Aramex — không phải Pos Laju, SPX, City-Link); (3) order grand total ≥ RM5.01 (min COD) VÀ ≤ RM7,000 (max COD của courier). Thiếu bất kỳ điều kiện nào → COD option ẩn hoặc disabled với helper text lý do. **Tenant EP OFF:** COD vẫn khả dụng như cũ (không thay đổi `site.paymentConfig.enableCod`) — chỉ không có automation courier thu hộ. | US-F36-08 |
+| **C-6a** | **COD eligibility gating tại checkout:** Tùy chọn COD hiển thị VÀ cho phép chọn CHỈ khi ĐỒNG THỜI: (1) địa chỉ buyer thuộc West Malaysia (state zone='west' từ `/api/geo/lookup/[postcode]`); (2) `selectedCourier` có `cod_service_available=true` trong response EPRateCheckingBulk (J&T, DHL eCommerce, Flash, Aramex — không phải Pos Laju, SPX, City-Link); (3) order grand total nằm trong **`cod_service_min/max_cod_amount` PER-COURIER từ response** — **KHÔNG dùng hằng số RM7,000 chung** (J&T cap RM1,000, Flash RM7,000 — khác nhau; xem bảng COD reference §6.C). Thiếu bất kỳ điều kiện nào → COD option ẩn hoặc disabled với helper text lý do (nêu rõ hạn mức của courier đang chọn). **Tenant EP OFF:** COD vẫn khả dụng như cũ (không thay đổi `site.paymentConfig.enableCod`) — chỉ không có automation courier thu hộ. | US-F36-08 |
 | **C-6b** | **`codAmount` snapshot:** Khi buyer chọn COD, `codAmount` = snapshot grand total (sen) tại thời điểm checkout (= subtotal + shippingFee − discount). Lưu nội bộ bằng **sen**; chuyển sang RM khi gửi EasyParcel (`/100`). KHÔNG recalculate sau khi order tạo. **Schema:** cột MỚI `cod_amount` (number, sen) trên `orders` — KHÔNG derive từ `total` (field `total` lưu RM-float, khác đơn vị) → yêu cầu entry `scripts/db-setup.js` MIGRATIONS (NFR-9). | US-F36-08 |
 | **C-6c** | **`codStatus` field (display-only, NOT reconciliation engine):** Thêm field `codStatus` enum vào Orders với 3 giá trị: `pending` (default, tiền chưa thu) → `collected` (merchant xác nhận nhận COD từ courier/EasyParcel settlement) → `settled` (merchant đã rút tiền, đối soát xong). KHÔNG có API đối soát — merchant tự check dashboard EasyParcel. **Schema:** cột scalar `cod_status` varchar trên `orders` → yêu cầu entry trong `scripts/db-setup.js` MIGRATIONS (per NFR-9). | US-F36-08 |
 | **C-6f** | **`codStatus` là TẦNG RIÊNG, KHÔNG thay `paymentStatus` (ranh giới với F10/F13):** `codStatus` chỉ track việc **courier thu tiền mặt + settle về merchant** (tầng giao vận). `paymentStatus` của đơn COD GIỮ NGUYÊN logic có sẵn (đơn COD: `unpaid` → `paid` khi order chuyển `completed`) — F36 KHÔNG đụng. Hai field độc lập: 1 đơn COD có thể `paymentStatus='unpaid'` mà `codStatus='collected'` (courier đã thu, merchant chưa bấm Completed). F36 chỉ THÊM `codStatus`, không ghi đè cơ chế COD/payment hiện hữu; tenant EP OFF → không có `codStatus`, COD chạy y như cũ. | US-F36-08 |
@@ -340,15 +362,14 @@ Cron /api/cron/sync-tracking (mỗi 30-60 phút)
 
 ### 6.D — Phase D: Returns + Refund (reuse refund/cancel có sẵn)
 
-> **Codebase đã có `POST /api/orders/[id]/refund` (Stripe + manual, tự restock, idempotent) và `POST /api/orders/[id]/cancel` (F10 restock atomic) + nút Refund/Cancel inline trong `OrderDetailPanel`.** Phase D **KHÔNG dựng Returns/RMA collection, KHÔNG buyer return-request UI.** Return = merchant nhận hàng về → bấm **Refund** (đã restock sẵn). Phần EP-specific duy nhất = **nút "Tạo nhãn trả hàng" (reverse label)** cạnh nút Refund.
+> **Codebase đã có `POST /api/orders/[id]/refund` (Stripe + manual, tự restock, idempotent) và `POST /api/orders/[id]/cancel` (F10 restock atomic) + nút Refund/Cancel inline trong `OrderDetailPanel`.** Phase D **KHÔNG dựng Returns/RMA collection, KHÔNG buyer return-request UI.** Return = **buyer tự gửi hàng về** → merchant nhận → bấm **Refund** (đã restock sẵn). **Reverse label (nhãn trả hàng EP) CẮT khỏi MVP** (defer post-MVP) — chuẩn theo BA/design F10 #1238.
 
 #### Flow return (merchant-driven, reuse refund)
 
 ```
-Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàng":
-   ├─ Reverse label: EPSubmitOrderBulk đảo origin↔dest (pick=địa chỉ buyer, send=kho merchant) → return AWB
-   │       → buyer gửi hàng về → merchant nhận → bấm Refund (endpoint có sẵn → refund + restock)
-   └─ Không tạo label (buyer tự gửi / nhận tay): merchant nhận hàng → bấm Refund (refund + restock có sẵn)
+Merchant quyết refund 1 đơn:
+   → buyer tự gửi hàng về (KHÔNG có reverse label ở MVP) → merchant nhận hàng
+   → bấm Refund (endpoint /refund có sẵn → refund + restock)
 ```
 
 #### Flow cancel refund (theo trạng thái label — chỉ chọn endpoint + message)
@@ -361,8 +382,8 @@ Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàn
 
 | FR | Mô tả | Story |
 |---|---|---|
-| **D-1** | Nút **"Tạo nhãn trả hàng" (reverse label)** mới cạnh nút Refund có sẵn (tuỳ chọn). **KHÔNG có RMA collection / buyer return-request UI** cho MVP. | US-F36-10 |
-| **D-2** | Reverse label: `EPSubmitOrderBulk` đảo origin↔dest (kho merchant = dest); lưu return AWB riêng; track hàng về. | US-F36-10 |
+| **D-1** | Return = reuse nút **Refund/Cancel** có sẵn (buyer tự gửi hàng về → merchant nhận → Refund). **KHÔNG reverse label, KHÔNG RMA collection, KHÔNG buyer return-request UI** cho MVP. | US-F36-10 |
+| **D-2** | **Reverse label (nhãn trả hàng EP) DEFERRED post-MVP** — không build ở MVP; hàng trả về xử lý ngoài luồng (buyer tự gửi). | US-F36-10 |
 | **D-3** | Refund + restock **reuse 100%** `/api/orders/[id]/refund` + `/api/orders/[id]/cancel` đã có (F10). **KHÔNG viết logic refund/restock mới.** | US-F36-10 |
 | **D-4** | Cancel **chưa mua label** → gọi `/cancel` có sẵn: refund full (hàng + ship) + restock ngay. | US-F36-11 |
 | **D-5** | Cancel **đã mua label** → gọi `/refund` có sẵn: refund tiền hàng + restock; cước: chưa pickup → message hủy trên dashboard EP (hoàn ví); đã pickup → cước mất, ghi rõ. | US-F36-11 |
@@ -408,17 +429,17 @@ Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàn
 1. GIVEN order paid/confirmed WHEN merchant bấm "Ready to Ship" (EP tenant) THEN trừ ví, trả AWB + label PDF, trackingNumber=awbNo, order → ready_to_ship (không màn riêng).
 2. GIVEN order đã có awbNo WHEN tạo label lần 2 THEN bị chặn (idempotent, không trừ ví 2 lần).
 3. GIVEN ví EasyParcel hết WHEN tạo label THEN error `EASYPARCEL_WALLET_LOW` + link nạp; order không đổi.
-4. GIVEN order COD + buyer West MY + courier COD-enabled + total [RM5.01, RM7,000] WHEN tạo label THEN gửi cod_enabled=true + cod_amount (RM) → EasyParcel; codStatus='pending'.
+4. GIVEN order COD + buyer West MY + courier COD-enabled + total trong [min, max] per-courier (`cod_service_min/max`) WHEN tạo label THEN gửi cod_enabled=true + cod_amount (RM) → EasyParcel; codStatus='pending'.
 5. GIVEN buyer East MY (Sabah/Sarawak) WHEN chọn COD tại checkout THEN COD option disabled/ẩn; buyer không tạo được order COD.
 6. GIVEN buyer West MY nhưng selectedCourier KHÔNG hỗ trợ COD (vd Pos Laju, SPX) WHEN render tùy chọn thanh toán THEN COD option disabled với helper "Courier đang chọn không hỗ trợ COD".
-7. GIVEN order total > RM7,000 WHEN render tùy chọn COD THEN COD option disabled với helper "Đơn vượt hạn mức COD (RM7,000)".
+7. GIVEN order total vượt `cod_service_max_cod_amount` của courier đang chọn (vd J&T RM1,000, Flash RM7,000) WHEN render tùy chọn COD THEN COD option disabled với helper nêu đúng hạn mức courier đó.
 8. GIVEN buyer chọn COD WHEN order tạo THEN codAmount = snapshot grand total (sen); paymentStatus='unpaid' (tiền chưa thu); codStatus='pending'.
 9. GIVEN order COD đã shipped, buyer từ chối nhận WHEN cron nhận status Returned THEN shippingTrackingStatus='Returned'; codStatus giữ 'pending' (không thu được tiền); merchant xử lý refund thủ công.
 10. GIVEN order shipped có awbNo WHEN cron chạy THEN shippingTrackingStatus cập nhật; buyer xem được.
 11. GIVEN order delivered (cron) THEN chỉ update tracking; order completed do merchant bấm tay.
 
 ### Phase D
-1. GIVEN merchant bấm "Tạo nhãn trả hàng" (reverse) THEN tạo return AWB (đảo origin↔dest).
+1. GIVEN đơn cần trả hàng THEN merchant dùng nút Refund/Cancel có sẵn (KHÔNG có reverse label ở MVP; buyer tự gửi hàng về).
 2. GIVEN merchant nhận hàng trả WHEN bấm Refund (endpoint có sẵn) THEN refund + restock (reuse, không logic mới).
 3. GIVEN hủy đơn chưa mua label THEN gọi `/cancel` có sẵn: refund full + restock.
 4. GIVEN hủy đơn đã mua label, chưa pickup THEN gọi `/refund`: refund hàng + restock; message hủy cước trên dashboard EP.
@@ -437,7 +458,7 @@ Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàn
 2. **Ví merchant hết tiền:** create-label fail giữa chừng → cần UX cảnh báo + link nạp rõ ràng (không có API topup).
 3. **Pickup:** dùng `collection_date` trong `EPSubmitOrderBulk` (KHÔNG có `EPPickUpBooking` — đã resolved §10).
 4. **Không có webhook tracking:** polling cron có độ trễ 30-60 phút — chấp nhận cho MVP.
-5. **Reverse label API shape:** chưa rõ EasyParcel hỗ trợ đảo origin↔dest thế nào — verify Phase D, fallback "buyer tự gửi".
+5. **Return logistics:** MVP **KHÔNG** có reverse label (đã cắt) — buyer tự gửi hàng về, merchant bấm Refund. Reverse label defer post-MVP nếu cần.
 6. **Rate limit:** giả định ≤100 req/min — thêm backoff ở cron + checkout.
 7. **Double-charge ví:** create-label phải idempotent theo `awbNo`.
 
@@ -448,8 +469,8 @@ Merchant quyết refund 1 đơn → (tuỳ chọn) bấm "Tạo nhãn trả hàn
 > Verify nguồn: source PHP wrapper `apih/easyparcel` (`src/Client.php`, maintained, đúng MY API) + 2 research report §11.
 
 - `[RESOLVED]` **Pickup**: KHÔNG có endpoint `EPPickUpBooking` (không tồn tại trong API). Pickup truyền qua tham số `collection_date` trong `EPSubmitOrderBulk`; courier tự sắp theo ngày. **EasyParcel chấp nhận same-day**: trước cut-off (T2–T6) → lấy hôm nay; sau cut-off → API âm thầm bump ngày làm việc kế. Date picker cut-off-aware (xem C-4/C-4c). Dropoff tùy courier. **Tin cậy: cao** (Pos Laju cut-off cần confirm). Nguồn: `plans/reports/researcher-260617-1426-courier-cutoff-verify.md`.
-- `[RESOLVED]` **COD remittance**: EasyParcel settle COD về tài khoản ngân hàng merchant theo **batch tuần**; phí max(RM7, 4%) trừ thẳng tiền thu hộ. **KHÔNG có API đối soát** → merchant tự xem dashboard. Platform chỉ lưu `codAmount`, không build reconciliation. **Tin cậy: trung bình.**
-- `[RESOLVED]` **Reverse/return label**: KHÔNG có flag reverse native. Tạo **đơn mới** qua `EPSubmitOrderBulk` đảo origin↔dest (pick=địa chỉ buyer, send=kho merchant), lưu thành return AWB riêng. **Tin cậy: cao.**
+- `[RESOLVED]` **COD remittance**: EasyParcel settle COD về tài khoản ngân hàng merchant; **thời gian KHÁC theo courier** (Flash/DHL T+1–3, J&T T+7–12, Aramex ~T+30 ngày — KHÔNG phải batch tuần cố định). Phí COD max(flat, 4%) trừ thẳng tiền thu hộ. Withdraw **thủ công** trên dashboard (statuses Pending→To Release→Released); **cần eKYC + verify bank trước lần rút đầu**. **KHÔNG có API/webhook đối soát** → merchant tự xem dashboard. Platform chỉ lưu `codAmount`+`codStatus` display-only, không build reconciliation. **Tin cậy: cao** (cross-check help centre + API docs, `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`).
+- `[RESOLVED]` **Reverse/return label**: KHÔNG có flag reverse native; về lý thuyết tạo đơn mới đảo origin↔dest được. **Quyết định F36 (chuẩn BA/design #1238): CẮT khỏi MVP** — return = buyer tự gửi về; ghi nhận cho post-MVP. **Tin cậy: cao.**
 - `[RESOLVED]` **Cancel shipment hoàn ví**: Wrapper KHÔNG có endpoint cancel → hủy đơn/hoàn cước xử lý qua **dashboard EasyParcel hoặc support**, không programmatic cho MVP. Quy ước: chưa pickup → merchant tự hủy trên dashboard (credit hoàn về ví); đã pickup → cước mất, ghi rõ. **Tin cậy: trung bình** (nếu cần auto-cancel, mở ticket hỏi EasyParcel endpoint riêng).
 - `[RESOLVED]` **Wallet balance API**: **CÓ** — endpoint `EPCheckCreditBalance` (không cần param ngoài auth). **Quyết định F36: KHÔNG show số dư ví chủ động, KHÔNG cron cảnh báo ví** (bỏ cho gọn). Ví thiếu chỉ lộ ra khi tạo label thất bại → `EASYPARCEL_WALLET_LOW` (C-3). Endpoint vẫn ghi nhận để dùng sau nếu cần. **Tin cậy: cao.**
 - `[RESOLVED]` **Rate limit + API model**: Rate limit KHÔNG công bố → giả định ~100/min + backoff. **Model = Individual API per merchant** (mỗi merchant tự account + ví + key) — KHÔNG dùng Marketplace API (Marketplace = 1 ví platform chung = custody, phá guardrail §4). Platform không cần đăng ký gì với EasyParcel. **Tin cậy: cao.**
