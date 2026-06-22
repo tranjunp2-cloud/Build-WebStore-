@@ -22,7 +22,7 @@ const DEFAULT_OVERLAP_THRESHOLD = 0.6
 // Variant fallback chains — each block type cycles through these so we
 // always have something different to pick. Order = preference.
 const VARIANT_CYCLES: Record<string, string[]> = {
-    hero: ['centered', 'split-left', 'split-right', 'video', 'minimal'],
+    hero: ['centered', 'split-left', 'split-right', 'fullscreen', 'minimal'],
     features: ['grid-3', 'grid-2', 'list', 'cards', 'icons'],
     about: ['split-image', 'centered', 'stacked', 'with-stats'],
     testimonials: ['carousel', 'grid', 'single', 'masonry'],

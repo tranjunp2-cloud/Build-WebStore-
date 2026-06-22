@@ -914,7 +914,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
-        hero: ['gradient', 'split-video', 'minimal', 'parallax'],
+        hero: ['gradient', 'cards-overlay', 'minimal', 'parallax'],
         features: ['zigzag', 'grid-2', 'icon-left', 'carousel'],
         testimonials: ['spotlight', 'cards', 'video-text'],
         footer: ['minimal', 'dark-gradient', 'simple'],
@@ -1026,7 +1026,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['grid', 'bio-modal', 'compact-row'],
     },
     fitness: {
-        hero: ['fullscreen', 'parallax', 'split-video', 'gradient'],
+        hero: ['fullscreen', 'parallax', 'gradient', 'cards-overlay'],
         features: ['grid-4', 'zigzag', 'icon-top', 'carousel'],
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['dark-gradient', 'simple', 'centered-stack'],
@@ -1113,7 +1113,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
  * the 'cards' default variant silently. Filter them out of AI variant picking.
  */
 const BROKEN_VARIANTS: Record<string, string[]> = {
-    hero: ['animated-gradient'],
+    hero: ['animated-gradient', 'video', 'split-video'],
     testimonials: ['grid', 'single'],
 }
 

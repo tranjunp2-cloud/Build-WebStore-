@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
     GripVertical, ChevronDown, ChevronRight, Plus, Trash2, Pencil,
     ArrowUp, ArrowDown, ArrowRightToLine, ArrowLeftToLine,
@@ -16,6 +16,11 @@ import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import { isValidExternalNavigationUrl } from '@/lib/navigation-url'
 import type { NavLinkItem, DropTarget } from './navigation-editor-types'
+
+// Max label length per nav depth — prevents layout breakage on rendered nav.
+// Desktop nav bar: top-level items are wider; child items appear in narrower dropdowns.
+const MAX_LABEL_CHARS_TOP = 20    // depth 0 — desktop nav bar
+const MAX_LABEL_CHARS_CHILD = 15  // depth 1+ — dropdown / sidebar
 
 // ── Palette mapped to --dash-* tokens → adapts to light/dark automatically.
 // (Inline styles can't be remapped by the .dash-shell layer, so reference the
@@ -172,6 +177,8 @@ export function NavLinkRow({
     const isEditingName = editingNameId === link.id
     const hasChildren = link.children.length > 0
     const [isExpanded, setIsExpanded] = useState(true)
+    const maxLabelChars = depth === 0 ? MAX_LABEL_CHARS_TOP : MAX_LABEL_CHARS_CHILD
+    const [editingLabelLen, setEditingLabelLen] = useState(link.label.length)
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
         useSortable({ id: link.id })
@@ -185,6 +192,11 @@ export function NavLinkRow({
             nameInputRef.current.select()
         }
     }, [isEditingName])
+
+    // Sync char count to current label when editing opens (label may have changed since last edit)
+    useEffect(() => {
+        if (isEditingName) setEditingLabelLen(link.label.length)
+    }, [isEditingName, link.label.length])
 
     const handleNameCommit = useCallback(
         (raw: string) => {
@@ -328,12 +340,20 @@ export function NavLinkRow({
         </>
     )
 
+    // Char counter color: red near limit, orange approaching, muted otherwise
+    const charCounterColor = useMemo(() => {
+        if (editingLabelLen >= maxLabelChars - 2) return C.danger
+        if (editingLabelLen >= Math.floor(maxLabelChars * 0.75)) return C.warning
+        return C.text3
+    }, [editingLabelLen, maxLabelChars])
+
     // Inline name input (zone 2: click label = edit name inline)
     const nameEl = isEditingName ? (
         <input
             ref={nameInputRef}
             defaultValue={link.label}
             placeholder={nav.namePlaceholder}
+            onChange={e => setEditingLabelLen(e.target.value.length)}
             onBlur={e => handleNameCommit(e.target.value)}
             onKeyDown={e => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -344,6 +364,7 @@ export function NavLinkRow({
         />
     ) : (
         <span
+            title={link.label || undefined}
             style={{ flex: 1, minWidth: 0, fontSize: 14, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, cursor: 'text' }}
             onClick={e => { e.stopPropagation(); onSetOpenPanelId(link.id); onSetEditingNameId(link.id) }}
         >
@@ -400,6 +421,16 @@ export function NavLinkRow({
 
                     {/* Zone 2: label (click = inline rename) */}
                     {nameEl}
+
+                    {/* Character counter — only visible while typing the label */}
+                    {isEditingName && (
+                        <span
+                            title={`Max ${maxLabelChars} characters`}
+                            style={{ fontSize: 10, color: charCounterColor, flexShrink: 0, minWidth: 28, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        >
+                            {editingLabelLen}/{maxLabelChars}
+                        </span>
+                    )}
 
                     {/* "· missing URL" tip (collapsed state only) */}
                     {!isPanelOpen && missingUrlTip}

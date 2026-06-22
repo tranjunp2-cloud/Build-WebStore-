@@ -43,7 +43,7 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
  * apply-template sanitizer logic. Refactor is out of scope for Phase 01.
  */
 export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
-    hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video'], fallback: 'centered' },
+    hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow'], fallback: 'centered' },
     // navigation has TWO select columns: `style` (validated here) and `variant`.
     // `variant` is intentionally NOT validated here because schema.field='style' means
     // the delete-cleanup inside sanitizeBlockForPayload never runs for variant — so variant
