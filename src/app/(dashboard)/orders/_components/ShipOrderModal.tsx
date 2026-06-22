@@ -34,8 +34,7 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)' }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
             onClick={(e) => { if (e.target === e.currentTarget && !isLoading) { setTrackingNumber(''); onBack() } }}
         >
             <div
