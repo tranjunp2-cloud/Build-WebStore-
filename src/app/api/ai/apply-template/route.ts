@@ -310,8 +310,10 @@ export const POST = withAuth(async (user, req) => {
             const templateBlockList = templatePages?.length
                 ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
                 : blocks
+            // GH-1266: coerce before sanitize — sanitizeBlocks maps unknown variants→'centered',
+            // overwriting the coercion target. Coercing first preserves 'fullscreen'/'split-left'.
+            coerceVideoVariants(templateBlockList as Record<string, unknown>[])
             const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
-            coerceVideoVariants(sanitizedTemplateBlocks) // GH-1266
 
             // Extract structural + visual fields per blockType from template (first match wins)
             // These fields define the template's look — user content (headlines, text, images) is preserved
@@ -383,10 +385,10 @@ export const POST = withAuth(async (user, req) => {
                     ) ?? templatePages?.[0]
                 const templateHomepageLayout =
                     (templateHomepagePage?.layout as Record<string, unknown>[] | undefined) ?? []
-                const templateBlocksClean = sanitizeBlocks(
-                    templateHomepageLayout.length ? templateHomepageLayout : blocks,
-                )
-                coerceVideoVariants(templateBlocksClean) // GH-1266
+                // GH-1266: coerce before sanitize (same reasoning as path 1 above)
+                const rawHomepageLayout = (templateHomepageLayout.length ? templateHomepageLayout : blocks) as Record<string, unknown>[]
+                coerceVideoVariants(rawHomepageLayout)
+                const templateBlocksClean = sanitizeBlocks(rawHomepageLayout)
 
                 // Hoisted outside page loop — same values for every page
                 const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
