@@ -42,9 +42,8 @@ export function ProductAddToCartSection({ product, primaryColor, siteSlug, siteI
     const compareAtPrice = selectedVariant != null
         ? (selectedVariant.compareAtPrice ?? undefined)
         : product.compareAtPrice
-    // CAS only decrements aggregate product.inventory; variant.stock is a stale snapshot.
-    // Always use product.inventory so the button mirrors server-side validation.
-    const inventory = product.inventory ?? 0
+    // Per-variant stock when a variant is selected; aggregate inventory otherwise (#1179).
+    const inventory = selectedVariant?.stock ?? product.inventory ?? 0
     const variantName = selectedVariant?.name ?? null
 
     return (

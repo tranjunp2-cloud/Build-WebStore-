@@ -8,6 +8,7 @@ import { SEOView } from '@/components/dashboard/views/SEOView'
 import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
+import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -37,6 +38,12 @@ export default async function DashboardRoot({ searchParams }: Props) {
     // We fetch preferences here so we can pass it down to modal safely
     let dashboardPreferences: string[] | undefined = undefined
     let hasUsableSites = false
+    let siteId: string | null = null
+    let hasPublishedSite = false
+    let isDesignCustomized = false
+    let hasProducts = false
+    let hasPaymentConfigured = false
+    let hasShippingConfigured = false
     const tenantId = await getCurrentTenantId()
     if (tenantId) {
         const payload = await getPayload({ config })
@@ -60,6 +67,43 @@ export default async function DashboardRoot({ searchParams }: Props) {
             },
         })
         hasUsableSites = usableSiteCount.totalDocs > 0
+
+        if (hasUsableSites) {
+            // Onboarding status — skipped when no usable sites; tenantResult already in scope above
+            const tenantPayments = (tenantResult as { payments?: Record<string, boolean> })?.payments
+            hasPaymentConfigured = !!(
+                tenantPayments?.payment_cod || tenantPayments?.payment_qr ||
+                tenantPayments?.payment_card || tenantPayments?.payment_fpx ||
+                tenantPayments?.xendit_tng || tenantPayments?.xendit_grabpay ||
+                tenantPayments?.xendit_duitnow || tenantPayments?.xendit_fpx ||
+                tenantPayments?.xendit_shopeepay || tenantPayments?.xendit_boost ||
+                tenantPayments?.xendit_mae
+            )
+            const [onboardingSitesResult, onboardingProductsCount] = await Promise.all([
+                payload.find({
+                    collection: 'sites',
+                    where: {
+                        and: [
+                            { tenant: { equals: tenantId } },
+                            { or: [
+                                { generationStatus: { equals: 'completed' } },
+                                { generationStatus: { equals: 'none' } },
+                                { generationStatus: { equals: null } },
+                                { generationStatus: { exists: false } },
+                            ]},
+                        ],
+                    },
+                    limit: 1,
+                }),
+                payload.count({ collection: 'products', where: { tenant: { equals: tenantId }, status: { equals: 'active' } } }),
+            ])
+            const siteDoc = onboardingSitesResult.docs[0]
+            siteId = siteDoc?.id != null ? String(siteDoc.id) : null
+            isDesignCustomized = !!(siteDoc as { themeCustomized?: boolean })?.themeCustomized
+            hasPublishedSite = (siteDoc as { status?: string })?.status === 'published'
+            hasProducts = onboardingProductsCount.totalDocs > 0
+            hasShippingConfigured = !!(siteDoc as { shippingConfig?: { shippingSetupConfirmed?: boolean } })?.shippingConfig?.shippingSetupConfirmed
+        }
     }
 
     // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
@@ -68,6 +112,18 @@ export default async function DashboardRoot({ searchParams }: Props) {
     return (
         <div className="space-y-6">
             <DashboardTabContent defaultTab={tab}>
+                {/* Onboarding checklist — above toolbar per Figma; hidden when all 4 steps done */}
+                {hasUsableSites && !(hasProducts && isDesignCustomized && hasPaymentConfigured && hasShippingConfigured && hasPublishedSite) && (
+                    <DashboardOnboarding
+                        hasPublishedSite={hasPublishedSite}
+                        siteId={siteId}
+                        hasProducts={hasProducts}
+                        isDesignCustomized={isDesignCustomized}
+                        hasPaymentConfigured={hasPaymentConfigured}
+                        hasShippingConfigured={hasShippingConfigured}
+                    />
+                )}
+
                 {/* Universal Page Header / Toolbar — hidden when no usable sites */}
                 {hasUsableSites && (
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

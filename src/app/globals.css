@@ -20,7 +20,9 @@
   --surface-1: #09090b;
   --surface-2: #18181b;
   --surface-3: #27272a;
-  --border: #3f3f46;
+  /* GH-1192: renamed from --border — site-renderer/storefront baseline. The shadcn
+     themed --border (light/dark) is defined in the GH-1192 token section below. */
+  --border-legacy: #3f3f46;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --radius: 0.5rem;
@@ -35,8 +37,8 @@
   --surface-card: var(--surface-3);
   --text-inverse: #09090b;
   --text-muted: var(--text-secondary);
-  --border-semantic: var(--border);
-  --divider: var(--border);
+  --border-semantic: var(--border-legacy);
+  --divider: var(--border-legacy);
 
   /* Typography fallbacks — ensure `font-sans` / body rule resolves even
      OUTSIDE the AppShell wrapper (portals, toasts, modals mounted directly
@@ -48,33 +50,35 @@
   /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
   --nav-height: 64px;
 
-  /* Dashboard semantic tokens — light mode (default) */
-  --dash-bg: #F8FAFC;
-  /* Sidebar column bg (sidebar + header logo segment). Light keeps the previous --dash-bg. */
-  --dash-sidebar-bg: #F8FAFC;
-  /* Sidebar/content column divider — visible in light, hidden in dark (dark bg separates on its own). */
-  --dash-col-divider-color: var(--dash-divider);
-  --dash-surface: #FFFFFF;
-  --dash-surface-hover: #F1F5F9;
-  --dash-text: #0F172A;
-  --dash-text-muted: #64748B;
-  --dash-border: #E2E8F0;
-  /* Stronger-contrast divider for the sidebar/content separator (the faint --dash-border blends in). */
+  /* Dashboard tokens — GH-1192: aliased to shadcn semantic (tự đổi light/dark).
+     Mappable → semantic; specialized (sidebar/divider/overlay/error/save-bar) giữ riêng. */
+  --dash-bg: hsl(var(--background));
+  --dash-surface: hsl(var(--card));
+  --dash-surface-hover: hsl(var(--muted));
+  --dash-text: hsl(var(--foreground));
+  --dash-text-muted: hsl(var(--muted-foreground));
+  --dash-border: hsl(var(--border));
+  --dash-accent: hsl(var(--primary));        /* GH-1192: nay = TEAL (đổi từ #2563EB) */
+  --dash-secondary-bg: hsl(var(--secondary));
+  /* Specialized — không có semantic tương đương (vẫn override theo .dark bên dưới) */
+  --dash-sidebar-bg: #FFFFFF;
+  --dash-col-divider-color: transparent; /* light: bỏ viền dọc giữa sidebar/header và content (dark đã transparent) */
   --dash-divider: #CBD5E1;
-  --dash-accent: #2563EB;
   --dash-error: #FB2C36;
+  --dash-warning: #B45309;
   --dash-overlay: rgba(0, 0, 0, 0.35);
-  --dash-secondary-bg: #F1F5F9;
   --save-bar-bg: rgba(248, 250, 252, 0.92);
 
   /* Editor semantic tokens — light mode */
   --editor-bg: #F1F5F9;
+  --editor-bg-rgb: 241 245 249;            /* GH-1192: channel-split for /opacity glass overlays */
   --editor-surface: #FFFFFF;
   --editor-surface-deep: #F8FAFC;
   --editor-surface-elevated: #FFFFFF;
-  --editor-text: #0F172A;
-  --editor-text-muted: #64748B;
-  --editor-text-subtle: #94A3B8;
+  --editor-surface-elevated-rgb: 255 255 255;
+  --editor-text: #22313F;         /* GH-1192: CHÍNH — khớp dashboard --foreground (orders/discounts) */
+  --editor-text-muted: #475569;   /* GH-1192: PHỤ — slate-600, đậm dễ đọc ở light */
+  --editor-text-subtle: #475569;  /* GH-1192: gộp = phụ (bỏ cấp 3 cho đỡ lộn xộn) */
   --editor-border: rgba(0, 0, 0, 0.08);
   --editor-border-subtle: rgba(0, 0, 0, 0.05);
   --editor-overlay-bg: rgba(0, 0, 0, 0.04);
@@ -83,28 +87,22 @@
 
 /* Dashboard + Editor semantic tokens — dark mode overrides */
 .dark {
-  --dash-bg: #0B1120;
-  /* Sidebar column bg (sidebar + header logo segment) — darker than --dash-bg for separation. */
+  /* GH-1192: các token dash mappable đã alias về semantic ở :root (semantic tự đổi
+     theo .dark) → chỉ giữ override cho token specialized. */
   --dash-sidebar-bg: #060B18;
-  /* Column divider hidden in dark — the darker sidebar bg already separates from content. */
   --dash-col-divider-color: transparent;
-  --dash-surface: #161E2E;
-  --dash-surface-hover: #1F2937;
-  --dash-text: #FFFFFF;
-  --dash-text-muted: #9CA3AF;
-  --dash-border: #1F2937;
-  /* Subtle divider — just above --dash-border (#1F2937), barely lighter than --dash-bg (#0B1120). */
   --dash-divider: #232E3D;
-  --dash-accent: #2563EB;
+  --dash-warning: #F5B945;
   --dash-overlay: rgba(0, 0, 0, 0.5);
-  --dash-secondary-bg: #1F2937;
   --save-bar-bg: rgba(15, 23, 42, 0.88);
 
   /* Editor semantic tokens — dark mode */
   --editor-bg: #0B1120;
+  --editor-bg-rgb: 11 17 32;               /* GH-1192: channel-split for /opacity glass overlays */
   --editor-surface: #0F172A;
   --editor-surface-deep: #0B1120;
   --editor-surface-elevated: #1E293B;
+  --editor-surface-elevated-rgb: 30 41 59;
   --editor-text: #F8FAFC;
   --editor-text-muted: #94A3B8;
   --editor-text-subtle: #64748B;
@@ -112,6 +110,85 @@
   --editor-border-subtle: rgba(255, 255, 255, 0.04);
   --editor-overlay-bg: rgba(255, 255, 255, 0.04);
   --editor-overlay-hover: rgba(255, 255, 255, 0.06);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GH-1192 — Design System tokens (shadcn semantic). Nguồn: docs/design/Design system/.
+   Light = :root, Dark = .dark. Brand primary = TEAL; Blue = info / AI (KHONG phai
+   primary). Gia tri neo theo dashboard hien hanh (zero-shift) — tru --primary co y = teal.
+   Phase 02 wire vao tailwind hsl(var(x)) + alias token dash / editor / auth.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Primitive palette (lưu dạng "H S% L%" để semantic dùng hsl(var(--x) / <a>)) ── */
+  --p-teal-400: 172.46 66.01% 50.39%;  /* #2DD4BF (HSL decimal → khớp hex chính xác) */
+  --p-teal-600: 180.28 100% 41.57%;  /* #00D3D4 (light brand teal — GH-1192 update; HSL decimal khớp hex) */
+  --p-blue-500: 217.22 91.22% 59.8%;   /* #3B82F6 */
+  --p-blue-600: 221.21 83.19% 53.33%;  /* #2563EB */
+  --p-slate-50: 210 40% 98.04%;        /* #F8FAFC */
+  --p-slate-100: 210 40% 96.08%;       /* #F1F5F9 */
+  --p-slate-200: 214.29 31.82% 91.37%; /* #E2E8F0 */
+  --p-slate-500: 215.38 16.32% 46.86%; /* #64748B */
+  --p-slate-800: 215 27.91% 16.86%;    /* #1F2937 */
+  --p-slate-900: 222.22 47.37% 11.18%; /* #0F172A */
+  --p-slate-950: 222.86 48.84% 8.43%;  /* #0B1120 */
+  --p-gray-400: 217.89 10.61% 64.9%;   /* #9CA3AF */
+  --p-emerald-500: 160.12 84.08% 39.41%; /* #10B981 */
+  --p-emerald-600: 161.38 93.55% 30.39%; /* #059669 */
+  --p-red-500: 0 84.24% 60.2%;         /* #EF4444 */
+  --p-red-600: 0 72.22% 50.59%;        /* #DC2626 */
+  --p-amber-500: 37.69 92.13% 50.2%;   /* #F59E0B */
+  --p-amber-600: 32.13 94.62% 43.73%;  /* #D97706 */
+  --p-violet-300: 244.24 98.02% 80.2%; /* #A29BFE — AI glow */
+
+  /* ── Semantic — Light ── */
+  --background: var(--p-slate-50);
+  --foreground: 208.96 29.9% 19.02%;       /* #22313F — chữ body light (GH-1192) */
+  --card: 0 0% 100%;
+  --card-foreground: var(--p-slate-900);
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--p-slate-900);
+  --primary: var(--p-teal-600);            /* Teal #00D3D4 (light) */
+  --primary-foreground: var(--p-slate-900); /* #0F172A — chữ đậm trên teal sáng (WCAG ~9:1, GH-1192) */
+  --secondary: var(--p-slate-100);
+  --secondary-foreground: var(--p-slate-900);
+  --muted: var(--p-slate-100);
+  --muted-foreground: var(--p-slate-500);  /* #64748B — chữ phụ light */
+  --border: var(--p-slate-200);            /* #E2E8F0 */
+  --input: var(--p-slate-200);
+  --input-border: 210 7% 72%;              /* #B3B8BD = rgba(1,18,34,0.30) trên nền trắng — viền input (GH-1192) */
+  --ring: var(--p-teal-600);
+  /* --radius: 0.5rem đã khai ở :root phía trên */
+  --success: var(--p-emerald-600);    --success-foreground: 0 0% 100%;
+  --warning: var(--p-amber-600);      --warning-foreground: 0 0% 100%;
+  --destructive: var(--p-red-600);    --destructive-foreground: 0 0% 100%;
+  --info: var(--p-blue-600);          --info-foreground: 0 0% 100%;
+  --brand-teal: var(--p-teal-600);
+  --ai-glow: var(--p-violet-300);
+}
+
+.dark {
+  /* ── Semantic — Dark (neo theo --dash-* hiện hành; primary = teal) ── */
+  --background: var(--p-slate-950);        /* #0B1120 */
+  --foreground: 0 0% 100%;                 /* #FFFFFF (zero-shift dashboard) */
+  --card: 220 35.29% 13.33%;               /* #161E2E (HSL decimal exact) */
+  --card-foreground: 0 0% 100%;
+  --popover: 220 35.29% 13.33%;            /* #161E2E — elevated như card (overlay nổi trên nền #0B1120) */
+  --popover-foreground: 0 0% 100%;
+  --primary: var(--p-teal-400);            /* Teal #2DD4BF */
+  --primary-foreground: var(--p-slate-950); /* chữ tối #0B1120 trên teal sáng */
+  --secondary: 215 27.91% 16.86%;                /* #1F2937 */
+  --secondary-foreground: 0 0% 100%;
+  --muted: 215 27.91% 16.86%;                    /* #1F2937 */
+  --muted-foreground: var(--p-gray-400);   /* #9CA3AF */
+  --border: 213.33 24.32% 21.76%;                   /* #2A3645 — fix #1222 (table row border hover) đã về staging */
+  --input: 213.33 24.32% 21.76%;
+  --input-border: 213.33 24.32% 21.76%;             /* #2A3645 — dark giữ nguyên (viền input) */
+  --ring: var(--p-teal-400);
+  --success: var(--p-emerald-500);
+  --warning: var(--p-amber-500);
+  --destructive: var(--p-red-500);
+  --info: var(--p-blue-500);
+  --brand-teal: var(--p-teal-400);
 }
 
 /* Sidebar/content vertical divider. Preflight is OFF (tailwind.config.js corePlugins),
@@ -125,6 +202,17 @@
    Same preflight-off reason as above — paint the 2px underline here so it shows. */
 .dash-tab-trigger { border-bottom: 2px solid transparent; }
 .dash-tab-trigger[data-state="active"] { border-bottom-color: var(--dash-accent); }
+
+/* ── Base Table (GH-1222) ───────────────────────────────────────────────────
+   Preflight is OFF, so `border-b`/`divide-y` utilities emit border-width but no
+   border-style and render invisible. Paint row separators here with the full
+   shorthand so every dashboard <table className="dash-table"> shows lines in
+   both themes. `:last-child` drops the trailing line (the wrapper's own border
+   closes the box). Header row + body rows use the themed --dash-border. */
+.dash-table { width: 100%; border-collapse: collapse; }
+.dash-table thead tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr { border-bottom: 1px solid var(--dash-border); }
+.dash-table tbody tr:last-child { border-bottom: none; }
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
 /* Dark mode (default — matches current hardcoded values) */
@@ -377,6 +465,11 @@ html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color
 /* Design System §3: card shadow — Light: subtle / Dark: deeper */
 .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1); }
 .dark .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.5); }
+/* GH-1192: dark shadow boost cho util to (md/lg/xl/2xl) theo doc §3 — opacity 0.6→0.8 */
+.dark .dash-shell .shadow-md  { box-shadow: 0 4px 6px -1px rgb(0 0 0/0.6), 0 2px 4px -2px rgb(0 0 0/0.6); }
+.dark .dash-shell .shadow-lg  { box-shadow: 0 10px 15px -3px rgb(0 0 0/0.7), 0 4px 6px -4px rgb(0 0 0/0.7); }
+.dark .dash-shell .shadow-xl  { box-shadow: 0 20px 25px -5px rgb(0 0 0/0.8), 0 8px 10px -6px rgb(0 0 0/0.8); }
+.dark .dash-shell .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0/0.8); }
 
 /* ── Text color sweep — Design System §1 ─────────────────────────────────── */
 /* Dark text values (fine in light, invisible in dark → remap to dash-text) */
@@ -534,9 +627,13 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell .border-white\/\[0\.05\] { border-color: var(--dash-border); }
 
 /* ── TopHeader: force opaque background to prevent scroll overlap ─ */
+/* Top header bg matches the sidebar column so the two read as one surface. */
 .dash-shell header {
-    background-color: var(--dash-surface) !important;
+    background-color: var(--dash-sidebar-bg) !important;
 }
+/* Light mode: bỏ viền ngang dưới header (TopHeader dùng --dash-divider trực tiếp).
+   Dark giữ nguyên đường viền header. */
+html:not(.dark) .dash-shell header { border-bottom-color: transparent; }
 
 /* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
 .dash-shell .text-slate-300,
@@ -700,6 +797,22 @@ html:not(.dark) .editor-shell .hover\:text-\[\#5EEAD4\]:hover { color: #0e7490; 
 .editor-shell .border-white\/\[0\.08\],
 .editor-shell .border-white\/20 { border-color: var(--editor-border); }
 .editor-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+/* GH-1192 Phase 2 — remap gaps */
+.editor-shell .border-\[\#1F2937\],
+.editor-shell .border-\[\#1f2937\],
+.editor-shell .border-\[\#25324A\],
+.editor-shell .border-\[\#25324a\] { border-color: var(--editor-border); }
+.editor-shell .text-\[\#9CA3AF\],
+.editor-shell .text-\[\#9ca3af\],
+.editor-shell .text-\[\#64748B\],
+.editor-shell .text-\[\#64748b\] { color: var(--editor-text-muted); }
+/* dark hex text — invisible in dark → editor-text */
+.editor-shell .text-\[\#202124\] { color: var(--editor-text); }
+/* pale accent text → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#ff9b8f\],
+html:not(.dark) .editor-shell .text-\[\#FF9B8F\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[\#4ede9f\],
+html:not(.dark) .editor-shell .text-\[\#4EDE9F\] { color: #15803d; }
 
 /* hover:text → remap to readable values in light mode */
 .editor-shell .hover\:text-white:hover,
@@ -966,14 +1079,14 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
     color: inherit;
   }
 
-  /* Override Chrome/Safari autofill backgrounds — dark mode only */
-  .dark input:-webkit-autofill,
-  .dark input:-webkit-autofill:hover,
-  .dark input:-webkit-autofill:focus,
-  .dark input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 1000px #0F172A inset !important;
-    -webkit-text-fill-color: #fff !important;
-    caret-color: #fff;
+  /* Override Chrome/Safari autofill backgrounds — theme-aware (GH-1192) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px hsl(var(--card)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
     transition: background-color 5000s ease-in-out 0s;
   }
 

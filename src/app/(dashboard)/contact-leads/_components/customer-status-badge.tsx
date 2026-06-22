@@ -2,14 +2,28 @@
 
 import type { CustomerStatus } from '../_lib/customer-record'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Badge } from '@/components/ui/badge'
 import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 
-const STATUS_CLASSES: Record<CustomerStatus, string> = {
-    new:        'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400',
-    contacted:  'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-500/10 dark:border-teal-500/30 dark:text-teal-400',
-    ignored:    'bg-zinc-100 border-zinc-200 text-zinc-600 dark:bg-zinc-500/10 dark:border-zinc-500/30 dark:text-zinc-400',
-    subscribed: 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400',
-    read:       'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-400',
+type BadgeVariant = 'warning' | 'success' | 'secondary' | 'outline' | 'default'
+
+const STATUS_VARIANT: Record<CustomerStatus, BadgeVariant> = {
+    new:        'warning',
+    contacted:  'success',
+    ignored:    'secondary',
+    subscribed: 'default',
+    read:       'outline',
+}
+
+// GH-1192: contact-lead status tags = NỀN ĐẶC semantic + chữ trắng (filled, theo yêu cầu).
+// `!` để override màu tint của Badge variant. Riêng contact-lead — không đụng badge chỗ khác.
+const STATUS_SOLID: Record<CustomerStatus, string> = {
+    new:        '!bg-[hsl(var(--warning))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    read:       '!bg-[hsl(var(--info))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    contacted:  '!bg-[hsl(var(--success))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    ignored:    '!bg-[hsl(var(--muted-foreground))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    subscribed: '!bg-[hsl(var(--info))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
 }
 
 export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
@@ -26,13 +40,17 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <span
-                    className={`inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default transition-all duration-150 hover:brightness-110 hover:scale-[1.03] ${STATUS_CLASSES[status]}`}
+                <Badge
+                    variant={STATUS_VARIANT[status]}
+                    dot
+                    className={cn(STATUS_SOLID[status], 'cursor-default')}
                 >
                     {labelMap[status]}
-                </span>
+                </Badge>
             </TooltipTrigger>
-            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{tooltipMap[status]}</TooltipContent>
+            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>
+                {tooltipMap[status]}
+            </TooltipContent>
         </Tooltip>
     )
 }

@@ -1,13 +1,13 @@
 /**
  * Lookup helper for per-tenant email template config (F32).
- * Cache: Upstash Redis with 300s TTL → fallback to Payload DB → null.
+ * Cache: Upstash Redis with 60s TTL → fallback to Payload DB → null.
  */
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { redis } from '../redis'
 import type { EmailTemplateConfig, EmailTemplateType, EmailRecipient } from './types'
 
-const CACHE_TTL_SECONDS = 300
+const CACHE_TTL_SECONDS = 60
 
 export function templateConfigCacheKey(
     tenantId: string | number,
@@ -18,7 +18,7 @@ export function templateConfigCacheKey(
 }
 
 /**
- * Returns config from Redis cache (5 min TTL) → Payload DB → null on miss.
+ * Returns config from Redis cache (60s TTL) → Payload DB → null on miss.
  * Does NOT cache null — missing rows skip caching so future creates are detected.
  */
 export async function getTemplateConfig(

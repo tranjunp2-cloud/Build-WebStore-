@@ -9,6 +9,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
 import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
@@ -27,9 +28,10 @@ import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
-import { buildImagePool } from '@/lib/ai/image-pool'
+import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
+import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
@@ -40,7 +42,9 @@ import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -114,12 +118,13 @@ export async function POST(req: NextRequest) {
         const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', generationLocale: requestedGenerationLocale, contentBrief: rawContentBrief } = data!
 
         // Normalize text inputs before sending to AI
-        const businessInfo = {
+        const normalizedBusinessInfo = {
             ...rawBusinessInfo,
             businessName: normalizeBusinessInput(rawBusinessInfo.businessName),
             shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
             products: normalizeBusinessInput(rawBusinessInfo.products),
         }
+
         const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
@@ -148,6 +153,23 @@ export async function POST(req: NextRequest) {
                     },
                 }
             )
+        }
+
+        // Translate user-supplied fields to the selected generation language when
+        // the input language differs (e.g. Vietnamese input + English site language).
+        // Runs after auth + rate-limit — prevents unauthenticated callers from
+        // triggering OpenAI API calls.
+        const targetInputLocale = requestedGenerationLocale || language || 'en'
+        const businessInfo = {
+            ...normalizedBusinessInfo,
+            ...(await translateUserInputsIfNeeded(
+                {
+                    businessName: normalizedBusinessInfo.businessName,
+                    shortDescription: normalizedBusinessInfo.shortDescription,
+                    products: normalizedBusinessInfo.products,
+                },
+                targetInputLocale,
+            ))
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)
@@ -394,24 +416,96 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Start sample product generation in parallel with site AI generation (non-blocking)
-        // Note: siteId intentionally omitted — products run before site row is created so site.id
-        // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
-        // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
-        // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
-        const sampleProductsPromise = generateSampleProducts(
-            businessInfo,
-            (language as 'en' | 'ms' | 'auto'),
-            String(resolvedTenantId),
-            payload,
-        )
+        // ── F3: Real SSE streaming — return response immediately, pipeline runs inside start() ──
+        // GH-1190: Previously entire pipeline ran synchronously before ReadableStream was created.
+        // Now we create the stream first and run the pipeline inside start() so the client
+        // receives SSE events in real-time instead of waiting 60-100s for the first byte.
+        const runGenPipeline = async (onEvent?: (e: SSEEvent) => void): Promise<{
+            result: GenerationResult
+            site: Record<string, unknown>
+            homepagePage: Record<string, unknown>
+            createdPages: Record<string, unknown>[]
+            pageFailures: Array<{ slug: string; title: string; error: string }>
+            productsCreatedCount: number
+            timeMs: number
+            productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+            normalizedPageLinks: Array<{ label: string; url: string }>
+        }> => {
+            // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
+            // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
+            const translateKeywordsPromise: Promise<string[]> = !ENABLE_DALLE_HERO
+                ? translateToEnglishKeywords({
+                    industry: businessInfo.industry,
+                    products: businessInfo.products,
+                }).then((r): string[] => r ?? []).catch((): string[] => [])
+                : Promise.resolve([] as string[])
 
-        // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
-        const { result, events } = await trackPhase('ai', () =>
-            withSentrySpan('ai.generateSite', () =>
-                generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
-            ),
-        )
+            // O1: pre-compute sync values and chain imagePool build off translation
+            // so the 2 Unsplash search calls run during AI generation (GH-1190).
+            // translateKeywordsPromise resolves in ~3-5s → buildImagePool starts at ~t=3s
+            // → finishes at ~t=5s — well before AI (~10-30s) completes.
+            // await below costs ~0ms in the common case.
+            const _parsedProductsForPool = !ENABLE_DALLE_HERO
+                ? parseProductsString(businessInfo.products) : []
+            const _presetCategoryForPool = !ENABLE_DALLE_HERO
+                ? resolveComposerCategory(businessInfo.industry) : ''
+            const _themeSeedForPool = !ENABLE_DALLE_HERO ? computeGenSeed(businessInfo) : 0
+            const _themeMoodForPool = !ENABLE_DALLE_HERO
+                ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
+
+            type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
+            const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
+                ? translateKeywordsPromise.then(async (aiKeywords): Promise<_PoolResult> => {
+                    const topProd = _parsedProductsForPool[0]
+                    let kws = aiKeywords.length > 0 ? [...aiKeywords] : []
+                    if (kws.length === 0) {
+                        const dictKw = translateProductTerm(topProd || '')
+                        if (dictKw) kws = [dictKw]
+                    }
+                    // Isolate buildImagePool failure so kws (englishKeywords) is always
+                    // preserved for the fulfillImageNeeds legacy search path even when
+                    // pool build fails (e.g. Unsplash 429 on demo key).
+                    let pool: ImagePool | null = null
+                    try {
+                        pool = await buildImagePool({
+                            category: _presetCategoryForPool,
+                            mood: _themeMoodForPool,
+                            topProduct: kws[0] || translateProductTerm(topProd || ''),
+                            products: kws.length > 0
+                                ? kws
+                                : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
+                            seed: _themeSeedForPool,
+                        })
+                    } catch {
+                        // pool stays null; kws still returned below for legacy search
+                    }
+                    return { pool, englishKeywords: kws }
+                }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
+                : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
+
+            // Start sample product generation AFTER imagePool completes to avoid competing
+            // for Unsplash rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
+            // sample products (~7-12s) then run during AI (~30-77s) so await below still
+            // costs ~0ms in the common case. Both phases use separate Unsplash search calls.
+            // Note: siteId intentionally omitted — products run before site row is created so site.id
+            // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
+            // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
+            // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
+            const sampleProductsPromise = imagePoolPromise.then(() =>
+                generateSampleProducts(
+                    businessInfo,
+                    (language as 'en' | 'ms' | 'auto'),
+                    String(resolvedTenantId),
+                    payload,
+                )
+            )
+
+            // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
+            const { result, events } = await trackPhase('ai', () =>
+                withSentrySpan('ai.generateSite', () =>
+                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
+                ),
+            )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -484,56 +578,15 @@ export async function POST(req: NextRequest) {
                 const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
-                    // Plan 260414-2249 phase-01: pass parsed user products into
-                    // media pipeline so deriveKeywords can drive Unsplash queries
-                    // from what the user actually sells (translated vi/ms → en).
-                    const parsedProducts = parseProductsString(businessInfo.products)
-                    // Plan 260414-2249 phase-02: resolve theme mood and pass it
-                    // so deriveKeywords appends mood imagery adjectives (e.g.
-                    // 'candlelit' for elegant, 'minimalist' for serene). Keeps
-                    // Unsplash queries per-mood coherent across all blocks on a site.
-                    const presetCategory = resolveComposerCategory(businessInfo.industry)
-                    const themeSeed = computeGenSeed(businessInfo)
-                    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
 
-                    // Plan 260414-2249 phase-03: build ONE per-site image pool
-                    // before fulfillment so all blocks share the same photographer,
-                    // lighting, mood. 1-2 Unsplash calls total (landscape + square)
-                    // — replaces 6-8 per-block calls and delivers visual cohesion.
-                    //
-                    // Plan 07 — pass top-3 products so two restaurants whose
-                    // first product collides still produce different queries.
-                    const topProduct = parsedProducts[0]
-
-                    // Plan 260424: Dynamic LLM Translation with Tier 2 Fallback
-                    let englishKeywords: string[] = []
-                    try {
-                        const aiTranslation = await translateToEnglishKeywords({
-                            industry: businessInfo.industry,
-                            products: businessInfo.products
-                        })
-                        if (aiTranslation && aiTranslation.length > 0) {
-                            englishKeywords = aiTranslation
-                        }
-                    } catch (e) {
-                        console.warn('[AI Translation] LLM failed, falling back to dictionary', e)
+                    // O1: await pre-built pool (GH-1190) — typically 0ms wait since
+                    // buildImagePool completed during AI generation above.
+                    const { pool: imagePool, englishKeywords } = await imagePoolPromise
+                    if (imagePool) {
+                        console.info(
+                            `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
+                        )
                     }
-
-                    if (englishKeywords.length === 0) {
-                        const dictKeyword = translateProductTerm(topProduct || '') 
-                        if (dictKeyword) englishKeywords.push(dictKeyword)
-                    }
-
-                    const imagePool = await buildImagePool({
-                        category: presetCategory,
-                        mood: themeMood,
-                        topProduct: englishKeywords[0] || translateProductTerm(topProduct || ''),
-                        products: englishKeywords.length > 0 ? englishKeywords : parsedProducts.slice(0, 3).map(p => translateProductTerm(p)),
-                        seed: themeSeed,
-                    })
-                    console.info(
-                        `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
-                    )
 
                     await trackPhase('media', () =>
                         fulfillImageNeeds(
@@ -543,9 +596,9 @@ export async function POST(req: NextRequest) {
                                 tenantId: String(resolvedTenantId),
                                 category: businessInfo.industry,
                                 language: resolvedLang,
-                                products: parsedProducts.length > 0 ? parsedProducts : undefined,
-                                mood: themeMood,
-                                pool: imagePool,
+                                products: _parsedProductsForPool.length > 0 ? _parsedProductsForPool : undefined,
+                                mood: _themeMoodForPool,
+                                pool: imagePool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
@@ -770,6 +823,20 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Pass 3 (GH-1266): coerce video/split-video variants that have no videoUrl to safe fallbacks.
+        // Must run on ALL block arrays: buildGeneratedPages uses result.pages[].blocks directly
+        // (multi-page AI response path) and ignores sanitizedBlocks, so coercing only sanitizedBlocks
+        // has no effect on the blocks that actually get saved to DB for multi-page sites.
+        // Same pattern as image-injection collectAllBlockBuckets (see route.ts:544-558).
+        if (Array.isArray(result.pages)) {
+            for (const page of result.pages as Array<{ blocks?: unknown[] }>) {
+                if (Array.isArray(page.blocks)) {
+                    coerceVideoVariants(page.blocks as Record<string, unknown>[])
+                }
+            }
+        }
+        coerceVideoVariants(sanitizedBlocks)
+
         const rawPageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
@@ -839,9 +906,11 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? stripArrayItemIds(
-                    stripNavOffset(
-                        sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                ? normalizeBlocksForPersistence(
+                    stripArrayItemIds(
+                        stripNavOffset(
+                            sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                        ) as Record<string, unknown>[]
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
@@ -1229,59 +1298,91 @@ export async function POST(req: NextRequest) {
             void _blogSeedTask()
         }
 
-        const timeMs = Date.now() - startTime
+            const timeMs = Date.now() - startTime
 
-        // Plan 260415 F01-gen-audit — single summary line per gen so ops can
-        // scan Vercel logs for phase breakdown without correlating manually.
-        // Use compact key=value so grep/jq can pull it out easily.
-        const phaseOther = Math.max(
-            0,
-            timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
-        )
-        console.info(
-            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
-        )
+            // Plan 260415 F01-gen-audit — single summary line per gen so ops can
+            // scan Vercel logs for phase breakdown without correlating manually.
+            // Use compact key=value so grep/jq can pull it out easily.
+            const phaseOther = Math.max(
+                0,
+                timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
+            )
+            console.info(
+                `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
+            )
 
-        // ── SSE Streaming Response ──
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
+        } // end runGenPipeline
+
+        // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
         if (isStreaming) {
-            const encoder = new TextEncoder()
-
-            const stream = new ReadableStream({
-                start(controller) {
-                    // Emit all events with delays for smooth animation
-                    const emitEvents = async () => {
-                        for (const event of events) {
-                            const sseData = `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`
-                            controller.enqueue(encoder.encode(sseData))
-                            // Small delay between events for visual effect
-                            await new Promise(resolve => setTimeout(resolve, 100))
-                        }
-
-                        // Emit products_generated event if any sample products were created
-                        if (productsCreatedCount > 0) {
-                            const productEventData = `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`
-                            controller.enqueue(encoder.encode(productEventData))
-                        }
-
-                        // Final done event with siteId
-                        const doneData = `event: done\ndata: ${JSON.stringify({
-                            siteId: site.id,
-                            pageId: homepagePage.id,
-                            siteName: result.siteName,
-                            siteLanguage: result.language || language,
-                            totalBlocks: result.blocks.length,
-                            totalPages: createdPages.length,
+            const _encoder = new TextEncoder()
+            return new Response(new ReadableStream<Uint8Array>({
+                async start(controller) {
+                    const onEvent = (e: SSEEvent) =>
+                        controller.enqueue(
+                            _encoder.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`),
+                        )
+                    try {
+                        const {
+                            result,
+                            site: _pipeSite,
+                            homepagePage,
+                            createdPages,
+                            productsCreatedCount,
                             timeMs,
-                        })}\n\n`
-                        controller.enqueue(encoder.encode(doneData))
-                        controller.close()
+                            normalizedPageLinks,
+                        } = await runGenPipeline(onEvent)
+
+                        // products_generated event
+                        if (productsCreatedCount > 0) {
+                            controller.enqueue(
+                                _encoder.encode(
+                                    `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`,
+                                ),
+                            )
+                        }
+
+                        // done event
+                        const doneData =
+                            `event: done\ndata: ${JSON.stringify({
+                                siteId: _pipeSite.id,
+                                pageId: (homepagePage as { id: unknown }).id,
+                                siteName: result.siteName,
+                                siteLanguage: result.language || language,
+                                totalBlocks: result.blocks.length,
+                                totalPages: createdPages.length,
+                                timeMs,
+                            })}\n\n`
+                        controller.enqueue(_encoder.encode(doneData))
+                    } catch (streamErr) {
+                        const errMsg =
+                            streamErr instanceof Error ? streamErr.message : String(streamErr)
+                        // Guard: if stream was canceled (client disconnected), enqueue throws —
+                        // wrap so error recovery below always runs regardless of stream state.
+                        try {
+                            controller.enqueue(
+                                _encoder.encode(
+                                    `event: error\ndata: ${JSON.stringify({ message: errMsg })}\n\n`,
+                                ),
+                            )
+                        } catch { /* stream already canceled — skip SSE write, still recover DB */ }
+                        // Error recovery: update site status if site was created before failure
+                        if (_site?.id && _payload) {
+                            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+                            await _payload
+                                .update({
+                                    collection: 'sites',
+                                    id: _site.id as string | number,
+                                    data: { generationStatus: status },
+                                })
+                                .catch(() => {})
+                        }
+                    } finally {
+                        try { controller.close() } catch { /* already closed */ }
                     }
-
-                    emitEvents().catch(() => controller.close())
                 },
-            })
-
-            return new Response(stream, {
+            }), {
                 headers: {
                     'Content-Type': 'text/event-stream',
                     'Cache-Control': 'no-cache',
@@ -1290,14 +1391,23 @@ export async function POST(req: NextRequest) {
             })
         }
 
-        // ── JSON Response (backward compatible) ──
+        // Non-streaming path (legacy — streaming is always used in production)
+        const {
+            result,
+            site,
+            homepagePage,
+            createdPages,
+            productsCreatedCount: _productsCreatedCount,
+            timeMs,
+        } = await runGenPipeline()
+
         return NextResponse.json({
             success: true,
             siteId: site.id,
-            pageId: homepagePage.id,
+            pageId: (homepagePage as { id: unknown }).id,
             siteName: result.siteName,
             siteLanguage: result.language || language,
-            siteType: safeSiteType,
+            siteType: resolveSiteType(result.siteType),
             blockCount: result.blocks.length,
             totalPages: createdPages.length,
             theme: result.theme,
@@ -1306,11 +1416,12 @@ export async function POST(req: NextRequest) {
 
     } catch (error: unknown) {
         // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
-        if (_site?.id && _payload) {
+        const _siteForCatch = _site as Record<string, unknown> | null
+        if (_siteForCatch?.id && _payload) {
             const status = _createdPagesCount > 0 ? 'completed' : 'failed'
             await _payload.update({
                 collection: 'sites',
-                id: _site.id as string | number,
+                id: _siteForCatch.id as string | number,
                 data: { generationStatus: status },
             }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
         }
@@ -1347,7 +1458,7 @@ export async function POST(req: NextRequest) {
             pgTable,
             pgColumn,
             pagesCreated: _createdPagesCount,
-            siteId: _site?.id ?? null,
+            siteId: _siteForCatch?.id ?? null,
         }))
         if (errStack) console.error('[AI Generate Site Error Stack]', debugId, errStack)
 
@@ -1463,7 +1574,7 @@ function createPageHero(baseHero: AIBlock | null, options: {
     hero.blockType = 'hero'
     // Validate variant against registry — AI may produce invalid variants
     const heroMeta = blockRegistry.getBlockMeta('hero')
-    const validVariants = heroMeta?.variants || ['centered', 'split', 'video', 'minimal']
+    const validVariants = heroMeta?.variants || ['centered', 'split-left', 'split-right', 'fullscreen', 'minimal']
     hero.variant = (typeof hero.variant === 'string' && validVariants.includes(hero.variant))
         ? hero.variant
         : 'centered'

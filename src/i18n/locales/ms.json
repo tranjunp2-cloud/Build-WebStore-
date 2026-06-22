@@ -833,6 +833,36 @@
             "notLive": "belum aktif.",
             "publishNow": "Terbitkan sekarang →"
         },
+        "onboarding": {
+            "title": "Sediakan Kedai Anda",
+            "subtitle": "Lengkapkan langkah-langkah ini untuk melancarkan kedai anda",
+            "completeLabel": "Selesai",
+            "continueBtn": "Teruskan",
+            "steps": {
+                "products": {
+                    "label": "Tambah Produk Pertama Anda",
+                    "description": "Buat katalog produk anda"
+                },
+                "design": {
+                    "label": "Sesuaikan Reka Bentuk Kedai",
+                    "description": "Pilih warna, fon, dan susun atur"
+                },
+                "payment": {
+                    "label": "Sediakan Pembayaran & Penghantaran",
+                    "description": "Konfigurasikan kaedah pembayaran dan pilihan penghantaran"
+                },
+                "publish": {
+                    "label": "Terbitkan Laman Web Anda",
+                    "description": "Jadikan kedai anda aktif"
+                }
+            },
+            "banner": {
+                "title": "Kedai Anda Hampir Siap!",
+                "description": "Lengkapkan persediaan pembayaran untuk menerbitkan laman web anda dan mula menjual dalam talian.",
+                "completeBtn": "Lengkapkan Persediaan",
+                "dismissBtn": "Saya akan buat nanti"
+            }
+        },
         "resetAccount": {
             "dangerZone": "Zon Bahaya",
             "stagingOnly": "Hanya untuk staging — tidak kelihatan dalam produksi",
@@ -1237,6 +1267,12 @@
                 "back": "Batal",
                 "submit": "Tolak Pembayaran",
                 "submitting": "Menolak..."
+            },
+            "filterLabels": {
+                "date": "Tarikh",
+                "status": "Status",
+                "payment": "Pembayaran",
+                "sort": "Susun"
             },
             "filterDates": {
                 "allDates": "Semua Tarikh",
@@ -1957,9 +1993,9 @@
                 "xenditConnectCta": "Sambung Akaun Xendit",
                 "xenditConnecting": "Mengalih ke Xendit...",
                 "xenditStep1": "Klik \"Sambung Akaun Xendit\"",
-                "xenditStep2": "Lengkapkan KYB Xendit dalam talian",
-                "xenditStep3": "TNG, GrabPay & lain-lain aktif serta-merta",
-                "xenditTrust": "Dijamin oleh Xendit · Patuh PCI DSS",
+                "xenditStep2": "Tampal Secret Key & Webhook Token anda",
+                "xenditStep3": "Kad, FPX & E-Wallet aktif serta-merta",
+                "xenditTrust": "Dijamin Xendit · PCI DSS Tahap 1",
                 "xenditSecretKeyLabel": "Secret Key",
                 "xenditSecretKeyPlaceholder": "xnd_development_... atau xnd_production_...",
                 "xenditSecretKeyStep1": "Xendit Dashboard → Settings → API Keys → + Generate secret key",
@@ -1972,6 +2008,11 @@
                 "xenditCallbackTokenStep2": "Di bawah Webhook verification token → klik View Webhook Verification Token",
                 "xenditCallbackTokenStep3": "Salin token dan tampal di sini",
                 "xenditSaveBtn": "Simpan sambungan Xendit",
+                "xenditModalTitle": "Sambungkan Akaun Xendit Anda",
+                "xenditModalSubtitle": "Tampal kelayakan Xendit anda di bawah untuk menghubungkan akaun dengan Prime Web. Kad, FPX & E-Wallet aktif sebaik pengesahan.",
+                "xenditConnectAccountBtn": "Sambung Akaun",
+                "xenditLoginPrompt": "Ada akaun Xendit?",
+                "xenditLoginLink": "Log masuk ke Xendit",
                 "xenditSaving": "Menyimpan...",
                 "xenditValidationRequired": "Sila isi kedua-dua medan.",
                 "xenditValidationKey": "Secret Key tidak sah. Mesti bermula dengan xnd_",
@@ -1981,11 +2022,12 @@
                 "xenditResendLink": "Hantar semula pautan",
                 "xenditConnected": "Disambungkan",
                 "xenditConnectedBar": "Akaun Xendit disambungkan",
+                "xenditConnectSuccess": "Xendit berjaya disambungkan!",
                 "xenditKybVerified": "API key disambungkan · Pembayaran aktif",
                 "xenditManage": "Urus dalam Xendit",
                 "xenditDisconnect": "Putuskan sambungan",
                 "xenditDisconnectTitle": "Putuskan sambungan Xendit?",
-                "xenditDisconnectDesc": "Pembeli tidak dapat membayar melalui TNG, GrabPay, FPX dan kaedah Malaysia lain sehingga disambungkan semula. Pesanan sedia ada tidak terjejas.",
+                "xenditDisconnectDesc": "Ini akan melumpuhkan pembayaran Xendit Card, FPX dan E-Wallet di kedai anda. Anda boleh sambung semula pada bila-bila masa.",
                 "xenditDisconnectKeep": "Kekal disambungkan",
                 "xenditPendingVerify": "Menunggu pengesahan",
                 "xenditTngDesc": "Dompet digital #1 Malaysia",
@@ -1995,7 +2037,13 @@
                 "xenditMaeDesc": "Dompet digital MAE oleh Maybank",
                 "xenditDuitnowDesc": "Imbas QR — semua bank Malaysia disokong",
                 "xenditFpxDesc": "Perbankan internet — peribadi & perniagaan",
-                "xenditLockTip": "Selesaikan onboarding Xendit untuk aktifkan"
+                "xenditLockTip": "Selesaikan onboarding Xendit untuk aktifkan",
+                "lastMethodWarning": "Sekurang-kurangnya satu kaedah pembayaran mesti kekal aktif.",
+                "cancel": "Batal",
+                "errAccountHolderRequired": "Nama pemegang akaun diperlukan.",
+                "errAccountNumberRequired": "Nombor akaun diperlukan.",
+                "errAccountNumberFormat": "Nombor akaun mesti sekurang-kurangnya 6 digit (nombor sahaja).",
+                "fixBankErrors": "Sila lengkapkan medan pindahan bank yang diperlukan."
             },
             "shipping": {
                 "pageTitle": "Penghantaran",
@@ -2295,6 +2343,9 @@
                 "allStatus": "Semua Status",
                 "draft": "Draf",
                 "published": "Diterbitkan",
+                "statusLabel": "Status",
+                "categoryLabel": "Kategori",
+                "sortLabel": "Susun",
                 "allCategories": "Semua Kategori",
                 "sortNewest": "Terbaru",
                 "sortOldest": "Tertua",
@@ -2487,10 +2538,26 @@
             },
             "pagination": {
                 "previous": "Sebelumnya",
-                "next": "Seterusnya"
+                "next": "Seterusnya",
+                "showing": "Menunjukkan",
+                "of": "daripada",
+                "unit": "siaran",
+                "rowsPerPage": "Baris setiap halaman:"
             },
             "noMatches": "Tiada kiriman yang sepadan dengan penapis anda",
             "resetFilters": "Set Semula Penapis"
+        },
+        "tenantAccessWatcher": {
+            "sessionExpiredTitle": "Sesi Tamat Tempoh",
+            "sessionExpiredBody": "Sesi anda telah tamat tempoh. Sila log masuk semula.",
+            "accessRevokedTitle": "Akses Dibatalkan",
+            "accessRevokedBody": "Akses anda ke ruang kerja ini telah dibuang oleh pemilik ruang kerja. Anda akan dilog keluar sekarang.",
+            "subscriptionExpiredTitle": "Langganan Tamat Tempoh",
+            "subscriptionExpiredBody": "Langganan anda telah tamat tempoh. Sila perbaharui pelan anda untuk meneruskan. Anda akan dilog keluar sekarang.",
+            "accountSuspendedTitle": "Akaun Digantung",
+            "accountSuspendedBody": "Akaun anda telah digantung. Sila hubungi sokongan. Anda akan dilog keluar sekarang.",
+            "acknowledge": "Akui",
+            "loggingOut": "Melog keluar..."
         }
     },
     "auth": {
@@ -3537,10 +3604,24 @@
             "phone": "Telefon",
             "selectPage": "Pilih halaman",
             "addSubLink": "Tambah sub-pautan",
-            "moveUp": "Alih ke atas",
-            "moveDown": "Alih ke bawah",
-            "moveLeft": "Alih ke kiri",
-            "makeSubItem": "Jadikan sub-item",
+            "moveUp": "Atas",
+            "moveDown": "Bawah",
+            "nestIn": "Sarangkan",
+            "nestInDisabledHint": "Item ini sudah mempunyai sub-item. Seret ke item lain untuk menyarangkannya — sub-itemnya akan naik supaya menu kekal pada 2 aras.",
+            "promote": "Naik taraf",
+            "delete": "Padam",
+            "addSubmenu": "Tambah submenu",
+            "linkType": "Jenis pautan",
+            "pageField": "Halaman",
+            "urlField": "URL",
+            "missingUrl": "URL tiada",
+            "namePlaceholder": "Nama pautan",
+            "submenuCount": "{count} submenu",
+            "submenuCountPlural": "{count} submenu",
+            "flattenTitle": "Sarang ini akan melebihi 2 aras",
+            "flattenBody": "Menu hanya menyokong 2 aras. Sub-item \"{name}\" akan naik ke aras yang sama di bawah \"{target}\".",
+            "flattenCancel": "Batal",
+            "flattenConfirm": "Sarang & ratakan",
             "quickLanguage": {
                 "title": "Bahasa Pantas",
                 "tooltip": "Aktifkan untuk menterjemah dan memaparkan laman web anda dalam pelbagai bahasa untuk pelanggan antarabangsa atau pelbagai etnik.",
@@ -3949,6 +4030,9 @@
         "loadError": "Ralat memuatkan pratonton. Sila pastikan anda telah log masuk dan mempunyai akses ke laman ini."
     },
     "storefront": {
+        "nav": {
+            "overflowMore": "Lagi"
+        },
         "products": {
             "home": "Utama",
             "title": "Produk",
@@ -3965,7 +4049,9 @@
             "selectVariant": "Pilih varian",
             "allProducts": "Semua Produk",
             "priceRange": "Julat Harga",
-            "applyFilter": "Gunakan Penapis"
+            "applyFilter": "Gunakan Penapis",
+            "stockLimitMessage": "Anda telah menambah stok maksimum yang tersedia ({cartQty}/{inventory}) ke dalam troli",
+            "stockLimitToast": "Kuantiti troli telah mencapai stok maksimum yang tersedia"
         },
         "blog": {
             "title": "Blog",

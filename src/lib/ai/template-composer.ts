@@ -124,11 +124,11 @@ const CATEGORY_HERO_VARIANTS: Record<string, string[]> = {
   restaurant: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
   ecommerce: ['slideshow', 'cards-overlay', 'gradient', 'split-right', 'magazine'],
   beauty: ['gradient', 'minimal', 'parallax', 'split-left', 'magazine'],
-  tech: ['gradient', 'split-video', 'minimal', 'parallax', 'cards-overlay'],
+  tech: ['gradient', 'minimal', 'parallax', 'cards-overlay'],
   health: ['centered', 'split-left', 'minimal', 'gradient', 'parallax'],
   education: ['centered', 'split-right', 'gradient', 'magazine', 'parallax'],
   realestate: ['fullscreen', 'parallax', 'slideshow', 'split-left', 'magazine'],
-  fitness: ['fullscreen', 'parallax', 'split-video', 'gradient', 'cards-overlay'],
+  fitness: ['fullscreen', 'parallax', 'gradient', 'cards-overlay'],
   creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
   business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
   fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
@@ -451,15 +451,23 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
   // product-derived cards instead of canned. Keeps canned count so layout
   // variants (grid-3, grid-4) still render cleanly.
   const userProducts = biz.products ?? []
+  // Skip user-provided product names when target lang is English but products contain
+  // non-ASCII characters (e.g. Vietnamese diacritics). Prevents mixed-language output
+  // like "Ship faster with our Phần mềm quản lý..." (GH-1184).
+  const hasNonAsciiProducts = language === 'en' && userProducts.some(p => /[^\x00-\x7F]/.test(p))
   const features =
-    userProducts.length >= 2
+    userProducts.length >= 2 && !hasNonAsciiProducts
       ? featuresFromProducts(userProducts, category, canned.length)
       : canned.map(localizeFeature)
+  // Skip non-ASCII tagline when target is English — avoids VN subheadline in EN features block (GH-1184).
+  const subheadline = (language === 'en' && biz.tagline && /[^\x00-\x7F]/.test(biz.tagline))
+    ? undefined
+    : biz.tagline
   return {
     blockType: 'features',
     variant: 'grid-3',
     headline: i18n.features.headlineWhyChoose(biz.name),
-    subheadline: biz.tagline,
+    subheadline,
     features,
   }
 }
@@ -925,34 +933,42 @@ function buildNewsletter(biz: BusinessSample): Record<string, unknown> {
 
 // ── Industry block builders ─────────────────────────────────────────────────
 
-// GH-1024: menu-display hidden — use menu-food (schema: price: string, tag?: string, no dietaryTags).
+// GH-1024: menu-display hidden — use menu-food (schema: price: string, currency: string, tag?: string, no dietaryTags).
+// GH-1219: prefer library block categories (already in canonical format) over hardcoded fallback.
 function buildMenuFood(content: CategoryContent): Record<string, unknown> {
-  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food')
+  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food') as Record<string, unknown> | undefined
+  const headline = (industryBlock?.headline as string) ?? (industryBlock?.title as string) ?? 'Our Menu'
+  const libCategories = Array.isArray(industryBlock?.categories) && (industryBlock.categories as unknown[]).length > 0
+    ? industryBlock.categories as unknown[]
+    : null
+
   return {
     blockType: 'menu-food',
     variant: 'classic',
-    headline: (industryBlock?.title as string) ?? 'Our Menu',
-    categories: [
+    headline,
+    categories: libCategories ?? [
       {
-        name: 'Nasi & Rice',
+        name: 'Mains',
         items: [
-          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: 'RM 12', tag: 'halal' },
-          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: 'RM 10', tag: 'spicy' },
-          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: 'RM 11', tag: 'halal' },
+          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: '12.00', currency: 'RM', tag: 'halal' },
+          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: '10.00', currency: 'RM', tag: 'spicy' },
+          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: '11.00', currency: 'RM', tag: 'halal' },
         ],
       },
       {
         name: 'Roti & Bread',
         items: [
-          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: 'RM 3', tag: 'vegetarian' },
-          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: 'RM 4', tag: 'halal' },
+          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: '3.00', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: '4.00', currency: 'RM', tag: 'halal' },
+          { name: 'Roti Bakar', description: 'Toasted bread with kaya and butter', price: '3.50', currency: 'RM' },
         ],
       },
       {
         name: 'Beverages',
         items: [
-          { name: 'Teh Tarik', description: 'Pulled milk tea', price: 'RM 3.50', tag: 'vegetarian' },
-          { name: 'Kopi O', description: 'Traditional black coffee', price: 'RM 3', tag: 'vegetarian' },
+          { name: 'Teh Tarik', description: 'Pulled milk tea', price: '3.50', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Kopi O', description: 'Traditional black coffee', price: '3.00', currency: 'RM', tag: 'vegetarian' },
+          { name: 'Fresh Lime Juice', description: 'Squeezed to order, served chilled', price: '4.50', currency: 'RM' },
         ],
       },
     ],

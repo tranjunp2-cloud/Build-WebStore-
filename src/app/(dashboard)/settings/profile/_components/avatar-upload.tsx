@@ -80,13 +80,13 @@ export function AvatarUpload({ currentAvatar, onUserUpdate }: Props) {
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 disabled={uploading}
-                className="absolute bottom-0 right-0 z-20 bg-[#44ddc1] rounded-[12px] p-2 flex items-center justify-center shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] disabled:opacity-50 transition-opacity hover:opacity-90"
+                className="absolute bottom-0 right-0 z-20 bg-[hsl(var(--primary))] rounded-[12px] p-2 flex items-center justify-center shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] disabled:opacity-50 transition-opacity hover:opacity-90"
                 aria-label={t.profile.banner.uploadAvatar}
             >
                 {uploading ? (
-                    <div className="size-[11px] animate-spin rounded-full border-2 border-[#0b1120]/30 border-t-[#0b1120]" />
+                    <div className="size-[11px] animate-spin rounded-full border-2 border-[hsl(var(--primary-foreground)/0.3)] border-t-primary-foreground" />
                 ) : (
-                    <Camera className="size-[11px] text-[#0b1120]" />
+                    <Camera className="size-[11px] text-[hsl(var(--primary-foreground))]" />
                 )}
             </button>
         </>

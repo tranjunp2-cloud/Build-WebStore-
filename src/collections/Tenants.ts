@@ -267,6 +267,17 @@ export const Tenants: CollectionConfig = {
             ],
         },
         {
+            name: 'migrationStatus',
+            type: 'select',
+            defaultValue: 'migrated',
+            options: [
+                { label: 'Migrated', value: 'migrated' },
+                { label: 'Pending', value: 'pending' },
+                { label: 'Failed', value: 'failed' },
+            ],
+            admin: { description: 'Migration status from legacy SSO system' },
+        },
+        {
             name: 'settings',
             type: 'group',
             fields: [
@@ -443,7 +454,7 @@ export const Tenants: CollectionConfig = {
                 {
                     name: 'payment_cod',
                     type: 'checkbox',
-                    defaultValue: false,
+                    defaultValue: true,
                     label: 'Cash on Delivery (COD)',
                     admin: { description: 'Enable Cash on Delivery' },
                 },

@@ -25,7 +25,7 @@ export function PeriodSelector() {
     }
 
     return (
-        <div className="flex flex-1 sm:flex-none items-center gap-[2px] rounded-[8px] bg-[#1F2937] p-[3px]">
+        <div className="flex flex-1 sm:flex-none items-center gap-[2px] rounded-[8px] bg-[hsl(var(--secondary))] p-[3px]">
             {PERIODS.map(p => {
                 const isActive = currentPeriod === p.id
                 return (
@@ -34,9 +34,9 @@ export function PeriodSelector() {
                         onClick={() => handleSelect(p.id)}
                         className={cn(
                             "px-[14px] py-[6px] text-[13px] font-semibold rounded-[6px] transition-all leading-none",
-                            isActive 
-                                ? "bg-[#161E2E] text-[#3B82F6] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)]" 
-                                : "text-[#9CA3AF] hover:text-[#E5E7EB] hover:bg-white/5"
+                            isActive
+                                ? "bg-[hsl(var(--card))] text-[hsl(var(--primary))] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)]"
+                                : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-white/5"
                         )}
                     >
                         {p.label}

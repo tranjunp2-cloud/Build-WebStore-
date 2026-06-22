@@ -58,7 +58,8 @@ vi.mock('next/link', () => ({
     default: ({ children }: any) => <a>{children}</a>
 }))
 vi.mock('next/navigation', () => ({
-    notFound: vi.fn()
+    notFound: vi.fn(),
+    usePathname: vi.fn().mockReturnValue('/sites/demo/products/test-product'),
 }))
 vi.mock('next/headers', () => ({
     headers: vi.fn().mockResolvedValue(new Map([

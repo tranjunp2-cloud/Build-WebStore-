@@ -25,7 +25,7 @@ import { CategoryModal } from '../_components/CategoryModal'
 
 const BlogRichEditor = dynamic(
     () => import('../_components/BlogRichEditor').then(mod => mod.BlogRichEditor),
-    { ssr: false, loading: () => <div className="flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden min-h-[523px] animate-pulse" /> }
+    { ssr: false, loading: () => <div className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] overflow-hidden min-h-[523px] animate-pulse" /> }
 )
 
 type BlogCategory = {
@@ -448,13 +448,13 @@ export default function BlogEditorPage() {
                     </div>
                     <div className="h-10 w-32 rounded-lg bg-white/5" />
                 </div>
-                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary))]/30 p-6 space-y-4">
                     <div className="h-4 w-24 rounded bg-white/5" />
                     <div className="h-12 w-full rounded-lg bg-white/5" />
                     <div className="h-4 w-20 rounded bg-white/5" />
                     <div className="h-10 w-full rounded-lg bg-white/5" />
                 </div>
-                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary))]/30 p-6 space-y-4">
                     <div className="h-4 w-32 rounded bg-white/5" />
                     <div className="h-48 w-full rounded-lg bg-white/5" />
                 </div>
@@ -501,22 +501,22 @@ export default function BlogEditorPage() {
                     <button
                         onClick={() => router.push('/blog')}
                         aria-label="Back to blog list"
-                        className="flex items-center justify-center w-[36px] h-[36px] rounded-[12px] hover:bg-[rgba(248,250,252,0.05)] transition-colors shrink-0"
+                        className="flex items-center justify-center w-[36px] h-[36px] rounded-[12px] hover:bg-[hsl(var(--muted))] transition-colors shrink-0"
                     >
-                        <ArrowLeft className="w-[18px] h-[18px] text-[rgba(248,250,252,0.6)]" strokeWidth={1.66} />
+                        <ArrowLeft className="w-[18px] h-[18px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.66} />
                     </button>
                     <div className="flex flex-col gap-[4px] min-w-0">
                         <div className="flex flex-row items-center gap-[8px] flex-wrap">
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[#F8FAFC]">
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-foreground">
                                 {isNew ? t.dashboard.blog.editor.newPost : `${t.dashboard.blog.editor.editPrefix} ${form.title || t.dashboard.blog.editor.untitled}`}
                             </span>
                         </div>
                         <div className="h-[32px] flex items-center">
-                            <h1 className="font-['Inter'] font-[700] text-[24px] leading-[32px] text-[#F8FAFC]">
+                            <h1 className="font-['Inter'] font-[700] text-[24px] leading-[32px] text-foreground">
                                 {isNew ? t.dashboard.blog.editor.createTitle : t.dashboard.blog.editor.editTitle}
                             </h1>
                         </div>
@@ -529,7 +529,7 @@ export default function BlogEditorPage() {
                     <button
                         onClick={() => setShowAIGenerator(true)}
                         className="flex flex-row items-center justify-center h-[44px] xl:h-[48px] w-[68px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95"
-                        style={{ background: 'linear-gradient(90deg, rgba(173, 70, 255, 1) 0%, rgba(246, 51, 154, 1) 100%)' }}
+                        style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <g clipPath="url(#clip0_30970_14228)">
@@ -552,14 +552,14 @@ export default function BlogEditorPage() {
                     <button
                         onClick={() => handleSave('draft')}
                         disabled={isSaving || success}
-                        className="flex flex-row items-center justify-center h-[46px] xl:h-[50px] w-[70px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] bg-[#1E293B] panel-outline hover:bg-[#1E293B]/80 transition-colors disabled:opacity-50"
+                        className="flex flex-row items-center justify-center h-[46px] xl:h-[50px] w-[70px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] bg-[hsl(var(--secondary))] panel-outline hover:bg-[hsl(var(--secondary))]/80 transition-colors disabled:opacity-50"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12.6667 2.5C13.1063 2.50626 13.5256 2.68598 13.8333 3L17 6.16667C17.314 6.47438 17.4937 6.89372 17.5 7.33333V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H12.6667Z" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M14.1666 17.5007V11.6673C14.1666 11.4463 14.0788 11.2343 13.9225 11.0781C13.7662 10.9218 13.5543 10.834 13.3333 10.834H6.66659C6.44557 10.834 6.23361 10.9218 6.07733 11.0781C5.92105 11.2343 5.83325 11.4463 5.83325 11.6673V17.5007" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M5.83325 2.5V5.83333C5.83325 6.05435 5.92105 6.26631 6.07733 6.42259C6.23361 6.57887 6.44557 6.66667 6.66659 6.66667H12.4999" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#F8FAFC]">{t.dashboard.blog.editor.saveDraft}</span>
+                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-foreground">{t.dashboard.blog.editor.saveDraft}</span>
                     </button>
 
                     {/* Publish Button — always shows icon + text */}
@@ -567,7 +567,7 @@ export default function BlogEditorPage() {
                         onClick={() => handleSave('published')}
                         disabled={isSaving || success}
                         className="flex flex-row items-center justify-center px-[24px] h-[48px] gap-[8px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
-                        style={{ background: 'linear-gradient(90deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(50, 162, 229, 1) 36%, rgba(48, 168, 225, 1) 43%, rgba(47, 174, 222, 1) 50%, rgba(46, 179, 218, 1) 57%, rgba(45, 185, 214, 1) 64%, rgba(45, 191, 209, 1) 71%, rgba(44, 196, 205, 1) 79%, rgba(44, 201, 201, 1) 86%, rgba(45, 207, 196, 1) 93%, rgba(45, 212, 191, 1) 100%)' }}
+                        style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                     >
                         {isSaving ? (
                             <Loader2 className="w-[20px] h-[20px] text-white animate-spin" />
@@ -594,14 +594,14 @@ export default function BlogEditorPage() {
 
 
                     {showDraftRecovery && (
-                        <div className="flex items-center justify-between rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-4 py-3">
-                            <p className="text-sm text-yellow-400">
+                        <div className="flex items-center justify-between rounded-lg bg-warning/10 border border-warning/30 px-4 py-3">
+                            <p className="text-sm text-warning">
                                 {t.dashboard.blog.editor.draftRecoveryMessage || 'Unsaved draft found. Restore it?'}
                             </p>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={restoreDraft}
-                                    className="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-sm font-medium text-yellow-300 hover:bg-yellow-500/30 transition-colors"
+                                    className="px-3 py-1.5 rounded-lg bg-warning/20 text-sm font-medium text-warning hover:bg-warning/30 transition-colors"
                                 >
                                     {t.dashboard.blog.editor.draftRestore || 'Restore'}
                                 </button>
@@ -621,56 +621,56 @@ export default function BlogEditorPage() {
                         }
                     `}</style>
 
-                    <div className="flex flex-col p-[24px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px]">
+                    <div className="flex flex-col p-[24px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-col gap-[8px]">
                             <div className="flex flex-row justify-between items-center h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.postTitle}</label>
-                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-red-400" : "text-[rgba(248,250,252,0.5)]")}>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-foreground">{t.dashboard.blog.editor.postTitle}</label>
+                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-destructive" : "text-[hsl(var(--muted-foreground))]")}>
                                     {form.title.length}/255 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
-                            <div className="flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
+                            <div className="flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
                                 <input
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => updateField('title', e.target.value)}
                                     maxLength={255}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] placeholder:text-[#737373]"
+                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
                                     placeholder={t.dashboard.blog.editor.titlePlaceholder}
                                 />
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
+                    <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
-                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
+                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">
                                 {t.dashboard.blog.editor.urlSlugLabel}
                             </label>
                         </div>
                         <div className="flex flex-row items-center gap-[8px]">
                             <div className="w-[124px] h-[20px]">
-                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.5)]">yoursite.com/blog/</span>
+                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">yoursite.com/blog/</span>
                             </div>
-                            <div className="flex-1 flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
+                            <div className="flex-1 flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
                                 <input
                                     type="text"
                                     value={form.slug}
                                     onChange={(e) => updateField('slug', formatSlugInput(e.target.value))}
                                     onBlur={(e) => updateField('slug', slugify(e.target.value))}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] placeholder:text-[#737373]"
+                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
                                     placeholder="ksd-vdf"
                                 />
                             </div>
                         </div>
                         {error === 'slug_invalid' && (
-                            <p className="text-xs text-red-400">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
+                            <p className="text-xs text-destructive">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
                         )}
                     </div>
 
-                    <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
+                    <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
-                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
+                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">
                                 {t.dashboard.blog.editor.thumbnailLabel}
                             </label>
                         </div>
@@ -684,22 +684,22 @@ export default function BlogEditorPage() {
                                 />
                                 <button
                                     onClick={(e) => { e.preventDefault(); setThumbnailPreview(null); setThumbnailFile(null); setThumbnailId(null) }}
-                                    className="absolute top-[8px] right-[8px] flex items-center justify-center rounded-[8px] bg-[rgba(11,17,32,0.6)] px-[12px] py-[6px] text-[12px] font-[500] text-white hover:bg-[rgba(11,17,32,0.8)] transition-colors panel-outline"
+                                    className="absolute top-[8px] right-[8px] flex items-center justify-center rounded-[8px] bg-[hsl(var(--background)/0.6)] px-[12px] py-[6px] text-[12px] font-[500] text-white hover:bg-[hsl(var(--background)/0.8)] transition-colors panel-outline"
                                 >
                                     {t.dashboard.blog.editor.replace}
                                 </button>
                             </div>
                         ) : (
-                            <label className="flex flex-col items-center justify-center cursor-pointer gap-[12px] py-[68px] h-[256px] border-2 border-dashed border-[rgba(255,255,255,0.08)] rounded-[16px] bg-transparent hover:bg-white/5 transition-colors">
-                                <div className="flex items-center justify-center w-[64px] h-[64px] rounded-[33554400px] bg-[rgba(59,130,246,0.1)]">
-                                    <Upload className="w-[32px] h-[32px] text-[#3B82F6]" strokeWidth={1.5} />
+                            <label className="flex flex-col items-center justify-center cursor-pointer gap-[12px] py-[68px] h-[256px] border-2 border-dashed border-[hsl(var(--border))] rounded-[16px] bg-transparent hover:bg-white/5 transition-colors">
+                                <div className="flex items-center justify-center w-[64px] h-[64px] rounded-[33554400px] bg-[hsl(var(--primary)/0.1)]">
+                                    <Upload className="w-[32px] h-[32px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
                                 </div>
                                 <div className="flex flex-col items-center w-full max-w-[250px] gap-[4px]">
                                     <div className="flex items-center justify-center w-full min-h-[20px] text-center">
-                                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.clickToUpload}</span>
+                                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-foreground">{t.dashboard.blog.editor.clickToUpload}</span>
                                     </div>
                                     <div className="flex flex-row justify-center w-full">
-                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.5)]">{t.dashboard.blog.editor.uploadHint}</span>
+                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.uploadHint}</span>
                                     </div>
                                 </div>
                                 <input
@@ -740,21 +740,21 @@ export default function BlogEditorPage() {
                 </div>
 
                 <div className="w-full xl:w-[512px] max-w-[512px] flex flex-col gap-[24px] flex-shrink-0">
-                    <div className="flex flex-col p-[25px] gap-[20px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px]">
+                    <div className="flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-row items-center gap-[12px] h-[28px]">
-                            <Tag className="w-[20px] h-[20px] text-[#3B82F6]" strokeWidth={1.5} />
-                            <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-[#F8FAFC]">{t.dashboard.blog.editor.postSettings}</span>
+                            <Tag className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
+                            <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-foreground">{t.dashboard.blog.editor.postSettings}</span>
                         </div>
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">{t.dashboard.blog.editor.category}</label>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.category}</label>
                             </div>
                             <Popover open={isCategoryDropdownOpen} onOpenChange={setIsCategoryDropdownOpen}>
                                 <PopoverTrigger asChild>
-                                    <div className="w-full flex items-center justify-between h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] cursor-pointer outline-none">
+                                    <div className="w-full flex items-center justify-between h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground cursor-pointer outline-none">
                                         <span className="truncate">{categories.find(c => String(c.id) === String(form.category))?.name || t.dashboard.blog.editor.noCategory}</span>
-                                        <ChevronDown className="w-[16px] h-[16px] text-[#9F9FA9] shrink-0" />
+                                        <ChevronDown className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))] shrink-0" />
                                     </div>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1.5 rounded-xl relative shadow-xl" style={{ minWidth: 'var(--radix-popover-trigger-width)', backgroundColor: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }} align="start">
@@ -784,7 +784,7 @@ export default function BlogEditorPage() {
                                     <div className="h-px my-1.5 mx-1" style={{ backgroundColor: 'var(--dash-border)' }} />
                                     <button
                                         onClick={() => { setIsCategoryDropdownOpen(false); setIsCategoryModalOpen(true); }}
-                                        className="flex w-full items-center gap-2 px-3 py-[10px] text-[14px] font-[500] font-['Inter'] leading-[1.4285714285714286em] text-cyan-400 hover:text-cyan-300 rounded-lg transition-colors"
+                                        className="flex w-full items-center gap-2 px-3 py-[10px] text-[14px] font-[500] font-['Inter'] leading-[1.4285714285714286em] text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] rounded-lg transition-colors"
                                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
                                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
                                     >
@@ -797,11 +797,11 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">{t.dashboard.blog.editor.author}</label>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.author}</label>
                             </div>
-                            <div className="flex flex-row items-center h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px]">
-                                <User className="w-[16px] h-[16px] text-[#9F9FA9]" strokeWidth={1.5} />
-                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA]">
+                            <div className="flex flex-row items-center h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px]">
+                                <User className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.5} />
+                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground">
                                     {getAuthorName()}
                                 </span>
                             </div>
@@ -809,38 +809,38 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">{t.dashboard.blog.editor.publishDate}</label>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.publishDate}</label>
                             </div>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <button className="flex flex-row items-center w-full h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px] text-left outline-none cursor-pointer">
-                                        <Calendar className="w-[16px] h-[16px] text-[#9F9FA9]" strokeWidth={1.5} />
+                                    <button className="flex flex-row items-center w-full h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px] text-left outline-none cursor-pointer">
+                                        <Calendar className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.5} />
                                         <span className={cn(
                                             "font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] flex-grow truncate",
-                                            !publishDate ? "text-[#737373]" : "text-[#FAFAFA]"
+                                            !publishDate ? "text-[hsl(var(--muted-foreground))]" : "text-foreground"
                                         )}>
                                             {publishDate ? format(publishDate, "MMM d, yyyy") : ""}
                                         </span>
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="dash-shell w-auto p-0 border-[rgba(255,255,255,0.08)] text-[#F8FAFC]" align="start" style={{ backgroundColor: 'var(--dash-bg)' }}>
+                                <PopoverContent className="dash-shell w-auto p-0 border-[hsl(var(--border))] text-foreground" align="start" style={{ backgroundColor: 'var(--dash-bg)' }}>
                                     <CalendarUI
                                         mode="single"
                                         selected={publishDate}
                                         onSelect={setPublishDate}
                                         initialFocus
-                                        className="bg-[#0B1120] rounded-[8px] [&_.rdp-day_button:hover]:bg-[#1E293B] [&_.rdp-day_button:focus]:bg-[#1E293B] [&_.rdp-day_button.rdp-selected]:bg-[#2DD4BF] [&_.rdp-day_button.rdp-selected]:text-white"
+                                        className="bg-[hsl(var(--background))] rounded-[8px] [&_.rdp-day_button:hover]:bg-[hsl(var(--secondary))] [&_.rdp-day_button:focus]:bg-[hsl(var(--secondary))] [&_.rdp-day_button.rdp-selected]:bg-[hsl(var(--primary))] [&_.rdp-day_button.rdp-selected]:text-white"
                                     />
                                 </PopoverContent>
                             </Popover>
                         </div>
                     </div>
 
-                    <div className="flex flex-col p-[25px] gap-[20px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px]">
+                    <div className="flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-row items-center justify-between w-full h-[32px]">
                             <div className="flex flex-row items-center gap-[12px] h-[28px]">
-                                <Sparkles className="w-[20px] h-[20px] text-[#2DD4BF]" strokeWidth={1.5} />
-                                <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-[#F8FAFC]">{t.dashboard.blog.editor.seoTitle}</span>
+                                <Sparkles className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
+                                <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-foreground">{t.dashboard.blog.editor.seoTitle}</span>
                             </div>
                             <button
                                 onClick={(e) => {
@@ -849,7 +849,7 @@ export default function BlogEditorPage() {
                                 }}
                                 disabled={isGeneratingSEO || (!form.title.trim() && !getContentText(form.content).trim())}
                                 className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
-                                style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
+                                style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                             >
                                 {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-white" strokeWidth={1.5} />}
                                 <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-white">{t.dashboard.blog.editor.generateSeo}</span>
@@ -858,20 +858,20 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[7px]">
                             <div className="h-[20px] w-full">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">{t.dashboard.blog.editor.metaTitle}</label>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.metaTitle}</label>
                             </div>
-                            <div className="flex flex-row items-center px-[12px] py-[4px] h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 w-full">
+                            <div className="flex flex-row items-center px-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))] w-full">
                                 <input
                                     type="text"
                                     value={form.seoTitle}
                                     onChange={e => updateField('seoTitle', e.target.value)}
                                     maxLength={60}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] placeholder:text-[#737373]"
+                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
                                     placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
                                 />
                             </div>
                             <div className="h-[16px] w-full flex items-center">
-                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.5)]">
+                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">
                                     {form.seoTitle.length}/60 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
@@ -879,19 +879,19 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[9px]">
                             <div className="h-[20px] w-full">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">{t.dashboard.blog.editor.metaDesc}</label>
+                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.metaDesc}</label>
                             </div>
-                            <div className="flex flex-row items-start px-[12px] py-[8px] h-[113px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 w-full">
+                            <div className="flex flex-row items-start px-[12px] py-[8px] h-[113px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))] w-full">
                                 <textarea
                                     value={form.seoDescription}
                                     onChange={e => updateField('seoDescription', e.target.value)}
                                     maxLength={160}
-                                    className="w-full h-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC] placeholder:text-[#737373] resize-none"
+                                    className="w-full h-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))] resize-none"
                                     placeholder={t.dashboard.blog.editor.seoDescPlaceholder}
                                 />
                             </div>
                             <div className="h-[16px] w-full flex items-center">
-                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.5)]">
+                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">
                                     {form.seoDescription.length}/160 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
@@ -903,10 +903,10 @@ export default function BlogEditorPage() {
             {/* AI Generator Modal */}
             {showAIGenerator && typeof document !== 'undefined' && createPortal(
                 <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
-                    <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[#1E293B] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[rgba(255,255,255,0.08)] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
+                    <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[hsl(var(--secondary))] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[hsl(var(--border))] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
                         {/* Mobile drag handle */}
                         <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
-                            <div className="bg-[rgba(255,255,255,0.2)] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
+                            <div className="bg-[hsl(var(--border))] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
                         </div>
                         {/* Header — mobile: compact 77px / desktop: 97px */}
                         <div
@@ -914,19 +914,19 @@ export default function BlogEditorPage() {
                             style={{ borderBottom: '1px solid var(--dash-border)' }}
                         >
                             <div className="flex flex-row items-center gap-[12px]">
-                                <div className="flex flex-row justify-center items-center w-[40px] h-[40px] rounded-[16px] shrink-0" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(45, 212, 191, 1) 100%)' }}>
+                                <div className="flex flex-row justify-center items-center w-[40px] h-[40px] rounded-[16px] shrink-0" style={{ background: 'linear-gradient(135deg,#3b82f6 0%,#2dd4bf 100%)' }}>
                                     <Sparkles className="w-[20px] h-[20px] text-white" strokeWidth={1.67} />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="font-['Inter'] font-[700] text-[18px] xl:text-[20px] leading-[28px] text-[#F8FAFC]">{t.dashboard.blog.editor.aiModalTitle}</span>
-                                    <span className="font-['Inter'] font-[400] text-[12px] xl:text-[14px] leading-[16px] xl:leading-[20px] text-[rgba(248,250,252,0.6)]">{t.dashboard.blog.editor.aiModalDesc}</span>
+                                    <span className="font-['Inter'] font-[700] text-[18px] xl:text-[20px] leading-[28px] text-foreground">{t.dashboard.blog.editor.aiModalTitle}</span>
+                                    <span className="font-['Inter'] font-[400] text-[12px] xl:text-[14px] leading-[16px] xl:leading-[20px] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.aiModalDesc}</span>
                                 </div>
                             </div>
                             <button
                                 onClick={(e) => { e.preventDefault(); setShowAIGenerator(false) }}
                                 className="flex items-center justify-center w-[36px] h-[36px] rounded-[12px] hover:bg-white/5 transition-colors shrink-0"
                             >
-                                <X className="w-[20px] h-[20px] text-[rgba(248,250,252,0.6)]" strokeWidth={1.67} />
+                                <X className="w-[20px] h-[20px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.67} />
                             </button>
                         </div>
 
@@ -936,21 +936,21 @@ export default function BlogEditorPage() {
                         >
                             <div className="flex flex-col gap-[8px] w-full">
                                 <div className="flex items-center w-full h-[20px]">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-[#F8FAFC]">{t.dashboard.blog.editor.aiTopicLabel}</span>
+                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground">{t.dashboard.blog.editor.aiTopicLabel}</span>
                                 </div>
-                                <div className="flex flex-row items-center px-[16px] py-[16px] xl:py-[4px] h-[58px] xl:h-[48px] bg-[#0B1120] border border-[rgba(255,255,255,0.08)] rounded-[16px] xl:rounded-[8px] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
+                                <div className="flex flex-row items-center px-[16px] py-[16px] xl:py-[4px] h-[58px] xl:h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[16px] xl:rounded-[8px] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
                                     <input
                                         value={aiPrompt}
                                         onChange={e => setAiPrompt(e.target.value)}
                                         placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                        className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[16px] leading-[24px] text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)]"
+                                        className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[16px] leading-[24px] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
                                     />
                                 </div>
                             </div>
 
                             <div className="flex flex-col gap-[12px] w-full">
                                 <div className="flex items-center h-[20px] w-full">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-[#F8FAFC]">{t.dashboard.blog.editor.aiToneLabel}</span>
+                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground">{t.dashboard.blog.editor.aiToneLabel}</span>
                                 </div>
                                 <div className="flex flex-col xl:flex-row justify-between gap-[8px] xl:gap-[12px] w-full">
                                     {([
@@ -963,9 +963,9 @@ export default function BlogEditorPage() {
                                             onClick={(e) => { e.preventDefault(); setAiTone(tone.key) }}
                                             className="flex flex-row items-center gap-[12px] shrink-0 xl:flex-1 h-[70px] xl:h-[56px] px-[17px] xl:px-0 xl:justify-center transition-all relative rounded-[16px]"
                                             style={aiTone === tone.key ? {
-                                                border: '1px solid #3B82F6',
-                                                background: 'rgba(59, 130, 246, 0.10)',
-                                                boxShadow: '0 0 20px 0 rgba(59, 130, 246, 0.30)'
+                                                border: '1px solid hsl(var(--primary))',
+                                                background: 'hsl(var(--primary)/0.1)',
+                                                boxShadow: '0 0 20px 0 hsl(var(--primary)/0.3)'
                                             } : {
                                                 border: '1px solid var(--dash-border)',
                                                 background: 'var(--dash-surface)'
@@ -973,10 +973,10 @@ export default function BlogEditorPage() {
                                         >
                                             <span className="text-[24px] xl:text-[18px] leading-[32px] shrink-0">{tone.emoji}</span>
                                             <div className="flex flex-col items-start xl:items-center flex-1 xl:flex-initial">
-                                                <span className={`font-['Inter'] font-[600] xl:font-[500] text-[14px] leading-[20px] ${aiTone === tone.key ? 'text-[#3B82F6]' : 'text-[#F8FAFC]'}`}>{tone.label}</span>
-                                                <span className="xl:hidden font-['Inter'] font-[500] text-[12px] leading-[16px] text-[rgba(248,250,252,0.5)]">{tone.desc}</span>
+                                                <span className={`font-['Inter'] font-[600] xl:font-[500] text-[14px] leading-[20px] ${aiTone === tone.key ? 'text-[hsl(var(--primary))]' : 'text-foreground'}`}>{tone.label}</span>
+                                                <span className="xl:hidden font-['Inter'] font-[500] text-[12px] leading-[16px] text-[hsl(var(--muted-foreground))]">{tone.desc}</span>
                                             </div>
-                                            {aiTone === tone.key && <Check className="xl:hidden w-[20px] h-[20px] text-[#3B82F6] shrink-0" strokeWidth={2} />}
+                                            {aiTone === tone.key && <Check className="xl:hidden w-[20px] h-[20px] text-[hsl(var(--primary))] shrink-0" strokeWidth={2} />}
                                         </button>
                                     ))}
                                 </div>
@@ -987,10 +987,10 @@ export default function BlogEditorPage() {
                                     onClick={handleGenerateWithAI}
                                     disabled={!aiPrompt.trim()}
                                     className="flex flex-row justify-center items-center gap-[8px] w-full h-[56px] xl:h-[48px] rounded-[16px] xl:rounded-[10px] shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all"
-                                    style={{ background: !aiPrompt.trim() ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                                    style={{ background: !aiPrompt.trim() ? 'hsl(var(--primary)/0.5)' : 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                                 >
                                     <Sparkles className="w-[20px] h-[20px] text-white" strokeWidth={1.67} />
-                                    <span className={`font-['Inter'] font-[600] text-[16px] leading-[24px] ${!aiPrompt.trim() ? 'text-[rgba(255,255,255,0.5)]' : 'text-white'}`}>
+                                    <span className={`font-['Inter'] font-[600] text-[16px] leading-[24px] ${!aiPrompt.trim() ? 'text-[hsl(var(--muted-foreground))]' : 'text-white'}`}>
                                         {t.dashboard.blog.editor.aiGenerateBtn}
                                     </span>
                                 </button>
@@ -1000,10 +1000,10 @@ export default function BlogEditorPage() {
                                     <button
                                         disabled
                                         className="flex flex-row justify-center items-center gap-[4px] w-full h-[56px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-all"
-                                        style={{ background: 'rgba(59, 130, 246, 0.5)' }}
+                                        style={{ background: 'hsl(var(--primary)/0.5)' }}
                                     >
-                                        <Loader2 className="w-[28px] h-[28px] text-[rgba(255,255,255,0.5)] animate-spin" />
-                                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[rgba(255,255,255,0.5)]">{t.dashboard.blog.editor.aiGenerating}</span>
+                                        <Loader2 className="w-[28px] h-[28px] text-[hsl(var(--muted-foreground))] animate-spin" />
+                                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.aiGenerating}</span>
                                     </button>
                                 </div>
                             )}
@@ -1011,17 +1011,17 @@ export default function BlogEditorPage() {
                             {(isGenerating || generatedAiContent) && (
                                 <div className="flex flex-col items-stretch self-stretch gap-[16px] w-full h-[366px] animate-in fade-in slide-in-from-top-4 duration-300">
                                     <div className="h-[20px] flex items-center">
-                                        <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.aiGeneratedContent}</span>
+                                        <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-foreground">{t.dashboard.blog.editor.aiGeneratedContent}</span>
                                     </div>
-                                    <div className={`relative flex flex-col items-stretch w-full ${(!isGenerating && generatedAiContent) ? 'h-[330px]' : 'h-[300px]'} bg-[#0B1120] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[16px] px-[17px] pt-[17px] pb-[1px] overflow-hidden`}>
+                                    <div className={`relative flex flex-col items-stretch w-full ${(!isGenerating && generatedAiContent) ? 'h-[330px]' : 'h-[300px]'} bg-[hsl(var(--background))] border-[1px] border-[hsl(var(--border))] rounded-[16px] px-[17px] pt-[17px] pb-[1px] overflow-hidden`}>
                                         {isGenerating ? (
                                             <div className="relative w-full h-[156px]">
-                                                <div className="absolute left-0 top-[0px] w-[522px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[28px] w-[620px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[56px] w-[556px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[84px] w-[646px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[112px] w-[546px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
-                                                <div className="absolute left-0 top-[140px] w-[657px] h-[16px] bg-[rgba(255,255,255,0.1)] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[0px] w-[522px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[28px] w-[620px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[56px] w-[556px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[84px] w-[646px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[112px] w-[546px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
+                                                <div className="absolute left-0 top-[140px] w-[657px] h-[16px] bg-[hsl(var(--muted))] opacity-[0.523] rounded-[4px] animate-pulse"></div>
                                             </div>
                                         ) : (
                                             <div className="w-full h-full overflow-y-auto pb-[16px] nice-scrollbar">
@@ -1031,7 +1031,7 @@ export default function BlogEditorPage() {
                                                         <p className="text-xs text-gray-500 mb-4">{t.dashboard.blog.editor.slugLabel} {slugify(generatedAiData.title)}</p>
                                                     </div>
                                                 )}
-                                                <div className="w-full font-['Inter'] font-[400] text-[14px] leading-[1.625em] tracking-[-0.0107em] text-[rgba(248,250,252,0.9)] whitespace-pre-wrap border-t border-[rgba(255,255,255,0.08)] pt-4">
+                                                <div className="w-full font-['Inter'] font-[400] text-[14px] leading-[1.625em] tracking-[-0.0107em] text-foreground whitespace-pre-wrap border-t border-[hsl(var(--border))] pt-4">
                                                     {generatedAiContent}
                                                 </div>
                                             </div>
@@ -1049,10 +1049,10 @@ export default function BlogEditorPage() {
                                 <button
                                     onClick={handleGenerateWithAI}
                                     disabled={isGenerating}
-                                    className="flex flex-row justify-center items-center gap-[6px] h-[48px] px-[16px] bg-[#0B1120] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 active:scale-95 transition-all w-full xl:w-auto"
+                                    className="flex flex-row justify-center items-center gap-[6px] h-[48px] px-[16px] bg-[hsl(var(--background))] border-[1px] border-[hsl(var(--border))] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 active:scale-95 transition-all w-full xl:w-auto"
                                 >
-                                    <RefreshCw className="w-[16px] h-[16px] text-[#FAFAFA]" />
-                                    <span className="font-['Inter'] font-[500] text-[14px] text-[#FAFAFA]">{t.dashboard.blog.editor.aiRegenerate}</span>
+                                    <RefreshCw className="w-[16px] h-[16px] !text-white" />
+                                    <span className="font-['Inter'] font-[500] text-[14px] !text-white">{t.dashboard.blog.editor.aiRegenerate}</span>
                                 </button>
 
                                 <button
@@ -1073,11 +1073,11 @@ export default function BlogEditorPage() {
                                         }
                                         setShowAIGenerator(false);
                                     }}
-                                    className="flex flex-row justify-center items-center gap-[6px] w-full xl:w-[187px] h-[48px] px-[10px] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 active:scale-95 transition-all"
-                                    style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
+                                    className="flex flex-row justify-center items-center gap-[6px] w-full xl:w-[187px] h-[48px] px-[10px] border-[1px] border-[hsl(var(--border))] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 active:scale-95 transition-all"
+                                    style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                                 >
-                                    <Check className="w-[16px] h-[16px] text-[#FAFAFA]" />
-                                    <span className="font-['Inter'] font-[500] text-[14px] text-[#FAFAFA]">{t.dashboard.blog.editor.aiInsertBtn}</span>
+                                    <Check className="w-[16px] h-[16px] !text-white" />
+                                    <span className="font-['Inter'] font-[500] text-[14px] !text-white">{t.dashboard.blog.editor.aiInsertBtn}</span>
                                 </button>
                             </div>
                         )}

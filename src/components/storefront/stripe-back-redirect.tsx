@@ -14,7 +14,7 @@ export function StripeBackRedirectScript() {
     return (
         <script
             dangerouslySetInnerHTML={{
-                __html: `(function(){try{var keys=['pw_stripe_pending','pw_xendit_pending'];for(var i=0;i<keys.length;i++){var r=sessionStorage.getItem(keys[i]);if(r){sessionStorage.removeItem(keys[i]);var d=JSON.parse(r);if(d&&d.orderId&&d.slug){location.replace('/sites/'+encodeURIComponent(d.slug)+'/order/'+encodeURIComponent(d.orderId)+'/confirm?cancelled=1');return;}}}}catch(e){}})();`,
+                __html: `(function(){try{var keys=['pw_stripe_pending','pw_xendit_pending'];for(var i=0;i<keys.length;i++){var r=sessionStorage.getItem(keys[i]);if(r){sessionStorage.removeItem(keys[i]);var d=JSON.parse(r);if(d&&d.orderId&&d.slug){var pfx=window.location.pathname.indexOf('/sites/')===0?'/sites/'+encodeURIComponent(d.slug):'';location.replace(pfx+'/order/'+encodeURIComponent(d.orderId)+'/confirm?cancelled=1');return;}}}}catch(e){}})();`,
             }}
         />
     )

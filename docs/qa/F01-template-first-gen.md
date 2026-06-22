@@ -245,6 +245,30 @@ test-cases: 18
   3. Extract page.slug from each page
 - **Expected:** Within each preset, all page slugs are unique. Homepage slug is '/' (first page). No two pages share the same slug.
 
+### TC-TF-022: MenuFoodBlock — returns null when categories is empty (GH-1219)
+- **Priority:** P1
+- **Type:** Unit (component)
+- **Steps:**
+  1. Render `MenuFoodBlock` with `categories: []`
+  2. Inspect the rendered container
+- **Expected:** Component returns null — `container.firstChild` is null. No blank section rendered.
+
+### TC-TF-023: validateBlocks gate — drops menu-food block when categories empty (GH-1219)
+- **Priority:** P1
+- **Type:** Unit (AI pipeline)
+- **Steps:**
+  1. Call `sanitizeBlockData` with `{ blockType: 'menu-food', categories: [] }`
+  2. Check `categories` field on the result
+- **Expected:** `categories` is still `[]` — the GH-1219 guard condition (`!Array.isArray(cats) || cats.length === 0`) evaluates to true, meaning the block would be dropped by `validateBlocks`.
+
+### TC-TF-024: validateBlocks gate — keeps menu-food block when categories non-empty (GH-1219)
+- **Priority:** P1
+- **Type:** Unit (AI pipeline)
+- **Steps:**
+  1. Call `sanitizeBlockData` with a valid `menu-food` block (2 categories, 3+ items each)
+  2. Check `categories` field on the result
+- **Expected:** `categories.length > 0` — the GH-1219 drop condition is false; block is kept.
+
 ## 5. Traceability Matrix
 
 | AC / FR | Test Cases | Coverage |

@@ -69,8 +69,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         >
             <div
                 className="flex flex-col w-full max-w-md"
@@ -112,8 +111,8 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                                 style={{
                                     padding: '10px 14px',
                                     borderRadius: 10,
-                                    border: `1px solid ${isSelected ? 'rgba(251,44,54,0.4)' : 'var(--dash-border)'}`,
-                                    background: isSelected ? 'rgba(251,44,54,0.06)' : 'transparent',
+                                    border: `1px solid ${isSelected ? 'hsl(var(--destructive)/0.4)' : 'hsl(var(--input-border))'}`,
+                                    background: isSelected ? 'hsl(var(--destructive)/0.06)' : 'transparent',
                                     cursor: isLoading ? 'not-allowed' : 'pointer',
                                 }}
                             >
@@ -121,11 +120,11 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                                     className="flex shrink-0 items-center justify-center rounded-full transition-all"
                                     style={{
                                         width: 18, height: 18,
-                                        border: `2px solid ${isSelected ? '#FB2C36' : 'var(--dash-text-muted)'}`,
+                                        border: `2px solid ${isSelected ? 'hsl(var(--destructive))' : 'var(--dash-text-muted)'}`,
                                     }}
                                 >
                                     {isSelected && (
-                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#FB2C36' }} />
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'hsl(var(--destructive))' }} />
                                     )}
                                 </div>
                                 <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)' }}>
@@ -192,11 +191,12 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         style={{
                             height: 48,
                             borderRadius: 12,
-                            background: isLoading ? 'rgba(251, 44, 54, 0.5)' : 'var(--dash-error)',
+                            background: 'hsl(var(--destructive))',
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 15,
                             color: '#FFFFFF',
+                            opacity: isLoading ? 0.5 : 1,
                             cursor: isLoading ? 'not-allowed' : 'pointer',
                         }}
                     >

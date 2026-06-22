@@ -32,7 +32,7 @@ type Props = {
 
 const TRIGGER_CLASS =
     'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
-    'text-slate-400 hover:text-white data-[state=active]:text-white'
+    'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
 
 export function TeamAccountTabs({ initialUser, staffProps }: Props) {
     const { t } = useI18n()
@@ -46,8 +46,8 @@ export function TeamAccountTabs({ initialUser, staffProps }: Props) {
         <Tabs defaultValue="profile" className="flex flex-col gap-6">
             {/* Page-level title above the tabs — synced with the Email Templates layout. */}
             <div>
-                <h1 className="text-[24px] font-bold text-white mb-1">{t.profile.teamTabs.pageTitle}</h1>
-                <p className="text-sm text-slate-400">{t.profile.teamTabs.pageSubtitle}</p>
+                <h1 className="text-[24px] font-bold text-[var(--dash-text)] mb-1">{t.profile.teamTabs.pageTitle}</h1>
+                <p className="text-sm text-[var(--dash-text-muted)]">{t.profile.teamTabs.pageSubtitle}</p>
             </div>
             <TabsList className="flex w-full justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
                 <TabsTrigger value="profile" className={TRIGGER_CLASS}>

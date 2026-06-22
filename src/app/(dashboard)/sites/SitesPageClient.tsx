@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Plus, Sparkles, Globe, Pencil, Eye, RefreshCw, LayoutTemplate } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { formatRelativeTime } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 type SiteDoc = {
     id: string
@@ -24,15 +24,15 @@ function StatusBadge({ status }: { status: string }) {
         draft: t.dashboard.sites.draft,
         published: t.dashboard.sites.published,
     }
-    const styles: Record<string, string> = {
-        draft: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-        published: 'bg-green-500/15 text-green-400 border-green-500/30',
-        archived: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
+    const variantMap: Record<string, 'success' | 'warning' | 'secondary'> = {
+        published: 'success',
+        draft: 'warning',
+        archived: 'secondary',
     }
     return (
-        <span className={cn('rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize', styles[status] || styles.draft)}>
+        <Badge variant={variantMap[status] ?? 'warning'}>
             {labels[status] || status}
-        </span>
+        </Badge>
     )
 }
 
@@ -40,7 +40,10 @@ function SiteTypeBadge({ type }: { type: string }) {
     const { t } = useI18n()
     const labels = t.dashboard.sites.siteTypes
     return (
-        <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+        <span
+            className="rounded-md px-2 py-0.5 text-[10px] font-medium"
+            style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }}
+        >
             {labels[type as keyof typeof labels] || type}
         </span>
     )
@@ -61,18 +64,18 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">{t.dashboard.sites.title}</h1>
+                        <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.dashboard.sites.title}</h1>
                     </div>
                 </div>
 
                 <div className="flex h-[50vh] items-center justify-center">
                     <div className="text-center">
-                        <Globe className="mx-auto h-12 w-12 text-gray-600" />
-                        <h2 className="mt-4 text-lg font-semibold text-white">{t.dashboard.sites.noSites}</h2>
-                        <p className="mt-1 text-sm text-gray-500">{t.dashboard.sites.noSitesDesc}</p>
+                        <Globe className="mx-auto h-12 w-12" style={{ color: 'var(--dash-text-muted)' }} />
+                        <h2 className="mt-4 text-lg font-semibold" style={{ color: 'var(--dash-text)' }}>{t.dashboard.sites.noSites}</h2>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--dash-text-muted)' }}>{t.dashboard.sites.noSitesDesc}</p>
                         <Link
                             href="/onboarding"
-                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all"
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:opacity-90 transition-all"
                         >
                             <Sparkles className="h-4 w-4" /> {t.dashboard.sites.createWebsite}
                         </Link>
@@ -91,14 +94,14 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">{t.dashboard.sites.title}</h1>
-                    <p className="mt-1 text-sm text-gray-400">
+                    <h1 className="text-2xl font-bold" style={{ color: 'var(--dash-text)' }}>{t.dashboard.sites.title}</h1>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--dash-text-muted)' }}>
                         {totalSites} site{totalSites !== 1 ? 's' : ''} &middot; {publishedCount} {t.dashboard.sites.published.toLowerCase()} &middot; {draftCount} {t.dashboard.sites.draft.toLowerCase()}
                     </p>
                 </div>
                 <Link
                     href="/onboarding"
-                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all"
+                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:opacity-90 transition-all"
                 >
                     <Plus className="h-4 w-4" /> {t.dashboard.sites.newSite}
                 </Link>
@@ -110,7 +113,16 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                     const isFailed = site.generationStatus === 'failed'
                     const primaryColor = site.theme?.primaryColor || '#0ea5e9'
                     return (
-                        <div key={site.id} className="group rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden hover:border-white/20 transition-all">
+                        <div
+                            key={site.id}
+                            className="group rounded-xl overflow-hidden transition-all"
+                            style={{
+                                background: 'var(--dash-surface)',
+                                border: '1px solid var(--dash-border)',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--dash-divider)')}
+                            onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--dash-border)')}
+                        >
                             {/* Color bar */}
                             <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)` }} />
 
@@ -118,15 +130,13 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                 {/* Header */}
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="truncate text-base font-semibold text-white">{site.name || t.dashboard.sites.untitledSite}</h3>
+                                        <h3 className="truncate text-base font-semibold" style={{ color: 'var(--dash-text)' }}>{site.name || t.dashboard.sites.untitledSite}</h3>
                                         {site.domain && (
-                                            <p className="mt-0.5 truncate text-xs text-gray-500">{site.domain}</p>
+                                            <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--dash-text-muted)' }}>{site.domain}</p>
                                         )}
                                     </div>
                                     {isFailed ? (
-                                        <span className="rounded-full border border-gray-500/30 bg-gray-500/15 px-2.5 py-0.5 text-[11px] font-medium text-gray-400">
-                                            {t.dashboard.sites.incomplete}
-                                        </span>
+                                        <Badge variant="secondary">{t.dashboard.sites.incomplete}</Badge>
                                     ) : (
                                         <StatusBadge status={site.status || 'draft'} />
                                     )}
@@ -135,7 +145,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                 {/* Meta */}
                                 <div className="mt-3 flex items-center gap-2">
                                     <SiteTypeBadge type={site.siteType || 'business'} />
-                                    <span className="text-[10px] text-gray-600">
+                                    <span className="text-[10px]" style={{ color: 'var(--dash-text-muted)' }}>
                                         {t.dashboard.sites.updatedLabel} {site.updatedAt ? formatRelativeTime(site.updatedAt) : t.dashboard.sites.updatedRecently}
                                     </span>
                                 </div>
@@ -146,13 +156,14 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                         <>
                                             <Link
                                                 href="/builder/new"
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-400 hover:bg-blue-600/25 transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--primary)/0.15)] px-3 py-2 text-xs font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.25)] transition-colors"
                                             >
                                                 <RefreshCw className="h-3 w-3" /> {t.dashboard.sites.retryAi}
                                             </Link>
                                             <Link
                                                 href="/templates"
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+                                                style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }}
                                             >
                                                 <LayoutTemplate className="h-3 w-3" /> {t.dashboard.sites.template}
                                             </Link>
@@ -161,14 +172,15 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                         <>
                                             <Link
                                                 href={`/editor/${site.id}`}
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600/15 px-3 py-2 text-xs font-medium text-blue-400 hover:bg-blue-600/25 transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--primary)/0.15)] px-3 py-2 text-xs font-medium text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.25)] transition-colors"
                                             >
                                                 <Pencil className="h-3 w-3" /> {t.dashboard.sites.edit}
                                             </Link>
                                             <Link
                                                 href={`/sites/${site.domain || site.id}`}
                                                 target="_blank"
-                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-xs font-medium text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                                                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+                                                style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }}
                                             >
                                                 <Eye className="h-3 w-3" /> {t.dashboard.sites.preview}
                                             </Link>

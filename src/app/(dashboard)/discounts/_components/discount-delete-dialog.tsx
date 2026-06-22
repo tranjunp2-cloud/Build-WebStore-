@@ -4,6 +4,8 @@ import { Trash2 } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 
@@ -33,23 +35,23 @@ export function DiscountDeleteDialog({
             >
                 {/* Icon */}
                 <div className="flex justify-center mb-2">
-                    <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-red-500/15">
-                        <Trash2 className="h-7 w-7 text-red-500" />
+                    <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-destructive/15">
+                        <Trash2 className="h-7 w-7 text-destructive" />
                     </div>
                 </div>
 
-                {/* Title */}
-                <h2 className="text-[15px] font-semibold" style={{ color: 'var(--dash-text)' }}>
+                {/* Title (DialogTitle — required by Radix for a11y) */}
+                <DialogTitle className="text-[15px] font-semibold" style={{ color: 'var(--dash-text)' }}>
                     {ti(d.deleteDialog.title, { code })}
-                </h2>
+                </DialogTitle>
 
                 {/* Description */}
-                <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--dash-text-muted)' }}>
+                <DialogDescription className="text-sm leading-relaxed mt-1" style={{ color: 'var(--dash-text-muted)' }}>
                     {d.deleteDialog.description}
-                </p>
+                </DialogDescription>
 
                 {usageCount > 0 && (
-                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 text-left mt-2">
+                    <div className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning text-left mt-2">
                         ⚠ {usageCount}{' '}
                         {usageCount === 1 ? d.deleteDialog.usageWarningOrder : d.deleteDialog.usageWarningOrders}{' '}
                         {d.deleteDialog.usageWarningSuffix}
@@ -66,7 +68,7 @@ export function DiscountDeleteDialog({
                         {d.deleteDialog.cancel}
                     </button>
                     <button
-                        className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                        className="flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive"
                         onClick={onConfirm}
                     >
                         <Trash2 className="h-3.5 w-3.5" />

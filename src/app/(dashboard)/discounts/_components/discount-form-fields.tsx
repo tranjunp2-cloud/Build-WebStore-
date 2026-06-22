@@ -4,6 +4,7 @@ import { Percent, Banknote, Info, CircleAlert } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtRM, MAX_FIXED_DISCOUNT_RM } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 
 export interface DiscountDraft {
     code: string
@@ -49,10 +50,10 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
         'w-full rounded-md border px-3 py-2 text-sm outline-none transition-colors'
     const inputStyle = {
         background: 'var(--dash-surface-hover)',
-        borderColor: 'var(--dash-border)',
+        borderColor: 'hsl(var(--input-border))',
         color: 'var(--dash-text)',
     } as React.CSSProperties
-    const inputErrorStyle = { ...inputStyle, borderColor: 'rgb(239,68,68)' }
+    const inputErrorStyle = { ...inputStyle, borderColor: 'hsl(var(--destructive))' }
     const labelStyle = { color: 'var(--dash-text)', fontSize: 13, fontWeight: 500 } as React.CSSProperties
     const helpStyle = { color: 'var(--dash-text-muted)', fontSize: 12 } as React.CSSProperties
 
@@ -67,7 +68,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {/* Code */}
             <div className="flex flex-col gap-1.5">
-                <label style={labelStyle}>{d.codeLabel} <span className="text-red-400">*</span></label>
+                <label style={labelStyle}>{d.codeLabel} <span className="text-destructive">*</span></label>
                 <input
                     className={`${inputBase} font-mono tracking-wider`}
                     style={errors.code ? inputErrorStyle : inputStyle}
@@ -81,7 +82,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     aria-describedby={errors.code ? 'discount-code-error' : undefined}
                 />
                 {errors.code
-                    ? <span id="discount-code-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.code}</span>
+                    ? <span id="discount-code-error" role="alert" className="flex items-center gap-1 text-xs text-destructive"><CircleAlert className="h-3 w-3 shrink-0" />{errors.code}</span>
                     : <span style={helpStyle}>{d.codeHelp}</span>
                 }
             </div>
@@ -119,17 +120,20 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
             {/* Type */}
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label style={labelStyle}>{d.typeLabel} <span className="text-red-400">*</span></label>
-                <div className="flex rounded-md border overflow-hidden w-fit" style={{ borderColor: 'var(--dash-border)' }}>
+                <label style={labelStyle}>{d.typeLabel} <span className="text-destructive">*</span></label>
+                <div className="flex rounded-md border overflow-hidden w-fit" style={{ borderColor: 'hsl(var(--input-border))' }}>
                     {(['percentage', 'fixed'] as const).map((tp) => (
                         <button
                             key={tp}
                             type="button"
                             onClick={() => { set('type', tp); set('valueInput', '') }}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors"
+                            className={cn(
+                                'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',
+                                draft.type === tp && 'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white'
+                            )}
                             style={
                                 draft.type === tp
-                                    ? { background: 'var(--brand, #14b8a6)', color: '#fff' }
+                                    ? undefined
                                     : { background: 'var(--dash-surface-hover)', color: 'var(--dash-text-muted)' }
                             }
                         >
@@ -142,22 +146,22 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
             {/* Value */}
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <label style={labelStyle}>{d.valueLabel} <span className="text-red-400">*</span></label>
+                <label style={labelStyle}>{d.valueLabel} <span className="text-destructive">*</span></label>
                 <div className="flex items-center gap-3">
                     {/* Affix-input group (per F33 design): unit label is a sibling panel with a divider,
                         not an overlay — keeps the native number spinner usable without overlapping the
                         RM/% label. Fixed → RM prefix (left); percentage → % suffix (right). */}
                     <div
-                        className="flex max-w-[220px] items-center overflow-hidden rounded-md border transition-colors focus-within:border-sky-500"
+                        className="flex max-w-[220px] items-center overflow-hidden rounded-md border transition-colors focus-within:border-[hsl(var(--primary))]"
                         style={{
                             background: 'var(--dash-surface-hover)',
-                            borderColor: errors.value ? 'rgb(239,68,68)' : 'var(--dash-border)',
+                            borderColor: errors.value ? 'hsl(var(--destructive))' : 'hsl(var(--input-border))',
                         }}
                     >
                         {draft.type === 'fixed' && (
                             <span
                                 className="flex h-9 shrink-0 items-center border-r px-3 text-xs font-semibold"
-                                style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)' }}
+                                style={{ color: 'var(--dash-text-muted)', borderColor: 'hsl(var(--input-border))' }}
                             >
                                 RM
                             </span>
@@ -178,7 +182,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                         {draft.type === 'percentage' && (
                             <span
                                 className="flex h-9 shrink-0 items-center border-l px-3 text-xs font-semibold"
-                                style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)' }}
+                                style={{ color: 'var(--dash-text-muted)', borderColor: 'hsl(var(--input-border))' }}
                             >
                                 %
                             </span>
@@ -190,7 +194,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                         </span>
                     )}
                     {fixedOverCap && (
-                        <span className="text-xs font-medium text-red-400">
+                        <span className="text-xs font-medium text-destructive">
                             {ti(d.valueMaxError, { max: MAX_FIXED_DISCOUNT_RM.toLocaleString('en-MY') })}
                         </span>
                     )}
@@ -199,7 +203,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     )}
                 </div>
                 {errors.value
-                    ? <span id="discount-value-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.value}</span>
+                    ? <span id="discount-value-error" role="alert" className="flex items-center gap-1 text-xs text-destructive"><CircleAlert className="h-3 w-3 shrink-0" />{errors.value}</span>
                     : <span style={helpStyle}>{draft.type === 'percentage' ? d.valueHelpPercentage : d.valueHelpFixed}</span>
                 }
             </div>
@@ -220,7 +224,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                     aria-describedby={errors.usageLimit ? 'discount-usagelimit-error' : undefined}
                 />
                 {errors.usageLimit
-                    ? <span id="discount-usagelimit-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.usageLimit}</span>
+                    ? <span id="discount-usagelimit-error" role="alert" className="flex items-center gap-1 text-xs text-destructive"><CircleAlert className="h-3 w-3 shrink-0" />{errors.usageLimit}</span>
                     : <span style={helpStyle}>{d.usageLimitHelp}</span>
                 }
             </div>
@@ -294,7 +298,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
                         aria-describedby={errors.dates ? 'discount-dates-error' : undefined}
                     />
                     {errors.dates
-                        ? <span id="discount-dates-error" role="alert" className="flex items-center gap-1 text-xs text-red-400"><CircleAlert className="h-3 w-3 shrink-0" />{errors.dates}</span>
+                        ? <span id="discount-dates-error" role="alert" className="flex items-center gap-1 text-xs text-destructive"><CircleAlert className="h-3 w-3 shrink-0" />{errors.dates}</span>
                         : <span style={helpStyle}>{d.expiresAtHelp}</span>
                     }
                 </div>

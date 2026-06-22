@@ -50,6 +50,10 @@ vi.mock('lucide-react', () => ({
     CheckCircle: () => <span data-testid="icon-checkcircle" />,
     CheckCircle2: () => <span data-testid="icon-checkcircle2" />,
     XCircle: () => <span data-testid="icon-xcircle" />,
+    Calendar: () => <span data-testid="icon-calendar" />,
+    CreditCard: () => <span data-testid="icon-creditcard" />,
+    ArrowDownUp: () => <span data-testid="icon-arrowdownup" />,
+    ChevronDown: () => <span data-testid="icon-chevron-down" />,
 }))
 
 // ── Mock next/image ──────────────────────────────────────────────────────
@@ -60,7 +64,6 @@ vi.mock('next/image', () => ({
 // ── Imports after mocks ──────────────────────────────────────────────────
 import { OrdersMetrics } from '@/app/(dashboard)/orders/_components/OrdersMetrics'
 import { OrdersActionBar } from '@/app/(dashboard)/orders/_components/OrdersActionBar'
-import { OrdersPagination } from '@/app/(dashboard)/orders/_components/OrdersPagination'
 import { CancelOrderModal } from '@/app/(dashboard)/orders/_components/CancelOrderModal'
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -250,14 +253,16 @@ describe('TC-F10.i18n.05 — OrdersActionBar dropdown i18n labels', () => {
         currentMockOrders = enOrders
     })
 
+    // The filters are shared <FilterChip> pills that render "{label} : {value}",
+    // so the chip's accessible name contains the i18n value; options appear on click.
     it('displays "All Dates" label from i18n by default', () => {
         render(<OrdersActionBar />)
-        expect(screen.getByText(enOrders.filterDates.allDates)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: new RegExp(enOrders.filterDates.allDates) })).toBeInTheDocument()
     })
 
     it('displays "All Status" label from i18n by default', () => {
         render(<OrdersActionBar />)
-        expect(screen.getByText(enOrders.filterStatus.allStatus)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: new RegExp(enOrders.filterStatus.allStatus) })).toBeInTheDocument()
     })
 
     it('displays search placeholder from i18n', () => {
@@ -265,48 +270,21 @@ describe('TC-F10.i18n.05 — OrdersActionBar dropdown i18n labels', () => {
         expect(screen.getByPlaceholderText(enOrders.search)).toBeInTheDocument()
     })
 
-    it('shows date filter options when dropdown is clicked', () => {
+    it('shows date filter options when the chip is clicked', () => {
         render(<OrdersActionBar />)
-        // Click the "All Dates" button to open dropdown
-        fireEvent.click(screen.getByText(enOrders.filterDates.allDates))
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(enOrders.filterDates.allDates) }))
 
-        // All date options should be visible
         expect(screen.getByText(enOrders.filterDates.today)).toBeInTheDocument()
         expect(screen.getByText(enOrders.filterDates.thisWeek)).toBeInTheDocument()
         expect(screen.getByText(enOrders.filterDates.thisMonth)).toBeInTheDocument()
     })
 
-    it('shows status filter options when dropdown is clicked', () => {
+    it('shows status filter options when the chip is clicked', () => {
         render(<OrdersActionBar />)
-        // Click the "All Status" button to open dropdown
-        fireEvent.click(screen.getByText(enOrders.filterStatus.allStatus))
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(enOrders.filterStatus.allStatus) }))
 
-        // Status options should be visible
         expect(screen.getByText(enOrders.status.pending)).toBeInTheDocument()
         expect(screen.getByText(enOrders.status.confirmed)).toBeInTheDocument()
-    })
-})
-
-// ═══════════════════════════════════════════════════════════════════════
-// SECTION 6: OrdersPagination Labels
-// ═══════════════════════════════════════════════════════════════════════
-describe('TC-F10.i18n.06 — OrdersPagination i18n labels', () => {
-    beforeEach(() => {
-        currentMockLocale = 'en'
-        currentMockOrders = enOrders
-    })
-
-    it('renders Previous and Next labels from i18n', () => {
-        render(
-            <OrdersPagination
-                currentPage={2}
-                totalPages={5}
-                onPageChange={vi.fn()}
-            />
-        )
-
-        expect(screen.getByText(enOrders.pagination.previous)).toBeInTheDocument()
-        expect(screen.getByText(enOrders.pagination.next)).toBeInTheDocument()
     })
 })
 

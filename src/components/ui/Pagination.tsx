@@ -47,7 +47,7 @@ export function Pagination({
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="flex items-center justify-center gap-1.5 px-3 h-8 text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white hover:bg-[#1E293B]/50 rounded-[8px] transition-colors disabled:opacity-50 disabled:pointer-events-none border-none outline-none bg-transparent cursor-pointer shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3 h-8 text-[14px] font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] rounded-[8px] transition-colors disabled:opacity-50 disabled:pointer-events-none border-none outline-none bg-transparent cursor-pointer shrink-0"
             >
                 <ChevronLeft className="w-4 h-4 shrink-0" />
                 <span>{previousLabel}</span>
@@ -57,7 +57,7 @@ export function Pagination({
                 {getVisiblePages().map((page, i) => {
                     if (page === '...') {
                         return (
-                            <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-[#F8FAFC]/60 text-[14px] shrink-0">
+                            <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-[hsl(var(--muted-foreground))] text-[14px] shrink-0">
                                 ...
                             </span>
                         )
@@ -68,9 +68,9 @@ export function Pagination({
                             onClick={() => onPageChange(page as number)}
                             className={cn(
                                 "w-8 h-8 min-w-[32px] flex flex-row items-center justify-center rounded-[8px] text-[14px] font-medium transition-colors cursor-pointer border-none outline-none shrink-0",
-                                currentPage === page 
-                                    ? "bg-[#1E293B] text-white shadow-sm" 
-                                    : "bg-transparent text-[#F8FAFC]/60 hover:bg-[#1E293B]/50 hover:text-white"
+                                currentPage === page
+                                    ? "bg-[hsl(var(--secondary))] text-[hsl(var(--foreground))] shadow-sm"
+                                    : "bg-transparent text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
                             )}
                         >
                             {page}
@@ -82,7 +82,7 @@ export function Pagination({
             <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="flex items-center justify-center gap-1.5 px-3 h-8 text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white hover:bg-[#1E293B]/50 rounded-[8px] transition-colors disabled:opacity-50 disabled:pointer-events-none border-none outline-none bg-transparent cursor-pointer shrink-0"
+                className="flex items-center justify-center gap-1.5 px-3 h-8 text-[14px] font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] rounded-[8px] transition-colors disabled:opacity-50 disabled:pointer-events-none border-none outline-none bg-transparent cursor-pointer shrink-0"
             >
                 <span>{nextLabel}</span>
                 <ChevronRight className="w-4 h-4 shrink-0" />

@@ -69,15 +69,15 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
     return (
         <div className="mb-3 space-y-3">
             {/* Products Management — stepper card */}
-            <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[var(--editor-border)] rounded-xl overflow-hidden">
                 <div className="flex items-center px-3 h-12">
                     <span className="text-sm font-medium text-white">{s.fcManagement}</span>
                 </div>
                 <div className="px-3 pb-3">
                     <div className="flex gap-4 items-center">
                         <div className="w-[100px] shrink-0">
-                            <p className="text-[12px] font-medium text-[#94a3b8] leading-4">{s.fcNumberOfProducts}</p>
-                            <p className="text-[10px] text-[#94a3b8] leading-4">{s.fcProductsMinMax}</p>
+                            <p className="text-[12px] font-medium text-[var(--editor-text-muted)] leading-4">{s.fcNumberOfProducts}</p>
+                            <p className="text-[10px] text-[var(--editor-text-muted)] leading-4">{s.fcProductsMinMax}</p>
                         </div>
                         <div className="flex flex-1 items-center justify-center gap-2">
                             <button
@@ -85,11 +85,11 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                                 aria-label={s.fcDecreaseProductCount}
                                 disabled={count <= 1}
                                 onClick={handleDecrement}
-                                className="h-[38px] w-[38px] rounded-xl bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] flex items-center justify-center text-blue-400 disabled:opacity-30 transition-colors"
+                                className="h-[38px] w-[38px] rounded-xl bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.3)] flex items-center justify-center text-blue-400 disabled:opacity-30 transition-colors"
                             >
                                 <Minus className="w-4 h-4" />
                             </button>
-                            <div className="h-[38px] w-11 rounded-xl bg-[rgba(31,41,55,0.5)] flex items-center justify-center text-white text-sm font-medium">
+                            <div className="h-[38px] w-11 rounded-xl bg-[var(--editor-surface-elevated)] flex items-center justify-center text-white text-sm font-medium">
                                 {count}
                             </div>
                             <button
@@ -97,7 +97,7 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                                 aria-label={s.fcIncreaseProductCount}
                                 disabled={count >= MAX_PRODUCTS}
                                 onClick={handleIncrement}
-                                className="h-[38px] w-[38px] rounded-xl border border-[rgba(31,41,55,0.3)] flex items-center justify-center text-gray-400 disabled:opacity-30 hover:bg-white/5 transition-colors"
+                                className="h-[38px] w-[38px] rounded-xl border border-[var(--editor-border)] flex items-center justify-center text-gray-400 disabled:opacity-30 hover:bg-white/5 transition-colors"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -107,8 +107,8 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
             </div>
 
             {/* Product tabs + fields */}
-            <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden p-px">
-                <div className="bg-[#080e1d] flex gap-2 p-1 rounded-xl">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[var(--editor-border)] rounded-xl overflow-hidden p-px">
+                <div className="bg-[var(--editor-bg)] flex gap-2 p-1 rounded-xl">
                     {(products.length > 0 ? products : [null]).map((_, i) => (
                         <button
                             key={i}
@@ -117,8 +117,8 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                             className={cn(
                                 'flex-1 py-2 rounded-lg text-[12px] font-bold transition-colors',
                                 safeTab === i
-                                    ? 'bg-[rgba(77,142,255,0.1)] text-[#adc6ff]'
-                                    : 'text-[#c2c6d6] hover:bg-white/5'
+                                    ? 'bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]'
+                                    : 'text-[var(--editor-text-muted)] hover:bg-white/5'
                             )}
                         >
                             {ti(s.productN, { n: i + 1 })}
@@ -129,7 +129,7 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                     {products[safeTab] && (
                         <div key={`${safeTab}-${removeVersion}`} className="space-y-3">
                             <div>
-                                <p className="text-[12px] font-medium text-[#94a3b8] mb-1.5">{s.name}</p>
+                                <p className="text-[12px] font-medium text-[var(--editor-text-muted)] mb-1.5">{s.name}</p>
                                 <Input
                                     defaultValue={products[safeTab].name || ''}
                                     placeholder={s.name}
@@ -138,7 +138,7 @@ export default function FeatureComparisonSettings({ block, blockIndex, onBlockUp
                                 />
                             </div>
                             <div className="flex items-center justify-between">
-                                <p className="text-[12px] font-medium text-[#94a3b8]">{s.highlighted}</p>
+                                <p className="text-[12px] font-medium text-[var(--editor-text-muted)]">{s.highlighted}</p>
                                 <button
                                     type="button"
                                     onClick={() => handleProductFieldChange('highlighted', !products[safeTab].highlighted)}

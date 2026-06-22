@@ -145,7 +145,7 @@ export function InlineEdit({
                         onChange={e => setEditValue(maxLength ? e.target.value.slice(0, maxLength) : e.target.value)}
                         onKeyDown={handleKeyDown}
                         rows={3}
-                        className="flex-1 rounded-md border border-blue-500/50 bg-[#1E293B] px-2 py-1.5 text-sm text-white outline-none resize-none"
+                        className="flex-1 rounded-md border border-blue-500/50 bg-[var(--editor-surface-elevated)] px-2 py-1.5 text-sm text-white outline-none resize-none"
                     />
                 ) : (
                     <input
@@ -153,7 +153,7 @@ export function InlineEdit({
                         value={editValue}
                         onChange={e => setEditValue(maxLength ? e.target.value.slice(0, maxLength) : e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 rounded-md border border-blue-500/50 bg-[#1E293B] px-2 py-1.5 text-sm text-white outline-none"
+                        className="flex-1 rounded-md border border-blue-500/50 bg-[var(--editor-surface-elevated)] px-2 py-1.5 text-sm text-white outline-none"
                     />
                 )}
                 <div className="flex flex-col gap-0.5">

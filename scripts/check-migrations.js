@@ -160,12 +160,14 @@ function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
   const columns = new Set()
 
-  // Match ALTER TABLE xxx ADD COLUMN IF NOT EXISTS yyy
-  const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
+  // Match ALTER TABLE xxx ADD COLUMN IF NOT EXISTS yyy <type>
+  // Capture the type word so we can scope _id-strip logic to integer FK columns only.
+  const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)\s*(\w+)?/gi
   let match
   while ((match = regex.exec(content)) !== null) {
     const table = match[1]
     const col = match[2]
+    const colType = (match[3] || '').toLowerCase()
     columns.add(`${table}.${col}`)
     // Also register without known group prefix (e.g., payment_config_enable_cod → enable_cod).
     // For upload/relationship columns ending in _id, also register without the _id suffix
@@ -179,6 +181,11 @@ function getMigrationColumns() {
         }
         break
       }
+    }
+    // Standalone relationship/upload FK columns: also register bare name for diff-based checks.
+    // Scoped to integer type only — varchar _id columns (e.g. stripe_account_id) are NOT FK aliases.
+    if (col.endsWith('_id') && colType === 'integer') {
+      columns.add(`${table}.${col.slice(0, -3)}`)
     }
   }
 

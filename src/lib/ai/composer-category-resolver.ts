@@ -25,7 +25,7 @@ export type ComposerCategory =
 // Keyword-to-category scoring table. Word-boundary match, case-insensitive.
 // VN tokens included where locally relevant.
 const COMPOSER_TYPE_KEYWORDS: Record<ComposerCategory, string[]> = {
-    restaurant: ['restaurant', 'dining', 'menu', 'chef', 'bistro', 'eatery', 'nhà hàng', 'quán ăn'],
+    restaurant: ['restaurant', 'dining', 'menu', 'chef', 'bistro', 'eatery', 'nhà hàng', 'quán ăn', 'cơm', 'bún', 'phở', 'hải sản', 'quán cơm', 'quán bún', 'quán phở', 'noodle', 'rice'],
     ecommerce:  ['ecommerce', 'shop', 'store', 'product', 'cart', 'checkout', 'retail', 'boutique', 'mua sắm', 'cửa hàng'],
     beauty:     ['beauty', 'spa', 'salon', 'skincare', 'cosmetic', 'nail', 'hair', 'makeup', 'lash', 'thẩm mỹ', 'làm đẹp'],
     tech:       ['saas', 'software', 'app', 'platform', 'startup', 'ai', 'dev', 'cloud', 'api', 'tech', 'công nghệ'],
@@ -33,7 +33,7 @@ const COMPOSER_TYPE_KEYWORDS: Record<ComposerCategory, string[]> = {
     education:  ['school', 'academy', 'tuition', 'course', 'training', 'kindergarten', 'bootcamp', 'education', 'trung tâm', 'giáo dục'],
     realestate: ['real estate', 'property', 'agent', 'condo', 'apartment', 'listing', 'realty', 'bất động sản', 'nhà đất'],
     fitness:    ['gym', 'fitness', 'yoga', 'pilates', 'crossfit', 'personal trainer', 'workout', 'phòng tập'],
-    fnb:        ['cafe', 'café', 'coffee', 'bakery', 'bubble tea', 'kopitiam', 'dessert', 'juice bar', 'tea', 'quán cafe', 'tiệm bánh'],
+    fnb:        ['cafe', 'café', 'coffee', 'bakery', 'bubble tea', 'kopitiam', 'dessert', 'juice bar', 'tea', 'quán cafe', 'tiệm bánh', 'trà sữa', 'trà', 'boba', 'nước ép', 'nước giải khát', 'giải khát', 'sinh tố', 'trà trái cây', 'milk tea', 'smoothie', 'juice'],
     events:     ['wedding', 'event', 'events', 'party', 'photography', 'venue', 'ceremony', 'planner', 'cưới hỏi', 'sự kiện'],
     travel:     ['travel', 'tour', 'hotel', 'resort', 'homestay', 'agency', 'trip', 'vacation', 'du lịch', 'khách sạn'],
     creative:   ['portfolio', 'photographer', 'designer', 'artist', 'freelance', 'studio', 'illustrator', 'creative'],

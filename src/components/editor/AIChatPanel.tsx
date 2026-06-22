@@ -340,7 +340,7 @@ function AIChatPanelInner({
     }
 
     return (
-        <div className="flex h-full flex-col bg-[#0F172A]">
+        <div className="flex h-full flex-col bg-[var(--editor-bg)]">
             <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
                 <div
                     className={cn(
@@ -355,7 +355,7 @@ function AIChatPanelInner({
                             if (msg.role === 'user') {
                                 return (
                                     <div key={msg.id} className="flex justify-end">
-                                        <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
+                                        <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
                                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                             {msg.createdAt ? (
                                                 <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
@@ -368,12 +368,12 @@ function AIChatPanelInner({
                             if (msg.isStreaming) {
                                 return (
                                     <div key={msg.id} className="flex">
-                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[var(--editor-surface-elevated)] px-4 py-3">
                                             <div className="flex items-center gap-2.5">
                                                 <div className="flex gap-1">
-                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:0ms]" />
-                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:150ms]" />
-                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:300ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:0ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:150ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[hsl(var(--primary))] [animation-delay:300ms]" />
                                                 </div>
                                                 <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || ac.thinking}</span>
                                             </div>
@@ -385,13 +385,13 @@ function AIChatPanelInner({
                             if (msg.undoable) {
                                 return (
                                     <div key={msg.id} className="flex">
-                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3 text-[#F8FAFC]">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[var(--editor-surface-elevated)] px-4 py-3 text-[var(--editor-text)]">
                                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                             <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
                                                 <button
                                                     type="button"
                                                     onClick={onUndoLastAction}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#2DD4BF] transition-all hover:bg-[#2DD4BF]/10 hover:text-[#5EEAD4]"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[hsl(var(--primary))] transition-all hover:bg-[hsl(var(--primary)/0.1)] hover:text-[hsl(var(--primary))]"
                                                 >
                                                     <RotateCcw className="h-3 w-3" />
                                                     {ac.undo}
@@ -408,7 +408,7 @@ function AIChatPanelInner({
                             return (
                                 <div key={msg.id} className="flex">
                                     <div className={cn(
-                                        'rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] text-[#F8FAFC]',
+                                        'rounded-2xl rounded-bl-md border border-white/[0.06] bg-[var(--editor-surface-elevated)] text-[var(--editor-text)]',
                                         compact ? 'max-w-[85%] px-4 py-3' : 'max-w-[85%] px-4 py-3',
                                     )}>
                                         <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
@@ -424,7 +424,7 @@ function AIChatPanelInner({
                     </div>
                 </div>
 
-                <div className={cn('border-t border-white/[0.06] bg-[#0B1120]/80 backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
+                <div className={cn('border-t border-white/[0.06] bg-[rgb(var(--editor-bg-rgb)/0.8)] backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
                     <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
                         <button
                             type="button"
@@ -442,7 +442,7 @@ function AIChatPanelInner({
                     </div>
 
                     <div className={cn(
-                        'group relative rounded-xl border border-white/[0.08] bg-[#1E293B]/80 pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[#1E293B] focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]',
+                        'group relative rounded-xl border border-white/[0.08] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[var(--editor-surface-elevated)] focus-within:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]',
                         compact && 'px-4 py-3',
                         blockContext && 'pt-2',
                     )}>
@@ -485,7 +485,7 @@ function AIChatPanelInner({
                             className={cn(
                                 'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
                                 input.trim() && !isProcessing
-                                    ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                    ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
                                     : 'bg-white/[0.06] text-slate-500',
                                 isProcessing && 'cursor-not-allowed',
                             )}

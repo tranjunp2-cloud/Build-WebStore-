@@ -10,7 +10,7 @@ export default function ForbiddenPage() {
             </p>
             <Link
                 href="/dashboard"
-                className="mt-6 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-500"
+                className="mt-6 rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 py-2.5 text-sm font-medium !text-white transition-colors hover:opacity-90"
             >
                 Go to Dashboard
             </Link>

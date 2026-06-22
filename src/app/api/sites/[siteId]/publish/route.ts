@@ -9,6 +9,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 /**
@@ -147,6 +148,30 @@ export async function PATCH(
             causeMsg?: string
             validationErrors?: Array<{ path?: string; message?: string }>
         }> = []
+        // Soft-deleted pages must NEVER be promoted: writing their main row trips the
+        // partial unique index pages_site_slug_uniq (site_id, slug) WHERE deleted_at IS
+        // NULL → Payload surfaces it as a "site_id, slug must be unique" ValidationError
+        // → 500. The deletedAt filter is unreliable through `draft: true` (it reads the
+        // version snapshot, not the live row), so resolve the live page ids from a plain
+        // (non-draft) query — that reads the main `pages` rows where deleted_at is accurate.
+        // Resolve deleted ids from the DB deleted_at column (only reliable source: a
+        // draft:true find reads stale version snapshots; a non-draft find can miss
+        // draft-only pages). Skip exactly these — never a live page.
+        const deletedPageIds = new Set<number>()
+        try {
+            const db = payload.db.drizzle as { execute: (q: unknown) => Promise<{ rows: Array<{ id: string | number }> }> }
+            const res = await db.execute(sql`SELECT id FROM pages WHERE site_id = ${Number(siteId)} AND deleted_at IS NOT NULL`)
+            res.rows.forEach((r) => deletedPageIds.add(Number(r.id)))
+        } catch (err) {
+            // Non-fatal: this is a safety filter, not core logic. A transient DB error
+            // here must NOT block an otherwise-valid publish — degrade to the empty set
+            // (pre-fix behavior). Worst case a soft-deleted page is promoted and trips
+            // the partial unique index → that page lands in failedPageIds with detail,
+            // which is strictly better than 500-ing the whole publish on a pool blip.
+            console.warn('[Publish] deletedPageIds query failed — skipping soft-delete filter',
+                err instanceof Error ? err.message : String(err))
+        }
+
         let hasMore = true
         let pageNum = 1
         while (hasMore) {
@@ -162,11 +187,20 @@ export async function PATCH(
 
             for (const pg of sitePages.docs) {
                 const pageId = String(pg.id)
+                // Never promote a soft-deleted page (see deletedPageIds above).
+                if (deletedPageIds.has(Number(pg.id))) continue
                 try {
                     // Promote full draft doc — strip system/version fields, keep
                     // everything else so published version matches latest draft.
+                    // `deletedAt` is stripped too: soft-delete state lives on the base
+                    // `pages` row (written via raw SQL, never through promote). The
+                    // draft snapshot carries deletedAt=null, so including it would reset
+                    // deleted_at→NULL and trip pages_site_slug_uniq. This is the 2nd
+                    // line of defence behind the deletedPageIds skip: even if a page is
+                    // soft-deleted *mid-publish* (after the deletedPageIds query) and
+                    // still reaches here, promote leaves deleted_at untouched → no 500.
                     const SYSTEM_FIELDS = new Set([
-                        'id', '_status', 'createdAt', 'updatedAt', 'sizes',
+                        'id', '_status', 'createdAt', 'updatedAt', 'sizes', 'deletedAt',
                         '_verificationToken', '_versionID', '_currentVersionId',
                         'publishedDoc', 'version', 'latest',
                     ])

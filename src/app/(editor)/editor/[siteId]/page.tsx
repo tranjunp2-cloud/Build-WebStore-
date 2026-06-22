@@ -2037,7 +2037,19 @@ export default function EditorPage() {
                     currentPageId={currentPageId}
                     siteStatus={site?.status}
                     onPageSelected={handlePageSelected}
-                    onPagesChanged={() => setIframeKey(key => key + 1)}
+                    onPagesChanged={async () => {
+                        setIframeKey(key => key + 1)
+                        // Re-sync the page list from the server after create/delete so the
+                        // panel reflects the change immediately (no manual reload). no-store
+                        // guarantees a fresh read; setPages is the single source of truth.
+                        try {
+                            const r = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include', cache: 'no-store' })
+                            if (r.ok) {
+                                const d = await r.json()
+                                if (Array.isArray(d?.pages)) setPages(d.pages)
+                            }
+                        } catch { /* non-fatal — optimistic addPageToState already applied */ }
+                    }}
                     onEditPage={() => setActiveSidebarTab('chat')}
                 />
             ) : null}

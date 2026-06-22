@@ -37,30 +37,12 @@ vi.mock('@/app/(dashboard)/blog/actions', () => ({
 }))
 
 // Mock child components that have heavy deps
-vi.mock('@/app/(dashboard)/blog/_components/FilterDropdown', () => ({
-    FilterDropdown: ({ placeholder, value, onChange, options }: any) => (
-        <select
-            data-testid={`filter-${placeholder}`}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-        >
-            {options?.map((o: any) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-        </select>
-    ),
-}))
-
 vi.mock('@/app/(dashboard)/blog/_components/CategoryModal', () => ({
     CategoryModal: ({ onClose }: { onClose: () => void }) => (
         <div data-testid="category-modal">
             <button onClick={onClose}>Close</button>
         </div>
     ),
-}))
-
-vi.mock('@/app/(dashboard)/blog/_components/BlogPagination', () => ({
-    BlogPagination: () => <div data-testid="blog-pagination" />,
 }))
 
 vi.mock('@/i18n', () => ({

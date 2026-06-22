@@ -13,8 +13,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 type={type}
                 className={cn(
                     variant === 'editor'
-                        ? 'flex h-9 w-full rounded-[10px] border border-[rgba(59,130,246,0.2)] bg-[rgba(11,17,32,0.5)] px-3 py-2 text-sm leading-5 text-[#F8FAFC] shadow-none outline-none placeholder:text-[#64748B] focus-visible:border-[rgba(59,130,246,0.45)] focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 transition-colors'
-                        : 'flex h-10 w-full rounded-lg border border-white/10 bg-[#0F172A] px-3 py-2 text-base md:text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-600 focus-visible:outline-none focus-visible:border-blue-500 focus-visible:ring-1 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors',
+                        ? 'flex h-9 w-full rounded-[10px] border border-[var(--editor-border)] bg-[var(--editor-surface)] px-3 py-2 text-sm leading-5 text-[var(--editor-text)] shadow-none outline-none placeholder:text-[var(--editor-text-muted)] focus-visible:border-[hsl(var(--ring))] focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 transition-colors'
+                        : 'flex h-10 w-full rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-base md:text-sm text-[hsl(var(--foreground))] file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[hsl(var(--muted-foreground))] focus-visible:outline-none focus-visible:border-[hsl(var(--ring))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50 transition-colors',
                     className,
                 )}
                 ref={ref}

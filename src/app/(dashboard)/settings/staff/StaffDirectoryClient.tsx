@@ -2,8 +2,12 @@
 
 import React, { useState, useMemo, useTransition } from 'react';
 import { useI18n } from '@/i18n';
-import { Users, UserPlus, Trash2, Loader2, Search, Edit2 } from 'lucide-react';
+import { Users, UserPlus, Trash2, Loader2, Search, Edit2, SearchX } from 'lucide-react';
 import { toast } from 'sonner';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table';
+import { TablePagination } from '@/components/ui/table-pagination';
+import { TableEmptyState } from '@/components/ui/table-empty-state';
+import { Button } from '@/components/ui/button';
 import { removeStaff } from './actions';
 import { StaffDrawer } from './StaffDrawer';
 import { RemoveStaffModal } from './RemoveStaffModal';
@@ -102,59 +106,77 @@ export function StaffDirectoryClient({
             {/* Page Header — Figma 31058:693 */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex flex-col">
-                    <div className="m-0 p-0 text-[30px] font-bold text-[#F8FAFC] leading-[1.2em] font-['Inter']">{t?.Staff?.title || 'Staff Management'}</div>
-                    <div className="m-0 p-0 mt-[2px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">{t?.Staff?.description || 'Manage your team members and their access permissions'}</div>
+                    <div className="m-0 p-0 text-[30px] font-bold text-[var(--dash-text)] leading-[1.2em] font-['Inter']">{t?.Staff?.title || 'Staff Management'}</div>
+                    <div className="m-0 p-0 mt-[2px] text-[14px] font-normal text-[var(--dash-text-muted)] leading-[1.428em] font-['Inter']">{t?.Staff?.description || 'Manage your team members and their access permissions'}</div>
                 </div>
 
                 <div className="flex items-center gap-[12px]">
                     {/* Invite Staff Button — Figma 31058:699 */}
-                    <button
+                    <Button
                         type="button"
                         onClick={() => { setEditingStaff(null); setIsDrawerOpen(true); }}
-                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)', boxShadow: '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' }}
-                        className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                        variant="dashPrimary"
+                        size="dash"
+                        className="whitespace-nowrap font-['Inter']"
                     >
-                        <UserPlus className="h-5 w-5" />
+                        <UserPlus className="h-4 w-4" />
                         <span>{t?.Staff?.inviteBtn || 'Invite Staff'}</span>
-                    </button>
+                    </Button>
                 </div>
             </div>
 
 
 
-            {/* Table Area — Figma 31058:706 */}
-            <div className="overflow-hidden rounded-[16px] border border-white/[0.08] bg-[#1E293B]">
-                {/* Heading 2 — Figma 31058:708 */}
-                <div className="py-[16px] px-[24px] pb-[1px] border-b border-white/[0.08]">
-                    <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">{t?.Staff?.directoryTitle || 'Staff Directory'}</h2>
-                </div>
-
+            {/* Table Area — shared <Table> (GH-1222); relative wrapper hosts the loader overlay */}
+            <div className="relative">
                 {/* Loader overlay */}
                 {isPending && (
-                    <div className="absolute inset-0 z-50 bg-[#0B1120]/50 flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                    <div className="absolute inset-0 z-50 bg-black/30 flex items-center justify-center rounded-[12px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--primary))]" />
                     </div>
                 )}
-                
-                {/* Card Gap: 24px — Figma 31058:706 */}
-                <div className="overflow-x-auto mt-[24px]">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead>
-                            <tr>
-                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
-                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
-                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
-                                <th style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+
+                {/* Empty state — shown in place of the table when no staff match */}
+                {filteredStaff.length === 0 ? (
+                    debouncedSearch ? (
+                        <TableEmptyState
+                            icon={<SearchX />}
+                            title={t?.Staff?.emptyState?.noMatch || 'No staff members match your search.'}
+                        />
+                    ) : (
+                        <TableEmptyState
+                            icon={<Users />}
+                            title={t?.Staff?.emptyState?.noStaff || 'No staff members found.'}
+                        />
+                    )
+                ) : (
+                    <Table
+                        minWidth={800}
+                        footer={(
+                            <TablePagination
+                                page={currentPage}
+                                total={filteredStaff.length}
+                                limit={itemsPerPage}
+                                onPageChange={setCurrentPage}
+                                labels={{ unit: t?.Staff?.title || 'staff' }}
+                            />
+                        )}
+                    >
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</TableHead>
+                                <TableHead>{t?.Staff?.table?.role || 'ROLE'}</TableHead>
+                                <TableHead>{t?.Staff?.table?.status || 'STATUS'}</TableHead>
+                                <TableHead>{t?.Staff?.table?.actions || 'ACTIONS'}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {currentStaffPage.map((user) => {
                                 const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
                                     user.email.split('@')[0];
                                 const isOwner = user.role === 'owner';
-                                
+
                                 const isSelf = user.id === currentUserId;
-                                const isTargetOwner = user.role === 'owner';
                                 const amIOwner = currentUserRole === 'owner';
 
                                 // Owner can edit/delete anyone except themselves (to prevent accidental self-demotion or error)
@@ -162,135 +184,95 @@ export function StaffDirectoryClient({
                                 const canDelete = !isSelf && amIOwner;
 
                                 return (
-                                    <tr key={user.id} className="h-[73px] hover:bg-white/[0.02] transition-colors group">
+                                    <TableRow key={user.id} className="hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors group">
                                         {/* NAME / EMAIL */}
-                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
+                                        <TableCell className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex items-center gap-[12px]">
                                                 {user.avatar ? (
                                                     <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-full object-cover" />
                                                 ) : (
                                                     <div
                                                         className="h-[40px] w-[40px] rounded-full flex items-center justify-center text-white text-[14px] font-semibold font-['Inter'] leading-[1.428em]"
-                                                        style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(45, 212, 191, 1) 100%)' }}
+                                                        style={{ background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)' }}
                                                     >
                                                         {displayName.substring(0, 2).toUpperCase()}
                                                     </div>
                                                 )}
                                                 <div className="flex flex-col h-[40px] justify-center gap-[0px]">
-                                                    <span className="text-[14px] font-medium text-[#F8FAFC] leading-[1.428em] font-['Inter']">{displayName}</span>
-                                                    <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter'] max-w-[200px] truncate block" title={user.email}>{user.email}</span>
+                                                    <span className="text-[14px] font-medium text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{displayName}</span>
+                                                    <span className="text-[12px] font-normal text-[var(--dash-text-muted)] leading-[1.333em] font-['Inter'] max-w-[200px] truncate block" title={user.email}>{user.email}</span>
                                                 </div>
                                             </div>
-                                        </td>
+                                        </TableCell>
 
                                         {/* ROLE */}
-                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
+                                        <TableCell className="px-4 py-3 whitespace-nowrap">
                                             {isOwner ? (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--info)/0.1)] border border-[hsl(var(--info)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--info))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
                                                 </div>
                                             ) : user.role === 'custom' ? (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(240,177,0,0.1)] border border-[rgba(240,177,0,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#FDC700] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.custom || 'Custom Features'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--warning))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.custom || 'Custom Features'}</span>
                                                 </div>
                                             ) : (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(0,201,80,0.1)] border border-[rgba(0,201,80,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Manager'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--success)/0.1)] border border-[hsl(var(--success)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--success))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Manager'}</span>
                                                 </div>
                                             )}
-                                        </td>
+                                        </TableCell>
 
                                         {/* STATUS */}
-                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap">
+                                        <TableCell className="px-4 py-3 whitespace-nowrap">
                                             {user.status === 'active' ? (
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.active || 'Active'}</span>
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--success))]"></div>
+                                                    <span className="text-[14px] font-normal text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.active || 'Active'}</span>
                                                 </div>
                                             ) : user.status === 'suspended' ? (
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#EF4444]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.suspended || 'Suspended'}</span>
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--destructive))]"></div>
+                                                    <span className="text-[14px] font-normal text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.suspended || 'Suspended'}</span>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[rgba(248,250,252,0.3)]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.pending || 'Pending'}</span>
+                                                    <div className="w-[8px] h-[8px] rounded-full" style={{ background: 'var(--dash-text-muted)', opacity: 0.5 }}></div>
+                                                    <span className="text-[14px] font-normal text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.pending || 'Pending'}</span>
                                                 </div>
                                             )}
-                                        </td>
+                                        </TableCell>
 
                                         {/* ACTIONS */}
-                                        <td style={{ borderBottom: '1px solid var(--dash-border)' }} className="px-[24px] whitespace-nowrap relative">
+                                        <TableCell className="px-4 py-3 whitespace-nowrap relative">
                                             {(!canEdit && !canDelete) ? (
-                                                <span className="text-[14px] font-normal text-[rgba(248,250,252,0.4)] leading-[1.428em] font-['Inter']">—</span>
+                                                <span className="text-[14px] font-normal text-[var(--dash-text-muted)] leading-[1.428em] font-['Inter']">—</span>
                                             ) : (
-                                                <div className="flex items-center gap-[16px]">
+                                                <div className="flex items-center gap-1">
                                                     {canEdit && (
-                                                        <button
-                                                            type="button"
+                                                        <TableActionButton
                                                             onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
-                                                            className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
                                                             title={t?.Staff?.tooltip?.edit || 'Edit Details'}
                                                         >
-                                                            <Edit2 className="w-[18px] h-[18px] text-[#3B82F6]" strokeWidth={2.5} />
-                                                        </button>
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </TableActionButton>
                                                     )}
-                                                    
                                                     {canDelete && (
-                                                        <button
-                                                            type="button"
+                                                        <TableActionButton
+                                                            variant="danger"
                                                             onClick={() => handleRemove(user.id)}
-                                                            className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
                                                             title={t?.Staff?.tooltip?.remove || 'Remove User'}
                                                         >
-                                                            <Trash2 className="w-[18px] h-[18px] text-[#FF6467]" strokeWidth={2.5} />
-                                                        </button>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </TableActionButton>
                                                     )}
                                                 </div>
                                             )}
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 );
                             })}
-
-                            {currentStaffPage.length === 0 && (
-                                <tr>
-                                    <td colSpan={4} className="px-[24px] py-[60px] text-center text-[rgba(248,250,252,0.6)]">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <Users className="w-10 h-10 text-slate-600" />
-                                            <p>{debouncedSearch ? (t?.Staff?.emptyState?.noMatch || 'No staff members match your search.') : (t?.Staff?.emptyState?.noStaff || 'No staff members found.')}</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination (Inline flow) */}
-                {totalPages > 1 && (
-                    <div className="h-[56px] border-t border-white/[0.08] flex items-center justify-between px-[24px] bg-[#1E293B]">
-                        <span className="text-[13px] text-slate-400">
-                            {(t?.Staff?.pagination?.showing || 'Showing {from} to {to} of {total} results').replace('{from}', String((currentPage - 1) * itemsPerPage + 1)).replace('{to}', String(Math.min(currentPage * itemsPerPage, filteredStaff.length))).replace('{total}', String(filteredStaff.length))}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium text-slate-300 bg-[#1E293B] border border-white/[0.08] hover:bg-[#1E293B]/80 disabled:opacity-50"
-                            >
-                                {t?.Staff?.pagination?.previous || 'Previous'}
-                            </button>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium text-slate-300 bg-[#1E293B] border border-white/[0.08] hover:bg-[#1E293B]/80 disabled:opacity-50"
-                            >
-                                {t?.Staff?.pagination?.next || 'Next'}
-                            </button>
-                        </div>
-                    </div>
+                        </TableBody>
+                    </Table>
                 )}
             </div>
 

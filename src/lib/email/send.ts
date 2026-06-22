@@ -31,16 +31,24 @@ export async function sendEmail({ to, subject, html, templateType, recipient, te
             }
         }
 
-        await payload.sendEmail({
-            to,
-            subject,
-            html,
-        })
-
-        console.log(`[Email] Sent to ${to}: ${subject}`)
-        return true
+        // Retry up to 2 times for transient SMTP/SES failures (500ms, 1000ms backoff).
+        // Last attempt rethrows to outer catch — the unreachable branch after the loop is intentionally absent.
+        const MAX_ATTEMPTS = 3
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                await payload.sendEmail({ to, subject, html })
+                console.log(`[Email] Sent to ${to}: ${subject}${attempt > 1 ? ` (attempt ${attempt})` : ''}`)
+                return true
+            } catch (err) {
+                if (attempt === MAX_ATTEMPTS) throw err
+                console.warn(`[Email] Attempt ${attempt} failed, retrying in ${500 * attempt}ms...`)
+                await new Promise(r => setTimeout(r, 500 * attempt))
+            }
+        }
+        /* istanbul ignore next — rethrow on final attempt exits loop via throw, not here */
+        return false
     } catch (error) {
-        console.error('[Email] Failed:', error)
+        console.error('[Email] Failed after 3 attempts:', error)
         return false
     }
 }

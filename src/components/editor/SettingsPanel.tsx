@@ -49,6 +49,16 @@ function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
 }
 
+/** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
+function deriveOgUrl(ogImage: string | number | null | undefined): string | null {
+    if (!ogImage) return null
+    if (typeof ogImage === 'string') return ogImage
+    if (typeof ogImage === 'object' && 'url' in (ogImage as object)) {
+        return (ogImage as { url?: string }).url ?? null
+    }
+    return null
+}
+
 /** Check if input contains HTML/script injection */
 function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
@@ -72,11 +82,11 @@ type SocialWidgetLink = {
 }
 
 const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { mark: string; accent: string }> = {
-    facebook: { mark: 'f', accent: '#2563eb' },
-    whatsapp: { mark: 'wa', accent: '#16a34a' },
-    instagram: { mark: 'ig', accent: '#db2777' },
-    linkedin: { mark: 'in', accent: '#0284c7' },
-    youtube: { mark: '▶', accent: '#dc2626' },
+    facebook: { mark: 'f', accent: 'hsl(var(--primary))' }, // BLUE: facebook link → primary (action/brand link)
+    whatsapp: { mark: 'wa', accent: 'hsl(var(--success))' },
+    instagram: { mark: 'ig', accent: 'hsl(var(--info))' }, // pink #db2777 solo accent → info (FLAG: pink)
+    linkedin: { mark: 'in', accent: 'hsl(var(--info))' }, // #0284c7 sky/info
+    youtube: { mark: '▶', accent: 'hsl(var(--destructive))' },
 }
 
 const FOOTER_SOCIAL_PLATFORMS = [
@@ -132,7 +142,7 @@ function PhoneCountryPicker({ value, onChange }: { value: string; onChange: (cod
                 <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
             </button>
             {open && (
-                <div className="absolute left-0 top-[calc(100%+6px)] z-50 min-w-[140px] overflow-hidden rounded-xl border border-[rgba(59,130,246,0.2)] bg-[#0b1120] py-1 shadow-lg">
+                <div className="absolute left-0 top-[calc(100%+6px)] z-50 min-w-[140px] overflow-hidden rounded-xl border border-[hsl(var(--primary)/0.2)] bg-[var(--editor-bg)] py-1 shadow-lg">
                     {PHONE_COUNTRIES.map(c => (
                         <button
                             key={c.code}
@@ -368,6 +378,18 @@ function SettingsPanelInner({
     const [seoTitleInput, setSeoTitleInput] = useState('')
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
     const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
+    const [ogImageDisplayUrl, setOgImageDisplayUrl] = useState<string | null>(
+        () => deriveOgUrl(site?.seo?.ogImage)
+    )
+
+    useEffect(() => {
+        const val = site?.seo?.ogImage
+        // Skip re-sync when value is a bare numeric ID — that means an optimistic write
+        // is in flight and there is no URL to derive. Leaving the local display URL alone
+        // prevents the image preview from vanishing immediately after upload.
+        if (typeof val === 'number') return
+        setOgImageDisplayUrl(deriveOgUrl(val))
+    }, [site?.seo?.ogImage])
 
     const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -409,7 +431,7 @@ function SettingsPanelInner({
     const siteBranding = site?.branding || {}
 
     const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
-    const globalAccordionBodyCls = 'rounded-b-xl border border-t-0 border-white/[0.08] bg-[#0F172A] px-4 py-4'
+    const globalAccordionBodyCls = 'rounded-b-xl border border-t-0 border-white/[0.08] bg-[var(--editor-surface)] px-4 py-4'
 
     const renderGlobalAccordion = (
         id: keyof typeof openGlobalSections,
@@ -455,20 +477,20 @@ function SettingsPanelInner({
                         className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
                     <input value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
-                        className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
+                        className="flex-1 rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
                 </div>
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.headingFont}</label>
                 <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
                     {HEADING_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.bodyFont}</label>
                 <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
                     {BODY_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
@@ -751,20 +773,21 @@ function SettingsPanelInner({
 
                 <div className={sectionCls}>
                     <label className="text-xs font-medium uppercase text-gray-500">{s.googlePreview}</label>
-                    <div className="mt-3 rounded-[8px] border border-[#25324A] bg-white p-4">
-                        <div className="text-[14px] text-[#202124] truncate" style={{ fontFamily: 'arial,sans-serif' }}>
-                            <span className="text-[12px] text-[#202124] flex items-center gap-2">
+                    {/* Google SERP mimic — intentional: bg-white + text colors simulate Google search result appearance */}
+                    <div className="mt-3 rounded-[8px] border border-[var(--editor-border)] bg-white p-4">
+                        <div className="text-[14px] truncate" style={{ fontFamily: 'arial,sans-serif', color: '#202124' }}>{/* Google SERP mimic — intentional: màu literal, bỏ class text-[#202124] để không bị .editor-shell remap về --editor-text ở dark */}
+                            <span className="text-[12px] flex items-center gap-2" style={{ color: '#202124' }}>
                                 <Globe2 className="w-4 h-4 text-slate-400" />
                                 {siteName || 'Your Website'}
                             </span>
                         </div>
-                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{ fontFamily: 'arial,sans-serif' }}>
+                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
                             https://{previewDomain}/{normalizedPreviewPath}
                         </div>
-                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{ fontFamily: 'arial,sans-serif' }}>
+                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
                             {seoTitleValue || 'Page Title'}
                         </div>
-                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{ fontFamily: 'arial,sans-serif' }}>
+                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
                             {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
                         </div>
                     </div>
@@ -775,9 +798,10 @@ function SettingsPanelInner({
                         <label className={labelCls}>{s.socialImage}</label>
                     </div>
                     <OgImageEditor
-                        currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
-                        onOgImageChange={(url) => {
-                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                        currentOgImage={ogImageDisplayUrl}
+                        onOgImageChange={(mediaId, url) => {
+                            setOgImageDisplayUrl(url)
+                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: mediaId } })
                         }}
                     />
                 </div>
@@ -832,7 +856,7 @@ function SettingsPanelInner({
                                 setIsGeneratingSEO(false)
                             }
                         }}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,hsl(var(--info))_0%,hsl(var(--primary))_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
                     >
                         {isGeneratingSEO ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1004,8 +1028,8 @@ function SettingsPanelInner({
                 {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
                 <div ref={breadcrumbSectionRef} className={sectionCls}>
                     <div className="flex items-center gap-2 mb-4">
-                        <ListTree className="h-4 w-4 text-[#2dd4bf]" aria-hidden />
-                        <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.breadcrumbSettings}</span>
+                        <ListTree className="h-4 w-4 text-[hsl(var(--primary))]" aria-hidden />
+                        <span className="text-[13px] font-semibold uppercase tracking-wide text-[hsl(var(--primary))]">{s.breadcrumbSettings}</span>
                     </div>
                     <BreadcrumbEditor
                         homeLabel={String(breadcrumbCfg?.homeLabel || 'Home')}
@@ -1022,8 +1046,8 @@ function SettingsPanelInner({
                 {footerBlock && (
                     <div ref={footerSectionRef} className={sectionCls}>
                         <div className="flex items-center gap-2 mb-4">
-                            <Palette className="h-4 w-4 text-[#2dd4bf]" aria-hidden />
-                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.footerSettings}</span>
+                            <Palette className="h-4 w-4 text-[hsl(var(--primary))]" aria-hidden />
+                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[hsl(var(--primary))]">{s.footerSettings}</span>
                         </div>
 
                         {/* Footer Style */}
@@ -1058,7 +1082,7 @@ function SettingsPanelInner({
                             <button
                                 type="button"
                                 onClick={() => setIsFooterBrandOpen(v => !v)}
-                                className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
+                                className="flex w-full items-center justify-between rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
                                 <span className="flex items-center gap-1"><Building2 className="h-4 w-4" aria-hidden /> {s.brandLogo}</span>
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
@@ -1066,7 +1090,7 @@ function SettingsPanelInner({
                             {isFooterBrandOpen && (() => {
                                 const currentLogoUrl = (footerBlock?.logo as { url?: string } | undefined)?.url || ''
                                 return (
-                                <div className="mt-1 space-y-3 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 pb-3 pt-2.5">
+                                <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {/* Upload Logo */}
                                     <div>
                                         <label className={labelCls}>{s.uploadLogo}</label>
@@ -1074,7 +1098,7 @@ function SettingsPanelInner({
                                             type="button"
                                             onClick={() => footerLogoRef.current?.click()}
                                             disabled={isUploadingFooterLogo}
-                                            className="mt-1 flex h-24 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-blue-500/20 bg-[#0b1120] text-slate-400 transition-colors hover:border-blue-500/40 disabled:opacity-50"
+                                            className="mt-1 flex h-24 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-blue-500/20 bg-[var(--editor-bg)] text-slate-400 transition-colors hover:border-blue-500/40 disabled:opacity-50"
                                         >
                                             {isUploadingFooterLogo ? (
                                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -1128,7 +1152,7 @@ function SettingsPanelInner({
                                             defaultValue={(footerBlock?.tagline as string) || ''}
                                             placeholder={s.companyDescPlaceholder}
                                             onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ tagline: sanitizeInput(e.target.value) })}
-                                            className="mt-1 min-h-[66px] resize-none rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-blue-500/30"
+                                            className="mt-1 min-h-[66px] resize-none rounded-xl border border-[var(--editor-border)] bg-[var(--editor-bg)] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-[hsl(var(--primary)/0.3)]"
                                         />
                                     </div>
                                     )}
@@ -1151,13 +1175,13 @@ function SettingsPanelInner({
                             <button
                                 type="button"
                                 onClick={() => setIsFooterSocialOpen(v => !v)}
-                                className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
+                                className="flex w-full items-center justify-between rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
                                 <span>{s.socialMedia}</span>
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterSocialOpen && 'rotate-180')} />
                             </button>
                             {isFooterSocialOpen && (
-                                <div className="mt-1 space-y-3 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 pb-3 pt-2.5">
+                                <div className="mt-1 space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-3 pb-3 pt-2.5">
                                     {FOOTER_SOCIAL_PLATFORMS.map(({ key, label }) => {
                                         const PlatformIcon = SOCIAL_ICONS[key]
                                         const currentUrl = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
@@ -1334,7 +1358,7 @@ function SettingsPanelInner({
 
     return (
         <div
-            className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[#111827]"
+            className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[var(--editor-surface)]"
             style={{ width: SETTINGS_PANEL_WIDTH }}
         >
             <div className="border-b border-white/5 px-4 py-4">
@@ -1351,7 +1375,7 @@ function SettingsPanelInner({
                                             className={cn(
                                                 'inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-medium transition-colors',
                                                 activeTab === tab.id
-                                                    ? 'bg-[linear-gradient(90deg,rgba(37,99,235,0.28),rgba(34,211,238,0.2))] text-[#F8FAFC] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
+                                                    ? 'bg-[linear-gradient(90deg,hsl(var(--primary)/0.28),hsl(var(--info)/0.2))] text-[var(--editor-text)] shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.25)]'
                                                     : 'text-slate-400 hover:bg-white/5 hover:text-slate-200',
                                                 tab.disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-500',
                                             )}
@@ -1366,11 +1390,11 @@ function SettingsPanelInner({
                                         <Tooltip.Content
                                             side="bottom"
                                             sideOffset={8}
-                                            className="z-50 rounded-md border border-white/10 bg-[#0B1120] px-3 py-2 text-xs text-slate-100 shadow-xl"
+                                            className="z-50 rounded-md border border-white/10 bg-[var(--editor-bg)] px-3 py-2 text-xs text-slate-100 shadow-xl"
                                             style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}
                                         >
                                             {s.selectBlock}
-                                            <Tooltip.Arrow className="fill-[#0B1120]" />
+                                            <Tooltip.Arrow className="fill-[var(--editor-bg)]" />
                                         </Tooltip.Content>
                                     </Tooltip.Portal>
                                 ) : null}
@@ -1385,16 +1409,16 @@ function SettingsPanelInner({
                     <div className="flex items-start gap-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="flex shrink-0 text-[#2DD4BF]">
+                                <span className="flex shrink-0 text-[hsl(var(--primary))]">
                                     {activeTab === 'global' ? <Settings className="h-4 w-4" aria-hidden /> : activeTab === 'seo' ? <Search className="h-4 w-4" aria-hidden /> : activeTab === 'menu' ? <Compass className="h-4 w-4" aria-hidden /> : <Palette className="h-4 w-4" aria-hidden />}
                                 </span>
-                                <p className="text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
+                                <p className="text-[14px] font-semibold uppercase leading-5 tracking-normal text-[hsl(var(--primary))]">{panelTitle}</p>
                             </div>
                             {activeTab === 'block' && block ? (
                                 <div className="mt-1 pl-7 flex items-center gap-2">
                                     <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
                                     {isGlobal && (
-                                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+                                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'hsl(var(--info)/0.12)', color: 'hsl(var(--info))' }}>
                                             <Globe className="h-3 w-3" aria-hidden /> Global
                                         </span>
                                     )}
@@ -1416,7 +1440,7 @@ function SettingsPanelInner({
 
                     {activeTab === 'block' && block ? (
                         <>
-                            <div className="rounded-2xl border border-[#25324A] bg-[#172033] px-4 py-3">
+                            <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium text-white">{info?.icon} {info?.label}</span>
                                     <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
@@ -1459,7 +1483,7 @@ function SettingsPanelInner({
                                                     const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                     onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                 }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                             />
                                         </div>
                                         <div>
@@ -1477,7 +1501,7 @@ function SettingsPanelInner({
                                                     const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                     onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                 }}
-                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                             />
                                         </div>
                                     </div>
@@ -1629,7 +1653,7 @@ function SettingsPanelInner({
                                     <label className="text-xs font-medium uppercase text-gray-500">Announcement Bar</label>
 
                                     {/* Content Configuration */}
-                                    <div className="mt-3 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                    <div className="mt-3 rounded-xl overflow-hidden border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)]">
                                         <button type="button" onClick={() => setIsAnnContentOpen(v => !v)}
                                             className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
                                             <span className="text-sm font-medium text-slate-100">Content Configuration</span>
@@ -1647,7 +1671,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* CTA Settings */}
-                                    <div className="mt-4 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                    <div className="mt-4 rounded-xl overflow-hidden border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)]">
                                         <button type="button" onClick={() => setIsAnnCtaOpen(v => !v)}
                                             className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
                                             <span className="text-sm font-medium text-slate-100">CTA Settings</span>
@@ -1685,7 +1709,7 @@ function SettingsPanelInner({
                                                             <select
                                                                 value={(block.linkIsInternal as boolean) ? 'internal' : 'external'}
                                                                 onChange={(e) => onBlockUpdate(currentBlockIndex, { linkIsInternal: e.target.value === 'internal' })}
-                                                                className="mt-1.5 w-full rounded-lg bg-[#0b1120] border border-[rgba(59,130,246,0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                                className="mt-1.5 w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
                                                             >
                                                                 <option value="external">Style: External</option>
                                                                 <option value="internal">Style: Internal Page</option>
@@ -1695,7 +1719,7 @@ function SettingsPanelInner({
                                                             <select
                                                                 value={(block.linkUrl as string) || ''}
                                                                 onChange={(e) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
-                                                                className="w-full rounded-lg bg-[#0b1120] border border-[rgba(59,130,246,0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                                className="w-full rounded-lg bg-[var(--editor-bg)] border border-[hsl(var(--primary)/0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
                                                             >
                                                                 <option value="">— select page —</option>
                                                                 {pages?.map(p => (
@@ -1723,7 +1747,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* Appearance */}
-                                    <div className="mt-4 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                    <div className="mt-4 rounded-xl overflow-hidden border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)]">
                                         <button type="button" onClick={() => setIsAnnAppearanceOpen(v => !v)}
                                             className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
                                             <span className="text-sm font-medium text-slate-100">Appearance</span>
@@ -1739,7 +1763,7 @@ function SettingsPanelInner({
                                                             placeholder="#0ea5e9"
                                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value.trim())}
                                                             variant="editor" className="h-8 text-[12px]" />
-                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.backgroundColor as string) || '#0ea5e9' }}>
+                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[hsl(var(--primary)/0.5)]" style={{ backgroundColor: (block.backgroundColor as string) || '#0ea5e9' }}>
                                                             <input type="color" key={`bgc1-${bk}`}
                                                                 value={(block.backgroundColor as string) || '#0ea5e9'}
                                                                 onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
@@ -1757,7 +1781,7 @@ function SettingsPanelInner({
                                                                 placeholder="#d946ef"
                                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value.trim())}
                                                                 variant="editor" className="h-8 text-[12px]" />
-                                                            <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.backgroundColor2 as string) || '#d946ef' }}>
+                                                            <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[hsl(var(--primary)/0.5)]" style={{ backgroundColor: (block.backgroundColor2 as string) || '#d946ef' }}>
                                                                 <input type="color" key={`bgc2-${bk}`}
                                                                     value={(block.backgroundColor2 as string) || '#d946ef'}
                                                                     onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
@@ -1775,7 +1799,7 @@ function SettingsPanelInner({
                                                             placeholder="#ffffff"
                                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value.trim())}
                                                             variant="editor" className="h-8 text-[12px]" />
-                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.textColor as string) || '#ffffff' }}>
+                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[hsl(var(--primary)/0.5)]" style={{ backgroundColor: (block.textColor as string) || '#ffffff' }}>
                                                             <input type="color" key={`tc-${bk}`}
                                                                 value={(block.textColor as string) || '#ffffff'}
                                                                 onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
@@ -1805,7 +1829,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                             <div>
@@ -1821,7 +1845,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                         </div>
@@ -2042,7 +2066,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                             <div>
@@ -2060,7 +2084,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                         </div>
@@ -2073,7 +2097,7 @@ function SettingsPanelInner({
                                 const categories = (block.categories || []) as MenuCategory[]
                                 return (
                                     <div className={sectionCls}>
-                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">{s.categoriesLabel}</p>
+                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">{s.categoriesLabel}</p>
                                         {categories.map((cat, ci) => (
                                             <div key={`mf-cat-${ci}`} className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2">
                                                 <div className="mb-1 flex items-center justify-between">
@@ -2086,7 +2110,7 @@ function SettingsPanelInner({
                                                     onBlur={(e: FieldBlurEvent) => { if (focusedBlockIndexRef.current === currentBlockIndex) updateArrayItem('categories', ci, 'name', e.target.value) }}
                                                     variant="editor" className={editorInputClassName} />
                                                 {/* Items */}
-                                                <p className="mt-2 mb-1 text-xs font-medium text-[#94a3b8]">{s.itemsLabel}</p>
+                                                <p className="mt-2 mb-1 text-xs font-medium text-[var(--editor-text-muted)]">{s.itemsLabel}</p>
                                                 {(cat.items || []).map((item: MenuItem, ii: number) => (
                                                     <div key={`mf-item-${ci}-${ii}`} className="mb-2 rounded border border-white/5 bg-black/20 p-2">
                                                         <div className="mb-1 flex items-center justify-between">
@@ -2155,7 +2179,7 @@ function SettingsPanelInner({
                                 const count = steps.length
                                 return (
                                     <div className={sectionCls}>
-                                        <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+                                        <div className="bg-[var(--editor-surface-elevated)] border border-[var(--editor-border)] rounded-xl overflow-hidden">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsStepConfigOpen(!isStepConfigOpen)}
@@ -2168,8 +2192,8 @@ function SettingsPanelInner({
                                                 <div className="px-3 pb-3">
                                                     <div className="flex gap-4 items-center">
                                                         <div className="w-[100px] shrink-0">
-                                                            <p className="text-[12px] font-medium text-[#94a3b8] leading-4">{s.numberOfSteps}</p>
-                                                            <p className="text-[10px] text-[#94a3b8] leading-4">{s.stepsMinMax}</p>
+                                                            <p className="text-[12px] font-medium text-[var(--editor-text-muted)] leading-4">{s.numberOfSteps}</p>
+                                                            <p className="text-[10px] text-[var(--editor-text-muted)] leading-4">{s.stepsMinMax}</p>
                                                         </div>
                                                         <div className="flex flex-1 items-center justify-center gap-2">
                                                             <button
@@ -2177,10 +2201,10 @@ function SettingsPanelInner({
                                                                 aria-label="Decrease step count"
                                                                 disabled={count <= 3}
                                                                 onClick={() => onBlockUpdate(currentBlockIndex, { steps: steps.slice(0, -1) })}
-                                                                className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/5 transition-colors"
+                                                                className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/5 transition-colors"
                                                             >−</button>
                                                             {/* count may display < 3 if block was set externally; − is disabled so it cannot go lower */}
-                                                            <div className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1f2937] flex items-center justify-center text-white text-sm font-medium">
+                                                            <div className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] flex items-center justify-center text-white text-sm font-medium">
                                                                 {count}
                                                             </div>
                                                             <button
@@ -2194,7 +2218,7 @@ function SettingsPanelInner({
                                                                         steps: [...steps, { title: `Step ${n}`, description: `Description ${n}`, icon: stepEmojis[n - 1] ?? String(n) }]
                                                                     })
                                                                 }}
-                                                                className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/10 transition-colors"
+                                                                className="h-[38px] w-[44px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-bg)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/10 transition-colors"
                                                             >+</button>
                                                         </div>
                                                     </div>
@@ -2232,7 +2256,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                             <div>
@@ -2250,7 +2274,7 @@ function SettingsPanelInner({
                                                         const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
                                                         onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                     }}
-                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[var(--editor-surface-elevated)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[hsl(var(--primary))] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[var(--editor-surface-elevated)] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[hsl(var(--primary))]"
                                                 />
                                             </div>
                                         </div>
@@ -2415,7 +2439,7 @@ function SettingsPanelInner({
                                                 const showPhoneError = phoneEmpty && phoneTouched
                                                 return (
                                                     <>
-                                                        <div className={cn('mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border bg-[#0b1120] px-[6px] py-[4px]', showPhoneError ? 'border-red-500/50' : 'border-[rgba(59,130,246,0.04)]')}>
+                                                        <div className={cn('mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border bg-[var(--editor-bg)] px-[6px] py-[4px]', showPhoneError ? 'border-red-500/50' : 'border-[hsl(var(--primary)/0.04)]')}>
                                                             <PhoneCountryPicker
                                                                 value={waCode}
                                                                 onChange={code => {
@@ -2435,7 +2459,7 @@ function SettingsPanelInner({
                                                                     }
                                                                     handleBlockFieldChange('phoneNumber', v)
                                                                 }}
-                                                                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
+                                                                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[var(--editor-text)] placeholder:text-[var(--editor-text-muted)] focus:outline-none"
                                                                 placeholder={waCountry.placeholder}
                                                             />
                                                         </div>

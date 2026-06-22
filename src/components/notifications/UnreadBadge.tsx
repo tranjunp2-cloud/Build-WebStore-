@@ -37,7 +37,6 @@ export function UnreadBadge({ count }: UnreadBadgeProps) {
                 fontSize: '11px',
                 fontWeight: 700,
                 padding: '0 4px',
-                border: '2px solid #1E293B',
                 pointerEvents: 'none',
                 userSelect: 'none',
                 zIndex: 10,

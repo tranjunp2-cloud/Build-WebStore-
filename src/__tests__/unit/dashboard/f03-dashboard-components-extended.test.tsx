@@ -308,7 +308,7 @@ describe('PeriodSelector', () => {
     it('defaults to 7d when URL param is 7d', () => {
         render(<PeriodSelector />)
         const selectedBtn = screen.getByText('Last 7 days')
-        expect(selectedBtn.className).toContain('bg-[#161E2E]')
+        expect(selectedBtn.className).toContain('bg-[hsl(var(--card))]')
     })
 
     it('renders all period labels', () => {

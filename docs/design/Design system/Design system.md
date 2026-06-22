@@ -15,8 +15,9 @@
 |-------|---------------------|------------|
 | **Background** | `#0B1120` | `#F8FAFC` |
 | **Surface** | `#161E2E` | `#FFFFFF` |
-| **Primary Blue** | `#3B82F6` | `#2563EB` |
-| **Primary Teal** | `#2DD4BF` | `#0D9488` |
+| **Primary Teal** | `#2DD4BF` | `#00D3D4` |// sửa lại theo yêu cầu design
+
+**Brand primary = Teal** (focus ring, link/active, toggle, text nhấn dùng teal `#0D9488`/`#2DD4BF`). **Blue** (`#3B82F6`/`#2563EB`) KHÔNG còn là màu primary — dùng làm **accent / AI / Info**. Riêng **nút Primary** dùng **gradient Blue→Teal** (AI signature) — blue ở đây là màu trang trí gradient, không phải vai trò primary.
 
 ### Neutral Scale
 | Token | Dark Mode | Light Mode | Usage |
@@ -36,8 +37,8 @@
 
 ### Semantic Tokens (Components)
 - **Button (Primary):**
-  - **Background:** `linear-gradient(90deg, var(--primary-blue) 0%, var(--primary-teal) 100%)`
-  - **Text:** `#FFFFFF` (Both modes)
+  - **Background:** Gradient Blue→Teal — `linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)` (cả 2 mode). *Blue ở đây là màu trang trí gradient (AI signature), không phải primary; primary semantic vẫn là teal.*
+  - **Text:** `#FFFFFF` (cả 2 mode)
   - **Radius:** `8px`
 - **Button (Secondary):**
   - **Background:** Dark `#1F2937` / Light `#F1F5F9`
@@ -80,7 +81,7 @@
 ### Components & Extras
 | Token | Font Size | Line Height | Font Weight |
 |-------|-----------|-------------|-------------|
-| **Button** | `14px` | `18px` | `700` (bold) |
+| **Button** | `13px` | `18px` | `600` (bold) |
 | **Small 1** | `12px` | `16px` | `400` (regular) |
 | **Small 2** | `12px` | `16px` | `600` (semibold) |
 
@@ -142,14 +143,14 @@
 *Consistent with shadcn/ui patterns.*
 
 ### Buttons
-- **Primary:** Dải màu Gradient (`linear-gradient` Blue sang Teal), chữ trắng. Dùng làm Action gọi sự chú ý lớn nhất.
+- **Primary:** Nền **Gradient Blue→Teal** (`linear-gradient(90deg, #3B82F6 → #2DD4BF)`), chữ trắng. Dùng làm Action gọi sự chú ý lớn nhất.
 - **Secondary:** Nền `#1F2937` (Dark) / `#F1F5F9` (Light), và chữ tương ứng. Dùng cho các alternative action.
 - **Outline:** Không nền, viền xám mỏng. Dùng làm action phụ trợ/Cancel.
 - **Ghost:** Không viền, không nền. Dùng cho các list tác vụ hay Chat action cần tiết chế không gian.
 - **Icon Button:** Form vuông vức bo cong tiêu chuẩn, chứa icon Send, Edit, Delete...
 
 ### Inputs
-- **Text Input:** Chiều cao 40px, góc bo `md` (`8px`), viền mỏng theo mode tông xám (`#E2E8F0` Light / `#1F2937` Dark). Focus chuyển vòng màu sang màu Primary (`#3B82F6`).
+- **Text Input:** Chiều cao 40px, góc bo `md` (`8px`), viền mỏng theo mode tông xám (`#E2E8F0` Light / `#1F2937` Dark). Focus chuyển vòng màu sang màu Primary (Teal `#2DD4BF`).
 - **Textarea:** Form tự động đa dòng như text input cho khung nhập Description.
 - **Chat Input:** Khung Input nâng cao chứa button Send bo góc nằm bên phải. Cực kì quan trọng cho Workflow AI.
 - **Disabled State:** Giảm Opacity xuống 50%, tắt khả năng tương tác, hiện trỏ chuột `cursor-not-allowed`.
@@ -222,24 +223,24 @@ Copy và paste đoạn mã sau vào file `src/app/globals.css`. Các giá trị 
   :root {
     /* Light Mode */
     --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --foreground: 209 30% 19%;       /* #22313F — chữ body light (GH-1192) */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 180 100% 42%;         /* Teal #00D3D4 — brand primary (light, GH-1192) */
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 173 80% 40%;
+    --muted-foreground: 215 16% 47%;     /* #64748B — chữ phụ light */
+    --accent: 221 83% 53%;           /* Blue #2563EB — accent phụ / AI / Info */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --ring: 180 100% 42%;            /* Teal #00D3D4 — focus ring khớp primary */
     --radius: 0.5rem;
   }
 
@@ -251,19 +252,19 @@ Copy và paste đoạn mã sau vào file `src/app/globals.css`. Các giá trị 
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 172 66% 50%;          /* Teal #2DD4BF — brand primary */
+    --primary-foreground: 222 47% 9%; /* chữ tối #0B1120 trên teal sáng */
     --secondary: 215 28% 17%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
-    --accent: 173 65% 50%;
-    --accent-foreground: 222 47% 9%;
+    --accent: 217 91% 60%;           /* Blue #3B82F6 — accent phụ / AI / Info */
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
     --border: 217 33% 25%;
     --input: 217 33% 25%;
-    --ring: 217 91% 60%;
+    --ring: 172 66% 50%;             /* Teal — khớp primary */
   }
 }
 ```
@@ -287,7 +288,7 @@ module.exports = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          ai: "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)", // Custom Gradient
+          ai: "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)", // Primary button gradient (blue→teal)
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",

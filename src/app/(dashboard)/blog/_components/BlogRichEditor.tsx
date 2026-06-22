@@ -441,8 +441,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     color: var(--dash-text) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button.ck-on {
-                    background: rgba(59, 130, 246, 0.15) !important;
-                    color: #3B82F6 !important;
+                    background: hsl(var(--info)/0.15) !important;
+                    color: hsl(var(--info)) !important;
                     border: none !important;
                     border-radius: 12px !important;
                 }
@@ -484,19 +484,19 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
 
                 /* ===== CONTENT STYLING ===== */
                 .blog-ckeditor-wrapper .ck.ck-editor__editable a {
-                    color: #2DD4BF !important;
+                    color: hsl(var(--primary)) !important;
                     text-decoration: underline !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable a:empty::after {
                     content: attr(href);
-                    color: #2DD4BF;
+                    color: hsl(var(--primary));
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-link_selected {
-                    color: #2DD4BF !important;
-                    background: rgba(45, 212, 191, 0.15) !important;
+                    color: hsl(var(--primary)) !important;
+                    background: hsl(var(--primary)/0.15) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable blockquote {
-                    border-left: 3px solid #3B82F6 !important;
+                    border-left: 3px solid hsl(var(--info)) !important;
                     color: var(--dash-text-muted) !important;
                     padding-left: 16px !important;
                     margin-left: 0 !important;
@@ -525,14 +525,14 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     max-width: 100% !important;
                 }
                 .blog-ckeditor-wrapper .ck-widget__selection-handle {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                 }
                 /* Upload progress bar */
                 .blog-ckeditor-wrapper .ck .ck-progress-bar {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                 }
                 .blog-ckeditor-wrapper .ck .ck-upload-placeholder-loader::before {
-                    border-color: #3B82F6 transparent transparent !important;
+                    border-color: hsl(var(--info)) transparent transparent !important;
                 }
 
                 /* ===== ALL POPUP / BALLOON PANELS ===== */
@@ -587,15 +587,15 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     font-size: 13px !important;
                     outline: none !important;
                     box-shadow: none !important;
-                    caret-color: #3B82F6 !important;
+                    caret-color: hsl(var(--info)) !important;
                 }
                 .ck.ck-balloon-panel .ck-input:focus,
                 .ck.ck-balloon-panel .ck-input-text:focus,
                 .ck.ck-balloon-panel input:focus,
                 .ck.ck-dropdown__panel .ck-input:focus,
                 .ck.ck-dropdown__panel input:focus {
-                    border-color: #3B82F6 !important;
-                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+                    border-color: hsl(var(--info)) !important;
+                    box-shadow: 0 0 0 2px hsl(var(--info)/0.2) !important;
                     outline: none !important;
                 }
                 .ck.ck-balloon-panel .ck-input::placeholder,
@@ -636,13 +636,13 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck.ck-balloon-panel .ck-button-save,
                 .ck.ck-balloon-panel .ck-button-action {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                     color: #FFFFFF !important;
                     border-radius: 8px !important;
                 }
                 .ck.ck-balloon-panel .ck-button-save:hover,
                 .ck.ck-balloon-panel .ck-button-action:hover {
-                    background: #2563EB !important;
+                    background: hsl(var(--info)) !important;
                 }
                 .ck.ck-balloon-panel .ck-button-cancel {
                     color: var(--dash-text-muted) !important;
@@ -655,7 +655,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     padding: 8px !important;
                 }
                 .ck.ck-link-actions .ck-link-actions__preview {
-                    color: #2DD4BF !important;
+                    color: hsl(var(--primary)) !important;
                     background: transparent !important;
                 }
 
@@ -689,9 +689,9 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     border: none !important;
                 }
                 .ck.ck-dropdown__panel .ck-file-dialog-button .ck-button {
-                    background: rgba(59, 130, 246, 0.1) !important;
-                    color: #3B82F6 !important;
-                    border: 1px dashed rgba(59, 130, 246, 0.3) !important;
+                    background: hsl(var(--info)/0.1) !important;
+                    color: hsl(var(--info)) !important;
+                    border: 1px dashed hsl(var(--info)/0.3) !important;
                     border-radius: 8px !important;
                     padding: 12px 16px !important;
                     font-weight: 500 !important;
@@ -699,9 +699,9 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     justify-content: center !important;
                 }
                 .ck.ck-dropdown__panel .ck-file-dialog-button .ck-button:hover {
-                    background: rgba(59, 130, 246, 0.2) !important;
-                    border-color: rgba(59, 130, 246, 0.5) !important;
-                    color: #60A5FA !important;
+                    background: hsl(var(--info)/0.2) !important;
+                    border-color: hsl(var(--info)/0.5) !important;
+                    color: hsl(var(--info)) !important;
                 }
 
                 /* ===== LISTS / MENUS ===== */
@@ -717,8 +717,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     color: var(--dash-text) !important;
                 }
                 .ck.ck-list .ck-list__item .ck-button.ck-on {
-                    background: rgba(59, 130, 246, 0.15) !important;
-                    color: #3B82F6 !important;
+                    background: hsl(var(--info)/0.15) !important;
+                    color: hsl(var(--info)) !important;
                 }
                 .ck.ck-list .ck-list__separator {
                     background: var(--dash-border) !important;
@@ -736,7 +736,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck.ck-balloon-panel .ck-switchbutton.ck-on .ck-button__toggle,
                 .ck.ck-dropdown__panel .ck-switchbutton.ck-on .ck-button__toggle {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                 }
 
                 /* ===== TOOLTIP ===== */
@@ -834,12 +834,12 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     font-size: 13px !important;
                     outline: none !important;
                     box-shadow: none !important;
-                    caret-color: #3B82F6 !important;
+                    caret-color: hsl(var(--info)) !important;
                 }
                 .ck.ck-dialog .ck-input:focus,
                 .ck.ck-dialog input:focus {
-                    border-color: #3B82F6 !important;
-                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+                    border-color: hsl(var(--info)) !important;
+                    box-shadow: 0 0 0 2px hsl(var(--info)/0.2) !important;
                     outline: none !important;
                 }
                 .ck.ck-dialog .ck-input::placeholder,
@@ -880,14 +880,14 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck.ck-dialog .ck-button-action,
                 .ck.ck-dialog .ck-button-save {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                     color: #FFFFFF !important;
                     border: none !important;
                     border-radius: 8px !important;
                 }
                 .ck.ck-dialog .ck-button-action:hover,
                 .ck.ck-dialog .ck-button-save:hover {
-                    background: #2563EB !important;
+                    background: hsl(var(--info)) !important;
                 }
 
                 /* ===== CK BODY WRAPPER (global panel container) ===== */
@@ -911,12 +911,12 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     padding: 8px 12px !important;
                     font-family: 'Inter', sans-serif !important;
                     font-size: 13px !important;
-                    caret-color: #3B82F6 !important;
+                    caret-color: hsl(var(--info)) !important;
                 }
                 .ck-body-wrapper .ck-input:focus,
                 .ck-body-wrapper input.ck-input:focus {
-                    border-color: #3B82F6 !important;
-                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+                    border-color: hsl(var(--info)) !important;
+                    box-shadow: 0 0 0 2px hsl(var(--info)/0.2) !important;
                 }
                 .ck-body-wrapper label,
                 .ck-body-wrapper .ck-label {
@@ -929,7 +929,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     background: var(--dash-surface-hover) !important;
                 }
                 .ck-body-wrapper .ck-button-action {
-                    background: #3B82F6 !important;
+                    background: hsl(var(--info)) !important;
                     color: #FFFFFF !important;
                 }
                 .ck-body-wrapper .ck-link-form,
@@ -950,7 +950,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     background: var(--dash-secondary-bg) !important;
                 }
                 .ck-body-wrapper .ck-link-actions__preview {
-                    color: #2DD4BF !important;
+                    color: hsl(var(--primary)) !important;
                 }
             `}</style>
         </div>

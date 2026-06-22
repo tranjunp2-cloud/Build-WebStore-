@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { AnnouncementBarConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Body } from '../shared/Typography'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel?: string } {
@@ -26,6 +27,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
     const paddingY = ((block as Record<string, unknown>).paddingY as number | null | undefined) ?? 12
     const paddingTop = spacing?.paddingTop ?? paddingY
     const paddingBottom = spacing?.paddingBottom ?? paddingY
+    const resolveHref = useLocalHref()
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -59,7 +61,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
                             <>
                                 {' '}
                                 <a
-                                    href={linkUrl}
+                                    href={resolveHref(linkUrl)}
                                     className="underline underline-offset-2 font-semibold hover:opacity-80 transition-opacity"
                                     {...getLinkAttrs(linkUrl, linkIsInternal)}
                                 >

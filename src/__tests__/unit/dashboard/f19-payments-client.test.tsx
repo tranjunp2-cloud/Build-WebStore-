@@ -24,11 +24,17 @@ vi.mock('@/app/(dashboard)/settings/payments/actions', () => ({
 import { PaymentsFormClient } from '@/app/(dashboard)/settings/payments/PaymentsFormClient';
 import { I18nProvider } from '@/i18n';
 import { toast } from 'sonner';
+import { getPaymentSettings, updatePaymentSettings } from '@/app/(dashboard)/settings/payments/actions';
+
+// jsdom has no scrollIntoView — stub globally so scroll-related effects don't throw
+Element.prototype.scrollIntoView = vi.fn();
 
 describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // Reset scrollIntoView spy each test
+        (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
     });
 
     it('[TC-F19.12] Renders both COD and QR payment toggles', async () => {
@@ -149,6 +155,102 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
         await waitFor(() => {
             expect(qrSwitch.checked).toBe(false);
+        });
+    });
+
+    it('[TC-F19.17] Blocks toggling off the last active payment method', async () => {
+        // Arrange: only COD is active
+        vi.mocked(getPaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: { payment_cod: true, payment_qr: false, qr_image: null },
+        });
+
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => {
+            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+        });
+
+        // Act: try to toggle COD off (it is the only active method)
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        const codSwitch = checkboxes[0];
+        fireEvent.click(codSwitch);
+
+        // Assert: error toast fired, COD still checked, save NOT called
+        expect(toast.error).toHaveBeenCalledWith('At least one payment method must stay active.');
+        expect(codSwitch.checked).toBe(true);
+        expect(updatePaymentSettings).not.toHaveBeenCalled();
+    });
+
+    it('[TC-F19.18] Auto-scrolls Bank Transfer form into view when toggled on', async () => {
+        // Arrange: default render (no QR)
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => {
+            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+        });
+
+        // Act: toggle QR on (expands widget — no image so expand-gate triggers)
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        const qrSwitch = checkboxes[1];
+        fireEvent.click(qrSwitch);
+
+        // Assert: scrollIntoView called (expand triggered the useEffect)
+        await waitFor(() => {
+            expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+        });
+    });
+
+    it('[TC-F19.19] Blocks saving Bank Transfer with empty required fields', async () => {
+        // Arrange: QR already active with image so form renders without extra click
+        vi.mocked(getPaymentSettings).mockResolvedValueOnce({
+            success: true,
+            payments: { payment_cod: false, payment_qr: true, qr_image: { id: 'img-1', url: 'https://example.com/qr.png' } },
+        });
+
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => {
+            expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
+        });
+
+        // Wait for form to be visible (QR active + image = no expand-gate)
+        await waitFor(() => {
+            expect(screen.getByPlaceholderText('As shown on bank statement')).toBeInTheDocument();
+        });
+
+        // Make form dirty so Save is enabled (toggle COD on)
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        fireEvent.click(checkboxes[0]); // toggle COD on to mark dirty
+
+        // Act: click Save with empty bank transfer fields
+        const saveBtn = screen.getByRole('button', { name: /save changes/i });
+        fireEvent.click(saveBtn);
+
+        // Assert: validation error text shown, save NOT called
+        await waitFor(() => {
+            expect(screen.getByText('Account holder name is required.')).toBeInTheDocument();
+        });
+        expect(updatePaymentSettings).not.toHaveBeenCalled();
+    });
+
+    it('[TC-F19.20] Cancel button reverts unsaved changes', async () => {
+        // Arrange: default (COD off)
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        await waitFor(() => {
+            expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
+        });
+
+        // Make form dirty: toggle COD on
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+        const codSwitch = checkboxes[0];
+        fireEvent.click(codSwitch);
+        expect(codSwitch.checked).toBe(true);
+
+        // Act: click Cancel — no confirm dialog, reverts immediately
+        const cancelBtn = screen.getByRole('button', { name: /cancel/i });
+        fireEvent.click(cancelBtn);
+
+        // Assert: COD reverts to unchecked (server state)
+        await waitFor(() => {
+            expect(codSwitch.checked).toBe(false);
         });
     });
 });

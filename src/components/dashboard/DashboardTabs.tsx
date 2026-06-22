@@ -17,7 +17,7 @@ export function DashboardTabs() {
 
     return (
         <div className="w-full sm:w-auto">
-            <div className="flex w-full sm:inline-flex gap-1 rounded-[8px] bg-[#1F2937] p-1 h-[49px]">
+            <div className="flex w-full sm:inline-flex gap-1 rounded-[8px] bg-[hsl(var(--secondary))] p-1 h-[49px]">
                 {TABS.map((tab) => {
                     const isActive = activeTab === tab.id
 
@@ -28,8 +28,8 @@ export function DashboardTabs() {
                             className={cn(
                                 "flex flex-1 sm:flex-none items-center justify-center sm:justify-start px-[14px] py-[8px] text-[13px] font-semibold rounded-[6px] transition-all h-full whitespace-nowrap",
                                 isActive
-                                    ? "bg-[#161E2E] text-[#3B82F6] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)] ring-1 ring-white/5"
-                                    : "text-[#9CA3AF] hover:text-[#E5E7EB] hover:bg-white/5"
+                                    ? "bg-[hsl(var(--card))] text-[hsl(var(--primary))] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)] ring-1 ring-white/5"
+                                    : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-white/5"
                             )}
                         >
                             <span className="flex items-center gap-1.5 leading-[1.69em]">

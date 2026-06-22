@@ -123,7 +123,7 @@ describe('POST /api/v1/sso/provision', () => {
         const res = await POST(req) as unknown as { data: any, status: number }
 
         expect(res.status).toBe(409)
-        expect(res.data.message).toBe('User with this email already exists')
+        expect(res.data.message).toBe('User already provisioned')
     })
 
     it('successfully provisions user and tenant, parsing name correctly', async () => {

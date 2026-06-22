@@ -110,8 +110,8 @@ export function CustomersClientLayout() {
         <div className="space-y-6 pb-20">
             {/* Header */}
             <div>
-                <h1 className="text-[24px] font-bold text-[#F8FAFC]">{c.title}</h1>
-                <p className="text-[14px] text-white/60 mt-1">{c.subtitle}</p>
+                <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>{c.title}</h1>
+                <p className="text-[14px] mt-1" style={{ color: 'var(--dash-text-muted)' }}>{c.subtitle}</p>
             </div>
 
             <CustomersActionBar
@@ -129,37 +129,37 @@ export function CustomersClientLayout() {
                 onExport={handleExport}
             />
 
-            {loading ? (
-                <div className="py-16 text-center text-[14px] text-white/30">{c.loading}</div>
-            ) : (
-                <>
-                    {/* Mobile: card list */}
-                    <div className="md:hidden">
-                        <CustomersCardList
-                            records={records}
-                            total={total}
-                            page={page}
-                            limit={LIMIT}
-                            onSelect={handleSelect}
-                            onDelete={setPendingDelete}
-                            onPageChange={setPage}
-                        />
-                    </div>
-                    {/* Desktop: table */}
-                    <div className="hidden md:block">
-                        <CustomersTable
-                            records={records}
-                            total={total}
-                            page={page}
-                            limit={LIMIT}
-                            selectedId={selected?.id ?? null}
-                            onSelect={handleSelect}
-                            onDelete={setPendingDelete}
-                            onPageChange={setPage}
-                        />
-                    </div>
-                </>
-            )}
+            {/* Mobile: card list — still gates on loading to avoid flash */}
+            <div className="md:hidden">
+                {loading ? (
+                    <div className="py-16 text-center text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{c.loading}</div>
+                ) : (
+                    <CustomersCardList
+                        records={records}
+                        total={total}
+                        page={page}
+                        limit={LIMIT}
+                        onSelect={handleSelect}
+                        onDelete={setPendingDelete}
+                        onPageChange={setPage}
+                    />
+                )}
+            </div>
+
+            {/* Desktop: table with inline skeleton rows */}
+            <div className="hidden md:block">
+                <CustomersTable
+                    records={records}
+                    loading={loading}
+                    total={total}
+                    page={page}
+                    limit={LIMIT}
+                    selectedId={selected?.id ?? null}
+                    onSelect={handleSelect}
+                    onDelete={setPendingDelete}
+                    onPageChange={setPage}
+                />
+            </div>
 
             <CustomerDetailPanel
                 record={selected}
@@ -173,22 +173,23 @@ export function CustomersClientLayout() {
                     className="max-w-[360px] rounded-[20px] p-6 gap-0"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
-                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal */}
-                    <div className="dash-shell">
+                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal.
+                        bg transparent: tránh .dash-shell{background:--dash-bg} đè lên nền --dash-surface của DialogContent (gây "2 màu"). */}
+                    <div className="dash-shell" style={{ background: 'transparent' }}>
                     <DialogHeader className="mb-3">
                         <div className="flex items-center gap-3 mb-1">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
-                                <Trash2 className="w-5 h-5 text-red-400" />
+                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--destructive)/0.12)' }}>
+                                <Trash2 className="w-5 h-5 text-[hsl(var(--destructive))]" />
                             </div>
-                            <DialogTitle className="text-[18px] font-bold text-[#f8fafc]">
+                            <DialogTitle className="text-[18px] font-bold" style={{ color: 'var(--dash-text)' }}>
                                 {c.deleteTitle}
                             </DialogTitle>
                         </div>
                     </DialogHeader>
 
-                    <p className="text-[14px] text-white/60 leading-relaxed mb-6">
+                    <p className="text-[14px] leading-relaxed mb-6" style={{ color: 'var(--dash-text-muted)' }}>
                         {c.deleteConfirmPre}{' '}
-                        <span className="text-white font-medium">{deleteDisplayName}</span>
+                        <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{deleteDisplayName}</span>
                         {' '}{c.deleteConfirmPost}
                     </p>
 
@@ -196,15 +197,16 @@ export function CustomersClientLayout() {
                         <button
                             type="button"
                             onClick={() => setPendingDelete(null)}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white/70 border border-white/[0.08] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
+                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium bg-transparent hover:opacity-80 transition-opacity cursor-pointer"
+                            style={{ color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--input-border))' }}
                         >
                             {c.cancel}
                         </button>
                         <button
                             type="button"
                             onClick={confirmDelete}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
-                            style={{ background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' }}
+                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium !text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
+                            style={{ background: 'hsl(var(--destructive))' }}
                         >
                             {c.deleteButton}
                         </button>

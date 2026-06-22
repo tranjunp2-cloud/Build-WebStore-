@@ -20,6 +20,7 @@ import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -309,6 +310,9 @@ export const POST = withAuth(async (user, req) => {
             const templateBlockList = templatePages?.length
                 ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
                 : blocks
+            // GH-1266: coerce before sanitize — sanitizeBlocks maps unknown variants→'centered',
+            // overwriting the coercion target. Coercing first preserves 'fullscreen'/'split-left'.
+            coerceVideoVariants(templateBlockList as Record<string, unknown>[])
             const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
 
             // Extract structural + visual fields per blockType from template (first match wins)
@@ -381,9 +385,10 @@ export const POST = withAuth(async (user, req) => {
                     ) ?? templatePages?.[0]
                 const templateHomepageLayout =
                     (templateHomepagePage?.layout as Record<string, unknown>[] | undefined) ?? []
-                const templateBlocksClean = sanitizeBlocks(
-                    templateHomepageLayout.length ? templateHomepageLayout : blocks,
-                )
+                // GH-1266: coerce before sanitize (same reasoning as path 1 above)
+                const rawHomepageLayout = (templateHomepageLayout.length ? templateHomepageLayout : blocks) as Record<string, unknown>[]
+                coerceVideoVariants(rawHomepageLayout)
+                const templateBlocksClean = sanitizeBlocks(rawHomepageLayout)
 
                 // Hoisted outside page loop — same values for every page
                 const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])

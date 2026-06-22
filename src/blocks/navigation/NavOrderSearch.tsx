@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Package, ArrowRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -14,6 +14,7 @@ export function NavOrderSearch({ slug, className = '' }: NavOrderSearchProps) {
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
     const router = useRouter()
+    const pathname = usePathname()
     const [open, setOpen] = useState(false)
     const [value, setValue] = useState('')
     const [error, setError] = useState('')
@@ -44,7 +45,8 @@ export function NavOrderSearch({ slug, className = '' }: NavOrderSearchProps) {
         e.preventDefault()
         const trimmed = value.trim()
         if (!trimmed) { setError(ol.required); return }
-        router.push(`/sites/${slug}/orders/${encodeURIComponent(trimmed)}`)
+        const shopBase = pathname.startsWith('/sites/') ? `/sites/${slug}` : ''
+        router.push(`${shopBase}/orders/${encodeURIComponent(trimmed)}`)
         setOpen(false)
         setValue('')
         setError('')

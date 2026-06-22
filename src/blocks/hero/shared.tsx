@@ -6,6 +6,7 @@ import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
@@ -38,6 +39,7 @@ export function safeAltText(imageAlt: string | undefined, headline: unknown): st
 // shrink the padding. siteId prop threads through for click tracking.
 export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass'; siteId?: string }) {
     const isOwner = useIsOwner()
+    const resolveHref = useLocalHref()
     if (!buttons || buttons.length === 0) return null
 
     return (
@@ -45,7 +47,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
             {buttons.map((btn, i) => {
                 const rawUrl = btn?.url
                 const isBroken = rawUrl?.startsWith(BROKEN_URL_PREFIX)
-                const href = isBroken ? '#' : (rawUrl || '#')
+                const href = resolveHref(isBroken ? '#' : rawUrl)
                 const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (
                 <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">

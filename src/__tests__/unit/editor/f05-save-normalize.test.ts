@@ -17,6 +17,9 @@
  *   TC-F05-save-13  → normalizeBlocksForPersistence: blog-list with legacy "editorial" variant → coerced to "cards"
  *   TC-F05-save-19  → normalizeBlocksForPersistence: service-cards empty/null/missing titles → coerced to 'Service' (GH-731)
  *   TC-F05-save-19b → normalizeBlocksForPersistence: non-service-cards block services → NOT coerced
+ *   TC-F05-save-20  → normalizeBlocksForPersistence: cta block with invalid ctaStyle → coerced to 'primary' (GH-1283)
+ *   TC-F05-save-20b → normalizeBlocksForPersistence: cta block with valid ctaStyle → unchanged
+ *   TC-F05-save-21  → normalizeBlocksForPersistence: contact block with email='' → coerced to null (GH-generate-site)
  *
  * Source:
  *   src/lib/block-normalization.ts
@@ -655,5 +658,76 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
 
         // Assert — hero block services untouched
         expect(services[0].title).toBe('')
+    })
+})
+
+// TC-F05-save-20: GH-1283 — CTA ctaStyle invalid values fail Payload validation on publish/save
+describe('normalizeBlocksForPersistence — cta ctaStyle coercion (GH-1283)', () => {
+    it('TC-F05-save-20: cta block with invalid ctaStyle → coerced to "primary"', () => {
+        // Arrange — AI may generate 'ghost', 'secondary', etc. not in CTA Payload enum
+        const blocks = [
+            { blockType: 'cta', headline: 'Join us', ctaStyle: 'ghost' },
+            { blockType: 'cta', headline: 'Sign up', ctaStyle: 'secondary' },
+            { blockType: 'cta', headline: 'Learn more', ctaStyle: 'link' },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — all invalid values coerced to 'primary'
+        expect(result[0].ctaStyle).toBe('primary')
+        expect(result[1].ctaStyle).toBe('primary')
+        expect(result[2].ctaStyle).toBe('primary')
+    })
+
+    it('TC-F05-save-20b: cta block with valid ctaStyle → unchanged', () => {
+        // Arrange — valid values must not be touched
+        const blocks = [
+            { blockType: 'cta', headline: 'A', ctaStyle: 'primary' },
+            { blockType: 'cta', headline: 'B', ctaStyle: 'outline' },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid values preserved
+        expect(result[0].ctaStyle).toBe('primary')
+        expect(result[1].ctaStyle).toBe('outline')
+    })
+})
+
+// TC-F05-save-21: generate-site contact email='' fails Payload email-format validation
+describe('normalizeBlocksForPersistence — contact email coercion (generate-site)', () => {
+    it('TC-F05-save-21: contact block with email="" → coerced to null (prevents Payload email ValidationError on create)', () => {
+        // Arrange — AI gen may produce email: '' on contact block
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — empty string stripped to null so Payload skips format check
+        expect(result[0].email).toBeNull()
+    })
+
+    it('TC-F05-save-21b: contact block with valid email → unchanged', () => {
+        // Arrange
+        const blocks = [{ blockType: 'contact', headline: 'Contact Us', email: 'hello@example.com' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert
+        expect(result[0].email).toBe('hello@example.com')
+    })
+
+    it('TC-F05-save-21c: non-contact block with email="" → NOT coerced', () => {
+        // Arrange — guard is scoped to contact block only
+        const blocks = [{ blockType: 'hero', headline: 'Hello', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — hero block email untouched
+        expect(result[0].email).toBe('')
     })
 })

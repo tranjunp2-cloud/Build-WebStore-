@@ -1,7 +1,8 @@
 'use client'
 
-import { Eye, Trash2 } from 'lucide-react'
-import { Pagination } from '@/components/ui/Pagination'
+import { Eye, Trash2, Users } from 'lucide-react'
+import { TablePagination } from '@/components/ui/table-pagination'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { CustomerSourceBadge } from './customer-source-badge'
@@ -21,10 +22,9 @@ type Props = {
 export function CustomersCardList({ records, total, page, limit, onSelect, onDelete, onPageChange }: Props) {
     const { t } = useI18n()
     const c = t.dashboard.customers
-    const totalPages = Math.ceil(total / limit)
 
     if (records.length === 0) {
-        return <div className="py-16 text-center text-[14px] text-white/30">{c.empty}</div>
+        return <TableEmptyState icon={<Users />} title={c.empty} />
     }
 
     return (
@@ -38,21 +38,21 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                     <div
                         key={record.id}
                         onClick={() => onSelect(record)}
-                        className="rounded-[16px] border border-white/[0.08] overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
-                        style={{ background: 'var(--dash-surface)' }}
+                        className="rounded-[16px] overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
+                        style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                     >
                         {/* Card body */}
                         <div className="flex flex-col gap-[10px] px-[17px] pt-[17px] pb-[14px]">
                             {/* Avatar + Name */}
                             <div className="flex items-center gap-3">
                                 <CustomerAvatar name={record.name} email={record.email} source={record.source} size={40} />
-                                <span className="text-[14px] font-semibold text-[#f8fafc] truncate">{displayName}</span>
+                                <span className="text-[14px] font-semibold truncate" style={{ color: 'var(--dash-text)' }}>{displayName}</span>
                             </div>
 
                             {/* Email | Date */}
                             <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-white/60 truncate">{record.email}</span>
-                                <span className="text-[12px] text-white/60 shrink-0 ml-2">
+                                <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>{record.email}</span>
+                                <span className="text-[12px] shrink-0 ml-2" style={{ color: 'var(--dash-text-muted)' }}>
                                     {new Date(record.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
                             </div>
@@ -64,17 +64,21 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                             </div>
 
                             {/* Message preview */}
-                            <p className="text-[12px] text-white/60 truncate">
+                            <p className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
                                 {record.message ?? c.defaultMessage}
                             </p>
                         </div>
 
                         {/* Actions */}
-                        <div className="flex gap-2 px-[17px] py-[10px] border-t border-white/[0.05]" onClick={e => e.stopPropagation()}>
+                        <div
+                            className="flex gap-2 px-[17px] py-[10px]"
+                            style={{ borderTop: '1px solid var(--dash-border)' }}
+                            onClick={e => e.stopPropagation()}
+                        >
                             <button
                                 onClick={() => onSelect(record)}
                                 className="flex items-center justify-center gap-2 flex-1 h-[37px] rounded-[12px] text-[14px] font-medium border-none cursor-pointer transition-opacity hover:opacity-80"
-                                style={{ background: 'rgba(0,201,80,0.1)', color: '#05df72' }}
+                                style={{ background: 'hsl(var(--success)/0.1)', color: 'hsl(var(--success))' }}
                             >
                                 <Eye className="w-4 h-4" />
                                 {c.view}
@@ -82,7 +86,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                             <button
                                 onClick={() => onDelete(record)}
                                 className="flex items-center justify-center gap-2 flex-1 h-[37px] rounded-[12px] text-[14px] font-medium border-none cursor-pointer transition-opacity hover:opacity-80"
-                                style={{ background: 'rgba(251,44,54,0.1)', color: '#ff6467' }}
+                                style={{ background: 'hsl(var(--destructive)/0.1)', color: 'hsl(var(--destructive))' }}
                             >
                                 <Trash2 className="w-4 h-4" />
                                 {c.deleteButton}
@@ -92,9 +96,14 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                 )
             })}
 
-            {totalPages > 1 && (
-                <div className="flex justify-center py-6 border-t border-white/[0.08] mt-2">
-                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
+            {total > limit && (
+                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                    <TablePagination
+                        page={page}
+                        total={total}
+                        limit={limit}
+                        onPageChange={onPageChange}
+                    />
                 </div>
             )}
         </div>

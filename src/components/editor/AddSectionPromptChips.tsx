@@ -47,8 +47,8 @@ export function AddSectionPromptChips({
                     onClick={() => onPromptSelect(item.prompt)}
                     className={cn(
                         'inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10',
-                        desktopMinimal && !compact && 'min-w-[122px] justify-center border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] py-[7px] font-medium text-slate-400',
-                        compact && 'shrink-0 border-white/[0.04] bg-[#1E293B] text-slate-400',
+                        desktopMinimal && !compact && 'min-w-[122px] justify-center border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] px-[13px] py-[7px] font-medium text-slate-400',
+                        compact && 'shrink-0 border-white/[0.04] bg-[var(--editor-surface-elevated)] text-slate-400',
                     )}
                 >
                     {compact ? item.compactLabel : desktopMinimal && desktopLabelOverride ? desktopLabelOverride : item.label}

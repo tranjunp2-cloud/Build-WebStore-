@@ -52,7 +52,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
         <div
             ref={setNodeRef}
             style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-            className="rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-[13px] pb-[1px] pt-[13px]"
+            className="rounded-xl border border-[hsl(var(--info)/0.04)] bg-[var(--editor-surface-elevated)] px-[13px] pb-[1px] pt-[13px]"
         >
             <div className="flex items-start gap-2">
                 {/* Drag handle — listeners scoped here so inputs are unaffected */}
@@ -75,7 +75,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
                             placeholder="About Us"
                             onBlur={(e) => onUpdate('label', e.target.value)}
                             variant="editor"
-                            className="h-8 flex-1 text-[14px] text-[#94a3b8]"
+                            className="h-8 flex-1 text-[14px] text-[var(--editor-text-muted)]"
                         />
                         <button
                             type="button"
@@ -92,7 +92,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
                         <select
                             value={currentStyle}
                             onChange={(e) => onUpdate('style', e.target.value)}
-                            className="h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[rgba(15,23,42,0.7)] px-3 pr-8 text-[13px] text-[#94a3b8] cursor-pointer focus:outline-none focus:border-blue-500/40"
+                            className="h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[var(--editor-bg)] px-3 pr-8 text-[13px] text-[var(--editor-text-muted)] cursor-pointer focus:outline-none focus:border-blue-500/40"
                         >
                             <option value="internal">Style: Internal</option>
                             <option value="external">Style: External</option>
@@ -108,7 +108,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
                                 value={link.url || '#'}
                                 onChange={(e) => onUpdate('url', e.target.value === '#' ? '' : e.target.value)}
                                 className={cn(
-                                    'h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[rgba(15,23,42,0.7)] pl-7 pr-8 text-[13px] text-[#94a3b8] cursor-pointer focus:outline-none focus:border-blue-500/40',
+                                    'h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[var(--editor-bg)] pl-7 pr-8 text-[13px] text-[var(--editor-text-muted)] cursor-pointer focus:outline-none focus:border-blue-500/40',
                                     hiddenStatus && 'ring-2 ring-red-500/70',
                                 )}
                             >
@@ -131,7 +131,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
                                 onBlur={(e) => onUpdate('url', e.target.value)}
                                 variant="editor"
                                 className={cn(
-                                    'h-8 text-[14px] text-[#94a3b8] w-full',
+                                    'h-8 text-[14px] text-[var(--editor-text-muted)] w-full',
                                     currentStyle === 'external' && 'pr-8',
                                     hiddenStatus && 'ring-2 ring-red-500/70',
                                 )}
@@ -248,14 +248,14 @@ export function FooterLinkEditor({ columns, onUpdate, pages }: FooterLinkEditorP
                 return (
                     <div
                         key={ci}
-                        className="overflow-hidden rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]"
+                        className="overflow-hidden rounded-xl border border-[hsl(var(--info)/0.04)] bg-[var(--editor-surface-elevated)]"
                     >
                         <button
                             type="button"
                             onClick={() => toggleCol(ci)}
                             className="flex w-full items-center justify-between px-3 py-3 text-left"
                         >
-                            <span className="truncate text-[14px] font-medium leading-5 text-[#F8FAFC]">
+                            <span className="truncate text-[14px] font-medium leading-5 text-[var(--editor-text)]">
                                 {col.title || `Column ${ci + 1}`}
                             </span>
                             {isOpen
@@ -265,7 +265,7 @@ export function FooterLinkEditor({ columns, onUpdate, pages }: FooterLinkEditorP
                         </button>
 
                         {isOpen && (
-                            <div className="space-y-3 border-t border-[rgba(59,130,246,0.04)] px-3 pb-3 pt-3">
+                            <div className="space-y-3 border-t border-[hsl(var(--info)/0.04)] px-3 pb-3 pt-3">
 
                                 <div className="space-y-1.5">
                                     <label className={labelCls}>{s.columnTitle}</label>
@@ -320,7 +320,7 @@ export function FooterLinkEditor({ columns, onUpdate, pages }: FooterLinkEditorP
                                     <button
                                         type="button"
                                         onClick={() => addLink(ci)}
-                                        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[rgba(59,130,246,0.07)] bg-[#0B1120] py-2 text-[12px] font-medium leading-4 text-[#F8FAFC] transition-colors hover:border-[rgba(59,130,246,0.15)] hover:bg-[#0d1528]"
+                                        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[hsl(var(--info)/0.07)] bg-[var(--editor-bg)] py-2 text-[12px] font-medium leading-4 text-[var(--editor-text)] transition-colors hover:border-[hsl(var(--info)/0.15)] hover:bg-[var(--editor-bg)]"
                                     >
                                         <Plus className="h-4 w-4" />
                                         {s.addLink}

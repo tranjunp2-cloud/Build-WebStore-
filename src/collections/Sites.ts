@@ -372,6 +372,12 @@ export const Sites: CollectionConfig = {
                     type: 'number',
                     admin: { description: 'Free shipping above X sen (null = no free shipping)' },
                 },
+                {
+                    name: 'shippingSetupConfirmed',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    admin: { description: 'Set true when user explicitly saves shipping settings' },
+                },
             ],
         },
         {
@@ -427,6 +433,12 @@ export const Sites: CollectionConfig = {
                     admin: { description: 'Allow FPX (Online Banking) via Stripe — Malaysia only (layer-2 guard)' },
                 },
             ],
+        },
+        {
+            name: 'themeCustomized',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'True once user has explicitly saved a theme change from editor' },
         },
         {
             name: 'headerBlock',

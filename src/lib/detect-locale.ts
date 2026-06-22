@@ -119,6 +119,10 @@ function detectByScript(text: string): string | null {
     if (/[ក-៿]/.test(text)) return 'km'   // Khmer
     if (/[԰-֏]/.test(text)) return 'hy'   // Armenian
     if (/[Ⴀ-ჿ]/.test(text)) return 'ka'   // Georgian
+    // Vietnamese uses Latin Extended Additional diacritics (U+1EA0-U+1EF9: ạắặấềổợ...).
+    // Must detect here — before franc — to prevent English business names from diluting
+    // mixed-input like "Brother Hai's Restaurant Phở ngon nhất Việt Nam" (GH-1184).
+    if (/[Ạ-ỹ]/.test(text)) return 'vi'
     return null
 }
 

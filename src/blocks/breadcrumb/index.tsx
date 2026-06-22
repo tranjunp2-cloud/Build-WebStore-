@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import type { BlockProps } from '../types'
 import type { BreadcrumbConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
@@ -17,6 +18,7 @@ function safeDecodeSegment(seg: string): string {
 // Auto-breadcrumb logic has been centralized into SiteRenderer so it can traverse the Navigation tree
 
 export function BreadcrumbBlock({ block }: BlockProps<BreadcrumbConfig>) {
+    const resolveHref = useLocalHref()
     const {
         items = [],
         variant = 'simple',
@@ -57,7 +59,7 @@ export function BreadcrumbBlock({ block }: BlockProps<BreadcrumbConfig>) {
                                         </span>
                                     ) : (
                                         <a
-                                            href={item.url}
+                                            href={resolveHref(item.url)}
                                             className={`opacity-70 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} inline-flex items-center`}
                                         >
                                             {item.label}

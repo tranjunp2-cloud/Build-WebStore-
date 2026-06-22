@@ -64,6 +64,12 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
                 }
             },
             sort: 'createdAt',
+            // Without an explicit limit Payload defaults to 10 → sites with >10 pages
+            // silently drop the newest pages from the list (a just-created 11th page
+            // never appears). limit:0 returns all of a site's pages (matches the POST
+            // count query's idiom in this file; page count is hard-capped at
+            // MAX_PAGES_PER_SITE anyway).
+            limit: 0,
         })
 
         type PageDoc = {

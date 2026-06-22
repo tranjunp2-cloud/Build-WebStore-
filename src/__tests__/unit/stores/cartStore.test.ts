@@ -317,4 +317,47 @@ describe('CartStore', () => {
             expect(stored[0].price).toBe(59.90)
         })
     })
+
+    // ─── TC-F09.238: Variant inventory snapshot cap ────────────────────────────
+    // Tests the cartStore cap mechanism given a correct inventory snapshot.
+    // The propagation of selectedVariant.stock → inventory snapshot is gated by TC-F09.237.
+
+    describe('[TC-F09.238] variant inventory snapshot cap', () => {
+        it('[TC-F09.238] addItem caps quantity at stored variant inventory (stock=3)', () => {
+            // Arrange: item with inventory=3 (simulates selectedVariant.stock snapshot from fix #1179)
+            const variantItem: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                variantName: 'Red',
+                inventory: 3,
+            }
+
+            // Act: attempt 4 adds (exceeds variant stock of 3)
+            useCartStore.getState().addItem(variantItem)
+            useCartStore.getState().addItem(variantItem)
+            useCartStore.getState().addItem(variantItem)
+            useCartStore.getState().addItem(variantItem) // 4th is no-op
+
+            // Assert: quantity capped at variant stock (3), not unlimited
+            const items = useCartStore.getState().items
+            expect(items).toHaveLength(1)
+            expect(items[0].quantity).toBe(3)
+        })
+
+        it('[TC-F09.238b] updateQuantity above variant inventory clamps to variant stock', () => {
+            // Arrange: Red variant with inventory=3 at qty=2
+            const variantItem: Omit<CartItem, 'quantity'> = {
+                ...mockItem,
+                variantName: 'Red',
+                inventory: 3,
+            }
+            useCartStore.getState().addItem(variantItem)
+            useCartStore.getState().addItem(variantItem) // qty=2
+
+            // Act: try to set quantity to 10 (far above variant stock)
+            useCartStore.getState().updateQuantity('prod-1', 10, 'Red')
+
+            // Assert: clamped to variant inventory (3)
+            expect(useCartStore.getState().items[0].quantity).toBe(3)
+        })
+    })
 })

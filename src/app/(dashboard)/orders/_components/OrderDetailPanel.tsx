@@ -115,7 +115,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                     width: 32,
                     height: 32,
                     padding: '0 8px',
-                    background: 'rgba(59, 130, 246, 0.1)',
+                    background: 'hsl(var(--info)/0.1)',
                     borderRadius: 12,
                 }}
             >
@@ -155,42 +155,42 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 // ─── SVG ICONS ───
 const IconUser = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="8" cy="5.33" r="3.33" stroke="#3B82F6" strokeWidth="1.33" />
-        <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="#3B82F6" strokeWidth="1.33" strokeLinecap="round" />
+        <circle cx="8" cy="5.33" r="3.33" stroke="hsl(var(--info))" strokeWidth="1.33" />
+        <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="hsl(var(--info))" strokeWidth="1.33" strokeLinecap="round" />
     </svg>
 )
 
 const IconPhone = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M13.33 10.42c-.97-.97-2.14-1.42-2.83-.74l-.83.83c-.27.27-.87.07-1.48-.4-.76-.6-1.49-1.33-2.09-2.09-.47-.61-.67-1.21-.4-1.48l.83-.83c.68-.69.23-1.86-.74-2.83-.97-.97-2.14-1.42-2.83-.74L2.13 3.77c-.68.69-.34 2.25.55 3.87.75 1.36 1.9 2.7 3.33 3.9 1.42 1.19 2.88 2.03 4.14 2.47.9.31 1.72.32 2.19-.14l.85-.85c.68-.69.23-1.86-.74-2.83z" stroke="#3B82F6" strokeWidth="1.33" />
+        <path d="M13.33 10.42c-.97-.97-2.14-1.42-2.83-.74l-.83.83c-.27.27-.87.07-1.48-.4-.76-.6-1.49-1.33-2.09-2.09-.47-.61-.67-1.21-.4-1.48l.83-.83c.68-.69.23-1.86-.74-2.83-.97-.97-2.14-1.42-2.83-.74L2.13 3.77c-.68.69-.34 2.25.55 3.87.75 1.36 1.9 2.7 3.33 3.9 1.42 1.19 2.88 2.03 4.14 2.47.9.31 1.72.32 2.19-.14l.85-.85c.68-.69.23-1.86-.74-2.83z" stroke="hsl(var(--info))" strokeWidth="1.33" />
     </svg>
 )
 
 const IconEmail = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1.33" y="3.33" width="13.33" height="9.33" rx="1.33" stroke="#3B82F6" strokeWidth="1.33" />
-        <path d="M1.33 4.67l6.67 5 6.67-5" stroke="#3B82F6" strokeWidth="1.33" />
+        <rect x="1.33" y="3.33" width="13.33" height="9.33" rx="1.33" stroke="hsl(var(--info))" strokeWidth="1.33" />
+        <path d="M1.33 4.67l6.67 5 6.67-5" stroke="hsl(var(--info))" strokeWidth="1.33" />
     </svg>
 )
 
 const IconLocation = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 1.33c-2.57 0-4.67 2.1-4.67 4.67 0 3.5 4.67 8.67 4.67 8.67s4.67-5.17 4.67-8.67c0-2.57-2.1-4.67-4.67-4.67z" stroke="#3B82F6" strokeWidth="1.33" />
-        <circle cx="8" cy="6" r="1.67" stroke="#3B82F6" strokeWidth="1.33" />
+        <path d="M8 1.33c-2.57 0-4.67 2.1-4.67 4.67 0 3.5 4.67 8.67 4.67 8.67s4.67-5.17 4.67-8.67c0-2.57-2.1-4.67-4.67-4.67z" stroke="hsl(var(--info))" strokeWidth="1.33" />
+        <circle cx="8" cy="6" r="1.67" stroke="hsl(var(--info))" strokeWidth="1.33" />
     </svg>
 )
 
 const IconCreditCard = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="1.33" y="3.33" width="13.33" height="9.33" rx="1.33" stroke="#3B82F6" strokeWidth="1.33" />
-        <path d="M1.33 6.67h13.33" stroke="#3B82F6" strokeWidth="1.33" />
+        <rect x="1.33" y="3.33" width="13.33" height="9.33" rx="1.33" stroke="hsl(var(--info))" strokeWidth="1.33" />
+        <path d="M1.33 6.67h13.33" stroke="hsl(var(--info))" strokeWidth="1.33" />
     </svg>
 )
 
 const IconUnconfirmed = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="8" cy="8" r="6.666" stroke="#FF8904" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#FF8904" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="8" cy="8" r="6.666" stroke="hsl(var(--warning))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M5.333 8L7.333 10L11.333 5.333" stroke="hsl(var(--warning))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 )
 
@@ -249,7 +249,7 @@ function StepPendingIcon({ isActive }: { isActive: boolean }) {
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M18.0002 24.6673C21.6821 24.6673 24.6668 21.6825 24.6668 18.0007C24.6668 14.3188 21.6821 11.334 18.0002 11.334C14.3183 11.334 11.3335 14.3188 11.3335 18.0007C11.3335 21.6825 14.3183 24.6673 18.0002 24.6673Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M18 14V18L20.6667 19.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -261,7 +261,7 @@ function StepConfirmedIcon({ isActive }: { isActive: boolean }) {
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -273,7 +273,7 @@ function StepReadyIcon({ isActive }: { isActive: boolean }) {
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M17.3333 24.486C17.536 24.603 17.766 24.6646 18 24.6646C18.234 24.6646 18.464 24.603 18.6667 24.486L23.3333 21.8193C23.5358 21.7024 23.704 21.5343 23.821 21.3318C23.938 21.1294 23.9998 20.8998 24 20.666V15.3326C23.9998 15.0988 23.938 14.8692 23.821 14.6667C23.704 14.4643 23.5358 14.2962 23.3333 14.1793L18.6667 11.5126C18.464 11.3956 18.234 11.334 18 11.334C17.766 11.334 17.536 11.3956 17.3333 11.5126L12.6667 14.1793C12.4642 14.2962 12.296 14.4643 12.179 14.6667C12.062 14.8692 12.0002 15.0988 12 15.3326V20.666C12.0002 20.8998 12.062 21.1294 12.179 21.3318C12.296 21.5343 12.4642 21.7024 12.6667 21.8193L17.3333 24.486Z" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M18 24.6667V18" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M12.1934 14.666L18 17.9993L23.8067 14.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -287,7 +287,7 @@ function StepShippedIcon({ isActive }: { isActive: boolean }) {
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M19.3333 21.9993V13.9993C19.3333 13.6457 19.1928 13.3066 18.9427 13.0565C18.6927 12.8065 18.3535 12.666 17.9999 12.666H12.6666C12.313 12.666 11.9738 12.8065 11.7238 13.0565C11.4737 13.3066 11.3333 13.6457 11.3333 13.9993V21.3327C11.3333 21.5095 11.4035 21.6791 11.5285 21.8041C11.6535 21.9291 11.8231 21.9993 11.9999 21.9993H13.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M20 22H16" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M22.6666 22.0007H23.9999C24.1767 22.0007 24.3463 21.9304 24.4713 21.8054C24.5963 21.6804 24.6666 21.5108 24.6666 21.334V18.9007C24.6663 18.7494 24.6146 18.6027 24.5199 18.4847L22.1999 15.5847C22.1376 15.5066 22.0585 15.4435 21.9685 15.4001C21.8784 15.3567 21.7798 15.3341 21.6799 15.334H19.3333" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
@@ -302,7 +302,7 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     const iClass = isActive ? undefined : "stroke-slate-500 dark:stroke-white"
     return (
         <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 md:w-9 md:h-9">
-            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[#3B82F6] md:fill-[#10B981]" : "fill-slate-200 dark:fill-[rgba(255,255,255,0.1)]"} />
+            <path d="M0 18C0 8.05888 8.05888 0 18 0C27.9411 0 36 8.05888 36 18C36 27.9411 27.9411 36 18 36C8.05888 36 0 27.9411 0 18Z" className={isActive ? "fill-[hsl(var(--primary))]" : "fill-[hsl(var(--muted))]"} />
             <path d="M24.5341 16.6676C24.8385 18.1618 24.6215 19.7153 23.9193 21.0688C23.2171 22.4224 22.072 23.4943 20.6751 24.1058C19.2782 24.7174 17.7138 24.8315 16.2429 24.4292C14.772 24.0269 13.4835 23.1326 12.5923 21.8953C11.701 20.6579 11.2608 19.1525 11.3452 17.6299C11.4295 16.1073 12.0333 14.6597 13.0558 13.5284C14.0783 12.3971 15.4578 11.6506 16.9641 11.4133C18.4704 11.176 20.0126 11.4622 21.3334 12.2243" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
             <path d="M16 17.3327L18 19.3327L24.6667 12.666" stroke={iStroke} className={iClass} strokeWidth={1.33333} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -348,7 +348,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                             {/* Step node */}
                             <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
                                 {/* Icon container */}
-                                <div className={`flex items-center justify-center shrink-0 rounded-full ${isActive ? 'shadow-[0_0_0_4px_rgba(59,130,246,0.2)] md:shadow-none' : ''}`}>
+                                <div className={`flex items-center justify-center shrink-0 rounded-full ${isActive ? 'shadow-[0_0_0_4px_hsl(var(--primary)/0.2)] md:shadow-none' : ''}`}>
                                     <step.StepIcon isActive={isActive} />
                                 </div>
 
@@ -367,7 +367,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: i <= currentStep ? '#10B981' : 'var(--dash-border)',
+                                        background: i <= currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
                                     }}
                                 />
                             )}
@@ -464,24 +464,24 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
         ? (typeof order.paymentProofImage === 'string' ? order.paymentProofImage : order.paymentProofImage?.url || '')
         : null
 
-    let statusColor = '#FF8904'
-    let statusBg = 'rgba(255, 105, 0, 0.1)'
+    let statusColor = 'hsl(var(--warning))'
+    let statusBg = 'hsl(var(--warning)/0.1)'
     let StatusIcon = IconUnconfirmed
 
     if (order.status === 'ready_to_ship' || order.status === 'shipped' || order.status === 'completed' || order.paymentStatus?.toLowerCase() === 'paid') {
-        statusColor = '#10B981'
-        statusBg = 'rgba(16, 185, 129, 0.1)'
+        statusColor = 'hsl(var(--success))'
+        statusBg = 'hsl(var(--success)/0.1)'
         StatusIcon = function SuccessIcon() {
             return (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="8" cy="8" r="6.666" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="8" cy="8" r="6.666" stroke="hsl(var(--success))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.333 8L7.333 10L11.333 5.333" stroke="hsl(var(--success))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             )
         }
     } else if (order.status === 'cancelled' || order.status === 'refunded') {
-        statusColor = 'var(--dash-error)'
-        statusBg = 'rgba(251, 44, 54, 0.1)'
+        statusColor = 'hsl(var(--destructive))'
+        statusBg = 'hsl(var(--destructive)/0.1)'
         StatusIcon = function CancelledIcon() {
             return (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -526,7 +526,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 {/* Method row */}
                 <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     {/* Icon */}
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: 32, height: 32, padding: '0px 8px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 12, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: 32, height: 32, padding: '0px 8px', background: 'hsl(var(--info)/0.1)', borderRadius: 12, flexShrink: 0 }}>
                         <IconCreditCard />
                     </div>
                     {/* Text container */}
@@ -709,7 +709,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                     Discount{order.discountCode ? ` (${order.discountCode})` : ''}
                                 </span>
-                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#10b981' }}>
+                                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'hsl(var(--success))' }}>
                                     −{order.currency} {((order.discountAmount ?? 0) / 100).toFixed(2)}
                                 </span>
                             </div>
@@ -758,7 +758,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 fontWeight: 700,
                                 fontSize: 20,
                                 lineHeight: '28px',
-                                color: '#2DD4BF',
+                                color: 'hsl(var(--primary))',
                             }}
                         >
                             {order.currency} {order.total?.toFixed(2) || '0.00'}
@@ -871,7 +871,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 height: 48,
                                 width: '100%',
                                 borderRadius: 16,
-                                background: 'linear-gradient(90deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(50, 162, 229, 1) 36%, rgba(48, 168, 225, 1) 43%, rgba(47, 174, 222, 1) 50%, rgba(46, 179, 218, 1) 57%, rgba(45, 185, 214, 1) 64%, rgba(45, 191, 209, 1) 71%, rgba(44, 196, 205, 1) 79%, rgba(44, 201, 201, 1) 86%, rgba(45, 207, 196, 1) 93%, rgba(45, 212, 191, 1) 100%)',
+                                background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
                                 boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
                             }}
                         >
@@ -907,7 +907,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 style={{
                                     height: 50,
                                     borderRadius: 16,
-                                    border: '1px solid rgba(251, 44, 54, 0.3)', /* dash-error/30 */
+                                    border: '1px solid hsl(var(--destructive)/0.3)', /* dash-error/30 */
                                 }}
                             >
                                 <span
@@ -916,7 +916,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                         fontWeight: 600,
                                         fontSize: 16,
                                         lineHeight: '1.5em',
-                                        color: '#FF6467',
+                                        color: 'hsl(var(--destructive))',
                                     }}
                                 >
                                     {a.cancelOrder}

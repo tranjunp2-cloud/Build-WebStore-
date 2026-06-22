@@ -259,6 +259,36 @@ ORDERING RULES:
 7. Block ORDER must vary — do NOT always put features directly after hero.
 8. Ecommerce homepages SHOULD use **product-quick-view** for quick add-to-cart — reserve products-grid for catalog/shop pages.
 
+## BLOCK SCHEMA EXAMPLES (nested fields — follow these exact shapes)
+
+**menu-food** — categories MUST follow this schema. NEVER output categories: []:
+\`\`\`json
+{
+  "blockType": "menu-food",
+  "variant": "classic",
+  "headline": "Our Menu",
+  "categories": [
+    {
+      "name": "Starters",
+      "items": [
+        { "name": "Crispy Spring Rolls", "description": "Hand-rolled with vegetables", "price": "12.90", "currency": "RM", "tag": "vegetarian" },
+        { "name": "Tom Yum Soup", "description": "Spicy lemongrass broth with prawns", "price": "18.00", "currency": "RM", "tag": "spicy" },
+        { "name": "Satay Skewers", "description": "Grilled marinated chicken, peanut sauce", "price": "22.00", "currency": "RM" }
+      ]
+    },
+    {
+      "name": "Mains",
+      "items": [
+        { "name": "Nasi Lemak Special", "description": "Coconut rice with rendang and sambal", "price": "28.00", "currency": "RM" },
+        { "name": "Pad Thai", "description": "Stir-fried rice noodles with prawns", "price": "24.00", "currency": "RM" },
+        { "name": "Vegetable Curry", "description": "Mixed vegetables in coconut curry", "price": "22.00", "currency": "RM" }
+      ]
+    }
+  ]
+}
+\`\`\`
+RULES for menu-food: categories.length >= 2 | items.length >= 3 per category | item names/descriptions MUST match the business cuisine (Vietnamese restaurant → Vietnamese dishes, Italian → Italian dishes) | price = amount only ("12.90"), currency = separate field ("RM") | use the site language for all item text.
+
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation
 - Content must feel SPECIFIC to this business — not template filler
@@ -445,7 +475,7 @@ export function buildUserPrompt(
   if (!resolvedLangName) {
     langInstruction = "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
   } else if (resolvedLangName === 'English') {
-    langInstruction = "Generate ALL content in English."
+    langInstruction = "Generate ALL content in English. If any business information is in another language, translate it to English — do NOT copy non-English product names, descriptions, or user input verbatim into block fields."
   } else {
     langInstruction = `LANGUAGE REQUIREMENT — CRITICAL:
 Generate EVERY word of this website in ${resolvedLangName}. Absolutely no English words anywhere in the output.
@@ -481,7 +511,7 @@ export function buildPersonalizePrompt(
   "seoTitle": "max 60 chars, includes business name",
   "seoDescription": "max 160 chars, compelling meta description"
 }
-Write in ${langLabel}. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
+Write in ${langLabel}. If business information is in another language, translate it to ${langLabel} — do not copy the original language into output. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
     user: `Business: "${info.businessName}"
 Industry: ${info.industry}
 Products/services: ${info.products}

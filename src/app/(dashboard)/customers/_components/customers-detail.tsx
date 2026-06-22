@@ -105,14 +105,14 @@ export function CustomersDetail({ customer }: Props) {
                 <button
                     type="button"
                     onClick={() => router.push('/customers')}
-                    className="flex items-center justify-center w-9 h-9 rounded-[10px] text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors border-none bg-transparent cursor-pointer shrink-0"
+                    className="flex items-center justify-center w-9 h-9 rounded-[10px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors border-none bg-transparent cursor-pointer shrink-0"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <CustomerAvatar name={original.name} email={original.email} size={48} square />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <h1 className="text-[20px] font-bold text-[#F8FAFC] truncate">{original.name}</h1>
+                        <h1 className="text-[20px] font-bold text-foreground truncate">{original.name}</h1>
                         <RankBadge rank={original.rank} />
                     </div>
                     <div className="flex items-center gap-2 flex-wrap mt-0.5" style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
@@ -132,8 +132,8 @@ export function CustomersDetail({ customer }: Props) {
 
             {/* Dirty bar */}
             {dirty && (
-                <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-[8px] border border-amber-500/30 bg-amber-500/[0.10]">
-                    <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: '#fbbf24' }}>
+                <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-[8px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)]">
+                    <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: 'hsl(var(--warning))' }}>
                         <CircleAlert className="w-3.5 h-3.5 shrink-0" />
                         {cd.unsavedBanner}
                     </div>
@@ -142,7 +142,8 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleRevert}
                             disabled={saving}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-white/70 border border-white/[0.1] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-50"
+                            style={{ border: '1px solid var(--dash-border)' }}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-50"
                         >
                             <Undo2 className="w-3 h-3" /> {cd.revert}
                         </button>
@@ -150,7 +151,7 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium text-white border-none cursor-pointer disabled:opacity-60"
+                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium !text-white border-none cursor-pointer disabled:opacity-60"
                             style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                         >
                             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
@@ -161,14 +162,14 @@ export function CustomersDetail({ customer }: Props) {
             )}
 
             {/* Tab bar */}
-            <div className="flex gap-1 border-b border-white/[0.06]">
+            <div className="flex gap-1" style={{ borderBottom: '1px solid var(--dash-border)' }}>
                 <button
                     type="button"
                     onClick={() => setActiveTab('default')}
                     className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-none bg-transparent border-b-2 -mb-px"
                     style={{
-                        color: activeTab === 'default' ? '#3b82f6' : 'var(--cus-text-muted)',
-                        borderBottomColor: activeTab === 'default' ? '#3b82f6' : 'transparent',
+                        color: activeTab === 'default' ? 'hsl(var(--primary))' : 'var(--cus-text-muted)',
+                        borderBottomColor: activeTab === 'default' ? 'hsl(var(--primary))' : 'transparent',
                     }}
                 >
                     <User className="w-3.5 h-3.5 shrink-0" />
@@ -179,8 +180,8 @@ export function CustomersDetail({ customer }: Props) {
                     onClick={() => setActiveTab('orders')}
                     className="flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer border-none bg-transparent border-b-2 -mb-px"
                     style={{
-                        color: activeTab === 'orders' ? '#3b82f6' : 'var(--cus-text-muted)',
-                        borderBottomColor: activeTab === 'orders' ? '#3b82f6' : 'transparent',
+                        color: activeTab === 'orders' ? 'hsl(var(--primary))' : 'var(--cus-text-muted)',
+                        borderBottomColor: activeTab === 'orders' ? 'hsl(var(--primary))' : 'transparent',
                     }}
                 >
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
@@ -190,8 +191,8 @@ export function CustomersDetail({ customer }: Props) {
                         style={{
                             minWidth: 18, height: 18, padding: '0 6px',
                             borderRadius: 999, fontSize: 11, fontWeight: 700,
-                            background: activeTab === 'orders' ? 'rgba(59,130,246,0.18)' : 'var(--cus-border-medium)',
-                            color: activeTab === 'orders' ? '#93c5fd' : 'var(--cus-text-subtle)',
+                            background: activeTab === 'orders' ? 'hsl(var(--primary)/0.18)' : 'var(--cus-border-medium)',
+                            color: activeTab === 'orders' ? 'hsl(var(--primary))' : 'var(--cus-text-subtle)',
                         }}
                     >
                         {original.orderCount}
@@ -207,8 +208,8 @@ export function CustomersDetail({ customer }: Props) {
             {/* Sticky save bar — only on Default tab */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t border-white/[0.06] z-40"
-                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)' }}
+                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 z-40"
+                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--dash-border)' }}
                 >
                     <span style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
                         {dirty ? cd.unsaved : cd.upToDate}
@@ -220,7 +221,8 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleRevert}
                             disabled={!dirty || saving}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-white/70 border border-white/[0.1] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-40"
+                            style={{ border: '1px solid var(--dash-border)' }}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-40"
                         >
                             <Undo2 className="w-3 h-3" /> {cd.revert}
                         </button>
@@ -228,7 +230,7 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleSave}
                             disabled={!dirty || saving}
-                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium text-white border-none cursor-pointer disabled:opacity-40"
+                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium !text-white border-none cursor-pointer disabled:opacity-40"
                             style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
                         >
                             {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}

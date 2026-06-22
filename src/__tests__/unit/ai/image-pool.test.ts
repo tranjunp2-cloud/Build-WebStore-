@@ -188,6 +188,30 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     const matches = q.match(/candlelit/g) ?? []
     expect(matches.length).toBe(1)
   })
+
+  it('query uses LLM-translated product terms directly (GH-1185)', async () => {
+    // LLM should return visual concepts, not acronyms.
+    // e.g. translateToEnglishKeywords({industry:"SaaS CRM"}) → ["software team", "business dashboard"]
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    const pool = await buildImagePool({
+      category: 'tech',
+      products: ['software team', 'business dashboard'],
+      seed: 1,
+    })
+    expect(pool.queryUsed).toContain('software team')
+    expect(pool.queryUsed).toContain('business dashboard')
+    // Category name must NOT be injected when product terms are present
+    expect(pool.queryUsed).not.toContain('tech')
+  })
+
+  it('falls back to category name only when LLM fails (no products)', async () => {
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+    const pool = await buildImagePool({
+      category: 'tech',
+      seed: 1,
+    })
+    expect(pool.queryUsed).toBe('tech')
+  })
 })
 
 // ── TC-F01-W.15: pickFromPool determinism ───────────────────────────────────
@@ -313,6 +337,26 @@ describe('TC-F01-W.16 — underfill backoff', () => {
     await buildImagePool(baseCtx())
     // Only 2 calls (no retry)
     expect(mockSearchPhotos).toHaveBeenCalledTimes(2)
+  })
+
+  it('pool.square borrows from landscape when squarish returns 0', async () => {
+    // TC-F01-W.16 extension: landscape succeeds, squarish returns 0 on both
+    // initial + relaxed retry → square bucket gets landscape photos as fallback.
+    // This prevents media-injector from falling back to legacy search per block.
+    mockSearchPhotos
+      .mockResolvedValueOnce(landscapeFixture) // landscape OK
+      .mockResolvedValueOnce([])               // squarish initial → 0
+      .mockResolvedValueOnce([])               // squarish relaxed retry → 0
+
+    const pool = await buildImagePool(baseCtx({ mood: THEME_MOODS.elegant }))
+
+    expect(pool.underfill).toBe(true)
+    expect(pool.landscape).toHaveLength(12)
+    // Square gets landscape photos as fallback — not empty
+    expect(pool.square.length).toBeGreaterThan(0)
+    // IDs come from landscape fixture
+    const landscapeIds = new Set(landscapeFixture.map((p) => p.id))
+    expect(landscapeIds.has(pool.square[0]!.id)).toBe(true)
   })
 })
 

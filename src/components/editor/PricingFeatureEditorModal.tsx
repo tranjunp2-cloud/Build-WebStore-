@@ -67,12 +67,12 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel() }}>
             <DialogContent
-                className="editor-portal w-[768px] max-w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 dark:bg-[#0b1120] bg-white dark:border-[rgba(255,255,255,0.08)] border-[rgba(0,0,0,0.1)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
+                className="editor-portal w-[768px] max-w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 bg-[var(--editor-bg)] border-[var(--editor-border)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                 onInteractOutside={e => { e.preventDefault(); handleCancel() }}
                 onEscapeKeyDown={e => { e.preventDefault(); handleCancel() }}
             >
                 {/* Header */}
-                <div className="px-6 py-5 border-b border-[rgba(255,255,255,0.08)] flex-shrink-0 flex items-center gap-3">
+                <div className="px-6 py-5 border-b border-[var(--editor-border)] flex-shrink-0 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 flex items-center justify-center shrink-0">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-white">
                             <rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity="0.9" />
@@ -82,8 +82,8 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
                         </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <DialogTitle className="text-[20px] font-bold text-[#f8fafc] leading-7">{s.pricingFeatureModalTitle}</DialogTitle>
-                        <p className="text-[14px] text-[rgba(248,250,252,0.6)] mt-0.5 leading-5">
+                        <DialogTitle className="text-[20px] font-bold text-[var(--editor-text)] leading-7">{s.pricingFeatureModalTitle}</DialogTitle>
+                        <p className="text-[14px] text-[var(--editor-text-muted)] mt-0.5 leading-5">
                             {s.pricingFeatureModalSubtitle}
                         </p>
                     </div>
@@ -94,7 +94,7 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse min-w-[480px]">
                             <thead>
-                                <tr className="bg-[#151b2b]">
+                                <tr className="bg-[var(--editor-bg)]">
                                     <th className="text-left p-4 text-[10px] text-white font-bold uppercase tracking-[1px] w-[200px]">
                                         {s.pricingFeatureNameCol}
                                     </th>
@@ -108,7 +108,7 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
                             </thead>
                             <tbody>
                                 {draft.map((row, rIdx) => (
-                                    <tr key={rIdx} className="border-t border-[rgba(66,71,84,0.1)]">
+                                    <tr key={rIdx} className="border-t border-[var(--editor-border)]">
                                         <td className="p-1.5 w-[200px]">
                                             <Input
                                                 defaultValue={row.featureName}
@@ -125,13 +125,13 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
                                                     aria-label={val.included ? s.pricingIncludedToggle : s.pricingExcludedToggle}
                                                     className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto transition-colors ${
                                                         val.included
-                                                            ? 'bg-[rgba(78,222,163,0.1)] hover:bg-[rgba(78,222,163,0.2)]'
-                                                            : 'bg-[rgba(255,180,171,0.1)] hover:bg-[rgba(255,180,171,0.2)]'
+                                                            ? 'bg-[hsl(var(--primary)/0.1)] hover:bg-[hsl(var(--primary)/0.2)]'
+                                                            : 'bg-[hsl(var(--destructive)/0.1)] hover:bg-[hsl(var(--destructive)/0.2)]'
                                                     }`}
                                                 >
                                                     {val.included
-                                                        ? <CheckCircle2 className="w-5 h-5 text-[#4ede9f]" />
-                                                        : <XCircle className="w-5 h-5 text-[#ff9b8f]" />
+                                                        ? <CheckCircle2 className="w-5 h-5 text-[hsl(var(--primary))]" />
+                                                        : <XCircle className="w-5 h-5 text-[hsl(var(--destructive))]" />
                                                     }
                                                 </button>
                                             </td>
@@ -155,7 +155,7 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
                     <button
                         type="button"
                         onClick={addRow}
-                        className="mt-6 w-full flex items-center justify-center gap-2 py-[18px] rounded-[16px] border-2 border-dashed border-[rgba(66,71,84,0.3)] text-[14px] text-[#3b82f6] tracking-[0.35px] hover:border-[rgba(66,71,84,0.5)] hover:bg-white/[0.02] transition-colors"
+                        className="mt-6 w-full flex items-center justify-center gap-2 py-[18px] rounded-[16px] border-2 border-dashed border-[var(--editor-border)] text-[14px] text-[hsl(var(--primary))] tracking-[0.35px] hover:border-[var(--editor-border)] hover:bg-white/[0.02] transition-colors"
                     >
                         <PlusCircle className="w-5 h-5" />
                         {s.pricingAddFeatureRow}
@@ -173,7 +173,7 @@ export default function PricingFeatureEditorModal({ open, onOpenChange, matrix, 
 
                 {/* Footer — only shown when confirming discard */}
                 {confirmDiscard && (
-                    <div className="px-6 py-4 border-t border-[rgba(255,255,255,0.08)] flex-shrink-0">
+                    <div className="px-6 py-4 border-t border-[var(--editor-border)] flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <p className="text-xs text-amber-400">{s.pricingDiscardPrompt}</p>
                             <div className="flex gap-2">

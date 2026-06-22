@@ -219,7 +219,7 @@ function VerifyOTPContent() {
                 <div className="mt-8 w-full flex flex-col items-center" style={{ gap: 24 }}>
                     <Link
                         href="/login"
-                        className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                        className="inline-flex items-center justify-center gap-[8px] text-primary hover:text-primary/80 transition-colors"
                         style={{
                             fontFamily: 'Inter, sans-serif',
                             fontSize: '14px',
@@ -228,7 +228,7 @@ function VerifyOTPContent() {
                             textDecoration: 'none',
                         }}
                     >
-                        <svg className="h-4 w-4 text-[#3B82F6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
+                        <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
                         {t.auth.otp.backLogin}
                     </Link>
                     <div className="w-full">
@@ -370,7 +370,7 @@ function VerifyOTPContent() {
                             onChange={(e) => handleInputChange(i, e.target.value)}
                             onKeyDown={(e) => handleKeyDown(i, e)}
                             disabled={isVerifying}
-                            className="outline-none transition-all duration-200 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="outline-none transition-all duration-200 focus:ring-2 focus:ring-ring/30 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
                                 flex: '1 1 0',
                                 maxWidth: '48px',
@@ -466,7 +466,7 @@ export default function VerifyOTPPage() {
     return (
         <Suspense fallback={
             <div className="w-full min-h-[300px] flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         }>
             <VerifyOTPContent />

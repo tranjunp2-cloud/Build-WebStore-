@@ -100,20 +100,33 @@ vi.mock('@/lib/ai/generate-sample-products', () => ({
 }))
 
 // Mock AI Generator (SSE logic)
+// GH-1190: generateSiteWithAI now forwards events via onEvent callback (6th param) in real-time
+// instead of returning them in the events[] array for post-hoc replay. Mock must call onEvent.
 vi.mock('@/lib/ai/openai-generator', () => ({
-    generateSiteWithAI: vi.fn().mockResolvedValue({
-        result: {
-            siteName: 'AI Bakery',
-            siteType: 'ecommerce',
-            theme: { primaryColor: '#000' },
-            seo: { title: 'SEO Bakery', description: 'Desc Bakery' },
-            blocks: [{ blockType: 'hero', headline: 'Welcome to Bakery' }]
-        },
-        events: [
+    generateSiteWithAI: vi.fn().mockImplementation(async (
+        _rawBusinessInfo: unknown,
+        _extra: unknown,
+        _lang: unknown,
+        _ref: unknown,
+        _overrides: unknown,
+        onEvent?: (e: { event: string; data: unknown }) => void,
+    ) => {
+        const mockEvents = [
             { event: 'theme_generated', data: { color: 'blue' } },
-            { event: 'content_generated', data: { block: 'hero' } }
+            { event: 'content_generated', data: { block: 'hero' } },
         ]
-    })
+        mockEvents.forEach(e => onEvent?.(e))
+        return {
+            result: {
+                siteName: 'AI Bakery',
+                siteType: 'ecommerce',
+                theme: { primaryColor: '#000' },
+                seo: { title: 'SEO Bakery', description: 'Desc Bakery' },
+                blocks: [{ blockType: 'hero', headline: 'Welcome to Bakery' }]
+            },
+            events: mockEvents,
+        }
+    }),
 }))
 
 // Top-level openai mock — vi.mock() must never be inside it() per testing.md

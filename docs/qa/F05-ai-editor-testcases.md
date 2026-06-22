@@ -63,6 +63,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-02-14** | `GH-864/panel-ux` | `UX` | Page Library — đổi tên, micro-copy, badge Live/Draft | 1. Mở Page Library panel. | - Title hiển thị "Page Library".<br>- Micro-copy mô tả biên tập nội bộ hiện ngay dưới tiêu đề.<br>- Không có ô tìm kiếm.<br>- Trang published + site published → badge "Live"; trang draft hoặc site chưa publish → badge "Draft". | High | [x] |
 | **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản page × site status | 1. Test badge với: (a) page published + site published → Live; (b) page draft + site published → Draft; (c) page published + site draft/unpublished → Draft; (d) page hidden (`isVisible=false`) → Draft. | - Mỗi kịch bản trả về badge đúng.<br>- Badge không phụ thuộc vào menu-linkage (điều kiện `inMenu` đã bỏ theo GH-864). | High | [x] |
 | **TC-F05-02-16** | `GH-864/coach` | `UX` | EditorCoachMarks — 2-bước overlay cho first-time user | 1. Xóa localStorage flag. Mở Editor. | - Sau delay, Step 1 popup hiển thị tại Page Library anchor; không có nút "Back" ở bước 1.<br>- Nhấn "Next" → Step 2 tại Menu Settings anchor; có nút "Back" và "Done".<br>- Nhấn "Back" ở bước 2 → quay về bước 1 (không ghi flag).<br>- Nhấn "Done" → đóng overlay, ghi flag localStorage.<br>- ESC và click backdrop KHÔNG đóng overlay (GH-864).<br>- Lần sau mở lại → không hiển thị lại. | High | [x] |
+| **TC-F05-02-17** | `GH-1222/list-limit` | `Bound` | Danh sách trả về >10 trang (không bị Payload default limit cắt) | 1. Site có >10 trang.<br>2. Gọi `GET /api/sites/:id/pages`. | - API trả về đầy đủ tất cả trang (vd 15 trang), không cắt còn 10.<br>- `payload.find` cho pages được gọi với `limit: 0`. | High | [x] |
 
 ---
 
@@ -234,6 +235,11 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-12-12** | `US-12/AC3` | `Val` | Upload file không phải ảnh cho Social Thumbnail | 1. Upload file `.pdf` hoặc `.exe` vào "Social Share Thumbnail". | - Hệ thống từ chối với lỗi "Chỉ chấp nhận JPG, PNG, WebP".<br>- Không upload. | High | [ ] |
 | **TC-F05-12-13** | `US-12/AC3` | `API` | SEO meta inject vào `<head>` trên published site | 1. Điền Meta Description + Title trong SEO Settings.<br>2. Publish.<br>3. View Source trang. | - `<head>` chứa `<meta name="description" content="...">` đúng nội dung đã nhập.<br>- `<title>` tag đúng. | Blocker | [ ] |
 | **TC-F05-12-14** | `US-12/AC3` | `UI` | OG:image verification | 1. Upload Social Share Thumbnail.<br>2. Publish.<br>3. View Source. | - `<head>` chứa `<meta property="og:image" content="[URL ảnh]">`.<br>- Khi share lên Facebook/Zalo, thumbnail hiển thị đúng.<br>- Kích thước OG image ≥ 1200×630px. | High | [ ] |
+| **TC-F05-12-15** | `GH-1263/upload-id` | `Logic` | OgImageEditor gọi callback với numeric mediaId (không phải URL string) | 1. Upload ảnh JPG hợp lệ vào OgImageEditor.<br>2. `uploadMediaAction` trả về `{ id: 42, url: 'https://...jpg' }`. | - `onOgImageChange` được gọi với `(42, 'https://...jpg')`.<br>- Không gọi với URL string thuần. | Blocker | [x] |
+| **TC-F05-12-16** | `GH-1263/remove` | `Logic` | OgImageEditor Remove button gọi callback với (null, null) | 1. Render OgImageEditor với `currentOgImage` đang có.<br>2. Click "Remove". | - `onOgImageChange(null, null)` được gọi đúng 1 lần. | High | [x] |
+| **TC-F05-12-17** | `GH-1263/preview` | `UI` | OgImageEditor hiển thị preview khi có ảnh; dropzone khi không có | 1. Render với `currentOgImage = 'https://img.jpg'`.<br>2. Render lại với `currentOgImage = null`. | - Trường hợp 1: `<img>` hiển thị + nút Replace + nút Remove.<br>- Trường hợp 2: Dropzone với "Click to upload" visible. | High | [x] |
+| **TC-F05-12-18** | `GH-1263/invalid-format` | `Val` | Upload file không phải ảnh bị chặn, toast lỗi, không gọi callback | 1. Chọn file `.pdf` trong OgImageEditor. | - `toast.error("Only JPG, PNG, or WebP images are accepted")` được gọi.<br>- `onOgImageChange` không được gọi.<br>- `uploadMediaAction` không được gọi. | High | [x] |
+| **TC-F05-12-19** | `GH-1263/upload-no-id` | `Edge` | Upload trả về object không có id → toast lỗi, callback không được gọi | 1. `uploadMediaAction` mock trả về `{ url: 'https://img.jpg' }` (thiếu `id`). | - `toast.error` được gọi.<br>- `onOgImageChange` không được gọi. | High | [x] |
 
 ---
 
@@ -295,6 +301,35 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-14-08** | `US-14/AC3` | `State` | Bottom Sheet open → xoay thiết bị | 1. Mở Bottom Sheet bằng cách tap element.<br>2. Xoay device từ portrait sang landscape. | - Bottom Sheet reposition đúng.<br>- Content không tràn.<br>- Input focus được duy trì. | Medium | [ ] |
 | **TC-F05-14-09** | `US-14/AC1` | `Net` | AI Chat qua FAB — lỗi mạng | 1. Mở FAB Chat trên mobile.<br>2. Gửi prompt khi mất kết nối. | - Toast lỗi hiển thị trên FAB.<br>- Nội dung chat input được giữ nguyên.<br>- Nút retry xuất hiện. | High | [ ] |
 | **TC-F05-14-10** | `US-14/AC2` | `Perf` | Tap-to-Add trên page 50+ blocks | 1. Trang có 50+ blocks.<br>2. Tap thêm 1 block mới. | - Auto-scroll mượt tới vị trí block mới.<br>- Không lag/jank trên mobile.<br>- DOM render trong < 1 giây. | Medium | [ ] |
+
+---
+
+### GH-1278: useLocalHref Hook — Storefront Logo Redirect Fix (15 Cases)
+
+| TC-ID | Layer | Description | Assertion |
+|-------|-------|-------------|-----------|
+| **TC-F05-1278-01** | Unit | Non-local context: https:// passes through unchanged | `href === 'https://external.com/page'` → result unchanged |
+| **TC-F05-1278-02** | Unit | Non-local context: undefined → '#' | `href === undefined` → result `'#'` |
+| **TC-F05-1278-02b** | Unit | Non-local context: empty string → '#' | `href === ''` → result `'#'` |
+| **TC-F05-1278-03** | Unit | Non-local context: /about passes through unchanged | `href === '/about'` → result unchanged (not prefixed) |
+| **TC-F05-1278-04** | Unit | Local dev: /about → /sites/mystore/about | `pathname === '/sites/mystore/home'`, `href === '/about'` → `/sites/mystore/about` |
+| **TC-F05-1278-05** | Unit | Local dev: nested path /services/consulting → /sites/mystore/services/consulting | `pathname === '/sites/mystore/home'`, `href === '/services/consulting'` → `/sites/mystore/services/consulting` |
+| **TC-F05-1278-06** | Unit | Local dev: bare relative 'about' (no slash) → /sites/mystore/about | `pathname === '/sites/mystore/home'`, `href === 'about'` → `/sites/mystore/about` (normalized) |
+| **TC-F05-1278-07** | Unit | Local dev: https://external.com passes through | `pathname === '/sites/mystore/home'`, `href === 'https://external.com'` → result unchanged |
+| **TC-F05-1278-08** | Unit | Local dev: //cdn.example.com passes through | `pathname === '/sites/mystore/home'`, `href === '//cdn.example.com/img.jpg'` → result unchanged |
+| **TC-F05-1278-09** | Unit | Local dev: #section passes through | `pathname === '/sites/mystore/home'`, `href === '#section'` → result unchanged |
+| **TC-F05-1278-10** | Unit | Local dev: mailto:contact@example.com passes through **(CRITICAL BUG FIX GH-1278)** | `pathname === '/sites/mystore/home'`, `href === 'mailto:contact@example.com'` → result unchanged (not prefixed) |
+| **TC-F05-1278-11** | Unit | Local dev: tel:+1234567890 passes through | `pathname === '/sites/mystore/home'`, `href === 'tel:+1234567890'` → result unchanged |
+| **TC-F05-1278-12** | Unit | Local dev: /preview/abc123 passes through | `pathname === '/sites/mystore/home'`, `href === '/preview/abc123'` → result unchanged |
+| **TC-F05-1278-13** | Unit | Local dev: /sites/another-store/page passes through | `pathname === '/sites/mystore/home'`, `href === '/sites/another-store/page'` → result unchanged |
+| **TC-F05-1278-14** | Unit | Local dev: BROKEN_URL_PREFIX + '/test' passes through | `href === '_broken_url_:/test'` → result unchanged (passthrough) |
+| **TC-F05-1278-15** | Unit | Local dev: undefined → '#' | `pathname === '/sites/mystore/home'`, `href === undefined` → result `'#'` |
+| **TC-F05-1278-16** | Unit | Local dev: empty string → '#' | `pathname === '/sites/mystore/home'`, `href === ''` → result `'#'` |
+| **TC-F05-1278-17** | Unit | SSR/null pathname: /about passes through | `pathname === null`, `href === '/about'` → result unchanged (non-local branch) |
+| **TC-F05-1278-18** | Unit | SSR/null pathname: undefined → '#' | `pathname === null`, `href === undefined` → result `'#'` |
+| **TC-F05-1278-19** | Unit | Local dev: whatsapp://send?phone=60123456789 passes through | `pathname === '/sites/mystore/home'`, `href === 'whatsapp://send?phone=60123456789'` → result unchanged (protocol passthrough) |
+| **TC-F05-1278-20** | Unit | Local dev: sms:+60123456789 passes through | `pathname === '/sites/mystore/home'`, `href === 'sms:+60123456789'` → result unchanged (protocol passthrough) |
+| **TC-F05-1278-21** | Unit | Local dev: http://insecure.example.com/page passes through | `pathname === '/sites/mystore/home'`, `href === 'http://insecure.example.com/page'` → result unchanged (http protocol passthrough) |
 
 ---
 

@@ -26,7 +26,7 @@ export function HelpCenterNav() {
   return (
     <div className="w-full mb-6">
       {/* ───────── Desktop Tabs ───────── */}
-      <div className="hidden md:flex p-1 bg-[#1F2937] rounded-lg w-max border border-[#1F2937] shadow-sm">
+      <div className="hidden md:flex p-1 bg-[hsl(var(--secondary))] rounded-lg w-max border border-[hsl(var(--border))] shadow-sm">
         {TABS.map((tab) => {
           const isActive =
             tab.href === '/help'
@@ -38,8 +38,8 @@ export function HelpCenterNav() {
               href={tab.href}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold transition-all ${
                 isActive
-                  ? 'bg-[#0B1120] text-blue-500 shadow-sm'
-                  : 'text-[#9CA3AF] hover:text-white'
+                  ? 'bg-[hsl(var(--background))] text-[hsl(var(--primary))] shadow-sm'
+                  : 'text-[hsl(var(--muted-foreground))] hover:text-white'
               }`}
             >
               <tab.Icon className="w-4 h-4 shrink-0" aria-hidden />
@@ -50,10 +50,10 @@ export function HelpCenterNav() {
       </div>
 
       {/* ───────── Mobile Dropdown ───────── */}
-      <div className={`md:hidden relative rounded-lg ${open ? 'border border-[#9CA3AF]' : ''}`}>
+      <div className={`md:hidden relative rounded-lg ${open ? 'border border-[hsl(var(--border))]' : ''}`}>
         <button
           onClick={() => setOpen((v) => !v)}
-          className={`w-full flex items-center justify-between px-4 py-2.5 bg-[#161E2E] rounded-lg text-sm font-semibold text-white focus:outline-none ${open ? 'rounded-b-none' : 'border border-[#374151]'}`}
+          className={`w-full flex items-center justify-between px-4 py-2.5 bg-[hsl(var(--card))] rounded-lg text-sm font-semibold text-white focus:outline-none ${open ? 'rounded-b-none' : 'border border-[hsl(var(--border))]'}`}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
@@ -62,12 +62,12 @@ export function HelpCenterNav() {
             {activeTab.name}
           </span>
           <ChevronDown
-            className={`w-4 h-4 text-[#9CA3AF] transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-[hsl(var(--muted-foreground))] transition-transform ${open ? 'rotate-180' : ''}`}
           />
         </button>
 
         {open && (
-          <div className="bg-[#161E2E] border-t border-t-[#374151] rounded-b-lg overflow-hidden">
+          <div className="bg-[hsl(var(--card))] border-t border-t-border rounded-b-lg overflow-hidden">
             {TABS.map((tab) => {
               const isActive =
                 tab.href === '/help'
@@ -82,8 +82,8 @@ export function HelpCenterNav() {
                   }}
                   className={`w-full flex items-center gap-2 text-left px-4 py-3 text-sm font-semibold transition-colors ${
                     isActive
-                      ? 'text-blue-400 bg-blue-500/10'
-                      : 'text-[#9CA3AF] hover:text-white hover:bg-[#1F2937]'
+                      ? 'text-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.1)]'
+                      : 'text-[hsl(var(--muted-foreground))] hover:text-white hover:bg-[hsl(var(--secondary))]'
                   }`}
                 >
                   <tab.Icon className="w-4 h-4 shrink-0" aria-hidden />

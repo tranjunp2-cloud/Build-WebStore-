@@ -220,6 +220,10 @@ const MIGRATIONS = [
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
   {
+    name: 'sites.shipping_config_shipping_setup_confirmed',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_shipping_setup_confirmed boolean DEFAULT false;`,
+  },
+  {
     name: 'sites.header_block',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block jsonb;`,
   },
@@ -4745,6 +4749,37 @@ const MIGRATIONS = [
       END
       WHERE sort_order IS NULL;
     `,
+  },
+
+  // ── SSO-PW2: Foundation Schema ──
+  {
+    name: 'tenants.migration_status',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS migration_status varchar DEFAULT 'migrated';`,
+  },
+  {
+    name: 'users.migration_status',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_status varchar DEFAULT 'migrated';`,
+  },
+  {
+    name: 'users.customer_id_number',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_id_number varchar;`,
+  },
+  {
+    name: 'users.created_by_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by_id integer;`,
+  },
+  {
+    name: 'users.updated_by_id',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_by_id integer;`,
+  },
+  {
+    name: 'sites.theme_customized.add_column',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_customized boolean DEFAULT false;`,
+  },
+  // GH-1225: COD defaults ON — new tenants get a valid payment method out of the box
+  {
+    name: 'tenants.payments_payment_cod.default_true',
+    sql: `ALTER TABLE tenants ALTER COLUMN payments_payment_cod SET DEFAULT true;`,
   },
 ];
 

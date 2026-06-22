@@ -9,7 +9,7 @@ interface TabSuspendedOverlayProps {
 
 export function TabSuspendedOverlay({ onReclaim, onReload }: TabSuspendedOverlayProps) {
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0B1120]/95 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--editor-bg)]/95 backdrop-blur-sm">
             <div className="w-full max-w-sm text-center">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
                     <Lock className="h-8 w-8" aria-hidden />

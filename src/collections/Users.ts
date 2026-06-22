@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import type { CollectionConfig, CollectionAfterChangeHook, CollectionBeforeChangeHook } from 'payload'
 import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
@@ -12,6 +12,21 @@ import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { getActivePlanSubscription, canUseWithinLimit, recordUsage, reduceUsage } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+
+/**
+ * beforeChange hook: auto-set createdBy (on create) and updatedBy (on create/update) from req.user.
+ * Skip if req.user is null — system-level operations (e.g. Payload internal tasks) have no caller.
+ */
+const setAuditFields: CollectionBeforeChangeHook = ({ data, operation, req }) => {
+    const callerId = req.user?.id ?? null
+    if (!callerId) return data
+
+    if (operation === 'create') {
+        data.createdBy = callerId
+    }
+    data.updatedBy = callerId
+    return data
+}
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -130,6 +145,7 @@ export const Users: CollectionConfig = {
         description: 'Platform users — can be super-admins or tenant members.',
     },
     hooks: {
+        beforeChange: [setAuditFields],
         afterChange: [sendWelcomeEmailHook],
     },
     endpoints: [
@@ -158,6 +174,29 @@ export const Users: CollectionConfig = {
                         collection: 'users',
                         data: { email, password },
                     })
+
+                    // Ban enforcement: block login if all tenants are suspended.
+                    // Extract IDs defensively — handles both depth:0 (raw ID) and depth:2 (populated object).
+                    // Guard against vacuous truth: [].every() returns true, which would block all users.
+                    const userTenants = result.user?.tenants as Array<{ tenant: string | number | { id: string | number } }> | undefined
+                    if (userTenants && userTenants.length > 0) {
+                        const tenantIds = userTenants
+                            .map(t => {
+                                if (t.tenant == null) return null
+                                if (typeof t.tenant === 'object') return String((t.tenant as { id: string | number }).id)
+                                return String(t.tenant)  // depth:0 — raw integer or string ID
+                            })
+                            .filter((id): id is string => Boolean(id) && id !== '0')
+                        if (tenantIds.length > 0) {
+                            const tenantResults = await Promise.all(
+                                tenantIds.map(id => req.payload.find({ collection: 'tenants', where: { id: { equals: id } }, limit: 1, depth: 0 }))
+                            )
+                            const allSuspended = tenantResults.every(r => (r.docs[0] as { status?: string } | undefined)?.status === 'suspended')
+                            if (allSuspended) {
+                                return Response.json({ errors: [{ message: 'Account suspended' }] }, { status: 403 })
+                            }
+                        }
+                    }
 
                     let finalToken = result.token
 
@@ -968,7 +1007,7 @@ export const Users: CollectionConfig = {
                 const { SignJWT } = await import('jose')
                 const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
                 const secretKey = new TextEncoder().encode(secret)
-                const expSeconds = 60 * 60 * 24 // 24 hours
+                const expSeconds = 60 * 60 * 24
                 const now = Math.floor(Date.now() / 1000)
 
                 const token = await new SignJWT({
@@ -1135,6 +1174,36 @@ export const Users: CollectionConfig = {
             name: 'lastLoginAt',
             type: 'date',
             admin: { readOnly: true },
+        },
+        {
+            name: 'migrationStatus',
+            type: 'select',
+            defaultValue: 'migrated',
+            options: [
+                { label: 'Migrated', value: 'migrated' },
+                { label: 'Pending', value: 'pending' },
+                { label: 'Failed', value: 'failed' },
+            ],
+            admin: { description: 'Migration status from legacy SSO system', position: 'sidebar' },
+        },
+        {
+            name: 'customerIdNumber',
+            type: 'text',
+            admin: { description: 'TM customer ID — composite key with email' },
+        },
+        // ── Audit trail (hidden from admin) ──
+        {
+            name: 'createdBy',
+            type: 'relationship',
+            relationTo: 'users',
+            admin: { hidden: true, description: 'User who created this record (audit trail)' },
+            access: { update: () => false },
+        },
+        {
+            name: 'updatedBy',
+            type: 'relationship',
+            relationTo: 'users',
+            admin: { hidden: true, description: 'User who last updated this record (audit trail)' },
         },
         // ── OTP 2FA fields (hidden from admin) ──
         {
