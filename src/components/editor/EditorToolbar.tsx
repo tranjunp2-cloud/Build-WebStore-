@@ -56,14 +56,14 @@ const PRESETS: Array<{
 
 function PresetThumb({ cells }: { cells: ('rail' | 'preview')[] }) {
     return (
-        <div className="flex h-8 w-full items-center gap-0.5 rounded-md border border-white/[0.08] bg-[#0B1120] p-1">
+        <div className="flex h-8 w-full items-center gap-0.5 rounded-md border border-white/[0.08] bg-[var(--editor-bg)] p-1">
             {cells.map((cell, i) => (
                 <div
                     key={i}
                     className={cn(
                         'h-full rounded-sm',
                         cell === 'preview'
-                            ? 'flex-1 bg-gradient-to-r from-[#3B82F6]/40 to-[#2DD4BF]/40'
+                            ? 'flex-1 bg-gradient-to-r from-[hsl(var(--info)/0.4)] to-[hsl(var(--primary)/0.4)]'
                             : 'w-3 bg-white/[0.08]',
                     )}
                 />
@@ -87,8 +87,8 @@ function WorkspaceLayoutControls() {
         cn(
             'inline-flex h-8 w-8 items-center justify-center rounded-[10px] transition-colors',
             active
-                ? 'bg-white/[0.08] text-[#F8FAFC] hover:bg-white/[0.12]'
-                : 'text-slate-500 hover:bg-white/5 hover:text-[#F8FAFC]',
+                ? 'bg-white/[0.08] text-[var(--editor-text)] hover:bg-white/[0.12]'
+                : 'text-slate-500 hover:bg-white/5 hover:text-[var(--editor-text)]',
         )
 
     return (
@@ -102,9 +102,9 @@ function WorkspaceLayoutControls() {
                 <PopoverContent
                     align="start"
                     sideOffset={8}
-                    className="editor-portal w-56 rounded-xl border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#1E293B] bg-white p-2 dark:text-slate-200 text-slate-700 shadow-2xl"
+                    className="editor-portal w-56 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] p-2 text-[var(--editor-text)] shadow-2xl"
                 >
-                    <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider dark:text-slate-400 text-slate-500">
+                    <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--editor-text-muted)]">
                         Workspace
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -118,12 +118,12 @@ function WorkspaceLayoutControls() {
                                     className={cn(
                                         'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
                                         active
-                                            ? 'border-[#3B82F6]/60 bg-[#3B82F6]/10'
-                                            : 'dark:border-white/[0.06] border-[rgba(0,0,0,0.08)] bg-transparent dark:hover:bg-white/[0.04] hover:bg-slate-50',
+                                            ? 'border-[hsl(var(--primary)/0.6)] bg-[hsl(var(--primary)/0.1)]'
+                                            : 'border-[var(--editor-border)] bg-transparent hover:bg-[var(--editor-overlay-hover)]',
                                     )}
                                 >
                                     <PresetThumb cells={p.cells} />
-                                    <span className="text-[11px] font-medium dark:text-slate-200 text-slate-700">{p.label}</span>
+                                    <span className="text-[11px] font-medium text-[var(--editor-text-muted)]">{p.label}</span>
                                 </button>
                             )
                         })}
@@ -268,7 +268,7 @@ export function EditorToolbar({
 
     if (compact) {
         return (
-            <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-3">
+            <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-3">
                 <div className="flex min-w-0 items-center gap-0.5">
                     <button
                         type="button"
@@ -328,7 +328,7 @@ export function EditorToolbar({
                                 size="sm"
                                 onClick={onRepublish}
                                 disabled={isPublishing || isSaving}
-                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
                             >
                                 {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
                             </Button>
@@ -350,7 +350,7 @@ export function EditorToolbar({
                             onClick={onPublish}
                             disabled={isPublishing || publishSuccess}
                             className={cn(
-                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
+                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
                                 publishSuccess && 'from-emerald-500 to-emerald-400',
                             )}
                         >
@@ -371,13 +371,13 @@ export function EditorToolbar({
 
     return (
         <>
-        <header className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
+        <header className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-5">
             {/* LEFT: page tools. Text labels collapse only at tier 2 (< 1024px). */}
             <div className="flex shrink-0 items-center gap-2">
                 <button
                     type="button"
                     onClick={onOpenMenu}
-                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[#F8FAFC] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
                     title={et.openMenu}
                 >
                     <Menu className="h-4 w-4 shrink-0" />
@@ -395,7 +395,7 @@ export function EditorToolbar({
                 <button
                     type="button"
                     onClick={onOpenTemplates}
-                    className="inline-flex h-9 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[#F8FAFC] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
+                    className="inline-flex h-9 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
                     title={et.templates}
                 >
                     <Palette className="h-4 w-4 shrink-0" aria-hidden />
@@ -408,7 +408,7 @@ export function EditorToolbar({
                     type="button"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[#F8FAFC] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
                     title={et.undoShortcut}
                 >
                     <Undo2 className="h-4 w-4 shrink-0" />
@@ -419,7 +419,7 @@ export function EditorToolbar({
                     type="button"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[#F8FAFC] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[var(--editor-text)] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
                     title={et.redoShortcut}
                 >
                     <Redo2 className="h-4 w-4 shrink-0" />
@@ -432,14 +432,14 @@ export function EditorToolbar({
 
             {/* CENTER: device toggle + layout icons. Text collapses at tier 1 (< 1366px). */}
             <div className="flex shrink-0 items-center gap-2">
-                <div className="hidden h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px lg:flex">
+                <div className="hidden h-[38px] items-center rounded-full border border-[hsl(var(--primary)/0.04)] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] px-[5px] py-px lg:flex">
                     <button
                         type="button"
                         onClick={() => onViewportChange('desktop')}
                         className={cn(
                             'inline-flex h-7 shrink-0 items-center justify-center gap-0 rounded-full px-2 text-xs transition-all min-[1366px]:min-w-[104px] min-[1366px]:gap-2 min-[1366px]:px-4',
                             viewport === 'desktop'
-                                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
+                                ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] font-semibold text-white'
                                 : 'font-medium text-white/70 hover:text-white',
                         )}
                         title={et.desktop}
@@ -453,7 +453,7 @@ export function EditorToolbar({
                         className={cn(
                             'inline-flex h-7 shrink-0 items-center justify-center gap-0 rounded-full px-2 text-xs transition-all min-[1366px]:min-w-[94px] min-[1366px]:gap-2 min-[1366px]:px-4',
                             viewport === 'mobile'
-                                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
+                                ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] font-semibold text-white'
                                 : 'font-medium text-white/70 hover:text-white',
                         )}
                         title={et.mobile}
@@ -544,7 +544,7 @@ export function EditorToolbar({
                                 size="sm"
                                 onClick={onRepublish}
                                 disabled={isPublishing || isSaving}
-                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
                             >
                                 {isPublishing ? (
                                     <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {et.updating}</>
@@ -569,25 +569,25 @@ export function EditorToolbar({
                             </DropdownMenu.Trigger>
                             <DropdownMenu.Portal>
                                 <DropdownMenu.Content
-                                    className="editor-portal z-50 min-w-[180px] rounded-xl border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#1E293B] bg-white p-1.5 shadow-2xl"
+                                    className="editor-portal z-50 min-w-[180px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] p-1.5 shadow-2xl"
                                     sideOffset={8}
                                     align="end"
                                 >
                                     <DropdownMenu.Item
                                         onSelect={onViewLive}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium dark:text-slate-200 text-slate-700 outline-none dark:hover:bg-white/[0.06] hover:bg-slate-100 dark:focus:bg-white/[0.06] focus:bg-slate-100"
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
                                     >
                                         <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
                                         {vm.openWebsite}
                                     </DropdownMenu.Item>
                                     <DropdownMenu.Item
                                         onSelect={onCopyLink}
-                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium dark:text-slate-200 text-slate-700 outline-none dark:hover:bg-white/[0.06] hover:bg-slate-100 dark:focus:bg-white/[0.06] focus:bg-slate-100"
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
                                     >
                                         <Copy className="h-3.5 w-3.5 text-slate-400" />
                                         {vm.copyLink}
                                     </DropdownMenu.Item>
-                                    <DropdownMenu.Separator className="my-1 h-px dark:bg-white/[0.08] bg-[rgba(0,0,0,0.08)]" />
+                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--editor-border)]" />
                                     <DropdownMenu.Item
                                         onSelect={onUnpublish}
                                         className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-400 outline-none hover:bg-red-500/10 focus:bg-red-500/10"
@@ -607,7 +607,7 @@ export function EditorToolbar({
                         onClick={onPublish}
                         disabled={isPublishing || publishSuccess}
                         className={cn(
-                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
+                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
                             publishSuccess && 'from-emerald-500 to-emerald-400',
                         )}
                     >

@@ -38,14 +38,14 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
         onChange(rest ? `${code}${rest}` : code)
     }
 
-    const inputBase = 'bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-[8px] h-[48px] text-[14px] text-white outline-none focus:border-blue-500/50 transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
+    const inputBase = 'bg-[hsl(var(--card))] border border-[hsl(var(--input-border))] rounded-[8px] h-[48px] text-[14px] text-white outline-none focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--ring))] transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
 
     return (
         <div className="flex gap-2 w-full">
             {/* Country code selector */}
             <div className={`${inputBase} relative flex items-center gap-1.5 px-1 flex-shrink-0`}>
                 <span className="text-xl leading-none pointer-events-none select-none pl-1">{selected.flag}</span>
-                <ChevronDown className="h-4 w-4 text-[rgba(248,250,252,0.5)] pointer-events-none flex-shrink-0" />
+                <ChevronDown className="h-4 w-4 text-[hsl(var(--muted-foreground)/0.5)] pointer-events-none flex-shrink-0" />
                 <select
                     value={code}
                     onChange={handleCodeChange}
@@ -54,7 +54,7 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
                     className="absolute inset-0 opacity-0 cursor-pointer w-full disabled:cursor-not-allowed"
                 >
                     {COUNTRY_CODES.map(c => (
-                        <option key={c.code} value={c.code} className="bg-[#1e293b]">
+                        <option key={c.code} value={c.code} className="bg-[hsl(var(--secondary))]">
                             {c.flag} {c.code} {c.label}
                         </option>
                     ))}
@@ -70,7 +70,7 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
                 disabled={disabled}
                 placeholder="123456789"
                 aria-label="Phone number"
-                className={`${inputBase} flex-1 px-3 placeholder-[rgba(159,159,169,1)] disabled:cursor-not-allowed disabled:opacity-60`}
+                className={`${inputBase} flex-1 px-3 placeholder-[hsl(var(--muted-foreground))] disabled:cursor-not-allowed disabled:opacity-60`}
             />
         </div>
     )

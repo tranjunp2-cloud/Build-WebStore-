@@ -30,8 +30,8 @@ function formatFileSize(bytes: number): string {
 }
 
 function MediaIcon({ mimeType }: { mimeType: string }) {
-    if (mimeType.startsWith('video/')) return <Film className="h-8 w-8 text-purple-400" />
-    if (mimeType === 'application/pdf') return <FileText className="h-8 w-8 text-red-400" />
+    if (mimeType.startsWith('video/')) return <Film className="h-8 w-8 text-[hsl(var(--info))]" />
+    if (mimeType === 'application/pdf') return <FileText className="h-8 w-8 text-[hsl(var(--destructive))]" />
     return <ImageIcon className="h-8 w-8 text-gray-600" />
 }
 
@@ -148,7 +148,7 @@ export default function MediaLibraryPage() {
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                        className="flex items-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 py-2 text-sm font-medium !text-white hover:opacity-90 transition-opacity shadow-lg shadow-[hsl(var(--primary)/0.25)] disabled:opacity-50"
                     >
                         <Upload className="h-4 w-4" />
                         {isUploading ? ml.uploading : ml.upload}
@@ -172,10 +172,10 @@ export default function MediaLibraryPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder={ml.searchPlaceholder}
-                        className="w-full rounded-lg border border-white/10 bg-[#1E293B] pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50"
+                        className="w-full rounded-lg [border:1px_solid_hsl(var(--input-border))] bg-secondary pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-[hsl(var(--muted-foreground))] outline-none focus:[border-color:hsl(var(--primary))]"
                     />
                 </div>
-                <div className="flex gap-1 rounded-lg border border-white/10 bg-[#1E293B] p-0.5">
+                <div className="flex gap-1 rounded-lg border border-border bg-secondary p-0.5">
                     {(() => {
                         const filterLabels: Record<string, string> = { all: ml.filterAll, image: ml.filterImages, video: ml.filterVideos, pdf: ml.filterPdf }
                         return (['all', 'image', 'video', 'pdf'] as const).map(filterKey => (
@@ -184,7 +184,7 @@ export default function MediaLibraryPage() {
                                 onClick={() => setFilterType(filterKey)}
                                 className={cn(
                                     'rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize',
-                                    filterType === filterKey ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300',
+                                    filterType === filterKey ? 'bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]' : 'text-gray-500 hover:text-gray-300',
                                 )}
                             >
                                 {filterLabels[filterKey]}
@@ -198,7 +198,7 @@ export default function MediaLibraryPage() {
             {isLoading ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                     {Array.from({ length: 10 }).map((_, i) => (
-                        <div key={i} className="animate-pulse rounded-xl border border-white/10 bg-[#1E293B]/30">
+                        <div key={i} className="animate-pulse rounded-xl border border-border bg-secondary/30">
                             <div className="aspect-square bg-white/5 rounded-t-xl" />
                             <div className="p-3 space-y-2">
                                 <div className="h-3 w-3/4 rounded bg-white/5" />
@@ -216,7 +216,7 @@ export default function MediaLibraryPage() {
                         <p className="mt-1 text-sm text-gray-500">{ml.emptyDescription}</p>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25"
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 py-2.5 text-sm font-medium !text-white hover:opacity-90 transition-opacity shadow-lg shadow-[hsl(var(--primary)/0.25)]"
                         >
                             <Upload className="h-4 w-4" /> {ml.uploadFiles}
                         </button>
@@ -233,7 +233,7 @@ export default function MediaLibraryPage() {
                             <button
                                 key={item.id}
                                 onClick={() => setSelectedMedia(item)}
-                                className="group text-left rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden hover:border-blue-500/40 transition-all"
+                                className="group text-left rounded-xl border border-border bg-secondary/30 overflow-hidden hover:border-[hsl(var(--primary)/0.4)] transition-all"
                             >
                                 <div className="relative aspect-square bg-white/5 overflow-hidden">
                                     {isImage ? (
@@ -250,7 +250,7 @@ export default function MediaLibraryPage() {
                                         </div>
                                     )}
                                     {item.aiGenerated && (
-                                        <span className="absolute top-2 left-2 rounded-md bg-purple-500/80 px-1.5 py-0.5 text-[9px] font-medium text-white">AI</span>
+                                        <span className="absolute top-2 left-2 rounded-md bg-[hsl(var(--info))]/80 px-1.5 py-0.5 text-[9px] font-medium text-white">AI</span>
                                     )}
                                 </div>
                                 <div className="p-3">
@@ -273,7 +273,7 @@ export default function MediaLibraryPage() {
             {selectedMedia && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedMedia(null)} />
-                    <div className="relative z-10 w-full max-w-lg rounded-2xl border border-white/10 bg-[#0F172A] shadow-2xl">
+                    <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl">
                         {/* Close */}
                         <button
                             onClick={() => setSelectedMedia(null)}
@@ -321,12 +321,12 @@ export default function MediaLibraryPage() {
                                     onClick={() => copyUrl(selectedMedia.url, selectedMedia.id)}
                                     className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/10 transition-colors"
                                 >
-                                    {copiedId === selectedMedia.id ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                                    {copiedId === selectedMedia.id ? <Check className="h-3 w-3 text-[hsl(var(--success))]" /> : <Copy className="h-3 w-3" />}
                                     {copiedId === selectedMedia.id ? ml.copied : ml.copyUrl}
                                 </button>
                                 <button
                                     onClick={() => handleDelete(selectedMedia.id)}
-                                    className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                                    className="flex items-center justify-center gap-1.5 rounded-lg bg-[hsl(var(--destructive)/0.1)] px-3 py-2.5 text-xs font-medium text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)] transition-colors"
                                 >
                                     <Trash2 className="h-3 w-3" /> {ml.delete}
                                 </button>

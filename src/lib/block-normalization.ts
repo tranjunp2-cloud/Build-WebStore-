@@ -163,6 +163,14 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.email = null
         }
 
+        // CTA block: ctaStyle must be 'primary' | 'outline' (GH-1283).
+        // AI gen and legacy data may contain values outside this enum (e.g. 'ghost')
+        // causing Payload ValidationError "This field has an invalid selection" on publish.
+        if (b.blockType === 'cta' && typeof b.ctaStyle === 'string' && b.ctaStyle !== 'primary' && b.ctaStyle !== 'outline') {
+            console.warn(`[Save] CTA block ctaStyle "${b.ctaStyle}" not in enum [primary, outline] — coercing to "primary"`)
+            b.ctaStyle = 'primary'
+        }
+
         // service-cards: services[].title is required=true in Payload schema.
         // Drafts bypass validation, so existing pages may have empty titles that
         // fail on publish. Coerce to 'Service' fallback before payload.update().

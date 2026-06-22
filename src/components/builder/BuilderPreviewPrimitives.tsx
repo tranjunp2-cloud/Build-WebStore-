@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -50,11 +50,26 @@ export function BuilderPreviewModeToggle({
 }
 
 interface BuilderMobilePreviewShellProps {
-    children: ReactNode
+    children?: ReactNode
     siteId?: string | null
 }
 
 function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShellProps) {
+    // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
+    const vRef = useRef(Date.now())
+    // Track which siteId the iframe has finished loading for.
+    // Overlay LivePreview until iframe is ready → eliminates blank flash on transition.
+    const [readySiteId, setReadySiteId] = useState<string | null>(null)
+    const iframeReady = readySiteId === siteId && siteId != null
+
+    // Fallback: if iframe never fires onLoad (Vercel 504, CSP block, redirect loop),
+    // force-dismiss spinner after 15s so user is not permanently stuck.
+    useEffect(() => {
+        if (!siteId || iframeReady) return
+        const id = setTimeout(() => setReadySiteId(siteId), 15_000)
+        return () => clearTimeout(id)
+    }, [siteId, iframeReady])
+
     return (
         <div className="relative h-[812px] w-[375px] rounded-[48px] bg-[linear-gradient(114.79deg,#1e2939_0%,#101828_100%)] shadow-[0px_25px_50px_0px_rgba(0,0,0,0.25)]">
             <div className="absolute inset-[12px] overflow-hidden rounded-[40px] bg-[#0b1120]">
@@ -67,17 +82,22 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
                     </div>
                 </div>
                 {siteId ? (
-                    <iframe
-                        src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
-                        className="h-full w-full border-0"
-                        title="Mobile preview"
-                    />
-                ) : (
-                    <div className="h-full overflow-y-auto pr-[11px]">
-                        <div className="w-[351px]">
-                            {children}
-                        </div>
+                    <div className="relative h-full w-full">
+                        {/* Iframe loads invisibly; spinner shown until ready */}
+                        <iframe
+                            src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
+                            className={cn("absolute inset-0 h-full w-full border-0", !iframeReady && "invisible")}
+                            title="Mobile preview"
+                            onLoad={() => setReadySiteId(siteId)}
+                        />
+                        {!iframeReady && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+                            </div>
+                        )}
                     </div>
+                ) : (
+                    <>{children}</>
                 )}
             </div>
             <div className="absolute bottom-2 left-1/2 h-1 w-32 -translate-x-1/2 rounded-full bg-white/30" />
@@ -90,7 +110,7 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
 interface BuilderPreviewSurfaceProps {
     mode: BuilderPreviewMode
     variant: 'panel' | 'fullwidth'
-    children: ReactNode
+    children?: ReactNode
     siteId?: string | null
 }
 
@@ -100,6 +120,21 @@ export function BuilderPreviewSurface({
     children,
     siteId,
 }: BuilderPreviewSurfaceProps) {
+    // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
+    const vRef = useRef(Date.now())
+    // Track which siteId the iframe has finished loading for.
+    // Overlay LivePreview until iframe is ready → eliminates blank flash on transition.
+    const [readySiteId, setReadySiteId] = useState<string | null>(null)
+    const iframeReady = readySiteId === siteId && siteId != null
+
+    // Fallback: if iframe never fires onLoad (Vercel 504, CSP block, redirect loop),
+    // force-dismiss spinner after 15s so user is not permanently stuck.
+    useEffect(() => {
+        if (mode === 'mobile' || !siteId || iframeReady) return
+        const id = setTimeout(() => setReadySiteId(siteId), 15_000)
+        return () => clearTimeout(id)
+    }, [mode, siteId, iframeReady])
+
     if (mode === 'mobile') {
         return (
             <div className="flex h-full items-center justify-center">
@@ -108,25 +143,32 @@ export function BuilderPreviewSurface({
         )
     }
 
-    // Desktop with siteId (post-generation): use iframe so SiteRenderer rewrites nav
-    // links to /preview/{siteId}?pageId=... — enables page navigation without leaving
-    // the builder. Without siteId (streaming phase) fall back to children (LivePreview).
+    // Desktop: iframe loads invisibly; spinner shown until onLoad fires.
+    // siteId is always set when this component renders (preview only shows after done).
     const desktopContent = siteId ? (
-        <iframe
-            src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
-            className="h-full w-full border-0"
-            title="Website preview"
-        />
-    ) : children
+        <div className="relative h-full w-full overflow-hidden">
+            {/* Iframe loads in background; invisible until ready */}
+            <iframe
+                src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
+                className={cn("absolute inset-0 h-full w-full border-0", !iframeReady && "invisible")}
+                title="Website preview"
+                onLoad={() => setReadySiteId(siteId)}
+            />
+            {!iframeReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-[#06090F]">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-white/50" />
+                </div>
+            )}
+        </div>
+    ) : (
+        <>{children}</>
+    )
 
     if (variant === 'fullwidth') {
         return (
             <div className="flex h-full items-start justify-center px-10 pt-8">
                 <div className="h-full max-h-[5094px] w-full max-w-[1280px] overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-                    <div className={cn(
-                        "h-full rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]",
-                        siteId ? "overflow-hidden" : "overflow-y-auto",
-                    )}>
+                    <div className={cn("h-full rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]", siteId ? "overflow-hidden" : "overflow-y-auto")}>
                         {desktopContent}
                     </div>
                 </div>

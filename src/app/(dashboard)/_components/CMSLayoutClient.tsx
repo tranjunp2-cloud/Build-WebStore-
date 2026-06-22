@@ -61,7 +61,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col [overflow-x:clip]">
+            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col">
                 <TenantAccessWatcher />
                 <TopHeader
                     userName={userName}
@@ -89,7 +89,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                     />
                     <main
                         className={cn(
-                            'flex-1 min-w-0',
+                            'flex-1 min-w-0 [overflow-x:clip]',
                             hydrated && 'transition-[padding] duration-200',
                             collapsed ? 'md:pl-[64px]' : 'md:pl-[250px]'
                         )}

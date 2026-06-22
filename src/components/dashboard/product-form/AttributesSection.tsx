@@ -16,12 +16,12 @@ export function AttributesSection() {
     const sectionsT = t.dashboard.products.form.sections
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-5">
+        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-5">
             <div className="flex items-center justify-between">
-                <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">
+                <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">
                     {sectionsT?.attributes || 'Extended Information (Attributes)'}
                 </h2>
-                <span className="text-[13px] text-[#F8FAFC]/50">
+                <span className="text-[13px] text-foreground/50">
                     {fields.length} / {MAX_ATTRIBUTES}
                 </span>
             </div>
@@ -38,12 +38,12 @@ export function AttributesSection() {
                                         placeholder={sectionsT?.attributeKey || 'Attribute name'}
                                         {...register(`attributes.${idx}.key`)}
                                         className={cn(
-                                            "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
-                                            rowErrors?.key ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                            "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
+                                            rowErrors?.key ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                         )}
                                     />
                                     {rowErrors?.key && (
-                                        <span className="text-[12px] text-red-500">{rowErrors.key.message}</span>
+                                        <span className="text-[12px] text-destructive">{rowErrors.key.message}</span>
                                     )}
                                 </div>
                                 <div className="flex-1 flex flex-col gap-1">
@@ -52,18 +52,18 @@ export function AttributesSection() {
                                         placeholder={sectionsT?.attributeValue || 'Value'}
                                         {...register(`attributes.${idx}.value`)}
                                         className={cn(
-                                            "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
-                                            rowErrors?.value ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                            "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
+                                            rowErrors?.value ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                         )}
                                     />
                                     {rowErrors?.value && (
-                                        <span className="text-[12px] text-red-500">{rowErrors.value.message}</span>
+                                        <span className="text-[12px] text-destructive">{rowErrors.value.message}</span>
                                     )}
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => remove(idx)}
-                                    className="mt-3 flex items-center justify-center text-[#F8FAFC]/50 hover:text-red-400 transition-colors"
+                                    className="mt-3 flex items-center justify-center text-foreground/50 hover:text-destructive transition-colors"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -77,7 +77,7 @@ export function AttributesSection() {
                 type="button"
                 onClick={() => append({ key: '', value: '' })}
                 disabled={fields.length >= MAX_ATTRIBUTES}
-                className="flex items-center gap-2 text-[14px] text-[#3B82F6] hover:text-[#2DD4BF] transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-fit"
+                className="flex items-center gap-2 text-[14px] text-primary hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed w-fit"
             >
                 <Plus className="w-4 h-4" />
                 {sectionsT?.addAttribute || 'Add information'}

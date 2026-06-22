@@ -7,11 +7,13 @@ import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
 export function VideoBackgroundBlock({ block, theme: _theme }: BlockProps<VideoBackgroundConfig>) {
     void _theme
+    const resolveHref = useLocalHref()
     const {
         variant = 'full',
         headline,
@@ -37,7 +39,7 @@ export function VideoBackgroundBlock({ block, theme: _theme }: BlockProps<VideoB
             )}
             {cta && (
                 <a
-                    href={cta?.url}
+                    href={resolveHref(cta?.url)}
                     className={`inline-flex items-center gap-2 px-10 py-4 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 ${TOUCH_TARGET.min}`}
                     style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`, boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)` }}
                 >

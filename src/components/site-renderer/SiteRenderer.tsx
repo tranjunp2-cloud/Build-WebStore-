@@ -364,6 +364,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         ? { ...rawCta, show: false }
                         : { ...rawCta, url: markBrokenUrl(rawCta.url, rewriteUrl(rawCta.url)) }
                     : b.ctaButton,
+                // rewritten so editor iframe navigates to homepage pageId, not bare '/'
+                _logoHref: rewriteUrl('/'),
             }
         }
         if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {

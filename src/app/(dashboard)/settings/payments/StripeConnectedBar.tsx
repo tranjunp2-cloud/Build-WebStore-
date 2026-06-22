@@ -80,7 +80,7 @@ export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props)
 
             {showModal && (
                 <div
-                    className="fixed inset-0 bg-[#020612]/[0.62] backdrop-blur-[8px] grid place-items-center p-6 z-[100]"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm grid place-items-center p-6 z-[100]"
                     role="dialog"
                     aria-modal="true"
                     onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}

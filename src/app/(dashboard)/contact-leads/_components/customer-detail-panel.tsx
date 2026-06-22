@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X, User, Mail, Loader2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerAvatar } from './customer-avatar'
@@ -28,11 +29,11 @@ const ALLOWED_TRANSITIONS: Record<CustomerStatus, CustomerStatus[]> = {
 }
 
 const STATUS_COLORS: Record<CustomerStatus, { bg: string; border: string; text: string }> = {
-    new:        { bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)',  text: '#fbbf24' },
-    read:       { bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.3)', text: '#818cf8' },
-    contacted:  { bg: 'rgba(45,212,191,0.1)',  border: 'rgba(45,212,191,0.3)',  text: '#2dd4bf' },
-    ignored:    { bg: 'rgba(156,163,175,0.1)', border: 'rgba(156,163,175,0.3)', text: '#9ca3af' },
-    subscribed: { bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.3)', text: '#a78bfa' },
+    new:        { bg: 'hsl(var(--warning))',          border: 'hsl(var(--warning))',          text: '#fff' },
+    read:       { bg: 'hsl(var(--info))',             border: 'hsl(var(--info))',             text: '#fff' },
+    contacted:  { bg: 'hsl(var(--success))',          border: 'hsl(var(--success))',          text: '#fff' },
+    ignored:    { bg: 'hsl(var(--muted-foreground))', border: 'hsl(var(--muted-foreground))', text: '#fff' },
+    subscribed: { bg: 'hsl(var(--info))',             border: 'hsl(var(--info))',             text: '#fff' },
 }
 
 function StatusDropdown({ status, disabled, onChange }: {
@@ -65,8 +66,8 @@ function StatusDropdown({ status, disabled, onChange }: {
             <button
                 type="button"
                 onClick={() => canChange && !disabled && setOpen(v => !v)}
-                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer"
-                style={{ borderColor: c.border, color: c.text, background: c.bg, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
+                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer !text-white dark:!text-[hsl(var(--background))]"
+                style={{ borderColor: c.border, background: c.bg, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
             >
                 {statusLabels[status]}
                 {canChange && (
@@ -162,11 +163,13 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
         ? (record.name ?? 'Guest') + ' (Newsletter)'
         : (record.name ?? 'Guest')
 
-    return (
+    if (typeof document === 'undefined') return null
+
+    return createPortal(
         <>
-            {/* Backdrop — full screen on mobile, offset below header on md+ */}
+            {/* Backdrop — rendered via portal at document.body to escape ancestor stacking contexts */}
             <div
-                className="fixed inset-0 z-40 md:top-[56px]"
+                className="fixed inset-0 z-40"
                 style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
                 onClick={onClose}
             />
@@ -230,8 +233,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                         <div className="flex flex-col gap-3">
                             {/* Name */}
                             <div className="flex items-center gap-3 h-9">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
-                                    <User className="w-4 h-4 text-blue-400" />
+                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--info)/0.1)' }}>
+                                    <User className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldName}</span>
@@ -241,8 +244,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                             {/* Email */}
                             <div className="flex items-center gap-3 h-9">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
-                                    <Mail className="w-4 h-4 text-blue-400" />
+                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--info)/0.1)' }}>
+                                    <Mail className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldEmail}</span>
@@ -252,8 +255,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                             {/* Latest Date — all sources */}
                             <div className="flex items-center gap-3 h-9">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
-                                    <CalendarDays className="w-4 h-4 text-blue-400" />
+                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--info)/0.1)' }}>
+                                    <CalendarDays className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldLatestDate}</span>
@@ -296,7 +299,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                             )}
                                         >
                                             {/* Half-circle (D-shape) bullet — flat side flush with the vertical line */}
-                                            <div className="absolute -left-[26px] top-0 w-2 h-4 rounded-r-full bg-[#2dd4bf]" />
+                                            <div className="absolute -left-[26px] top-0 w-2 h-4 rounded-r-full bg-[hsl(var(--primary))]" />
                                             <div className="flex flex-col gap-2">
                                                 {/* Title + date */}
                                                 <div className="flex items-center justify-between">
@@ -329,7 +332,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                         <button
                             onClick={handleUpdate}
                             disabled={updating || localStatus === serverStatusRef.current}
-                            className="w-full h-[44px] rounded-[10px] text-[14px] font-medium text-white cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="w-full h-[44px] rounded-[10px] text-[14px] font-medium !text-white cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
                             style={{ background: 'linear-gradient(90deg, #3b82f6 0%, #2dd4bf 100%)' }}
                         >
                             {updating ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : c.update}
@@ -337,6 +340,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     </div>
                 )}
             </div>
-        </>
+        </>,
+        document.body
     )
 }

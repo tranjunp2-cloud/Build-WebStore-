@@ -28,9 +28,9 @@ export function SetupAlertBanner({ hasPaymentConfigured }: SetupAlertBannerProps
     }
 
     return (
-        <div className="flex items-start gap-4 rounded-2xl border border-blue-400 bg-gradient-to-br from-blue-500/10 to-teal-400/10 p-[25px] shadow-sm">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-teal-400 drop-shadow-[0_10px_7.5px_rgba(0,0,0,0.1)]">
-                <Bell className="h-6 w-6 text-white" />
+        <div className="flex items-start gap-4 rounded-2xl border border-[hsl(var(--info)/0.4)] bg-gradient-to-br from-[hsl(var(--info)/0.1)] to-[hsl(var(--primary)/0.1)] p-[25px] shadow-sm">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] drop-shadow-[0_10px_7.5px_rgba(0,0,0,0.1)]">
+                <Bell className="h-6 w-6 !text-white" />
             </div>
             <div className="flex-1">
                 <h3 className="text-lg font-semibold text-dash-text">{b.title}</h3>
@@ -38,7 +38,7 @@ export function SetupAlertBanner({ hasPaymentConfigured }: SetupAlertBannerProps
                 <div className="mt-4 flex gap-3">
                     <Link
                         href="/settings/payments"
-                        className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-4 text-sm font-medium text-white drop-shadow-[0_4px_3px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
+                        className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 text-sm font-medium !text-white drop-shadow-[0_4px_3px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
                     >
                         {b.completeBtn}
                         <ArrowRight className="h-4 w-4" />

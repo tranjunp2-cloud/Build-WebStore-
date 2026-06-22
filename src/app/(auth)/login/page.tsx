@@ -339,7 +339,7 @@ function LoginFormContent() {
                         {t.auth.email}
                     </label>
                     <div
-                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
                         style={INPUT_WRAPPER_STYLE}
                     >
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
@@ -373,7 +373,7 @@ function LoginFormContent() {
                         {t.auth.password}
                     </label>
                     <div
-                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
                         style={INPUT_WRAPPER_STYLE}
                     >
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
@@ -412,7 +412,7 @@ function LoginFormContent() {
                         type="button"
                         onClick={handleForgotPassword}
                         disabled={checkingReset}
-                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
+                        className="text-sm font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
                         style={{ lineHeight: '1.43' }}
                     >
                         {checkingReset ? t.auth.checking : t.auth.forgotPassword}

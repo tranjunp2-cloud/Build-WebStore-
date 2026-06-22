@@ -101,6 +101,35 @@
 | US-F18-03 | F18 CMS Core Layout & Navigation | Main Content Area Display | [F18-cms-layout-stories.md](./F18-cms-layout-stories.md) | P0 | 1 | S | Ready |
 | US-F19-01 | F19 Store Configuration | Add Custom Domain | [F19-store-configuration-stories.md](./F19-store-configuration-stories.md) | P1 | 2 | M | Draft |
 | US-F19-02 | F19 Store Configuration | Set Primary Domain | [F19-store-configuration-stories.md](./F19-store-configuration-stories.md) | P1 | 2 | S | Draft |
+| US-F33-01 | F33 Discount Setting CMS | Tạo discount (percentage/fixed) | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P0 | 3 | S | Ready |
+| US-F33-02 | F33 Discount Setting CMS | Sửa thông tin discount | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P0 | 3 | S | Ready |
+| US-F33-03 | F33 Discount Setting CMS | Xoá discount | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P1 | 3 | XS | Ready |
+| US-F33-04 | F33 Discount Setting CMS | Danh sách discount (search + filter) | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P0 | 3 | M | Ready |
+| US-F33-05 | F33 Discount Setting CMS | Export danh sách discount CSV | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P1 | 3 | S | Ready |
+| US-F33-06 | F33 Discount Setting CMS | Áp dụng discount code tại checkout (COD/QR) | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P0 | 3 | M | Ready |
+| US-F33-07 | F33 Discount Setting CMS | Áp dụng discount code tại checkout (Stripe) | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P0 | 3 | M | Ready |
+| US-F33-08 | F33 Discount Setting CMS | Xem lịch sử sử dụng discount per order | [F33-discount-cms-stories.md](./F33-discount-cms-stories.md) | P1 | 3 | M | Ready |
+| US-F35-01 | F35 Webstore Template V2 | Cấu hình Theme & Layout toàn site | [F35-template-block-storefront-stories.md](./F35-template-block-storefront-stories.md) | P1 | TBD | M | Draft |
+| US-F35-02 | F35 Webstore Template V2 | Cấu hình Header / Navigation | [F35-template-block-storefront-stories.md](./F35-template-block-storefront-stories.md) | P1 | TBD | M | Draft |
+| US-F35-03 | F35 Webstore Template V2 | Cấu hình Footer | [F35-template-block-storefront-stories.md](./F35-template-block-storefront-stories.md) | P1 | TBD | M | Draft |
+| US-F35-04 | F35 Webstore Template V2 | Cấu hình Banner block | [F35-template-block-storefront-stories.md](./F35-template-block-storefront-stories.md) | P1 | TBD | L | Draft |
+| US-F35-05 | F35 Webstore Template V2 | Cấu hình Rich Text block | [F35-template-block-storefront-stories.md](./F35-template-block-storefront-stories.md) | P1 | TBD | S | Draft |
+| US-F35-06 | F35 Webstore Template V2 | Cấu hình Product Listing block (Filter & Sort) | [F35-template-block-commerce-stories.md](./F35-template-block-commerce-stories.md) | P1 | TBD | L | Draft |
+| US-F35-07 | F35 Webstore Template V2 | Cấu hình Category Listing block | [F35-template-block-commerce-stories.md](./F35-template-block-commerce-stories.md) | P1 | TBD | M | Draft |
+| US-F35-08 | F35 Webstore Template V2 | Cấu hình Article (Blog) Listing & Detail | [F35-template-block-commerce-stories.md](./F35-template-block-commerce-stories.md) | P1 | TBD | L | Draft |
+| US-F35-09 | F35 Webstore Template V2 | Cấu hình Shortlist / Featured block | [F35-template-block-commerce-stories.md](./F35-template-block-commerce-stories.md) | P1 | TBD | M | Draft |
+| US-F35-10 | F35 Webstore Template V2 | Cấu hình hiển thị Cart & Product Detail | [F35-template-block-commerce-stories.md](./F35-template-block-commerce-stories.md) | P1 | TBD | M | Draft |
+| US-F36-01 | F36 EasyParcel Delivery | Connect EasyParcel Account (API Key + Warehouse) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | L | Draft |
+| US-F36-02 | F36 EasyParcel Delivery | Courier Selection (Single) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | S | Draft |
+| US-F36-03 | F36 EasyParcel Delivery | Hybrid Fallback to Flat Rate | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | S | Draft |
+| US-F36-04 | F36 EasyParcel Delivery | Real-Time Rate Calculation (Backend) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | L | Draft |
+| US-F36-05 | F36 EasyParcel Delivery | Checkout Shipping Fee Display (Single Courier) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | S | Draft |
+| US-F36-06 | F36 EasyParcel Delivery | Create Shipping Label (Manual) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | L | Draft |
+| US-F36-07 | F36 EasyParcel Delivery | Pickup / Dropoff | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | S | Draft |
+| US-F36-08 | F36 EasyParcel Delivery | COD via EasyParcel (West MY Only) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
+| US-F36-09 | F36 EasyParcel Delivery | Tracking Sync Cron + Buyer Tracking View | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | L | Draft |
+| US-F36-10 | F36 EasyParcel Delivery | Returns — Reverse Label OR Buyer Self-Ship | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
+| US-F36-11 | F36 EasyParcel Delivery | Cancel Refund by Label Status | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | M | Draft |
 
 ---
 
@@ -126,6 +155,10 @@
 | `F17-blog-management-stories.md` | US-F17-01 |
 | `F18-cms-layout-stories.md` | US-F18-01 |
 | `F19-store-configuration-stories.md` | US-F19-01 → US-F19-02 |
+| `F33-discount-cms-stories.md` | US-F33-01 → US-F33-08 |
+| `F35-template-block-storefront-stories.md` | US-F35-01 → US-F35-05 |
+| `F35-template-block-commerce-stories.md` | US-F35-06 → US-F35-10 |
+| `F36-easyparcel-delivery-stories.md` | US-F36-01 → US-F36-11 |
 
 ---
 

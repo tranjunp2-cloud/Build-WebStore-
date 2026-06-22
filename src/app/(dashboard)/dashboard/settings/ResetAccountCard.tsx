@@ -53,10 +53,10 @@ export function ResetAccountCard() {
     }
 
     return (
-        <Card className="border-red-500/20 bg-red-500/5">
+        <Card className="border-[hsl(var(--destructive)/0.2)] bg-[hsl(var(--destructive)/0.05)]">
             <CardHeader>
-                <CardTitle className="text-red-400">{r.dangerZone}</CardTitle>
-                <CardDescription className="text-red-300/70">
+                <CardTitle className="text-[hsl(var(--destructive))]">{r.dangerZone}</CardTitle>
+                <CardDescription className="text-[hsl(var(--destructive)/0.7)]">
                     {r.stagingOnly}
                 </CardDescription>
             </CardHeader>
@@ -66,7 +66,7 @@ export function ResetAccountCard() {
                     <p className="text-sm text-gray-400">
                         {r.description}
                     </p>
-                    <p className="text-sm font-medium text-red-400">
+                    <p className="text-sm font-medium text-[hsl(var(--destructive))]">
                         {r.cannotUndo}
                     </p>
                 </div>
@@ -82,11 +82,11 @@ export function ResetAccountCard() {
                 )}
 
                 {(state === 'confirming' || state === 'loading') && (
-                    <div className="space-y-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+                    <div className="space-y-3 rounded-lg border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] p-4">
                         <p className="text-sm text-gray-300">
                             {ti(r.typeConfirm, { keyword: 'RESET' }).split('RESET').map((part, i, arr) =>
                                 i < arr.length - 1
-                                    ? <span key={i}>{part}<span className="font-mono font-bold text-red-400">RESET</span></span>
+                                    ? <span key={i}>{part}<span className="font-mono font-bold text-[hsl(var(--destructive))]">RESET</span></span>
                                     : <span key={i}>{part}</span>
                             )}
                         </p>
@@ -95,7 +95,7 @@ export function ResetAccountCard() {
                             onChange={(e) => setConfirmText(e.target.value)}
                             placeholder={r.typeConfirmPlaceholder}
                             disabled={state === 'loading'}
-                            className="border-red-500/30 bg-transparent"
+                            className="border-[hsl(var(--destructive)/0.3)] bg-transparent"
                         />
                         <div className="flex gap-2">
                             <Button

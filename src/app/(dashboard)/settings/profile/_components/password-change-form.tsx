@@ -9,6 +9,8 @@ import { z } from 'zod'
 import { useI18n } from '@/i18n'
 import { passwordBaseSchema } from '@/lib/profile/schemas'
 import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const formSchema = passwordBaseSchema.extend({
     confirmPassword: z.string().min(1),
@@ -22,17 +24,18 @@ const formSchema = passwordBaseSchema.extend({
 
 type FormValues = z.infer<typeof formSchema>
 
-const inputCls = 'bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-[8px] h-[48px] w-full pl-10 pr-10 text-[14px] text-[#9f9fa9] placeholder-[#9f9fa9] outline-none focus:border-blue-500/50 transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
+// Geometry only — colors/border/focus from shared <Input> primitive
+const inputCls = 'h-[48px] pl-10 pr-10 text-[14px] rounded-[8px] shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
 
 function PasswordRule({ met, label }: { met: boolean; label: string }) {
     return (
         <div className="flex items-center gap-2">
             {met ? (
-                <Check className="h-4 w-4 text-[#44ddc1] flex-shrink-0" />
+                <Check className="h-4 w-4 text-[hsl(var(--primary))] flex-shrink-0" />
             ) : (
-                <X className="h-4 w-4 text-[#94a3b8] flex-shrink-0" />
+                <X className="h-4 w-4 text-[hsl(var(--muted-foreground))] flex-shrink-0" />
             )}
-            <span className={cn('text-[12px]', met ? 'text-[#44ddc1]' : 'text-[#94a3b8]')}>
+            <span className={cn('text-[12px]', met ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--muted-foreground))]')}>
                 {label}
             </span>
         </div>
@@ -88,78 +91,78 @@ export function PasswordChangeForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 w-full">
             {/* Current password — full width */}
             <div className="flex flex-col gap-1">
-                <label className="text-[14px] font-medium text-[#94a3b8] leading-5">
+                <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-5">
                     {t.profile.security.currentPassword}
                 </label>
                 <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" />
-                    <input
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                    <Input
                         {...register('currentPassword')}
                         type={showCurrent ? 'text' : 'password'}
                         autoComplete="current-password"
-                        className={cn(inputCls, formState.errors.currentPassword && 'border-red-500/50')}
+                        className={cn(inputCls, formState.errors.currentPassword && 'border-[hsl(var(--destructive))]')}
                     />
                     <button
                         type="button"
                         onClick={() => setShowCurrent(p => !p)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-white transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-white transition-colors"
                     >
                         {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                 </div>
                 {formState.errors.currentPassword && (
-                    <p className="text-xs text-red-400">{formState.errors.currentPassword.message}</p>
+                    <p className="text-xs text-destructive">{formState.errors.currentPassword.message}</p>
                 )}
             </div>
 
             {/* New + Confirm — side by side */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                    <label className="text-[14px] font-medium text-[#94a3b8] leading-5">
+                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-5">
                         {t.profile.security.newPassword}
                     </label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" />
-                        <input
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             {...register('newPassword')}
                             type={showNew ? 'text' : 'password'}
                             autoComplete="new-password"
-                            className={cn(inputCls, formState.errors.newPassword && 'border-red-500/50')}
+                            className={cn(inputCls, formState.errors.newPassword && 'border-[hsl(var(--destructive))]')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowNew(p => !p)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-white transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-white transition-colors"
                         >
                             {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
                     {formState.errors.newPassword?.message === 'newPasswordSameAsCurrent' && (
-                        <p className="text-xs text-red-400">{t.profile.errors.newPasswordSameAsCurrent}</p>
+                        <p className="text-xs text-destructive">{t.profile.errors.newPasswordSameAsCurrent}</p>
                     )}
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-[14px] font-medium text-[#94a3b8] leading-5">
+                    <label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-5">
                         {t.profile.security.confirmPassword}
                     </label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94a3b8]" />
-                        <input
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             {...register('confirmPassword')}
                             type={showConfirm ? 'text' : 'password'}
                             autoComplete="new-password"
-                            className={cn(inputCls, formState.errors.confirmPassword && 'border-red-500/50')}
+                            className={cn(inputCls, formState.errors.confirmPassword && 'border-[hsl(var(--destructive))]')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirm(p => !p)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-white transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] hover:text-white transition-colors"
                         >
                             {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
                     {formState.errors.confirmPassword && (
-                        <p className="text-xs text-red-400">{t.profile.errors.passwordsMismatch}</p>
+                        <p className="text-xs text-destructive">{t.profile.errors.passwordsMismatch}</p>
                     )}
                 </div>
             </div>
@@ -173,21 +176,22 @@ export function PasswordChangeForm() {
 
             {/* Action bar — only visible when dirty */}
             {formState.isDirty && (
-                <div className="flex items-center justify-end gap-3 h-[72px] bg-[rgba(11,17,32,0.5)] rounded-[12px] px-6 mt-2">
-                    <button
+                <div className="flex items-center justify-end gap-3 h-[72px] bg-[hsl(var(--background)/0.5)] rounded-[12px] px-6 mt-2">
+                    <Button
                         type="button"
                         onClick={() => reset()}
                         disabled={formState.isSubmitting}
-                        className="flex items-center gap-1.5 bg-[#0b1120] border border-[rgba(255,255,255,0.08)] rounded-[10px] h-[48px] px-[10px] text-[14px] font-medium text-white shadow-[0px_1px_1px_rgba(0,0,0,0.1)] disabled:opacity-40 hover:bg-white/5 transition-colors"
+                        variant="dashSecondary"
+                        className="h-[48px] rounded-[10px] px-[10px] font-medium"
                     >
                         <RotateCcw className="h-4 w-4" />
                         {t.profile.general.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
                         disabled={formState.isSubmitting}
-                        className="flex items-center gap-1.5 rounded-[10px] h-[48px] min-w-[187px] px-[10px] justify-center text-[14px] font-medium text-white shadow-[0px_1px_1px_rgba(0,0,0,0.1)] border border-[rgba(255,255,255,0.08)] disabled:opacity-40 transition-opacity"
-                        style={{ backgroundImage: 'linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)' }}
+                        variant="dashPrimary"
+                        className="h-[48px] min-w-[187px] rounded-[10px] px-[10px] font-medium"
                     >
                         {formState.isSubmitting ? (
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -195,7 +199,7 @@ export function PasswordChangeForm() {
                             <Check className="h-4 w-4" />
                         )}
                         {formState.isSubmitting ? t.profile.security.changing : t.profile.security.updatePassword}
-                    </button>
+                    </Button>
                 </div>
             )}
         </form>

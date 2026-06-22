@@ -1370,3 +1370,48 @@ enforcer-padded hero subheadline.
 | Phase 07 new tests | 29 (15 block-library + 5 hero + 6 recipe + 3 variety-repro) | ✅ |
 | **Total AI suite** | **965** (across 29 files) | ✅ |
 | Full project suite | **5205** (across 264 files) | ✅ |
+
+---
+
+## GH-1266 — Hero Banner Video Variant Regression Tests
+
+**Issue:** When hero blocks with video variants (`split-video`, `video`) lack a `videoUrl`, the placeholder text "No video URL provided" was leaking onto generated public homepages. Fixed with two-layer approach:
+1. Backend: coerce missing-video variants to safe non-media variants via `coerceVideoVariants()`
+2. Frontend: render image fallback for public users (`isOwner=false`), placeholder for editors (`isOwner=true`)
+
+### Test Cases
+
+| TC-ID | Layer | Scenario | Expected | Type | File |
+|-------|-------|----------|----------|------|------|
+| TC-1266-01 | backend | hero `split-video`, no videoUrl | variant → `split-left` | unit | `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` |
+| TC-1266-02 | backend | hero `video`, no videoUrl | variant → `fullscreen` | unit | `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` |
+| TC-1266-03 | backend | hero `split-video`, videoUrl set | unchanged | unit | `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` |
+| TC-1266-04 | backend | hero `split-video`, videoUrl `'  '` (blank) | variant → `split-left` | unit | `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` |
+| TC-1266-05 | backend | non-hero block with video variant | untouched | unit | `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` |
+| TC-1266-06 | frontend | split-video, no videoUrl, `isOwner=false` | NO placeholder; image fallback rendered | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
+| TC-1266-07 | frontend | split-video, no videoUrl, `isOwner=true` | placeholder text "No video URL provided" present | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
+| TC-1266-08 | frontend | split-video, videoUrl set, `isOwner=false` | `<video>` rendered; no placeholder | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
+
+### Coverage Summary
+
+- **Backend tests:** 26 cases covering coercion logic (basic scenarios + edge cases + integration)
+- **Frontend tests:** 27 cases covering render branches (public/owner, video/fallback, multiple state changes)
+- **Total:** 53 regression tests, all ✅ passing
+- **Files created:**
+  - `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` (26 tests)
+
+---
+
+## GH-1252 — VARIANT_MIN_CONTENT grid-col mismatch fix
+
+**Bug:** `VARIANT_MIN_CONTENT.testimonials.cards` was 2 and `VARIANT_MIN_CONTENT.team.grid` was 2, but both render as 3-col grids (GRID_COLS confirms 3). On non-English sites (vi/ms), `padItems` skips library padding → 2 items remain in a 3-col grid → empty cell.
+
+**Fix:** Bump `cards:2→3` (testimonials) and `grid:2→3` (team) in `VARIANT_MIN_CONTENT` so `enforceMinContent` (called before padding) downgrades to a non-grid variant when items < 3.
+
+| TC ID | Layer | Scenario | Expected | Type | File |
+|-------|-------|----------|----------|------|------|
+| TC-1252-01 | backend | `testimonials` `cards` variant, 2 items → `enforceMinContent` | downgrades to non-grid variant | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
+| TC-1252-02 | backend | `testimonials` `cards` variant, 3 items → `enforceMinContent` | keeps `cards` | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
+| TC-1252-03 | backend | `team` `grid` variant, 2 members → `enforceMinContent` | downgrades to `list` | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
+| TC-1252-04 | backend | `team` `grid` variant, 3 members → `enforceMinContent` | keeps `grid` | unit | `src/__tests__/unit/ai/gh-1252-variant-min-content.test.ts` |
+  - `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` (27 tests)

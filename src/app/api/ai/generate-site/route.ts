@@ -42,7 +42,9 @@ import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -427,6 +429,7 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: number
             timeMs: number
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
+            normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
             // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
             // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
@@ -820,6 +823,20 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Pass 3 (GH-1266): coerce video/split-video variants that have no videoUrl to safe fallbacks.
+        // Must run on ALL block arrays: buildGeneratedPages uses result.pages[].blocks directly
+        // (multi-page AI response path) and ignores sanitizedBlocks, so coercing only sanitizedBlocks
+        // has no effect on the blocks that actually get saved to DB for multi-page sites.
+        // Same pattern as image-injection collectAllBlockBuckets (see route.ts:544-558).
+        if (Array.isArray(result.pages)) {
+            for (const page of result.pages as Array<{ blocks?: unknown[] }>) {
+                if (Array.isArray(page.blocks)) {
+                    coerceVideoVariants(page.blocks as Record<string, unknown>[])
+                }
+            }
+        }
+        coerceVideoVariants(sanitizedBlocks)
+
         const rawPageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
@@ -889,9 +906,11 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? stripArrayItemIds(
-                    stripNavOffset(
-                        sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                ? normalizeBlocksForPersistence(
+                    stripArrayItemIds(
+                        stripNavOffset(
+                            sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                        ) as Record<string, unknown>[]
                     ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
@@ -1292,7 +1311,7 @@ export async function POST(req: NextRequest) {
                 `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
             )
 
-            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats }
+            return { result, site, homepagePage, createdPages, pageFailures, productsCreatedCount, timeMs, productImageStats, normalizedPageLinks }
         } // end runGenPipeline
 
         // ── F3: Real SSE streaming — return Response immediately, pipeline runs inside start() ──
@@ -1312,6 +1331,7 @@ export async function POST(req: NextRequest) {
                             createdPages,
                             productsCreatedCount,
                             timeMs,
+                            normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
                         // products_generated event
@@ -1554,7 +1574,7 @@ function createPageHero(baseHero: AIBlock | null, options: {
     hero.blockType = 'hero'
     // Validate variant against registry — AI may produce invalid variants
     const heroMeta = blockRegistry.getBlockMeta('hero')
-    const validVariants = heroMeta?.variants || ['centered', 'split', 'video', 'minimal']
+    const validVariants = heroMeta?.variants || ['centered', 'split-left', 'split-right', 'fullscreen', 'minimal']
     hero.variant = (typeof hero.variant === 'string' && validVariants.includes(hero.variant))
         ? hero.variant
         : 'centered'

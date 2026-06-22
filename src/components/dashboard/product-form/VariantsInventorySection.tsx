@@ -158,17 +158,17 @@ export function VariantsInventorySection() {
     }
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-6">
-            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.variants || 'Variants & Inventory'}</h2>
+        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-6">
+            <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.variants || 'Variants & Inventory'}</h2>
             
             {/* Body */}
             <div className="flex flex-col gap-6">
                 
                 {/* Variant Toggle Banner */}
-                <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-[#0B1120]/50 p-[17px]">
+                <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-background/50 p-[17px]">
                     <div className="flex flex-col gap-1">
-                        <h3 className="text-[16px] font-medium text-[#F8FAFC] leading-[1.42] m-0">{t.dashboard.products.form.sections?.hasVariants || 'Product has multiple Options/Variants'}</h3>
-                        <p className="text-[12px] text-[#F8FAFC]/50 leading-[1.33] m-0">{t.dashboard.products.form.sections?.hasVariantsExample || 'Example: color, size, style'}</p>
+                        <h3 className="text-[16px] font-medium text-foreground leading-[1.42] m-0">{t.dashboard.products.form.sections?.hasVariants || 'Product has multiple Options/Variants'}</h3>
+                        <p className="text-[12px] text-foreground/50 leading-[1.33] m-0">{t.dashboard.products.form.sections?.hasVariantsExample || 'Example: color, size, style'}</p>
                     </div>
                     <button 
                         type="button"
@@ -181,7 +181,7 @@ export function VariantsInventorySection() {
                         }}
                         className={cn(
                             "relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full border border-white/[0.12] px-[3px] transition-colors focus-visible:outline-none focus:outline-none focus:ring-0",
-                            hasVariants ? "bg-blue-500" : "bg-[#1E293B]"
+                            hasVariants ? "bg-primary" : "bg-secondary"
                         )}
                     >
                         <span 
@@ -197,8 +197,8 @@ export function VariantsInventorySection() {
                 <div className="flex flex-col gap-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
-                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-[#F8FAFC]">*</span>
+                            <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-foreground">*</span>
                             </label>
                             <input
                                 type="number"
@@ -206,14 +206,14 @@ export function VariantsInventorySection() {
                                 {...register('basePrice')}
                                 placeholder="0"
                                 className={cn(
-                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.basePrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.basePrice ? "border-destructive" : "border-white/[0.08] focus:border-white"
                                 )}
                             />
-                            {errors.basePrice && <p className="text-xs text-red-500">{errors.basePrice.message}</p>}
+                            {errors.basePrice && <p className="text-xs text-destructive">{errors.basePrice.message}</p>}
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                            <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
                             </label>
                             <input
@@ -222,23 +222,23 @@ export function VariantsInventorySection() {
                                 {...register('compareAtPrice')}
                                 placeholder="0"
                                 className={cn(
-                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.compareAtPrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.compareAtPrice ? "border-destructive" : "border-white/[0.08] focus:border-white"
                                 )}
                             />
-                            {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
+                            {errors.compareAtPrice && <p className="text-xs text-destructive">{errors.compareAtPrice.message}</p>}
                         </div>
                     </div>
                     {hasVariants && (
-                        <p className="text-[12px] text-[#F8FAFC]/40 -mt-2">
+                        <p className="text-[12px] text-foreground/40 -mt-2">
                             {t.dashboard.products.form.sections?.autoFilledFromVariants || 'Auto-filled from variants — edit individual variant prices below'}
                         </p>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
-                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
+                            <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-foreground">*</span>
                             </label>
                             <input
                                 {...register('baseSku', {
@@ -252,26 +252,26 @@ export function VariantsInventorySection() {
                                 })}
                                 placeholder="SKU-001"
                                 className={cn(
-                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.baseSku ? "border-destructive" : "border-white/[0.08] focus:border-white"
                                 )}
                             />
-                            {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
+                            {errors.baseSku && <p className="text-xs text-destructive">{errors.baseSku.message}</p>}
                         </div>
                         <div className="flex flex-col gap-2">
-                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-[#F8FAFC]">*</span>
+                            <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-foreground">*</span>
                             </label>
                             <input
                                 type="number"
                                 {...register('baseInventory')}
                                 placeholder="0"
                                 className={cn(
-                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                    errors.baseInventory ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.baseInventory ? "border-destructive" : "border-white/[0.08] focus:border-white"
                                 )}
                             />
-                            {errors.baseInventory && <p className="text-xs text-red-500">{errors.baseInventory.message}</p>}
+                            {errors.baseInventory && <p className="text-xs text-destructive">{errors.baseInventory.message}</p>}
                         </div>
                     </div>
                 </div>
@@ -281,7 +281,7 @@ export function VariantsInventorySection() {
                     <div className="space-y-6 pt-6 border-t border-white/[0.08]">
                         
                         {isAllTiersEmpty && (
-                            <p className="text-[13px] text-[#F8FAFC]/60 m-0">
+                            <p className="text-[13px] text-foreground/60 m-0">
                                 {t.dashboard.products.form.sections?.emptyVariantState || 'Add options like Color, Size to create product variants'}
                             </p>
                         )}
@@ -292,7 +292,7 @@ export function VariantsInventorySection() {
                                 <div key={tier.id} className="flex flex-col gap-[10px] relative group">
                                     {/* Tier label — outside card, per Figma */}
                                     <div className="flex items-center justify-between">
-                                        <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                        <label className="text-[14px] font-medium text-foreground m-0">
                                             {t.dashboard.products.form.sections?.tierFormat
                                                 ?.replace('{level}', String(index + 1))
                                                 .replace('{example}', index === 0
@@ -300,7 +300,7 @@ export function VariantsInventorySection() {
                                                     : (t.dashboard.products.form.sections?.size || 'Size'))
                                                 || `Option ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
                                             {index > 0 && (
-                                                <span className="text-[12px] font-normal text-[#F8FAFC]/40 ml-1">
+                                                <span className="text-[12px] font-normal text-foreground/40 ml-1">
                                                     ({t.dashboard.products.form.sections?.optionalLabel || 'Optional'})
                                                 </span>
                                             )}
@@ -310,7 +310,7 @@ export function VariantsInventorySection() {
                                                 type="button"
                                                 onClick={() => setTierToDelete(index)}
                                                 aria-label={t.dashboard.products.form.sections?.removeTier || 'Remove option'}
-                                                className="flex items-center justify-center h-8 w-8 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                                className="flex items-center justify-center h-8 w-8 rounded-lg border border-destructive/20 bg-destructive/10 text-destructive/80 hover:bg-destructive/20 hover:text-destructive transition-colors"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -318,28 +318,28 @@ export function VariantsInventorySection() {
                                     </div>
 
                                     {/* Card */}
-                                    <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-[#0B1120]/50 p-[17px]">
+                                    <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-background/50 p-[17px]">
                                         {/* Option name sub-label + input */}
                                         <div className="flex flex-col gap-2 w-full">
-                                            <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                            <span className="text-[14px] font-medium text-foreground m-0">
                                                 {t.dashboard.products.form.sections?.optionNameLabel || 'Option name'}
-                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
+                                                {index === 0 && <span className="text-foreground ml-0.5">*</span>}
                                             </span>
                                             <input
                                                 {...register(`tiers.${index}.name`)}
                                                 placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || 'e.g. Color') : (t.dashboard.products.form.sections?.tierPlaceholderSize || 'e.g. Size')}
                                                 className={cn(
-                                                    'w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 transition-colors',
+                                                    'w-full rounded-2xl border bg-background px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/40 outline-none focus:ring-1 transition-colors',
                                                     (errors.tiers?.[index]?.name || hasDuplicateTierNames)
-                                                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                                                        ? 'border-destructive focus:border-destructive focus:ring-red-500'
                                                         : 'border-white/[0.08] focus:border-white focus:ring-white'
                                                 )}
                                             />
                                             {errors.tiers?.[index]?.name && (
-                                                <span className="text-[12px] text-red-500">{errors.tiers[index]?.name?.message}</span>
+                                                <span className="text-[12px] text-destructive">{errors.tiers[index]?.name?.message}</span>
                                             )}
                                             {!errors.tiers?.[index]?.name && hasDuplicateTierNames && (
-                                                <span className="text-[12px] text-red-500">
+                                                <span className="text-[12px] text-destructive">
                                                     {t.dashboard.products.form.errors?.uniqueTiers || 'Option names must be unique'}
                                                 </span>
                                             )}
@@ -347,9 +347,9 @@ export function VariantsInventorySection() {
 
                                         {/* Values sub-label + inputs */}
                                         <div className="flex flex-col gap-2">
-                                            <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                            <span className="text-[14px] font-medium text-foreground m-0">
                                                 {t.dashboard.products.form.sections?.valuesLabel || 'Values'}
-                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
+                                                {index === 0 && <span className="text-foreground ml-0.5">*</span>}
                                             </span>
                                             <div className="flex flex-col gap-3">
                                                 {tier.options.map((opt, oIdx) => {
@@ -363,8 +363,8 @@ export function VariantsInventorySection() {
                                                                     {...register(`tiers.${index}.options.${oIdx}` as const)}
                                                                     placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || 'e.g. Red') : (t.dashboard.products.form.sections?.optionPlaceholderSmall || 'e.g. Small')}
                                                                     className={cn(
-                                                                        'flex-1 rounded-xl border bg-[#0B1120] px-4 py-[10px] text-[14px] text-[#F8FAFC] outline-none focus:ring-1 transition-colors',
-                                                                        showRed ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-white/[0.08] focus:border-white focus:ring-white'
+                                                                        'flex-1 rounded-xl border bg-background px-4 py-[10px] text-[14px] text-foreground outline-none focus:ring-1 transition-colors',
+                                                                        showRed ? 'border-destructive focus:border-destructive focus:ring-red-500' : 'border-white/[0.08] focus:border-white focus:ring-white'
                                                                     )}
                                                                 />
                                                                 <button
@@ -380,18 +380,18 @@ export function VariantsInventorySection() {
                                                                             ))
                                                                         }
                                                                     }}
-                                                                    className="flex h-[44px] w-[38px] shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                                                    className="flex h-[44px] w-[38px] shrink-0 items-center justify-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive/80 hover:bg-destructive/20 hover:text-destructive transition-colors"
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </button>
                                                             </div>
                                                             {hasZodErr && (
-                                                                <span className="text-[12px] text-red-500">
+                                                                <span className="text-[12px] text-destructive">
                                                                     {errors.tiers?.[index]?.options?.[oIdx]?.message as string}
                                                                 </span>
                                                             )}
                                                             {!hasZodErr && isDup && (
-                                                                <span className="text-[12px] text-red-500">
+                                                                <span className="text-[12px] text-destructive">
                                                                     {t.dashboard.products.form.sections?.duplicateValue || 'Duplicate value'}
                                                                 </span>
                                                             )}
@@ -401,7 +401,7 @@ export function VariantsInventorySection() {
 
                                                 {/* Array-root error (e.g. "at least one option required") */}
                                                 {(errors.tiers?.[index]?.options as FieldError | undefined)?.message && (
-                                                    <span className="text-[12px] text-red-500">
+                                                    <span className="text-[12px] text-destructive">
                                                         {(errors.tiers![index]!.options as FieldError).message}
                                                     </span>
                                                 )}
@@ -413,7 +413,7 @@ export function VariantsInventorySection() {
                                                         const newOptions = [...(liveTier.options || []), '']
                                                         updateTier(index, { ...liveTier, options: newOptions })
                                                     }}
-                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-transparent py-3 text-[14px] font-medium text-blue-500 hover:bg-blue-500/5 transition-colors"
+                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-transparent py-3 text-[14px] font-medium text-primary hover:bg-primary/5 transition-colors"
                                                 >
                                                     <Plus className="h-4 w-4" />
                                                     {t.dashboard.products.form.sections?.addOption || 'Add values'}
@@ -429,7 +429,7 @@ export function VariantsInventorySection() {
                             <button
                                 type="button"
                                 onClick={() => appendTier({ id: crypto.randomUUID(), name: '', options: [] })}
-                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-foreground/60 hover:bg-white/5 transition-colors"
                             >
                                 <Plus className="h-4 w-4" />
                                 {t.dashboard.products.form.sections?.addTier || 'Add Option'}
@@ -445,8 +445,8 @@ export function VariantsInventorySection() {
                                     className={cn(
                                         'flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[14px] font-medium transition-colors',
                                         isGenerateDisabled || isGenerating
-                                            ? 'border-white/[0.08] bg-white/[0.04] text-[#F8FAFC]/40 cursor-not-allowed'
-                                            : 'border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
+                                            ? 'border-white/[0.08] bg-white/[0.04] text-foreground/40 cursor-not-allowed'
+                                            : 'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20'
                                     )}
                                 >
                                     <Wand2 className="h-4 w-4" />
@@ -454,7 +454,7 @@ export function VariantsInventorySection() {
                                 </button>
                                 {/* RHF types variants errors per-index; superRefine root errors (variantsRequired) land on the array root — cast through FieldError which is the actual runtime shape */}
                                 {(errors.variants as unknown as FieldError)?.message && variants.length === 0 && (
-                                    <p className="text-[12px] text-red-500">
+                                    <p className="text-[12px] text-destructive">
                                         {(errors.variants as unknown as FieldError).message}
                                     </p>
                                 )}
@@ -463,7 +463,7 @@ export function VariantsInventorySection() {
 
                         {/* Derived price hint — live-computed from variant rows */}
                         {hasVariants && variants.length > 0 && derivedMinPrice !== null && (
-                            <div className="text-[12px] text-[#F8FAFC]/50 leading-relaxed">
+                            <div className="text-[12px] text-foreground/50 leading-relaxed">
                                 {t.dashboard.products.form.sections?.derivedPricesHint || 'Derived from variants'}
                                 {': '}
                                 {t.dashboard.products.form.sections?.derivedMinLabel || 'min'}{' '}
@@ -476,13 +476,13 @@ export function VariantsInventorySection() {
 
                         {/* SKU Matrix Table */}
                         {variants.length > 0 && (
-                            <div className="mt-6 rounded-2xl border border-white/[0.08] bg-[#1E293B]/30 overflow-hidden" id="variants">
-                                <div className="px-4 py-3 border-b border-white/[0.08] bg-[#1E293B]/50">
-                                    <h3 className="text-[14px] font-medium text-[#F8FAFC]">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
+                            <div className="mt-6 rounded-2xl border border-white/[0.08] bg-secondary/30 overflow-hidden" id="variants">
+                                <div className="px-4 py-3 border-b border-white/[0.08] bg-secondary/50">
+                                    <h3 className="text-[14px] font-medium text-foreground">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
                                 </div>
                                 <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-left text-sm border-spacing-y-2 border-separate -mt-2">
-                                        <thead className="text-[12px] uppercase text-[#F8FAFC]/60 font-medium whitespace-nowrap">
+                                        <thead className="text-[12px] uppercase text-foreground/60 font-medium whitespace-nowrap">
                                             <tr>
                                                 <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colVariant || 'Variant'}</th>
                                                 <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colSku || 'SKU Code'}</th>
@@ -494,16 +494,16 @@ export function VariantsInventorySection() {
                                         <tbody>
                                             {variants.map((v, i) => (
                                                 <tr key={v.id} className="group align-top">
-                                                    <td className="px-4 py-3 text-[#F8FAFC] text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
+                                                    <td className="px-4 py-3 text-foreground text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
                                                             <input
                                                                 {...register(`variants.${i}.skuCode`)}
-                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[140px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.skuCode ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[140px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.skuCode ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                                                 )}
                                                             />
-                                                            {errors.variants?.[i]?.skuCode && <span className="text-[10px] text-red-500">{errors.variants[i]?.skuCode?.message}</span>}
+                                                            {errors.variants?.[i]?.skuCode && <span className="text-[10px] text-destructive">{errors.variants[i]?.skuCode?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
@@ -511,11 +511,11 @@ export function VariantsInventorySection() {
                                                             <input
                                                                 type="number"
                                                                 {...register(`variants.${i}.price`)}
-                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.price ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.price ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                                                 )}
                                                             />
-                                                            {errors.variants?.[i]?.price && <span className="text-[10px] text-red-500">{errors.variants[i]?.price?.message}</span>}
+                                                            {errors.variants?.[i]?.price && <span className="text-[10px] text-destructive">{errors.variants[i]?.price?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
@@ -523,11 +523,11 @@ export function VariantsInventorySection() {
                                                             <input
                                                                 type="number"
                                                                 {...register(`variants.${i}.compareAtPrice`)}
-                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.compareAtPrice ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.compareAtPrice ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                                                 )}
                                                             />
-                                                            {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-red-500">{errors.variants[i]?.compareAtPrice?.message}</span>}
+                                                            {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-destructive">{errors.variants[i]?.compareAtPrice?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
@@ -535,11 +535,11 @@ export function VariantsInventorySection() {
                                                             <input
                                                                 type="number"
                                                                 {...register(`variants.${i}.stock`)}
-                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                                    errors.variants?.[i]?.stock ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                className={cn("w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.stock ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
                                                                 )}
                                                             />
-                                                            {errors.variants?.[i]?.stock && <span className="text-[10px] text-red-500">{errors.variants[i]?.stock?.message}</span>}
+                                                            {errors.variants?.[i]?.stock && <span className="text-[10px] text-destructive">{errors.variants[i]?.stock?.message}</span>}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -558,20 +558,20 @@ export function VariantsInventorySection() {
 
             {/* Tier delete confirmation dialog */}
             <Dialog open={tierToDelete !== null} onOpenChange={(open) => { if (!open) setTierToDelete(null) }}>
-                <DialogContent className="dash-shell max-w-sm border-white/10 text-[#F8FAFC]" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>
+                <DialogContent className="dash-shell max-w-sm border-white/10 text-foreground" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>
                     <DialogHeader>
-                        <DialogTitle className="text-[16px] font-semibold text-[#F8FAFC]">
+                        <DialogTitle className="text-[16px] font-semibold text-foreground">
                             {t.dashboard.products.form.sections?.removeTierConfirmTitle || 'Remove this option?'}
                         </DialogTitle>
                     </DialogHeader>
-                    <p className="text-[13px] text-[#F8FAFC]/60">
+                    <p className="text-[13px] text-foreground/60">
                         {t.dashboard.products.form.sections?.removeTierConfirmDesc || 'This will also clear the variants matrix.'}
                     </p>
                     <DialogFooter className="gap-2 sm:gap-2">
                         <button
                             type="button"
                             onClick={() => setTierToDelete(null)}
-                            className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-[14px] font-medium text-[#F8FAFC] hover:bg-white/10 transition-colors"
+                            className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-[14px] font-medium text-foreground hover:bg-white/10 transition-colors"
                         >
                             {t.dashboard.products.form.sections?.removeTierCancelBtn || 'Cancel'}
                         </button>
@@ -585,7 +585,7 @@ export function VariantsInventorySection() {
                                 setTierToDelete(null)
                                 if (hasMatrix) regenerateMatrix(remainingTiers)
                             }}
-                            className="flex-1 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-[14px] font-medium text-red-400 hover:bg-red-500/25 transition-colors"
+                            className="flex-1 rounded-xl border border-destructive/40 bg-destructive/15 px-4 py-2 text-[14px] font-medium text-destructive hover:bg-destructive/25 transition-colors"
                         >
                             {t.dashboard.products.form.sections?.removeTierConfirmBtn || 'Remove'}
                         </button>

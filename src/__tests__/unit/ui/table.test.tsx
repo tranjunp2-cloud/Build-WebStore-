@@ -77,13 +77,13 @@ describe('[TC-DS1222-01-04] TableActionButton variants', () => {
         render(<TableActionButton aria-label="edit">e</TableActionButton>)
         const btn = screen.getByRole('button', { name: 'edit' })
         expect(btn.className).not.toContain('text-red')
-        expect(btn.getAttribute('style') ?? '').toContain('var(--dash-text-muted)')
+        expect(btn.className).toContain('text-[var(--dash-text-muted)]')
     })
 
     it('danger variant turns red on hover', () => {
         render(<TableActionButton variant="danger" aria-label="del">d</TableActionButton>)
         const btn = screen.getByRole('button', { name: 'del' })
-        expect(btn.className).toContain('hover:text-red-400')
+        expect(btn.className).toContain('hover:text-[hsl(var(--destructive))]')
     })
 
     it('forwards onClick', () => {

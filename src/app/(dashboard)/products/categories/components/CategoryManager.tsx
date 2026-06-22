@@ -75,9 +75,9 @@ const getCategoryDepth = (parentId: string | number | null, flatList: Category[]
 
 // Level text colors — semantic accents, not surface tokens, kept as-is
 const levelTextColors = {
-    1: 'text-[#3B82F6]',
-    2: 'text-[#06B6D4]',
-    3: 'text-[#A855F7]',
+    1: 'text-[hsl(var(--primary))]',
+    2: 'text-[hsl(var(--info))]',
+    3: 'text-[hsl(var(--info))]',
 } as const
 
 export default function CategoryManager() {
@@ -317,7 +317,7 @@ export default function CategoryManager() {
                                 <button
                                     type="button"
                                     onClick={() => handleOpenForm(undefined, node.id)}
-                                    className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[#3B82F6] hover:bg-[#3B82F6]/10 hover:border-[#3B82F6] transition-colors bg-transparent cursor-pointer"
+                                    className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.1)] hover:border-[hsl(var(--primary))] transition-colors bg-transparent cursor-pointer"
                                     title={t.dashboard.products.categories.addSubcategory || 'Add Subcategory'}
                                 >
                                     <Plus className="w-[16px] h-[16px] stroke-[1.5px]" />
@@ -326,7 +326,7 @@ export default function CategoryManager() {
                             <button
                                 type="button"
                                 onClick={() => handleOpenForm(node)}
-                                className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[#3B82F6] hover:bg-[#3B82F6]/10 hover:border-[#3B82F6] transition-colors bg-transparent cursor-pointer"
+                                className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.1)] hover:border-[hsl(var(--primary))] transition-colors bg-transparent cursor-pointer"
                                 title={t.dashboard.products.categories.edit || 'Edit'}
                             >
                                 <Edit className="w-[16px] h-[16px] stroke-[1.5px]" />
@@ -337,7 +337,7 @@ export default function CategoryManager() {
                                     setCategoryToDelete(node)
                                     setIsDeleteOpen(true)
                                 }}
-                                className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[#EF4444] hover:bg-[#EF4444]/10 hover:border-[#EF4444] transition-colors bg-transparent cursor-pointer"
+                                className="flex items-center justify-center w-8 h-8 rounded-[6px] border border-transparent text-[var(--dash-text-muted)] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)] hover:border-[hsl(var(--destructive))] transition-colors bg-transparent cursor-pointer"
                                 title={t.dashboard.products.categories.delete || 'Delete'}
                             >
                                 <Trash className="w-[16px] h-[16px] stroke-[1.5px]" />
@@ -361,9 +361,9 @@ export default function CategoryManager() {
                                 onClick={() => handleOpenForm(undefined, node.id)}
                             >
                                 <div className="flex items-center justify-center w-[14px] h-[14px]">
-                                    <Plus className="w-3.5 h-3.5 text-[#3B82F6] opacity-90 group-hover:opacity-100 transition-opacity" />
+                                    <Plus className="w-3.5 h-3.5 text-[hsl(var(--primary))] opacity-90 group-hover:opacity-100 transition-opacity" />
                                 </div>
-                                <span className="text-[13px] font-medium text-[#3B82F6] ml-2 opacity-90 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[13px] font-medium text-[hsl(var(--primary))] ml-2 opacity-90 group-hover:opacity-100 transition-opacity">
                                     {t.dashboard.products.categories.addSubcategory || 'Add subcategory'}
                                 </span>
                             </div>
@@ -378,7 +378,7 @@ export default function CategoryManager() {
         <div className="w-full pb-12">
             {/* Header */}
             <div className="flex flex-col gap-4 mb-6">
-                <Link href="/products" className="flex items-center gap-1 text-blue-500 text-[13px] no-underline hover:underline w-fit">
+                <Link href="/products" className="flex items-center gap-1 text-[hsl(var(--primary))] text-[13px] no-underline hover:underline w-fit">
                     <ChevronLeft className="w-4 h-4" />
                     {t.dashboard.products.categories.backToProducts || 'Products'}
                 </Link>
@@ -393,7 +393,7 @@ export default function CategoryManager() {
                     </div>
                     <button
                         onClick={() => handleOpenForm()}
-                        className="flex items-center gap-2 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white px-5 py-2.5 rounded-[12px] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg shadow-[#3B82F6]/20 border-none cursor-pointer w-full sm:w-auto justify-center"
+                        className="flex items-center gap-2 bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] !text-white px-5 py-2.5 rounded-[12px] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg shadow-[hsl(var(--primary)/0.2)] border-none cursor-pointer w-full sm:w-auto justify-center"
                     >
                         <Plus className="w-4 h-4" />
                         {t.dashboard.products.categories.addCategory || 'Add Category'}
@@ -448,7 +448,7 @@ export default function CategoryManager() {
 
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center p-8 min-h-[200px]">
-                            <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                            <Loader2 className="w-8 h-8 text-[hsl(var(--primary))] animate-spin mb-4" />
                         </div>
                     ) : tree.length > 0 ? (
                         <div className="flex flex-col w-full">
@@ -490,7 +490,7 @@ export default function CategoryManager() {
             {isFormOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div
-                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_rgba(59,130,246,0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh]"
+                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_50px_-12px_hsl(var(--primary)/0.2)] w-full max-w-[448px] flex flex-col max-h-[90vh]"
                         style={{ border: '1px solid var(--dash-border)' }}
                     >
                         <div
@@ -506,7 +506,7 @@ export default function CategoryManager() {
                             <form id="cat-form" onSubmit={handleSave} className="flex flex-col gap-6">
                                 <div className="flex flex-col gap-2">
                                     <label className="text-[14px] font-medium text-[var(--dash-text)]">
-                                        {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[#EF4444]">*</span>
+                                        {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[hsl(var(--destructive))]">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -521,7 +521,7 @@ export default function CategoryManager() {
                                             }));
                                         }}
                                         placeholder={t.dashboard.products.categories.form.namePlaceholder}
-                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-blue-500 transition-colors"
+                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-[hsl(var(--primary))] transition-colors"
                                         style={{ border: '1px solid var(--dash-border)' }}
                                     />
                                 </div>
@@ -534,7 +534,7 @@ export default function CategoryManager() {
                                         <select
                                             value={formData.parent || ''}
                                             onChange={e => setFormData({...formData, parent: e.target.value || null})}
-                                            className="w-full bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 pr-10 text-[16px] text-[var(--dash-text)] outline-none focus:border-blue-500 transition-colors appearance-none"
+                                            className="w-full bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 pr-10 text-[16px] text-[var(--dash-text)] outline-none focus:border-[hsl(var(--primary))] transition-colors appearance-none"
                                             style={{ border: '1px solid var(--dash-border)' }}
                                         >
                                             <option value="">{t.dashboard.products.categories.form.parentNone || '--None--'}</option>
@@ -558,7 +558,7 @@ export default function CategoryManager() {
                                         value={formData.description}
                                         onChange={e => setFormData({...formData, description: e.target.value})}
                                         placeholder={t.dashboard.products.categories.form.descriptionPlaceholder || 'Short description for SEO (optional)'}
-                                        className="w-full h-[80px] bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[14px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]/50 transition-all resize-none"
+                                        className="w-full h-[80px] bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[14px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--primary)/0.5)] transition-all resize-none"
                                         style={{ border: '1px solid var(--dash-border)' }}
                                     />
                                 </div>
@@ -586,7 +586,7 @@ export default function CategoryManager() {
                                         value={formData.slug}
                                         onChange={e => setFormData({...formData, slug: e.target.value})}
                                         placeholder={t.dashboard.products.categories.form.slugPlaceholder || 'category-url'}
-                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-blue-500 transition-colors"
+                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-[hsl(var(--primary))] transition-colors"
                                         style={{ border: '1px solid var(--dash-border)' }}
                                     />
                                 </div>
@@ -608,7 +608,7 @@ export default function CategoryManager() {
                             <button
                                 form="cat-form"
                                 type="submit"
-                                className="flex items-center gap-2 px-6 py-2 h-[46px] rounded-[12px] text-[16px] font-semibold text-white bg-gradient-to-r from-blue-500 to-teal-400 border-none outline-none shadow-[0_4px_6px_-4px_rgba(59,130,246,0.3),0_10px_15px_-3px_rgba(59,130,246,0.3)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                                className="flex items-center gap-2 px-6 py-2 h-[46px] rounded-[12px] text-[16px] font-semibold !text-white bg-gradient-to-r from-blue-500 to-teal-400 border-none outline-none shadow-[0_4px_6px_-4px_hsl(var(--primary)/0.3),0_10px_15px_-3px_hsl(var(--primary)/0.3)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
                             >
                                 {isSaving && <Loader2 className="w-5 h-5 animate-spin" />}
                                 {isSaving ? t.dashboard.products.categories.form.saving : (t.dashboard.products.categories.form.save || 'Save Category')}
@@ -641,7 +641,7 @@ export default function CategoryManager() {
                             </div>
                             <button
                                 onClick={() => setIsDeleteOpen(false)}
-                                className="w-8 h-8 rounded-[8px] flex items-center justify-center bg-transparent text-[var(--dash-text-muted)] hover:border-[#EF4444] hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-all cursor-pointer outline-none"
+                                className="w-8 h-8 rounded-[8px] flex items-center justify-center bg-transparent text-[var(--dash-text-muted)] hover:border-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)] transition-all cursor-pointer outline-none"
                                 style={{ border: '1px solid var(--dash-border)' }}
                             >
                                 <X className="w-4 h-4" />
@@ -651,7 +651,7 @@ export default function CategoryManager() {
                         <div className="p-6">
                             <div className="text-center py-2 flex flex-col items-center">
                                 <div className="w-12 h-12 flex items-center justify-center mb-4">
-                                    <XCircle className="w-12 h-12 text-[#EF4444]" strokeWidth={1.5} />
+                                    <XCircle className="w-12 h-12 text-[hsl(var(--destructive))]" strokeWidth={1.5} />
                                 </div>
                                 <p className="text-[14px] text-[var(--dash-text-muted)] m-0">
                                     {t.dashboard.products.categories.deleteModal.warning1 || 'Are you sure you want to delete'}
@@ -661,7 +661,7 @@ export default function CategoryManager() {
                                 </div>
 
                                 {hasChildren && (
-                                    <div className="mt-5 p-3 pr-4 shadow-[0_0_0_1px_rgba(245,158,11,0.2)] bg-[#F59E0B]/10 rounded-[8px] text-[13px] text-[#F59E0B] text-left flex items-start gap-2.5 w-full">
+                                    <div className="mt-5 p-3 pr-4 shadow-[0_0_0_1px_rgba(245,158,11,0.2)] bg-[hsl(var(--warning)/0.1)] rounded-[8px] text-[13px] text-[hsl(var(--warning))] text-left flex items-start gap-2.5 w-full">
                                         <AlertTriangle className="w-4 h-4 shrink-0 mt-[1px]" aria-hidden />
                                         <span className="leading-snug">
                                             {t.dashboard.products.categories.deleteModal.subCategoryWarning || 'This category has child categories. They will be unlinked from the tree (not permanently deleted).'}
@@ -686,7 +686,7 @@ export default function CategoryManager() {
                             <button
                                 onClick={handleDelete}
                                 disabled={isDeleting}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-[8px] text-[14px] font-semibold text-white bg-[#EF4444] border-none outline-none hover:bg-[#DC2626] transition-colors cursor-pointer disabled:opacity-50"
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-[8px] text-[14px] font-semibold !text-white bg-[hsl(var(--destructive))] border-none outline-none hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50"
                             >
                                 {isDeleting ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />

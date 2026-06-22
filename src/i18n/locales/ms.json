@@ -2546,6 +2546,18 @@
             },
             "noMatches": "Tiada kiriman yang sepadan dengan penapis anda",
             "resetFilters": "Set Semula Penapis"
+        },
+        "tenantAccessWatcher": {
+            "sessionExpiredTitle": "Sesi Tamat Tempoh",
+            "sessionExpiredBody": "Sesi anda telah tamat tempoh. Sila log masuk semula.",
+            "accessRevokedTitle": "Akses Dibatalkan",
+            "accessRevokedBody": "Akses anda ke ruang kerja ini telah dibuang oleh pemilik ruang kerja. Anda akan dilog keluar sekarang.",
+            "subscriptionExpiredTitle": "Langganan Tamat Tempoh",
+            "subscriptionExpiredBody": "Langganan anda telah tamat tempoh. Sila perbaharui pelan anda untuk meneruskan. Anda akan dilog keluar sekarang.",
+            "accountSuspendedTitle": "Akaun Digantung",
+            "accountSuspendedBody": "Akaun anda telah digantung. Sila hubungi sokongan. Anda akan dilog keluar sekarang.",
+            "acknowledge": "Akui",
+            "loggingOut": "Melog keluar..."
         }
     },
     "auth": {
@@ -4018,6 +4030,9 @@
         "loadError": "Ralat memuatkan pratonton. Sila pastikan anda telah log masuk dan mempunyai akses ke laman ini."
     },
     "storefront": {
+        "nav": {
+            "overflowMore": "Lagi"
+        },
         "products": {
             "home": "Utama",
             "title": "Produk",

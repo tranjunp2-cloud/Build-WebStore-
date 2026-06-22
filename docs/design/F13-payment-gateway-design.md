@@ -14,9 +14,13 @@
 >   - Wireframe ASCII bên dưới chỉ là sketch low-fi
 >   - Nếu Claude Design / Figma conflict §8 decisions → ưu tiên §8 (đã chốt với PM)
 > - Related: F09 Storefront Commerce (Checkout host), F14 Shipping (sibling settings card), F18 CMS Global Layout, F19 Store Configuration (extends `Settings > Payments`)
+> - **F34 Xendit Payment** (sibling provider — đã merged): PRD [`docs/prd/F34-xendit-payment.md`](../prd/F34-xendit-payment.md), QA [`docs/qa/F34-xendit-payment.md`](../qa/F34-xendit-payment.md). Xendit setup flow design (Screen D §2.4 dưới đây) bổ sung vào tài liệu này.
 > - Code reference: [`src/lib/payment/stripe.ts`](../../src/lib/payment/stripe.ts), [`src/app/api/orders/create/route.ts`](../../src/app/api/orders/create/route.ts), [`src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx`](../../src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx)
+> - Xendit code reference: [`src/app/(dashboard)/settings/payments/XenditConnectBlock.tsx`](../../src/app/(dashboard)/settings/payments/XenditConnectBlock.tsx), [`XenditConnectedBar.tsx`](../../src/app/(dashboard)/settings/payments/XenditConnectedBar.tsx), [`src/lib/payment/xendit.ts`](../../src/lib/payment/xendit.ts), [`src/app/api/orders/xendit-checkout/route.ts`](../../src/app/api/orders/xendit-checkout/route.ts)
 
 Tài liệu này cung cấp wireframe & UI spec low-fi cho tính năng **Payment Gateway Malaysia** — Wave 6 P0 (Card + FPX qua **Stripe Checkout Session hosted**). Settings UI tuân thủ **F18 CMS Global Layout**. Checkout UI thuộc Storefront F09.
+
+> **🆕 Bổ sung F34 — Xendit (provider thứ 2, song song Stripe):** Sau Wave 6, dự án **thêm** Xendit như một payment provider thứ 2 (KHÔNG thay thế Stripe). Xendit mở thêm các phương thức nội địa Malaysia (TNG, GrabPay, ShopeePay, DuitNow QR, FPX, Card) qua **Xendit hosted Invoice**, theo **Model C** (merchant dùng API key Xendit của chính họ — ECH non-custody, tiền về thẳng bank merchant). Seller **setup Xendit** bằng cách dán **Secret Key + Webhook Verification Token** vào `Settings > Payments`. Phần này được đặc tả ở **§2.4 Screen D — Xendit Payment Setup** (luồng connect/connected/disconnect). Stripe vẫn giữ nguyên như mô tả §2.1–§2.3.
 
 ---
 
@@ -357,11 +361,165 @@ Wave 6 Payment bao gồm 3 surface chính:
 
 ---
 
+### 2.4. Screen D — Xendit Payment Setup (Seller Settings) <a id="screen-d-xendit-setup"></a>
+
+> **🎨 Hi-fi reference (Claude Design — PRIMARY cho Xendit):** [Payment Settings.html](https://api.anthropic.com/v1/design/h/-_EE_9Cs4mq0KkQRNrRpOA?open_file=Payment+Settings.html) — bundle `pw2-design` (chat2 "Thêm luồng thanh toán Xendit"). Final landing: Xendit card dạng **hero** (title + desc + 3 steps + nút "Connect Xendit Account") → click mở **modal** nhập Secret Key + Webhook Token (kèm link "Login to Xendit") — mirror đúng luồng Stripe. Sau connect → status bar + unlock method cards (Card / FPX / E-Wallets).
+>
+> **🆕 F34 — Provider thứ 2 (song song Stripe).** Đây là luồng **setup Xendit** cho seller. Component liên quan:
+> - **Not-connected (hero + modal):** [`XenditConnectBlock.tsx`](../../src/app/(dashboard)/settings/payments/XenditConnectBlock.tsx) — hero card; connect modal (Secret Key + Webhook Token + "Login to Xendit" link)
+> - **Connected:** [`XenditConnectedBar.tsx`](../../src/app/(dashboard)/settings/payments/XenditConnectedBar.tsx) — status bar + disconnect modal
+> - **Integration:** [`PaymentsFormClient.tsx`](../../src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx) §`Xendit (F34)` (line ~505–527) — section nằm **giữa** Stripe card và Manual Methods card
+>
+> ⚠️ **Design vs code (divergence):** Tài liệu §2.4 mô tả **design target** (hero + modal, theo Payment Settings.html). Code đã ship hiện đang dùng biến thể **inline form** (key nhập thẳng trong card, chưa có modal). Khi implement: đổi `XenditConnectBlock` → hero + tách form ra modal (giống Stripe). Đây là **doc spec**, chưa phải mô tả code hiện tại.
+
+**Path:** `Dashboard > Settings > Payments` (`/dashboard/settings/payments`) — cùng trang với Stripe (Screen A) và Manual Methods (F19).
+**Model:** **Model C (non-custody)** — merchant dùng API key Xendit của chính họ. ECH lưu `tenant.xenditSecretKey` + `tenant.xenditCallbackToken` (cả 2 `access.read = false` — không đọc ngược ra UI). Tiền settle thẳng vào bank merchant (Auto-Withdrawal cấu hình trên Xendit Dashboard, ngoài ECH).
+**Connection logic:** `xenditIsConnected = (tenant.xenditSecretKey != null)`. Không có state "pending/KYB" trong UI (Model B XenPlatform polling đã bị comment-out trong code — KYB do merchant tự làm trực tiếp với Xendit).
+
+#### 2.4.1. State NOT_CONNECTED — Hero card (default)
+
+> Mặc định **chỉ hiện** title + description + 3 steps + nút **Connect Xendit Account** (mirror đúng hero của Stripe §2.1). Form nhập Secret Key / Token KHÔNG inline nữa — nằm trong modal (§2.4.2), mở khi click nút.
+
+```text
+│              │ ┌──────────────────────────────────────────┐ │
+│ ⚙️ Settings  │ │ ● XENDIT PAYMENT METHODS  Powered by      │ │ ◄── section header (cyan dot)
+│  ↳ Payments ●│ │                          Xendit Checkout  │ │
+│              │ │ ┌──────────────────────────────────────┐ │ │
+│              │ │ │ 🔗  Connect a Xendit account to      │ │ │ ◄── cyan-glow HERO card
+│              │ │ │     accept Malaysian payments        │ │ │     (grid: icon · body · CTA)
+│              │ │ │ Funds settle straight into your bank │ │ │
+│              │ │ │ account — Prime Web never touches    │ │ │
+│              │ │ │ them. Manual methods keep working.   │ │ │
+│              │ │ │ ① Click "Connect Xendit Account"     │ │ │ ◄── 3 step chips (numbered)
+│              │ │ │ ② Paste Secret Key & Webhook Token   │ │ │
+│              │ │ │ ③ Card, FPX & E-Wallets unlock       │ │ │
+│              │ │ │                  [ Connect Xendit → ]│ │ │ ◄── CTA mở modal §2.4.2
+│              │ │ │             🛡 Secured by Xendit ·   │ │ │ ◄── trust line
+│              │ │ │                PCI DSS Level 1       │ │ │
+│              │ │ └──────────────────────────────────────┘ │ │
+│              │ └──────────────────────────────────────────┘ │
+```
+
+- **Layout:** grid `56px 1fr auto` (icon · body · CTA-stack), giống `StripeConnectBlock` hero. Mobile: stack 1-col.
+- **Copy:** title `xenditConnectTitle`, desc `xenditConnectDesc`, steps `xenditStep1/2/3`, CTA `xenditConnectCta` ("Connect Xendit Account"), trust `xenditTrust` ("Secured by Xendit · PCI DSS Level 1").
+- **Action:** click CTA → `setShowXenditModal(true)` → mở modal §2.4.2. KHÔNG submit gì ở hero.
+
+#### 2.4.2. Connect modal — nhập Key/Token (click "Connect Xendit Account")
+
+> Popup giống modal Stripe credentials. Mở từ hero CTA. Đóng bằng: nút ✕, click backdrop, phím `Esc`, hoặc "Cancel".
+
+```text
+        ┌───────────────────────────────────────────────┐
+        │ 🔗  Connect your Xendit Account            [✕] │ ◄── header: icon + title + close
+        │     Paste your Xendit credentials below to     │     `xenditModalTitle` / `xenditModalSub`
+        │     link your account. Card, FPX & E-Wallets   │
+        │     unlock as soon as we verify.               │
+        ├───────────────────────────────────────────────┤
+        │ Secret Key                        [Required]   │ ◄── label + req-pill
+        │ [ xnd_development_… or xnd_production_…   👁 ]  │ ◄── password mask + eye toggle, autofocus
+        │  1. Dashboard → API Keys → + Generate secret   │ ◄── 4-step helper (`xenditSecretKeyStep1-4`)
+        │  2. Name your key (e.g. ECH Primeweb)          │
+        │  3. Permissions: Money-in products → Write     │
+        │  4. Generate key → copy immediately (once)     │
+        │                                                │
+        │ Webhook Verification Token        [Required]   │
+        │ [ Paste Webhook Verification Token…      👁 ]  │ ◄── `xenditCallbackTokenStep1-3`
+        │  1. Dashboard → Settings → Webhooks            │
+        │  2. View Webhook Verification Token            │
+        │  3. Copy the token and paste here              │
+        ├───────────────────────────────────────────────┤
+        │ Don't have a Xendit account yet?               │ ◄── footer left: register prompt
+        │ ↗ Login to Xendit       [ Cancel ] [Connect ►] │     link → dashboard.xendit.co/register
+        └───────────────────────────────────────────────┘
+```
+
+- **Fields:** Secret Key + Webhook Verification Token, mỗi field có `[Required]` pill + eye toggle (mask mặc định) + helper steps numbered.
+- **"Login to Xendit" link:** `<a href="https://dashboard.xendit.co/register" target="_blank">` (`xenditModalNoAccount` + `xenditModalLoginLink`) — cho merchant chưa có account.
+- **Buttons:** `Cancel` (`xenditModalCancel`) đóng modal · `Connect Account` (`xenditModalConnect`, green gradient) submit. Disabled cho tới khi cả 2 field có giá trị.
+- **Validation (client-side):**
+  - Cả 2 field empty → "Please fill in both fields." (`xenditValidationRequired`)
+  - Secret Key không bắt đầu bằng `xnd_` → "Invalid Secret Key. Must start with xnd_" (`xenditValidationKey`)
+- **Submit → `saveXenditKeys(secretKey, callbackToken)` server action:**
+  - Success → `xenditIsConnected = true` + đóng modal + toast "Xendit đã được kết nối thành công!" → render Connected Bar (§2.4.3)
+  - Fail → throw → inline error đỏ (⚠️) trong modal, modal **vẫn mở**, KHÔNG flip connected.
+
+#### 2.4.3. State CONNECTED — Connected Bar
+
+```text
+│              │ ┌──────────────────────────────────────┐ │
+│              │ │ 🟢 ✓ Xendit account connected  [acct]│ │ ◄── emerald bar, pulse dot, optional acct-id pill (mono)
+│              │ │   🛡 API key connected · Payments    │ │ ◄── businessName (từ /status) HOẶC fallback copy
+│              │ │      active                          │ │
+│              │ │              [↗ Manage in Xendit]    │ │ ◄── external → dashboard.xendit.co
+│              │ │              [⛓ Disconnect]          │ │ ◄── mở confirm modal
+│              │ │ ──────────────────────────────────── │ │
+│              │ │ SUPPORTED PAYMENT METHODS            │ │
+│              │ │ [TNG eWallet] [GrabPay] [ShopeePay]  │ │ ◄── static pills (Xendit MY official)
+│              │ │ [DuitNow QR] [FPX] [Credit/Debit Card]│ │
+│              │ └──────────────────────────────────────┘ │
+```
+
+- **acct-id pill:** chỉ hiện nếu có `accountId` (hiện code pass `accountId={null}` → pill ẩn). `businessName`/`email` lấy async từ `GET /api/xendit/connect/status?tenantId=` (fallback copy `xenditKybVerified` nếu fetch fail).
+- **Supported methods:** danh sách **tĩnh** (TNG eWallet · GrabPay · ShopeePay · DuitNow QR · FPX · Credit/Debit Card) theo Xendit MY docs — không phụ thuộc toggle.
+
+#### 2.4.4. Disconnect — confirm modal
+
+```text
+┌──────────────────────────────────────┐
+│ ⛓ Disconnect Xendit?                 │ ◄── red Unlink icon
+│ Buyers won't be able to pay via TNG,  │
+│ GrabPay, FPX and other Malaysian      │
+│ methods until reconnected. Existing   │
+│ orders are not affected.              │
+│                                       │
+│        [ Keep connected ] [Disconnect]│ ◄── destructive confirm
+└──────────────────────────────────────┘
+```
+
+- Confirm → `disconnectXendit()` server action → clear `xenditSecretKey` + `xenditCallbackToken` → `xenditIsConnected = false` → quay lại Hero card (§2.4.1).
+- Fail → toast "Failed to disconnect Xendit", giữ nguyên connected.
+- Modal đóng bằng: click backdrop, phím `Esc`, hoặc "Keep connected".
+
+**Components (custom Tailwind theo dark dashboard tokens — KHÔNG dùng shadcn):**
+| Vùng | Element | Ghi chú |
+|------|---------|---------|
+| Section header | `<h2>` + cyan dot + "Powered by Xendit Checkout" | `xenditSectionTitle` / `xenditPoweredBy` |
+| Hero card | grid `56px 1fr auto` cyan-glow (radial gradient + border `rgba(6,182,212,0.32)`) | `XenditConnectBlock` — chỉ title/desc/steps/CTA |
+| Hero CTA | gradient `#0ea5e9→#2dd4bf` + `ArrowRight` | `xenditConnectCta` → mở modal |
+| Trust line | `ShieldCheck` emerald + `text-[11.5px]` | `xenditTrust` |
+| Connect modal | overlay `bg-[#020612]/62` + backdrop-blur, panel `#141e2e` max-w 520px | header/body/footer; `Esc`/backdrop để đóng |
+| Key inputs | `<input type=password>` + eye toggle (`Eye`/`EyeOff` lucide) + `[Required]` pill | mask mặc định, reveal on click |
+| Helper steps | `<ol>` numbered, `text-[11.5px] text-slate-500` | 4 bước Secret Key, 3 bước Token |
+| Register link | `<a>` external `ExternalLink` → `dashboard.xendit.co/register` | `xenditModalNoAccount` + `xenditModalLoginLink` |
+| Connect button | green gradient `#10b981→#14b8a6`, disabled until both filled | `xenditModalConnect` / spinner `xenditSaving` |
+| Connected bar | emerald border + pulse dot + `Check` icon | `XenditConnectedBar` |
+| Manage / Disconnect | ghost buttons (`ExternalLink` / `Unlink`) | external link + modal trigger |
+| Disconnect modal | fixed overlay `bg-[#020612]/62` + backdrop-blur, max-w 440px | `Esc` / backdrop để đóng |
+
+**States:**
+| State | UI |
+|-------|-----|
+| Not connected (default) | Hero card: title/desc/3 steps/CTA "Connect Xendit Account" + trust line |
+| Modal open | Connect modal: 2 input + helper steps + "Login to Xendit" link; Connect disabled tới khi cả 2 field filled |
+| Validating (empty/bad key) | Inline error đỏ (⚠️) trong modal; không gọi server |
+| Saving | Connect button → spinner "Saving..." (`xenditSaving`), disabled |
+| Connect success | Đóng modal + toast "Xendit đã được kết nối thành công!" → render Connected Bar |
+| Connect fail | Inline error đỏ trong modal, modal vẫn mở, không flip connected |
+| Connected | Emerald bar + supported-method pills + Manage/Disconnect |
+| Disconnect confirm | Modal "Disconnect Xendit?" (destructive) |
+| Disconnect success | Về Hero card (key đã clear khỏi tenant) |
+| Disconnect fail | Toast "Failed to disconnect Xendit", giữ connected |
+
+**Payment-method toggles (TNG/GrabPay/DuitNow/FPX/ShopeePay/Boost/MAE):** mỗi toggle có `beforeChange` hook chặn bật khi `xenditSecretKey` chưa set (xem `Tenants.ts` `payments` group). UI lock tip: "Complete Xendit onboarding to enable" (`xenditLockTip`). Checkout storefront: buyer được redirect ra **Xendit hosted Invoice** (`invoice_url`) — buyer tự chọn method trên trang Xendit; ECH **không** build inline picker (giống nguyên tắc KISS của Stripe Checkout §8.6). Webhook `/api/webhooks/xendit` verify `x-callback-token` (per-tenant) → `reconcileOrderPaid()` atomic → order `paid`.
+
+---
+
 ## 3. UI States Matrix
 
 | Screen | Loading | Empty | Error | Success | Validation |
 |--------|---------|-------|-------|---------|-----------|
-| Settings | Skeleton 2 method rows | Destructive alert "Connect Stripe" + CTA | Toast destructive + revert toggle state | Toast "Payment methods updated" (Sonner 3s) | Soft warn `Alert` "At least one required" (không block Save) |
+| Settings (Stripe) | Skeleton 2 method rows | Destructive alert "Connect Stripe" + CTA | Toast destructive + revert toggle state | Toast "Payment methods updated" (Sonner 3s) | Soft warn `Alert` "At least one required" (không block Save) |
+| Settings (Xendit §2.4) | — (render từ tenant state) | Hero card → modal nhập Secret Key + Webhook Token | Inline error đỏ trong modal / toast "Failed to disconnect" | Đóng modal + toast "Xendit đã được kết nối thành công!" → Connected Bar | Connect disabled tới khi cả 2 field filled; Secret Key phải `xnd_` prefix |
 | Checkout — method select | RadioGroup skeleton 3 rows | Stripe row ẩn nếu cả Card+FPX OFF tenant-side | Toast "Failed to load checkout. Please refresh." | Place Order enabled | N/A (radio, no input) |
 | Checkout — Place Order click | Button spinner "Processing..." + full-page overlay "Redirecting to Stripe..." | N/A | Toast destructive "Failed to start payment" + button re-enabled | Browser navigate `checkout.stripe.com/...` | N/A |
 | Checkout — returned (cancel) | N/A | N/A | Toast BM "Pembayaran gagal. Sila cuba lagi." (FR-04) + cart preserved (FR-05) | (success → confirmation page, không trong checkout) | N/A |
@@ -390,6 +548,8 @@ Wave 6 Payment bao gồm 3 surface chính:
 - ❌ Stripe Card Element mount slot — không cần (Stripe Checkout hosted)
 - ❌ FPX bank picker dropdown — không cần (Stripe Checkout hosted)
 - ❌ Inline Stripe.js Elements provider — không cần
+
+**Xendit (F34 — custom Tailwind, KHÔNG shadcn):** xem bảng component mapping ở **§2.4** — `XenditConnectBlock` (form nhập key + eye-toggle inputs + numbered helper steps), `XenditConnectedBar` (emerald status bar + supported-method pills + disconnect modal). Cùng dark dashboard tokens với Stripe card.
 
 ---
 
@@ -553,6 +713,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md),
 | F19 Store Config | Existing `Settings > Payments` page với COD + QR | F13 thêm card "Stripe Payment Methods" — KHÔNG thay thế Manual Methods |
 | F21 Localization | Future — translate BM error strings | Wave 6: hardcode BM "Pembayaran gagal" |
 | Stripe Connect | Onboarding flow ở `src/app/api/stripe/connect/onboard/route.ts` | Yêu cầu seller complete onboard trước khi enable Card/FPX |
+| **F34 Xendit** | Provider thứ 2 song song Stripe — setup flow Screen D §2.4 | Model C non-custody: merchant dán Secret Key + Webhook Token; checkout qua Xendit hosted Invoice; webhook `/api/webhooks/xendit` |
 
 ---
 

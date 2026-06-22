@@ -20,12 +20,12 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                     <span className="text-[13px] font-medium" style={{ color: 'var(--dash-text)' }}>
                         {count} / ∞
                     </span>
-                    <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#38bdf8' }}>
+                    <span className="text-[11px] font-semibold tracking-wide" style={{ color: 'hsl(var(--primary))' }}>
                         {d.badges.unlimited}
                     </span>
                 </div>
                 <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: 'var(--dash-border)' }}>
-                    <div className="h-full rounded-full" style={{ width: `${fill}%`, background: '#38bdf8' }} />
+                    <div className="h-full rounded-full" style={{ width: `${fill}%`, background: 'hsl(var(--primary))' }} />
                 </div>
             </div>
         )
@@ -34,9 +34,9 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
     const pct = limit > 0 ? Math.min((count / limit) * 100, 100) : 0
     const atLimit = count >= limit
 
-    let barColor = 'bg-green-500'
-    if (pct >= 100) barColor = 'bg-red-500'
-    else if (pct >= 80) barColor = 'bg-amber-400'
+    let barColor = 'bg-success'
+    if (pct >= 100) barColor = 'bg-destructive'
+    else if (pct >= 80) barColor = 'bg-warning'
 
     return (
         <div className="flex flex-col gap-1 min-w-[80px]">
@@ -45,7 +45,7 @@ export function DiscountUsageMeter({ count, limit }: DiscountUsageMeterProps) {
                     {count} / {limit}
                 </span>
                 {atLimit && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-red-500/20 text-red-400 tracking-wide">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold bg-destructive/20 text-destructive tracking-wide">
                         {d.badges.atLimit}
                     </span>
                 )}

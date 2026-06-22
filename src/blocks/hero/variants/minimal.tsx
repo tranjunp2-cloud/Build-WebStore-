@@ -8,10 +8,12 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 import { HERO_CONTAINER } from '../shared'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 void _CSS_VARS
 
 export function MinimalHero({ block }: BlockProps<HeroConfig>) {
+    const resolveHref = useLocalHref()
     const { headline, subheadline, ctaButtons = [] } = block
 
     return (
@@ -52,7 +54,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                     >
                         {/* Single CTA — take only the first button */}
                         <motion.a
-                            href={ctaButtons[0].url}
+                            href={resolveHref(ctaButtons[0].url)}
                             whileHover={{ scale: 1.04, y: -2 }}
                             whileTap={{ scale: 0.97 }}
                             className={`px-10 py-4 rounded-xl font-semibold text-sm transition-all duration-300 ${TOUCH_TARGET.min} inline-flex items-center justify-center`}

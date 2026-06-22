@@ -205,8 +205,8 @@ export default function ProductEditPage() {
                     <div className="h-8 w-8 rounded-lg bg-white/5" />
                     <div className="h-7 w-48 rounded bg-white/5" />
                 </div>
-                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 h-64" />
-                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 h-48" />
+                <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 h-64" />
+                <div className="rounded-xl border border-white/10 bg-[hsl(var(--secondary)/0.3)] p-6 h-48" />
             </div>
         )
     }
@@ -216,9 +216,9 @@ export default function ProductEditPage() {
             {showLegacyWarning && (
                 <div
                     role="alert"
-                    className="mx-auto max-w-3xl mb-4 flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-[13px] text-yellow-200"
+                    className="mx-auto max-w-3xl mb-4 flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-[13px] text-warning"
                 >
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-400" />
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />
                     <span>{t.dashboard.products.form.legacyPriceWarning}</span>
                 </div>
             )}

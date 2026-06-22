@@ -8,7 +8,7 @@ import { useI18n } from '@/i18n'
 import {
     Plus,
     Trash2,
-    SquarePen,
+    Pencil,
     FileText,
     SearchX,
     X,
@@ -70,12 +70,12 @@ function BlogCheckbox({ checked, onClick }: { checked: boolean; onClick: () => v
     return (
         <div className="flex justify-center items-center cursor-pointer group" onClick={(e) => { e.stopPropagation(); onClick(); }}>
             {checked ? (
-                <div className="w-5 h-5 flex shrink-0 items-center justify-center rounded-[4px] bg-[#2DD4BF] group-hover:opacity-80 transition-opacity">
+                <div className="w-5 h-5 flex shrink-0 items-center justify-center rounded-[4px] bg-[hsl(var(--primary))] group-hover:opacity-80 transition-opacity">
                     <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M4.00004 7.8L1.20004 5L0.266708 5.93333L4.00004 9.66667L12 1.66667L11.0667 0.733337L4.00004 7.8Z" fill="white" /></svg>
                 </div>
             ) : (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="shrink-0 stroke-[#374151] group-hover:stroke-[#2DD4BF]/50 transition-colors">
-                    <rect x="1" y="1" width="18" height="18" rx="3" fill="transparent" strokeWidth="2" />
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="shrink-0 stroke-[hsl(var(--input-border))] group-hover:stroke-[hsl(var(--primary))]/50 transition-colors">
+                    <rect x="1" y="1" width="18" height="18" rx="3" fill="transparent" strokeWidth="1.5" />
                 </svg>
             )}
         </div>
@@ -286,14 +286,14 @@ export default function BlogListPage() {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-6">
                 <div className="text-center space-y-4">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
-                        <FileText className="h-8 w-8 text-red-400" />
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+                        <FileText className="h-8 w-8 text-destructive" />
                     </div>
                     <h3 className="text-lg font-semibold text-white">{t.dashboard.blog.loadFailed}</h3>
                     <p className="text-sm text-gray-400">{error}</p>
                     <button
                         onClick={fetchPosts}
-                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                        className="rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 py-2 text-sm font-medium !text-white hover:opacity-90 transition-colors"
                     >
                         {t.dashboard.blog.tryAgain}
                     </button>
@@ -327,12 +327,12 @@ export default function BlogListPage() {
             <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center w-full gap-4 xl:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
                     <div className="w-full h-[32px]">
-                        <h1 className="mt-[-1px] w-[242px] h-[32px] text-[#F8FAFC] text-[24px] font-[700] leading-[1.3333333333333333em]">
+                        <h1 className="mt-[-1px] w-[242px] h-[32px] text-foreground text-[24px] font-[700] leading-[1.3333333333333333em]">
                             {t.dashboard.blog.title}
                         </h1>
                     </div>
                     <div className="w-full h-[20px]">
-                        <p className="w-max h-[20px] text-[rgba(248,250,252,0.6)] text-[14px] font-[400] leading-[1.4285714285714286em]">
+                        <p className="w-max h-[20px] text-[hsl(var(--muted-foreground))] text-[14px] font-[400] leading-[1.4285714285714286em]">
                             {t.dashboard.blog.subtitle}
                         </p>
                     </div>
@@ -403,7 +403,7 @@ export default function BlogListPage() {
                     <button
                         onClick={handleBulkPublish}
                         disabled={bulkActionLoading}
-                        className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[#2DD4BF] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
+                        className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[hsl(var(--primary))] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
                     >
                         <Eye className="w-[16px] h-[16px]" />
                         <span>{t.dashboard.blog.actions.bulkPublish || 'Publish'}</span>
@@ -429,12 +429,12 @@ export default function BlogListPage() {
                 ) : posts.map((post) => (
                     <div
                         key={`mobile-${post.id}`}
-                        className="flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] p-4 gap-4"
+                        className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] p-4 gap-4"
                     >
                         {/* Top Content Row */}
                         <div className="flex flex-row gap-4">
                             {/* Image */}
-                            <div className="shrink-0 w-[96px] h-[80px] bg-[#0B1120] rounded-[12px] border border-[rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="shrink-0 w-[96px] h-[80px] bg-[hsl(var(--background))] rounded-[12px] border border-[hsl(var(--border))] overflow-hidden">
                                 {post.thumbnail ? (
                                     <img
                                         src={getThumbUrl(typeof post.thumbnail === 'object' ? post.thumbnail.url : '')}
@@ -443,7 +443,7 @@ export default function BlogListPage() {
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                        <span className="text-[#9CA3AF] text-xs">{t.dashboard.blog.noImage}</span>
+                                        <span className="text-[hsl(var(--muted-foreground))] text-xs">{t.dashboard.blog.noImage}</span>
                                     </div>
                                 )}
                             </div>
@@ -452,7 +452,7 @@ export default function BlogListPage() {
                             <div className="flex flex-col flex-1 min-w-0 gap-[10px]">
                                 {/* Title & Checkbox */}
                                 <div className="flex flex-row justify-between items-start gap-2">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-[#F8FAFC] line-clamp-2 flex-1 min-w-0">
+                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground line-clamp-2 flex-1 min-w-0">
                                         {post.title}
                                     </span>
                                     <div className="shrink-0 pt-0.5">
@@ -465,28 +465,28 @@ export default function BlogListPage() {
 
                                 {/* Badges */}
                                 <div className="flex flex-row items-center gap-2 flex-wrap">
-                                    <div className="flex items-center bg-[rgba(59,130,246,0.1)] rounded-[12px] border border-[rgba(59,130,246,0.3)] px-[9px] py-[3px]">
-                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#3B82F6] truncate max-w-[80px]">
+                                    <div className="flex items-center bg-[hsl(var(--primary)/0.1)] rounded-[12px] border border-[hsl(var(--primary)/0.3)] px-[9px] py-[3px]">
+                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[hsl(var(--primary))] truncate max-w-[80px]">
                                             {getCategoryName(post.category)}
                                         </span>
                                     </div>
                                     {post.status === 'published' ? (
-                                        <div className="flex items-center bg-[rgba(0,201,80,0.1)] rounded-[12px] border border-[rgba(0,201,80,0.3)] px-[9px] py-[3px]">
-                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#05DF72]">{t.dashboard.blog.filters.published}</span>
+                                        <div className="flex items-center bg-[hsl(var(--success)/0.1)] rounded-[12px] border border-[hsl(var(--success)/0.3)] px-[9px] py-[3px]">
+                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[hsl(var(--success))]">{t.dashboard.blog.filters.published}</span>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center bg-[rgba(245,158,11,0.1)] rounded-[12px] border border-[rgba(245,158,11,0.3)] px-[9px] py-[3px]">
-                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#F59E0B]">{t.dashboard.blog.filters.draft}</span>
+                                        <div className="flex items-center bg-[hsl(var(--warning)/0.1)] rounded-[12px] border border-[hsl(var(--warning)/0.3)] px-[9px] py-[3px]">
+                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[hsl(var(--warning))]">{t.dashboard.blog.filters.draft}</span>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Author & Date */}
                                 <div className="flex flex-row justify-between items-center">
-                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)] truncate max-w-[100px]">
+                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[hsl(var(--muted-foreground))] truncate max-w-[100px]">
                                         {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                     </span>
-                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)]">
+                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[hsl(var(--muted-foreground))]">
                                         {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(post.updatedAt))}
                                     </span>
                                 </div>
@@ -494,27 +494,27 @@ export default function BlogListPage() {
                         </div>
 
                         {/* Action Buttons Row */}
-                        <div className="flex flex-row items-center gap-2 border-t border-[rgba(255,255,255,0.05)] pt-3">
+                        <div className="flex flex-row items-center gap-2 border-t border-[hsl(var(--border))] pt-3">
                             <button
                                 onClick={() => router.push(`/blog/${post.id}`)}
-                                className="flex items-center justify-center gap-1.5 bg-[rgba(0,201,80,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--success)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
-                                <Eye className="w-4 h-4 text-[#05DF72]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#05DF72]">{t.dashboard.blog.actions.view}</span>
+                                <Eye className="w-4 h-4 text-[hsl(var(--success))]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--success))]">{t.dashboard.blog.actions.view}</span>
                             </button>
                             <button
                                 onClick={() => router.push(`/blog/${post.id}`)}
-                                className="flex items-center justify-center gap-1.5 bg-[rgba(59,130,246,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--primary)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
-                                <SquarePen className="w-4 h-4 text-[#3B82F6]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">{t.dashboard.blog.actions.edit}</span>
+                                <Pencil className="w-4 h-4 text-[hsl(var(--primary))]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--primary))]">{t.dashboard.blog.actions.edit}</span>
                             </button>
                             <button
                                 onClick={() => openDeleteConfirm(post)}
-                                className="flex items-center justify-center gap-1.5 bg-[rgba(251,44,54,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--destructive)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
-                                <Trash2 className="w-4 h-4 text-[#FF6467]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">{t.dashboard.blog.actions.delete}</span>
+                                <Trash2 className="w-4 h-4 text-[hsl(var(--destructive))]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--destructive))]">{t.dashboard.blog.actions.delete}</span>
                             </button>
                         </div>
                     </div>
@@ -689,7 +689,7 @@ export default function BlogListPage() {
                                                 onClick={() => router.push(`/blog/${post.id}`)}
                                                 title={t.dashboard.blog.actions.edit}
                                             >
-                                                <SquarePen className="w-4 h-4" strokeWidth={1.5} />
+                                                <Pencil className="w-4 h-4" />
                                             </TableActionButton>
                                             <TableActionButton
                                                 variant="danger"
@@ -711,30 +711,30 @@ export default function BlogListPage() {
             {/* Delete Confirmation Modal — AC-2, Figma: 31958-7172 */}
             {
                 deleteTarget && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
                                 maxWidth: 347,
                                 background: 'var(--dash-surface)',
-                                border: '1px solid rgba(59,130,246,0.3)',
+                                border: '1px solid hsl(var(--primary)/0.3)',
                             }}
                         >
                             {/* Icon */}
-                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[rgba(251,44,54,0.1)] border border-[rgba(251,44,54,0.3)] shrink-0">
-                                <Trash2 className="w-[27px] h-[24px] text-[#FF6467]" strokeWidth={1.5} />
+                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)] shrink-0">
+                                <Trash2 className="w-[27px] h-[24px] text-[hsl(var(--destructive))]" strokeWidth={1.5} />
                             </div>
 
                             {/* Text block */}
                             <div className="flex flex-col gap-[4px] w-full">
                                 {/* Title */}
                                 <div className="flex justify-center items-center w-full px-[92px]">
-                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-[#F8FAFC]">
+                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-foreground">
                                         {t.dashboard.blog.actions.deleteConfirmTitle}
                                     </h3>
                                 </div>
                                 {/* Body */}
-                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[#94A3B8] w-full">
+                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[hsl(var(--muted-foreground))] w-full">
                                     {t.dashboard.blog.actions.deleteConfirmDetails.replace('{title}', deleteTarget.title)}
                                     {'\n'}{t.dashboard.blog.actions.deleteConfirmWarn}
                                 </p>
@@ -742,8 +742,8 @@ export default function BlogListPage() {
 
                             {/* Warning box — only for published */}
                             {deleteTarget.status === 'published' && (
-                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[rgba(245,158,11,0.1)] w-full">
-                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[#F59E0B]" style={{ maxWidth: 296 }}>
+                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[hsl(var(--warning)/0.1)] w-full">
+                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[hsl(var(--warning))]" style={{ maxWidth: 296 }}>
                                         {t.dashboard.blog.actions.deletePublishedWarning}
                                     </p>
                                 </div>
@@ -754,9 +754,9 @@ export default function BlogListPage() {
                                 {/* Cancel */}
                                 <button
                                     onClick={() => setDeleteTarget(null)}
-                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[#0B1120] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[hsl(var(--background))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
                                 >
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-foreground">
                                         {t.dashboard.blog.actions.cancel}
                                     </span>
                                 </button>
@@ -764,14 +764,14 @@ export default function BlogListPage() {
                                 <button
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
-                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[#FF6467] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[hsl(var(--destructive))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isDeleting ? (
-                                        <Loader2 className="w-4 h-4 animate-spin text-[#FAFAFA]" />
+                                        <Loader2 className="w-4 h-4 animate-spin !text-white" />
                                     ) : (
-                                        <Trash2 className="w-[16px] h-[16px] text-[#FAFAFA]" />
+                                        <Trash2 className="w-[16px] h-[16px] !text-white" />
                                     )}
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] !text-white">
                                         {isDeleting ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
                                     </span>
                                 </button>
@@ -785,30 +785,30 @@ export default function BlogListPage() {
             {/* Bulk Delete Confirmation Modal — TC-F17-01-12, Figma: 31958-7197 */}
             {
                 showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
                                 maxWidth: 347,
                                 background: 'var(--dash-surface)',
-                                border: '1px solid rgba(59,130,246,0.3)',
+                                border: '1px solid hsl(var(--primary)/0.3)',
                             }}
                         >
                             {/* Icon */}
-                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[rgba(251,44,54,0.1)] border border-[rgba(251,44,54,0.3)] shrink-0">
-                                <Trash2 className="w-[27px] h-[24px] text-[#FF6467]" strokeWidth={1.5} />
+                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)] shrink-0">
+                                <Trash2 className="w-[27px] h-[24px] text-[hsl(var(--destructive))]" strokeWidth={1.5} />
                             </div>
 
                             {/* Text block */}
                             <div className="flex flex-col gap-[4px] w-full">
                                 {/* Title */}
                                 <div className="flex justify-center items-center w-full px-[92px]">
-                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-[#F8FAFC]">
+                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-foreground">
                                         {t.dashboard.blog.actions.bulkDeleteTitle.replace('{count}', selectedIds.size.toString())}
                                     </h3>
                                 </div>
                                 {/* Body */}
-                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[#94A3B8] w-full">
+                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[hsl(var(--muted-foreground))] w-full">
                                     {t.dashboard.blog.actions.bulkDeleteConfirm.replace('{count}', selectedIds.size.toString())}
                                     {'\n'}{t.dashboard.blog.actions.bulkDeleteWarning}
                                 </p>
@@ -816,8 +816,8 @@ export default function BlogListPage() {
 
                             {/* Warning box — only when selection has published posts */}
                             {hasPublishedInSelection && (
-                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[rgba(245,158,11,0.1)] w-full">
-                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[#F59E0B]" style={{ maxWidth: 296 }}>
+                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[hsl(var(--warning)/0.1)] w-full">
+                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[hsl(var(--warning))]" style={{ maxWidth: 296 }}>
                                         {t.dashboard.blog.actions.bulkDeletePublishedWarning}
                                     </p>
                                 </div>
@@ -828,9 +828,9 @@ export default function BlogListPage() {
                                 {/* Cancel */}
                                 <button
                                     onClick={() => setShowBulkDeleteModal(false)}
-                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[#0B1120] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[hsl(var(--background))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
                                 >
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-foreground">
                                         {t.dashboard.blog.actions.cancel}
                                     </span>
                                 </button>
@@ -841,14 +841,14 @@ export default function BlogListPage() {
                                         setShowBulkDeleteModal(false)
                                     }}
                                     disabled={bulkActionLoading}
-                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[#FF6467] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[hsl(var(--destructive))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {bulkActionLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin text-[#FAFAFA]" />
+                                        <Loader2 className="w-4 h-4 animate-spin !text-white" />
                                     ) : (
-                                        <Trash2 className="w-[16px] h-[16px] text-[#FAFAFA]" />
+                                        <Trash2 className="w-[16px] h-[16px] !text-white" />
                                     )}
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] !text-white">
                                         {bulkActionLoading ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
                                     </span>
                                 </button>

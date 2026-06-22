@@ -115,7 +115,7 @@ describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed/lock
         // step 2 is completed, should have green CheckCircle2 and green text styling
         expect(screen.getByText('Customize Your Store Design')).toBeInTheDocument()
         const customizeText = screen.getByText('Customize Your Store Design')
-        expect(customizeText).toHaveClass('text-[#05df72]')
+        expect(customizeText).toHaveClass('text-[hsl(var(--success))]')
 
         // step 3 is locked (comes after first incomplete), should have gray/disabled styling and no button
         const paymentDiv = screen.getByText('Set Up Payment & Shipping').closest('div[class*="rounded-xl"]')
@@ -134,12 +134,12 @@ describe('[TC-F03.59] DashboardOnboarding — Step States (active/completed/lock
             />
         )
 
-        // Completed step: svg with green text class (CheckCircle2)
-        const completedSvg = container.querySelector('svg.text-\\[\\#05df72\\]')
+        // Completed step: svg with success token text class (CheckCircle2)
+        const completedSvg = container.querySelector('svg.text-\\[hsl\\(var\\(--success\\)\\)\\]')
         expect(completedSvg).toBeInTheDocument()
 
-        // Active step: svg with blue-400 text class (Clock)
-        const activeSvg = container.querySelector('svg.text-blue-400')
+        // Active step: svg with primary token text class (Clock)
+        const activeSvg = container.querySelector('svg.text-\\[hsl\\(var\\(--primary\\)\\)\\]')
         expect(activeSvg).toBeInTheDocument()
 
         // Locked step: svg with muted text class (Circle)
@@ -265,7 +265,7 @@ describe('[TC-F03.60] DashboardOnboarding — Progress Percentage Math', () => {
 
         // 1/4 = 25%
         const progressBarFill = container.querySelector(
-            'div.bg-gradient-to-r.from-blue-500.to-teal-400'
+            'div.bg-gradient-to-r.from-\\[hsl\\(var\\(--info\\)\\)\\].to-\\[hsl\\(var\\(--primary\\)\\)\\]'
         ) as HTMLElement
         expect(progressBarFill).toHaveStyle({ width: '25%' })
     })
@@ -340,7 +340,7 @@ describe('[TC-F03.62] SetupAlertBanner — Renders when !hasPaymentConfigured', 
 
         const banner = container.querySelector('div[class*="rounded-2xl"]')
         expect(banner).toBeInTheDocument()
-        expect(banner).toHaveClass('border-blue-400')
+        expect(banner).toHaveClass('border-[hsl(var(--info)/0.4)]')
     })
 })
 

@@ -2546,6 +2546,18 @@
             },
             "noMatches": "No posts match your filters",
             "resetFilters": "Reset Filters"
+        },
+        "tenantAccessWatcher": {
+            "sessionExpiredTitle": "Session Expired",
+            "sessionExpiredBody": "Your session has expired. Please log in again.",
+            "accessRevokedTitle": "Access Revoked",
+            "accessRevokedBody": "Your access to this workspace has been removed by the workspace owner. You will now be logged out.",
+            "subscriptionExpiredTitle": "Subscription Expired",
+            "subscriptionExpiredBody": "Your subscription has expired. Please renew your plan to continue. You will now be logged out.",
+            "accountSuspendedTitle": "Account Suspended",
+            "accountSuspendedBody": "Your account has been suspended. Please contact support. You will now be logged out.",
+            "acknowledge": "Acknowledge",
+            "loggingOut": "Logging out..."
         }
     },
     "auth": {
@@ -4018,6 +4030,9 @@
         "loadError": "Error loading preview. Please ensure you are logged in and have access to this site."
     },
     "storefront": {
+        "nav": {
+            "overflowMore": "More"
+        },
         "products": {
             "home": "Home",
             "title": "Products",

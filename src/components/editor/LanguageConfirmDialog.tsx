@@ -43,7 +43,7 @@ export function LanguageConfirmDialog({
                 {/* M2 fix: light/dark variants via editor-portal pattern instead of hardcoded dark */}
                 <Dialog.Content
                     className="editor-portal fixed left-1/2 top-1/2 z-[9999] w-[90vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-6 shadow-2xl focus:outline-none font-sans
-                        dark:border-white/10 dark:bg-[#1a1a2e]
+                        dark:border-white/10 dark:bg-[var(--editor-surface)]
                         border-slate-200 bg-white"
                 >
                     {/* Icon */}

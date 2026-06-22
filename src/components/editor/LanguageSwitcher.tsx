@@ -45,7 +45,7 @@ export function LanguageSwitcher({ activeLocale, onSwitch, disabled = false }: L
                         'text-[11px] font-semibold transition-all',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         // dark
-                        'dark:border-white/[0.08] dark:bg-[rgba(30,41,59,0.8)] dark:text-white/80',
+                        'dark:border-white/[0.08] dark:bg-[var(--editor-surface-elevated)] dark:text-white/80',
                         'dark:hover:border-white/20 dark:hover:text-white',
                         'dark:data-[state=open]:border-white/20 dark:data-[state=open]:text-white',
                         // light
@@ -69,9 +69,9 @@ export function LanguageSwitcher({ activeLocale, onSwitch, disabled = false }: L
                 className={cn(
                     'editor-portal z-50 min-w-[130px] rounded-lg border shadow-xl p-1',
                     // dark
-                    'dark:border-white/[0.08] dark:bg-[#1E293B]',
+                    'dark:border-white/[0.08] dark:bg-[var(--editor-surface-elevated)]',
                     // light
-                    'border-[rgba(0,0,0,0.1)] bg-white',
+                    'border-[var(--editor-border)] bg-white',
                 )}
             >
                 {LOCALES.map(({ id, label, name }) => {

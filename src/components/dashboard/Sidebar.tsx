@@ -8,7 +8,7 @@
  * - Section header = static uppercase label, not clickable, no chevron; every item is a leaf-route.
  * - Badges: neutral pill on the right of the label, driven by the `badgeCounts` prop only
  *   (no fake data — nothing renders until the layout wires real counts), hidden when 0/undefined.
- * - Active item: teal highlight via --primary token (theme-aware: light #0D9488 / dark #2DD4BF, GH-1192).
+ * - Active item: teal highlight via --primary token (theme-aware: light #00D3D4 / dark #2DD4BF, GH-1192).
  * - Footer (language switch) and mobile drawer behavior are unchanged from F18 v1.
  * - Collapse/mini mode (phase-02): desktop aside shrinks to 64px icon-only with EN tooltips
  *   and dot badges; the mobile drawer always renders full. State lives in CMSLayoutClient.

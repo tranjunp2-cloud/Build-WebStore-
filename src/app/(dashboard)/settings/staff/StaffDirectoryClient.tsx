@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { TableEmptyState } from '@/components/ui/table-empty-state';
+import { Button } from '@/components/ui/button';
 import { removeStaff } from './actions';
 import { StaffDrawer } from './StaffDrawer';
 import { RemoveStaffModal } from './RemoveStaffModal';
@@ -111,15 +112,16 @@ export function StaffDirectoryClient({
 
                 <div className="flex items-center gap-[12px]">
                     {/* Invite Staff Button — Figma 31058:699 */}
-                    <button
+                    <Button
                         type="button"
                         onClick={() => { setEditingStaff(null); setIsDrawerOpen(true); }}
-                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)', boxShadow: '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' }}
-                        className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                        variant="dashPrimary"
+                        size="dash"
+                        className="whitespace-nowrap font-['Inter']"
                     >
-                        <UserPlus className="h-5 w-5" />
+                        <UserPlus className="h-4 w-4" />
                         <span>{t?.Staff?.inviteBtn || 'Invite Staff'}</span>
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -130,7 +132,7 @@ export function StaffDirectoryClient({
                 {/* Loader overlay */}
                 {isPending && (
                     <div className="absolute inset-0 z-50 bg-black/30 flex items-center justify-center rounded-[12px]">
-                        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                        <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--primary))]" />
                     </div>
                 )}
 
@@ -191,7 +193,7 @@ export function StaffDirectoryClient({
                                                 ) : (
                                                     <div
                                                         className="h-[40px] w-[40px] rounded-full flex items-center justify-center text-white text-[14px] font-semibold font-['Inter'] leading-[1.428em]"
-                                                        style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(45, 212, 191, 1) 100%)' }}
+                                                        style={{ background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)' }}
                                                     >
                                                         {displayName.substring(0, 2).toUpperCase()}
                                                     </div>
@@ -206,16 +208,16 @@ export function StaffDirectoryClient({
                                         {/* ROLE */}
                                         <TableCell className="px-4 py-3 whitespace-nowrap">
                                             {isOwner ? (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--info)/0.1)] border border-[hsl(var(--info)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--info))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
                                                 </div>
                                             ) : user.role === 'custom' ? (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(240,177,0,0.1)] border border-[rgba(240,177,0,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#FDC700] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.custom || 'Custom Features'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--warning))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.custom || 'Custom Features'}</span>
                                                 </div>
                                             ) : (
-                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(0,201,80,0.1)] border border-[rgba(0,201,80,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Manager'}</span>
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[hsl(var(--success)/0.1)] border border-[hsl(var(--success)/0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[hsl(var(--success))] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Manager'}</span>
                                                 </div>
                                             )}
                                         </TableCell>
@@ -224,12 +226,12 @@ export function StaffDirectoryClient({
                                         <TableCell className="px-4 py-3 whitespace-nowrap">
                                             {user.status === 'active' ? (
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--success))]"></div>
                                                     <span className="text-[14px] font-normal text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.active || 'Active'}</span>
                                                 </div>
                                             ) : user.status === 'suspended' ? (
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#EF4444]"></div>
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[hsl(var(--destructive))]"></div>
                                                     <span className="text-[14px] font-normal text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.suspended || 'Suspended'}</span>
                                                 </div>
                                             ) : (
