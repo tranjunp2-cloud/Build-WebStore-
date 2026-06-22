@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useRef } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 import { Monitor, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -57,6 +57,11 @@ interface BuilderMobilePreviewShellProps {
 function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShellProps) {
     // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
     const vRef = useRef(Date.now())
+    // Track which siteId the iframe has finished loading for.
+    // Overlay LivePreview until iframe is ready → eliminates blank flash on transition.
+    const [readySiteId, setReadySiteId] = useState<string | null>(null)
+    const iframeReady = readySiteId === siteId && siteId != null
+
     return (
         <div className="relative h-[812px] w-[375px] rounded-[48px] bg-[linear-gradient(114.79deg,#1e2939_0%,#101828_100%)] shadow-[0px_25px_50px_0px_rgba(0,0,0,0.25)]">
             <div className="absolute inset-[12px] overflow-hidden rounded-[40px] bg-[#0b1120]">
@@ -69,11 +74,23 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
                     </div>
                 </div>
                 {siteId ? (
-                    <iframe
-                        src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
-                        className="h-full w-full border-0"
-                        title="Mobile preview"
-                    />
+                    <div className="relative h-full w-full">
+                        {/* Iframe loads in background; invisible until ready */}
+                        <iframe
+                            src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
+                            className={cn("absolute inset-0 h-full w-full border-0", !iframeReady && "invisible")}
+                            title="Mobile preview"
+                            onLoad={() => setReadySiteId(siteId)}
+                        />
+                        {/* LivePreview overlay shown until iframe is ready */}
+                        {!iframeReady && (
+                            <div className="absolute inset-0 overflow-y-auto pr-[11px]">
+                                <div className="w-[351px]">
+                                    {children}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 ) : (
                     <div className="h-full overflow-y-auto pr-[11px]">
                         <div className="w-[351px]">
@@ -104,6 +121,10 @@ export function BuilderPreviewSurface({
 }: BuilderPreviewSurfaceProps) {
     // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
     const vRef = useRef(Date.now())
+    // Track which siteId the iframe has finished loading for.
+    // Overlay LivePreview until iframe is ready → eliminates blank flash on transition.
+    const [readySiteId, setReadySiteId] = useState<string | null>(null)
+    const iframeReady = readySiteId === siteId && siteId != null
 
     if (mode === 'mobile') {
         return (
@@ -116,12 +137,24 @@ export function BuilderPreviewSurface({
     // Desktop with siteId (post-generation): use iframe so SiteRenderer rewrites nav
     // links to /preview/{siteId}?pageId=... — enables page navigation without leaving
     // the builder. Without siteId (streaming phase) fall back to children (LivePreview).
+    // When siteId is first available, iframe loads invisibly behind LivePreview overlay
+    // to avoid a blank flash; the overlay lifts when iframe fires onLoad.
     const desktopContent = siteId ? (
-        <iframe
-            src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
-            className="h-full w-full border-0"
-            title="Website preview"
-        />
+        <div className="relative h-full w-full overflow-hidden">
+            {/* Iframe loads in background; invisible until ready */}
+            <iframe
+                src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
+                className={cn("absolute inset-0 h-full w-full border-0", !iframeReady && "invisible")}
+                title="Website preview"
+                onLoad={() => setReadySiteId(siteId)}
+            />
+            {/* LivePreview overlay shown until iframe is ready */}
+            {!iframeReady && (
+                <div className="absolute inset-0 overflow-y-auto">
+                    {children}
+                </div>
+            )}
+        </div>
     ) : children
 
     if (variant === 'fullwidth') {
