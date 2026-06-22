@@ -220,6 +220,10 @@ const MIGRATIONS = [
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
   {
+    name: 'sites.shipping_config_shipping_setup_confirmed',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_shipping_setup_confirmed boolean DEFAULT false;`,
+  },
+  {
     name: 'sites.header_block',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block jsonb;`,
   },

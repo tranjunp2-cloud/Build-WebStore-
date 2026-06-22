@@ -43,6 +43,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
     let isDesignCustomized = false
     let hasProducts = false
     let hasPaymentConfigured = false
+    let hasShippingConfigured = false
     const tenantId = await getCurrentTenantId()
     if (tenantId) {
         const payload = await getPayload({ config })
@@ -101,6 +102,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
             isDesignCustomized = !!(siteDoc as { themeCustomized?: boolean })?.themeCustomized
             hasPublishedSite = (siteDoc as { status?: string })?.status === 'published'
             hasProducts = onboardingProductsCount.totalDocs > 0
+            hasShippingConfigured = !!(siteDoc as { shippingConfig?: { shippingSetupConfirmed?: boolean } })?.shippingConfig?.shippingSetupConfirmed
         }
     }
 
@@ -111,13 +113,14 @@ export default async function DashboardRoot({ searchParams }: Props) {
         <div className="space-y-6">
             <DashboardTabContent defaultTab={tab}>
                 {/* Onboarding checklist — above toolbar per Figma; hidden when all 4 steps done */}
-                {hasUsableSites && !(hasProducts && isDesignCustomized && hasPaymentConfigured && hasPublishedSite) && (
+                {hasUsableSites && !(hasProducts && isDesignCustomized && hasPaymentConfigured && hasShippingConfigured && hasPublishedSite) && (
                     <DashboardOnboarding
                         hasPublishedSite={hasPublishedSite}
                         siteId={siteId}
                         hasProducts={hasProducts}
                         isDesignCustomized={isDesignCustomized}
                         hasPaymentConfigured={hasPaymentConfigured}
+                        hasShippingConfigured={hasShippingConfigured}
                     />
                 )}
 
