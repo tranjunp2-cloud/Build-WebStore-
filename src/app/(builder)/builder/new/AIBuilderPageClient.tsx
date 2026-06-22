@@ -23,6 +23,7 @@ import { useBuilderStore, getDraftStatus, getDraftMeta, type BusinessInfo } from
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { useI18n } from '@/i18n'
+import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -417,9 +418,16 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             case 'theme_set':
                 setTheme(data.theme)
                 break
-            case 'block_complete':
-                addBlock(data.block)
+            case 'block_complete': {
+                // GH-1266: coerce video variants with no URL before adding to preview store
+                // Server coercion runs after SSE events are emitted, so the stream can
+                // carry split-video/video with no videoUrl. Apply the same rule here so
+                // LivePreview matches the DB state that the gen route saves.
+                const block = { ...data.block }
+                coerceVideoVariants([block])
+                addBlock(block)
                 break
+            }
             case 'error':
                 setError(data)
                 break

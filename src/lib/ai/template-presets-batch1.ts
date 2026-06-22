@@ -86,7 +86,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'spotlight' },
           { blockType: 'menu-display', variant: 'featured' },
@@ -121,7 +121,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'team', variant: 'spotlight' },
@@ -366,7 +366,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'product-quick-view' },
           { blockType: 'products-grid', variant: 'spotlight', count: 6 },
@@ -645,7 +645,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'masonry', count: 4 },
           { blockType: 'before-after', count: 2 },
@@ -1290,7 +1290,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'menu-display', variant: 'featured' },
           { blockType: 'gallery', variant: 'spotlight' },
@@ -1316,7 +1316,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'spotlight' },
           { blockType: 'gallery', variant: 'masonry' },
