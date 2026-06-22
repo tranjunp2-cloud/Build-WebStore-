@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -62,6 +62,14 @@ function BuilderMobilePreviewShell({ siteId }: BuilderMobilePreviewShellProps) {
     const [readySiteId, setReadySiteId] = useState<string | null>(null)
     const iframeReady = readySiteId === siteId && siteId != null
 
+    // Fallback: if iframe never fires onLoad (Vercel 504, CSP block, redirect loop),
+    // force-dismiss spinner after 15s so user is not permanently stuck.
+    useEffect(() => {
+        if (!siteId || iframeReady) return
+        const id = setTimeout(() => setReadySiteId(siteId), 15_000)
+        return () => clearTimeout(id)
+    }, [siteId, iframeReady])
+
     return (
         <div className="relative h-[812px] w-[375px] rounded-[48px] bg-[linear-gradient(114.79deg,#1e2939_0%,#101828_100%)] shadow-[0px_25px_50px_0px_rgba(0,0,0,0.25)]">
             <div className="absolute inset-[12px] overflow-hidden rounded-[40px] bg-[#0b1120]">
@@ -119,6 +127,14 @@ export function BuilderPreviewSurface({
     // Overlay LivePreview until iframe is ready → eliminates blank flash on transition.
     const [readySiteId, setReadySiteId] = useState<string | null>(null)
     const iframeReady = readySiteId === siteId && siteId != null
+
+    // Fallback: if iframe never fires onLoad (Vercel 504, CSP block, redirect loop),
+    // force-dismiss spinner after 15s so user is not permanently stuck.
+    useEffect(() => {
+        if (mode === 'mobile' || !siteId || iframeReady) return
+        const id = setTimeout(() => setReadySiteId(siteId), 15_000)
+        return () => clearTimeout(id)
+    }, [mode, siteId, iframeReady])
 
     if (mode === 'mobile') {
         return (

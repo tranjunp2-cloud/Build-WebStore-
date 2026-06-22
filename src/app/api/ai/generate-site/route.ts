@@ -1342,7 +1342,6 @@ export async function POST(req: NextRequest) {
                                 totalBlocks: result.blocks.length,
                                 totalPages: createdPages.length,
                                 timeMs,
-                                normalizedNavLinks: normalizedPageLinks,
                             })}\n\n`
                         controller.enqueue(_encoder.encode(doneData))
                     } catch (streamErr) {
