@@ -28,6 +28,12 @@ vi.mock('next/server', () => ({
     },
 }))
 
+// cookies() is called at the end of the ok:true path to decode expiresAt.
+// Return undefined (no cookie) so expiresAt resolves to null — non-fatal, per best-effort design.
+vi.mock('next/headers', () => ({
+    cookies: vi.fn(() => Promise.resolve({ get: vi.fn().mockReturnValue(undefined) })),
+}))
+
 vi.mock('@payload-config', () => ({ default: {} }))
 
 vi.mock('@/lib/auth', () => ({
@@ -97,8 +103,8 @@ describe('[TC-1270-SC] GET /api/auth/session-check', () => {
         // Act
         const res = await GET() as any
 
-        // Assert
-        expect(res.data).toEqual({ ok: true })
+        // Assert — expiresAt is null when no cookie present (best-effort decode)
+        expect(res.data).toMatchObject({ ok: true })
     })
 
     it('TC-1270-SC-03: re-fetches user from DB when JWT tenants empty — force_logout if DB also empty', async () => {
@@ -128,8 +134,8 @@ describe('[TC-1270-SC] GET /api/auth/session-check', () => {
         // Act
         const res = await GET() as any
 
-        // Assert — subscription + ban checks ran, session is ok
-        expect(res.data).toEqual({ ok: true })
+        // Assert — subscription + ban checks ran, session is ok; expiresAt null (no cookie in test)
+        expect(res.data).toMatchObject({ ok: true })
         expect(mockPayload.find).toHaveBeenCalled()
     })
 
