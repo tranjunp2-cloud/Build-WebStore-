@@ -82,7 +82,7 @@ function SortableItem({
         className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 border-solid transition-colors duration-200 cursor-pointer ${visible ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))]' : ''}`}
         style={!visible ? { borderColor: 'var(--dash-text-muted)', background: 'var(--dash-secondary-bg)' } : {}}
       >
-        {visible && <Check className="h-3.5 w-3.5 !text-white stroke-[3px]" />}
+        {visible && <Check className="h-3.5 w-3.5 stroke-[3px]" style={{ color: '#fff' }} />}
       </button>
 
       {/* Text Content */}
