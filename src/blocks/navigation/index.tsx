@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import type { BlockProps } from '../types'
@@ -13,6 +13,9 @@ import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
+import { useNavOverflow } from './use-nav-overflow'
+import { NavDesktopLinks, MoreDropdown } from './nav-desktop-links'
+import { DropdownLink } from './nav-dropdown-link'
 import { NavLangSwitcherPlaceholder } from './language-switcher-placeholder'
 import { NavOrderSearch } from './NavOrderSearch'
 import { useI18n } from '@/i18n'
@@ -75,70 +78,6 @@ function NavLogo({
 // Support link.children on desktop (hover dropdown) and mobile/sidebar
 // (recursive nested list). Used by all variants.
 
-function DropdownLink({ link, i }: { link: NavLink; i: number }) {
-    const [open, setOpen] = useState(false)
-    const hasChildren = link.children && link.children.length > 0
-
-    if (!hasChildren) {
-        return (
-            <motion.a
-                key={i}
-                href={link?.url}
-                whileHover={{ y: -1 }}
-                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
-            >
-                {link.label}
-                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-            </motion.a>
-        )
-    }
-
-    return (
-        <div
-            className="relative"
-            onMouseEnter={() => setOpen(true)}
-            onMouseLeave={() => setOpen(false)}
-        >
-            <button
-                type="button"
-                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
-            >
-                {link.label}
-                <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            <AnimatePresence>
-                {open && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={{ duration: 0.15 }}
-                        className={`absolute left-0 top-full ${NAV_Z_CLASS.dropdown} mt-1 min-w-[180px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg`}
-                        style={{
-                            // Plan 260415 nav fix: theme-adaptive dropdown panel.
-                            // Reads --surface from resolved theme so light themes
-                            // get a light dropdown instead of the previous
-                            // hardcoded navy `#0F172A`.
-                            background: `color-mix(in srgb, var(--surface, #111111) 95%, transparent)`,
-                            border: `1px solid color-mix(in srgb, var(--text, #fafafa) 10%, transparent)`,
-                            color: NAV_SURFACE_TEXT,
-                        }}
-                    >
-                        {link.children!.map((child, ci) => (
-                            <a
-                                key={ci}
-                                href={child.url}
-                                className="block rounded-lg px-3 py-2 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] transition-all"
-                            >
-                                {child.label}
-                            </a>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    )
-}
 
 function MobileNavItem({
     link,
@@ -155,10 +94,11 @@ function MobileNavItem({
         <div>
             <a
                 href={link?.url}
+                title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
-                {link.label}
+                <span className="truncate">{link.label}</span>
                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
@@ -192,10 +132,11 @@ function SidebarNavItem({
         <div>
             <a
                 href={link?.url}
+                title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
-                {link.label}
+                <span className="truncate">{link.label}</span>
                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
@@ -429,17 +370,13 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300`}
+                    className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
                 >
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                 </motion.div>
 
                 {/* Desktop Links */}
-                <div className="hidden md:flex items-center gap-1">
-                    {links.map((link, i) => (
-                        <DropdownLink key={i} link={link} i={i} />
-                    ))}
-                </div>
+                <NavDesktopLinks links={links} className="hidden md:flex gap-1 flex-1" />
 
                 {/* Desktop CTA + Language Switcher + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
@@ -511,7 +448,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
+                <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
                     <NavLogo
                         logo={mergedBlock.logo}
                         logoText={logoText}
@@ -521,11 +458,10 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                 </motion.div>
 
                 {/* Desktop Links */}
-                <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-                    {links.map((link, i) => (
-                        <DropdownLink key={i} link={link} i={i} />
-                    ))}
-                </div>
+                <NavDesktopLinks
+                    links={links}
+                    className="hidden md:flex gap-1 absolute left-1/2 -translate-x-1/2 w-[60%]"
+                />
 
                 {/* CTA + Language Switcher + Mobile */}
                 <div className="flex items-center gap-3">
@@ -648,7 +584,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                             </div>
 
                             {/* Links */}
-                            <nav className="flex-1 px-4 space-y-1">
+                            <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
                                 {links.map((link, i) => (
                                     <motion.div
                                         key={i}
@@ -742,9 +678,84 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const scrolled = useScrollShrink(50)
-    const midpoint = Math.ceil(links.length / 2)
-    const leftLinks = links.slice(0, midpoint)
-    const rightLinks = links.slice(midpoint)
+
+    // CenteredNav needs per-side measurement because each side has a different
+    // available width: left = (navW - logoW) / 2, right = same minus CTA group.
+    // Using a single budgetOffset (like other variants) under-counts the right
+    // side constraint and causes links to overlap the absolutely-centered logo.
+    const navRef = useRef<HTMLDivElement>(null)
+    const logoRef = useRef<HTMLDivElement>(null)
+    const ctaGroupRef = useRef<HTMLDivElement>(null)
+    const spanRefs = useRef<(HTMLElement | null)[]>([])
+    const [leftCount, setLeftCount] = useState(Math.ceil(links.length / 2))
+    const [rightCount, setRightCount] = useState(Math.floor(links.length / 2))
+
+    const centeredLinksSignature = links.map(l => l.label).join('\0')
+
+    const measureCentered = useCallback(() => {
+        if (!navRef.current) return
+        const navW = navRef.current.clientWidth
+        // 32px = visual gap between logo edges and nearest link
+        const logoW = (logoRef.current?.offsetWidth ?? 200) + 32
+        const ctaW = (ctaGroupRef.current?.offsetWidth ?? 0) + 8
+        const halfAvail = (navW - logoW) / 2
+
+        // Left: fill from left edge up to logo's left edge
+        let leftW = 0, lc = 0
+        for (let i = 0; i < links.length; i++) {
+            const el = spanRefs.current[i]
+            if (!el) break
+            const w = el.offsetWidth + (lc > 0 ? 4 : 0)
+            if (leftW + w > halfAvail) break
+            leftW += w; lc++
+        }
+
+        // Right: fill from logo's right edge to right edge minus CTA.
+        // Fast path: if all remaining items fit without a More button, show them all.
+        const rightAvail = halfAvail - ctaW
+        let rightW = 0, rc = 0
+        let rightTotalAll = 0, rightAllMounted = true
+        for (let i = lc; i < links.length; i++) {
+            const el = spanRefs.current[i]
+            if (!el) { rightAllMounted = false; break }
+            rightTotalAll += el.offsetWidth + (i > lc ? 4 : 0)
+        }
+        if (rightAllMounted && rightTotalAll <= rightAvail) {
+            rc = links.length - lc
+        } else {
+            for (let i = lc; i < links.length; i++) {
+                const el = spanRefs.current[i]
+                if (!el) break
+                const j = i - lc
+                const w = el.offsetWidth + (j > 0 ? 4 : 0)
+                if (rightW + w + 88 > rightAvail) break
+                rightW += w; rc++
+            }
+        }
+
+        setLeftCount(lc)
+        setRightCount(rc)
+    }, [links.length, centeredLinksSignature])
+
+    useLayoutEffect(() => {
+        measureCentered()
+    }, [measureCentered])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        let rafId: number
+        const debouncedMeasure = () => {
+            cancelAnimationFrame(rafId)
+            rafId = requestAnimationFrame(measureCentered)
+        }
+        const ro = new ResizeObserver(debouncedMeasure)
+        if (navRef.current) ro.observe(navRef.current)
+        return () => { ro.disconnect(); cancelAnimationFrame(rafId) }
+    }, [measureCentered])
+
+    const leftVisible = links.slice(0, leftCount)
+    const rightVisible = links.slice(leftCount, leftCount + rightCount)
+    const overflowLinks = links.slice(leftCount + rightCount)
 
     return (
         <motion.nav
@@ -763,42 +774,59 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 boxShadow: scrolled ? '0 4px 20px rgba(0,0,0,0.08)' : 'none',
             }}
         >
-            <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} transition-[height] duration-300`}>
-                {/* Desktop: logo absolutely centered on page; left/right links flex naturally */}
+            <div ref={navRef} className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} relative transition-[height] duration-300`}>
+                {/* Hidden spans measure each link's natural width without affecting layout. */}
+                <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: -9999, opacity: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {links.map((link, i) => (
+                        <span
+                            key={i}
+                            ref={(el) => { spanRefs.current[i] = el }}
+                            className="px-4 py-2 text-sm font-medium whitespace-nowrap"
+                        >
+                            {link.label}
+                        </span>
+                    ))}
+                </div>
+
+                {/* Desktop: logo absolute-centered; left/right links fill half-nav each */}
                 <div className="relative hidden md:flex items-center h-full">
-                    {/* Left links */}
+                    {/* Left visible links */}
                     <div className="flex items-center gap-1">
-                        {leftLinks.map((link, i) => (
+                        {leftVisible.map((link, i) => (
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
                     </div>
 
-                    {/* Center logo — absolute so it's always at true page center */}
+                    {/* Center logo — absolute so it never shifts the flex layout */}
                     <div className="absolute left-1/2 -translate-x-1/2">
                         <motion.div
+                            ref={logoRef}
                             whileHover={{ scale: 1.02 }}
-                            className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap"
+                            className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap shrink-0"
                         >
                             <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                         </motion.div>
                     </div>
 
-                    {/* Right links + Track + CTA + Language Switcher — pushed to far right */}
+                    {/* Right visible links + single More ▼ for all overflow + CTA group */}
                     <div className="ml-auto flex items-center gap-1">
-                        {rightLinks.map((link, i) => (
+                        {rightVisible.map((link, i) => (
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
-                        {showOrderSearch && slug && <NavOrderSearch slug={slug} />}
-                        {ctaButton?.show && (
-                            <NavCTAButton
-                                href={ctaButton.url || '#'}
-                                label={ctaButton.label}
-                                className="inline-flex shrink-0 ml-2 px-4 py-2"
-                            />
-                        )}
-                        {mergedBlock.showLanguageSwitcher && (
-                            <NavLangSwitcherPlaceholder className="hidden md:flex ml-1" />
-                        )}
+                        {overflowLinks.length > 0 && <MoreDropdown links={overflowLinks} />}
+                        <div ref={ctaGroupRef} className="flex items-center gap-1 shrink-0">
+                            {showOrderSearch && slug && <NavOrderSearch slug={slug} />}
+                            {ctaButton?.show && (
+                                <NavCTAButton
+                                    href={ctaButton.url || '#'}
+                                    label={ctaButton.label}
+                                    className="inline-flex shrink-0 ml-2 px-4 py-2"
+                                />
+                            )}
+                            {mergedBlock.showLanguageSwitcher && (
+                                <NavLangSwitcherPlaceholder className="hidden md:flex ml-1" />
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -839,6 +867,9 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
     const scrolled = useScrollShrink(50)
 
+    const { containerRef: megaContainerRef, itemRefs: megaItemRefs, visibleCount: megaVisibleCount } = useNavOverflow(links)
+    const megaOverflowLinks = links.slice(megaVisibleCount)
+
     const getSubLinks = (link?: NavLink) => {
         const children = link?.children ?? []
         const cols: NavLink[][] = [[], [], []]
@@ -872,18 +903,40 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="font-bold text-xl font-heading flex items-center gap-2"
+                    className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"
                 >
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                 </motion.div>
 
-                {/* Desktop Links */}
-                <div className="hidden md:flex items-center gap-1">
-                    {links.map((link, i) => (
+                {/* Desktop Links — inline hook to preserve mega panel hover behavior */}
+                <div
+                    ref={megaContainerRef}
+                    className="relative hidden md:flex items-center gap-1 min-w-0 flex-1"
+                >
+                    {/* Hidden measurement layer — keeps refs for all items so
+                        measure() can expand visibleCount when labels shorten. */}
+                    <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: -9999, opacity: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {links.map((link, i) => (
+                            <span
+                                key={i}
+                                ref={(el) => { megaItemRefs[i] = el as HTMLElement | null }}
+                                className="shrink-0 inline-flex items-center gap-1 px-4 py-2 text-sm font-medium whitespace-nowrap"
+                            >
+                                {link.label}
+                                {link.children?.length ? (
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                ) : null}
+                            </span>
+                        ))}
+                    </div>
+
+                    {links.slice(0, megaVisibleCount).map((link, i) => (
                         link.children?.length ? (
                             <div
                                 key={i}
-                                className="relative"
+                                className="relative shrink-0"
                                 onMouseEnter={() => setHoveredIndex(i)}
                             >
                                 <button
@@ -901,12 +954,13 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                 key={i}
                                 href={link?.url}
                                 whileHover={{ y: -1 }}
-                                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
+                                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] shrink-0"
                             >
                                 {link.label}
                             </motion.a>
                         )
                     ))}
+                    {megaOverflowLinks.length > 0 && <MoreDropdown links={megaOverflowLinks} />}
                 </div>
 
                 {/* Desktop CTA + Language Switcher + Mobile Menu Button */}
@@ -1018,16 +1072,12 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 }}
             >
                 {/* Logo */}
-                <div className="font-bold text-lg font-heading">
+                <div className="font-bold text-lg font-heading shrink-0">
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
                 </div>
 
                 {/* Desktop Links */}
-                <div className="hidden md:flex items-center gap-0.5">
-                    {links.map((link, i) => (
-                        <DropdownLink key={i} link={link} i={i} />
-                    ))}
-                </div>
+                <NavDesktopLinks links={links} className="hidden md:flex gap-0.5 flex-1" />
 
                 {/* CTA + Language Switcher + Mobile */}
                 <div className="flex items-center gap-2">
