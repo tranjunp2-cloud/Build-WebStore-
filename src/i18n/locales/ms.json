@@ -4012,6 +4012,9 @@
         "loadError": "Ralat memuatkan pratonton. Sila pastikan anda telah log masuk dan mempunyai akses ke laman ini."
     },
     "storefront": {
+        "nav": {
+            "overflowMore": "Lagi"
+        },
         "products": {
             "home": "Utama",
             "title": "Produk",
