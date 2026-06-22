@@ -28,7 +28,9 @@ export const GET = withAuth(async (user, request) => {
         const where: any = {}
 
         if (status && status !== 'all') {
-            const groupStatuses = ORDER_STATUS_GROUPS[status]
+            const groupStatuses = Object.hasOwn(ORDER_STATUS_GROUPS, status)
+                ? ORDER_STATUS_GROUPS[status]
+                : undefined
             where.status = groupStatuses ? { in: groupStatuses } : { equals: status }
         }
 

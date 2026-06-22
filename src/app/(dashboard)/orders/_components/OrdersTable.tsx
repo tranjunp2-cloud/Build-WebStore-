@@ -15,10 +15,10 @@ import {
     TableCell,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { ORDER_STATUS_LABEL_KEY } from '@/lib/orders/status-groups'
+import { ORDER_STATUS_LABEL_KEY, type OrderStatus } from '@/lib/orders/status-groups'
 
 // ───────── TYPES ─────────
-export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type { OrderStatus }
 
 export interface Order {
     id: string

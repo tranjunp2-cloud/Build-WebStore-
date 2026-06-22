@@ -327,6 +327,40 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 
 ---
 
+## 4. Regression Tests — GH-1286 (Status Group Shared Module)
+
+> Tests for `src/lib/orders/status-groups.ts` — single source of truth for order status groupings.
+> All tests are automated (unit tests in `src/__tests__/unit/orders/status-groups.test.ts`).
+> GH-1286: stats boxes counted only `status='pending'` exactly; table treated `new`+`payment_failed` as "Pending" badge.
+
+### ORDER_STATUS_GROUPS
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-1286-01** | `[Unit]` | pending group includes new and payment_failed | Import ORDER_STATUS_GROUPS. Check pending group. | Contains ['pending','new','payment_failed'], length=3. | High | [x] |
+| **TC-F10-1286-02** | `[Unit]` | ready_to_ship group contains only ready_to_ship | Check ready_to_ship group. | Equals ['ready_to_ship']. | High | [x] |
+| **TC-F10-1286-03** | `[Unit]` | confirmed group contains only confirmed | Check confirmed group. | Equals ['confirmed']. | High | [x] |
+| **TC-F10-1286-04** | `[Unit]` | shipped group contains only shipped | Check shipped group. | Equals ['shipped']. | High | [x] |
+| **TC-F10-1286-05** | `[Unit]` | completed group includes paid (Stripe legacy) | Check completed group. | Contains ['completed','paid'], length=2. | High | [x] |
+| **TC-F10-1286-06** | `[Unit]` | cancelled group contains only cancelled | Check cancelled group. | Equals ['cancelled']. | High | [x] |
+| **TC-F10-1286-07** | `[Unit]` | refunded group contains only refunded | Check refunded group. | Equals ['refunded']. | High | [x] |
+| **TC-F10-1286-08** | `[Invariant]` | No DB status appears in more than one group | Flatten all group values; check for duplicates. | Each status appears exactly once across all groups. | Blocker | [x] |
+
+### ORDER_STATUS_LABEL_KEY
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-1286-09** | `[Unit]` | pending → label key "pending" | Check ORDER_STATUS_LABEL_KEY.pending. | Returns 'pending'. | High | [x] |
+| **TC-F10-1286-10** | `[Unit]` | new → label key "pending" (shows as Pending badge) | Check ORDER_STATUS_LABEL_KEY.new. | Returns 'pending'. | High | [x] |
+| **TC-F10-1286-11** | `[Unit]` | payment_failed → label key "pending" (shows as Pending badge) | Check ORDER_STATUS_LABEL_KEY.payment_failed. | Returns 'pending'. | High | [x] |
+| **TC-F10-1286-12** | `[Unit]` | ready_to_ship → label key "readyToShip" | Check ORDER_STATUS_LABEL_KEY.ready_to_ship. | Returns 'readyToShip'. | High | [x] |
+| **TC-F10-1286-13** | `[Unit]` | shipped → label key "shipped" | Check ORDER_STATUS_LABEL_KEY.shipped. | Returns 'shipped'. | High | [x] |
+| **TC-F10-1286-14** | `[Exhaustive]` | Every OrderStatus key has a defined label key | Iterate all keys of ORDER_STATUS_LABEL_KEY; assert each is truthy. | No status maps to undefined or empty string. | High | [x] |
+
+> **Known gap (deferred — issue #1286):** `processing` status is in `ORDER_STATUS_LABEL_KEY` but not in any `ORDER_STATUS_GROUPS` group. Orders with `status='processing'` appear in the table but are not counted in any stats box. Awaiting PM confirmation on group placement.
+
+---
+
 ## 5. Quality Gates
 
 | Nhom | Trang Thai | Ghi Chu |

@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
-import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
+import { ORDER_STATUS_GROUPS, type OrderStatus } from '@/lib/orders/status-groups'
 
 export const GET = withAuth(async (user) => {
     try {
         const payload = await getPayload({ config })
 
-        const countGroup = async (statuses: string[]) => {
+        const countGroup = async (statuses: OrderStatus[]) => {
             const res = await payload.find({
                 collection: 'orders',
                 where: { status: { in: statuses } },
@@ -33,6 +33,7 @@ export const GET = withAuth(async (user) => {
             data: { pending, readyToShip, confirmed, shipped, cancelled },
         })
     } catch (error: any) {
+        console.error('[Orders Metrics Error]', error)
         return NextResponse.json({ success: false }, { status: 500 })
     }
 })

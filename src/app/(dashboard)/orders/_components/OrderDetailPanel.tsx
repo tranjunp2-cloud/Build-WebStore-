@@ -10,11 +10,12 @@ import { CancelOrderModal } from './CancelOrderModal'
 import { ShipOrderModal } from './ShipOrderModal'
 import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
+import { type OrderStatus } from '@/lib/orders/status-groups'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
 // ─── TYPES & MOCKS ───
-export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type { OrderStatus }
 
 export interface OrderDetail {
     id: string | number
