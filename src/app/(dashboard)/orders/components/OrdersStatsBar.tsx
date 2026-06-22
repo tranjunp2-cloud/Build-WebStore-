@@ -9,10 +9,10 @@ export function OrdersStatsBar({ orders }: { orders: Order[] }) {
 
     const stats = {
         total: orders.length,
-        pending:   orders.filter(o => ORDER_STATUS_GROUPS.pending.includes(o.status as never)).length,
-        confirmed: orders.filter(o => ORDER_STATUS_GROUPS.confirmed.includes(o.status as never)).length,
-        shipped:   orders.filter(o => ORDER_STATUS_GROUPS.shipped.includes(o.status as never)).length,
-        completed: orders.filter(o => ORDER_STATUS_GROUPS.completed.includes(o.status as never)).length,
+        pending:   orders.filter(o => ORDER_STATUS_GROUPS.pending.includes(o.status)).length,
+        confirmed: orders.filter(o => ORDER_STATUS_GROUPS.confirmed.includes(o.status)).length,
+        shipped:   orders.filter(o => ORDER_STATUS_GROUPS.shipped.includes(o.status)).length,
+        completed: orders.filter(o => ORDER_STATUS_GROUPS.completed.includes(o.status)).length,
     }
 
     const cards = [
