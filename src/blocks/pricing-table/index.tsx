@@ -8,6 +8,7 @@ import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 const PT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
@@ -53,7 +54,9 @@ type PlanCTAProps = {
     extraClassName?: string
 }
 
-function PlanCTA({ href, label, highlighted = false, fullWidth = false, extraClassName = '' }: PlanCTAProps) {
+function PlanCTA({ href: rawHref, label, highlighted = false, fullWidth = false, extraClassName = '' }: PlanCTAProps) {
+    const resolveHref = useLocalHref()
+    const href = resolveHref(rawHref)
     const widthCls = fullWidth ? 'block w-full' : 'inline-flex'
     return (
         <a

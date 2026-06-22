@@ -8,6 +8,7 @@ import { useNavOverflow } from './use-nav-overflow'
 import { DropdownLink, DROPDOWN_CHILD_LINK_CLASS } from './nav-dropdown-link'
 import { useI18n } from '@/i18n'
 import { NAV_Z_CLASS } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 // Re-declared inline to avoid coupling to index.tsx internals
 const NAV_SURFACE_BG_SOLID = `color-mix(in srgb, var(--background, #09090b) 97%, transparent)`
@@ -20,12 +21,13 @@ const LINK_CLASS =
 /** Single item inside MoreDropdown — plain link or flyout sub-menu when children exist. */
 function MoreDropdownItem({ link }: { link: NavLink }) {
     const [subOpen, setSubOpen] = useState(false)
+    const resolveHref = useLocalHref()
     const hasChildren = link.children && link.children.length > 0
 
     if (!hasChildren) {
         return (
             <a
-                href={link.url}
+                href={resolveHref(link.url)}
                 title={link.label}
                 className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg opacity-70 hover:opacity-100 hover:bg-white/[0.06] transition-all"
             >
@@ -66,7 +68,7 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
                         style={{ background: NAV_SURFACE_BG_SOLID, border: NAV_SURFACE_BORDER }}
                     >
                         {link.children!.map((child, ci) => (
-                            <a key={ci} href={child.url} className={DROPDOWN_CHILD_LINK_CLASS}>
+                            <a key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
                                 {child.label}
                             </a>
                         ))}

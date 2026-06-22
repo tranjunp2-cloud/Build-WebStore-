@@ -22,6 +22,7 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 const FLOATING_STORAGE_PREFIX = 'cta-floating-dismissed-'
 const FLOATING_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
@@ -60,11 +61,13 @@ type CTAButtonProps = {
 function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: CTAButtonProps) {
     const shouldReduce = useReducedMotion()
     const isOwner = useIsOwner()
+    const resolveHref = useLocalHref()
     if (!url) return null
     const isBrokenUrl = url.startsWith(BROKEN_URL_PREFIX)
-    const href = isBrokenUrl ? '#' : url
+    const rawUrl = isBrokenUrl ? '#' : url
+    const href = resolveHref(rawUrl)
     const isPrimary = style === 'primary'
-    const linkAttrs = getLinkAttrs(href)
+    const linkAttrs = getLinkAttrs(rawUrl)
 
     const buttonStyle: React.CSSProperties = isPrimary
         ? onInverseBg
@@ -123,9 +126,11 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
 function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string; url: string; siteId?: string; onInverseBg?: boolean }) {
     const shouldReduce = useReducedMotion()
     const isOwner = useIsOwner()
+    const resolveHref = useLocalHref()
     const isBrokenUrl = url.startsWith(BROKEN_URL_PREFIX)
-    const href = isBrokenUrl ? '#' : url
-    const linkAttrs = getLinkAttrs(href)
+    const rawUrl = isBrokenUrl ? '#' : url
+    const href = resolveHref(rawUrl)
+    const linkAttrs = getLinkAttrs(rawUrl)
 
     const handleClick = () => {
         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, role: 'secondary' }, isOwner })

@@ -11,6 +11,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 const FALLBACK_PLANS: PricingConfig['plans'] = [
     { name: 'Starter', price: 'RM 99', period: 'mo', features: [{ text: 'Core features', included: true }, { text: 'Email support', included: true }], ctaLabel: 'Get Started', ctaUrl: '/contact' },
@@ -94,7 +95,9 @@ type PlanCTAProps = {
  * Plan CTA button — highlighted (filled brand) vs outline. Used 8+ times.
  * TOUCH_TARGET.min (44px) ensures WCAG 2.5.5 compliance.
  */
-function PlanCTA({ href, label, highlighted = false, fullWidth = false, className = '' }: PlanCTAProps) {
+function PlanCTA({ href: rawHref, label, highlighted = false, fullWidth = false, className = '' }: PlanCTAProps) {
+    const resolveHref = useLocalHref()
+    const href = resolveHref(rawHref)
     const widthCls = fullWidth ? 'block w-full' : 'inline-block'
     const baseStyle: CSSProperties = highlighted
         ? { background: 'var(--brand-primary)' }

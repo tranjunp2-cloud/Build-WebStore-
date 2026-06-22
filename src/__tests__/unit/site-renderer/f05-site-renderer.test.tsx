@@ -1308,3 +1308,146 @@ describe('[TC-NAV-EDITOR] SiteRenderer nav offset for overlay variants (editor v
         expect(heroWrapper.style.paddingTop).toBe('calc(var(--nav-height, 64px) + 1rem)')
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
+// Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
+//
+// Note: TC-IDs are prefixed F04 (Block Renderer QA doc) because this tests
+// SiteRenderer's _logoHref injection behaviour which is a block-renderer
+// concern. Tests live here (f05-site-renderer.test.tsx) because the subject
+// under test is SiteRenderer — there is no separate F04 test file for it.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F04-SR-07a: navigation block in page.layout gets _logoHref: "/" in non-editor mode', () => {
+        // Arrange — capture block props to verify _logoHref injection
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with navigation block in page.layout
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{
+                    layout: [
+                        {
+                            blockType: 'navigation',
+                            links: [
+                                { label: 'Home', url: '/' },
+                                { label: 'About', url: '/about' },
+                            ],
+                        },
+                    ],
+                }}
+            />
+        )
+
+        // Assert — navigation block should receive _logoHref property injected
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/')
+    })
+
+    it('TC-F04-SR-07b: site.headerBlock also gets _logoHref: "/" injected', () => {
+        // Arrange — capture block props to verify _logoHref injection on headerBlock
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with site.headerBlock
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [
+                            { label: 'Services', url: '/services' },
+                            { label: 'Contact', url: '/contact' },
+                        ],
+                    },
+                }}
+                page={{ layout: [] }}
+            />
+        )
+
+        // Assert — headerBlock navigation should receive _logoHref property injected
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/')
+    })
+
+    it('TC-F04-SR-07c: SiteRenderer in editor mode injects _logoHref pointing to preview URL', () => {
+        // Arrange — capture block props to verify preview URL injection in editor mode
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with isEditor=true and homepage
+        render(
+            <SiteRenderer
+                site={{ ...defaultSite, id: 'site-abc' }}
+                page={{
+                    id: 'page-xyz',
+                    slug: '/',
+                    isHomepage: true,
+                    layout: [{ blockType: 'navigation', links: [{ label: 'Home', url: '/' }] }],
+                }}
+                pages={[{ id: 'page-xyz', slug: '/', isHomepage: true }]}
+                isEditor={true}
+            />
+        )
+
+        // Assert — navigation block should receive preview URL in _logoHref
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('/preview/site-abc?pageId=page-xyz')
+    })
+
+    it('TC-F04-SR-07d: SiteRenderer in editor mode with no homepage page → _logoHref = "#" (safe fallback)', () => {
+        // Arrange — capture block props to verify fallback behavior when no homepage
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        // Act — render SiteRenderer with isEditor=true but empty pages array (no homepage found)
+        render(
+            <SiteRenderer
+                site={{ ...defaultSite, id: 'site-abc' }}
+                page={{
+                    id: 'page-xyz',
+                    slug: '/about',
+                    layout: [{ blockType: 'navigation', links: [{ label: 'About', url: '/about' }] }],
+                }}
+                pages={[]}
+                isEditor={true}
+            />
+        )
+
+        // Assert — navigation block should receive safe fallback "#" when homepage not found
+        expect(capturedBlocks.length).toBeGreaterThan(0)
+        expect(capturedBlocks[0]._logoHref).toBe('#')
+    })
+})

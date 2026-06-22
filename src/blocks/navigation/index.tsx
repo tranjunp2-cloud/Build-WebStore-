@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +14,7 @@ import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { useNavOverflow } from './use-nav-overflow'
 import { NavDesktopLinks, MoreDropdown } from './nav-desktop-links'
 import { DropdownLink } from './nav-dropdown-link'
@@ -74,6 +76,28 @@ function NavLogo({
     )
 }
 
+// ── Logo Link ───────────────────────────────────────────────────────────────
+
+function NavLogoLink({
+    block,
+    children,
+    className,
+    onClick,
+}: {
+    block?: Record<string, unknown>
+    children: ReactNode
+    className?: string
+    onClick?: () => void
+}) {
+    const resolveHref = useLocalHref()
+    const injectedHref = block?._logoHref as string | undefined
+    return (
+        <Link href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
+            {children}
+        </Link>
+    )
+}
+
 // ── Dropdown + recursive nav item helpers (BUG-F05-033) ─────────────────────
 // Support link.children on desktop (hover dropdown) and mobile/sidebar
 // (recursive nested list). Used by all variants.
@@ -88,12 +112,13 @@ function MobileNavItem({
     onNavigate: () => void
     depth?: number
 }) {
+    const resolveHref = useLocalHref()
     const hasChildren = Boolean(link.children?.length)
 
     return (
         <div>
             <a
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
@@ -126,12 +151,13 @@ function SidebarNavItem({
     onNavigate: () => void
     depth?: number
 }) {
+    const resolveHref = useLocalHref()
     const hasChildren = Boolean(link.children?.length)
 
     return (
         <div>
             <a
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
@@ -184,10 +210,12 @@ function NavCTAButton({
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
+    const resolveHref = useLocalHref()
     const cls = `${className} rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
-    const href = isBroken ? '#' : rawHref
-    const isExternal = href.startsWith('http://') || href.startsWith('https://')
+    const rawUrl = isBroken ? '#' : rawHref
+    const href = resolveHref(rawUrl)
+    const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
         <BrokenLinkWarning url={rawHref}>
             <motion.a
@@ -207,10 +235,15 @@ function NavCTAButton({
 
 /** Mobile drawer CTA — full-width, centered, min-h 44px. */
 function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
-    const href = rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref
+    const resolveHref = useLocalHref()
+    const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
+    const rawUrl = isBroken ? '#' : rawHref
+    const href = resolveHref(rawUrl)
+    const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
         <a
             href={href}
+            {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
             style={{ background: CTA_GRADIENT_BACKGROUND }}
             onClick={onClick}
@@ -368,12 +401,14 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
-                >
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                </motion.div>
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                    <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
+                    >
+                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                    </motion.div>
+                </NavLogoLink>
 
                 {/* Desktop Links */}
                 <NavDesktopLinks links={links} className="hidden md:flex gap-1 flex-1" />
@@ -448,14 +483,16 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
-                    <NavLogo
-                        logo={mergedBlock.logo}
-                        logoText={logoText}
-                        gradientMode="when-scrolled"
-                        scrolled={scrolled}
-                    />
-                </motion.div>
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                    <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
+                        <NavLogo
+                            logo={mergedBlock.logo}
+                            logoText={logoText}
+                            gradientMode="when-scrolled"
+                            scrolled={scrolled}
+                        />
+                    </motion.div>
+                </NavLogoLink>
 
                 {/* Desktop Links */}
                 <NavDesktopLinks
@@ -506,6 +543,8 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
     const [orderValue, setOrderValue] = useState('')
     const [orderError, setOrderError] = useState('')
     const router = useRouter()
+    const resolveHref = useLocalHref()
+    const ctaIsExternal = (ctaButton?.url ?? '').startsWith('http://') || (ctaButton?.url ?? '').startsWith('https://')
     const { t } = useI18n()
     const ol = t.storefront.orderLookup
 
@@ -570,9 +609,9 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                         >
                             {/* Close + Logo */}
                             <div className="flex items-center justify-between p-6">
-                                <div className="font-bold text-xl font-heading">
+                                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-xl font-heading cursor-pointer" onClick={() => setIsOpen(false)}>
                                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                                </div>
+                                </NavLogoLink>
                                 <button
                                     type="button"
                                     onClick={() => setIsOpen(false)}
@@ -649,7 +688,8 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                 )}
                                 {ctaButton?.show && (
                                     <a
-                                        href={ctaButton.url || '#'}
+                                        href={resolveHref(ctaButton.url || '#')}
+                                        {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
@@ -799,13 +839,15 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                     {/* Center logo — absolute so it never shifts the flex layout */}
                     <div className="absolute left-1/2 -translate-x-1/2">
-                        <motion.div
-                            ref={logoRef}
-                            whileHover={{ scale: 1.02 }}
-                            className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap shrink-0"
-                        >
-                            <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                        </motion.div>
+                        <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                            <motion.div
+                                ref={logoRef}
+                                whileHover={{ scale: 1.02 }}
+                                className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap shrink-0"
+                            >
+                                <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                            </motion.div>
+                        </NavLogoLink>
                     </div>
 
                     {/* Right visible links + single More ▼ for all overflow + CTA group */}
@@ -832,9 +874,11 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                 {/* Mobile: logo left, hamburger right */}
                 <div className="flex md:hidden items-center justify-between h-full">
-                    <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
-                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                    </motion.div>
+                    <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                        <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
+                            <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                        </motion.div>
+                    </NavLogoLink>
                     <NavHamburgerButton
                         open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -866,6 +910,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
     const scrolled = useScrollShrink(50)
+    const resolveHref = useLocalHref()
 
     const { containerRef: megaContainerRef, itemRefs: megaItemRefs, visibleCount: megaVisibleCount } = useNavOverflow(links)
     const megaOverflowLinks = links.slice(megaVisibleCount)
@@ -901,12 +946,14 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"
-                >
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                </motion.div>
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                    <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"
+                    >
+                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                    </motion.div>
+                </NavLogoLink>
 
                 {/* Desktop Links — inline hook to preserve mega panel hover behavior */}
                 <div
@@ -952,7 +999,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                         ) : (
                             <motion.a
                                 key={i}
-                                href={link?.url}
+                                href={resolveHref(link?.url)}
                                 whileHover={{ y: -1 }}
                                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] shrink-0"
                             >
@@ -1011,7 +1058,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                         {col.map((subLink, si) => (
                                             <a
                                                 key={si}
-                                                href={subLink?.url}
+                                                href={resolveHref(subLink?.url)}
                                                 className="block px-3 py-2.5 rounded-lg text-sm opacity-60 hover:opacity-100 hover:bg-white/[0.04] transition-all duration-200"
                                             >
                                                 {subLink.label}
@@ -1047,6 +1094,8 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
     showOrderSearch?: boolean
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const resolveHref = useLocalHref()
+    const ctaIsExternal = (ctaButton?.url ?? '').startsWith('http://') || (ctaButton?.url ?? '').startsWith('https://')
 
     return (
         <motion.nav
@@ -1072,9 +1121,9 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 }}
             >
                 {/* Logo */}
-                <div className="font-bold text-lg font-heading shrink-0">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="font-bold text-lg font-heading cursor-pointer shrink-0">
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
-                </div>
+                </NavLogoLink>
 
                 {/* Desktop Links */}
                 <NavDesktopLinks links={links} className="hidden md:flex gap-0.5 flex-1" />
@@ -1084,7 +1133,8 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <a
-                            href={ctaButton.url || '#'}
+                            href={resolveHref(ctaButton.url || '#')}
+                            {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                             className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
@@ -1134,7 +1184,8 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                             )}
                             {ctaButton?.show && (
                                 <a
-                                    href={ctaButton.url || '#'}
+                                    href={resolveHref(ctaButton.url || '#')}
+                                    {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                     className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { EyeOff } from 'lucide-react'
 import type { NavLink } from './config'
 import { NAV_Z_CLASS } from '@/lib/design-tokens'
+import { useLocalHref } from '@/lib/hooks/use-local-href'
 
 const NAV_SURFACE_TEXT = `var(--text, #fafafa)`
 
@@ -15,13 +16,14 @@ export const DROPDOWN_CHILD_LINK_CLASS =
 /** Desktop nav link — renders a plain anchor or a hover-dropdown button when children exist. */
 export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
     const [open, setOpen] = useState(false)
+    const resolveHref = useLocalHref()
     const hasChildren = link.children && link.children.length > 0
 
     if (!hasChildren) {
         return (
             <motion.a
                 key={i}
-                href={link?.url}
+                href={resolveHref(link?.url)}
                 whileHover={{ y: -1 }}
                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
             >
@@ -61,7 +63,7 @@ export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         }}
                     >
                         {link.children!.map((child, ci) => (
-                            <a key={ci} href={child.url} className={DROPDOWN_CHILD_LINK_CLASS}>
+                            <a key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
                                 {child.label}
                             </a>
                         ))}
