@@ -233,7 +233,7 @@ Copy và paste đoạn mã sau vào file `src/app/globals.css`. Các giá trị 
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 209 30% 19%;     /* #22313F — chữ phụ light (GH-1192) */
+    --muted-foreground: 215 16% 47%;     /* #64748B — chữ phụ light */
     --accent: 221 83% 53%;           /* Blue #2563EB — accent phụ / AI / Info */
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
