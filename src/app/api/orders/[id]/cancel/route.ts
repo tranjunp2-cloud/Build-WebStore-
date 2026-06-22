@@ -7,7 +7,9 @@ import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCancelSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { createRefund } from '@/lib/payment/xendit'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
+import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { restockItem, type RestockResult } from '../../lib/stock-utils'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -70,19 +72,100 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
+        const db = (payload.db.drizzle as any)
+
+        // --- Xendit paid orders: auto-refund atomically with cancel ---
+        // Mirrors Stripe pattern in /refund: CAS-before-remote → call Xendit → rollback on failure.
+        // This ensures cancel never succeeds without a corresponding refund for paid Xendit orders.
+        let xenditRefundId: string | undefined
+        let xenditCasDone = false
+        if ((order as any).paymentProvider === 'xendit' && (order as any).paymentStatus === 'paid') {
+            const tenantRawId = typeof (order as any).tenant === 'object'
+                ? (order as any).tenant.id
+                : (order as any).tenant
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+            }).catch(() => null)
+            const xenditSecretKey: string | undefined = (tenantWithKeys as any)?.xenditSecretKey
+            const xenditPaymentRequestId = (order as any).xenditPaymentRequestId
+
+            if (!xenditSecretKey || !xenditPaymentRequestId) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'XENDIT_NOT_REFUNDABLE', message: 'Missing Xendit payment info — cancel blocked to protect buyer funds. Refund manually via Xendit dashboard first.' } },
+                    { status: 422 }
+                )
+            }
+
+            // CAS: commit cancel + payment_status='refunded' atomically.
+            // AND payment_status='paid' guard prevents double-refund under concurrent requests.
+            const xenditCas = await db.execute(sql`
+                UPDATE orders
+                SET status = 'cancelled', cancel_reason = ${reason}, payment_status = 'refunded', updated_at = NOW()
+                WHERE id = ${orderId} AND status = ${currentStatus} AND payment_status = 'paid'
+                RETURNING id
+            `)
+
+            if (!xenditCas.rows?.length) {
+                const recheck = await payload.findByID({ collection: 'orders', id: orderId, overrideAccess: true, depth: 0 })
+                if ((recheck as any)?.status === 'cancelled') {
+                    return NextResponse.json({ success: true, data: recheck, restock: [] })
+                }
+                return NextResponse.json(
+                    { success: false, error: { code: 'INVALID_TRANSITION', message: 'Order status changed — cancellation no longer valid' } },
+                    { status: 422 }
+                )
+            }
+
+            xenditCasDone = true
+
+            // CAS committed — now call Xendit. If it fails, roll back so order is unchanged.
+            try {
+                const xenditRefund = await createRefund({
+                    apiKey: xenditSecretKey,
+                    invoiceId: xenditPaymentRequestId,
+                    amount: (order as any).total,
+                    reason: 'REQUESTED_BY_CUSTOMER',
+                })
+                xenditRefundId = xenditRefund.id
+            } catch (xenditErr) {
+                // Roll back CAS: restore original status + payment_status so order is unchanged.
+                await db.execute(sql`
+                    UPDATE orders
+                    SET status = ${currentStatus}, payment_status = 'paid', updated_at = NOW()
+                    WHERE id = ${orderId}
+                `).catch((rollbackErr: unknown) => {
+                    payload.logger.error(
+                        { rollbackErr: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr), orderId },
+                        '[Order Cancel] Xendit CAS rollback failed — DB state may be inconsistent'
+                    )
+                })
+                payload.logger.error(
+                    { err: xenditErr instanceof Error ? xenditErr.message : String(xenditErr), orderId },
+                    '[Order Cancel] Xendit refund failed — cancel aborted, CAS rolled back'
+                )
+                return NextResponse.json(
+                    { success: false, error: { code: 'XENDIT_REFUND_ERROR', message: 'Refund could not be processed — cancellation aborted. Please try again or refund via Xendit dashboard.' } },
+                    { status: 502 }
+                )
+            }
+        }
+
         // Atomic status transition — prevents concurrent double-restock.
         // Two concurrent cancel requests both pass the validation above, but only the
         // one whose CAS succeeds (RETURNING non-empty) proceeds to restock.
         // The loser sees 0 rows → rechecks order → returns idempotent success without restocking.
-        const db = (payload.db.drizzle as any)
-        const casResult = await db.execute(sql`
-            UPDATE orders
-            SET status = 'cancelled', cancel_reason = ${reason}, updated_at = NOW()
-            WHERE id = ${orderId} AND status = ${currentStatus}
-            RETURNING id
-        `)
+        // Skip if Xendit branch already ran its own CAS above.
+        let casResult: { rows?: Array<Record<string, unknown>> } = { rows: [{}] }
+        if (!xenditCasDone) {
+            casResult = await db.execute(sql`
+                UPDATE orders
+                SET status = 'cancelled', cancel_reason = ${reason}, updated_at = NOW()
+                WHERE id = ${orderId} AND status = ${currentStatus}
+                RETURNING id
+            `)
+        }
 
-        if (!casResult.rows?.length) {
+        if (!xenditCasDone && !casResult.rows?.length) {
             // CAS missed — status changed between our validation read and this write.
             // Two sub-cases: already cancelled (concurrent cancel WON) or advanced to
             // a non-cancellable state (e.g. ready_to_ship/shipped by seller).
@@ -102,9 +185,13 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // CAS only wrote status + cancel_reason; all other order fields are unchanged.
-        // Construct updated from the pre-fetched order to avoid an extra DB round trip.
-        const updated = { ...(order as any), status: 'cancelled', cancelReason: reason }
+        // CAS only wrote status + cancel_reason (+ payment_status for Xendit); construct from pre-fetched.
+        const updated = {
+            ...(order as any),
+            status: 'cancelled',
+            cancelReason: reason,
+            ...(xenditRefundId ? { paymentStatus: 'refunded' } : {}),
+        }
 
         // Release the reserved discount slot (F33) — runs only on the CAS winner so a concurrent cancel
         // can't double-release. The slot is reserved at PLACE ORDER for every gateway (incl. pending
@@ -147,7 +234,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // Send cancellation email to customer
+        // Send email to customer.
+        // Xendit paid orders that were auto-refunded → send refund email (mentions refund amount + ETA).
+        // All other orders → send standard cancellation email.
         const customerEmail = (updated as any).customerEmail
         if (customerEmail) {
             try {
@@ -157,49 +246,76 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 const siteLocale: 'en' | 'ms' = typeof (updated as any).site === 'object'
                     ? ((updated as any).site?.locale ?? 'ms')
                     : 'ms'
+                const emailTemplate = xenditRefundId ? 'order-refunded' : 'order-cancelled'
                 const [tenant, cmsConfig] = await Promise.all([
                     tenantId
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : Promise.resolve(null),
                     tenantId
-                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
+                        ? getTemplateConfig(tenantId, emailTemplate, 'buyer', siteLocale)
                         : Promise.resolve(null),
                 ])
 
                 if (cmsConfig?.enabled === false) {
-                    console.log('[Email] suppressed (disabled): order-cancelled (cancel route)')
+                    console.log(`[Email] suppressed (disabled): ${emailTemplate} (cancel route)`)
                 } else {
                     const shopName = (tenant as any)?.name ?? ''
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
                     const shopUrl = buildStorefrontUrl(shopSlug)
+                    const emailItems = ((updated as any).items ?? []).map((item: any) => ({
+                        name: item.productName,
+                        variant: item.variant || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    }))
 
-                    const cancelEmail = orderCancelledEmail({
-                        shopName,
-                        orderNumber: (updated as any).orderNumber ?? String(updated.id),
-                        customerName: (updated as any).customerName ?? '',
-                        customerEmail,
-                        customerPhone: (updated as any).customerPhone ?? null,
-                        customerAddress: (updated as any).shippingAddress ?? null,
-                        items: ((updated as any).items ?? []).map((item: any) => ({
-                            name: item.productName,
-                            variant: item.variant || null,
-                            quantity: item.quantity,
-                            unitPrice: item.unitPrice,
-                            lineTotal: item.quantity * item.unitPrice,
-                        })),
-                        subtotal: (updated as any).subtotal ?? 0,
-                        shippingFee: (updated as any).shippingFee ?? 0,
-                        total: (updated as any).total ?? 0,
-                        paymentMethod: (updated as any).paymentMethod ?? 'cod',
-                        orderDate: (updated as any).createdAt,
-                        cancellationDate: new Date().toISOString(),
-                        cancellationNote: reason ?? null,
-                        shopUrl,
-                        currency: (updated as any).currency ?? 'MYR',
-                        locale: siteLocale,
-                    }, cmsConfig ?? undefined)
-                    payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
-                        .catch((err: unknown) => console.warn('[Order Cancel] Failed to send email:', err))
+                    if (xenditRefundId) {
+                        // Refund email: buyer knows money is coming back
+                        const refundEmail = orderRefundedEmail({
+                            shopName,
+                            orderNumber: (updated as any).orderNumber ?? String(updated.id),
+                            customerName: (updated as any).customerName ?? '',
+                            customerEmail,
+                            customerPhone: (updated as any).customerPhone ?? null,
+                            customerAddress: (updated as any).shippingAddress ?? null,
+                            items: emailItems,
+                            subtotal: (updated as any).subtotal ?? 0,
+                            shippingFee: (updated as any).shippingFee ?? 0,
+                            total: (updated as any).total ?? 0,
+                            refundAmount: (updated as any).total ?? 0,
+                            paymentMethod: (updated as any).paymentMethod ?? 'bank_transfer',
+                            orderDate: (updated as any).createdAt,
+                            refundDate: new Date().toISOString(),
+                            shopUrl,
+                            currency: (updated as any).currency ?? 'MYR',
+                            locale: siteLocale,
+                        }, cmsConfig ?? undefined)
+                        payload.sendEmail({ to: customerEmail, subject: refundEmail.subject, html: refundEmail.html })
+                            .catch((err: unknown) => console.warn('[Order Cancel] Failed to send refund email:', err))
+                    } else {
+                        const cancelEmail = orderCancelledEmail({
+                            shopName,
+                            orderNumber: (updated as any).orderNumber ?? String(updated.id),
+                            customerName: (updated as any).customerName ?? '',
+                            customerEmail,
+                            customerPhone: (updated as any).customerPhone ?? null,
+                            customerAddress: (updated as any).shippingAddress ?? null,
+                            items: emailItems,
+                            subtotal: (updated as any).subtotal ?? 0,
+                            shippingFee: (updated as any).shippingFee ?? 0,
+                            total: (updated as any).total ?? 0,
+                            paymentMethod: (updated as any).paymentMethod ?? 'cod',
+                            orderDate: (updated as any).createdAt,
+                            cancellationDate: new Date().toISOString(),
+                            cancellationNote: reason ?? null,
+                            shopUrl,
+                            currency: (updated as any).currency ?? 'MYR',
+                            locale: siteLocale,
+                        }, cmsConfig ?? undefined)
+                        payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
+                            .catch((err: unknown) => console.warn('[Order Cancel] Failed to send email:', err))
+                    }
                 }
             } catch (emailErr) {
                 console.warn('[Order Cancel] Failed to build email:', emailErr)
@@ -210,6 +326,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             success: true,
             data: updated,
             restock: restockResults,
+            ...(xenditRefundId ? { refundId: xenditRefundId } : {}),
         })
     } catch (error: any) {
         console.error('[Order Cancel Error]', error)
