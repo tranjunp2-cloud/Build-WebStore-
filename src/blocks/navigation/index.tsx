@@ -3,6 +3,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -427,12 +428,14 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300`}
-                >
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                </motion.div>
+                <Link href="/" className="cursor-pointer">
+                    <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300`}
+                    >
+                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                    </motion.div>
+                </Link>
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-1">
@@ -511,14 +514,16 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
-                    <NavLogo
-                        logo={mergedBlock.logo}
-                        logoText={logoText}
-                        gradientMode="when-scrolled"
-                        scrolled={scrolled}
-                    />
-                </motion.div>
+                <Link href="/" className="cursor-pointer">
+                    <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
+                        <NavLogo
+                            logo={mergedBlock.logo}
+                            logoText={logoText}
+                            gradientMode="when-scrolled"
+                            scrolled={scrolled}
+                        />
+                    </motion.div>
+                </Link>
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
@@ -634,9 +639,9 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                         >
                             {/* Close + Logo */}
                             <div className="flex items-center justify-between p-6">
-                                <div className="font-bold text-xl font-heading">
+                                <Link href="/" className="font-bold text-xl font-heading cursor-pointer">
                                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                                </div>
+                                </Link>
                                 <button
                                     type="button"
                                     onClick={() => setIsOpen(false)}
@@ -775,12 +780,14 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                     {/* Center logo — absolute so it's always at true page center */}
                     <div className="absolute left-1/2 -translate-x-1/2">
-                        <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap"
-                        >
-                            <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                        </motion.div>
+                        <Link href="/" className="cursor-pointer">
+                            <motion.div
+                                whileHover={{ scale: 1.02 }}
+                                className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap"
+                            >
+                                <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                            </motion.div>
+                        </Link>
                     </div>
 
                     {/* Right links + Track + CTA + Language Switcher — pushed to far right */}
@@ -804,9 +811,11 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
 
                 {/* Mobile: logo left, hamburger right */}
                 <div className="flex md:hidden items-center justify-between h-full">
-                    <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
-                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                    </motion.div>
+                    <Link href="/" className="cursor-pointer">
+                        <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
+                            <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                        </motion.div>
+                    </Link>
                     <NavHamburgerButton
                         open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -870,12 +879,14 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    className="font-bold text-xl font-heading flex items-center gap-2"
-                >
-                    <NavLogo logo={mergedBlock.logo} logoText={logoText} />
-                </motion.div>
+                <Link href="/" className="cursor-pointer">
+                    <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        className="font-bold text-xl font-heading flex items-center gap-2"
+                    >
+                        <NavLogo logo={mergedBlock.logo} logoText={logoText} />
+                    </motion.div>
+                </Link>
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-1">
@@ -1018,9 +1029,9 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 }}
             >
                 {/* Logo */}
-                <div className="font-bold text-lg font-heading">
+                <Link href="/" className="font-bold text-lg font-heading cursor-pointer">
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
-                </div>
+                </Link>
 
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-0.5">
