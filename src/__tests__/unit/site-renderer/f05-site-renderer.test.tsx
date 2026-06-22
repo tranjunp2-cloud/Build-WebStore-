@@ -1312,6 +1312,11 @@ describe('[TC-NAV-EDITOR] SiteRenderer nav offset for overlay variants (editor v
 // ═══════════════════════════════════════════════════════════════════════════
 // TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
 // Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
+//
+// Note: TC-IDs are prefixed F04 (Block Renderer QA doc) because this tests
+// SiteRenderer's _logoHref injection behaviour which is a block-renderer
+// concern. Tests live here (f05-site-renderer.test.tsx) because the subject
+// under test is SiteRenderer — there is no separate F04 test file for it.
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks', () => {
     beforeEach(() => {
