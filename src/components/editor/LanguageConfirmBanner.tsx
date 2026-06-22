@@ -14,9 +14,9 @@ export interface LanguageConfirmBannerProps {
 }
 
 // Design tokens (Figma: F26 confirm dialog)
-const GRADIENT_PRIMARY = 'linear-gradient(135deg, #3B82F6 0%, #2DD4BF 100%)'
-const ICON_GRADIENT = 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(45,212,191,0.18) 100%)'
-const DIALOG_SHADOW = '0 20px 48px -8px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.35)'
+const GRADIENT_PRIMARY = 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)'
+const ICON_GRADIENT = 'linear-gradient(135deg, hsl(var(--info)/0.18) 0%, hsl(var(--primary)/0.18) 100%)'
+const DIALOG_SHADOW = '0 20px 48px -8px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.35)' /* shadow — keep */
 
 const KEEP_NOTE =
     'Note: Some new template elements added later in the CMS will display in EN/MY by default.'
@@ -24,12 +24,12 @@ const KEEP_NOTE =
 // Option card background/border per state.
 function optionStyle(isSelected: boolean, reco: boolean): React.CSSProperties {
     if (isSelected) {
-        return { background: '#1B2943', border: '1px solid #3B82F6', boxShadow: '0 0 0 3px rgba(59,130,246,0.18)' }
+        return { background: 'var(--editor-surface-elevated)', border: '1px solid hsl(var(--primary))', boxShadow: '0 0 0 3px hsl(var(--primary)/0.18)' }
     }
     if (reco) {
-        return { background: '#212E41', border: '1px solid #2C4B7E' }
+        return { background: 'var(--editor-surface-elevated)', border: '1px solid var(--editor-border)' }
     }
-    return { background: '#1F2937', border: '1px solid #1F2937' }
+    return { background: 'var(--editor-surface-elevated)', border: '1px solid var(--editor-surface-elevated)' }
 }
 
 export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: LanguageConfirmBannerProps) {
@@ -56,13 +56,13 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
     return (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
             <div
-                className="relative w-full max-w-[520px] overflow-hidden rounded-[14px] border border-[#1F2937] bg-[#161E2E]"
+                className="relative w-full max-w-[520px] overflow-hidden rounded-[14px] border border-[var(--editor-border)] bg-[var(--editor-surface)]"
                 style={{ boxShadow: DIALOG_SHADOW }}
             >
                 {/* Header */}
                 <div className="px-6 pt-5 pb-2">
                     <div
-                        className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[#3B82F6]"
+                        className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-[10px] text-[hsl(var(--info))]"
                         style={{ backgroundImage: ICON_GRADIENT }}
                     >
                         <Languages size={18} />
@@ -70,12 +70,12 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                     <h2 className="text-base font-bold text-white mb-1.5 tracking-tight">
                         {detected.full} language detected
                     </h2>
-                    <p className="text-[13px] text-[#9CA3AF] leading-relaxed">
+                    <p className="text-[13px] text-[var(--editor-text-muted)] leading-relaxed">
                         The system detects that you wish to create a website in {detected.full}. However, to ensure
                         the best editing experience with full features and templates, we encourage you to optimize
                         your website in{' '}
-                        <span className="text-[#3B82F6] font-medium">English</span> or{' '}
-                        <span className="text-[#3B82F6] font-medium">Malay</span>.
+                        <span className="text-[hsl(var(--info))] font-medium">English</span> or{' '}
+                        <span className="text-[hsl(var(--info))] font-medium">Malay</span>.
                     </p>
                 </div>
 
@@ -97,7 +97,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                                     style={optionStyle(isSelected, opt.reco)}
                                 >
                                     {/* Flag box */}
-                                    <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-[#1F2937] bg-[#111827] flex-shrink-0">
+                                    <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-bg)] flex-shrink-0">
                                         <LocaleFlag locale={opt.locale} className="w-6 rounded-[2px]" />
                                     </span>
 
@@ -107,12 +107,12 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                                             {opt.full}
                                         </span>
                                         {opt.reco && (
-                                            <span className="self-start rounded-full bg-[rgba(59,130,246,0.16)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#3B82F6]">
+                                            <span className="self-start rounded-full bg-[hsl(var(--info)/0.16)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--info))]">
                                                 Recommended
                                             </span>
                                         )}
                                         {opt.note && (
-                                            <span className="text-[11.5px] text-[#9CA3AF] leading-snug">
+                                            <span className="text-[11.5px] text-[var(--editor-text-muted)] leading-snug">
                                                 {opt.note}
                                             </span>
                                         )}
@@ -122,8 +122,8 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                                     <span
                                         className="rounded-[5px] border px-[7px] py-[3px] font-mono text-[10.5px] font-bold tracking-wide uppercase"
                                         style={opt.reco
-                                            ? { background: '#161E2E', borderColor: 'rgba(59,130,246,0.4)', color: '#3B82F6' }
-                                            : { background: '#161E2E', borderColor: '#374151', color: '#9CA3AF' }
+                                            ? { background: 'var(--editor-surface)', borderColor: 'hsl(var(--info)/0.4)', color: 'hsl(var(--info))' }
+                                            : { background: 'var(--editor-surface)', borderColor: 'var(--editor-border)', color: 'var(--editor-text-muted)' }
                                         }
                                     >
                                         {opt.short}
@@ -133,8 +133,8 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                                     <span
                                         className="h-[18px] w-[18px] flex-shrink-0 rounded-full transition-colors"
                                         style={isSelected
-                                            ? { background: '#3B82F6' }
-                                            : { border: '2px solid #374151' }
+                                            ? { background: 'hsl(var(--primary))' }
+                                            : { border: '2px solid var(--editor-border)' }
                                         }
                                     />
                                 </button>
@@ -144,11 +144,11 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                 </div>
 
                 {/* Footer — darker bar, buttons right-aligned */}
-                <div className="flex items-center justify-end gap-2 border-t border-[#1F2937] bg-[#111827] px-5 py-3.5">
+                <div className="flex items-center justify-end gap-2 border-t border-[var(--editor-border)] bg-[var(--editor-bg)] px-5 py-3.5">
                     <button
                         type="button"
                         onClick={() => onAction('dismiss', detectedLocale)}
-                        className="rounded-lg px-4 py-1.5 text-[13px] font-semibold text-[#9CA3AF] transition-colors hover:text-white"
+                        className="rounded-lg px-4 py-1.5 text-[13px] font-semibold text-[var(--editor-text-muted)] transition-colors hover:text-white"
                     >
                         Cancel
                     </button>
@@ -156,7 +156,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                         type="button"
                         onClick={handleContinue}
                         className="rounded-lg px-4 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-                        style={{ backgroundImage: GRADIENT_PRIMARY, boxShadow: '0 2px 6px rgba(59,130,246,0.3)' }}
+                        style={{ backgroundImage: GRADIENT_PRIMARY, boxShadow: '0 2px 6px hsl(var(--info)/0.3)' }}
                     >
                         Continue
                     </button>

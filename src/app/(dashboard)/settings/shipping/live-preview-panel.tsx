@@ -34,7 +34,7 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
     const gapSen = cfg.freeAbove != null && !isFree ? cfg.freeAbove - SIM_CART_SEN : null
 
     return (
-        <div className="mt-1 rounded-[12px] border border-white/[0.08] bg-[#0B1120]/70 overflow-hidden">
+        <div className="mt-1 rounded-[12px] border border-white/[0.08] bg-[hsl(var(--background)/0.7)] overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
                 <span className="text-[11px] font-semibold tracking-widest text-[var(--dash-text-muted)] uppercase">
                     {s.livePreview}
@@ -49,15 +49,15 @@ export function LivePreviewPanel({ westRateRm, eastRateRm, freeEnabled, freeAbov
                 <div className="flex justify-between text-[13px]">
                     <span className="text-[var(--dash-text-muted)]">{s.liveShipping}</span>
                     {isFree ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold"><PartyPopper className="w-4 h-4 shrink-0" aria-hidden /> FREE</span>
+                        <span className="inline-flex items-center gap-1 text-success dark:text-success font-semibold"><PartyPopper className="w-4 h-4 shrink-0" aria-hidden /> FREE</span>
                     ) : (
                         <span className="text-[var(--dash-text)]">{formatRm(shipSen)}</span>
                     )}
                 </div>
                 {gapSen != null && (
-                    <div className="flex items-center gap-2 rounded-[8px] border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2">
-                        <Lightbulb className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
-                        <span className="text-[13px] text-emerald-700 dark:text-emerald-300">
+                    <div className="flex items-center gap-2 rounded-[8px] border border-success/20 bg-success/[0.08] px-3 py-2">
+                        <Lightbulb className="w-4 h-4 shrink-0 text-success dark:text-success" aria-hidden />
+                        <span className="text-[13px] text-success dark:text-success">
                             {s.liveAddMore.replace('{amount}', formatRm(gapSen))}
                         </span>
                     </div>

@@ -6,12 +6,12 @@ import { useI18n } from '@/i18n'
 import type { ShopCustomerRecord, AddressRecord } from '../_lib/shop-customer-record'
 import type { EditableFields } from './customers-detail'
 
-const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full'
+const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full'
 const INPUT_READONLY_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] font-mono text-white/40 w-full flex items-center select-all cursor-default'
-const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-blue-500/40 transition-colors w-full resize-none'
+const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full resize-none'
 const LABEL_CLS = 'text-[12px] font-semibold [color:var(--cus-text-secondary)]'
 const HELP_CLS = 'text-[11px] [color:var(--cus-text-muted)]'
-const ERROR_CLS = 'text-[11px] text-red-400 flex items-center gap-1'
+const ERROR_CLS = 'text-[11px] text-[hsl(var(--destructive))] flex items-center gap-1'
 
 type Props = {
     draft: ShopCustomerRecord
@@ -60,19 +60,19 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
 
                     {/* Email — read-only identity (col 1) */}
                     <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
-                        <label className={LABEL_CLS}>{cd.fieldEmail} <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label className={LABEL_CLS}>{cd.fieldEmail} <span style={{ color: 'hsl(var(--destructive))' }}>*</span></label>
                         <div className={INPUT_READONLY_CLS}>{draft.email}</div>
                         <span className={HELP_CLS}>{cd.fieldEmailHelp}</span>
                     </div>
 
                     {/* Name (col 2) */}
                     <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
-                        <label className={LABEL_CLS}>{cd.fieldName} <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label className={LABEL_CLS}>{cd.fieldName} <span style={{ color: 'hsl(var(--destructive))' }}>*</span></label>
                         <input
                             type="text"
                             value={draft.name || ''}
                             onChange={e => onChange({ name: e.target.value })}
-                            className={INPUT_CLS + (errors.name ? ' border-red-500/50' : '')}
+                            className={INPUT_CLS + (errors.name ? ' border-[hsl(var(--destructive)/0.5)]' : '')}
                             placeholder={cd.fieldNamePlaceholder}
                         />
                         {errors.name && <span className={ERROR_CLS}>{errors.name}</span>}
@@ -185,7 +185,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                             style={{ borderTop: i > 0 ? '1px solid var(--cus-border-subtle)' : undefined }}
                         >
                             <span className="text-[11px] font-bold uppercase tracking-wide text-white/35">{k}</span>
-                            <span className="text-[20px] font-bold tabular-nums text-[#f8fafc]">{v}</span>
+                            <span className="text-[20px] font-bold tabular-nums text-foreground">{v}</span>
                         </div>
                     ))}
                 </div>
@@ -193,7 +193,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                 {/* Auto-link info box */}
                 <div className="rounded-[14px] px-4 py-3" style={{ background: 'var(--cus-surface-info)', border: '1px solid var(--cus-border-medium)' }}>
                     <h3 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/45 mb-2">
-                        <Info className="w-3.5 h-3.5 shrink-0" style={{ color: '#3b82f6' }} />
+                        <Info className="w-3.5 h-3.5 shrink-0" style={{ color: 'hsl(var(--info))' }} />
                         {cd.autoLinkTitle}
                     </h3>
                     <p style={{ margin: 0, fontSize: 12, color: 'var(--cus-text-faint)', lineHeight: 1.6 }}>

@@ -37,7 +37,7 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
     return (
         <div className="flex flex-col gap-8">
             {!hideHeading && (
-                <h1 className="text-[32px] font-black text-[#e1e2eb] tracking-[-0.9px] leading-10">
+                <h1 className="text-[32px] font-black text-[hsl(var(--foreground))] tracking-[-0.9px] leading-10">
                     {t.profile.accountSettings}
                 </h1>
             )}
@@ -46,15 +46,15 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
 
             <div className="flex flex-col gap-8">
                 {/* Tab navigation */}
-                <div className="flex gap-8 border-b border-[rgba(65,71,84,0.1)]">
+                <div className="flex gap-8 border-b border-[hsl(var(--border)/0.1)]">
                     <button
                         type="button"
                         onClick={() => handleTabChange('general')}
                         className={[
                             'text-[14px] tracking-[1.4px] uppercase px-2 transition-colors',
                             activeTab === 'general'
-                                ? 'font-black text-[#3b82f6] border-b-2 border-[#3b82f6] pb-[18px]'
-                                : 'font-bold text-[#c1c6d7] border-b-2 border-transparent pb-[16px]',
+                                ? 'font-black text-[hsl(var(--primary))] border-b-2 border-[hsl(var(--primary))] pb-[18px]'
+                                : 'font-bold text-[hsl(var(--muted-foreground))] border-b-2 border-transparent pb-[16px]',
                         ].join(' ')}
                     >
                         {t.profile.tabs.general}
@@ -65,8 +65,8 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
                         className={[
                             'text-[14px] tracking-[1.4px] uppercase px-2 transition-colors',
                             activeTab === 'security'
-                                ? 'font-black text-[#3b82f6] border-b-2 border-[#3b82f6] pb-[18px]'
-                                : 'font-bold text-[#c1c6d7] border-b-2 border-transparent pb-[16px]',
+                                ? 'font-black text-[hsl(var(--primary))] border-b-2 border-[hsl(var(--primary))] pb-[18px]'
+                                : 'font-bold text-[hsl(var(--muted-foreground))] border-b-2 border-transparent pb-[16px]',
                         ].join(' ')}
                     >
                         {t.profile.tabs.security}

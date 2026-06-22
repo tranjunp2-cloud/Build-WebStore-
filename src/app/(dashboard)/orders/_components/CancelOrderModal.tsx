@@ -60,12 +60,12 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                     style={{
                         width: 64,
                         height: 64,
-                        background: 'rgba(240, 177, 0, 0.1)',
+                        background: 'hsl(var(--warning)/0.1)',
                         borderRadius: 33554400, // as drawn in figma
                         marginBottom: 16
                     }}
                 >
-                    <AlertTriangle size={26} strokeWidth={2.67} color="#F0B100" />
+                    <AlertTriangle size={26} strokeWidth={2.67} color="hsl(var(--warning))" />
                 </div>
 
                 {/* Heading */}
@@ -106,7 +106,7 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         fontWeight: 400,
                         fontSize: 13,
                         lineHeight: '1.4em',
-                        color: '#F0B100',
+                        color: 'hsl(var(--warning))',
                         marginBottom: 24
                     }}
                 >
@@ -137,7 +137,7 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                             height: 128,
                             padding: '12px 16px',
                             background: 'var(--dash-secondary-bg)',
-                            border: `1px solid ${showError ? '#FB2C36' : 'var(--dash-border)'}`,
+                            border: `1px solid ${showError ? 'hsl(var(--destructive))' : 'hsl(var(--input-border))'}`,
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 400,
@@ -150,14 +150,14 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                     />
                     <div className="flex justify-between items-center" style={{ minHeight: 16 }}>
                         {showError ? (
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#FB2C36' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: 'hsl(var(--destructive))' }}>
                                 {c.reasonRequired}
                             </span>
                         ) : <span />}
                         <span
                             title={c.reasonMaxLength}
                             aria-label={c.reasonMaxLength}
-                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? '#FB2C36' : 'var(--dash-text-muted)' }}
+                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? 'hsl(var(--destructive))' : 'var(--dash-text-muted)' }}
                         >
                             {reason.length}/500
                         </span>
@@ -193,13 +193,14 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         disabled={isDisabled}
                         className="flex items-center justify-center flex-1 transition-opacity gap-2"
                         style={{
-                            background: isDisabled ? 'rgba(251, 44, 54, 0.5)' : 'rgba(251, 44, 54, 1)',
+                            background: 'hsl(var(--destructive))',
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 16,
                             lineHeight: '1.5em',
-                            color: isDisabled ? 'rgba(255, 255, 255, 0.5)' : '#FFFFFF',
+                            color: '#FFFFFF',
+                            opacity: isDisabled ? 0.5 : 1,
                             cursor: isDisabled ? 'not-allowed' : 'pointer',
                         }}
                     >

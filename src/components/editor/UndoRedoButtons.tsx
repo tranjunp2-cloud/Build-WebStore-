@@ -59,7 +59,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 aria-label={`${ur.undo}${undoCount > 0 ? ` (${undoCount})` : ''}`}
                 className={cn(
                     'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
-                    'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
+                    'bg-white/5 text-[var(--editor-text)] font-medium text-[12px]',
                     isUndoEnabled
                         ? 'opacity-100 hover:bg-white/15 cursor-pointer'
                         : 'opacity-50 cursor-not-allowed',
@@ -68,7 +68,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 <Undo2 className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                 <span>{ur.undo}</span>
                 {undoCount > 0 && isUndoEnabled && (
-                    <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[#F8FAFC]/70 tabular-nums">
+                    <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[var(--editor-text)]/70 tabular-nums">
                         {undoCount}
                     </span>
                 )}
@@ -82,7 +82,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 aria-label={`${ur.redo}${redoCount > 0 ? ` (${redoCount})` : ''}`}
                 className={cn(
                     'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
-                    'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
+                    'bg-white/5 text-[var(--editor-text)] font-medium text-[12px]',
                     isRedoEnabled
                         ? 'opacity-100 hover:bg-white/15 cursor-pointer'
                         : 'opacity-50 cursor-not-allowed',
@@ -91,7 +91,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 <Redo2 className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                 <span>{ur.redo}</span>
                 {redoCount > 0 && isRedoEnabled && (
-                    <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[#F8FAFC]/70 tabular-nums">
+                    <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[var(--editor-text)]/70 tabular-nums">
                         {redoCount}
                     </span>
                 )}

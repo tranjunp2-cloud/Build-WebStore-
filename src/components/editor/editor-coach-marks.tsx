@@ -148,7 +148,7 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                     left: rect.left,
                     width: rect.width,
                     height: rect.height,
-                    boxShadow: 'inset 0 0 0 2px #22d3ee',
+                    boxShadow: 'inset 0 0 0 2px hsl(var(--info))',
                 }}
                 aria-hidden="true"
             />
@@ -159,7 +159,7 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                 role="dialog"
                 aria-modal="false"
                 aria-label={step === 1 ? cm.step1Title : cm.step2Title}
-                className="fixed z-[70] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[#1e293b] p-4 shadow-2xl"
+                className="fixed z-[70] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[var(--editor-surface-elevated)] p-4 shadow-2xl"
                 style={{
                     top: popoverTop,
                     left: popoverLeft,
@@ -187,7 +187,7 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                     <button
                         type="button"
                         onClick={next}
-                        className="rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                        className="rounded-lg bg-[hsl(var(--primary))] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                     >
                         {step === 1 ? cm.next : cm.finish}
                     </button>

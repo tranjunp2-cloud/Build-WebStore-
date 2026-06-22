@@ -53,12 +53,12 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
                     className="flex items-center justify-center"
                     style={{
                         width: 64, height: 64,
-                        background: 'rgba(45, 212, 191, 0.1)',
+                        background: 'hsl(var(--primary)/0.1)',
                         borderRadius: 9999,
                         marginBottom: 16,
                     }}
                 >
-                    <Package size={26} strokeWidth={2.67} color="#2DD4BF" />
+                    <Package size={26} strokeWidth={2.67} color="hsl(var(--primary))" />
                 </div>
 
                 {/* Heading */}
@@ -120,12 +120,13 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
                         disabled={isDisabled}
                         className="flex items-center justify-center flex-1 gap-2 transition-opacity"
                         style={{
-                            background: isDisabled ? 'rgba(45,212,191,0.4)' : '#2DD4BF',
+                            background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 16,
-                            color: isDisabled ? 'rgba(11,17,32,0.5)' : '#0B1120',
+                            color: '#fff',
+                            opacity: isDisabled ? 0.5 : 1,
                             cursor: isDisabled ? 'not-allowed' : 'pointer',
                         }}
                     >

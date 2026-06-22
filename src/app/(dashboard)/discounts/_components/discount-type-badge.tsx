@@ -15,7 +15,7 @@ export function DiscountTypeBadge({ type }: DiscountTypeBadgeProps) {
         return (
             <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold"
-                style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
+                style={{ background: 'hsl(var(--info)/0.15)', color: 'hsl(var(--info))' }}
             >
                 <Percent className="h-2.5 w-2.5" />
                 {d.badges.percentage}
@@ -25,7 +25,7 @@ export function DiscountTypeBadge({ type }: DiscountTypeBadgeProps) {
     return (
         <span
             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold"
-            style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4' }}
+            style={{ background: 'hsl(var(--primary)/0.15)', color: 'hsl(var(--primary))' }}
         >
             <Banknote className="h-2.5 w-2.5" />
             {d.badges.fixed}

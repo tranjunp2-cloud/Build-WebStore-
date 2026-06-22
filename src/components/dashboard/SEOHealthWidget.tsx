@@ -65,19 +65,19 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                     handleNavigate(e)
                 }
             }}
-            className="relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-dash-border bg-dash-surface p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer overflow-hidden min-h-[260px]">
+            className="relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-dash-border bg-dash-surface p-5 shadow-sm transition-colors duration-200 hover:border-[hsl(var(--primary))] focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:outline-none cursor-pointer overflow-hidden min-h-[260px]">
             {/* Top Row: Icon and Fix Button */}
             <div className="flex items-start justify-between mb-4 relative z-10">
-                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
-                    <Sparkles className="h-6 w-6 text-white" strokeWidth={2.5} />
+                <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 !text-white" strokeWidth={2.5} />
                 </div>
                 <button
                     onClick={() => setIsFixModalOpen(true)}
                     disabled={!missingSeoItems || missingSeoItems.length === 0}
-                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 text-white text-[12px] font-semibold leading-none bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0_4px_10px_-2px_rgba(59,130,246,0.4)] hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-[8px] px-3 py-1.5 !text-white text-[12px] font-semibold leading-none bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shadow-[0_4px_10px_-2px_hsl(var(--info)/0.4)] hover:opacity-90 disabled:opacity-50 transition-opacity"
                     title={t.dashboard.overview.seo.fixAll || 'Fix All Issues'}
                 >
-                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                    <Sparkles className="h-3.5 w-3.5 !text-white" />
                     {t.dashboard.overview.seo.fixAll || 'AI Fix All Issues'}
                 </button>
             </div>
@@ -99,8 +99,8 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                     {issues.length > 0 ? (
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-1.5">
-                                <AlertTriangle className="w-3.5 h-3.5 text-[#FDC700] shrink-0" />
-                                <span className="text-[12px] font-medium text-[#FDC700] leading-tight truncate">
+                                <AlertTriangle className="w-3.5 h-3.5 text-[hsl(var(--warning))] shrink-0" />
+                                <span className="text-[12px] font-medium text-[hsl(var(--warning))] leading-tight truncate">
                                     {issues.length} {issues.length === 1 ? t.dashboard.overview.seo.issue : t.dashboard.overview.seo.issues}
                                 </span>
                             </div>
@@ -109,7 +109,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                             </span>
                         </div>
                     ) : (
-                        <span className="text-[12px] font-medium text-green-600 dark:text-green-400 leading-tight">
+                        <span className="text-[12px] font-medium text-[hsl(var(--success))] leading-tight">
                             {warnings.allGood || 'Looking great'}
                         </span>
                     )}
@@ -119,7 +119,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                 <div className="relative flex justify-center items-center w-10 h-10 shrink-0">
                     <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
                         <circle cx="18" cy="18" r="15.915" fill="none" stroke="var(--dash-border)" strokeWidth="4" />
-                        <circle cx="18" cy="18" r="15.915" fill="none" stroke="#2B7FFF" strokeWidth="4"
+                        <circle cx="18" cy="18" r="15.915" fill="none" stroke="var(--dash-accent)" strokeWidth="4"
                             strokeLinecap="round" strokeDasharray="100" strokeDashoffset={100 - score}
                             className="transition-all duration-1000 ease-out" />
                     </svg>

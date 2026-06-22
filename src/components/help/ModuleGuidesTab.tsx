@@ -185,8 +185,8 @@ export function ModuleGuidesTab() {
             onClick={() => handleTabClick(module.id)}
             className={`flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold rounded-[20px] border transition-all duration-200 ${
               activeModule === module.id
-                ? 'bg-[#3B82F6] border-[#3B82F6] text-white'
-                : 'bg-[#161E2E] border-[#1F2937] text-[#9CA3AF] hover:border-[#3B82F6] hover:text-[#3B82F6]'
+                ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] !text-white'
+                : 'bg-[hsl(var(--card))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]'
             }`}
           >
             <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
@@ -202,23 +202,23 @@ export function ModuleGuidesTab() {
           ref={(el) => {
             sectionRefs.current[module.id] = el
           }}
-          className={`flex-col transition-opacity duration-300 border border-[#1F2937] rounded-xl p-4 bg-[#0F172A]/30 ${
+          className={`flex-col transition-opacity duration-300 border border-[hsl(var(--border))] rounded-xl p-4 bg-[hsl(var(--background)/0.3)] ${
             activeModule === module.id ? 'flex opacity-100' : 'hidden opacity-0'
           }`}
         >
           {module.steps.map((step) => (
             <div
               key={`${module.id}-step-${step.num}`}
-              className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
+              className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-6 mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
             >
               <h3 className="text-[16px] font-bold text-white flex items-center mb-3">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] text-white text-[13px] font-bold mr-2.5 shrink-0">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] !text-white text-[13px] font-bold mr-2.5 shrink-0">
                   {step.num}
                 </span>
                 {step.title}
               </h3>
 
-              <div className="text-[#9CA3AF] text-[14px] leading-[22px] mb-4">
+              <div className="text-[hsl(var(--muted-foreground))] text-[14px] leading-[22px] mb-4">
                 <p dangerouslySetInnerHTML={{ __html: step.desc }} />
               </div>
 
@@ -232,7 +232,7 @@ export function ModuleGuidesTab() {
                 return (
                   <div className="flex justify-center md:justify-start mb-4">
                   <div
-                    className="rounded-lg overflow-hidden border border-[#1F2937] cursor-pointer hover:border-[#3B82F6]/50 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)] transition-all bg-[#0F172A] inline-flex flex-col"
+                    className="rounded-lg overflow-hidden border border-[hsl(var(--border))] cursor-pointer hover:border-[hsl(var(--primary)/0.5)] hover:shadow-[0_0_12px_hsl(var(--primary)/0.15)] transition-all bg-[hsl(var(--background))] inline-flex flex-col"
                     onClick={() => setLightboxImg({ src: step.imgSrc!, title: step.imgTitle || step.title })}
                   >
                     <div className={maxW}>
@@ -246,9 +246,9 @@ export function ModuleGuidesTab() {
                         unoptimized
                       />
                     </div>
-                    <div className="px-3 py-1.5 border-t border-[#1F2937] flex items-center justify-between gap-4 w-full">
-                      <span className="text-[11px] text-[#9CA3AF] truncate">{step.imgTitle}</span>
-                      <span className="text-[11px] text-[#3B82F6] whitespace-nowrap flex items-center gap-1"><ZoomIn className="w-3 h-3 shrink-0" aria-hidden />{t.help.modules.lazyScreenshot.clickToZoom}</span>
+                    <div className="px-3 py-1.5 border-t border-[hsl(var(--border))] flex items-center justify-between gap-4 w-full">
+                      <span className="text-[11px] text-[hsl(var(--muted-foreground))] truncate">{step.imgTitle}</span>
+                      <span className="text-[11px] text-[hsl(var(--primary))] whitespace-nowrap flex items-center gap-1"><ZoomIn className="w-3 h-3 shrink-0" aria-hidden />{t.help.modules.lazyScreenshot.clickToZoom}</span>
                     </div>
                   </div>
                   </div>
@@ -257,18 +257,18 @@ export function ModuleGuidesTab() {
 
               {/* Step-by-step text guide */}
               {step.guide.length > 0 && (
-                <div className="rounded-lg border border-[#1F2937] bg-[#0F172A] p-4">
+                <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <BookOpen className="h-4 w-4 text-[#3B82F6]" />
-                    <span className="text-[13px] font-semibold text-[#3B82F6]">{t.help.modules.tab.stepByStepGuide}</span>
+                    <BookOpen className="h-4 w-4 text-[hsl(var(--primary))]" />
+                    <span className="text-[13px] font-semibold text-[hsl(var(--primary))]">{t.help.modules.tab.stepByStepGuide}</span>
                   </div>
                   <ol className="space-y-2.5">
                     {step.guide.map((line, idx) => (
                       <li key={idx} className="flex gap-3 text-[13px] leading-[20px]">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#1E293B] text-[#3B82F6] text-[11px] font-bold shrink-0 mt-0.5">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[hsl(var(--secondary))] text-[hsl(var(--primary))] text-[11px] font-bold shrink-0 mt-0.5">
                           {idx + 1}
                         </span>
-                        <span className="text-[#CBD5E1]" dangerouslySetInnerHTML={{ __html: line }} />
+                        <span className="text-[hsl(var(--foreground))]" dangerouslySetInnerHTML={{ __html: line }} />
                       </li>
                     ))}
                   </ol>
@@ -299,7 +299,7 @@ export function ModuleGuidesTab() {
           </button>
 
           <div
-            className="relative w-[90vw] max-w-6xl h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom bg-[#1e293b] flex items-center justify-center"
+            className="relative w-[90vw] max-w-6xl h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom bg-[hsl(var(--secondary))] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
             <Image

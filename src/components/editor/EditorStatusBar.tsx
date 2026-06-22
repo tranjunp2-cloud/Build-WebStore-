@@ -17,7 +17,7 @@ export function EditorStatusBar({
     const sb = t.editor.statusBar
 
     return (
-        <div className="flex h-8 shrink-0 items-center justify-between border-t border-white/10 bg-[#0B1120] px-4 text-[11px] text-gray-500">
+        <div className="flex h-8 shrink-0 items-center justify-between border-t border-white/10 bg-[var(--editor-bg)] px-4 text-[11px] text-gray-500">
             <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5 text-emerald-400">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />

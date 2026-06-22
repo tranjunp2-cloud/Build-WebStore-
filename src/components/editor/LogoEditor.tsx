@@ -130,7 +130,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             />
 
             {displayLogo ? (
-                <div className="relative rounded-[12px] border border-white/[0.08] bg-[rgba(11,17,32,0.3)] p-3">
+                <div className="relative rounded-[12px] border border-white/[0.08] bg-[var(--editor-bg)] p-3">
                     <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-[10px] border border-white/10 bg-white/[0.03]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={displayLogo} alt="Logo" className="max-h-full max-w-full object-contain" />
@@ -161,7 +161,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.3)] px-0 py-[26px] text-center transition-colors hover:bg-[rgba(17,24,39,0.55)] disabled:opacity-60"
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-[var(--editor-border)] bg-[var(--editor-bg)] px-0 py-[26px] text-center transition-colors hover:bg-[var(--editor-surface-elevated)] disabled:opacity-60"
                 >
                     <div className="flex h-5 w-5 items-center justify-center">
                         {isUploading ? (
@@ -170,16 +170,16 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                             <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />
                         )}
                     </div>
-                    <span className="text-xs font-medium leading-4 text-[#94A3B8]">
+                    <span className="text-xs font-medium leading-4 text-[var(--editor-text-muted)]">
                         {isUploading ? le.uploading : le.clickToUpload}
                     </span>
                 </button>
             )}
             <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-                <DialogContent className="editor-portal max-w-sm dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#0F172A] bg-white dark:text-white text-slate-900">
+                <DialogContent className="editor-portal max-w-sm border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)]">
                     <DialogHeader>
-                        <DialogTitle className="dark:text-white text-slate-900">{le.removeTitle}</DialogTitle>
-                        <DialogDescription className="dark:text-slate-400 text-slate-500">
+                        <DialogTitle className="text-[var(--editor-text)]">{le.removeTitle}</DialogTitle>
+                        <DialogDescription className="text-[var(--editor-text-muted)]">
                             {le.confirmRemove}
                         </DialogDescription>
                     </DialogHeader>
@@ -187,7 +187,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                         <button
                             type="button"
                             onClick={() => setShowRemoveDialog(false)}
-                            className="flex-1 rounded-[10px] border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] py-2 text-[13px] font-medium dark:text-slate-300 text-slate-600 dark:hover:bg-white/5 hover:bg-slate-50 transition-colors"
+                            className="flex-1 rounded-[10px] border border-[var(--editor-border)] py-2 text-[13px] font-medium text-[var(--editor-text-muted)] hover:bg-white/5 transition-colors"
                         >
                             {le.cancel}
                         </button>

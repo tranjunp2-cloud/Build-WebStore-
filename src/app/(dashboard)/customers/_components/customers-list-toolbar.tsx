@@ -48,9 +48,9 @@ function FilterChip<T extends string>({
                 onClick={() => setOpen(v => !v)}
                 className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
-                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--dash-border)',
-                    color: active ? '#60a5fa' : 'var(--dash-text-muted)',
+                    background: active ? 'hsl(var(--primary)/0.12)' : 'transparent',
+                    border: active ? '1px solid hsl(var(--primary)/0.4)' : '1px solid hsl(var(--input-border))',
+                    color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                 }}
             >
                 {icon}
@@ -145,9 +145,9 @@ function DateFilterChip({
                 onClick={() => setOpen(v => !v)}
                 className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
-                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(59,130,246,0.4)' : '1px solid var(--dash-border)',
-                    color: active ? '#60a5fa' : 'var(--dash-text-muted)',
+                    background: active ? 'hsl(var(--primary)/0.12)' : 'transparent',
+                    border: active ? '1px solid hsl(var(--primary)/0.4)' : '1px solid hsl(var(--input-border))',
+                    color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                 }}
             >
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--dash-text-muted)' }} />
@@ -179,7 +179,7 @@ function DateFilterChip({
                         onClick={() => onChange('customRange')}
                         className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
                         style={{
-                            color: value === 'customRange' ? '#60a5fa' : 'var(--dash-text-muted)',
+                            color: value === 'customRange' ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                             fontWeight: value === 'customRange' ? 500 : 400,
                             borderTop: '1px solid var(--dash-border)',
                         }}
@@ -277,7 +277,7 @@ export function CustomersListToolbar({
     const unrankedBadge = (
         <span
             className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold"
-            style={{ background: 'rgba(107,114,128,0.08)', color: 'var(--dash-text-muted)', border: '1px solid rgba(107,114,128,0.20)' }}
+            style={{ background: 'hsl(var(--muted-foreground)/0.08)', color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--muted-foreground)/0.2)' }}
         >
             {tb.unranked}
         </span>

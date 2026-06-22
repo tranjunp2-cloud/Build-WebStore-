@@ -89,10 +89,10 @@ function SortableTh({
                 {label}
                 <span className="inline-flex flex-col gap-[1px]">
                     <ChevronUp
-                        className={cn('w-3 h-3 -mb-[3px]', active && dir === 'asc' ? 'text-blue-400' : 'opacity-20')}
+                        className={cn('w-3 h-3 -mb-[3px]', active && dir === 'asc' ? 'text-[hsl(var(--primary))]' : 'opacity-20')}
                     />
                     <ChevronDown
-                        className={cn('w-3 h-3', active && dir === 'desc' ? 'text-blue-400' : 'opacity-20')}
+                        className={cn('w-3 h-3', active && dir === 'desc' ? 'text-[hsl(var(--primary))]' : 'opacity-20')}
                     />
                 </span>
             </span>

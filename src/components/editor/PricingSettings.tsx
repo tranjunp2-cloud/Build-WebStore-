@@ -97,7 +97,7 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
     return (
         <div className="mb-3 space-y-3">
             {/* Plans Management — always expanded, no chevron */}
-            <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[hsl(var(--info)/0.04)] rounded-xl overflow-hidden">
                 <div className="flex items-center px-3 h-12">
                     <span className="text-sm font-medium text-white">{s.pricingManagement}</span>
                 </div>
@@ -105,8 +105,8 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                     {/* Stepper — always first */}
                     <div className="flex gap-4 items-center">
                         <div className="w-[100px] shrink-0">
-                            <p className="text-[12px] font-medium text-[#94a3b8] leading-4">{s.pricingNumberOfPlans}</p>
-                            <p className="text-[10px] text-[#94a3b8] leading-4">{s.pricingPlansMinMax}</p>
+                            <p className="text-[12px] font-medium text-[var(--editor-text-muted)] leading-4">{s.pricingNumberOfPlans}</p>
+                            <p className="text-[10px] text-[var(--editor-text-muted)] leading-4">{s.pricingPlansMinMax}</p>
                         </div>
                         <div className="flex flex-1 items-center justify-center gap-2">
                             <button
@@ -114,11 +114,11 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                                 aria-label={s.pricingDecreasePlanCount}
                                 disabled={count <= 1}
                                 onClick={handleDecrement}
-                                className="h-[38px] w-[38px] rounded-xl bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] flex items-center justify-center text-blue-400 disabled:opacity-30 transition-colors"
+                                className="h-[38px] w-[38px] rounded-xl bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.3)] flex items-center justify-center text-blue-400 disabled:opacity-30 transition-colors"
                             >
                                 <Minus className="w-4 h-4" />
                             </button>
-                            <div className="h-[38px] w-11 rounded-xl bg-[rgba(31,41,55,0.5)] flex items-center justify-center text-white text-sm font-medium">
+                            <div className="h-[38px] w-11 rounded-xl bg-[var(--editor-surface-elevated)] flex items-center justify-center text-white text-sm font-medium">
                                 {count}
                             </div>
                             <button
@@ -126,7 +126,7 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                                 aria-label={s.pricingIncreasePlanCount}
                                 disabled={count >= 3}
                                 onClick={handleIncrement}
-                                className="h-[38px] w-[38px] rounded-xl border border-[rgba(31,41,55,0.3)] flex items-center justify-center text-gray-400 disabled:opacity-30 hover:bg-white/5 transition-colors"
+                                className="h-[38px] w-[38px] rounded-xl border border-[var(--editor-border)] flex items-center justify-center text-gray-400 disabled:opacity-30 hover:bg-white/5 transition-colors"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -136,10 +136,10 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                     {/* Discount section — toggle variant only, always visible */}
                     {block.variant === 'toggle' && (
                         <>
-                            <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercentage}</p>
+                            <p className="text-[12px] font-medium text-[var(--editor-text-muted)]">{s.pricingDiscountPercentage}</p>
                             <div className="flex gap-3">
                                 <div className="flex-1 space-y-1.5">
-                                    <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingCycle1}</p>
+                                    <p className="text-[12px] font-medium text-[var(--editor-text-muted)]">{s.pricingCycle1}</p>
                                     <Input
                                         value={localCycle1}
                                         placeholder={s.pricingCycle1Placeholder}
@@ -150,7 +150,7 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                                     />
                                 </div>
                                 <div className="flex-1 space-y-1.5">
-                                    <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingCycle2}</p>
+                                    <p className="text-[12px] font-medium text-[var(--editor-text-muted)]">{s.pricingCycle2}</p>
                                     <Input
                                         value={localCycle2}
                                         placeholder={s.pricingCycle2Placeholder}
@@ -163,7 +163,7 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-1">
-                                    <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercent}</p>
+                                    <p className="text-[12px] font-medium text-[var(--editor-text-muted)]">{s.pricingDiscountPercent}</p>
                                     <Info className="w-3 h-3 text-gray-500" />
                                 </div>
                                 <div className="relative">
@@ -199,9 +199,9 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
             </div>
 
             {/* Plan tabs + Plan fields — separate container, always visible */}
-            <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden p-px">
+            <div className="bg-[var(--editor-surface-elevated)] border border-[hsl(var(--info)/0.04)] rounded-xl overflow-hidden p-px">
                 {/* Tab bar */}
-                <div className="bg-[#080e1d] flex gap-2 p-1 rounded-xl">
+                <div className="bg-[var(--editor-bg)] flex gap-2 p-1 rounded-xl">
                     {(plans.length > 0 ? plans : [null]).map((_, i) => (
                         <button
                             key={i}
@@ -210,8 +210,8 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                             className={cn(
                                 'flex-1 py-2 rounded-lg text-[12px] font-bold transition-colors',
                                 activeTab === i
-                                    ? 'bg-[rgba(77,142,255,0.1)] text-[#adc6ff]'
-                                    : 'text-[#c2c6d6] hover:bg-white/5'
+                                    ? 'bg-[hsl(var(--info)/0.1)] text-[hsl(var(--info))]'
+                                    : 'text-[var(--editor-text-muted)] hover:bg-white/5'
                             )}
                         >
                             {ti(s.pricingPlanTab, { n: i + 1 })}

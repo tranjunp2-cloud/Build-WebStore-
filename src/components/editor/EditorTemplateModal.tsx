@@ -189,7 +189,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                 <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
                 <div
-                    className="relative flex h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0B1120]"
+                    className="relative flex h-[90vh] w-[95vw] max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--editor-bg)]"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -270,7 +270,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                                         }}
                                         onMouseEnter={(e) => handleCardMouseEnter(template, e)}
                                         onMouseLeave={handleCardMouseLeave}
-                                        className="outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1120] rounded-2xl"
+                                        className="outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--editor-bg)] rounded-2xl"
                                     >
                                         <TemplateCard
                                             template={template}
@@ -289,7 +289,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
             {/* Hover preview tooltip (desktop only) */}
             {hoverPreview && (
                 <div
-                    className="fixed z-[100] hidden lg:block rounded-xl border border-white/10 bg-[#0B1120] p-3 shadow-2xl w-[420px]"
+                    className="fixed z-[100] hidden lg:block rounded-xl border border-white/10 bg-[var(--editor-bg)] p-3 shadow-2xl w-[420px]"
                     style={{
                         top: Math.min(hoverPreview.rect.top, typeof window !== 'undefined' ? window.innerHeight - 380 : 400),
                         left: hoverPreview.rect.right + 16,
@@ -326,7 +326,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                         onClick={() => !isApplying && setConfirmTemplate(null)}
                     />
                     <div
-                        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6"
+                        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[var(--editor-bg)] p-6"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="mb-4 flex items-center gap-3">

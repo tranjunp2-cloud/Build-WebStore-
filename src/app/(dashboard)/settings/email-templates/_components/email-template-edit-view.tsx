@@ -8,6 +8,7 @@ import type { ContentFields } from '../actions'
 import type { TemplateRow } from './EmailTemplatesClient'
 import { EmailTemplateFormCard } from './email-template-form-card'
 import { EmailPreviewPane } from './EmailPreviewPane'
+import { Button } from '@/components/ui/button'
 
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
@@ -92,7 +93,7 @@ export function EmailTemplateEditView({
                     <ArrowLeft className="h-4 w-4" />
                 </button>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 shrink-0">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shrink-0">
                     <Mail className="h-5 w-5 text-white" />
                 </div>
 
@@ -100,7 +101,7 @@ export function EmailTemplateEditView({
                     <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-lg font-bold text-white">{toLabel(templateType)}</h2>
                         {isCustomized && (
-                            <span className="bg-blue-500/15 text-blue-400 text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded">
+                            <span className="bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))] text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded">
                                 {et.customized}
                             </span>
                         )}
@@ -118,31 +119,35 @@ export function EmailTemplateEditView({
 
                 {/* Header action buttons */}
                 <div className="flex items-center gap-2 shrink-0">
-                    <button
+                    <Button
                         type="button"
                         onClick={onSendTest}
                         disabled={isSendingTest}
-                        className="flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white disabled:opacity-50 transition-colors"
+                        variant="dashSecondary"
+                        size="dash"
+                        className="text-xs"
                         title={et.sendTestTitle}
                     >
                         <Send className="h-3.5 w-3.5" />
                         {isSendingTest ? et.sending : et.sendTest}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
                         onClick={onOpenInNewTab}
-                        className="flex items-center gap-1.5 rounded-lg border border-white/[0.1] bg-white/[0.06] px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                        variant="dashSecondary"
+                        size="dash"
+                        className="text-xs"
                         title={et.openInNewTabTitle}
                     >
                         <ExternalLink className="h-3.5 w-3.5" />
                         {et.openInNewTab}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Save error banner */}
             {saveError && (
-                <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     {saveError}
                 </div>

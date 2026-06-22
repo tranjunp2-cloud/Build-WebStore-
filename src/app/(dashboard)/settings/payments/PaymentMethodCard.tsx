@@ -8,10 +8,10 @@ import { useI18n } from '@/i18n';
 type IconTone = 'brand' | 'purple' | 'amber' | 'teal' | '';
 
 const TONE: Record<string, string> = {
-    brand:  'bg-sky-500/10 border-sky-500/[0.25] text-sky-600 dark:text-sky-400',
-    purple: 'bg-purple-500/10 border-purple-500/[0.22] text-purple-600 dark:text-purple-300',
-    amber:  'bg-amber-500/10 border-amber-500/[0.22] text-amber-600 dark:text-amber-400',
-    teal:   'bg-teal-400/10 border-teal-400/[0.22] text-teal-600 dark:text-teal-400',
+    brand:  'bg-[hsl(var(--info)/0.1)] border-[hsl(var(--info)/0.25)] text-[hsl(var(--info))]',
+    purple: 'bg-[hsl(var(--success)/0.1)] border-[hsl(var(--success)/0.22)] text-[hsl(var(--success))]',
+    amber:  'bg-[hsl(var(--warning)/0.1)] border-[hsl(var(--warning)/0.22)] text-[hsl(var(--warning))]',
+    teal:   'bg-[hsl(var(--primary)/0.1)] border-[hsl(var(--primary)/0.22)] text-[hsl(var(--primary))]',
     '':     'bg-white/[0.04] border-white/[0.08] text-slate-400',
 };
 
@@ -42,8 +42,8 @@ export function PaymentMethodCard({
         <div className={cn(
             'rounded-[16px] p-[20px_22px] border transition-all duration-200',
             'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
-            locked ? 'bg-[#0f1729] border-dash-border' : 'bg-[#141e2e] border-dash-border',
-            highlight && !locked && 'border-sky-500/[0.30] shadow-[0_0_0_1px_rgba(14,165,233,0.18),0_8px_24px_-8px_rgba(14,165,233,0.18)]',
+            locked ? 'bg-[hsl(var(--background))] border-dash-border' : 'bg-[hsl(var(--card))] border-dash-border',
+            highlight && !locked && 'border-[hsl(var(--info)/0.3)] shadow-[0_0_0_1px_hsl(var(--info)/0.18),0_8px_24px_-8px_hsl(var(--info)/0.18)]',
         )}>
             <div className="flex items-start gap-4">
                 {/* Icon */}
@@ -84,8 +84,8 @@ export function PaymentMethodCard({
                                     locked && 'opacity-45 cursor-not-allowed',
                                 )}
                                 style={isActive ? {
-                                    background: 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                                    boxShadow: '0 0 12px rgba(14,165,233,0.40)',
+                                    background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)',
+                                    boxShadow: '0 0 12px hsl(var(--info)/0.40)',
                                     borderColor: 'transparent',
                                 } : undefined}
                                 onClick={() => !locked && onChange(!on)}
@@ -99,13 +99,13 @@ export function PaymentMethodCard({
                             </button>
 
                             {locked && (
-                                <div className="absolute -top-[7px] -right-[7px] w-[18px] h-[18px] rounded-full bg-[#1a2540] border border-white/[0.08] grid place-items-center text-amber-400">
+                                <div className="absolute -top-[7px] -right-[7px] w-[18px] h-[18px] rounded-full bg-[hsl(var(--card))] border border-white/[0.08] grid place-items-center text-warning">
                                     <Lock className="w-[10px] h-[10px]" />
                                 </div>
                             )}
                             {locked && lockTip && (
-                                <div className="absolute top-[calc(100%+8px)] right-0 hidden group-hover/sw:flex items-center gap-[6px] px-[11px] py-[7px] bg-[#1a2540] border border-white/[0.08] text-slate-50 text-[12px] font-medium rounded-[8px] shadow-lg whitespace-nowrap z-10 pointer-events-none">
-                                    <Lock className="w-3 h-3 text-amber-400" />
+                                <div className="absolute top-[calc(100%+8px)] right-0 hidden group-hover/sw:flex items-center gap-[6px] px-[11px] py-[7px] bg-[hsl(var(--card))] border border-white/[0.08] text-slate-50 text-[12px] font-medium rounded-[8px] shadow-lg whitespace-nowrap z-10 pointer-events-none">
+                                    <Lock className="w-3 h-3 text-warning" />
                                     {lockTip}
                                 </div>
                             )}
@@ -115,11 +115,11 @@ export function PaymentMethodCard({
                     {/* Status row */}
                     <div className="flex items-center gap-2 mt-[14px] flex-wrap">
                         {locked ? (
-                            <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-amber-500/[0.08] border-amber-500/[0.22] text-amber-400">
+                            <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-warning/[0.08] border-warning/[0.22] text-warning">
                                 <Lock className="w-3 h-3" /> {pt.statusLocked}
                             </span>
                         ) : isActive ? (
-                            <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-emerald-500/10 border-emerald-500/30 text-emerald-300">
+                            <span className="inline-flex items-center gap-[6px] px-[10px] py-[5px] rounded-[8px] text-[12px] font-semibold border bg-success/10 border-success/30 text-success">
                                 <Check className="w-3 h-3" /> {pt.active}
                             </span>
                         ) : (

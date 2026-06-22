@@ -154,7 +154,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
             <div className="flex flex-col p-[1px] w-full xl:w-[768px] max-h-[90vh] items-start bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-t-[16px] xl:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 duration-300">
                 {/* Mobile drag handle */}
                 <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
-                    <div className="bg-[rgba(255,255,255,0.2)] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
+                    <div className="bg-[hsl(var(--border))] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
                 </div>
                 {/* Header (31611:5304) */}
                 <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px]" style={{ borderBottom: '1px solid var(--dash-border)' }}>
@@ -212,14 +212,14 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                     disabled={isUpdating || !editName.trim()}
                                                     className="flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50"
                                                 >
-                                                    {isUpdating ? <Loader2 className="w-[24px] h-[24px] text-[#10B981] animate-spin" /> : <Check className="w-[24px] h-[24px] text-[#10B981]" strokeWidth={2} />}
+                                                    {isUpdating ? <Loader2 className="w-[24px] h-[24px] text-[hsl(var(--success))] animate-spin" /> : <Check className="w-[24px] h-[24px] text-[hsl(var(--success))]" strokeWidth={2} />}
                                                 </button>
                                                 <button
                                                     onClick={(e) => { e.preventDefault(); setEditingId(null); setEditName(''); }}
                                                     disabled={isUpdating}
                                                     className="flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-50"
                                                 >
-                                                    <X className="w-[24px] h-[24px] text-[#EF4444]" strokeWidth={2} />
+                                                    <X className="w-[24px] h-[24px] text-[hsl(var(--destructive))]" strokeWidth={2} />
                                                 </button>
                                             </div>
                                         </div>
@@ -241,7 +241,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                     onClick={(e) => { e.preventDefault(); startEditing(cat); }}
                                                     className="flex flex-col items-center pt-[8px] px-[8px] pb-0 w-[32px] h-[32px] rounded-[12px] hover:bg-white/10 transition-colors"
                                                 >
-                                                    <Pencil className="w-[16px] h-[16px] text-[#3B82F6]" strokeWidth={1.333} />
+                                                    <Pencil className="w-[16px] h-[16px] text-[hsl(var(--primary))]" strokeWidth={1.333} />
                                                 </button>
                                                 <button
                                                     onClick={(e) => { e.preventDefault(); openDeleteModal(cat); }}
@@ -249,8 +249,8 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                     className="flex flex-col items-center pt-[8px] px-[8px] pb-0 w-[32px] h-[32px] rounded-[12px] hover:bg-white/10 transition-colors disabled:opacity-50"
                                                 >
                                                     {fetchingDeleteId === cat.id
-                                                        ? <Loader2 className="w-[16px] h-[16px] text-[#EF4444] animate-spin" strokeWidth={1.333} />
-                                                        : <Trash2 className="w-[16px] h-[16px] text-[#EF4444]" strokeWidth={1.333} />
+                                                        ? <Loader2 className="w-[16px] h-[16px] text-[hsl(var(--destructive))] animate-spin" strokeWidth={1.333} />
+                                                        : <Trash2 className="w-[16px] h-[16px] text-[hsl(var(--destructive))]" strokeWidth={1.333} />
                                                     }
                                                 </button>
                                             </div>
@@ -267,9 +267,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                         className="flex flex-row items-center w-full gap-[6px] hover:opacity-80 transition-opacity"
                     >
                         {showCreateInput ? (
-                            <Minus className="w-[24px] h-[24px] text-[#3B82F6]" strokeWidth={2} />
+                            <Minus className="w-[24px] h-[24px] text-[hsl(var(--primary))]" strokeWidth={2} />
                         ) : (
-                            <Plus className="w-[24px] h-[24px] text-[#3B82F6]" strokeWidth={2} />
+                            <Plus className="w-[24px] h-[24px] text-[hsl(var(--primary))]" strokeWidth={2} />
                         )}
                         <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.addNewBtn}</span>
                     </button>
@@ -290,7 +290,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                 <button
                                     onClick={handleCreate}
                                     disabled={!newName.trim() || isCreating}
-                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-gradient-to-r from-teal-400 to-blue-500 hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
                                 >
                                     {isCreating ? <Loader2 className="w-[20px] h-[20px] text-white animate-spin" /> : <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.saveBtn}</span>}
                                 </button>
@@ -315,8 +315,8 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 rounded-[16px]">
                     <div className="flex flex-col shrink-0 items-center gap-[13px] p-[25px_10px] w-full max-w-[433px] bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-[16px] relative">
                         {/* Icon Container */}
-                        <div className="flex justify-center items-center px-[16px] w-[64px] h-[64px] bg-[rgba(240,177,0,0.1)] rounded-full">
-                            <AlertTriangle className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={2.666} />
+                        <div className="flex justify-center items-center px-[16px] w-[64px] h-[64px] bg-[hsl(var(--warning)/0.1)] rounded-full">
+                            <AlertTriangle className="w-[32px] h-[32px] text-[hsl(var(--warning))]" strokeWidth={2.666} />
                         </div>
 
                         {/* Heading */}
@@ -332,9 +332,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                         </div>
 
                         {deletePublishedCount > 0 && (
-                            <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 mx-[10px] w-full max-w-[398px]">
-                                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                                <p className="text-xs text-yellow-400">
+                            <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 px-4 py-3 mx-[10px] w-full max-w-[398px]">
+                                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-warning">
                                     {t.dashboard.blog.categoryModal.deletePublishedWarning.replace('{count}', String(deletePublishedCount))}
                                 </p>
                             </div>

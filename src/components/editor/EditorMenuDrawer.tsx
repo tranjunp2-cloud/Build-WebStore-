@@ -145,7 +145,7 @@ export function EditorMenuDrawer({
                     // Identical sizing to the dashboard sidebar renderLeaf (1:1 parity)
                     'no-underline flex items-center gap-3 px-4 rounded-[12px] h-[32px] 2xl:h-[34px] text-[13px] font-medium leading-[1.43] transition-colors',
                     isActive
-                        ? 'bg-[rgba(6,182,212,0.12)] text-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.25)]'
+                        ? 'bg-[hsl(var(--info)/0.12)] text-[hsl(var(--info))] shadow-[0_0_16px_hsl(var(--info)/0.25)]'
                         : 'text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text',
                 )}
                 aria-current={isActive ? 'page' : undefined}
@@ -156,7 +156,7 @@ export function EditorMenuDrawer({
                     <span className={cn(
                         'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none',
                         isActive
-                            ? 'bg-[rgba(6,182,212,0.15)] text-[#06B6D4]'
+                            ? 'bg-[hsl(var(--info)/0.15)] text-[hsl(var(--info))]'
                             : 'bg-dash-surface-hover text-dash-text-muted'
                     )}>
                         {formatBadgeCount(count)}
@@ -181,11 +181,11 @@ export function EditorMenuDrawer({
                             alt="PrimeWeb Logo"
                             width={28}
                             height={28}
-                            className="object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                            className="object-contain drop-shadow-[0px_0px_12px_hsl(var(--info)/0.6)]"
                         />
                         <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
                             <span className="text-dash-text">Prime</span>
-                            <span className="text-[#06B6D4]">Web</span>
+                            <span className="text-[hsl(var(--info))]">Web</span>
                         </div>
                     </div>
                     <button
@@ -219,7 +219,7 @@ export function EditorMenuDrawer({
                             onClick={guardedNavigate('/settings/profile')}
                             className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-dash-border pl-4 pr-px py-px transition-colors hover:bg-dash-surface-hover"
                         >
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_rgba(6,182,212,0.3)]">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_hsl(var(--info)/0.3)]">
                                 {userAvatarUrl
                                     ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="h-full w-full object-cover" />
                                     : <span className="text-[12px] font-bold text-dash-text">{userInitial || '?'}</span>
@@ -247,8 +247,8 @@ export function EditorMenuDrawer({
                             className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[16px] border border-dash-border text-dash-text-muted transition-colors hover:bg-dash-surface-hover hover:text-dash-text"
                         >
                             {isDark
-                                ? <Sun className="h-5 w-5" style={{ color: '#fbbf24' }} />
-                                : <Moon className="h-5 w-5" style={{ color: '#fbbf24' }} />}
+                                ? <Sun className="h-5 w-5" style={{ color: 'hsl(var(--warning))' }} />
+                                : <Moon className="h-5 w-5" style={{ color: 'hsl(var(--warning))' }} />}
                         </button>
                         <div className="notification-bell-sidebar">
                             <NotificationBell />
@@ -272,10 +272,10 @@ export function EditorMenuDrawer({
             </aside>
 
             <Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null) }}>
-                <DialogContent className="editor-portal max-w-sm dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#0F172A] bg-white dark:text-white text-slate-900">
+                <DialogContent className="editor-portal max-w-sm border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)]">
                     <DialogHeader>
-                        <DialogTitle className="dark:text-white text-slate-900">{menu.unsavedTitle}</DialogTitle>
-                        <DialogDescription className="dark:text-slate-400 text-slate-500">
+                        <DialogTitle className="text-[var(--editor-text)]">{menu.unsavedTitle}</DialogTitle>
+                        <DialogDescription className="text-[var(--editor-text-muted)]">
                             {menu.unsavedConfirm}
                         </DialogDescription>
                     </DialogHeader>
@@ -283,7 +283,7 @@ export function EditorMenuDrawer({
                         <button
                             type="button"
                             onClick={() => setPendingAction(null)}
-                            className="flex-1 rounded-[10px] border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] py-2 text-[13px] font-medium dark:text-slate-300 text-slate-600 dark:hover:bg-white/5 hover:bg-slate-50 transition-colors"
+                            className="flex-1 rounded-[10px] border border-[var(--editor-border)] py-2 text-[13px] font-medium text-[var(--editor-text-muted)] hover:bg-white/5 transition-colors"
                         >
                             {menu.unsavedStay}
                         </button>

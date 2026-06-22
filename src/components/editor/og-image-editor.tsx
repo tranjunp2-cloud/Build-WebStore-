@@ -54,7 +54,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
         <div className="space-y-2">
             <input ref={fileInputRef} type="file" className="hidden" accept={ACCEPTED} onChange={handleFileSelect} />
             {currentOgImage ? (
-                <div className="relative rounded-[12px] border border-white/[0.08] bg-[rgba(11,17,32,0.3)] overflow-hidden">
+                <div className="relative rounded-[12px] border border-white/[0.08] bg-[var(--editor-bg)] overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={currentOgImage} alt="Social preview" className="w-full aspect-[1200/630] object-cover" />
                     <div className="flex items-center justify-between gap-2 p-2">
@@ -81,10 +81,10 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.3)] px-0 py-[26px] text-center hover:bg-[rgba(17,24,39,0.55)] disabled:opacity-60"
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-[var(--editor-border)] bg-[var(--editor-bg)] px-0 py-[26px] text-center hover:bg-[var(--editor-surface-elevated)] disabled:opacity-60"
                 >
                     {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />}
-                    <span className="text-xs font-medium text-[#94A3B8]">
+                    <span className="text-xs font-medium text-[var(--editor-text-muted)]">
                         {isUploading ? oi.uploading : oi.clickToUpload}
                     </span>
                 </button>

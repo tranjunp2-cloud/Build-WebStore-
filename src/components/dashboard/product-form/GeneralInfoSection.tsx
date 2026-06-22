@@ -30,12 +30,12 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
     const images = watch('images')
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-6">
-            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.general || 'General Information'}</h2>
+        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-6">
+            <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.general || 'General Information'}</h2>
             
             {/* Product Name */}
             <div className="flex flex-col gap-2">
-                <label className="text-[14px] font-medium text-[#F8FAFC] flex items-center gap-1 leading-[1.43]">
+                <label className="text-[14px] font-medium text-foreground flex items-center gap-1 leading-[1.43]">
                     {t.dashboard.products.form.sections?.productName || 'Product Name *'}
                 </label>
                 <input
@@ -47,17 +47,17 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                         }
                     })}
                     placeholder={t.dashboard.products.form.sections?.productNamePlaceholder || 'Enter product name'}
-                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
+                    className="w-full rounded-2xl border border-white/[0.08] bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
                 />
                 {errors.name && (
-                    <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>
+                    <p className="text-xs text-destructive mt-1">{errors.name.message}</p>
                 )}
             </div>
 
             {/* Category */}
             <div className="flex flex-col gap-2" id="categoryIds">
-                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
-                    {t.dashboard.products.form.sections?.category || 'Category'} <span className="text-[#F8FAFC]">*</span>
+                <label className="text-[14px] font-medium text-foreground leading-[1.43]">
+                    {t.dashboard.products.form.sections?.category || 'Category'} <span className="text-foreground">*</span>
                 </label>
                 <CategorySelect 
                     categories={categories}
@@ -69,7 +69,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
 
             {/* Images */}
             <div className="flex flex-col gap-2" id="images">
-                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
+                <label className="text-[14px] font-medium text-foreground leading-[1.43]">
                     {t.dashboard.products.form.sections?.images || 'Images (Up to 5 images, each < 5MB)'}
                 </label>
                 <ImageUploader 
@@ -79,7 +79,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                     maxSizeMB={5}
                 />
                 {errors.images && (
-                    <p className="text-xs text-red-500 mt-1">{errors.images.message}</p>
+                    <p className="text-xs text-destructive mt-1">{errors.images.message}</p>
                 )}
             </div>
         </div>

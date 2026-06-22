@@ -28,23 +28,23 @@ export function AwaitingVerificationChip() {
                 alignItems: 'center',
                 gap: 6,
                 padding: '6px 14px',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
+                border: '1px solid hsl(var(--warning)/0.4)',
                 borderRadius: 8,
-                background: 'rgba(245, 158, 11, 0.08)',
+                background: 'hsl(var(--warning)/0.08)',
                 cursor: 'default',
                 alignSelf: 'flex-start',
             }}
         >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6.666" stroke="#F59E0B" strokeWidth="1.33" />
-                <path d="M8 5v3.5l2 1" stroke="#F59E0B" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8" cy="8" r="6.666" stroke="hsl(var(--warning))" strokeWidth="1.33" />
+                <path d="M8 5v3.5l2 1" stroke="hsl(var(--warning))" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span
                 style={{
                     fontFamily: 'Inter, sans-serif',
                     fontWeight: 600,
                     fontSize: 13,
-                    color: '#F59E0B',
+                    color: 'hsl(var(--warning))',
                 }}
             >
                 Awaiting Verification ({count})

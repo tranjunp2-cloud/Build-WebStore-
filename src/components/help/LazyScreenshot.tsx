@@ -26,13 +26,13 @@ export function LazyScreenshot({
   // QA TC-F20.11: Định hình chiếm dụng vùng nhớ khung Skeleton Aspect-Ratio để không làm CLS (Cumulative Layout Shift)
   return (
     <div 
-      className={`group relative w-full cursor-pointer overflow-hidden rounded-md border border-[#1F2937] bg-[#1F2937] transition-all duration-250 hover:border-blue-500 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)] ${hasError ? 'h-[200px]' : ''}`}
+      className={`group relative w-full cursor-pointer overflow-hidden rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] transition-all duration-250 hover:border-[hsl(var(--primary))] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)] ${hasError ? 'h-[200px]' : ''}`}
       style={hasError ? {} : { aspectRatio }}
       onClick={onClick}
     >
       {/* Fallback khi Image die link (Error) */}
       {hasError ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#9CA3AF]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[hsl(var(--muted-foreground))]">
           <Camera className="w-8 h-8 mb-1" aria-hidden />
           <span className="text-[13px] font-medium opacity-80 decoration-0">{ti(t.help.modules.lazyScreenshot.screenshot, { title })}</span>
         </div>
@@ -40,9 +40,9 @@ export function LazyScreenshot({
         <>
           {/* Skeleton Loading State */}
           {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#1F2937] animate-pulse">
-              <Camera className="w-8 h-8 text-[#9CA3AF] opacity-30" />
-              <span className="text-[13px] text-[#9CA3AF] opacity-50">{title}</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[hsl(var(--secondary))] animate-pulse">
+              <Camera className="w-8 h-8 text-[hsl(var(--muted-foreground))] opacity-30" />
+              <span className="text-[13px] text-[hsl(var(--muted-foreground))] opacity-50">{title}</span>
             </div>
           )}
 

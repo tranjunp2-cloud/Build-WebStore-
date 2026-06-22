@@ -190,14 +190,14 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
-                        <Link href="/products" className="flex shrink-0 items-center justify-center text-[#F8FAFC] hover:text-[#F8FAFC]/80 transition-colors">
+                        <Link href="/products" className="flex shrink-0 items-center justify-center text-foreground hover:text-foreground/80 transition-colors">
                             <ArrowLeft className="h-6 w-6" />
                         </Link>
                         <div className="flex flex-col gap-1">
-                            <h1 className="text-[24px] font-bold font-outfit text-[#F8FAFC] leading-[1.33] m-0">
+                            <h1 className="text-[24px] font-bold font-outfit text-foreground leading-[1.33] m-0">
                                 {isEdit ? t.dashboard.products.form.editProduct : t.dashboard.products.addProduct}
                             </h1>
-                            <p className="text-[14px] text-[#F8FAFC]/60 leading-[1.43] m-0">{t.dashboard.products.form.fillInfo}</p>
+                            <p className="text-[14px] text-foreground/60 leading-[1.43] m-0">{t.dashboard.products.form.fillInfo}</p>
                         </div>
                     </div>
                 </div>
@@ -212,19 +212,19 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 </div>
 
                 {/* Fixed Footer Actions */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-[#0B1120] border-t border-white/[0.08] px-8 py-[18px]">
-                    <div className="flex flex-row items-center gap-3 w-full bg-[#0B1120]">
+                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-background border-t border-white/[0.08] px-8 py-[18px]">
+                    <div className="flex flex-row items-center gap-3 w-full bg-background">
                         <button
                             type="button"
                             onClick={() => router.push('/products')}
-                            className="flex-1 h-12 rounded-2xl border border-solid border-[#F8FAFC]/30 bg-transparent text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors flex items-center justify-center"
+                            className="flex-1 h-12 rounded-2xl border border-solid border-[hsl(var(--input-border))] bg-transparent text-[16px] font-medium text-foreground hover:bg-white/5 transition-colors flex items-center justify-center"
                         >
                             {t.dashboard.products.form.cancel}
                         </button>
                         <button
                             type="submit"
                             disabled={isSaving}
-                            className="flex-1 h-12 rounded-2xl border-none outline-none bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-[16px] font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-[9px]"
+                            className="flex-1 h-12 rounded-2xl border-none outline-none bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] text-[16px] font-semibold !text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-[9px]"
                         >
                             <Save className="w-5 h-5 flex-shrink-0" />
                             <span>{isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}</span>

@@ -40,17 +40,17 @@ const STATUS_BADGE: Record<OrderStatus, {
     bg?: string
     borderColor?: string
 }> = {
-    pending:         { variant: 'warning',     dotColor: '#FF6900', textColor: '#FF8904', bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)' },
-    new:             { variant: 'warning',     dotColor: '#FF6900', textColor: '#FF8904', bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)' },
-    confirmed:       { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
-    ready_to_ship:   { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
-    shipped:         { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
-    completed:       { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
-    cancelled:       { variant: 'destructive', dotColor: '#FB2C36', textColor: '#FF6467', bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)' },
-    refunded:        { variant: 'secondary',   dotColor: '#B2354A', textColor: '#B2354A', bg: 'rgba(178,53,74,0.1)', borderColor: '#B2354A' },
-    paid:            { variant: 'success',     dotColor: '#00C950', textColor: '#05DF72', bg: 'rgba(0,201,80,0.1)',  borderColor: 'rgba(0,201,80,0.3)' },
-    processing:      { variant: 'default',     dotColor: '#3B82F6', textColor: '#3B82F6', bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)' },
-    payment_failed:  { variant: 'destructive', dotColor: '#FB2C36', textColor: '#FF6467', bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)' },
+    pending:         { variant: 'warning',     dotColor: 'hsl(var(--warning))',          textColor: 'hsl(var(--warning))',          bg: 'hsl(var(--warning)/0.1)',          borderColor: 'hsl(var(--warning)/0.3)' },
+    new:             { variant: 'warning',     dotColor: 'hsl(var(--warning))',          textColor: 'hsl(var(--warning))',          bg: 'hsl(var(--warning)/0.1)',          borderColor: 'hsl(var(--warning)/0.3)' },
+    confirmed:       { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
+    ready_to_ship:   { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
+    shipped:         { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
+    completed:       { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
+    cancelled:       { variant: 'destructive', dotColor: 'hsl(var(--destructive))',      textColor: 'hsl(var(--destructive))',      bg: 'hsl(var(--destructive)/0.1)',      borderColor: 'hsl(var(--destructive)/0.3)' },
+    refunded:        { variant: 'secondary',   dotColor: 'hsl(var(--muted-foreground))', textColor: 'hsl(var(--muted-foreground))', bg: 'hsl(var(--muted-foreground)/0.1)', borderColor: 'hsl(var(--muted-foreground)/0.3)' },
+    paid:            { variant: 'success',     dotColor: 'hsl(var(--success))',          textColor: 'hsl(var(--success))',          bg: 'hsl(var(--success)/0.1)',          borderColor: 'hsl(var(--success)/0.3)' },
+    processing:      { variant: 'default',     dotColor: 'hsl(var(--info))',             textColor: 'hsl(var(--info))',             bg: 'hsl(var(--info)/0.1)',             borderColor: 'hsl(var(--info)/0.3)' },
+    payment_failed:  { variant: 'destructive', dotColor: 'hsl(var(--destructive))',      textColor: 'hsl(var(--destructive))',      bg: 'hsl(var(--destructive)/0.1)',      borderColor: 'hsl(var(--destructive)/0.3)' },
 }
 
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
@@ -129,8 +129,8 @@ function Checkbox({
                     width: 18,
                     height: 18,
                     borderRadius: 6,
-                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid var(--dash-border)',
-                    background: checked || indeterminate ? '#2563EB' : 'transparent',
+                    border: checked || indeterminate ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--input-border))',
+                    background: checked || indeterminate ? 'hsl(var(--primary))' : 'transparent',
                     transition: 'background 0.2s, border 0.2s'
                 }}
             />
@@ -234,7 +234,7 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                             <div
                                 key={order.id}
                                 onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : newOrderIds?.has(order.id) ? 'bg-emerald-500/10 border-emerald-500/30' : isSelected ? 'bg-blue-500/5 border-dash-border' : 'bg-dash-surface border-dash-border'}`}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${isDetailOpen ? 'bg-[hsl(var(--primary)/0.1)] border-[hsl(var(--primary)/0.3)]' : newOrderIds?.has(order.id) ? 'bg-[hsl(var(--success)/0.1)] border-[hsl(var(--success)/0.3)]' : isSelected ? 'bg-[hsl(var(--primary)/0.05)] border-dash-border' : 'bg-dash-surface border-dash-border'}`}
                                 style={{ transition: 'background 1s ease-out, border-color 1s ease-out' }}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
@@ -316,10 +316,10 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                     clickable
                                     style={{
                                         background: isDetailOpen
-                                            ? 'rgba(59,130,246,0.12)'
+                                            ? 'hsl(var(--primary)/0.12)'
                                             : newOrderIds?.has(order.id)
-                                                ? 'rgba(0,201,80,0.12)'
-                                                : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                                ? 'hsl(var(--success)/0.12)'
+                                                : isSelected ? 'hsl(var(--primary)/0.06)' : undefined,
                                         transition: 'background 1s ease-out',
                                     }}
                                     onMouseEnter={e => {
