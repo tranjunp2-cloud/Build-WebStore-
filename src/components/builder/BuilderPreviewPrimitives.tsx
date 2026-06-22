@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { type ReactNode, useRef } from 'react'
 import { Monitor, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -55,6 +55,8 @@ interface BuilderMobilePreviewShellProps {
 }
 
 function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShellProps) {
+    // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
+    const vRef = useRef(Date.now())
     return (
         <div className="relative h-[812px] w-[375px] rounded-[48px] bg-[linear-gradient(114.79deg,#1e2939_0%,#101828_100%)] shadow-[0px_25px_50px_0px_rgba(0,0,0,0.25)]">
             <div className="absolute inset-[12px] overflow-hidden rounded-[40px] bg-[#0b1120]">
@@ -68,7 +70,7 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
                 </div>
                 {siteId ? (
                     <iframe
-                        src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
+                        src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
                         className="h-full w-full border-0"
                         title="Mobile preview"
                     />
@@ -100,6 +102,9 @@ export function BuilderPreviewSurface({
     children,
     siteId,
 }: BuilderPreviewSurfaceProps) {
+    // Stable cache-bust stamp — avoids iframe remount on every parent re-render.
+    const vRef = useRef(Date.now())
+
     if (mode === 'mobile') {
         return (
             <div className="flex h-full items-center justify-center">
@@ -113,7 +118,7 @@ export function BuilderPreviewSurface({
     // the builder. Without siteId (streaming phase) fall back to children (LivePreview).
     const desktopContent = siteId ? (
         <iframe
-            src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
+            src={`/preview/${siteId}?v=${vRef.current}&builder=1`}
             className="h-full w-full border-0"
             title="Website preview"
         />
