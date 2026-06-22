@@ -145,6 +145,24 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 
 ---
 
+## 3.8. refresh-token — Proactive JWT Refresh (Unit Tests)
+
+> Automated unit tests in `src/__tests__/unit/auth/refresh-token.test.ts`
+> Endpoint: `POST /api/auth/refresh-token` — re-mints payload-token cookie without hitting Payload's built-in refresh
+
+| ID | Loại | Tiêu Đề | Kết Quả Mong Đợi | Ưu Tiên |
+|:---|:---|:---|:---|:---:|
+| **TC-F02-RTOKEN-01** | `Unit` | Rate limit → 429 | Trả `{ error: "rate_limited" }` với header `Retry-After`. | High |
+| **TC-F02-RTOKEN-02** | `Unit` | Không có cookie payload-token → 401 | Trả `{ error: "No token found" }`. | Blocker |
+| **TC-F02-RTOKEN-03** | `Unit` | Token chữ ký không hợp lệ → 401 | jwtVerify ném lỗi → trả `{ error: "Invalid or expired token" }`. | Blocker |
+| **TC-F02-RTOKEN-04** | `Unit` | User không tồn tại trong DB → 403 | find() trả docs rỗng → trả `{ error: "User not found" }`. | Blocker |
+| **TC-F02-RTOKEN-05** | `Unit` | Tất cả tenant bị suspended → 403 (depth:0 raw IDs) | Với `depth: 0`, tenant IDs là số thô; suspension check vẫn hoạt động đúng. | High |
+| **TC-F02-RTOKEN-06** | `Unit` | Preserve mfa_verified:true từ token gốc | SignJWT được gọi với `mfa_verified: true` khi token gốc có claim này. | High |
+| **TC-F02-RTOKEN-07** | `Unit` | Mặc định mfa_verified=true khi claim vắng mặt | Token cũ (chưa có claim) → SignJWT vẫn nhận `mfa_verified: true`. | High |
+| **TC-F02-RTOKEN-08** | `Unit` | Happy path → 200, set httpOnly cookie | Trả `{ ok: true }`, cookie `payload-token` được set với `httpOnly: true`. | Blocker |
+
+---
+
 ## 4. End-to-End User Flow (Acceptance Test)
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

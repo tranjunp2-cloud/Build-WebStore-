@@ -63,10 +63,9 @@ export function TenantAccessWatcher() {
                         expiresAt - now < REFRESH_THRESHOLD &&
                         now - lastRefreshAtRef.current > REFRESH_THRESHOLD
                     ) {
-                        lastRefreshAtRef.current = now;
-                        fetch('/api/auth/refresh-token', { method: 'POST', cache: 'no-store' }).catch(
-                            (err) => console.warn('[TenantAccessWatcher] token refresh failed', err),
-                        );
+                        fetch('/api/auth/refresh-token', { method: 'POST', cache: 'no-store' })
+                            .then(() => { lastRefreshAtRef.current = now; })
+                            .catch((err) => console.warn('[TenantAccessWatcher] token refresh failed', err));
                     }
                     return;
                 }

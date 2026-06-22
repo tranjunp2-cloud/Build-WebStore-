@@ -43,9 +43,11 @@ export async function POST(req: NextRequest) {
         const secretKey = new TextEncoder().encode(secret);
 
         let userId: string | number | undefined;
+        let origMfaVerified = true;
         try {
             const { payload } = await jwtVerify(rawToken, secretKey, { algorithms: ['HS256'] });
             userId = payload.id as string | number | undefined;
+            origMfaVerified = Boolean(payload.mfa_verified ?? true);
         } catch {
             // Covers: expired, invalid signature, malformed
             return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
             collection: 'users',
             where: { id: { equals: userId } },
             limit: 1,
-            depth: 1,
+            depth: 0,
             overrideAccess: true,
         });
         const user = userResult.docs[0] ?? null;
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
             id: user.id,
             email: user.email,
             collection: 'users',
-            mfa_verified: true,
+            mfa_verified: origMfaVerified,
         })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt(now)
