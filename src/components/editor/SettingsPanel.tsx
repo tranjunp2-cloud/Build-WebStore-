@@ -775,8 +775,8 @@ function SettingsPanelInner({
                     <label className="text-xs font-medium uppercase text-gray-500">{s.googlePreview}</label>
                     {/* Google SERP mimic — intentional: bg-white + text colors simulate Google search result appearance */}
                     <div className="mt-3 rounded-[8px] border border-[var(--editor-border)] bg-white p-4">
-                        <div className="text-[14px] text-[#202124] truncate" style={{ fontFamily: 'arial,sans-serif' }}>{/* Google SERP mimic — intentional */}
-                            <span className="text-[12px] text-[#202124] flex items-center gap-2">
+                        <div className="text-[14px] truncate" style={{ fontFamily: 'arial,sans-serif', color: '#202124' }}>{/* Google SERP mimic — intentional: màu literal, bỏ class text-[#202124] để không bị .editor-shell remap về --editor-text ở dark */}
+                            <span className="text-[12px] flex items-center gap-2" style={{ color: '#202124' }}>
                                 <Globe2 className="w-4 h-4 text-slate-400" />
                                 {siteName || 'Your Website'}
                             </span>
