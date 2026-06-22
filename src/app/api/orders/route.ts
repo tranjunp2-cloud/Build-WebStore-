@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
 
 /**
  * GET /api/orders
@@ -27,7 +28,8 @@ export const GET = withAuth(async (user, request) => {
         const where: any = {}
 
         if (status && status !== 'all') {
-            where.status = { equals: status }
+            const groupStatuses = ORDER_STATUS_GROUPS[status]
+            where.status = groupStatuses ? { in: groupStatuses } : { equals: status }
         }
 
         if (paymentMethod) {
