@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -115,18 +116,17 @@ export default async function OrderConfirmPage({
                 shippingAddress: raw.shippingAddress,
             }
 
-            // Fire-and-forget: send one-time order-waiting reminder email
-            // Only for Stripe/Xendit awaiting_payment orders that haven't received a reminder yet
+            // One-time order-waiting reminder email for Stripe/Xendit awaiting_payment orders.
+            // Uses after() so Vercel keeps the function alive until the callback completes.
             const shouldSendReminder =
                 raw.paymentStatus === 'awaiting_payment' &&
-                raw.paymentMethod !== 'bank_transfer' &&
-                raw.paymentMethod !== 'cod' &&
+                (raw.paymentProvider === 'stripe' || raw.paymentProvider === 'xendit') &&
                 !raw.paymentReminderSentAt &&
                 raw.customerEmail &&
                 raw.magicLinkSecret
 
             if (shouldSendReminder) {
-                void (async () => {
+                after(async () => {
                     try {
                         const expSec = raw.paymentExpiresAt
                             ? Math.floor(new Date(raw.paymentExpiresAt).getTime() / 1000)
@@ -144,6 +144,13 @@ export default async function OrderConfirmPage({
                         const proto = srvUrl.startsWith('https') ? 'https' : 'http'
                         const apiOrigin = (!isLocal && platDomain) ? `${proto}://${slug}.${platDomain}` : srvUrl
                         const payUrl = `${apiOrigin}/api/orders/${raw.id}/confirm-redirect?slug=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}&cancelled=1`
+                        // Set flag first to prevent duplicate sends on concurrent page loads (TOCTOU guard)
+                        await payload.update({
+                            collection: 'orders',
+                            id: raw.id,
+                            data: { paymentReminderSentAt: new Date().toISOString() },
+                            overrideAccess: true,
+                        })
                         const shopName = tenant.name ?? slug
                         const template = orderWaitingEmail({
                             shopName,
@@ -169,6 +176,7 @@ export default async function OrderConfirmPage({
                             paymentMethod: raw.paymentMethod ?? '',
                             buyerNote: raw.notes ?? null,
                             payUrl,
+                            paymentExpiresAt: raw.paymentExpiresAt ?? null,
                             locale: 'en',
                         })
                         await sendEmail({
@@ -179,16 +187,10 @@ export default async function OrderConfirmPage({
                             recipient: 'buyer',
                             tenantId: tenant.id,
                         })
-                        await payload.update({
-                            collection: 'orders',
-                            id: raw.id,
-                            data: { paymentReminderSentAt: new Date().toISOString() },
-                            overrideAccess: true,
-                        })
                     } catch (err) {
                         console.error('[order-waiting] email send failed:', err)
                     }
-                })()
+                })
             }
         }
     } catch { }

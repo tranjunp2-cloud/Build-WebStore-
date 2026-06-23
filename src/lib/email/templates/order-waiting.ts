@@ -14,25 +14,27 @@ const locales = { en: en.email, ms: ms.email } as const
 const strings = {
     en: {
         subject: 'Complete your payment — Order',
-        body: "You placed an order but haven't completed payment yet. Your order is being held for 24 hours — complete your payment before time runs out.",
+        body: "You placed an order but haven't completed payment yet. Your order is being held — complete your payment before time runs out.",
         alertTitle: 'Awaiting payment',
-        alertText: 'Your order will be automatically cancelled if payment is not completed within 24 hours.',
+        alertTextDeadline: (d: string) => `Your order will be automatically cancelled if payment is not completed by ${d}.`,
+        alertTextGeneric: 'Your order will be automatically cancelled if payment is not completed in time.',
         orderStatusAwaitingPayment: 'Awaiting Payment',
         ctaLabel: 'Complete Payment',
-        ctaSubtitle: 'Button links to your secure order page. Valid for 24 hours.',
+        ctaSubtitle: 'Button links to your secure order page.',
         paymentLabels: { card: 'Credit/Debit Card', fpx: 'FPX Online Banking', ewallet: 'E-Wallet' } as Record<string, string>,
     },
     ms: {
         subject: 'Selesaikan pembayaran anda — Pesanan',
-        body: 'Anda telah membuat pesanan tetapi belum menyelesaikan pembayaran. Pesanan anda akan disimpan selama 24 jam — selesaikan pembayaran sebelum masa tamat.',
+        body: 'Anda telah membuat pesanan tetapi belum menyelesaikan pembayaran. Pesanan anda sedang ditahan — selesaikan pembayaran sebelum masa tamat.',
         alertTitle: 'Menunggu pembayaran',
-        alertText: 'Pesanan anda akan dibatalkan secara automatik jika pembayaran tidak diselesaikan dalam masa 24 jam.',
+        alertTextDeadline: (d: string) => `Pesanan anda akan dibatalkan jika pembayaran tidak diselesaikan sebelum ${d}.`,
+        alertTextGeneric: 'Pesanan anda akan dibatalkan secara automatik jika pembayaran tidak diselesaikan.',
         orderStatusAwaitingPayment: 'Menunggu Pembayaran',
         ctaLabel: 'Selesaikan Pembayaran',
-        ctaSubtitle: 'Butang menghubungkan ke halaman pesanan selamat anda. Sah selama 24 jam.',
+        ctaSubtitle: 'Butang menghubungkan ke halaman pesanan selamat anda.',
         paymentLabels: { card: 'Kad Kredit/Debit', fpx: 'Perbankan Dalam Talian FPX', ewallet: 'Dompet Elektronik' } as Record<string, string>,
     },
-} as const
+}
 
 export interface OrderWaitingData {
     shopName: string
@@ -65,6 +67,7 @@ export interface OrderWaitingData {
     paymentMethod: string
     buyerNote?: string | null
     payUrl: string
+    paymentExpiresAt?: string | null
     locale?: EmailLocale
 }
 
@@ -128,6 +131,8 @@ export function orderWaitingEmail(data: OrderWaitingData): { subject: string; ht
         </tr>` : ''
 
     const paymentLabel = t.paymentLabels[data.paymentMethod] ?? esc(data.paymentMethod)
+    const deadlineStr = data.paymentExpiresAt ? formatDate(data.paymentExpiresAt, locale) : null
+    const alertText = deadlineStr ? t.alertTextDeadline(deadlineStr) : t.alertTextGeneric
 
     return {
         subject,
@@ -269,7 +274,7 @@ export function orderWaitingEmail(data: OrderWaitingData): { subject: string; ht
             </td>
             <td style="padding:14px 16px 14px 12px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;">
               <div style="font-size:14px;font-weight:700;color:#92400E;line-height:20px;margin-bottom:4px;">${t.alertTitle}</div>
-              <div style="font-size:13.5px;line-height:20px;color:#78350F;">${t.alertText}</div>
+              <div style="font-size:13.5px;line-height:20px;color:#78350F;">${alertText}</div>
             </td>
           </tr>
         </table>
@@ -277,7 +282,7 @@ export function orderWaitingEmail(data: OrderWaitingData): { subject: string; ht
 
       <!-- CTA -->
       <tr><td align="center" style="padding:26px 40px 8px;">
-        <a href="${data.payUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 32px;border-radius:8px;text-decoration:none;">${t.ctaLabel}</a>
+        <a href="${esc(data.payUrl)}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 32px;border-radius:8px;text-decoration:none;">${t.ctaLabel}</a>
       </td></tr>
       <tr><td align="center" style="padding:0 40px 6px;">
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:18px;color:#94A3B8;">${t.ctaSubtitle}</div>
