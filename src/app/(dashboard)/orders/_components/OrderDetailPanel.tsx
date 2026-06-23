@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Loader2, ZoomIn, X } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 import { CancelOrderModal } from './CancelOrderModal'
 import { ShipOrderModal } from './ShipOrderModal'
 import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
@@ -860,36 +861,21 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const isAwaitingBtPayment = order.paymentMethod === 'bank_transfer' && order.paymentStatus !== 'paid' && ['pending', 'new'].includes(status)
                     const primaryDisabled = isLoading || isTerminal || isAwaitingBtPayment
+                    // Shared <Button> dashPrimary (GH-1290 Bug 1) — giữ size full-width h-12 rounded-2xl
                     return (
-                        <button
+                        <Button
+                            variant="dashPrimary"
                             onClick={() => {
                                 if (status === 'ready_to_ship') { setIsShipModalOpen(true); return }
                                 handleAction(status === 'shipped' ? 'completed' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')
                             }}
                             disabled={primaryDisabled}
-                            className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
-                            style={{
-                                height: 48,
-                                width: '100%',
-                                borderRadius: 16,
-                                background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
-                                boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                            }}
+                            className="w-full h-12 rounded-2xl text-[16px] gap-2 disabled:opacity-30"
+                            style={{ boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         >
-                            <span
-                                className="flex items-center gap-2"
-                                style={{
-                                    fontFamily: 'Inter, sans-serif',
-                                    fontWeight: 600,
-                                    fontSize: 16,
-                                    lineHeight: '1.5em',
-                                    color: '#FFFFFF',
-                                }}
-                            >
-                                {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'completed' ? p.completed : status === 'shipped' ? p.completed : status === 'ready_to_ship' ? p.shipped : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
-                            </span>
-                        </button>
+                            {isLoading && <Loader2 className="animate-spin" />}
+                            {status === 'completed' ? p.completed : status === 'shipped' ? p.completed : status === 'ready_to_ship' ? p.shipped : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                        </Button>
                     )
                 })()}
 
@@ -900,54 +886,26 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                     const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
-                            {/* Cancel Order Button */}
-                            <button
+                            {/* Cancel Order — <Button> dashSecondary, border+text destructive (GH-1290 Bug 1) */}
+                            <Button
+                                variant="dashSecondary"
                                 onClick={() => setIsCancelModalOpen(true)}
                                 disabled={cancelDisabled}
-                                className={`flex-1 flex items-center justify-center transition-opacity font-bold ${cancelDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-80'}`}
-                                style={{
-                                    height: 50,
-                                    borderRadius: 16,
-                                    border: '1px solid hsl(var(--destructive)/0.3)', /* dash-error/30 */
-                                }}
+                                className="flex-1 h-[50px] rounded-2xl text-[16px] font-semibold hover:opacity-80 disabled:opacity-30 [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))]"
                             >
-                                <span
-                                    style={{
-                                        fontFamily: 'Inter, sans-serif',
-                                        fontWeight: 600,
-                                        fontSize: 16,
-                                        lineHeight: '1.5em',
-                                        color: 'hsl(var(--destructive))',
-                                    }}
-                                >
-                                    {a.cancelOrder}
-                                </span>
-                            </button>
+                                {a.cancelOrder}
+                            </Button>
 
-                            {/* Refund Button */}
-                            <button
+                            {/* Refund — <Button> dashSecondary (GH-1290 Bug 1) */}
+                            <Button
+                                variant="dashSecondary"
                                 onClick={handleRefund}
                                 disabled={refundDisabled}
-                                className={`flex-1 flex items-center justify-center gap-2 font-bold transition-opacity ${refundDisabled ? 'cursor-not-allowed opacity-30' : 'hover:opacity-80'}`}
-                                style={{
-                                    height: 50,
-                                    borderRadius: 16,
-                                    border: '1px solid var(--dash-border)',
-                                }}
+                                className="flex-1 h-[50px] rounded-2xl text-[16px] font-semibold gap-2 hover:opacity-80 disabled:opacity-30"
                             >
                                 <IconRefund />
-                                <span
-                                    style={{
-                                        fontFamily: 'Inter, sans-serif',
-                                        fontWeight: 600,
-                                        fontSize: 16,
-                                        lineHeight: '1.5em',
-                                        color: 'var(--dash-text)',
-                                    }}
-                                >
-                                    {a.refund}
-                                </span>
-                            </button>
+                                {a.refund}
+                            </Button>
                         </div>
                     )
                 })()}

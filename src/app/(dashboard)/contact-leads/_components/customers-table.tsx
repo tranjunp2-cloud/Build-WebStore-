@@ -28,6 +28,7 @@ type Props = {
     onSelect: (record: CustomerRecord) => void
     onDelete: (record: CustomerRecord) => void
     onPageChange: (page: number) => void
+    onLimitChange?: (limit: number) => void
 }
 
 function SkeletonRow() {
@@ -49,7 +50,7 @@ function SkeletonRow() {
     )
 }
 
-export function CustomersTable({ records, loading = false, total, page, limit, selectedId, onSelect, onDelete, onPageChange }: Props) {
+export function CustomersTable({ records, loading = false, total, page, limit, selectedId, onSelect, onDelete, onPageChange, onLimitChange }: Props) {
     const { t } = useI18n()
     const c = t.dashboard.customers
 
@@ -60,6 +61,7 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
                 total={total}
                 limit={limit}
                 onPageChange={onPageChange}
+                onLimitChange={onLimitChange}
             />
         )
         : undefined

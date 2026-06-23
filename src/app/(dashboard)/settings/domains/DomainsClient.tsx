@@ -801,15 +801,16 @@ export function DomainsClient({
                                         {verifyingDomain === domain ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
                                         {verifyingDomain === domain ? (t?.Domains?.verifying || 'Verifying...') : (t?.Domains?.verifyConnection || 'Verify Connection')}
                                     </Button>
-                                    <button
+                                    {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
+                                    <Button
                                         type="button"
+                                        variant="dashSecondary"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending}
-                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] bg-transparent text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
-                                        style={{ border: '1px solid hsl(var(--destructive)/0.3)' }}
+                                        className="w-full sm:w-[112px] h-[50px] rounded-[16px] text-[16px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)]"
                                     >
                                         {t?.Domains?.remove || 'Remove'}
-                                    </button>
+                                    </Button>
                                 </div>
 
                                 {/* TXT Challenge card — render only when verification present */}
@@ -850,16 +851,17 @@ export function DomainsClient({
                                 </div>
                                 {/* Remove button — visible on all screen sizes */}
                                 <div className="flex items-center gap-3 pb-[25px]">
-                                    <button
+                                    {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
+                                    <Button
                                         type="button"
+                                        variant="dashSecondary"
                                         onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending || isPrimary === true}
-                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] bg-transparent text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)] text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
-                                        style={{ border: '1px solid hsl(var(--destructive)/0.3)' }}
+                                        className="h-[44px] px-[16px] rounded-[12px] text-[14px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
                                         title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
                                     >
                                         {t?.Domains?.removeDomain || 'Remove Domain'}
-                                    </button>
+                                    </Button>
                                 </div>
                                 </div>
                             </div>
@@ -969,15 +971,17 @@ export function DomainsClient({
                             >
                                 {t?.Domains?.cancel || 'Cancel'}
                             </Button>
-                            <button
+                            {/* Shared <Button> dashSecondary, soft-destructive (GH-1290 Bug 1) — đồng bộ với nút Cancel kế bên */}
+                            <Button
                                 type="button"
+                                variant="dashSecondary"
                                 onClick={handleRemoveConfirm}
                                 disabled={isPending}
-                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] text-[hsl(var(--destructive))] text-[16px] font-semibold leading-[1.5em] hover:bg-[hsl(var(--destructive)/0.2)] transition-colors font-['Inter'] disabled:opacity-50"
+                                className="flex-1 h-[50px] rounded-[16px] gap-2 text-[16px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                                 {t?.Domains?.removeDomain || 'Remove Domain'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>,

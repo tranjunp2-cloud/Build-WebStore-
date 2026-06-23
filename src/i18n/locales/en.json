@@ -1348,6 +1348,7 @@
                 "filterArchived": "Archived",
                 "sortLatest": "Latest",
                 "sortOldest": "Oldest",
+                "sortLabel": "Sort",
                 "advancedFilters": "Advanced Filters",
                 "clearAll": "Clear all",
                 "category": "Category",

@@ -23,6 +23,7 @@ import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
+import { FilterChip } from '@/components/ui/filter-chip'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
@@ -220,9 +221,11 @@ export default function ProductsPage() {
             }
         })
 
-    const ITEMS_PER_PAGE = 10
-    const totalPages = Math.ceil(filteredAndSortedProducts.length / ITEMS_PER_PAGE)
-    const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+    // Rows-per-page stateful so the DS TablePagination selector ([10,25,50,100]) works (GH-1290 Bug 4)
+    const [itemsPerPage, setItemsPerPage] = useState(10)
+    const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage)
+    const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    const handleLimitChange = (n: number) => { setItemsPerPage(n); setCurrentPage(1) }
 
     const statusCounts = {
         all: products.length,
@@ -455,13 +458,14 @@ export default function ProductsPage() {
                         {/* Row 1: Search Input */}
                         <div className="relative w-full h-[50px]">
                             <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
+                            {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
-                                style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                                className="w-full h-full rounded-[16px] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] focus:outline-none transition-colors"
+                                style={{ background: 'transparent', color: 'var(--dash-text)' }}
+                                className="w-full h-full rounded-[16px] border border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                             />
                         </div>
 
@@ -479,9 +483,10 @@ export default function ProductsPage() {
                                 <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-20">
                                     <div className="bg-[hsl(var(--secondary))] rounded-[12px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] flex flex-col py-2">
                                         {SORT_OPTIONS.map((option) => (
+                                            // Theme-aware colors (GH-1290 Bug 2): tránh text-white cứng (vô hình ở light mode)
                                             <button key={option} onClick={() => { setSortBy(option); setIsDropdownOpen(false) }}
-                                                className={cn("w-full px-4 py-[10px] text-left text-[15px] leading-[22px] transition-colors outline-none border-none",
-                                                    sortBy === option ? "bg-[hsl(var(--background))] text-white" : "bg-transparent text-white/80 hover:text-white hover:bg-white/5")}>
+                                                className="w-full px-4 py-[10px] text-left text-[15px] leading-[22px] bg-transparent transition-colors outline-none border-none hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                                                style={{ color: sortBy === option ? 'var(--dash-text)' : 'var(--dash-text-muted)', fontWeight: sortBy === option ? 500 : 400 }}>
                                                 {sortTranslateMap[option]}
                                             </button>
                                         ))}
@@ -515,32 +520,13 @@ export default function ProductsPage() {
                             placeholder={t.dashboard.products.list.search}
                         />
 
-                        {/* Sort Dropdown — trigger styled to match DS chips (transparent);
-                            the opened dropdown below is kept as-is. */}
-                        <div className="relative w-[180px]" ref={dropdownRef}>
-                            <button
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                                className="w-full h-9 rounded-md px-3 flex items-center justify-between gap-1.5 text-[13px] font-medium transition-colors"
-                            >
-                                <span className="truncate">{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={16} height={16} alt="Sort" className="invert dark:invert-0 shrink-0" />
-                            </button>
-                            {isDropdownOpen && (
-                                <div className="absolute top-[calc(100%+8px)] left-0 w-[189px] z-20">
-                                    <div className="absolute left-[32px] -top-[6px] w-0 h-0" style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--dash-secondary-bg)' }} />
-                                    <div className="bg-[hsl(var(--secondary))] rounded-[2px] shadow-[0_8px_24px_rgba(25,32,56,0.1)] flex flex-col py-2">
-                                        {SORT_OPTIONS.map((option) => (
-                                            <button key={option} onClick={() => { setSortBy(option); setIsDropdownOpen(false) }}
-                                                className={cn("w-full px-[12px] py-[5px] text-left text-[14px] leading-[22px] transition-colors outline-none border-none",
-                                                    sortBy === option ? "bg-[hsl(var(--background))] text-white" : "bg-transparent text-white/80 hover:text-white hover:bg-white/5")}>
-                                                {sortTranslateMap[option]}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {/* Sort — shared <FilterChip> (GH-1290 Bug 2, theme-aware, khớp /orders) */}
+                        <FilterChip<string>
+                            label={t.dashboard.products.list.sortLabel}
+                            value={sortBy}
+                            options={SORT_OPTIONS.map((o) => ({ key: o, label: sortTranslateMap[o] }))}
+                            onChange={setSortBy}
+                        />
 
                         {/* Filter Button — trigger styled to match DS chips (transparent);
                             the advanced filters panel below is kept as-is. */}
@@ -713,8 +699,9 @@ export default function ProductsPage() {
                                         <TablePagination
                                             page={currentPage}
                                             total={filteredAndSortedProducts.length}
-                                            limit={ITEMS_PER_PAGE}
+                                            limit={itemsPerPage}
                                             onPageChange={setCurrentPage}
+                                            onLimitChange={handleLimitChange}
                                             labels={{ unit: 'products' }}
                                         />
                                     }
@@ -962,8 +949,9 @@ export default function ProductsPage() {
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
-                                    limit={ITEMS_PER_PAGE}
+                                    limit={itemsPerPage}
                                     onPageChange={setCurrentPage}
+                                    onLimitChange={handleLimitChange}
                                     labels={{ unit: 'products' }}
                                 />
                             </div>

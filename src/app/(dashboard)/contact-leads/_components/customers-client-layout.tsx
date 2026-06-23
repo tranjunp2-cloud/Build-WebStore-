@@ -2,14 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { CustomersActionBar } from './customers-action-bar'
 import { CustomersTable } from './customers-table'
 import { CustomersCardList } from './customers-card-list'
@@ -21,14 +15,14 @@ import {
 } from '../actions'
 import type { CustomerRecord } from '../_lib/customer-record'
 
-const LIMIT = 10
-
 export function CustomersClientLayout() {
     const { t } = useI18n()
     const c = t.dashboard.customers
     const [records, setRecords] = useState<CustomerRecord[]>([])
     const [total, setTotal] = useState(0)
     const [page, setPage] = useState(1)
+    // Rows-per-page stateful for the DS pagination selector ([10,25,50,100]) (GH-1290 Bug 4)
+    const [limit, setLimit] = useState(10)
     const [status, setStatus] = useState('')
     const [source, setSource] = useState('')
     const [search, setSearch] = useState('')
@@ -40,7 +34,7 @@ export function CustomersClientLayout() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await getCustomersAction({ search, status, source, page, limit: LIMIT })
+            const res = await getCustomersAction({ search, status, source, page, limit })
             setRecords(res.data)
             setTotal(res.meta.total)
         } catch {
@@ -48,9 +42,10 @@ export function CustomersClientLayout() {
         } finally {
             setLoading(false)
         }
-    }, [search, status, source, page, c])
+    }, [search, status, source, page, limit, c])
 
     useEffect(() => { setPage(1) }, [status, source, search])
+    const handleLimitChange = (n: number) => { setLimit(n); setPage(1) }
     useEffect(() => { load() }, [load])
 
     async function confirmDelete() {
@@ -138,10 +133,11 @@ export function CustomersClientLayout() {
                         records={records}
                         total={total}
                         page={page}
-                        limit={LIMIT}
+                        limit={limit}
                         onSelect={handleSelect}
                         onDelete={setPendingDelete}
                         onPageChange={setPage}
+                        onLimitChange={handleLimitChange}
                     />
                 )}
             </div>
@@ -153,11 +149,12 @@ export function CustomersClientLayout() {
                     loading={loading}
                     total={total}
                     page={page}
-                    limit={LIMIT}
+                    limit={limit}
                     selectedId={selected?.id ?? null}
                     onSelect={handleSelect}
                     onDelete={setPendingDelete}
                     onPageChange={setPage}
+                    onLimitChange={handleLimitChange}
                 />
             </div>
 
@@ -167,53 +164,23 @@ export function CustomersClientLayout() {
                 onStatusUpdate={handleStatusUpdateFromPanel}
             />
 
-            {/* Delete confirmation dialog */}
-            <Dialog open={!!pendingDelete} onOpenChange={open => { if (!open) setPendingDelete(null) }}>
-                <DialogContent
-                    className="max-w-[360px] rounded-[20px] p-6 gap-0"
-                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
-                >
-                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal.
-                        bg transparent: tránh .dash-shell{background:--dash-bg} đè lên nền --dash-surface của DialogContent (gây "2 màu"). */}
-                    <div className="dash-shell" style={{ background: 'transparent' }}>
-                    <DialogHeader className="mb-3">
-                        <div className="flex items-center gap-3 mb-1">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'hsl(var(--destructive)/0.12)' }}>
-                                <Trash2 className="w-5 h-5 text-[hsl(var(--destructive))]" />
-                            </div>
-                            <DialogTitle className="text-[18px] font-bold" style={{ color: 'var(--dash-text)' }}>
-                                {c.deleteTitle}
-                            </DialogTitle>
-                        </div>
-                    </DialogHeader>
-
-                    <p className="text-[14px] leading-relaxed mb-6" style={{ color: 'var(--dash-text-muted)' }}>
+            {/* Delete confirmation — shared ConfirmModal (GH-1290 Bug 5) */}
+            <ConfirmModal
+                open={!!pendingDelete}
+                onCancel={() => setPendingDelete(null)}
+                onConfirm={confirmDelete}
+                title={c.deleteTitle}
+                description={
+                    <>
                         {c.deleteConfirmPre}{' '}
                         <span className="font-medium" style={{ color: 'var(--dash-text)' }}>{deleteDisplayName}</span>
                         {' '}{c.deleteConfirmPost}
-                    </p>
-
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setPendingDelete(null)}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium bg-transparent hover:opacity-80 transition-opacity cursor-pointer"
-                            style={{ color: 'var(--dash-text-muted)', border: '1px solid hsl(var(--input-border))' }}
-                        >
-                            {c.cancel}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={confirmDelete}
-                            className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium !text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
-                            style={{ background: 'hsl(var(--destructive))' }}
-                        >
-                            {c.deleteButton}
-                        </button>
-                    </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+                cancelLabel={c.cancel}
+                confirmLabel={c.deleteButton}
+                variant="danger"
+            />
         </div>
     )
 }

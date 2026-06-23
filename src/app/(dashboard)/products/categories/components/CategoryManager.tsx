@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { ImageUploader, UploadedImage } from '@/components/dashboard/ImageUploader'
-import { Pagination } from '@/components/ui/Pagination'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { getCategoriesAction, saveCategoryAction, deleteCategoryAction } from '../actions'
 
 // Types
@@ -90,6 +90,9 @@ export default function CategoryManager() {
     const [searchQuery, setSearchQuery] = useState('')
     const [expandedIds, setExpandedIds] = useState<Set<string | number>>(new Set())
     const [currentPage, setCurrentPage] = useState(1)
+    // Rows-per-page stateful for the DS pagination selector ([10,25,50,100]) (GH-1290 Bug 4)
+    const [pageSize, setPageSize] = useState(10)
+    const handleLimitChange = (n: number) => { setPageSize(n); setCurrentPage(1) }
 
     // Reset pagination
     useEffect(() => {
@@ -403,9 +406,9 @@ export default function CategoryManager() {
 
             {/* Search Bar */}
             <div className="mb-6">
+                {/* focus-within: focus border chuẩn DS thay vì raw input không state (GH-1290 Bug 3) */}
                 <div
-                    className="flex items-center gap-3 bg-[var(--dash-surface)] rounded-[12px] px-4"
-                    style={{ border: '1px solid var(--dash-border)' }}
+                    className="flex items-center gap-3 bg-[var(--dash-surface)] rounded-[12px] px-4 border border-[var(--dash-border)] transition-colors focus-within:border-[hsl(var(--primary))] focus-within:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                 >
                     <Search className="w-4 h-4 text-[var(--dash-text-muted)] shrink-0" />
                     <input
@@ -452,7 +455,7 @@ export default function CategoryManager() {
                         </div>
                     ) : tree.length > 0 ? (
                         <div className="flex flex-col w-full">
-                            {tree.slice((currentPage - 1) * 10, currentPage * 10).map(node => renderNode(node))}
+                            {tree.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(node => renderNode(node))}
                         </div>
                     ) : (
                         <div className="p-6">
@@ -471,15 +474,19 @@ export default function CategoryManager() {
                             )}
                         </div>
                     )}
-                    {!isLoading && tree.length > 0 && Math.ceil(tree.length / 10) > 1 && (
+                    {!isLoading && tree.length > 0 && (
                         <div
-                            className="flex justify-end items-center p-[16px]"
+                            className="p-[16px]"
                             style={{ borderTop: '1px solid var(--dash-border)' }}
                         >
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={Math.ceil(tree.length / 10)}
+                            {/* Shared DS pager + rows-per-page selector (GH-1290 Bug 4) */}
+                            <TablePagination
+                                page={currentPage}
+                                total={tree.length}
+                                limit={pageSize}
                                 onPageChange={setCurrentPage}
+                                onLimitChange={handleLimitChange}
+                                labels={{ unit: 'categories' }}
                             />
                         </div>
                     )}
