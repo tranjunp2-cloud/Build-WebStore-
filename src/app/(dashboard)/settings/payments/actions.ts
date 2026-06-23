@@ -265,10 +265,7 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
             console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| url:', webhookUrl)
             const isUrlError = xenditMsg.includes('URL_NOT_VALID')
-            const hint = isUrlError
-                ? ' (Xendit yêu cầu HTTPS public URL — dùng ngrok/Cloudflare Tunnel và set XENDIT_WEBHOOK_URL=https://your-tunnel.ngrok.io trong .env.local)'
-                : ''
-            return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}${hint}` }
+            return { success: false, error: isUrlError ? 'xenditWebhookUrlInvalid' : 'xenditWebhookRegisterFailed' }
         }
 
         await payload.update({

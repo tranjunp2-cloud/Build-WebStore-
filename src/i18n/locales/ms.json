@@ -2015,6 +2015,8 @@
                 "xenditWebhookConfirmDesc": "ECH akan mendaftarkan dirinya sebagai endpoint webhook Invoice pada akaun Xendit anda. Jika sistem lain sedang menerima webhook Invoice Xendit daripada akaun ini, ia akan berhenti menerimanya.",
                 "xenditWebhookConfirmNote": "Ini diperlukan untuk ECH memproses pesanan anda secara automatik.",
                 "xenditTokenMismatch": "Webhook Verification Token tidak betul — sila semak semula dalam Xendit Dashboard anda (Settings → Configuration → Webhook verification token).",
+                "xenditWebhookUrlInvalid": "Tidak dapat mendaftarkan webhook URL: Xendit memerlukan HTTPS public URL. Dalam local dev, tetapkan XENDIT_WEBHOOK_URL ke ngrok/Cloudflare tunnel URL anda dalam .env.local.",
+                "xenditWebhookRegisterFailed": "Tidak dapat mendaftarkan webhook URL dengan Xendit. Sila semak Secret Key anda dan cuba lagi.",
                 "xenditWebhookConfirmBack": "Kembali",
                 "xenditWebhookConfirmProceed": "Sahkan & Sambung",
                 "xenditLoginPrompt": "Ada akaun Xendit?",
