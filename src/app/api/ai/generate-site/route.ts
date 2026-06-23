@@ -1355,6 +1355,11 @@ export async function POST(req: NextRequest) {
                                 timeMs,
                             })}\n\n`
                         controller.enqueue(_encoder.encode(doneData))
+
+                        // Notify SSO Hub: user created their first site (step 1)
+                        import('@/lib/sso/sso-api-client')
+                            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
+                            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
@@ -1400,6 +1405,11 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             timeMs,
         } = await runGenPipeline()
+
+        // Notify SSO Hub: user created their first site (step 1)
+        import('@/lib/sso/sso-api-client')
+            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
+            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
 
         return NextResponse.json({
             success: true,

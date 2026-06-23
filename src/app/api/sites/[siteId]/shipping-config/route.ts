@@ -132,6 +132,11 @@ export const PATCH = withFeatureGuard('shipping_fee_configuration')(withAuth<Rou
             data: { shippingConfig: { enabled: !!enabled, westRate, eastRate, freeAbove, shippingSetupConfirmed: true } } as any,
         })
 
+        // Notify SSO Hub: user configured shipping (step 2)
+        import('@/lib/sso/sso-api-client')
+            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 2))
+            .catch((err) => console.error('[ShippingConfig] SSO step 2 import failed:', err))
+
         return NextResponse.json({
             success: true,
             data: { shippingConfig: (updated as any).shippingConfig },

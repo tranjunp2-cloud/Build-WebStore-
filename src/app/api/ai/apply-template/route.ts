@@ -649,6 +649,11 @@ export const POST = withAuth(async (user, req) => {
             console.warn('[ApplyTemplate] Failed to record template_limit usage:', err)
         }
 
+        // Notify SSO Hub: user picked a template (step 1)
+        import('@/lib/sso/sso-api-client')
+            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
+            .catch((err) => console.error('[ApplyTemplate] SSO step 1 import failed:', err))
+
         return NextResponse.json({
             success: true,
             siteId: site.id,

@@ -73,11 +73,20 @@ export async function PUT(req: NextRequest) {
         const targetUser = existingUsers.docs[0]
 
         // ── 4. Update Password ──
+        let keyString: string | undefined
+        try {
+            const { encryptPassword } = await import('@/lib/sso/sso-api-client')
+            keyString = encryptPassword(String(password))
+        } catch (err) {
+            console.error('[SSO Reset Password] keyString encryption failed:', err)
+        }
+
         await payload.update({
             collection: 'users',
             id: targetUser.id as number,
             data: {
                 password: String(password),
+                ...(keyString && { keyString }),
             },
             overrideAccess: true, // Admin action — bypass user self-edit restriction
         })

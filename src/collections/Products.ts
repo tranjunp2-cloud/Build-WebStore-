@@ -54,6 +54,14 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     const isPublishingUpdate = operation === 'update' && doc.status === 'active' && previousDoc?.status !== 'active'
     const isActiveCreate = operation === 'create' && doc.status === 'active'
 
+    // Notify SSO Hub: user added their first product (step 3)
+    // Trigger on any manual create (draft or active) — seeder creates have no req.user so are excluded
+    if (operation === 'create' && req?.user?.id) {
+        import('@/lib/sso/sso-api-client')
+            .then(({ notifyStepComplete }) => notifyStepComplete(req.payload, req.user!.id, 3))
+            .catch((err) => console.error('[Products] SSO step 3 import failed:', err))
+    }
+
     // Wait until it becomes active and seo title is empty
     if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
         const siteId = doc.site && typeof doc.site === 'object' ? doc.site.id : doc.site
