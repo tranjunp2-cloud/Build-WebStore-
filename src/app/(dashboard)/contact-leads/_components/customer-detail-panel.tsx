@@ -28,12 +28,13 @@ const ALLOWED_TRANSITIONS: Record<CustomerStatus, CustomerStatus[]> = {
     subscribed: [],
 }
 
+// GH-1337: tinted rgba per Figma spec — inline style object so Tailwind classes not applicable here.
 const STATUS_COLORS: Record<CustomerStatus, { bg: string; border: string; text: string }> = {
-    new:        { bg: 'hsl(var(--warning))',          border: 'hsl(var(--warning))',          text: '#fff' },
-    read:       { bg: 'hsl(var(--info))',             border: 'hsl(var(--info))',             text: '#fff' },
-    contacted:  { bg: 'hsl(var(--success))',          border: 'hsl(var(--success))',          text: '#fff' },
-    ignored:    { bg: 'hsl(var(--muted-foreground))', border: 'hsl(var(--muted-foreground))', text: '#fff' },
-    subscribed: { bg: 'hsl(var(--info))',             border: 'hsl(var(--info))',             text: '#fff' },
+    new:        { bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)',  text: '#fbbf24' },
+    read:       { bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.3)', text: '#818cf8' },
+    contacted:  { bg: 'rgba(45,212,191,0.1)',  border: 'rgba(45,212,191,0.3)',  text: '#2dd4bf' },
+    ignored:    { bg: 'rgba(156,163,175,0.1)', border: 'rgba(156,163,175,0.3)', text: '#9ca3af' },
+    subscribed: { bg: 'rgba(167,139,250,0.1)', border: 'rgba(138,129,245,0.3)', text: '#8a81f5' },
 }
 
 function StatusDropdown({ status, disabled, onChange }: {
@@ -66,8 +67,8 @@ function StatusDropdown({ status, disabled, onChange }: {
             <button
                 type="button"
                 onClick={() => canChange && !disabled && setOpen(v => !v)}
-                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer !text-white dark:!text-[hsl(var(--background))]"
-                style={{ borderColor: c.border, background: c.bg, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
+                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer"
+                style={{ borderColor: c.border, background: c.bg, color: c.text, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
             >
                 {statusLabels[status]}
                 {canChange && (
@@ -184,7 +185,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                 </div>
 
                 {/* Header row: title + close */}
-                <div className="flex items-center justify-between px-6 py-5 border-b border-solid border-[var(--dash-border)] shrink-0">
+                <div className="flex items-center justify-between px-6 py-5 shrink-0" style={{ borderBottom: '1px solid var(--dash-border)' }}>
                     <h2 className="text-[18px] md:text-[20px] font-bold text-[var(--dash-text)]">{c.profileTitle}</h2>
                     <button
                         onClick={onClose}
@@ -208,8 +209,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                     {/* Customer Information card */}
                     <div
-                        className="flex flex-col gap-3 rounded-[16px] px-[17px] py-6 border"
-                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
+                        className="flex flex-col gap-3 rounded-[16px] px-[17px] py-6"
+                        style={{ background: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }}
                     >
                         {/* Section header + status */}
                         <div className="flex items-center justify-between">
@@ -271,7 +272,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     {record.source === 'contact-form' && (
                         <div className="flex flex-col gap-6">
                             {/* Section title */}
-                            <div className="border-b border-solid pb-[17px]" style={{ borderColor: 'var(--dash-border)' }}>
+                            <div className="pb-[17px]" style={{ borderBottom: '1px solid var(--dash-border)' }}>
                                 <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[var(--dash-text)]">
                                     {c.timeline}
                                 </p>
@@ -310,8 +311,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                 {/* Message card */}
                                                 {t.message && (
                                                     <div
-                                                        className="rounded-[12px] p-[17px] border"
-                                                        style={{ background: 'var(--dash-secondary-bg)', borderColor: 'var(--dash-border)' }}
+                                                        className="rounded-[12px] p-[17px]"
+                                                        style={{ background: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }}
                                                     >
                                                         <p className="text-[12px] text-[var(--dash-text-muted)] leading-[19.5px]">{t.message}</p>
                                                     </div>
