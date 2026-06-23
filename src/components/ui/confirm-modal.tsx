@@ -95,8 +95,8 @@ export function ConfirmModal({
                         type="button"
                         onClick={onConfirm}
                         disabled={loading}
-                        className="flex items-center justify-center gap-1.5 rounded-[10px] h-[40px] px-5 text-[14px] font-medium !text-white transition-opacity hover:opacity-90 cursor-pointer border-none disabled:opacity-50"
-                        style={{ background: isDanger ? 'hsl(var(--destructive))' : 'hsl(var(--primary))' }}
+                        className="flex items-center justify-center gap-1.5 rounded-[10px] h-[40px] px-5 text-[14px] font-medium transition-opacity hover:opacity-90 cursor-pointer border-none disabled:opacity-50"
+                        style={{ background: isDanger ? 'hsl(var(--destructive))' : 'hsl(var(--primary))', color: '#fff' }}
                     >
                         {loading ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
