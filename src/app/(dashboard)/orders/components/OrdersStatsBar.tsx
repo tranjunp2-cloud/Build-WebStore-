@@ -1,5 +1,6 @@
 import { Package, Clock, CheckCircle, Truck } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { ORDER_STATUS_GROUPS } from '@/lib/orders/status-groups'
 import type { Order } from '../types'
 
 export function OrdersStatsBar({ orders }: { orders: Order[] }) {
@@ -8,10 +9,10 @@ export function OrdersStatsBar({ orders }: { orders: Order[] }) {
 
     const stats = {
         total: orders.length,
-        pending: orders.filter(o => o.status === 'pending').length,
-        confirmed: orders.filter(o => o.status === 'confirmed').length,
-        shipped: orders.filter(o => o.status === 'shipped').length,
-        completed: orders.filter(o => o.status === 'completed').length,
+        pending:   orders.filter(o => ORDER_STATUS_GROUPS.pending.includes(o.status)).length,
+        confirmed: orders.filter(o => ORDER_STATUS_GROUPS.confirmed.includes(o.status)).length,
+        shipped:   orders.filter(o => ORDER_STATUS_GROUPS.shipped.includes(o.status)).length,
+        completed: orders.filter(o => ORDER_STATUS_GROUPS.completed.includes(o.status)).length,
     }
 
     const cards = [
