@@ -225,7 +225,7 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                         </button>
                         <button
                             type="button" onClick={handleSubmit}
-                            disabled={!secretKey || !callbackToken || isSaving}
+                            disabled={!secretKey || !callbackToken}
                             className="inline-flex items-center gap-[6px] h-9 px-[16px] rounded-[8px] text-[13px] font-bold transition-all hover:brightness-[1.08] active:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                             style={{
                                 background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',

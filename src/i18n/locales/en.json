@@ -2000,8 +2000,6 @@
                 "xenditSecretKeyPlaceholder": "xnd_development_... or xnd_production_...",
                 "xenditSecretKeyStep1": "Xendit Dashboard → Settings → API Keys → + Generate secret key",
                 "xenditSecretKeyStep2": "Name your key (e.g. ECH Primeweb)",
-                "xenditSecretKeyStep3": "Permissions: Money-in products → select Write — leave others as None",
-                "xenditSecretKeyStep4": "Click Generate key → copy immediately (shown only once)",
                 "xenditCallbackTokenLabel": "Webhook Verification Token",
                 "xenditCallbackTokenPlaceholder": "Paste Webhook Verification Token from Xendit...",
                 "xenditCallbackTokenStep1": "Xendit Dashboard → Settings → Webhooks",
