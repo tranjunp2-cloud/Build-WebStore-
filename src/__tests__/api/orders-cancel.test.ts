@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockUser = { id: 1, tenants: [{ tenant: 'tenant-1' }] }
-vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
-}))
-
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
 const mockSendEmail = vi.fn().mockResolvedValue(undefined)
 const mockDrizzleExecute = vi.fn()
 const mockLogger = { error: vi.fn(), warn: vi.fn(), info: vi.fn() }
+const mockStripeRefundsCreate = vi.fn()
+const mockStripeSessionsRetrieve = vi.fn()
+
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
+}))
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         findByID: mockFindByID, update: mockUpdate, sendEmail: mockSendEmail,
@@ -20,6 +22,15 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/email/templates/order-cancelled', () => ({
     orderCancelledEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>cancelled</p>' })),
+}))
+vi.mock('@/lib/email/templates/order-refunded', () => ({
+    orderRefundedEmail: vi.fn(() => ({ subject: 'Order refunded', html: '<p>refunded</p>' })),
+}))
+vi.mock('@/lib/payment/stripe', () => ({
+    getStripeClient: vi.fn(() => ({
+        refunds: { create: mockStripeRefundsCreate },
+        checkout: { sessions: { retrieve: mockStripeSessionsRetrieve } },
+    })),
 }))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
@@ -54,6 +65,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         mockFindByID.mockReset()
         mockUpdate.mockReset()
         mockDrizzleExecute.mockReset()
+        mockStripeRefundsCreate.mockReset()
+        mockStripeSessionsRetrieve.mockReset()
+        // Default: Stripe refunds.create succeeds (overridden per-test as needed)
+        mockStripeRefundsCreate.mockResolvedValue({ id: undefined })
         // Default: CAS succeeds (returns 1 row) + restockItem SQL calls succeed (non-variant path).
         // Tests that use mockResolvedValueOnce sequences MUST prepend a CAS row first.
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
@@ -539,6 +554,175 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(mockLogger.warn).toHaveBeenCalledWith(
             expect.objectContaining({ quantity: -3 }),
             expect.stringContaining('[Restock] Invalid quantity'),
+        )
+    })
+
+    // ─── TC-F10-03-26–31: Stripe paid order cancel auto-refund (Issue #1326) ──────
+    // Detection: paymentStatus='paid' + paymentMethod NOT in ['bank_transfer','cod'] + paymentProvider != 'xendit'
+
+    it('[TC-F10-03-26] Stripe paid order cancel → CAS + auto-refund + refund email, no cancel email', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-1' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-1', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                stripePaymentIntentId: 'pi_test123',
+                items: [], customerEmail: 'buyer@test.com',
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s1', stripeAccountId: 'acct_test123' }) // tenant fetch
+
+        mockStripeRefundsCreate.mockResolvedValue({ id: 'ref_test123' })
+        // Stripe CAS — default mockResolvedValue({ rows: [{ id: 1 }] }) handles this
+
+        const req = { json: () => Promise.resolve({ reason: 'Buyer request' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.refundId).toBe('ref_test123')
+        expect(body.data.paymentStatus).toBe('refunded')
+        expect(mockStripeRefundsCreate).toHaveBeenCalledWith(
+            { payment_intent: 'pi_test123' },
+            expect.objectContaining({ stripeAccount: 'acct_test123', idempotencyKey: 'cancel-stripe-order-1' })
+        )
+        // Refund email sent (not cancel email)
+        expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'buyer@test.com' }))
+    })
+
+    it('[TC-F10-03-27] Stripe cancel blocked when stripeAccountId missing → 422 STRIPE_NOT_REFUNDABLE', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-2' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-2', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                stripePaymentIntentId: 'pi_test456', items: [],
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s2' }) // tenant with no stripeAccountId
+
+        const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('STRIPE_NOT_REFUNDABLE')
+        // No Stripe API called, no DB CAS
+        expect(mockStripeRefundsCreate).not.toHaveBeenCalled()
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10-03-28] Stripe cancel blocked when no payment intent and no session → 422 STRIPE_NOT_REFUNDABLE', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-3' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-3', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                // no stripePaymentIntentId, no stripeSessionId
+                items: [],
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s3', stripeAccountId: 'acct_test123' })
+
+        const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('STRIPE_NOT_REFUNDABLE')
+        expect(mockStripeRefundsCreate).not.toHaveBeenCalled()
+        expect(mockDrizzleExecute).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10-03-29] Stripe refund fails → CAS rolled back, 502 STRIPE_REFUND_ERROR, order not cancelled', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-4' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-4', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                stripePaymentIntentId: 'pi_test789', items: [],
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s4', stripeAccountId: 'acct_test123' })
+
+        mockStripeRefundsCreate.mockRejectedValue(new Error('Stripe network error'))
+        // Stripe CAS + rollback both use default mockResolvedValue
+
+        const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(502)
+        expect(body.error.code).toBe('STRIPE_REFUND_ERROR')
+        // Rollback SQL called (2nd drizzle call): restore status + payment_status='paid'
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(2) // CAS + rollback
+        expect(mockLogger.error).toHaveBeenCalledWith(
+            expect.objectContaining({ orderId: 'stripe-order-4' }),
+            expect.stringContaining('[Order Cancel] Stripe refund failed'),
+        )
+        expect(mockSendEmail).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F10-03-30] Stripe charge_already_refunded → idempotent success, CAS stands, refund email sent', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-5' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-5', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                stripePaymentIntentId: 'pi_already', items: [], customerEmail: 'buyer2@test.com',
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s5', stripeAccountId: 'acct_test123' })
+
+        const alreadyRefundedErr = Object.assign(new Error('Charge already refunded'), { code: 'charge_already_refunded' })
+        mockStripeRefundsCreate.mockRejectedValue(alreadyRefundedErr)
+
+        const req = { json: () => Promise.resolve({ reason: 'Retry cancel' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // No explicit refundId (charge_already_refunded path doesn't set stripeRefundId)
+        // but CAS succeeded and order is cancelled
+        expect(body.data.paymentStatus).toBe('refunded')
+        // Rollback must NOT be called for charge_already_refunded
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only Stripe CAS, no rollback
+        // Refund email sent — buyer is owed money regardless
+        expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'buyer2@test.com' }))
+    })
+
+    it('[TC-F10-03-31] Stripe cancel fetches stripePaymentIntentId fallback via session when not cached', async () => {
+        const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-6' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'stripe-order-6', status: 'confirmed',
+                paymentMethod: 'stripe', paymentStatus: 'paid',
+                stripeSessionId: 'cs_test_abc',
+                // no stripePaymentIntentId
+                items: [],
+            })
+            .mockResolvedValueOnce({ id: 'tenant-s6', stripeAccountId: 'acct_test123' }) // tenant fetch
+
+        mockStripeSessionsRetrieve.mockResolvedValue({
+            payment_intent: 'pi_from_session',
+        })
+        mockStripeRefundsCreate.mockResolvedValue({ id: 'ref_from_session' })
+        mockUpdate.mockResolvedValue({}) // backfill stripePaymentIntentId
+
+        const req = { json: () => Promise.resolve({ reason: 'Cancel' }) } as unknown as Request
+        const res = await POST(req, stripeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.refundId).toBe('ref_from_session')
+        // Session retrieved to backfill payment intent
+        expect(mockStripeSessionsRetrieve).toHaveBeenCalledWith(
+            'cs_test_abc',
+            { expand: ['payment_intent'] },
+            { stripeAccount: 'acct_test123' },
+        )
+        // Refund called with the fetched payment intent
+        expect(mockStripeRefundsCreate).toHaveBeenCalledWith(
+            { payment_intent: 'pi_from_session' },
+            expect.objectContaining({ stripeAccount: 'acct_test123' })
         )
     })
 })
