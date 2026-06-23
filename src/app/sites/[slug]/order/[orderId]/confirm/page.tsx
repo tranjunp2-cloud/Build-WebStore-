@@ -7,7 +7,6 @@ import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { generateUploadToken, verifyConfirmToken } from '@/lib/orders/upload-token'
 import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
 import { signOrderToken } from '@/lib/auth/order-token'
-import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import { orderWaitingEmail } from '@/lib/email/templates/order-waiting'
 import { sendEmail } from '@/lib/email/send'
 
