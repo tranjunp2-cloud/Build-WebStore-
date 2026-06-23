@@ -101,12 +101,12 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-03 | Product detail: image gallery, stock status, JSON-LD schema | US-F09-01 | P0 | |
 | FR-04 | Add to Cart → cart drawer slides in từ phải | US-F09-02 | P0 | |
 | FR-05 | Cart quantity controls (+/-), subtotal realtime, localStorage persist | US-F09-02 | P0 | |
-| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, Bank Transfer). Stripe Card/FPX qua F13. | US-F09-03 | P0 | |
+| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, Bank Transfer). Stripe Card/FPX qua F13. COD option gated per F19/F10 (West MY + courier COD support + per-courier limit); buyer does not see courier name. | US-F09-03 | P0 | |
 | ~~FR-06.1~~ | ~~Bắt buộc khách hàng upload receipt ảnh (<2MB, JPG/PNG) nếu chọn QR Banking~~ | ~~US-F09-03~~ | ~~P0~~ | **DEPRECATED v2.2 (D-04)** — upload moved post-order via magic link. F10 FR-14 → FR-16 handle. |
 | **FR-06.2** | **[v2.2]** Storefront checkout Bank Transfer option visibility tuân thủ tenant settings (`payment_bank_transfer` toggle ON + bank details complete). Nếu OFF → ẩn radio Bank Transfer. | US-F09-03 | P0 | Fix audit gap G-01 |
 | FR-07 | Guest checkout — không cần auth | US-F09-03 | P0 | |
 | FR-08 | SST 6% auto-calculated on subtotal | US-F09-03 | P0 | MY market |
-| FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15 | US-F09-03 | P0 | MY market |
+| FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15. Rate source = hybrid (flat OR EasyParcel real-time per tenant setting — see F14-shipping). | US-F09-03 | P0 | MY market |
 | FR-10 | Place Order → order created, order number ORD-XXXXXXXX | US-F09-03 | P0 | |
 | FR-11 | Cart preserved nếu payment fail | US-F09-03 | P0 | |
 | FR-12 | Confirmation page: order number, items, total. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
