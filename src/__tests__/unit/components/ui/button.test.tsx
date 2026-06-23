@@ -49,7 +49,8 @@ describe('TC-GH1290-BTN-05: asChild renders the child element', () => {
     it('renders an anchor instead of a button', () => {
         render(
             <Button asChild>
-                <a href="/x">Link</a>
+                {/* external href: tránh next/no-html-link-for-pages (rule chỉ chặn path nội bộ) */}
+                <a href="https://example.com">Link</a>
             </Button>,
         )
         const link = screen.getByRole('link', { name: 'Link' })
