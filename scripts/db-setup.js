@@ -4070,6 +4070,7 @@ const MIGRATIONS = [
   { name: 'orders.xendit_payment_request_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS xendit_payment_request_id varchar;` },
   { name: 'orders.xendit_payment_request_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_xendit_payment_request_id_idx ON orders (xendit_payment_request_id);` },
   { name: 'orders.xendit_channel_code', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS xendit_channel_code varchar;` },
+  { name: 'orders.payment_reminder_sent_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reminder_sent_at timestamp with time zone;` },
   { name: 'orders.payment_provider', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_provider varchar;` },
   { name: 'orders.payment_provider_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_provider_idx ON orders (payment_provider);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },

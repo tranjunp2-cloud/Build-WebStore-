@@ -2153,6 +2153,7 @@
                     "bank-transfer-instructions": "Ingatkan pembeli untuk melengkapkan pindahan bank — pesanan dibatalkan selepas 24j.",
                     "payment-confirmed": "Pengesahan bahawa pembayaran telah diterima dan pesanan sedang diproses.",
                     "payment-rejected": "Maklumkan pembeli bahawa pembayaran mereka ditolak.",
+                    "order-waiting": "Ingatkan pembeli untuk menyelesaikan pembayaran — pesanan dibuat tetapi pembayaran belum selesai.",
                     "new-order-seller": "Pemberitahuan kepada penjual setiap kali pesanan baharu masuk.",
                     "staff-invitation": "Jemput ahli kakitangan baru untuk mengakses papan pemuka.",
                     "contact-from-seller": "Hantar mesej kepada peti masuk sokongan penjual.",

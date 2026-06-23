@@ -255,6 +255,11 @@ export const Orders: CollectionConfig = {
             admin: { readOnly: true, description: 'BT order TTL — auto-cancel after this timestamp' },
         },
         {
+            name: 'paymentReminderSentAt',
+            type: 'date',
+            admin: { readOnly: true, hidden: true, description: 'Timestamp when order-waiting reminder email was sent' },
+        },
+        {
             name: 'paymentRejectionReason',
             type: 'select',
             options: [

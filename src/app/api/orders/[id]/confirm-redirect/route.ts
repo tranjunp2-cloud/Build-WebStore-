@@ -64,7 +64,11 @@ export async function GET(
 
         // Token valid — set confirm cookie and redirect to confirm page
         const confirmToken = generateConfirmToken(order.id, order.orderNumber)
-        const response = NextResponse.redirect(buildStorefrontUrl(slug, `/order/${order.id}/confirm`))
+        const cancelled = url.searchParams.get('cancelled')
+        const confirmPath = cancelled === '1'
+            ? `/order/${order.id}/confirm?cancelled=1`
+            : `/order/${order.id}/confirm`
+        const response = NextResponse.redirect(buildStorefrontUrl(slug, confirmPath))
         // TTL = remaining time until payment expires (max 24h), minimum 1h as fallback.
         // Avoids cutting the buyer's upload window shorter than the payment deadline.
         const ttl = order.paymentExpiresAt

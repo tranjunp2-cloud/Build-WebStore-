@@ -2153,6 +2153,7 @@
                     "bank-transfer-instructions": "Remind buyer to complete bank transfer — order auto-cancels after 24h.",
                     "payment-confirmed": "Confirm payment has been received and order is processing.",
                     "payment-rejected": "Inform buyer that their payment was rejected.",
+                    "order-waiting": "Remind buyer to complete payment — order placed but checkout not finished.",
                     "new-order-seller": "Heads-up to the seller every time a new order lands.",
                     "staff-invitation": "Invite new staff members to access the dashboard.",
                     "contact-from-seller": "Forward the message to the seller's support inbox.",

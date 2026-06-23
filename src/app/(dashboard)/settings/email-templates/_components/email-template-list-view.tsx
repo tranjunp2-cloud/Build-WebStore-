@@ -42,6 +42,7 @@ const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'bank-transfer-instructions': Timer,
     'payment-confirmed':          BadgeCheck,
     'payment-rejected':           XCircle,
+    'order-waiting':              Timer,
     'new-order-seller':           ShoppingCart,
     'staff-invitation':           UserPlus,
     'contact-from-seller':        MessageSquare,
