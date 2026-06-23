@@ -177,8 +177,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                             steps={[
                                 pt.xenditSecretKeyStep1,
                                 pt.xenditSecretKeyStep2,
-                                <React.Fragment key="s3">Permissions: <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Money-in products</span> → select <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Write</span> — leave others as None</React.Fragment>,
-                                <React.Fragment key="s4">Click <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Generate key</span> → copy immediately (shown only once)</React.Fragment>,
+                                <React.Fragment key="s3">{pt.xenditSecretKeyStep3a} <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Money-in products</span> {pt.xenditSecretKeyStep3b} <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Write</span> {pt.xenditSecretKeyStep3c}</React.Fragment>,
+                                <React.Fragment key="s4">{pt.xenditSecretKeyStep4a} <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Generate key</span> {pt.xenditSecretKeyStep4b}</React.Fragment>,
                             ]}
                             className="mt-[6px]"
                         />
