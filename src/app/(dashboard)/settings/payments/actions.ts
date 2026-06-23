@@ -252,24 +252,23 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         // POST /callback_urls/invoice returns callback_token = merchant's Webhook Verification Token.
         // Comparing it against input catches wrong tokens before they break payment webhooks.
         // Register ECH webhook URL on Xendit + validate callback token.
-        // Only runs when server URL is a public HTTPS endpoint — skipped on localhost/dev
-        // because Xendit rejects non-reachable URLs (URL_NOT_VALID_ERROR).
-        const serverUrl = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
-        const webhookUrl = `${serverUrl}/api/webhooks/xendit`
-        const isPublicHttps = serverUrl.startsWith('https://') && !serverUrl.includes('localhost')
-        if (isPublicHttps) {
-            try {
-                const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
-                if (cbResult.callback_token !== callbackToken.trim()) {
-                    return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
-                }
-            } catch (cbErr: unknown) {
-                const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
-                console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| url:', webhookUrl)
-                return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}` }
+        // XENDIT_WEBHOOK_URL overrides NEXT_PUBLIC_SERVER_URL — use this in local dev
+        // with an ngrok/Cloudflare tunnel URL so Xendit can reach the endpoint.
+        const baseUrl = (process.env.XENDIT_WEBHOOK_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+        const webhookUrl = `${baseUrl}/api/webhooks/xendit`
+        try {
+            const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
+            if (cbResult.callback_token !== callbackToken.trim()) {
+                return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
             }
-        } else {
-            console.warn('[saveXenditKeys] skipping webhook token validation (non-public URL):', webhookUrl)
+        } catch (cbErr: unknown) {
+            const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
+            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| url:', webhookUrl)
+            const isUrlError = xenditMsg.includes('URL_NOT_VALID')
+            const hint = isUrlError
+                ? ' (Xendit yêu cầu HTTPS public URL — dùng ngrok/Cloudflare Tunnel và set XENDIT_WEBHOOK_URL=https://your-tunnel.ngrok.io trong .env.local)'
+                : ''
+            return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}${hint}` }
         }
 
         await payload.update({
