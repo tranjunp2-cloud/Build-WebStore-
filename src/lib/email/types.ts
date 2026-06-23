@@ -21,6 +21,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   'bank-transfer-instructions',
   'payment-confirmed',
   'payment-rejected',
+  'order-waiting',
   // Operations
   'new-order-seller',
   // Team
@@ -60,6 +61,7 @@ export const EMAIL_TEMPLATE_RECIPIENTS: Record<EmailTemplateType, EmailRecipient
   'bank-transfer-instructions': ['buyer'],
   'payment-confirmed':          ['buyer'],
   'payment-rejected':           ['buyer'],
+  'order-waiting':              ['buyer'],
   // Operations
   'new-order-seller':           ['seller'],
   // Team — platform-managed, not CMS-customisable per tenant
@@ -90,6 +92,7 @@ export const EMAIL_TEMPLATE_VARIABLES: Record<EmailTemplateType, string[]> = {
   'bank-transfer-instructions': ['customerName', 'orderNumber', 'orderTotal', 'bankName', 'bankAccountNo', 'bankAccountHolder', 'brandName', 'supportEmail'],
   'payment-confirmed':          ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'dashboardUrl', 'supportEmail'],
   'payment-rejected':           ['customerName', 'orderNumber', 'rejectionReason', 'brandName', 'supportEmail'],
+  'order-waiting':              ['customerName', 'orderNumber', 'orderTotal', 'brandName', 'supportEmail'],
   // Operations
   'new-order-seller':           ['orderNumber', 'orderTotal', 'brandName', 'dashboardUrl'],
   // Team

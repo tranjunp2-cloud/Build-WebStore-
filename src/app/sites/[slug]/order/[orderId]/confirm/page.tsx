@@ -5,6 +5,10 @@ import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { generateUploadToken, verifyConfirmToken } from '@/lib/orders/upload-token'
 import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
+import { signOrderToken } from '@/lib/auth/order-token'
+import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
+import { orderWaitingEmail } from '@/lib/email/templates/order-waiting'
+import { sendEmail } from '@/lib/email/send'
 
 export default async function OrderConfirmPage({
     params,
@@ -109,6 +113,82 @@ export default async function OrderConfirmPage({
                 customerName: raw.customerName,
                 customerEmail: raw.customerEmail,
                 shippingAddress: raw.shippingAddress,
+            }
+
+            // Fire-and-forget: send one-time order-waiting reminder email
+            // Only for Stripe/Xendit awaiting_payment orders that haven't received a reminder yet
+            const shouldSendReminder =
+                raw.paymentStatus === 'awaiting_payment' &&
+                raw.paymentMethod !== 'bank_transfer' &&
+                raw.paymentMethod !== 'cod' &&
+                !raw.paymentReminderSentAt &&
+                raw.customerEmail &&
+                raw.magicLinkSecret
+
+            if (shouldSendReminder) {
+                void (async () => {
+                    try {
+                        const expSec = raw.paymentExpiresAt
+                            ? Math.floor(new Date(raw.paymentExpiresAt).getTime() / 1000)
+                            : Math.floor(Date.now() / 1000 + 24 * 3600)
+                        const token = await signOrderToken({
+                            orderId: raw.id,
+                            secret: raw.magicLinkSecret,
+                            expSec,
+                        })
+                        // Build direct link to confirm-redirect API (validates token → sets ct_ cookie → confirm page)
+                        // Cannot use buildStorefrontUrl here — that prepends /sites/{slug} for local (API routes don't use that prefix)
+                        const srvUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
+                        const isLocal = srvUrl.includes('localhost') || srvUrl.includes('127.0.0.1')
+                        const platDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN
+                        const proto = srvUrl.startsWith('https') ? 'https' : 'http'
+                        const apiOrigin = (!isLocal && platDomain) ? `${proto}://${slug}.${platDomain}` : srvUrl
+                        const payUrl = `${apiOrigin}/api/orders/${raw.id}/confirm-redirect?slug=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}&cancelled=1`
+                        const shopName = tenant.name ?? slug
+                        const template = orderWaitingEmail({
+                            shopName,
+                            orderNumber: raw.orderNumber,
+                            orderDate: raw.createdAt ?? new Date().toISOString(),
+                            customerName: raw.customerName ?? '',
+                            customerEmail: raw.customerEmail ?? '',
+                            customerPhone: raw.customerPhone ?? null,
+                            customerAddress: raw.shippingAddress ?? null,
+                            items: (raw.items ?? []).map((item: any) => ({
+                                name: item.productName ?? '',
+                                variant: item.variant ?? null,
+                                quantity: item.quantity ?? 1,
+                                unitPrice: (item.unitPrice ?? 0) / 100,
+                                lineTotal: ((item.unitPrice ?? 0) * (item.quantity ?? 1)) / 100,
+                            })),
+                            subtotal: (raw.subtotal ?? 0) / 100,
+                            shippingFee: (raw.shippingFee ?? 0) / 100,
+                            discountAmount: raw.discountAmount ? raw.discountAmount / 100 : null,
+                            discountCode: raw.discountCode ?? null,
+                            total: (raw.total ?? 0) / 100,
+                            currency: raw.currency ?? 'MYR',
+                            paymentMethod: raw.paymentMethod ?? '',
+                            buyerNote: raw.notes ?? null,
+                            payUrl,
+                            locale: 'en',
+                        })
+                        await sendEmail({
+                            to: raw.customerEmail,
+                            subject: template.subject,
+                            html: template.html,
+                            templateType: 'order-waiting',
+                            recipient: 'buyer',
+                            tenantId: tenant.id,
+                        })
+                        await payload.update({
+                            collection: 'orders',
+                            id: raw.id,
+                            data: { paymentReminderSentAt: new Date().toISOString() },
+                            overrideAccess: true,
+                        })
+                    } catch (err) {
+                        console.error('[order-waiting] email send failed:', err)
+                    }
+                })()
             }
         }
     } catch { }

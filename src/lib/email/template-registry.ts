@@ -22,6 +22,7 @@ import {
   orderRefundedEmail,
   contactFromSellerEmail,
   newsletterSellerDigestEmail,
+  orderWaitingEmail,
 } from './templates'
 
 export type TemplateFn = (
@@ -77,4 +78,7 @@ export const templateRegistry: Record<EmailTemplateType, TemplateFn> = {
 
   'newsletter-seller-digest': (fixture, config) =>
     newsletterSellerDigestEmail(fixture as any, config),
+
+  'order-waiting': (fixture) =>
+    orderWaitingEmail(fixture as any),
 }
