@@ -40,6 +40,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ exists: result.docs.length > 0 }, { status: 200 })
     } catch (error) {
         console.error('[V2][SSO CheckEmail Error]', error)
-        return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+        return NextResponse.json({ exists: false, error: 'service_unavailable' }, { status: 200 })
     }
 }
