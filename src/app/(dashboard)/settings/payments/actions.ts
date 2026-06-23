@@ -248,12 +248,10 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             // Network or unexpected error → proceed silently
         }
 
-        // Register ECH's webhook URL on merchant's Xendit account and validate callbackToken.
-        // POST /callback_urls/invoice returns callback_token = merchant's Webhook Verification Token.
-        // Comparing it against input catches wrong tokens before they break payment webhooks.
-        // Register ECH webhook URL on Xendit + validate callback token.
-        // XENDIT_WEBHOOK_URL overrides NEXT_PUBLIC_SERVER_URL — use this in local dev
-        // with an ngrok/Cloudflare tunnel URL so Xendit can reach the endpoint.
+        // POST /callback_urls/invoice registers ECH as webhook receiver and returns callback_token
+        // (= merchant's Webhook Verification Token). Comparing it against user input catches wrong
+        // tokens before they silently break payment webhooks.
+        // XENDIT_WEBHOOK_URL overrides NEXT_PUBLIC_SERVER_URL in local dev (ngrok/Cloudflare tunnel).
         const baseUrl = (process.env.XENDIT_WEBHOOK_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
         const webhookUrl = `${baseUrl}/api/webhooks/xendit`
         try {
