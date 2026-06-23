@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, X, Eye, EyeOff, AlertTriangle, Loader2, ExternalLink, Globe } from 'lucide-react';
 import { useI18n } from '@/i18n';
@@ -19,7 +19,7 @@ interface SecretFieldProps {
     placeholder: string;
     show: boolean;
     onToggleShow: () => void;
-    steps: string[];
+    steps: React.ReactNode[];
     className?: string;
 }
 
@@ -177,8 +177,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                             steps={[
                                 pt.xenditSecretKeyStep1,
                                 pt.xenditSecretKeyStep2,
-                                pt.xenditSecretKeyStep3,
-                                pt.xenditSecretKeyStep4,
+                                <React.Fragment key="s3">Permissions: <span style={{ color: '#5eead4', fontWeight: 600 }}>Money-in products</span> → select <span style={{ color: '#5eead4', fontWeight: 600 }}>Write</span> — leave others as None</React.Fragment>,
+                                <React.Fragment key="s4">Click <span style={{ color: '#5eead4', fontWeight: 600 }}>Generate key</span> → copy immediately (shown only once)</React.Fragment>,
                             ]}
                             className="mt-[6px]"
                         />
