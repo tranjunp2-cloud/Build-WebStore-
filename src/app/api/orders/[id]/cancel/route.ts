@@ -158,11 +158,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
         // --- Stripe paid orders: auto-refund atomically with cancel ---
         // Mirrors the Xendit block above: CAS-before-remote → call Stripe → rollback on failure.
-        // Detection: paid + not manual (BT/COD) + not Xendit → implicit Stripe (paymentProvider not set for Stripe).
+        // Detection: paid + not manual (BT/COD/free/qr_banking/bank) + not Xendit → implicit Stripe
+        // (paymentProvider is never set for Stripe orders).
         if (
             !xenditCasDone &&
             (order as any).paymentStatus === 'paid' &&
-            !['bank_transfer', 'cod'].includes((order as any).paymentMethod ?? '') &&
+            !['bank_transfer', 'cod', 'free', 'qr_banking', 'bank'].includes((order as any).paymentMethod ?? '') &&
             (order as any).paymentProvider !== 'xendit'
         ) {
             const tenantRawId = typeof (order as any).tenant === 'object'
@@ -170,7 +171,13 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 : (order as any).tenant
             const tenantWithKeys = await payload.findByID({
                 collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
-            }).catch(() => null)
+            }).catch((err: unknown) => {
+                payload.logger.error(
+                    { err: err instanceof Error ? err.message : String(err), tenantRawId, orderId },
+                    '[Order Cancel] Failed to fetch tenant for Stripe refund check'
+                )
+                return null
+            })
             const stripeAccountId: string | undefined = (tenantWithKeys as any)?.stripeAccountId
 
             if (!stripeAccountId) {
@@ -182,10 +189,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
             let stripePaymentIntentId: string | undefined = (order as any).stripePaymentIntentId
 
+            // Hoist client — reused for both session fallback and refund below.
+            const stripe = getStripeClient()
+
             // If payment intent not cached (webhook may not have fired yet), fetch from Stripe session.
             if (!stripePaymentIntentId && (order as any).stripeSessionId) {
                 try {
-                    const stripe = getStripeClient()
                     const session = await stripe.checkout.sessions.retrieve(
                         (order as any).stripeSessionId,
                         { expand: ['payment_intent'] },
@@ -236,7 +245,6 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
             // CAS committed — now call Stripe. If it fails, roll back so order is unchanged.
             try {
-                const stripe = getStripeClient()
                 const refund = await stripe.refunds.create(
                     { payment_intent: stripePaymentIntentId },
                     { stripeAccount: stripeAccountId, idempotencyKey: `cancel-${orderId}` },
@@ -249,7 +257,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                     // Genuine Stripe failure — roll back CAS so order is unchanged.
                     await db.execute(sql`
                         UPDATE orders
-                        SET status = ${currentStatus}, payment_status = 'paid', updated_at = NOW()
+                        SET status = ${currentStatus}, cancel_reason = NULL, payment_status = 'paid', updated_at = NOW()
                         WHERE id = ${orderId}
                     `).catch((rollbackErr: unknown) => {
                         payload.logger.error(

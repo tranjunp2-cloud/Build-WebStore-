@@ -725,4 +725,26 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
             expect.objectContaining({ stripeAccount: 'acct_test123' })
         )
     })
+
+    it('[TC-F10-03-32] free-discount paid order bypasses Stripe block and cancels via generic CAS', async () => {
+        // Regression: paymentMethod='free' was not in the exclusion list, causing free orders to
+        // enter the Stripe block and return 422 STRIPE_NOT_REFUNDABLE (no Stripe charge exists).
+        const freeCtx = { params: Promise.resolve({ id: 'free-order-1' }) }
+        mockFindByID.mockResolvedValueOnce({
+            id: 'free-order-1', status: 'confirmed',
+            paymentMethod: 'free', paymentStatus: 'paid',
+            paymentProvider: undefined, items: [],
+        })
+        mockUpdate.mockResolvedValue({ id: 'free-order-1', status: 'cancelled', paymentStatus: 'paid' })
+
+        const req = { json: () => Promise.resolve({ reason: 'No longer needed' }) } as unknown as Request
+        const res = await POST(req, freeCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(mockStripeRefundsCreate).not.toHaveBeenCalled()
+        // Generic CAS only — 1 SQL call, no restock
+        expect(mockDrizzleExecute).toHaveBeenCalledTimes(1)
+    })
 })
