@@ -10,10 +10,11 @@ const SOURCE_VARIANT: Record<CustomerSource, 'default' | 'secondary'> = {
     'newsletter':   'secondary',
 }
 
-// GH-1192: tag source = nền đặc + chữ trắng (filled). `!` override màu variant.
+// GH-1337: tinted pill badges per Figma spec. !rounded-full overrides Badge default rounded-md.
+// whitespace-nowrap prevents "Newsletter Subscriptions" from wrapping in narrow table columns.
 const SOURCE_SOLID: Record<CustomerSource, string> = {
-    'contact-form': '!bg-[hsl(var(--info))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
-    'newsletter':   '!bg-[hsl(var(--muted-foreground))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    'contact-form': '!bg-blue-500/10 !border-blue-500/30 !text-blue-500 !rounded-full whitespace-nowrap',
+    'newsletter':   '!bg-[rgba(167,139,250,0.1)] !border-[rgba(138,129,245,0.3)] !text-[#8a81f5] !rounded-full whitespace-nowrap',
 }
 
 export function CustomerSourceBadge({ source }: { source: CustomerSource }) {
