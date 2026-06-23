@@ -41,7 +41,7 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 z-[102] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity"
         >
             <div
                 className="flex flex-col items-center"

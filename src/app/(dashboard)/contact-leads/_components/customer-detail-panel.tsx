@@ -169,15 +169,14 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
         <>
             {/* Backdrop — rendered via portal at document.body to escape ancestor stacking contexts */}
             <div
-                className="fixed inset-0 z-40"
-                style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
             />
 
             {/* Panel — bottom sheet on mobile, right sidebar on md+ */}
             <div
-                className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t md:border-l border-solid border-[var(--dash-border)]"
-                style={{ background: 'var(--dash-surface)', backdropFilter: 'blur(20px)' }}
+                className="fixed bottom-0 left-0 right-0 z-[101] flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t md:border-l border-solid border-[var(--dash-border)]"
+                style={{ background: 'var(--dash-surface)' }}
             >
                 {/* Drag handle (mobile only) */}
                 <div className="md:hidden flex justify-center pt-3 pb-0 shrink-0">
