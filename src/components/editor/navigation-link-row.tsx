@@ -36,7 +36,7 @@ export const C = {
     text2: 'var(--dash-text-muted)',
     text3: 'var(--dash-text-muted)',
     info: 'var(--dash-accent)',
-    infoBg: 'rgba(37,99,235,0.12)',
+    infoBg: 'hsl(var(--primary)/0.12)',
     danger: 'var(--dash-error)',
     warning: 'var(--dash-warning)',
 } as const
@@ -259,7 +259,7 @@ export function NavLinkRow({
         background: C.row,
         border: `1px solid ${borderColor}`,
         borderRadius: 8,
-        boxShadow: (isPanelOpen || isDropChildTarget) ? '0 0 0 2px rgba(37,99,235,0.25)' : 'none',
+        boxShadow: (isPanelOpen || isDropChildTarget) ? '0 0 0 2px hsl(var(--primary)/0.25)' : 'none',
         marginBottom: 7,
         overflow: 'hidden',
         transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -360,7 +360,7 @@ export function NavLinkRow({
                 if (e.key === 'Escape') onSetEditingNameId(null)
             }}
             onClick={e => e.stopPropagation()}
-            style={{ flex: 1, minWidth: 0, background: C.bg, border: '1px solid rgba(37,99,235,0.45)', borderRadius: 6, padding: '3px 8px', fontSize: 14, color: C.text, outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, background: C.bg, border: '1px solid hsl(var(--primary)/0.45)', borderRadius: 6, padding: '3px 8px', fontSize: 14, color: C.text, outline: 'none' }}
         />
     ) : (
         <span
@@ -446,7 +446,8 @@ export function NavLinkRow({
                     {!isPanelOpen && (
                         <button
                             type="button"
-                            onClick={e => { e.stopPropagation(); onSetOpenPanelId(link.id) }}
+                            // GH-1204 #4: pencil mở panel + vào edit-name → input auto-focus (effect on isEditingName)
+                            onClick={e => { e.stopPropagation(); onSetOpenPanelId(link.id); onSetEditingNameId(link.id) }}
                             style={{ background: 'none', border: 'none', padding: 0, color: C.text3, cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}
                             aria-label="Edit link"
                             onMouseEnter={e => { e.currentTarget.style.color = C.text }}
@@ -461,15 +462,14 @@ export function NavLinkRow({
                 {isPanelOpen && (
                     <div style={{ padding: 12 }}>
                         {hasChildren ? toolbar : configForm}
+                        {/* GH-1204 #5: "+ Add submenu" INSIDE the focus panel → scope rõ ràng (thuộc item
+                            đang edit), tự ẩn khi đóng panel. Chỉ cho root leaf (depth 0, chưa có con). */}
+                        {depth === 0 && !hasChildren && (
+                            <DashedBtn label={nav.addSubmenu} onClick={e => { e.stopPropagation(); onAddChild(link.id) }} mt={12} />
+                        )}
                     </div>
                 )}
             </div>
-
-            {/* "+ Add submenu" dashed button — only while EDITING this root leaf (pencil
-                clicked / panel open), not on every collapsed row. */}
-            {depth === 0 && !hasChildren && isPanelOpen && (
-                <DashedBtn label={nav.addSubmenu} onClick={e => { e.stopPropagation(); onAddChild(link.id) }} mb={7} />
-            )}
 
             {/* Child-wrap with visible left-border guide (.child-wrap) */}
             {isExpanded && hasChildren && (
