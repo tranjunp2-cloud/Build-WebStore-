@@ -8,6 +8,7 @@ import { ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/i18n'
 import { getDisplayPrice } from '@/lib/products/display-price'
+import { Button } from '@/components/ui/button'
 
 // We extend the Product type locally as page.tsx might not have all fields typed
 type Category = {
@@ -121,14 +122,25 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     const stockColor = totalStock > 10 ? 'text-[#05DF72]' : totalStock > 0 ? 'text-amber-400' : 'text-red-400'
     const stockBg = totalStock > 10 ? 'bg-[#05DF72]/10' : totalStock > 0 ? 'bg-amber-400/10' : 'bg-red-400/10'
 
-    // Description extracting raw text from Payload RichText if available
-    let descText = product.shortDescription || ''
-    if (!descText && product.description?.root) {
-        // Simple extraction just to show something
+    // Prefer user-edited description (richText) over shortDescription (AI-generated, not user-editable).
+    // Handles two storage formats: Lexical richText object (standard) and plain string (legacy generate-site flow).
+    let descText = ''
+    if (product.description?.root) {
         try {
-            descText = product.description.root.children.map((c: any) => c.children?.map((tc: any) => tc.text).join(' ')).join('\n')
+            descText = product.description.root.children
+                .map((c: any) =>
+                    c.children
+                        ?.map((tc: any) => tc.text ?? '')
+                        .filter(Boolean)
+                        .join(' ')
+                )
+                .filter(Boolean)
+                .join('\n')
         } catch(e) {}
+    } else if (typeof product.description === 'string') {
+        descText = product.description
     }
+    if (!descText) descText = product.shortDescription || ''
 
     return createPortal(
         <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
@@ -314,39 +326,27 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
                     {/* Footer Actions (Node 30928:4057) */}
                     <div className="mt-auto pt-[24px] border-t border-[#414754]/10 flex justify-between items-center shrink-0">
-                        <button 
-                            onClick={() => {
-                                onDelete(product)
-                            }}
-                            className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity text-red-500 dark:text-[#FFB4AB]"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontSize: '12px',
-                                fontWeight: 700
-                            }}
+                        <Button
+                            variant="ghost"
+                            size="dash"
+                            onClick={() => onDelete(product)}
+                            className="flex items-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 uppercase tracking-widest text-xs font-bold"
                         >
-                            <Trash2 className="w-[14px] h-[14px]" />
+                            <Trash2 className="w-3.5 h-3.5" />
                             {t.dashboard?.products?.quickView?.deleteProduct || 'DELETE PRODUCT'}
-                        </button>
-                        <button 
+                        </Button>
+                        <Button
+                            variant="dashPrimary"
+                            size="dash"
                             onClick={() => {
                                 router.push(`/products/${product.id}`)
                                 onClose()
                             }}
-                            className="flex items-center justify-center gap-[8px] px-[32px] py-[12px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-90 transition-opacity"
-                            style={{ 
-                                backgroundColor: '#4A8EFF', 
-                                border: 'none', 
-                                color: '#00285B', 
-                                fontSize: '12px', 
-                                fontWeight: 900,
-                                boxShadow: '0 4px 14px 0 rgba(74,142,255,0.39)' 
-                            }}
+                            className="flex items-center gap-2 uppercase tracking-widest text-xs font-black"
                         >
-                            <Pencil className="w-[14px] h-[14px]" />
+                            <Pencil className="w-3.5 h-3.5" />
                             {t.dashboard?.products?.quickView?.editProduct || 'EDIT PRODUCT'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
