@@ -119,6 +119,15 @@ export async function POST(req: NextRequest) {
 
         const { password: _ssoPassword, ...safeMetaData } = rawPayload
 
+        let keyString: string | undefined
+        try {
+            const { encryptPassword } = await import('@/lib/sso/sso-api-client')
+            keyString = encryptPassword(password)
+        } catch (err) {
+            // Non-blocking — provision succeeds even if encryption fails
+            console.error('[SSO Provisioning] keyString encryption failed:', err)
+        }
+
         const newTenant = await payload.create({
             collection: 'tenants',
             data: {
@@ -155,6 +164,7 @@ export async function POST(req: NextRequest) {
                 ],
                 ...(customerId && { customerIdNumber: String(customerId) }),
                 migrationStatus: 'migrated',
+                ...(keyString && { keyString }),
                 // Audit trail: payload.create() local API has no req.user; set explicitly
                 createdBy: callerUser.id,
                 updatedBy: callerUser.id,

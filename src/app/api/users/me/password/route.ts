@@ -54,10 +54,18 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        let keyString: string | undefined
+        try {
+            const { encryptPassword } = await import('@/lib/sso/sso-api-client')
+            keyString = encryptPassword(newPassword)
+        } catch (err) {
+            console.error('[users/me/password] keyString encryption failed:', err)
+        }
+
         await payload.update({
             collection: 'users',
             id: user.id,
-            data: { password: newPassword },
+            data: { password: newPassword, ...(keyString && { keyString }) },
             overrideAccess: true,
         })
 

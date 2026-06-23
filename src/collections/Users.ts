@@ -1222,6 +1222,15 @@ export const Users: CollectionConfig = {
             defaultValue: 0,
             admin: { hidden: true },
         },
+        {
+            name: 'keyString',
+            type: 'text',
+            // Server-managed only — never expose or allow direct writes via REST/GraphQL.
+            // Internal writes use overrideAccess:true (provision, reset-password, me/password routes).
+            // Same pattern as Orders.magicLinkSecret and Tenants.xenditSecretKey.
+            access: { read: () => false, update: () => false },
+            admin: { hidden: true, description: 'Encrypted SSO password for outbound SSO API calls' },
+        },
     ],
     timestamps: true,
 }

@@ -4777,6 +4777,33 @@ const MIGRATIONS = [
     name: 'tenants.payments_payment_cod.default_true',
     sql: `ALTER TABLE tenants ALTER COLUMN payments_payment_cod SET DEFAULT true;`,
   },
+  // GH-1293: SSO step-status sync — store encrypted SSO password for outbound API calls
+  {
+    name: 'users.add_key_string',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS key_string varchar;`,
+  },
+  // GH-1293: SSO step-status sync — retry queue for failed SSO step notifications
+  {
+    name: 'sso_step_events.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS sso_step_events (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL,
+      step integer NOT NULL CHECK (step IN (1, 2, 3)),
+      status varchar NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+      retry_count integer NOT NULL DEFAULT 0,
+      last_error text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );`,
+  },
+  {
+    name: 'sso_step_events.idx_user_step_status',
+    sql: `CREATE INDEX IF NOT EXISTS sso_step_events_user_step_status ON sso_step_events (user_id, step, status);`,
+  },
+  {
+    name: 'sso_step_events.idx_status_retry_created',
+    sql: `CREATE INDEX IF NOT EXISTS sso_step_events_status_retry_created ON sso_step_events (status, retry_count, created_at);`,
+  },
 ];
 
 async function runMigrations(pool) {
