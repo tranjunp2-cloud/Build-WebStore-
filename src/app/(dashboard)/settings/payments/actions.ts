@@ -251,7 +251,9 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         // Register ECH's webhook URL on merchant's Xendit account and validate callbackToken.
         // POST /callback_urls/invoice returns callback_token = merchant's Webhook Verification Token.
         // Comparing it against input catches wrong tokens before they break payment webhooks.
-        const webhookUrl = `${process.env.NEXT_PUBLIC_SERVER_URL}/api/webhooks/xendit`
+        const serverUrl = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+        const webhookUrl = `${serverUrl}/api/webhooks/xendit`
+        console.log('[saveXenditKeys] registering webhook URL:', webhookUrl)
         try {
             const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
             if (cbResult.callback_token !== callbackToken.trim()) {
