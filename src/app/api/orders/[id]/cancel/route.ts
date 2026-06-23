@@ -7,6 +7,7 @@ import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCancelSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { getStripeClient } from '@/lib/payment/stripe'
 import { createRefund } from '@/lib/payment/xendit'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
@@ -79,6 +80,8 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // This ensures cancel never succeeds without a corresponding refund for paid Xendit orders.
         let xenditRefundId: string | undefined
         let xenditCasDone = false
+        let stripeRefundId: string | undefined
+        let stripeCasDone = false
         if ((order as any).paymentProvider === 'xendit' && (order as any).paymentStatus === 'paid') {
             const tenantRawId = typeof (order as any).tenant === 'object'
                 ? (order as any).tenant.id
@@ -153,13 +156,134 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             }
         }
 
+        // --- Stripe paid orders: auto-refund atomically with cancel ---
+        // Mirrors the Xendit block above: CAS-before-remote → call Stripe → rollback on failure.
+        // Detection: paid + not manual (BT/COD/free/qr_banking/bank) + not Xendit → implicit Stripe
+        // (paymentProvider is never set for Stripe orders).
+        if (
+            !xenditCasDone &&
+            (order as any).paymentStatus === 'paid' &&
+            !['bank_transfer', 'cod', 'free', 'qr_banking', 'bank'].includes((order as any).paymentMethod ?? '') &&
+            (order as any).paymentProvider !== 'xendit'
+        ) {
+            const tenantRawId = typeof (order as any).tenant === 'object'
+                ? (order as any).tenant.id
+                : (order as any).tenant
+            const tenantWithKeys = await payload.findByID({
+                collection: 'tenants', id: tenantRawId, depth: 0, overrideAccess: true,
+            }).catch((err: unknown) => {
+                payload.logger.error(
+                    { err: err instanceof Error ? err.message : String(err), tenantRawId, orderId },
+                    '[Order Cancel] Failed to fetch tenant for Stripe refund check'
+                )
+                return null
+            })
+            const stripeAccountId: string | undefined = (tenantWithKeys as any)?.stripeAccountId
+
+            if (!stripeAccountId) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'STRIPE_NOT_REFUNDABLE', message: 'Stripe account not configured — cancel blocked to protect buyer funds. Refund manually via Stripe dashboard first.' } },
+                    { status: 422 }
+                )
+            }
+
+            let stripePaymentIntentId: string | undefined = (order as any).stripePaymentIntentId
+
+            // Hoist client — reused for both session fallback and refund below.
+            const stripe = getStripeClient()
+
+            // If payment intent not cached (webhook may not have fired yet), fetch from Stripe session.
+            if (!stripePaymentIntentId && (order as any).stripeSessionId) {
+                try {
+                    const session = await stripe.checkout.sessions.retrieve(
+                        (order as any).stripeSessionId,
+                        { expand: ['payment_intent'] },
+                        { stripeAccount: stripeAccountId },
+                    )
+                    const pi = session.payment_intent
+                    stripePaymentIntentId = typeof pi === 'string' ? pi : (pi as any)?.id
+                    if (stripePaymentIntentId) {
+                        await payload.update({
+                            collection: 'orders',
+                            id: orderId,
+                            data: { stripePaymentIntentId } as any,
+                        }).catch(() => null)
+                    }
+                } catch (err: any) {
+                    payload.logger.error({ err: err.message, orderId }, '[Order Cancel] Failed to retrieve Stripe session')
+                }
+            }
+
+            if (!stripePaymentIntentId) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'STRIPE_NOT_REFUNDABLE', message: 'Missing Stripe payment intent — cancel blocked to protect buyer funds. Refund manually via Stripe dashboard first.' } },
+                    { status: 422 }
+                )
+            }
+
+            // CAS: commit cancel + payment_status='refunded' atomically before calling Stripe API.
+            // AND payment_status='paid' guard prevents double-refund under concurrent requests.
+            const stripeCas = await db.execute(sql`
+                UPDATE orders
+                SET status = 'cancelled', cancel_reason = ${reason}, payment_status = 'refunded', updated_at = NOW()
+                WHERE id = ${orderId} AND status = ${currentStatus} AND payment_status = 'paid'
+                RETURNING id
+            `)
+
+            if (!stripeCas.rows?.length) {
+                const recheck = await payload.findByID({ collection: 'orders', id: orderId, overrideAccess: true, depth: 0 })
+                if ((recheck as any)?.status === 'cancelled') {
+                    return NextResponse.json({ success: true, data: recheck, restock: [] })
+                }
+                return NextResponse.json(
+                    { success: false, error: { code: 'INVALID_TRANSITION', message: 'Order status changed — cancellation no longer valid' } },
+                    { status: 422 }
+                )
+            }
+
+            stripeCasDone = true
+
+            // CAS committed — now call Stripe. If it fails, roll back so order is unchanged.
+            try {
+                const refund = await stripe.refunds.create(
+                    { payment_intent: stripePaymentIntentId },
+                    { stripeAccount: stripeAccountId, idempotencyKey: `cancel-${orderId}` },
+                )
+                stripeRefundId = refund.id
+            } catch (stripeErr: any) {
+                if (stripeErr?.code === 'charge_already_refunded') {
+                    // Refund already exists on Stripe — idempotent success. CAS stands, buyer gets money.
+                } else {
+                    // Genuine Stripe failure — roll back CAS so order is unchanged.
+                    await db.execute(sql`
+                        UPDATE orders
+                        SET status = ${currentStatus}, cancel_reason = NULL, payment_status = 'paid', updated_at = NOW()
+                        WHERE id = ${orderId}
+                    `).catch((rollbackErr: unknown) => {
+                        payload.logger.error(
+                            { rollbackErr: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr), orderId },
+                            '[Order Cancel] Stripe CAS rollback failed — DB state may be inconsistent'
+                        )
+                    })
+                    payload.logger.error(
+                        { err: stripeErr instanceof Error ? stripeErr.message : String(stripeErr), orderId },
+                        '[Order Cancel] Stripe refund failed — cancel aborted, CAS rolled back'
+                    )
+                    return NextResponse.json(
+                        { success: false, error: { code: 'STRIPE_REFUND_ERROR', message: 'Refund could not be processed — cancellation aborted. Please try again or refund via Stripe dashboard.' } },
+                        { status: 502 }
+                    )
+                }
+            }
+        }
+
         // Atomic status transition — prevents concurrent double-restock.
         // Two concurrent cancel requests both pass the validation above, but only the
         // one whose CAS succeeds (RETURNING non-empty) proceeds to restock.
         // The loser sees 0 rows → rechecks order → returns idempotent success without restocking.
-        // Skip if Xendit branch already ran its own CAS above.
+        // Skip if Xendit or Stripe branch already ran its own CAS above.
         let casResult: { rows?: Array<Record<string, unknown>> } = { rows: [{}] }
-        if (!xenditCasDone) {
+        if (!xenditCasDone && !stripeCasDone) {
             casResult = await db.execute(sql`
                 UPDATE orders
                 SET status = 'cancelled', cancel_reason = ${reason}, updated_at = NOW()
@@ -168,7 +292,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             `)
         }
 
-        if (!xenditCasDone && !casResult.rows?.length) {
+        if (!xenditCasDone && !stripeCasDone && !casResult.rows?.length) {
             // CAS missed — status changed between our validation read and this write.
             // Two sub-cases: already cancelled (concurrent cancel WON) or advanced to
             // a non-cancellable state (e.g. ready_to_ship/shipped by seller).
@@ -188,12 +312,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // CAS only wrote status + cancel_reason (+ payment_status for Xendit); construct from pre-fetched.
+        // CAS only wrote status + cancel_reason (+ payment_status for Xendit/Stripe); construct from pre-fetched.
         const updated = {
             ...(order as any),
             status: 'cancelled',
             cancelReason: reason,
-            ...(xenditRefundId ? { paymentStatus: 'refunded' } : {}),
+            ...((xenditRefundId || stripeCasDone) ? { paymentStatus: 'refunded' } : {}),
         }
 
         // Release the reserved discount slot (F33) — runs only on the CAS winner so a concurrent cancel
@@ -238,7 +362,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         }
 
         // Send email to customer.
-        // Xendit paid orders that were auto-refunded → send refund email (mentions refund amount + ETA).
+        // Xendit/Stripe paid orders that were auto-refunded → send refund email (mentions refund amount + ETA).
         // All other orders → send standard cancellation email.
         const customerEmail = (updated as any).customerEmail
         if (customerEmail) {
@@ -249,7 +373,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 const siteLocale: 'en' | 'ms' = typeof (updated as any).site === 'object'
                     ? ((updated as any).site?.locale ?? 'ms')
                     : 'ms'
-                const emailTemplate = xenditRefundId ? 'order-refunded' : 'order-cancelled'
+                const emailTemplate = (xenditRefundId || stripeCasDone) ? 'order-refunded' : 'order-cancelled'
                 const [tenant, cmsConfig] = await Promise.all([
                     tenantId
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
@@ -273,7 +397,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                         lineTotal: item.quantity * item.unitPrice,
                     }))
 
-                    if (xenditRefundId) {
+                    if (xenditRefundId || stripeCasDone) {
                         // Refund email: buyer knows money is coming back
                         const refundEmail = orderRefundedEmail({
                             shopName,
@@ -329,7 +453,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             success: true,
             data: updated,
             restock: restockResults,
-            ...(xenditRefundId ? { refundId: xenditRefundId } : {}),
+            ...((xenditRefundId || stripeRefundId) ? { refundId: xenditRefundId ?? stripeRefundId } : {}),
         })
     } catch (error: any) {
         console.error('[Order Cancel Error]', error)
