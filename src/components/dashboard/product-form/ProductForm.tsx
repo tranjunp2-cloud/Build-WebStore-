@@ -8,6 +8,7 @@ import { ProductFormValues, getProductFormSchema } from './schema'
 import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { parseServerError, localizeFieldError } from '@/lib/products/server-errors'
@@ -214,21 +215,24 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 {/* Fixed Footer Actions */}
                 <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-background border-t border-white/[0.08] px-8 py-[18px]">
                     <div className="flex flex-row items-center gap-3 w-full bg-background">
-                        <button
+                        {/* Shared <Button> dashSecondary / dashPrimary (GH-1290 Bug 1) — giữ size full-width h-12 rounded-2xl */}
+                        <Button
                             type="button"
+                            variant="dashSecondary"
                             onClick={() => router.push('/products')}
-                            className="flex-1 h-12 rounded-2xl border border-solid border-[hsl(var(--input-border))] bg-transparent text-[16px] font-medium text-foreground hover:bg-white/5 transition-colors flex items-center justify-center"
+                            className="flex-1 h-12 rounded-2xl text-[16px]"
                         >
                             {t.dashboard.products.form.cancel}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
+                            variant="dashPrimary"
                             disabled={isSaving}
-                            className="flex-1 h-12 rounded-2xl border-none outline-none bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] text-[16px] font-semibold !text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-[9px]"
+                            className="flex-1 h-12 rounded-2xl text-[16px] disabled:opacity-50"
                         >
                             <Save className="w-5 h-5 flex-shrink-0" />
                             <span>{isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}</span>
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </form>

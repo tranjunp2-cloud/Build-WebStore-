@@ -108,19 +108,21 @@ export function RemoveStaffModal({
                     >
                         {t?.Staff?.removeModal?.cancel || 'Cancel'}
                     </Button>
-                    <button
+                    {/* Shared <Button> destructive (GH-1290 Bug 1) — giữ size + glow shadow */}
+                    <Button
                         type="button"
                         onClick={handleConfirm}
                         disabled={isPending}
-                        className="flex items-center justify-center gap-[8px] h-[44px] px-[28px] rounded-[12px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity focus:outline-none"
+                        variant="destructive"
+                        // token destructive + !text-white: tránh remap .dash-shell .text-white → chữ tối (GH-1192); đồng bộ đỏ với ConfirmModal ở cả 2 theme
+                        className="h-[44px] px-[28px] rounded-[12px] text-[16px] font-semibold gap-[8px] hover:opacity-90 !bg-[hsl(var(--destructive))] !text-white"
                         style={{
-                            background: 'hsl(var(--destructive))',
                             boxShadow: '0px 4px 6px -4px hsl(var(--destructive)/0.3), 0px 10px 15px -3px hsl(var(--destructive)/0.3)'
                         }}
                     >
-                        {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isPending && <Loader2 className="animate-spin" />}
                         {t?.Staff?.removeModal?.confirm || 'Yes, Remove'}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

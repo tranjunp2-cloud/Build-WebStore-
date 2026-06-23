@@ -17,9 +17,10 @@ type Props = {
     onSelect: (record: CustomerRecord) => void
     onDelete: (record: CustomerRecord) => void
     onPageChange: (page: number) => void
+    onLimitChange?: (limit: number) => void
 }
 
-export function CustomersCardList({ records, total, page, limit, onSelect, onDelete, onPageChange }: Props) {
+export function CustomersCardList({ records, total, page, limit, onSelect, onDelete, onPageChange, onLimitChange }: Props) {
     const { t } = useI18n()
     const c = t.dashboard.customers
 
@@ -96,13 +97,14 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                 )
             })}
 
-            {total > limit && (
+            {total > 0 && (
                 <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
                     <TablePagination
                         page={page}
                         total={total}
                         limit={limit}
                         onPageChange={onPageChange}
+                        onLimitChange={onLimitChange}
                     />
                 </div>
             )}

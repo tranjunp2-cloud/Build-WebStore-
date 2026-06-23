@@ -52,7 +52,9 @@ export function StaffDirectoryClient({
     const [userToRemove, setUserToRemove] = useState<StaffMember | null>(null);
     const [isPending, startTransition] = useTransition();
 
-    const itemsPerPage = 10;
+    // Rows-per-page stateful for the DS pagination selector ([10,25,50,100]) (GH-1290 Bug 4)
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const handleLimitChange = (n: number) => { setItemsPerPage(n); setCurrentPage(1); };
 
     // Debounce search safely (simplified for local fast typing)
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -158,6 +160,7 @@ export function StaffDirectoryClient({
                                 total={filteredStaff.length}
                                 limit={itemsPerPage}
                                 onPageChange={setCurrentPage}
+                                onLimitChange={handleLimitChange}
                                 labels={{ unit: t?.Staff?.title || 'staff' }}
                             />
                         )}
