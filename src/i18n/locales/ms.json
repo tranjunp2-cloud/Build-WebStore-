@@ -2017,6 +2017,8 @@
                 "xenditTokenMismatch": "Webhook Verification Token tidak betul — sila semak semula dalam Xendit Dashboard anda (Settings → Configuration → Webhook verification token).",
                 "xenditWebhookUrlInvalid": "Tidak dapat mendaftarkan webhook URL: Xendit memerlukan HTTPS public URL. Dalam local dev, tetapkan XENDIT_WEBHOOK_URL ke ngrok/Cloudflare tunnel URL anda dalam .env.local.",
                 "xenditWebhookRegisterFailed": "Tidak dapat mendaftarkan webhook URL dengan Xendit. Sila semak Secret Key anda dan cuba lagi.",
+                "xenditInvalidSecretKey": "Secret Key tidak sah — sila salin semula daripada Xendit Dashboard anda.",
+                "xenditMissingPermission": "Secret Key ini tidak mempunyai kebenaran \"Money-in products → Write\". Sila buat semula kunci tersebut dengan kebenaran itu diaktifkan dalam Xendit.",
                 "xenditWebhookConfirmBack": "Kembali",
                 "xenditWebhookConfirmProceed": "Sahkan & Sambung",
                 "xenditLoginPrompt": "Ada akaun Xendit?",

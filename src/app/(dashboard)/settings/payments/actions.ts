@@ -238,10 +238,10 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         } catch (err: unknown) {
             if (err instanceof XenditError) {
                 if (err.status === 401) {
-                    return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
+                    return { success: false, error: 'xenditInvalidSecretKey' }
                 }
                 if (err.status === 403) {
-                    return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
+                    return { success: false, error: 'xenditMissingPermission' }
                 }
                 // 400/422/other = key valid + has permission, minimal payload rejected as expected → proceed
             }
