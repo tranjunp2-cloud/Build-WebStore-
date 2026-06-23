@@ -61,7 +61,7 @@ function SecretField({ label, requiredLabel, value, onChange, placeholder, show,
             <ol className="flex flex-col gap-[7px] list-none mt-[10px] mb-[2px] p-0 text-[12.5px] leading-[1.4]" style={{ color: 'var(--dash-text-muted)' }}>
                 {steps.map((step, i) => (
                     <li key={i} className="flex gap-[8px] items-baseline">
-                        <span className="font-mono font-semibold shrink-0 select-none tabular-nums" style={{ color: '#5eead4', opacity: 0.75 }}>{i + 1}.</span>
+                        <span className="font-mono font-semibold shrink-0 select-none tabular-nums text-teal-600 dark:text-[#5eead4] dark:opacity-75">{i + 1}.</span>
                         <span>{step}</span>
                     </li>
                 ))}
@@ -177,8 +177,8 @@ export function XenditConnectModal({ open, onClose, onSave }: Props) {
                             steps={[
                                 pt.xenditSecretKeyStep1,
                                 pt.xenditSecretKeyStep2,
-                                <React.Fragment key="s3">Permissions: <span style={{ color: '#5eead4', fontWeight: 600 }}>Money-in products</span> → select <span style={{ color: '#5eead4', fontWeight: 600 }}>Write</span> — leave others as None</React.Fragment>,
-                                <React.Fragment key="s4">Click <span style={{ color: '#5eead4', fontWeight: 600 }}>Generate key</span> → copy immediately (shown only once)</React.Fragment>,
+                                <React.Fragment key="s3">Permissions: <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Money-in products</span> → select <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Write</span> — leave others as None</React.Fragment>,
+                                <React.Fragment key="s4">Click <span className="font-semibold text-teal-600 dark:text-[#5eead4]">Generate key</span> → copy immediately (shown only once)</React.Fragment>,
                             ]}
                             className="mt-[6px]"
                         />
