@@ -29,8 +29,9 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
         const file = e.target.files?.[0]
         if (!file) return
 
-        // Validate format — SVG excluded: no magic bytes → server rejects it
-        const allowed = ['image/x-icon', 'image/png']
+        // Validate format — SVG excluded: no magic bytes → server rejects it.
+        // image/vnd.microsoft.icon is the IANA standard; image/x-icon is legacy — both used across browsers/OS.
+        const allowed = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png']
         if (!allowed.includes(file.type)) {
             toast.error(fe.invalidFormat)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -60,7 +61,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
             previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
-            onFaviconChange(faviconUrl as string)
+            onFaviconChange(faviconUrl)
             toast.success(fe.success)
         } catch (error) {
             console.error('Favicon upload error:', error)

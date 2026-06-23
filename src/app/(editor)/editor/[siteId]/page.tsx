@@ -697,21 +697,33 @@ export default function EditorPage() {
             }
         })
 
-        // If logo is changing, silently sync header/footer block logos in the store.
+        // If logo is changing (value differs from current store), silently sync header/footer block logos.
         // This avoids handleContentChange (no "Changes Pending") — branding saves go live immediately.
+        // Guard against favicon-only saves: spreading siteBranding includes logo key even when unchanged.
         let logoSyncedHeaderBlock: Record<string, unknown> | null | undefined
         let logoSyncedFooterBlock: Record<string, unknown> | null | undefined
         if (changes.branding && 'logo' in changes.branding) {
-            const logoUrl = (changes.branding as { logo?: string }).logo
-            const logoObj = logoUrl ? { url: logoUrl, alt: '' } : null
+            const newLogoUrl = (changes.branding as { logo?: string }).logo ?? null
             const s = useEditorStore.getState()
-            if (s.headerBlock) {
-                logoSyncedHeaderBlock = { ...(s.headerBlock as Record<string, unknown>), logo: logoObj }
-                useEditorStore.setState({ headerBlock: logoSyncedHeaderBlock as typeof s.headerBlock })
-            }
-            if (s.footerBlock) {
-                logoSyncedFooterBlock = { ...(s.footerBlock as Record<string, unknown>), logo: logoObj }
-                useEditorStore.setState({ footerBlock: logoSyncedFooterBlock as typeof s.footerBlock })
+            const currentLogoUrl =
+                (s.headerBlock as Record<string, unknown> | null)?.logo &&
+                typeof (s.headerBlock as Record<string, unknown>).logo === 'object'
+                    ? ((s.headerBlock as Record<string, unknown>).logo as { url?: string })?.url ?? null
+                    : null
+            if (newLogoUrl !== currentLogoUrl) {
+                const logoObj = newLogoUrl ? { url: newLogoUrl, alt: '' } : null
+                if (s.headerBlock) {
+                    logoSyncedHeaderBlock = { ...(s.headerBlock as Record<string, unknown>), logo: logoObj }
+                }
+                if (s.footerBlock) {
+                    logoSyncedFooterBlock = { ...(s.footerBlock as Record<string, unknown>), logo: logoObj }
+                }
+                if (logoSyncedHeaderBlock || logoSyncedFooterBlock) {
+                    useEditorStore.setState({
+                        ...(logoSyncedHeaderBlock ? { headerBlock: logoSyncedHeaderBlock as typeof s.headerBlock } : {}),
+                        ...(logoSyncedFooterBlock ? { footerBlock: logoSyncedFooterBlock as typeof s.footerBlock } : {}),
+                    })
+                }
             }
         }
 
