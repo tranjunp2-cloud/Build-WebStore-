@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { DiscountFormHeader } from './discount-form-header'
 import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { DiscountFormFields, type DiscountDraft, type DiscountFormErrors } from './discount-form-fields'
+import { computeEffectiveDiscountStatus } from '@/lib/discounts/effective-status'
+import { discountActivationBlocks } from '@/lib/discounts/activation-guard'
 import { DiscountLivePreview } from './discount-live-preview'
 import { DiscountSaveBar } from './discount-save-bar'
 import { draftValueToStored } from '@/lib/discounts/draft-value'
@@ -35,7 +37,14 @@ const toDateInput = (iso?: string | null) => {
     if (!iso) return ''
     const d = new Date(iso)
     if (isNaN(d.getTime())) return ''
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    // Read back in KL timezone — expiresAt is stored pinned to end-of-day KL (15:59:59 UTC).
+    // Using getDate() (browser-local) shifts the date by +1 day for UTC+9+ browsers.
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kuala_Lumpur',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(d)
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+    return `${get('year')}-${get('month')}-${get('day')}`
 }
 
 const buildInit = (discount?: DiscountDoc): DiscountDraft => {
@@ -46,12 +55,25 @@ const buildInit = (discount?: DiscountDoc): DiscountDraft => {
     const valueInput = discount.type === 'fixed'
         ? String((discount.value / 100).toFixed(2))
         : String(discount.value)
+    // An EXPIRED discount shows Inactive in the editable dropdown on load — expiry is irreversible
+    // until the merchant extends the date, and the cron persists it inactive anyway, so reflecting
+    // it avoids a stale "Active". Used-up is NOT normalised: its DB status stays active (capacity can
+    // reopen on a slot release), so the dropdown keeps the raw value and the save guard enforces the
+    // limit. Scheduled stays raw so future-dated campaigns remain schedulable. (GH-1282 decision: B.)
+    const effective = computeEffectiveDiscountStatus({
+        status: discount.status,
+        startsAt: discount.startsAt,
+        expiresAt: discount.expiresAt,
+        usageLimit: discount.usageLimit,
+        usageCount: discount.usageCount,
+    })
+    const status = effective === 'expired' ? 'inactive' : discount.status
     return {
         code: discount.code,
         description: discount.description ?? '',
         type: discount.type,
         valueInput,
-        status: discount.status,
+        status,
         usageLimit: discount.usageLimit == null ? '' : String(discount.usageLimit),
         startsAt: toDateInput(discount.startsAt),
         expiresAt: toDateInput(discount.expiresAt),
@@ -109,9 +131,22 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
             e.dates = dv.datesOrder
         }
 
+        // Reactivation guards — a discount can't be saved Active while it is already unusable.
+        // Error lands on the offending field: expiry date (last date field) or usage limit.
+        // Uses end-of-day-KL semantics so a same-day expiry stays valid (matches persistence + badge).
+        if (draft.status === 'active') {
+            const block = discountActivationBlocks({
+                expiresAt: draft.expiresAt || null,
+                usageLimit: draft.usageLimit === '' ? null : Number(draft.usageLimit),
+                usageCount: discount?.usageCount ?? 0,
+            })
+            if (block.expired && !e.dates) e.dates = dv.expiredCannotActivate
+            if (block.atLimit && !e.usageLimit) e.usageLimit = dv.atLimitCannotActivate
+        }
+
         setErrors(e)
         return Object.keys(e).length === 0
-    }, [draft, dv, ti])
+    }, [draft, dv, ti, discount])
 
     const handleSave = async () => {
         if (!validate()) {
@@ -194,6 +229,10 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 isNew={isNew}
                 code={discount?.code}
                 status={discount?.status}
+                startsAt={discount?.startsAt}
+                expiresAt={discount?.expiresAt}
+                usageLimit={discount?.usageLimit}
+                usageCount={discount?.usageCount}
                 id={discount?.id}
                 createdAt={discount?.createdAt}
                 tenantName={tenantName}

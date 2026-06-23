@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { paymentExpiryJob } from '@/lib/jobs/payment-expiry'
+import { discountAutoInactiveJob } from '@/lib/jobs/discount-auto-inactive'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -16,7 +17,17 @@ export async function GET(req: Request) {
     try {
         const payload = await getPayload({ config })
         const result = await paymentExpiryJob(payload)
-        return NextResponse.json({ success: true, ...result })
+        // Piggyback the discount auto-deactivate sweep on this time-based cron (GH-1282) —
+        // no separate Vercel cron entry. Isolated so a discount-side failure never aborts
+        // payment expiry.
+        let discountAutoInactive: Awaited<ReturnType<typeof discountAutoInactiveJob>> | { error: string }
+        try {
+            discountAutoInactive = await discountAutoInactiveJob(payload)
+        } catch (err) {
+            payload.logger.error({ err }, '[payment-expiry] discount-auto-inactive sweep failed')
+            discountAutoInactive = { error: String(err) }
+        }
+        return NextResponse.json({ success: true, ...result, discountAutoInactive })
     } catch (error) {
         return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
     }
