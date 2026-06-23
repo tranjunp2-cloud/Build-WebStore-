@@ -257,8 +257,10 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             if (cbResult.callback_token !== callbackToken.trim()) {
                 return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
             }
-        } catch {
-            return { success: false, error: 'Không thể xác minh Webhook Verification Token — vui lòng kiểm tra kết nối và thử lại.' }
+        } catch (cbErr: unknown) {
+            const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
+            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg)
+            return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}` }
         }
 
         await payload.update({
