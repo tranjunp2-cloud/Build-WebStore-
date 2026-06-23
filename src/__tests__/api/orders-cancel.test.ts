@@ -746,5 +746,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(mockStripeRefundsCreate).not.toHaveBeenCalled()
         // Generic CAS only — 1 SQL call, no restock
         expect(mockDrizzleExecute).toHaveBeenCalledTimes(1)
+        // No customerEmail on order → no email sent
+        expect(mockSendEmail).not.toHaveBeenCalled()
     })
 })
