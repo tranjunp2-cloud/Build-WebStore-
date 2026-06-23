@@ -799,7 +799,7 @@ export async function POST(req: NextRequest) {
 
         // Map common AI variant names to Payload-valid variants
         const VARIANT_ALIASES: Record<string, Record<string, string>> = {
-            hero: { 'split': 'split-left', 'minimal': 'centered', 'gradient': 'centered', 'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left' },
+            hero: { 'split': 'split-left', 'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left' },
         }
         for (const block of sanitizedBlocks) {
             if (typeof block.blockType === 'string' && typeof block.variant === 'string') {
