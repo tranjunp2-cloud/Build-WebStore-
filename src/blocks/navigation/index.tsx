@@ -740,13 +740,16 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         const ctaW = (ctaGroupRef.current?.offsetWidth ?? 0) + 8
         const halfAvail = (navW - logoW) / 2
 
-        // Left: fill from left edge up to logo's left edge
+        // Left: fill from left edge up to logo's left edge.
+        // Cap at ceil(N/2) so links always distribute evenly — without the cap,
+        // all links end up on the left when they collectively fit in halfAvail.
+        const maxLeft = Math.ceil(links.length / 2)
         let leftW = 0, lc = 0
         for (let i = 0; i < links.length; i++) {
             const el = spanRefs.current[i]
             if (!el) break
             const w = el.offsetWidth + (lc > 0 ? 4 : 0)
-            if (leftW + w > halfAvail) break
+            if (leftW + w > halfAvail || lc >= maxLeft) break
             leftW += w; lc++
         }
 
@@ -1126,7 +1129,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 </NavLogoLink>
 
                 {/* Desktop Links */}
-                <NavDesktopLinks links={links} className="hidden md:flex gap-0.5 flex-1" />
+                <NavDesktopLinks links={links} className="hidden md:flex gap-0.5 flex-1 justify-center" />
 
                 {/* CTA + Language Switcher + Mobile */}
                 <div className="flex items-center gap-2">

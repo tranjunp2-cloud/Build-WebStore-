@@ -11,7 +11,7 @@ const NAV_SURFACE_TEXT = `var(--text, #fafafa)`
 
 /** Shared class for child links inside any nav dropdown (DropdownLink children, MoreDropdownItem sub-flyout). */
 export const DROPDOWN_CHILD_LINK_CLASS =
-    'block rounded-lg px-3 py-2 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] transition-all'
+    'block rounded-lg px-3 py-2 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.1] transition-all'
 
 /** Desktop nav link — renders a plain anchor or a hover-dropdown button when children exist. */
 export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
