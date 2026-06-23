@@ -251,20 +251,25 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         // Register ECH's webhook URL on merchant's Xendit account and validate callbackToken.
         // POST /callback_urls/invoice returns callback_token = merchant's Webhook Verification Token.
         // Comparing it against input catches wrong tokens before they break payment webhooks.
+        // Register ECH webhook URL on Xendit + validate callback token.
+        // Only runs when server URL is a public HTTPS endpoint — skipped on localhost/dev
+        // because Xendit rejects non-reachable URLs (URL_NOT_VALID_ERROR).
         const serverUrl = (process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
         const webhookUrl = `${serverUrl}/api/webhooks/xendit`
-        console.log('[saveXenditKeys] registering webhook URL:', webhookUrl)
-        try {
-            const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
-            if (cbResult.callback_token !== callbackToken.trim()) {
-                return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
+        const isPublicHttps = serverUrl.startsWith('https://') && !serverUrl.includes('localhost')
+        if (isPublicHttps) {
+            try {
+                const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
+                if (cbResult.callback_token !== callbackToken.trim()) {
+                    return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
+                }
+            } catch (cbErr: unknown) {
+                const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
+                console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| url:', webhookUrl)
+                return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}` }
             }
-        } catch (cbErr: unknown) {
-            const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
-            const xenditRaw = (cbErr as any)?.raw
-            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| raw:', JSON.stringify(xenditRaw))
-            console.error('[saveXenditKeys] webhookUrl was:', webhookUrl)
-            return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}` }
+        } else {
+            console.warn('[saveXenditKeys] skipping webhook token validation (non-public URL):', webhookUrl)
         }
 
         await payload.update({
