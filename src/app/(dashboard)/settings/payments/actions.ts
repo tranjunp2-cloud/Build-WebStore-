@@ -261,7 +261,9 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
             }
         } catch (cbErr: unknown) {
             const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
-            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg)
+            const xenditRaw = (cbErr as any)?.raw
+            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| raw:', JSON.stringify(xenditRaw))
+            console.error('[saveXenditKeys] webhookUrl was:', webhookUrl)
             return { success: false, error: `Không thể đăng ký webhook URL với Xendit: ${xenditMsg}` }
         }
 
