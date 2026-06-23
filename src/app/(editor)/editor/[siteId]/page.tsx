@@ -697,6 +697,24 @@ export default function EditorPage() {
             }
         })
 
+        // If logo is changing, silently sync header/footer block logos in the store.
+        // This avoids handleContentChange (no "Changes Pending") — branding saves go live immediately.
+        let logoSyncedHeaderBlock: Record<string, unknown> | null | undefined
+        let logoSyncedFooterBlock: Record<string, unknown> | null | undefined
+        if (changes.branding && 'logo' in changes.branding) {
+            const logoUrl = (changes.branding as { logo?: string }).logo
+            const logoObj = logoUrl ? { url: logoUrl, alt: '' } : null
+            const s = useEditorStore.getState()
+            if (s.headerBlock) {
+                logoSyncedHeaderBlock = { ...(s.headerBlock as Record<string, unknown>), logo: logoObj }
+                useEditorStore.setState({ headerBlock: logoSyncedHeaderBlock as typeof s.headerBlock })
+            }
+            if (s.footerBlock) {
+                logoSyncedFooterBlock = { ...(s.footerBlock as Record<string, unknown>), logo: logoObj }
+                useEditorStore.setState({ footerBlock: logoSyncedFooterBlock as typeof s.footerBlock })
+            }
+        }
+
         try {
             const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
             if (currentPageId) {
@@ -713,11 +731,12 @@ export default function EditorPage() {
                     socialLinks: changes.socialLinks,
                     branding: changes.branding,
                     seo: changes.seo,
-                    // When name changes, persist updated headerBlock (logoText synced above)
+                    // When name changes, persist updated headerBlock (logoText synced above).
+                    // When logo changes, persist synced header/footer blocks directly to DB.
                     headerBlock: changes.name
                         ? useEditorStore.getState().headerBlock
-                        : changes.headerBlock,
-                    footerBlock: changes.footerBlock,
+                        : (logoSyncedHeaderBlock ?? changes.headerBlock),
+                    footerBlock: logoSyncedFooterBlock ?? changes.footerBlock,
                 }),
             })
 

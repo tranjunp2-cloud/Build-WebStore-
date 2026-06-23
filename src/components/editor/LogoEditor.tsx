@@ -17,33 +17,7 @@ import {
 
 interface LogoEditorProps {
     currentLogo?: string | null
-    onLogoChange: (logoUrl: string, faviconUrl?: string) => void
-}
-
-async function generateFavicon(imageUrl: string): Promise<Blob | null> {
-    return new Promise((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = imageUrl
-        img.onload = () => {
-            const canvas = document.createElement('canvas')
-            canvas.width = 32
-            canvas.height = 32
-            const ctx = canvas.getContext('2d')
-            if (!ctx) return resolve(null)
-
-            // Draw image centered/fitted into 32x32
-            const ratio = Math.min(32 / img.width, 32 / img.height)
-            const w = img.width * ratio
-            const h = img.height * ratio
-            const x = (32 - w) / 2
-            const y = (32 - h) / 2
-
-            ctx.drawImage(img, x, y, w, h)
-            canvas.toBlob((blob) => resolve(blob), 'image/png')
-        }
-        img.onerror = () => resolve(null)
-    })
+    onLogoChange: (logoUrl: string) => void
 }
 
 export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
@@ -83,21 +57,8 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             const uploadedLogo = await uploadMediaAction(formData)
             const logoUrl = uploadedLogo.url as string
 
-            // 3. Auto-generate favicon from the uploaded logo
-            let faviconUrl: string | undefined
-
-            const faviconBlob = await generateFavicon(logoUrl.startsWith('/') ? window.location.origin + logoUrl : logoUrl)
-            if (faviconBlob) {
-                const faviconForm = new FormData()
-                faviconForm.append('file', new File([faviconBlob], 'favicon.png', { type: 'image/png' }))
-                faviconForm.append('alt', le.altFavicon)
-
-                const faviconData = await uploadMediaAction(faviconForm)
-                faviconUrl = faviconData.url as string
-            }
-
-            onLogoChange(logoUrl, faviconUrl)
-            toast.success(le.success + (faviconUrl ? le.faviconGenerated : ''))
+            onLogoChange(logoUrl)
+            toast.success(le.success)
         } catch (error) {
             console.error('Logo upload error:', error)
             toast.error(le.error)
