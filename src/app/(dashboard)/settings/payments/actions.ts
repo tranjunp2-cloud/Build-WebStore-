@@ -6,7 +6,8 @@ import { getCurrentTenantId } from '@/lib/auth';
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
 import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
-import { xenditFetch, XenditError } from '@/lib/payment/xendit-client';
+import { xenditFetch, XenditError } from '@/lib/payment/xendit-client'
+import { setCallbackUrl } from '@/lib/payment/xendit';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -245,6 +246,19 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
                 // 400/422/other = key valid + has permission, minimal payload rejected as expected → proceed
             }
             // Network or unexpected error → proceed silently
+        }
+
+        // Register ECH's webhook URL on merchant's Xendit account and validate callbackToken.
+        // POST /callback_urls/invoice returns callback_token = merchant's Webhook Verification Token.
+        // Comparing it against input catches wrong tokens before they break payment webhooks.
+        const webhookUrl = `${process.env.NEXT_PUBLIC_SERVER_URL}/api/webhooks/xendit`
+        try {
+            const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
+            if (cbResult.callback_token !== callbackToken.trim()) {
+                return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
+            }
+        } catch {
+            return { success: false, error: 'Không thể xác minh Webhook Verification Token — vui lòng kiểm tra kết nối và thử lại.' }
         }
 
         await payload.update({

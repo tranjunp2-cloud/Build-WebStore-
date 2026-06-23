@@ -253,6 +253,31 @@ export async function getBalance(forUserId: string): Promise<XenditBalance> {
     return xenditFetch<XenditBalance>('/balance', { method: 'GET', forUserId })
 }
 
+export interface SetCallbackUrlResponse {
+    status: string
+    user_id: string
+    url: string
+    environment: string
+    // Account-level webhook verification token — same value shown in Xendit Dashboard
+    // and sent as X-CALLBACK-TOKEN header on every webhook event.
+    callback_token: string
+}
+
+/** POST /callback_urls/:type — register a webhook URL for a specific event type.
+ * Returns callback_token which equals the merchant's Webhook Verification Token.
+ * Use to validate the token the merchant entered and auto-register ECH's webhook URL. */
+export async function setCallbackUrl(
+    type: string,
+    url: string,
+    apiKey: string,
+): Promise<SetCallbackUrlResponse> {
+    return xenditFetch<SetCallbackUrlResponse>(`/callback_urls/${type}`, {
+        method: 'POST',
+        apiKey,
+        body: { url },
+    })
+}
+
 export interface XenditPaymentChannel {
     channel_code: string       // e.g. TOUCHNGO, GRABPAY, ALIPAY
     channel_name: string       // e.g. "TNG eWallet"
