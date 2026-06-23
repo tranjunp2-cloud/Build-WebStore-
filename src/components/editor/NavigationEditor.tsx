@@ -97,6 +97,12 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
             // close the panel the user is still editing.
             if (target?.closest('[data-sonner-toaster]')) return
             if (rootRef.current && !rootRef.current.contains(target as Node)) {
+                // GH-1204 #2: commit an in-progress inline rename BEFORE tearing down edit state.
+                // The focused label/url input lives inside rootRef — blurring it fires its
+                // onBlur → commit → save while still mounted. Without this, setEditingNameId(null)
+                // unmounts the input first and the edit is lost ("click outside doesn't save").
+                const active = document.activeElement as HTMLElement | null
+                if (active && rootRef.current.contains(active)) active.blur()
                 setOpenPanelId(null)
                 setEditingNameId(null)
             }
