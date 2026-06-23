@@ -371,3 +371,135 @@ Coverage map (TC ↔ FR):
 - [ ] SST excludes shipping fee (BR-05)
 - [ ] Mobile 375px audit passed (US-F14-03 AC checks)
 - [ ] All 20 QA TC pass (excl. TC-F14.10 multi-seller, out of scope)
+
+---
+
+## 20. EasyParcel Integration (Wave 7)
+
+Carrier-integrated shipping via EasyParcel aggregator. Seller connects API key + warehouse origin + selects 1 COD-supporting courier; checkout offers real-time rates per selected courier (buyer does not choose). Hybrid fallback to flat West/East when unconfigured. See shared context & architecture: [`docs/prd/F36-easyparcel-delivery.md`](./F36-easyparcel-delivery.md).
+
+### 20.1. EasyParcel — Connect & Settings
+
+**User Stories**
+
+| ID | Story |
+|---|---|
+| **US-F36-01** | As a merchant, I want to connect my EasyParcel account (via API key) and validate my warehouse address, so that Prime can calculate real shipping rates and generate labels on my behalf. |
+| **US-F36-02** | As a merchant, I want to select 1 courier for my shop from the 4 COD-supporting couriers (COD is a non-negotiable platform default), so that my buyers always see rates for that courier and can pay by COD at checkout. |
+| **US-F36-03** | As a merchant or buyer, I want checkout to fall back to flat rate when EasyParcel is not configured or disabled, so that the store never breaks. |
+
+**Functional Requirements**
+
+| FR | Mô tả | Story |
+|---|---|---|
+| **A-1** | Tab "EasyParcel" dalam `settings/shipping`: input API key (api + auth), form warehouse address. Warehouse = **Prime source of truth**, dùng cho cả rate + label/pickup; **KHÔNG sync từ EasyParcel** (API không có endpoint đọc address). Form dùng **geo cascade NATIVE có sẵn** (State → City → Postcode = 3 dropdown qua `/api/geo/{states,districts,postcodes}` + reverse `/api/geo/lookup/[postcode]`); chỉ `line1/line2` free text. Cascade trả `zone` (west/east) → tái dùng cho COD West-MY. **KHÔNG có selector environment** — env auto-detect ở bước test. | US-F36-01 |
+| **A-2** | "Test connection" gọi `EPRateCheckingBulk` bằng key + **chính warehouse postcode**, **tự dò env** (production trước, fail → demo); OK → lưu key + `detectedEnv` + warehouse (đã validate) + trả list courier. FAIL key → `EASYPARCEL_INVALID_KEY`; FAIL warehouse postcode → `EASYPARCEL_INVALID_WAREHOUSE`. **Force validate: sai → KHÔNG lưu.** | US-F36-01 |
+| **A-3** | Chọn **1 courier** cho shop (`selectedCourier` = single `courier_id`, radio single-select). **Vì COD mặc định bật toàn platform (non-negotiable), list CHỈ gồm 4 courier hỗ trợ COD** (`cod_service_available=true`: Flash/DHL/J&T/Aramex — đọc live từ response, KHÔNG hardcode, KHÔNG list courier non-COD). Default = **J&T**; mỗi courier gắn badge "COD" + settlement ETA per-courier; KHÔNG cần collapse (chỉ 4 courier). **KHÔNG show giá cước ở settings**; giá thật chỉ ở checkout. List chỉ name + logo + badge. Hint seller: COD payout lần đầu cần eKYC + verify bank trên EasyParcel (Prime chỉ hiện hint, KHÔNG build verify). | US-F36-02 |
+| **A-4** | API key lưu trong `tenant.easyParcelIntegration.apiKey`; **PATCH yêu cầu auth + IDOR check** (chỉ owner tenant sửa được). | US-F36-01 |
+| **A-5** | `enabled=false` hoặc thiếu key/warehouse → checkout dùng **flat rate fallback** (không vỡ). | US-F36-03 |
+| **A-6** | EasyParcel API lỗi → log + error code, không lộ key, tenant không kẹt trạng thái sai. | US-F36-01 |
+
+**Data Model**
+
+```typescript
+// Tenants collection — easyParcelIntegration (new)
+easyParcelIntegration: {
+  apiKey: string,          // api_key (sensitive, encrypt at-rest consideration)
+  authKey: string,         // authentication key (sensitive)
+  warehouse: {
+    line1: string,
+    line2?: string,
+    city: string,
+    state: string,
+    postcode: string,
+    zone: 'west' | 'east'  // derived from state via /api/geo/
+  },
+  selectedCourier: {
+    courier_id: string,    // e.g. 'EP-CR0A'
+    courier_name: string,  // e.g. 'J&T'
+    courier_logo: string,  // URL
+    codAvailable: boolean, // cached from rate-check
+    codFee?: number,       // sen; from response
+    codMin?: number,       // sen
+    codMax?: number        // sen
+  },
+  detectedEnv: 'production' | 'demo',
+  enabled: boolean
+}
+```
+
+**Acceptance Criteria**
+
+1. GIVEN tenant chưa connect WHEN mở settings/shipping THEN thấy tab EasyParcel + form API key.
+2. GIVEN dán key đúng + warehouse WHEN "Test connection" THEN OK, lưu key, hiện list courier.
+3. GIVEN key sai WHEN test THEN error `EASYPARCEL_INVALID_KEY`, KHÔNG lưu.
+4. GIVEN connect xong WHEN chọn 1 courier THEN chỉ courier đó hiện ở checkout.
+5. GIVEN user không thuộc tenant WHEN PATCH settings THEN 403 (IDOR chặn).
+6. GIVEN enabled=false THEN checkout dùng flat rate fallback.
+
+---
+
+### 20.2. EasyParcel — Real-Time Rates (Hybrid)
+
+**User Stories**
+
+| ID | Story |
+|---|---|
+| **US-F36-04** | Real-time rate at checkout (EasyParcel → 1 courier) |
+| **US-F36-05** | Checkout address + shipping UI + hybrid fallback |
+
+**Functional Requirements**
+
+| FR | Mô tả | Story |
+|---|---|---|
+| **B-0** | Buyer shipping-address form **reuse cascade F14** (State → City → Postcode `<Select>` × 3, `/api/geo/*` + `CheckoutForm`) — KHÔNG dựng form/endpoint mới. | US-F36-05 |
+| **B-1** | `calculate-shipping` nhận thêm `items` → tính tổng weight (sum `Products.weight` × qty; product = 0/thiếu → hằng số hệ thống `DEFAULT_PARCEL`). `DEFAULT_PARCEL` contains **both** fallback weight (kg) **and** default box dimensions (width, length, height in cm integer). `EPRateCheckingBulk` call **MUST send weight + the `DEFAULT_PARCEL` dims** so volumetric basis at rate-check matches label creation. | US-F36-04 |
+| **B-1b** | **Snapshot `parcelWeight` (gram) lên order lúc checkout** (= tổng weight đã tính ở B-1) — để modal Ready-to-Ship đọc lại khớp đúng cước đã báo, KHÔNG re-join Products. | US-F36-04 |
+| **B-2** | Tenant EasyParcel ON → rate `selectedCourier` (1 courier shop chọn), trả `{ courier, serviceId, fee(sen), eta }` đơn; OFF → trả flat fee đơn (shape cũ tương thích). | US-F36-04 |
+| **B-3** | Checkout UI: phí ship hiển thị **1 dòng "Shipping" trong Order Summary** — KHÔNG có section vận chuyển (shop chốt 1 courier, buyer không chọn), KHÔNG có dòng SST. Fallback → giữ UI fee đơn hiện tại. | US-F36-05 |
+| **B-4** | Lưu `shippingCourier`, `shippingServiceId`, `shippingFee` vào order. `shippingFee` lưu **RM-float** (compute bằng sen rồi `/100` khi lưu — KHÔNG lưu sen vào cột này). Wire ở nhánh `/api/orders/checkout` + `/api/orders/stripe-checkout`. | US-F36-04 |
+| **B-5** | EasyParcel rate API lỗi/timeout → **fallback flat rate** (không chặn checkout); log cảnh báo. | US-F36-05 |
+| **B-6** | Giá hiển thị = **raw EasyParcel** (RM→sen ×100), KHÔNG markup. | US-F36-04 |
+| **B-7** | Free-shipping threshold (`freeAbove`) vẫn áp được lên phí ship nếu merchant bật. | US-F36-05 |
+| **B-8** | **Buyer checkout đã thu đủ 8 receiver fields** (name, phone, email, addr1, addr2, city, state, postcode) — KHÔNG cần thêm input field mới. Backend transform `mapState()` + `normalizePhone()` + `buildAddress()` trước khi gửi EasyParcel. | US-F36-04 |
+| **B-9** | **Product weight/dimensions snapshot vào order** tại checkout (grams); aggregated thành `parcelWeight` (grams) trên order để rate call và modal "Ready to Ship" dùng lại. Default `DEFAULT_PARCEL` khi product weight = 0. `DEFAULT_PARCEL` carries both fallback weight and box dims (W/L/H cm); both sent in `EPRateCheckingBulk` so checkout rate is volumetrically consistent with label creation. | US-F36-04 |
+| **B-10** | **EasyParcel normalize per-courier differences** — cùng 1 field set cho mọi courier (J&T, Pos Laju, Flash, Ninja Van, etc.). Backend gửi cùng field set bất kể `selectedCourier`. | US-F36-04 |
+
+**Data Model (Orders — new fields)**
+
+```typescript
+// Orders collection — shipping fields (extended)
+shippingCourier?: string,    // e.g. 'J&T' (from EasyParcel selectedCourier.courier_name; wave 7+)
+shippingServiceId?: string,  // e.g. 'EP-CS0I' (from EPRateCheckingBulk; wave 7+)
+parcelWeight?: number,       // gram; snapshot at checkout; wave 7+
+// existing:
+shippingFee: number,         // RM-float; wave 6+
+shippingAddress: { line1, line2, city, state, postcode, country }
+```
+
+**FR-02 Update (Wave 6 → Wave 7)**
+
+Updated note: Shipping auto-calculate — **Wave 6:** flat West MY = RM 8, East MY = RM 15. **Wave 7:** flat OR real-time EasyParcel rate per tenant setting (hybrid fallback to flat when unconfigured per FR A-5, B-5).
+
+**Acceptance Criteria**
+
+1. GIVEN tenant EasyParcel ON + product có weight WHEN buyer nhập địa chỉ THEN thấy phí ship thật của courier shop chọn + ETA (1 dòng, không chọn courier).
+2. GIVEN tenant OFF THEN checkout hiện flat West/East như cũ (không vỡ).
+3. GIVEN buyer đặt hàng THEN order lưu đúng shippingCourier (courier shop chọn) + serviceId + shippingFee (RM-float).
+4. GIVEN EasyParcel rate API timeout THEN fallback flat rate, checkout không chặn.
+5. GIVEN giá EasyParcel RM8 THEN compute nội bộ = 800 sen, order.shippingFee lưu = 8.00 (RM-float); KHÔNG lưu 800 vào shippingFee.
+
+---
+
+**Non-Functional Requirements (Wave 7)**
+
+Wave 7 NFRs are defined in [`docs/prd/F36-easyparcel-delivery.md §6`](./F36-easyparcel-delivery.md#6-non-functional-requirements-shared). Key items affecting checkout/rates:
+
+- **NFR-1:** sen↔RM conversion (P0) — critical for rate accuracy
+- **NFR-3:** API key per-merchant; auth + IDOR check; no key leak
+- **NFR-4:** Hybrid fallback (P0) — error → flat rate, no checkout break
+- **NFR-6:** Rate API p95 < 4s; timeout → fallback
+- **NFR-9:** Schema: new columns → `scripts/db-setup.js` MIGRATIONS; CI gate
+- **NFR-10:** Buyer-safe projection — public endpoints mask `labelUrl`, `easyParcelOrderNo`, `codAmount` (seller only)
+
+See full NFR list and resolved questions (warehouse sync, COD settlement, reverse labels, state code mapping, weight/dims precision) in the shared overview document.

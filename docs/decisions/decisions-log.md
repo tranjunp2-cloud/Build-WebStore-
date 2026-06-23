@@ -267,3 +267,16 @@
 | **Impact** | **Code:** Stock decrement moved from webhook `reconcileOrderPaid()` to checkout/session-creation for all payment methods (commit `938406a9`); the now-dead `oversellReview` field + refund branch removed in PR #1160. **Docs:** FR-18, US-F13-06 AC-3 marked SUPERSEDED; schema field `oversell_review` deprecated (column kept for backward-compat, NEVER-DROP rule). **QA:** TC-F13.145, TC-F13.146 marked OBSOLETE (no post-capture oversell scenario to test). |
 | **Status** | ✅ Decided 2026-06-04 (GH-1099, PR #1160 merged) — Docs sync: 2026-06-05 |
 
+---
+
+## PD-020 — F36 EasyParcel: Courier Picker Limited to COD-Supporting Couriers
+
+| | |
+|---|---|
+| **Decision** | Courier picker ở settings CHỈ list 4 courier hỗ trợ COD (Flash, DHL eCommerce, J&T, Aramex) |
+| **Options** | 1. Gate COD theo courier (seller chọn full list, checkout ẩn/hiện COD theo courier); 2. Lọc courier theo COD (chỉ list courier COD trong settings) |
+| **Chosen** | **Option 2 — lọc courier theo COD.** Picker chỉ hiện 4 courier có `cod_service_available=true` (đọc live từ `EPRateCheckingBulk`, KHÔNG hardcode); courier non-COD không hiển thị. |
+| **Rationale** | COD là **mặc định toàn platform, non-negotiable** — đã build + wire + deploy production cho mọi seller (`enableCod` default `true` ở `Sites.ts` / checkout). Vì mọi shop đều COD-on, ép seller chọn courier COD-capable đảm bảo automation thu hộ luôn chạy; buyer ở checkout chỉ thấy "COD" như payment method, KHÔNG thấy courier. Trade-off đã chấp nhận: bỏ độ phủ 60+ courier để đổi lấy COD-guarantee + ít touch codebase (tận dụng COD đã có sẵn). |
+| **Impact** | **Docs:** [F14-shipping.md § 20.1](../prd/F14-shipping.md#easyparcel--connect--settings) FR-A-3 + Flow A4 + [US-F36-02](../stories/F36-easyparcel-delivery-stories.md) AC-2 (picker = 4 courier COD, bỏ collapse "xem thêm" + nhánh "tắt COD → full list"); [F10-orders-management.md § 20.2](../prd/F10-orders-management.md#easyparcel--cod-order-runtime) FR-C-6a/E2/E3/AC#6/#7 (courier-COD condition luôn thỏa → defensive; helper text KHÔNG lộ tên courier); [F36-easyparcel-delivery.md](../prd/F36-easyparcel-delivery.md) §3 + Phase A + note picker; [stories AC-2](../stories/F36-easyparcel-delivery-stories.md). **Constraint giữ nguyên (fact của EasyParcel, không sửa được):** COD = West-MY-only (East MY buyer không thấy COD); hạn mức COD per-courier (J&T RM1k / Flash RM7k) gate ngầm tại checkout. |
+| **Status** | ✅ Decided 2026-06-23 (Domin) — Docs synced 2026-06-23 |
+

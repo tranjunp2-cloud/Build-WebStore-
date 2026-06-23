@@ -3,7 +3,7 @@
 <!-- Rules & ID Convention: docs/stories/user-stories-p0.md | SPEC.md §2.4 -->
 
 > **Feature:** F36 — EasyParcel Delivery Integration (Malaysia)
-> **Wave:** 7 | **Priority:** P1 | **Ref PRD:** [F36-easyparcel-delivery.md](../prd/F36-easyparcel-delivery.md)
+> **Wave:** 7 | **Priority:** P1 | **Ref PRD:** [F36-easyparcel-delivery.md](../prd/F36-easyparcel-delivery.md) (overview & index); phase details merged into [F14-shipping.md](../prd/F14-shipping.md), [F10-orders-management.md](../prd/F10-orders-management.md), [F19-store-configuration.md](../prd/F19-store-configuration.md)
 > **Provider:** EasyParcel (aggregator MY) — per-merchant API key, non-custody, platform RM0.
 > **Depends on:** F09 Storefront ✅, F10 Order lifecycle + cancel-restock ✅, F34 Xendit Payment (song hành).
 
@@ -130,18 +130,22 @@ THEN  lưu selectedCourier (single courier_id) vào tenant.easyParcelIntegration
 
 > 📌 Source: PRD FR A-3 + §10 RESOLVED (map theo `courier_id`, hiển thị `courier_name`+logo, mua label bằng `service_id`)
 
-#### AC-2: Default J&T + top 3 badge + gập phần còn lại
+#### AC-2: Chỉ list 4 courier hỗ trợ COD (COD mặc định toàn platform)
 
 ```gherkin
 GIVEN merchant vừa connect xong (list courier trả về từ EasyParcel)
+  AND COD bật mặc định toàn platform (đã deploy production, non-negotiable)
 WHEN  render section Courier
-THEN  default chọn J&T Express (#1 SME); top 3 (J&T, Pos Laju, Flash) có badge "Phổ biến SME"
-  AND courier còn lại (Ninja Van, DHL, City-Link...) gập trong "＋ Xem thêm courier"
-  AND merchant chọn lại tự do (vẫn single-select)
-  AND chỉ default những mã top 3 mà account merchant thực sự có
+THEN  CHỈ list 4 courier có cod_service_available=true (Flash, DHL eCommerce, J&T, Aramex — đọc live từ response)
+  AND courier non-COD (Pos Laju, Ninja Van, City-Link, SPX...) KHÔNG hiển thị
+  AND default chọn J&T Express
+  AND mỗi courier gắn badge "COD" + settlement ETA per-courier (xem [F10-orders-management.md § 20.2](../prd/F10-orders-management.md#easyparcel--cod-order-runtime))
+  AND KHÔNG có collapse "＋ Xem thêm courier" (chỉ 4 courier)
+  AND merchant chọn lại tự do trong 4 courier (vẫn single-select)
+  AND chỉ default mã courier mà account merchant thực sự có
 ```
 
-> 📌 Source: PRD FR A-3 + `plans/reports/researcher-260617-1150-my-sme-top-couriers.md` (top 3 SME: J&T market leader, Pos Laju phủ East MY, Flash giá rẻ nhất — cả 3 support COD)
+> 📌 Source: PRD FR A-3 (decision: COD non-negotiable platform default → courier picker giới hạn 4 courier COD) + `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`
 
 ### Additional Criteria
 
@@ -552,13 +556,13 @@ GIVEN buyer East MY (Sabah/Sarawak)
 WHEN  render payment options
 THEN  COD disabled + helper "COD chỉ khả dụng cho địa chỉ West Malaysia"
 
-GIVEN buyer West MY nhưng selectedCourier là Pos Laju (không hỗ trợ COD)
+GIVEN buyer West MY + selectedCourier không hỗ trợ COD (defensive — với tenant EP ON settings đã chặn, chỉ xảy ra edge/EP OFF)
 WHEN  render payment options
-THEN  COD disabled + helper "Courier đang chọn không hỗ trợ COD"
+THEN  COD disabled (buyer KHÔNG thấy tên courier — helper chung chung)
 
-GIVEN buyer West MY + courier hỗ trợ nhưng total > RM7,000
+GIVEN buyer West MY + total > cod_service_max_cod_amount của courier đang dùng (per-courier: J&T RM1,000, Flash RM7,000...)
 WHEN  render payment options
-THEN  COD disabled + helper "Đơn vượt hạn mức COD (RM7,000)"
+THEN  COD disabled + helper chung chung "COD chỉ áp dụng cho đơn dưới RM X" (KHÔNG lộ tên courier)
 
 GIVEN buyer West MY + courier hỗ trợ nhưng total < RM5.01
 WHEN  render payment options
@@ -806,51 +810,67 @@ THEN  CHỈ update shippingTrackingStatus (field hiển thị)
 
 ---
 
-## US-F36-10: Returns — Reverse Label + Reuse Refund
+## US-F36-10: Returns — Courier Auto-Return (Case A) + Manual Buyer-Return (Case B)
 
-**Wave 7** | **P1** | **S** | **Status:** Draft
+**Wave 7** | **P1** | **M** | **Status:** Draft
 
 ### Story
 
 ```
 As a   SME Owner
-I want (tuỳ chọn) tạo nhãn trả hàng reverse, rồi refund qua nút Refund có sẵn
-So that tôi xử lý hàng trả mà KHÔNG cần hệ RMA mới — reuse refund + restock đã build
+I want handle returned parcels in two ways — courier auto-returns failed/refused deliveries
+      (Case A) and manual buyer-initiated returns (Case B: buyer ships back via any courier)
+So that I can process refunds through the existing Refund button without needing a new RMA system,
+      and for Case B capture the return tracking code and who bears the return shipping cost
 ```
+
+> **No EasyParcel reverse label:** F36 does NOT use EP reverse label. Case A = courier auto-returns the parcel to sender (no new label, no EP API call). Case B = merchant records a free-text tracking code from any courier the buyer uses — not EP-generated.
 
 ### Acceptance Criteria
 
-#### AC-1: Reverse label (đảo origin↔dest) — nút mới cạnh Refund
+#### AC-1 (Case A): Cron marks auto-returned parcel; merchant triggers refund
 
 ```gherkin
-GIVEN merchant bấm "Tạo nhãn trả hàng" (tuỳ chọn, EP tenant)
-WHEN  gọi EPSubmitOrderBulk tạo ĐƠN MỚI đảo origin↔dest (pick = địa chỉ buyer, send = kho merchant)
-THEN  lưu return AWB riêng
-  AND buyer gửi hàng về → merchant nhận → bấm Refund (endpoint có sẵn) → refund + restock
-  AND KHÔNG dựng Returns/RMA collection, KHÔNG buyer return-request UI
+GIVEN an order where delivery failed (buyer no-show, COD refusal, or undeliverable)
+  AND courier auto-returns the parcel to sender address (no new label, no EP API call)
+WHEN  cron /api/cron/sync-tracking polls EPParcelStatusBulk
+  AND receives a status that maps to 'Returned'
+THEN  shippingTrackingStatus is set to 'Returned' on the order
+  AND no EasyParcel API call is made for the return leg
+  AND no reverse label is created
+  AND codStatus (if COD order) remains 'pending' (buyer never paid)
+  AND merchant sees a "Returned" badge on the order in dashboard
 ```
 
-> 📌 Source: PRD FR D-1, D-2 + §10 RESOLVED (không có flag reverse native → tạo đơn mới đảo chiều)
+> 📌 Source: PRD FR D-1, AC #1 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
 
-#### AC-2: Không reverse label → refund qua endpoint có sẵn
+#### AC-2 (Case A): Merchant refunds via existing endpoint
 
 ```gherkin
-GIVEN merchant không tạo nhãn (buyer tự gửi / nhận tay)
-WHEN  buyer gửi hàng về, merchant nhận → bấm Refund (nút có sẵn)
-THEN  refund + restock reuse /api/orders/[id]/refund (Stripe/manual) + restock atomic (KHÔNG logic mới)
+GIVEN shippingTrackingStatus = 'Returned' on the order
+  AND merchant has inspected the returned goods
+WHEN  merchant clicks Refund (existing nút Refund in OrderDetailPanel)
+THEN  POST /api/orders/[id]/refund (F10 — refund goods + restock) is called
+  AND inventory is restocked via existing F10 logic
+  AND outbound shipping fee is NOT refunded (freight lost per courier policy)
+  AND no new refund/restock logic is written
 ```
 
-> 📌 Source: PRD FR D-3
+> 📌 Source: PRD FR D-1, D-3, AC #2 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
 
 ### Additional Criteria
 
-- [ ] Reverse label API shape chưa chắc 100% → fallback "buyer tự gửi" nếu reverse fail.
-- [ ] KHÔNG viết logic refund/restock mới — reuse `/api/orders/[id]/{refund,cancel}` đã có (F10).
+- [ ] Case A requires NO new DB columns on the orders table.
+- [ ] KHÔNG viết logic refund/restock mới — reuse `/api/orders/[id]/refund` and `/api/orders/[id]/cancel` (F10).
+- [ ] No buyer-facing return-request UI; no Returns/RMA collection.
+- [ ] Manual buyer-return (Case B) with fee capture is covered in US-F36-12.
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test: reverse tạo return AWB riêng; refund + restock reuse endpoint có sẵn (0 logic refund mới)
+- [ ] Test Case A: cron sets shippingTrackingStatus='Returned'; no EP API call; no reverse label
+- [ ] Test Case A: merchant clicks Refund → F10 /refund executes; restock OK; outbound freight NOT refunded
+- [ ] 0 new refund/restock logic
 
 ---
 
@@ -920,5 +940,96 @@ THEN  refund qua provider: Stripe (live) / manual (COD-bank) / Xendit (khi F34 x
 
 ---
 
-<!-- 12 stories (US-F36-01..11 + US-F36-08b) — full coverage PRD F36 FR A-1..D-6 + COD C-6a..C-6e. Map FR→Story: xem cột "Story" trong PRD §6. -->
+## US-F36-12: Manual Buyer-Return with Fee Capture (Case B)
+
+**Wave 7** | **P1** | **M** | **Status:** Draft
+
+### Story
+
 ```
+As a   SME Owner
+I want record a buyer-initiated return on an order — capturing the return tracking code
+      (from any courier), who pays the return shipping fee, and the fee amount
+So that I have a complete record of the return, can track the parcel back to my warehouse,
+      and then process a refund through the existing Refund button once goods are received
+```
+
+> **No EasyParcel reverse label:** the buyer ships back via any courier of their choice (J&T, Pos Laju, Lalamove, etc.). The system records a free-text tracking code — not an EP reverse AWB.
+
+### Acceptance Criteria
+
+#### AC-1: Merchant records return details on a shipped/completed order
+
+```gherkin
+GIVEN an order in 'shipped' or 'completed' status
+  AND buyer has contacted merchant out-of-band to request a return (phone, WhatsApp, etc.)
+WHEN  merchant opens the order in OrderDetailPanel and fills in the return fields:
+        return_tracking_code (required — free-text, any courier AWB)
+        return_tracking_url (optional — deep link to courier tracking page)
+        return_fee_payer: 'buyer' | 'seller'
+        return_shipping_fee (sen — integer; 0 if not applicable)
+        return_reason (optional free-text)
+        return_status: none → requested
+THEN  all six return fields are persisted on the order
+  AND return_status transitions from 'none' to 'requested'
+  AND no EasyParcel API call is made at any step
+  AND buyer may have used any courier — tracking code is free-text, not EP-validated
+  AND return_shipping_fee and return_fee_payer are recorded informationally (shown in the return block; NOT a financial deduction)
+```
+
+> 📌 Source: PRD FR D-2, D-7, AC #3 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
+
+#### AC-2: Return status transitions as merchant tracks the return
+
+```gherkin
+GIVEN return_status = 'requested' and merchant has shared return address with buyer
+WHEN  buyer ships the parcel back and merchant enters the tracking code
+THEN  merchant can advance return_status: requested → in_transit → received
+  AND no server-side state machine enforces transitions for MVP (UI-only guardrails)
+  AND each transition is saved via PATCH /api/orders/[id] { return_status, ... }
+```
+
+> 📌 Source: PRD FR D-2, Open Item #1 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
+
+#### AC-3: Merchant refunds after receiving goods
+
+```gherkin
+GIVEN return_status = 'received' (merchant has inspected returned goods)
+WHEN  merchant clicks Refund (existing nút Refund in OrderDetailPanel)
+THEN  POST /api/orders/[id]/refund (F10) executes — goods refunded + inventory restocked
+  AND return_status advances to 'refunded'
+  AND no new refund/restock logic is written (100% reuse F10)
+```
+
+> 📌 Source: PRD FR D-3, AC #8 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
+
+#### AC-4: Seller-only fields — not exposed to buyer
+
+```gherkin
+GIVEN an order with return fields populated
+WHEN  buyer-facing endpoint /api/orders/track/[orderNumber] or /api/orders/stream/[orderNumber]
+      OR OrderTrackingClient renders the order
+THEN  none of return_status, return_tracking_code, return_tracking_url,
+      return_shipping_fee, return_fee_payer, return_reason appear in the response or rendered UI
+```
+
+> 📌 Source: PRD FR D-7, NFR-10 in [F10-orders-management.md § 20.3](../prd/F10-orders-management.md#easyparcel--returns--cancel)
+
+### Additional Criteria
+
+- [ ] Six new columns on `orders` table: `return_status` (varchar, default `none`), `return_tracking_code` (varchar, nullable), `return_tracking_url` (varchar, nullable), `return_shipping_fee` (number/sen, default `0`), `return_fee_payer` (varchar, nullable), `return_reason` (text, nullable). All require entries in `scripts/db-setup.js` MIGRATIONS (NFR-9).
+- [ ] Merchant-only: all six fields excluded from public buyer projections (per NFR-10 — mirrors existing exclusion pattern for `labelUrl`, `codAmount`, `codStatus`).
+- [ ] No RMA collection, no buyer self-service return-request UI.
+- [ ] return_shipping_fee stored in sen (consistent with codAmount). Display as RM (divide by 100).
+- [ ] return_shipping_fee and return_fee_payer are informational fields shown in the return block only — NOT added as a deduction in OrderSummary, NOT subtracted from revenue, NOT counted in analytics (record-only per PM decision).
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass
+- [ ] Test AC-1: all six return fields saved on order; return_status = 'requested'; no EP API call
+- [ ] Test AC-2: status transitions requested → in_transit → received via PATCH
+- [ ] Test AC-3: return_status='received' → Refund → F10 /refund executes; return_status='refunded'
+- [ ] Test AC-4: buyer-facing endpoints exclude all six return fields
+- [ ] Six new `orders` columns → MIGRATIONS entries (NFR-9) — CI gate rejects if missing
+
+<!-- 13 stories (US-F36-01..12 + US-F36-08b) — full coverage PRD F36 FR A-1..D-7 + COD C-6a..C-6e. Map FR→Story: xem cột "Story" trong PRD §6. -->

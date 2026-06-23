@@ -128,7 +128,7 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | FR-03 | Bulk Action: Chọn nhiều đơn "Pending" -> Update thành "Confirmed" | US-F10-01 | P0 | Áp dụng cho manual flow |
 | FR-04 | New order notification: in-app toast + email to merchant trong < 60s | US-F10-01 | P0 | |
 | FR-05 | Order detail: customer info, items, subtotal, SST, shipping, total, payment proof (đối với QR Banking) | US-F10-01 | P0 | Cho phép đổi status ở list/drawer |
-| FR-06 | Order Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled | US-F10-01 | P0 | Tách biệt với Payment Status |
+| FR-06 | Order Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled. **[Wave 7]** For EasyParcel tenants, "Ready to Ship" button opens a label-creation modal (weight, dims, pickup date); non-EP tenants flip status as before. | US-F10-01 | P0 | Tách biệt với Payment Status; modular per-tenant |
 | FR-07 | Status update → customer notification email auto-sent (áp dụng Confirm, Shipped, Cancelled) | US-F10-01 | P1 | |
 | FR-08 | Cancel order: Yêu cầu nhập Cancel Reason & inventory auto-restock | US-F10-03 | P0 | Bỏ qua restock nếu product bị xoá |
 | FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed), tự cập nhật Payment Status -> Refunded | US-F10-01 | P0 | |
@@ -523,3 +523,210 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 - [ ] All AC pass
 - [ ] New order visible < 60s after payment
 - [ ] Cancel + inventory restore atomic
+
+---
+
+## 20. EasyParcel Fulfillment & Returns (Wave 7)
+
+### EasyParcel — Fulfillment (Label / Pickup / Tracking)
+
+**Scope:** Real-time label creation with pickup-aware date selection and tracking sync cron. Applies to tenants with `easyParcelIntegration.enabled=true`.
+
+**Stories:** US-F36-06 (label from within order detail), US-F36-07 (cut-off-aware pickup), US-F36-09 (buyer tracking).
+
+**User Flow (shortened):**
+```
+1. Merchant clicks "Ready to Ship" (EP tenant) → modal: weight (prefilled + editable), dims (W/L/H cm, prefilled from DEFAULT_PARCEL), pickup date (cut-off-aware).
+2. POST /api/orders/[id]/create-label → EPSubmitOrderBulk + EPPayOrderBulk (merchant API key, serviceId).
+3. OK → trừ ví merchant → lưu awb_no, label_url, easy_parcel_order_no, tracking_number=awb_no; order → ready_to_ship.
+4. Cron /api/cron/sync-tracking polls EPParcelStatusBulk q30-60min → updates shipping_tracking_status (display-only, no auto-complete).
+5. Buyer xem tracking trên trang đơn (OtShippingCard + timeline).
+```
+
+**Functional Requirements:**
+
+| FR | Mô tả | Story |
+|---|---|---|
+| **C-1** | "Ready to Ship" (EP) → POST /api/orders/[id]/create-label gọi EPSubmitOrderBulk + EPPayOrderBulk; lưu awb_no, label_url, easy_parcel_order_no, tracking_number=awb_no; order → ready_to_ship. KHÔNG màn riêng. | US-F36-06 |
+| **C-2** | Idempotent: order đã có awbNo → KHÔNG tạo lần 2 (chống double-charge). | US-F36-06 |
+| **C-3** | Ví hết → error `EASYPARCEL_WALLET_LOW` + nạp link; order giữ nguyên; merchant retry được. | US-F36-06 |
+| **C-4** | Pickup/dropoff chọn được; `collection_date` passed in EPSubmitOrderBulk. **Cut-off-aware:** min = HÔM NAY nếu T2–T6 & MYT < cut-off; ngược lại min = ngày làm việc kế; disable quá khứ + T7/CN. Default = min. Public holiday để API tự bump. Server validate + clamp lên earliest nếu client drift. | US-F36-07 |
+| **C-4b** | Weight (prefill order.parcelWeight, kg, editable, 0.1–50 required); dims W/L/H (cm int, optional to change, prefill DEFAULT_PARCEL, always sent). | US-F36-06 |
+| **C-5** | Modal "Ready to Ship": KHÔNG hiển thị courier (đã khoá 1 courier). Fields: weight + dims. Nút disable until weight valid. Non-EP: ShipOrderModal hiện tại (free-text tracking) giữ NGUYÊN. | US-F36-06 |
+| **C-7** | GET /api/cron/sync-tracking (cron secret) poll EPParcelStatusBulk batch/tenant → update shippingTrackingStatus (13 enum chuẩn EP). | US-F36-09 |
+| **C-8** | Tracking nhúng order detail (buyer = OtShippingCard + timeline + linking tracking URL; merchant = badge). KHÔNG màn riêng. | US-F36-09 |
+| **C-8a** | Reuse F14 email hook: "Shipped" đã hỗ trợ trackingUrl (F14 BR-09) → F36 truyền vào email có sẵn; buyer có "Theo dõi" link. | US-F36-09 |
+| **C-9** | shipped → completed CHỈ manual (merchant bấm). Cron delivered chỉ update shippingTrackingStatus, KHÔNG auto-complete. | US-F36-09 |
+
+**Acceptance Criteria:**
+
+1. GIVEN order paid/confirmed WHEN merchant "Ready to Ship" (EP) THEN trừ ví, AWB + label PDF, tracking_number=awb_no, order → ready_to_ship.
+2. GIVEN order đã có awb_no WHEN tạo label lần 2 THEN blocked (idempotent).
+3. GIVEN ví hết WHEN tạo label THEN error `EASYPARCEL_WALLET_LOW` + link nạp; order unchanged.
+4. GIVEN order shipped awb_no WHEN cron runs THEN shipping_tracking_status updated; buyer xem được.
+5. GIVEN delivered THEN only tracking update; order completed do merchant bấm (manual).
+
+**Order Schema (new columns):**
+
+| Field | Type | Notes |
+|---|---|---|
+| `awb_no` | varchar | EasyParcel AWB (unique per order, non-null after label). |
+| `label_url` | varchar | PDF URL to download label. |
+| `easy_parcel_order_no` | varchar | EP internal order ref. |
+| `shipping_tracking_status` | varchar | One of 13 EP status enum; display-only, KHÔNG lifecycle. |
+| `tracking_number` | varchar | = awb_no (when EP); free-text (when manual). |
+
+---
+
+### EasyParcel — COD (order runtime)
+
+**Scope:** Cash-on-Delivery runtime tracking on order. **Eligibility gating + fee disclosure live in F19-store-configuration (Phase F).**
+
+**Stories:** US-F36-08 (buyer COD choice; merchant label with COD flag).
+
+**COD per-courier reference (source of truth for UI/UX gating + settlement expectation):**
+
+> Read LIVE from `EPRateCheckingBulk` (`cod_service_available`, `cod_service_min/max_cod_amount`, fee) — do NOT hardcode courier list. Table below = design baseline; min/max + settlement must be sandbox-verified (per F36 overview §9 item #1).
+
+| Courier | COD? | COD fee | COD min–max (collected) | Settlement → merchant | UI/UX note |
+|---|---|---|---|---|---|
+| **Flash Express** | ✅ | RM5 / 4% (higher) | ~RM5.01 – **RM7,000** | **T+1–3 days** | ⭐ Recommended default for COD shops: fastest payout, highest cap |
+| **DHL eCommerce** | ✅ | RM6 / 4% | unknown → read from API | T+1–3 days | Fast payout; cap not public → use `cod_service_max` |
+| **J&T Express** | ✅ | RM7 / 4% | ~RM7.01 – **RM1,000** | T+7–12 days | ⚠️ COD cap only RM1,000 (differs from Flash); slower payout; low-value orders |
+| **Aramex** | ✅ | RM10 / 4% | unknown → read from API | **~T+30 days** | ⚠️ Holds cash ~1 month → warn seller; do NOT default |
+| Pos Laju · Ninja Van · City-Link · SkyNet · SPX · Best · Redbox · Teleport · Lalamove | ❌ | — | — | — | No COD path via EasyParcel API |
+
+**Shared COD constraints (all couriers):** West Malaysia only (`zone='east'` has no COD; couriers still deliver East for prepaid). COD payout prerequisite (seller): eKYC + bank account verification before first withdrawal; manual withdraw on EP dashboard (Pending → To Release → Released); no API/webhook settlement → Prime stores `codStatus` display-only. COD fee deducted from collected cash (merchant nets remainder); failed delivery → sender (merchant) bears return cost.
+
+**Consequence:** COD max differs per courier (J&T RM1,000 vs Flash RM7,000) → gating (F19 C-6a) must use per-courier `cod_service_max_cod_amount` from API, NOT a shared RM7,000 constant. Source: `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`.
+
+**Runtime Flow (shortened):**
+```
+1. Buyer chọn COD → order: paymentMethod='cod', codAmount=snapshot grand total (sen), codStatus='pending'.
+2. Merchant tạo label cờ cod_enabled=true + cod_amount (RM) → EasyParcel.
+3. Courier thu tiền mặt → EasyParcel settle về merchant (T+X per-courier; Flash T+1–3, J&T T+7–12, Aramex ~T+30).
+4. Merchant withdraw từ dashboard EP (manual); platform RM0, KHÔNG đụng.
+```
+
+**Functional Requirements (runtime only):**
+
+| FR | Mô tả | Story |
+|---|---|---|
+| **C-6b** | `codAmount` snapshot: = grand total (sen) lúc checkout; KHÔNG recalc sau. Cột MỚI `cod_amount` (number, sen) trên orders (entry `scripts/db-setup.js` MIGRATIONS per NFR-9). | US-F36-08 |
+| **C-6c** | `codStatus` field (display-only): pending → collected → settled. Cột scalar `cod_status` varchar (entry MIGRATIONS). KHÔNG API đối soát; merchant tự check dashboard EP. | US-F36-08 |
+| **C-6e** | Label COD: send cod_enabled=true + cod_amount (RM) trong EPSubmitOrderBulk. Param name verified in sandbox. | US-F36-08 |
+| **C-6f** | `codStatus` (giao vận layer, courier thu + settle) vs `paymentStatus` (order lifecycle, COD = unpaid → paid on Completed). Độc lập: 1 đơn có thể codStatus='collected' mà paymentStatus='unpaid'. F36 THÊM codStatus, KHÔNG ghi đè payment logic. Tenant EP OFF → KHÔNG có codStatus. | US-F36-08 |
+
+**Acceptance Criteria:**
+
+1. GIVEN order COD West MY courier COD-enabled total∈[min,max] WHEN label created THEN cod_enabled=true, cod_amount (RM); codStatus='pending'.
+2. GIVEN buyer East MY WHEN COD THEN disabled (system-level per F19 gating).
+3. GIVEN order COD shipped, buyer refused WHEN cron Returned THEN shipping_tracking_status='Returned'; cod_status='pending' (chưa thu).
+4. GIVEN courierStatus='Returned' WHEN merchant Refund THEN F10 /refund reused; goods refunded, inventory restocked; COD không thu.
+
+**Cross-ref:** COD eligibility gating (West MY, per-courier min/max validation) + fee disclosure (informational, merchant-borne) → see **F19-store-configuration**.
+
+**Order Schema (new columns):**
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `cod_amount` | number | sen | Snapshot grand total; KHÔNG null khi paymentMethod='cod'. |
+| `cod_status` | varchar | pending \| collected \| settled | Default pending. Display-only. |
+
+---
+
+### EasyParcel — Returns & Cancel
+
+**Scope:** Return logistics (auto-return case + manual buyer-return with fee tracking) + cancel order (pre-label and post-label). Reuses F10 `/refund` and `/cancel` 100% — no new refund/restock logic.
+
+**Stories:** US-F36-10 (courier auto-return), US-F36-11 (cancel), US-F36-12 (manual buyer-return RMA).
+
+**Case A — Courier Auto-Return:**
+```
+Delivery fails (no-show, COD refusal, undeliverable) → courier auto-returns to sender.
+Cron receives shippingTrackingStatus='Returned' → merchant inspects → clicks Refund (F10 endpoint).
+→ goods refunded + restock; shipping fee lost (merchant-borne per courier policy).
+```
+
+> ⚠️ **OPEN — auto-return status detection (flag + suggest; dev team verify in sandbox & finalize).**
+>
+> **No webhook. Detection = polling cron `EPParcelStatusBulk` every ~30–60 min → not real-time** (lag ≤ 1 cron cycle). Seller learns while the parcel is on its return leg, NOT only on physical arrival — but bounded by polling lag.
+>
+> **3 statuses involved in an auto-return** (from EasyParcel's 13 normalized `ship_status` values — EP hides per-courier raw statuses):
+> | Status | Role in return | When it appears |
+> |---|---|---|
+> | `Delivery On Hold` | early warning (temp hold: bad address, missing docs, customs) | optional, before failure |
+> | `Exception` | early warning (delivery failed, refusal, bad address) | optional, before return |
+> | `Returned` | **definitive** — parcel returning/returned to merchant | triggers Case A banner |
+>
+> **Limitation:** EP collapses the entire return leg into a SINGLE `Returned` status — no sub-states (`returning-in-transit` vs `returned-to-warehouse`). Exact flip moment (return initiated vs delivered-back) is unconfirmed.
+>
+> **Suggested solutions (NOT final — for dev to evaluate):**
+> 1. **(current)** Fire Case A banner on `Returned` only. Simplest; seller acts on inspection.
+> 2. **(suggest)** Surface `Exception` / `Delivery On Hold` as an amber pre-alert so seller reacts earlier than the `Returned` flip.
+> 3. **(suggest)** If faster signal needed, shorten cron interval (cost/rate-limit tradeoff — see F36 NFR-5/NFR-6).
+> 4. **(verify)** Confirm in sandbox: exact moment `Returned` is set, and whether any intermediate return scans surface, before finalizing UX.
+>
+> **Source docs (official EasyParcel — verify here):** Developer API hub https://developers.easyparcel.com/ · MY Individual API doc (PDF, contains `EPParcelStatusBulk` + `ship_status`) https://developers.easyparcel.com/?ac=DocAPI&file=Malaysia_Individual_1.0.0.0 · Help Centre API folder https://helpcentre-my.easyparcel.com/support/solutions/folders/9000192728 · internal: `plans/reports/researcher-260617-1406-easyparcel-status-mapping.md` (13-status taxonomy).
+
+**Case B — Manual Buyer-Return (RMA):**
+```
+Buyer contacts merchant out-of-band → merchant approves, records return (free-text tracking code, optional fee/payer).
+Buyer ships back via ANY courier (not necessarily EP) → return_status: requested → in_transit → received.
+Merchant receives goods → clicks Refund (F10 endpoint) → return_status='refunded'.
+Return fee + payer recorded informationally (seller dashboard only, NOT in OrderSummary, NOT in revenue reports).
+```
+
+**Cancel by Label State:**
+```
+No label yet → POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock.
+Label bought, not picked up → POST /api/orders/[id]/refund (F10): goods refunded + restock; merchant msg "Cancel on EP dashboard to recover freight".
+Label bought, picked up → POST /api/orders/[id]/refund (F10): goods refunded + restock; merchant msg "Freight lost — courier processing".
+```
+
+**Functional Requirements:**
+
+| FR | Mô tả | Story |
+|---|---|---|
+| **D-1** | **Case A — auto-return:** Cron receives 'Returned' → set shippingTrackingStatus='Returned'. No EP API call. Merchant clicks Refund (F10 /refund) → goods refund + restock; outbound fee lost. | US-F36-10 |
+| **D-2** | **Case B — manual return record:** Merchant records return (shipped/completed status) with return_tracking_code (required), return_tracking_url (optional), return_reason (optional), return_fee_payer (buyer\|seller), return_shipping_fee (sen), return_status (requested→in_transit→received). No EP API. | US-F36-12 |
+| **D-3** | **Refund + restock reuse F10 100%:** `/api/orders/[id]/refund` + `/api/orders/[id]/cancel` unchanged. After merchant confirms goods received (return_status='received'), click Refund → endpoint handles payment reversal + restock. | US-F36-10 |
+| **D-4** | **Cancel, no label:** POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock. | US-F36-11 |
+| **D-5** | **Cancel, label bought:** POST /api/orders/[id]/refund (F10): goods refund + restock. Show merchant context msg: (a) not picked up → "Cancel on EP dashboard to recover freight"; (b) picked up → "Freight fee lost — courier processing". | US-F36-11 |
+| **D-6** | **Refund via existing provider:** Refund money Stripe (live), manual (COD/BT), or Xendit (F34). NOT via EasyParcel. | US-F36-11 |
+| **D-7** | **Capture return fee + payer (informational):** On Case B, merchant records return_shipping_fee (sen) + return_fee_payer (buyer\|seller). Both nullable. Displayed seller dashboard (return block), NOT in OrderSummary, NOT in revenue (record-only per PM). All 6 return fields seller-only per NFR-10 — NEVER in `/api/orders/track/[orderNumber]`, `/api/orders/stream/[orderNumber]`, or buyer OrderTrackingClient. | US-F36-12 |
+
+**Acceptance Criteria:**
+
+1. GIVEN delivery fails, buyer refuses WHEN cron polls 'Returned' THEN shipping_tracking_status='Returned'; no EP API call; no reverse label; cod_status='pending' (unpaid).
+2. GIVEN 'Returned' WHEN merchant Refund THEN F10 /refund called; goods refunded; inventory restocked; outbound freight NOT refunded (lost).
+3. GIVEN shipped/completed order WHEN merchant records return (tracking code, fee, payer) THEN all 6 fields persisted; return_status transitions none→requested→in_transit; no EP API; return_fee informational only.
+4. GIVEN merchant receives goods (return_status='received') WHEN click Refund THEN F10 /refund executes; return_status='refunded'; inventory restocked.
+5. GIVEN no label WHEN cancel THEN /api/orders/[id]/cancel (F10): full refund + restock.
+6. GIVEN label not picked up WHEN cancel THEN /api/orders/[id]/refund (F10): goods refund + restock; UI msg "Cancel on EP dashboard to recover freight".
+7. GIVEN label picked up WHEN cancel THEN /api/orders/[id]/refund (F10): goods refund + restock; UI msg "Freight lost — courier processing".
+8. GIVEN return fields populated WHEN buyer endpoint (track, stream, OrderTrackingClient) THEN none of return_status, return_tracking_code, return_tracking_url, return_shipping_fee, return_fee_payer, return_reason appear.
+
+**Order Schema (new columns):**
+
+| Field | Type | Values / Default | Notes |
+|---|---|---|---|
+| `return_status` | varchar | none (default) → requested → in_transit → received → refunded | State transitions merchant-driven. |
+| `return_tracking_code` | varchar | free-text, nullable | Any courier AWB (not EP-validated). |
+| `return_tracking_url` | varchar | optional URL, nullable | Deep link to tracking page. |
+| `return_shipping_fee` | number | sen, default 0 | Stored for reference; NOT in OrderSummary. |
+| `return_fee_payer` | varchar | buyer \| seller, nullable | Who paid return postage. |
+| `return_reason` | text | free-text, nullable | Optional reason text. |
+
+**Cross-ref & Reuse:** `/api/orders/[id]/refund` + `/api/orders/[id]/cancel` = 100% reused from F10 (no new logic). Tracking cron `/api/cron/sync-tracking` = shared with Phase C fulfillment.
+
+---
+
+## Appendix: Column Mappings (Snake Case for DB)
+
+All new EasyParcel columns use snake_case in database schema (per codebase convention):
+- Phase C: `awb_no`, `label_url`, `easy_parcel_order_no`, `shipping_tracking_status`, `tracking_number`
+- COD runtime: `cod_amount`, `cod_status`
+- Phase D: `return_status`, `return_tracking_code`, `return_tracking_url`, `return_shipping_fee`, `return_fee_payer`, `return_reason`
+
+Each requires an entry in `scripts/db-setup.js` MIGRATIONS array per NFR-9.

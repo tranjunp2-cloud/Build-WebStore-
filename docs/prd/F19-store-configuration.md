@@ -49,6 +49,8 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
 | REQ-F19-05 | **Primary Domain Selection:** The system must allow the user to designate one "Connected" domain (custom or default) as the Primary Domain. | US-F19-02 |
 | REQ-F19-06 | **Traffic Redirection:** All traffic coming to non-primary domains attached to the store must 301 redirect to the primary domain. | US-F19-02 |
 | REQ-F19-07 | **Payment Configuration:** The system must allow the user to enable/disable payment options such as COD and Bank Transfer. Multiple options can be active simultaneously. | US-F19-03 |
+| **REQ-F19-07.1** | **[v1.1] EasyParcel COD:** COD eligibility gated at checkout: visible and selectable ONLY when (1) buyer address in West Malaysia; (2) selected courier has `cod_service_available=true`; (3) order grand total within per-courier `cod_service_min/max_cod_amount` from rate API (J&T RM1,000; Flash RM7,000; varies by courier). Buyer does NOT see courier name. Existing `enableCod` toggle unchanged (default-on, deployed). | US-F36-08 |
+| **REQ-F19-07.2** | **[v1.1] COD Fee Disclosure:** When buyer selects COD, display informational COD fee estimate (max(flat, 4%) per courier). Merchant-borne, NOT shown in buyer price. See order fields `codAmount`/`codStatus` (F10 FR-18). Courier picker limited to 4 COD-supporting couriers (PD-020). | US-F36-08 |
 | REQ-F19-08 | **Bank Transfer Upload Rules:** The system MUST strictly enforce the upload of a valid QR image (size < 2MB, JPG/PNG format) before allowing Bank Transfer to be enabled. | US-F19-03 |
 | **REQ-F19-08.1** | **[v1.1] Bank Transfer Details Fields:** Khi bật Bank Transfer, seller bắt buộc nhập: `bankName` (text), `bankAccountNumber` (text — validate alphanumeric), `bankAccountHolderName` (text). Optional `paymentReferencePrefix` (default `BT`, 2-4 chars uppercase). | US-F19-03 |
 | **REQ-F19-08.2** | **[v1.1] Storefront Bank Transfer Visibility:** Nếu `payment_bank_transfer = false` (toggle OFF), storefront checkout KHÔNG hiển thị Bank Transfer option. Tenant settings là single source of truth (fix gap audit G-01). | US-F19-03 |
@@ -101,6 +103,13 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
   - Toggle Bank Transfer chỉ có thể bật ON khi tất cả 4 fields trên hợp lệ (QR + 3 bank details bắt buộc).
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]
+
+### EasyParcel COD (gating + fee disclosure)
+- **[v1.1] Context:** COD eligibility is automatically gated at checkout based on buyer location (West Malaysia only), selected courier COD support, and per-courier limits from EasyParcel rate API. See [F10-orders-management.md § 20.2 — EasyParcel — COD (order runtime)](./F10-orders-management.md#easyparcel--cod-order-runtime) for detailed merchant flow (C-6a, C-6d, US-F36-08).
+- **Gating (C-6a — REQ-F19-07.1):** COD option visible and selectable at checkout ONLY when all three conditions met: (1) buyer address postcode resolves to West Malaysian state (zone='west'); (2) `selectedCourier` has `cod_service_available=true` from EPRateCheckingBulk response; (3) order `grandTotal` ≤ courier's `cod_service_max_cod_amount` (J&T max RM1,000; Flash max RM7,000; per courier from API — NOT a hardcoded constant). If any condition fails → COD option hidden/disabled with generic helper text (e.g., "COD applies to orders under RM X"), buyer does NOT see specific courier name.
+- **Fee disclosure (C-6d — REQ-F19-07.2):** When buyer selects COD, display estimated COD fee as informational only (max(flat, 4%) per selected courier). Merchant bears the fee, NOT added to buyer's visible price. Fee is deducted from amounts collected by courier.
+- **Order runtime fields:** COD order stores snapshot `codAmount` (sen) + `codStatus` (pending/collected/settled) — see F10 FR-18 for buyer-safe projections. Tenant settings gate courier picker to exactly 4 COD-supporting couriers (decision PD-020 in `docs/decisions/decisions-log.md`).
+- **Note:** West Malaysia + per-courier COD limits are EasyParcel constraints, not configurable by tenant.
 
 ### 9.3. Màn hình Tab Staff Management
 - **Mô tả:** Nơi Seller/Owner quản lý nhân viên và phân quyền truy cập.

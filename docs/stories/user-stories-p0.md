@@ -128,8 +128,9 @@
 | US-F36-07 | F36 EasyParcel Delivery | Pickup / Dropoff | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | S | Draft |
 | US-F36-08 | F36 EasyParcel Delivery | COD via EasyParcel (West MY Only) | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
 | US-F36-09 | F36 EasyParcel Delivery | Tracking Sync Cron + Buyer Tracking View | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | L | Draft |
-| US-F36-10 | F36 EasyParcel Delivery | Returns — Reverse Label OR Buyer Self-Ship | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
+| US-F36-10 | F36 EasyParcel Delivery | Returns — Auto-Return (Failed) + Manual Buyer-Return | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
 | US-F36-11 | F36 EasyParcel Delivery | Cancel Refund by Label Status | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P0 | 7 | M | Draft |
+| US-F36-12 | F36 EasyParcel Delivery | Manual Buyer-Return + Fee Capture | [F36-easyparcel-delivery-stories.md](./F36-easyparcel-delivery-stories.md) | P1 | 7 | M | Draft |
 
 ---
 
@@ -158,7 +159,7 @@
 | `F33-discount-cms-stories.md` | US-F33-01 → US-F33-08 |
 | `F35-template-block-storefront-stories.md` | US-F35-01 → US-F35-05 |
 | `F35-template-block-commerce-stories.md` | US-F35-06 → US-F35-10 |
-| `F36-easyparcel-delivery-stories.md` | US-F36-01 → US-F36-11 |
+| `F36-easyparcel-delivery-stories.md` | US-F36-01 → US-F36-12 |
 
 ---
 
