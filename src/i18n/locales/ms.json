@@ -2014,6 +2014,7 @@
                 "xenditWebhookConfirmTitle": "Daftarkan ECH sebagai penerima webhook anda",
                 "xenditWebhookConfirmDesc": "ECH akan mendaftarkan dirinya sebagai endpoint webhook Invoice pada akaun Xendit anda. Jika sistem lain sedang menerima webhook Invoice Xendit daripada akaun ini, ia akan berhenti menerimanya.",
                 "xenditWebhookConfirmNote": "Ini diperlukan untuk ECH memproses pesanan anda secara automatik.",
+                "xenditTokenMismatch": "Webhook Verification Token tidak betul — sila semak semula dalam Xendit Dashboard anda (Settings → Configuration → Webhook verification token).",
                 "xenditWebhookConfirmBack": "Kembali",
                 "xenditWebhookConfirmProceed": "Sahkan & Sambung",
                 "xenditLoginPrompt": "Ada akaun Xendit?",

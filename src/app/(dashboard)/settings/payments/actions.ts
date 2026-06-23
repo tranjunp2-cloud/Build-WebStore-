@@ -259,7 +259,7 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         try {
             const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
             if (cbResult.callback_token !== callbackToken.trim()) {
-                return { success: false, error: 'Webhook Verification Token không đúng — vui lòng kiểm tra lại trong Xendit Dashboard (Settings → Configuration → Webhook verification token).' }
+                return { success: false, error: 'xenditTokenMismatch' }
             }
         } catch (cbErr: unknown) {
             const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
