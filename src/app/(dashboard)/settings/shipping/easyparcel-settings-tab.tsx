@@ -543,8 +543,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </button>
 
                         <div className="flex items-center justify-end gap-3">
-                            <Button variant="ghost" size="sm" onClick={() => setShowAddressForm(false)}>Cancel</Button>
-                            <Button size="sm" onClick={() => setShowAddressForm(false)} className="flex items-center gap-1.5">
+                            <Button variant="dashSecondary" size="dash" onClick={() => setShowAddressForm(false)}>Cancel</Button>
+                            <Button variant="dashPrimary" size="dash" onClick={() => setShowAddressForm(false)} className="flex items-center gap-1.5">
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 {hasWarehouse ? 'Update address' : 'Add address'}
                             </Button>
@@ -599,6 +599,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             <div className="flex items-center gap-4 px-6 py-5">
                 {testStatus !== 'connected' ? (
                     <Button
+                        variant="dashPrimary" size="dash"
                         onClick={handleTestConnection}
                         disabled={testStatus === 'testing'}
                         className="flex items-center gap-2 shrink-0"
@@ -610,7 +611,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         )}
                     </Button>
                 ) : (
-                    <Button onClick={handleSave} disabled={!canSave} className="flex items-center gap-2 shrink-0">
+                    <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={!canSave} className="flex items-center gap-2 shrink-0">
                         {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
                     </Button>
                 )}
