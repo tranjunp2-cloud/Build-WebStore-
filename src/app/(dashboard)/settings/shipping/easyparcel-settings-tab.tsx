@@ -600,32 +600,29 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
             {/* ─── Footer action ────────────────────────────── */}
-            <div className="flex items-center justify-between gap-4 px-6 py-5">
+            <div className="flex items-center gap-4 px-6 py-5">
                 {testStatus !== 'connected' ? (
-                    <>
-                        <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Test the connection successfully to enable saving.
-                        </p>
-                        <Button
-                            onClick={handleTestConnection}
-                            disabled={testStatus === 'testing'}
-                            className="flex items-center gap-2 shrink-0"
-                            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600, borderRadius: 10, padding: '10px 20px' }}
-                        >
-                            {testStatus === 'testing' ? (
-                                <><Loader2 className="h-4 w-4 animate-spin mr-1" />Testing connection…</>
-                            ) : (
-                                <><Search className="h-4 w-4" />{editingCredentials ? 'Re-test Connection' : 'Test connection'}</>
-                            )}
-                        </Button>
-                    </>
+                    <Button
+                        onClick={handleTestConnection}
+                        disabled={testStatus === 'testing'}
+                        className="flex items-center gap-2 shrink-0 font-bold"
+                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 14, padding: '10px 20px' }}
+                    >
+                        {testStatus === 'testing' ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" />Testing connection…</>
+                        ) : (
+                            <><Search className="h-4 w-4" />{editingCredentials ? 'Re-test Connection' : 'Test connection'}</>
+                        )}
+                    </Button>
                 ) : (
-                    <>
-                        <p className="text-[12px] text-[var(--dash-text-muted)]">Connection verified. Save your settings.</p>
-                        <Button onClick={handleSave} disabled={!canSave}>
-                            {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
-                        </Button>
-                    </>
+                    <Button
+                        onClick={handleSave}
+                        disabled={!canSave}
+                        className="flex items-center gap-2 shrink-0 font-bold"
+                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 14, padding: '10px 20px' }}
+                    >
+                        {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
+                    </Button>
                 )}
             </div>
         </div>
