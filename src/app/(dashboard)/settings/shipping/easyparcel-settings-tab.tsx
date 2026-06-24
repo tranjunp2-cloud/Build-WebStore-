@@ -441,7 +441,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <Checkbox id="wh-default" />
+                            <Checkbox id="wh-default" className="border-white/30 data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:border-[hsl(var(--primary))]" />
                             <label htmlFor="wh-default" className="text-[12px] text-[var(--dash-text-muted)] cursor-pointer select-none">
                                 Set as default pickup address
                             </label>
