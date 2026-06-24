@@ -79,6 +79,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     const [isSaving, setIsSaving] = useState(false)
     const [editingCredentials, setEditingCredentials] = useState(false)
+    const [couriersCount, setCouriersCount] = useState(0)
     const [showAddressForm, setShowAddressForm] = useState(
         !(initialEpConfig?.warehouse?.name || initialEpConfig?.warehouse?.address1),
     )
@@ -121,6 +122,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 return
             }
             setDetectedEnv(json.data.env)
+            setCouriersCount(json.data.couriersAvailable?.length ?? 0)
             setTestStatus('connected')
             setEditingCredentials(false)
             toast.success(`Connected to EasyParcel (${json.data.env})`)
@@ -270,28 +272,27 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             {/* ─── API Credentials ──────────────────────────── */}
             <div className="p-6 flex flex-col gap-4">
                 {credentialsLocked ? (
-                    <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-                        <div className="flex items-center gap-3">
-                            <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
-                            <div>
-                                <p className="text-[13px] font-medium text-[var(--dash-text)]">Credentials locked while connected</p>
-                                {detectedEnv && (
-                                    <p className="text-[12px] text-[var(--dash-text-muted)]">
-                                        Environment: <span className="text-[rgb(16,185,129)]">{detectedEnv}</span>
-                                    </p>
-                                )}
-                            </div>
+                    <>
+                        <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-3 text-[13px] text-[rgb(16,185,129)]">
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                            Connection Successful{couriersCount > 0 ? ` — ${couriersCount} couriers available` : detectedEnv ? ` (${detectedEnv})` : ''}
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => { setEditingCredentials(true); setTestStatus('idle') }}
-                            className="flex items-center gap-1.5 shrink-0"
-                        >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit credentials
-                        </Button>
-                    </div>
+                        <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                            <div className="flex items-center gap-3">
+                                <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
+                                <p className="text-[13px] font-medium text-[var(--dash-text)]">Credentials locked while connected</p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { setEditingCredentials(true); setTestStatus('idle') }}
+                                className="flex items-center gap-1.5 shrink-0"
+                            >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit credentials
+                            </Button>
+                        </div>
+                    </>
                 ) : (
                     <>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -358,7 +359,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
             {/* ─── Pickup Addresses ─────────────────────────── */}
-            <div className="p-6 flex flex-col gap-4">
+            <div className="p-6 flex flex-col gap-4" style={{ opacity: testStatus === 'testing' ? 0.5 : 1, pointerEvents: testStatus === 'testing' ? 'none' : undefined }}>
                 <div className="flex items-start justify-between gap-4">
                     <div>
                         <p className="text-[14px] font-semibold text-[var(--dash-text)]">
@@ -442,7 +443,12 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-3 pt-1">
+                        <label className="flex items-center gap-2 text-[12px] text-[var(--dash-text-muted)] cursor-pointer select-none">
+                            <input type="checkbox" className="h-[14px] w-[14px] rounded" />
+                            Set as default pickup address
+                        </label>
+
+                        <div className="flex items-center justify-end gap-3">
                             {hasWarehouse && (
                                 <Button variant="ghost" size="sm" onClick={() => setShowAddressForm(false)}>Cancel</Button>
                             )}
@@ -502,18 +508,23 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             {/* ─── Footer action ────────────────────────────── */}
             <div className="flex items-center justify-between gap-4 px-6 py-5">
                 {testStatus !== 'connected' ? (
-                    <Button
-                        onClick={handleTestConnection}
-                        disabled={testStatus === 'testing'}
-                        className="flex items-center gap-2"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600, borderRadius: 10, padding: '10px 20px' }}
-                    >
-                        {testStatus === 'testing' ? (
-                            <><Loader2 className="h-4 w-4 animate-spin mr-1" />Testing connection…</>
-                        ) : (
-                            <><Search className="h-4 w-4" />{editingCredentials ? 'Re-test Connection' : 'Test connection'}</>
-                        )}
-                    </Button>
+                    <>
+                        <p className="text-[12px] text-[var(--dash-text-muted)]">
+                            Test the connection successfully to enable saving.
+                        </p>
+                        <Button
+                            onClick={handleTestConnection}
+                            disabled={testStatus === 'testing'}
+                            className="flex items-center gap-2 shrink-0"
+                            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600, borderRadius: 10, padding: '10px 20px' }}
+                        >
+                            {testStatus === 'testing' ? (
+                                <><Loader2 className="h-4 w-4 animate-spin mr-1" />Testing connection…</>
+                            ) : (
+                                <><Search className="h-4 w-4" />{editingCredentials ? 'Re-test Connection' : 'Test connection'}</>
+                            )}
+                        </Button>
+                    </>
                 ) : (
                     <>
                         <p className="text-[12px] text-[var(--dash-text-muted)]">Connection verified. Save your settings.</p>

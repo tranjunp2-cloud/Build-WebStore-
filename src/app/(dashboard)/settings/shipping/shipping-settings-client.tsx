@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { Calculator, Truck } from 'lucide-react'
+import { Calculator, Truck, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { ShippingConfig } from '@/lib/shipping'
 import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX, validateRate, parseRateRm, validateCrossField } from '@/lib/shipping'
@@ -38,32 +38,34 @@ function snap(w: string, e: string, fe: boolean, fa: string): Snapshot {
     return { westRm: w, eastRm: e, freeEnabled: fe, freeAboveRm: fa }
 }
 
-function StatusBadge({ live }: { live: boolean }) {
-    return live ? (
-        <span style={{
-            background: 'rgba(34,197,94,0.18)',
-            color: 'rgb(34,197,94)',
-            borderRadius: 20,
-            padding: '2px 8px',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.3px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-        }}>
+type BadgeVariant = 'live' | 'off' | 'fallback' | 'connected' | 'not-connected'
+
+function StatusBadge({ variant }: { variant: BadgeVariant }) {
+    const base = { borderRadius: 20, padding: '2px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 } as const
+    if (variant === 'live') return (
+        <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700, letterSpacing: '0.3px' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgb(34,197,94)', display: 'inline-block' }} />
             LIVE
         </span>
-    ) : (
-        <span style={{
-            background: 'rgba(107,114,128,0.18)',
-            color: 'rgb(107,114,128)',
-            borderRadius: 20,
-            padding: '2px 8px',
-            fontSize: 11,
-            fontWeight: 600,
-        }}>
+    )
+    if (variant === 'fallback') return (
+        <span style={{ ...base, background: 'rgba(245,158,11,0.18)', color: 'rgb(245,158,11)', fontWeight: 700 }}>
+            ⚠ FALLBACK
+        </span>
+    )
+    if (variant === 'connected') return (
+        <span style={{ ...base, background: 'rgba(34,197,94,0.18)', color: 'rgb(34,197,94)', fontWeight: 700 }}>
+            <CheckCircle2 size={10} />
+            Connected
+        </span>
+    )
+    if (variant === 'not-connected') return (
+        <span style={{ ...base, background: 'rgba(107,114,128,0.18)', color: 'rgb(107,114,128)', fontWeight: 600 }}>
+            Not connected
+        </span>
+    )
+    return (
+        <span style={{ ...base, background: 'rgba(107,114,128,0.18)', color: 'rgb(107,114,128)', fontWeight: 600 }}>
             OFF
         </span>
     )
@@ -223,6 +225,7 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
 
     const flatRateLive = initial?.enabled !== false
     const epLive = epConfig?.enabled === true
+    const epConnected = Boolean(epConfig?.testedAt)
 
     return (
         <div className="w-full pb-4">
@@ -246,7 +249,7 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
                     >
                         <Calculator size={15} />
                         <span className="font-semibold text-[14px]">Flat Rate</span>
-                        <StatusBadge live={flatRateLive} />
+                        <StatusBadge variant={epLive ? 'fallback' : (flatRateLive ? 'live' : 'off')} />
                     </TabsTrigger>
                     <TabsTrigger
                         value="easyparcel"
@@ -255,10 +258,16 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
                     >
                         <Truck size={15} />
                         <span className="font-semibold text-[14px]">EasyParcel</span>
-                        <StatusBadge live={epLive} />
+                        <StatusBadge variant={epLive ? (epConnected ? 'connected' : 'not-connected') : 'off'} />
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="flat-rate">
+                    {epLive && (
+                        <div className="mt-5 flex items-start gap-3 rounded-[12px] border border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.08)] px-4 py-3 text-[13px] text-[rgb(245,158,11)]">
+                            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <p><strong>Fallback Mode Active</strong> — EasyParcel is connected. These flat rates are a backup only if the live-rate API fails.</p>
+                        </div>
+                    )}
                     <div className="space-y-5 mt-5">
                         <ShippingRatesCard
                             westRateRm={westRateRm}
