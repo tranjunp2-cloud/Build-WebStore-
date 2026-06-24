@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -440,12 +439,15 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <Checkbox id="wh-default" className="border-white/30 data-[state=checked]:bg-[hsl(var(--primary))] data-[state=checked]:border-[hsl(var(--primary))]" />
-                            <label htmlFor="wh-default" className="text-[12px] text-[var(--dash-text-muted)] cursor-pointer select-none">
-                                Set as default pickup address
-                            </label>
-                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 16, height: 16, borderRadius: 4,
+                                border: '1px solid rgba(255,255,255,0.35)',
+                                background: 'rgba(255,255,255,0.04)', flexShrink: 0,
+                            }} />
+                            <span className="text-[12px] text-[var(--dash-text-muted)]">Set as default pickup address</span>
+                        </label>
 
                         <div className="flex items-center justify-end gap-3">
                             {hasWarehouse && (
