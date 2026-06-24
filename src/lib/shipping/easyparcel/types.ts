@@ -1,110 +1,5 @@
-// EP API base URL pattern: https://connect.easyparcel.my/?ac={Action}
-export type EpEnv = 'production' | 'demo'
-
-export const EP_BASE_URLS: Record<EpEnv, string> = {
-    production: 'https://connect.easyparcel.my/',
-    demo: 'https://demo.connect.easyparcel.my/',
-}
-
-export interface EasyParcelConfig {
-    apiKey: string    // EP API key
-    authKey: string   // EP auth key
-    env: EpEnv        // 'production' | 'demo'
-}
-
-// --- Rate Check ---
-export interface EpRateCheckItem {
-    weight: number   // kg (float, min 0.1)
-    width?: number   // cm
-    height?: number  // cm
-    length?: number  // cm
-}
-
-export interface EpRateCheckParams {
-    pick_code: string   // sender postcode
-    send_code: string   // receiver postcode
-    send_state: string  // EP state code (e.g. 'Selangor')
-    weight: number      // kg
-    cod?: number        // COD amount in RM (float) — 0 = non-COD
-}
-
-export interface EpRateOption {
-    courier_id: string
-    courier_name: string
-    service_id: string
-    service_name: string
-    price: number          // RM (float) from EP
-    priceSen: number       // RM * 100 (sen) — our domain unit
-    cod_available: boolean
-    cod_service_max_cod_amount?: number  // RM — per-courier COD max from API
-    est_delivery: string
-}
-
-export interface EpRateCheckResponse {
-    status: string
-    rates?: EpRateOption[]
-}
-
-// --- Submit Order ---
-export interface EpSubmitOrderParams {
-    pick_name: string
-    pick_contact: string   // normalized "60XXXXXXXXX"
-    pick_addr1: string
-    pick_addr2?: string
-    pick_city: string
-    pick_state: string     // EP state code
-    pick_code: string      // postcode
-    pick_country: string   // 'MY'
-    send_name: string
-    send_contact: string
-    send_addr1: string
-    send_addr2?: string
-    send_city: string
-    send_state: string
-    send_code: string
-    send_country: string
-    weight: number         // kg
-    content: string        // parcel description
-    value: number          // RM (declared value)
-    service_id: string
-    collection_date: string  // "YYYY-MM-DD"
-    cod?: number             // RM — include only if COD order
-}
-
-export interface EpSubmitOrderResponse {
-    status: string
-    order_no?: string
-    tracking_no?: string
-}
-
-// --- Pay Order ---
-export interface EpPayOrderParams {
-    order_no: string
-}
-
-export interface EpPayOrderResponse {
-    status: string
-    awb_no?: string
-    label_url?: string
-    tracking_no?: string
-}
-
-// --- Parcel Status ---
-export interface EpParcelStatusParams {
-    awb_no: string
-}
-
-export interface EpParcelStatusEvent {
-    status: string
-    description: string
-    event_time: string
-}
-
-export interface EpParcelStatusResponse {
-    status: string
-    tracking_status?: string
-    events?: EpParcelStatusEvent[]
-}
+export const EP_API_BASE = 'https://api.easyparcel.com'
+export const EP_OAUTH_BASE = 'https://api.easyparcel.com'
 
 // --- Error ---
 export class EasyParcelError extends Error {
@@ -129,4 +24,166 @@ export interface RateOption {
     codMaxSen?: number    // max COD amount in sen (from API)
     estDelivery: string
     degraded?: boolean    // true = fallback flat rate used
+}
+
+// --- OAuth ---
+export interface EpOAuthTokenResponse {
+    token_type: string
+    expires_in: number
+    expires_at: string
+    access_token: string
+    refresh_token: string
+    refresh_token_expires_in: number
+    refresh_token_expires_at: string
+}
+
+// --- Quotation (rate check) ---
+export interface EpQuotationSender {
+    postcode: string
+    subdivision_code: string  // ISO 3166-2, e.g. "MY-10"
+    country: string           // "MY"
+}
+
+export interface EpQuotationParams {
+    sender: EpQuotationSender
+    receiver: EpQuotationSender
+    parcel_value: number       // RM float
+    weight: number             // kg float
+    width?: number
+    length?: number
+    height?: number
+}
+
+export interface EpQuotationCod {
+    available: boolean
+    min_cod_amount?: string
+    max_cod_amount?: string
+    charges_description?: string
+}
+
+export interface EpQuotationItem {
+    courier: {
+        service_id: string
+        service_name: string
+        courier_id: string
+        courier_name: string
+        delivery_duration?: string | null
+        is_pickup: boolean
+        is_dropoff: boolean
+    }
+    pricing: {
+        currency: string
+        total_amount: string   // RM as string, e.g. "12.50"
+        shipment_price: string
+    }
+    features: Array<{ cod?: EpQuotationCod } & Record<string, unknown>>
+}
+
+export interface EpQuotationResponse {
+    status_code: number
+    data: Array<{
+        status: 'success' | 'error'
+        quotations?: EpQuotationItem[]
+        errors?: string[]
+    }>
+}
+
+// --- Submit order ---
+export interface EpSubmitContact {
+    name: string
+    company?: string
+    phone_number_country_code: string  // "60"
+    phone_number: string               // digits only, no leading 0
+    email?: string
+    address_1: string
+    address_2?: string
+    postcode: string
+    city: string
+    subdivision_code: string
+    country_code: string               // "MY"
+    point_code?: string
+}
+
+export interface EpSubmitItem {
+    content: string
+    weight: number
+    height?: number
+    length?: number
+    width?: number
+    currency_code: string    // "MYR"
+    value: number            // RM float
+    quantity: number
+}
+
+export interface EpSubmitOrderParams {
+    reference?: string
+    service_id: string
+    collection_date?: string   // "YYYY-MM-DD"
+    weight: number
+    height?: number
+    length?: number
+    width?: number
+    item: EpSubmitItem[]
+    sender: EpSubmitContact
+    receiver: EpSubmitContact
+    feature?: {
+        sms_tracking?: boolean
+        email_tracking?: boolean
+        whatsapp_tracking?: boolean
+        awb_branding?: boolean
+    }
+    cod_amount?: number   // RM float, omit for non-COD
+}
+
+export interface EpSubmitOrderResponse {
+    status_code: number
+    data: {
+        shipment: Array<{
+            status: 'success' | 'error'
+            shipment_id?: string
+            reference?: string
+            tracking_number?: string
+            awb?: string
+            errors?: string[]
+        }>
+    }
+}
+
+// --- Tracking ---
+export interface EpTrackingEvent {
+    status: string
+    status_code?: string
+    timestamp: string
+    location?: string
+    remark?: string
+}
+
+export interface EpTrackingResponse {
+    status_code: number
+    data: {
+        tracking_number: string
+        reference?: string
+        status: string
+        status_code?: string
+        events?: EpTrackingEvent[]
+    }
+}
+
+// --- Cancel ---
+export interface EpCancelParams {
+    tracking_number: string
+    reference?: string
+}
+
+// --- Wallet ---
+export interface EpWalletResponse {
+    status_code: number
+    data: {
+        account_id: number
+        currency_code: string
+        current_balance: string    // RM string
+        total_credit: string
+        total_spent: string
+        last_transaction?: string
+    }
 }

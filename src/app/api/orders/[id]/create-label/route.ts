@@ -4,9 +4,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
-import { submitOrder, payOrder } from '@/lib/shipping/easyparcel/client'
+import { submitOrder } from '@/lib/shipping/easyparcel/client'
+import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
-import type { EasyParcelConfig } from '@/lib/shipping/easyparcel/types'
 import { buildSubmitParams } from './build-submit-params'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -15,7 +15,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * POST /api/orders/[id]/create-label
  *
  * Idempotent: if awbNo already set, returns existing label without charging.
- * Recovery: if easyParcelOrderNo set but awbNo null, skips submit and retries pay only.
+ * Single-step submit (New EP API): submitOrder returns awb + tracking_number in one call.
  */
 export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(async (user, request, ctx) => {
     try {
@@ -34,7 +34,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             }
         } catch { /* empty body is fine */ }
 
-        // Load order with depth=2 to resolve tenant.easyParcelIntegration
+        // Load order with depth=2 to resolve tenant
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
@@ -46,18 +46,18 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (!order) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
-                { status: 404 }
+                { status: 404 },
             )
         }
 
-        // Idempotency guard: already labelled
+        // Idempotency guard: already labelled — return existing without re-submitting
         const existingAwbNo = (order as any).awbNo as string | null | undefined
         const existingLabelUrl = (order as any).labelUrl as string | null | undefined
         if (existingAwbNo) {
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }
 
-        // Fetch tenant with secrets (overrideAccess for apiKey/authKey)
+        // Fetch tenant with secrets (overrideAccess for token fields)
         const tenantRawId = typeof (order as any).tenant === 'object' ? (order as any).tenant?.id : (order as any).tenant
         const tenantWithKeys = await payload.findByID({
             collection: 'tenants',
@@ -70,25 +70,39 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (!tenantEp?.enabled) {
             return NextResponse.json(
                 { success: false, error: { code: 'EP_NOT_CONFIGURED', message: 'EasyParcel integration is not enabled for this store' } },
-                { status: 422 }
+                { status: 422 },
             )
         }
 
-        const epConfig: EasyParcelConfig = {
-            apiKey: tenantEp.apiKey as string,
-            authKey: tenantEp.authKey as string,
-            env: (tenantEp.detectedEnv ?? 'production') as 'production' | 'demo',
+        if (!tenantEp.accessToken) {
+            return NextResponse.json(
+                { success: false, error: { code: 'EP_NOT_CONFIGURED', message: 'EasyParcel not connected. Please connect via OAuth.' } },
+                { status: 422 },
+            )
+        }
+
+        let token: string
+        try {
+            token = await getValidToken(tenantEp, tenantRawId, payload)
+        } catch (err) {
+            if (err instanceof EasyParcelError && err.code === 'AUTH_EXPIRED') {
+                return NextResponse.json(
+                    { success: false, error: { code: 'EASYPARCEL_AUTH_ERROR', message: 'EasyParcel session expired. Please reconnect.' } },
+                    { status: 422 },
+                )
+            }
+            throw err
         }
 
         const warehouse = tenantEp.warehouse as {
-            name?: string; phone?: string; addr1?: string; addr2?: string
+            name?: string; phone?: string; address1?: string; address2?: string
             city?: string; state?: string; postcode?: string; country?: string
         } | undefined
 
-        if (!warehouse?.addr1) {
+        if (!warehouse?.address1) {
             return NextResponse.json(
                 { success: false, error: { code: 'EP_NO_WAREHOUSE', message: 'Warehouse address not configured in EasyParcel settings' } },
-                { status: 422 }
+                { status: 422 },
             )
         }
 
@@ -99,7 +113,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (!shippingAddress?.postcode) {
             return NextResponse.json(
                 { success: false, error: { code: 'MISSING_ADDRESS', message: 'Order is missing recipient postcode' } },
-                { status: 422 }
+                { status: 422 },
             )
         }
 
@@ -107,78 +121,57 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (!shippingServiceId) {
             return NextResponse.json(
                 { success: false, error: { code: 'MISSING_SERVICE_ID', message: 'Order is missing shipping service ID' } },
-                { status: 422 }
+                { status: 422 },
             )
         }
 
         const courier = (order as any).shippingCourier as string | undefined
         const weightGrams = parcelWeightGrams ?? ((order as any).parcelWeight as number | undefined) ?? 500
 
-        // Recovery matrix: check if order_no already exists (step 1 succeeded but step 2 failed)
-        let epOrderNo = (order as any).easyParcelOrderNo as string | null | undefined
-
         // Read COD amount server-side — never trust client body
         const codAmountSen = (order as any).codAmount as number | null | undefined
         const codAmountRm = (codAmountSen != null && codAmountSen > 0) ? codAmountSen / 100 : undefined
 
-        if (!epOrderNo) {
-            // Step 1: Submit order to EP
-            const submitParams = buildSubmitParams({
-                warehouse,
-                shippingAddress,
-                customerName: (order as any).customerName ?? '',
-                customerPhone: (order as any).customerPhone ?? '',
-                total: (order as any).total ?? 0,
-                shippingServiceId,
-                shippingCourier: courier,
-                weightGrams,
-                collectionDate,
-                codAmountRm,
-            })
+        // Single-step submit (New EP API auto-deducts wallet)
+        const submitParams = buildSubmitParams({
+            warehouse,
+            shippingAddress,
+            customerName: (order as any).customerName ?? '',
+            customerPhone: (order as any).customerPhone ?? '',
+            total: (order as any).total ?? 0,
+            shippingServiceId,
+            shippingCourier: courier,
+            weightGrams,
+            collectionDate,
+            codAmountRm,
+        })
 
-            const submitRes = await submitOrder(epConfig, submitParams)
+        const submitRes = await submitOrder(token, submitParams)
+        const firstShipment = submitRes.data?.shipment?.[0]
 
-            if (!submitRes.order_no) {
-                return NextResponse.json(
-                    { success: false, error: { code: 'EASYPARCEL_ERROR', message: 'EasyParcel failed to reserve order. Please try again.' } },
-                    { status: 502 }
-                )
-            }
-
-            epOrderNo = submitRes.order_no
-
-            // Checkpoint: persist easyParcelOrderNo before paying (recovery if pay fails)
-            await payload.update({
-                collection: 'orders',
-                id: orderId,
-                data: { easyParcelOrderNo: epOrderNo } as any,
-            })
-        }
-
-        // Step 2: Pay order (charges EP wallet)
-        const payRes = await payOrder(epConfig, { order_no: epOrderNo })
-
-        if (!payRes.awb_no) {
+        if (!firstShipment || firstShipment.status === 'error' || !firstShipment.awb) {
+            const errMsg = firstShipment?.errors?.[0] ?? 'EasyParcel failed to create shipment'
             return NextResponse.json(
-                { success: false, error: { code: 'EASYPARCEL_ERROR', message: 'EasyParcel payment failed. Please check your wallet balance and try again.' } },
-                { status: 502 }
+                { success: false, error: { code: 'EASYPARCEL_ERROR', message: errMsg } },
+                { status: 502 },
             )
         }
 
-        // Persist AWB + label + tracking status (+ codStatus if COD order)
+        // Persist AWB + tracking_number + shipment_id (reuses easyParcelOrderNo col)
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
-                awbNo: payRes.awb_no,
-                labelUrl: payRes.label_url ?? null,
+                awbNo: firstShipment.awb,
+                trackingNumber: firstShipment.tracking_number ?? firstShipment.awb,
+                easyParcelOrderNo: firstShipment.shipment_id ?? null,
+                labelUrl: null,  // New API does not return label_url in submit response
                 shippingTrackingStatus: 'pending_pickup',
-                easyParcelOrderNo: epOrderNo,
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
             } as any,
         })
 
-        // Flip status to ready_to_ship ONLY after payOrder success
+        // Flip status to ready_to_ship only after successful submit
         await payload.update({
             collection: 'orders',
             id: orderId,
@@ -187,7 +180,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
         return NextResponse.json({
             success: true,
-            data: { awbNo: payRes.awb_no, labelUrl: payRes.label_url ?? null },
+            data: { awbNo: firstShipment.awb, trackingNumber: firstShipment.tracking_number ?? firstShipment.awb },
         })
     } catch (error: unknown) {
         if (error instanceof EasyParcelError) {
@@ -195,24 +188,24 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             if (isWalletLow) {
                 return NextResponse.json(
                     { success: false, error: { code: 'EASYPARCEL_WALLET_LOW', message: 'Insufficient EasyParcel wallet balance. Please top up and try again.' } },
-                    { status: 402 }
+                    { status: 402 },
                 )
             }
-            if (error.code === 'AUTH_ERROR' || error.message.toLowerCase().includes('auth')) {
+            if (error.code === 'AUTH_EXPIRED') {
                 return NextResponse.json(
-                    { success: false, error: { code: 'EASYPARCEL_AUTH_ERROR', message: 'EasyParcel authentication failed. Check your API credentials.' } },
-                    { status: 422 }
+                    { success: false, error: { code: 'EASYPARCEL_AUTH_ERROR', message: 'EasyParcel session expired. Please reconnect.' } },
+                    { status: 422 },
                 )
             }
             return NextResponse.json(
                 { success: false, error: { code: 'EASYPARCEL_ERROR', message: error.message } },
-                { status: 502 }
+                { status: 502 },
             )
         }
-        console.error('[Create Label Error]', error)
+        console.error('[Create Label Error]', error instanceof Error ? error.message : 'unknown')
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create shipping label' } },
-            { status: 500 }
+            { status: 500 },
         )
     }
 }))

@@ -581,6 +581,64 @@ export const Tenants: CollectionConfig = {
                 },
             ],
         },
+        {
+            name: 'easyParcelIntegration',
+            type: 'group',
+            label: 'EasyParcel Integration',
+            admin: {
+                description: 'Connect tenant own EasyParcel account for shipping rates and label purchase',
+            },
+            fields: [
+                {
+                    name: 'enabled',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    admin: { description: 'Master toggle — enable EasyParcel for this tenant' },
+                },
+                {
+                    name: 'accessToken',
+                    type: 'text',
+                    access: { read: () => false },
+                    admin: { description: 'EP OAuth access token — never exposed to client' },
+                },
+                {
+                    name: 'refreshToken',
+                    type: 'text',
+                    access: { read: () => false },
+                    admin: { description: 'EP OAuth refresh token — never exposed to client' },
+                },
+                {
+                    name: 'tokenExpiresAt',
+                    type: 'date',
+                    access: { read: () => false },
+                    admin: { readOnly: true, description: 'When the EP access token expires' },
+                },
+                {
+                    name: 'tokenRefreshExpiresAt',
+                    type: 'date',
+                    access: { read: () => false },
+                    admin: { readOnly: true, description: 'When the EP refresh token expires' },
+                },
+                {
+                    name: 'warehouse',
+                    type: 'json',
+                    admin: {
+                        description: 'Default pickup warehouse: {name, phone, address1, address2, city, state, postcode, country}',
+                    },
+                },
+                {
+                    name: 'selectedCourier',
+                    type: 'text',
+                    defaultValue: 'flash',
+                    admin: { description: 'Default selected courier ID (e.g. flash, jnt, poslaju)' },
+                },
+                {
+                    name: 'testedAt',
+                    type: 'date',
+                    admin: { readOnly: true, description: 'Timestamp of last successful EP connection test' },
+                },
+            ],
+        },
     ],
     timestamps: true,
 }

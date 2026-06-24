@@ -73,6 +73,25 @@ vi.mock('@/lib/discounts/record-discount-redemption', () => ({
     recordDiscountRedemption: (...args: any[]) => mockRecordRedemption(...args),
 }))
 
+// EasyParcel shipping rate lookup — returns flat rate (10 RM) when not integrated
+vi.mock('@/lib/shipping/get-rates', () => ({
+    getRates: vi.fn().mockResolvedValue({
+        rates: [{
+            courier: 'flat',
+            serviceId: 'flat',
+            courierName: 'Flat Rate',
+            serviceName: 'Standard',
+            priceSen: 1000, // 10 RM
+            codAvailable: false,
+            estDelivery: '3-5 business days',
+        }],
+    }),
+}))
+
+vi.mock('@/lib/shipping/easyparcel/token-manager', () => ({
+    getValidToken: vi.fn().mockResolvedValue(null),
+}))
+
 import { POST } from '@/app/api/orders/stripe-checkout/route'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'

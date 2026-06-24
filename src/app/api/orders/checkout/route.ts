@@ -5,7 +5,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
-import { getShippingRate } from '@/lib/shipping'
+import { getRates } from '@/lib/shipping/get-rates'
+import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -267,11 +268,46 @@ export async function POST(request: Request) {
         }
         const discountRM = discountSen / 100
 
-        // Shipping: rates stored in sen, subtotal is RM-float → convert for calc, result back to RM.
-        // Free-ship gates on the POST-discount subtotal (F33 phase-07): a discount that drops the cart
-        // below `freeAbove` now charges shipping. Discount amount itself stays on the original subtotal.
+        // Shipping: EP-aware hybrid router — falls back to flat rate when EP is disabled or fails.
+        // Free-ship gates on the POST-discount subtotal (F33 phase-07).
         const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
-        const shippingFeeSen = getShippingRate(customer.address.state, (site as any).shippingConfig, effSubtotalSen)
+
+        // Resolve EP token from tenant integration settings (tenantForSlug already fetched above)
+        const epIntegration = (tenantForSlug as any)?.easyParcelIntegration ?? {}
+        let epToken: string | null = null
+        const warehouseState = epIntegration.warehouse?.state ?? ''
+        if (epIntegration.enabled && epIntegration.accessToken) {
+            try {
+                epToken = await getValidToken(epIntegration, tenantId, payload)
+            } catch {
+                // token expired or not connected — silent fallback to flat rate
+            }
+        }
+
+        // Aggregate parcel weight from order items; use product.weight (grams) field, default 500g per item
+        const totalWeightGrams = orderItems.reduce((acc, item) => {
+            return acc + ((item as any).weightGrams || 500) * item.quantity
+        }, 0)
+
+        // For COD rate queries: use effSubtotalSen as an approximation of the cart total.
+        // The exact total (subtotal + shipping) is not yet known at rate-check time.
+        // EP uses the COD amount only to filter eligible couriers — an estimate is sufficient.
+        const rateResult = await getRates(
+            {
+                weightGrams: totalWeightGrams,
+                destPostcode: customer.address?.postcode ?? '',
+                destState: customer.address?.state ?? '',
+                senderPostcode: epIntegration.warehouse?.postcode ?? '47500',
+                senderState: warehouseState,
+                subtotalSen: effSubtotalSen,
+                codAmountSen: paymentMethod === 'cod' ? effSubtotalSen : undefined,
+            },
+            epToken,
+            (site as any).shippingConfig ?? {},
+            customer.address?.state,
+        )
+        const bestRate = rateResult.rates[0]
+        const shippingFeeSen = bestRate.priceSen
         const shippingFee = shippingFeeSen / 100
 
         // SST tax removed at checkout (F33 phase-06) — kept as 0 so the column stays populated;
@@ -329,6 +365,12 @@ export async function POST(request: Request) {
                     discountCode: discountRow.code,
                     discountAmount: discountSen,
                 } : {}),
+                // EP shipping fields — only written when a real EP courier is selected (not flat fallback)
+                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier } : {}),
+                ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
+                parcelWeight: totalWeightGrams,
+                // COD amount in sen — only for COD orders; final total after shipping is now known
+                ...(paymentMethod === 'cod' ? { codAmount: Math.round(total * 100) } : {}),
             } as any,
         })
 

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,7 @@ interface WarehouseData {
 export interface EasyParcelIntegrationConfig {
     enabled?: boolean
     // apiKey and authKey are NEVER returned from server
-    detectedEnv?: 'production' | 'demo'
+    // accessToken is server-only, never returned to client
     warehouse?: WarehouseData | null
     selectedCourier?: string
     testedAt?: string
@@ -56,16 +57,10 @@ const BENEFIT_TILES = [
 
 export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const [enabled, setEnabled] = useState(initialEpConfig?.enabled ?? false)
-    const [apiKey, setApiKey] = useState('')
-    const [authKey, setAuthKey] = useState('')
-    const [showApiKey, setShowApiKey] = useState(false)
-    const [showAuthKey, setShowAuthKey] = useState(false)
     const [testStatus, setTestStatus] = useState<TestStatus>(
         initialEpConfig?.testedAt ? 'connected' : 'idle',
     )
-    const [detectedEnv, setDetectedEnv] = useState<'production' | 'demo' | undefined>(
-        initialEpConfig?.detectedEnv,
-    )
+    const [walletBalance, setWalletBalance] = useState<string | null>(null)
 
     // Warehouse fields
     const wh = initialEpConfig?.warehouse ?? {}
@@ -90,15 +85,31 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const [postcodesLoading, setPostcodesLoading] = useState(false)
 
     const [isSaving, setIsSaving] = useState(false)
-    const [editingCredentials, setEditingCredentials] = useState(false)
     const [couriersCount, setCouriersCount] = useState(0)
     const [showAddressForm, setShowAddressForm] = useState(
         !(initialEpConfig?.warehouse?.name || initialEpConfig?.warehouse?.address1),
     )
     const [whIsDefault, setWhIsDefault] = useState(true)
 
-    // Credentials already set (server never returns them, but testedAt signals they exist)
-    const credentialsAlreadySet = Boolean(initialEpConfig?.testedAt)
+    const searchParams = useSearchParams()
+
+    // Handle OAuth callback query params
+    useEffect(() => {
+        const ep = searchParams.get('ep')
+        if (ep === 'connected') {
+            setTestStatus('connected')
+            toast.success('EasyParcel connected successfully!')
+            if (typeof window !== 'undefined') {
+                window.history.replaceState({}, '', '/settings/shipping')
+            }
+        } else if (ep === 'error') {
+            toast.error('EasyParcel connection failed. Please try again.')
+            if (typeof window !== 'undefined') {
+                window.history.replaceState({}, '', '/settings/shipping')
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // Load states on mount
     useEffect(() => {
@@ -177,42 +188,30 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const canSave = testStatus === 'connected' && !isSaving
 
     async function handleTestConnection() {
-        // Allow re-test only if new keys entered, or credentials already set (re-test with existing keys not possible client-side)
-        const usingNewKeys = apiKey.trim() !== '' || authKey.trim() !== ''
-        if (!usingNewKeys && !credentialsAlreadySet) {
-            toast.error('Enter your API Key and Auth Key first')
-            return
-        }
-        // If credentials already set and no new keys, skip — can't re-test without keys on client
-        if (!usingNewKeys && credentialsAlreadySet) {
-            toast.info('Connection already verified. Enter new credentials to re-test.')
-            return
-        }
-
         setTestStatus('testing')
         try {
             const res = await fetch(`/api/tenant/${tenantId}/easyparcel-test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ apiKey: apiKey.trim(), authKey: authKey.trim() }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) {
                 const code = json?.error?.code
-                if (code === 'INVALID_KEY') {
-                    setTestStatus('invalid')
+                if (code === 'EP_NOT_CONNECTED') {
+                    setTestStatus('idle')
+                    toast.error('EasyParcel not connected. Please connect via OAuth.')
                 } else {
                     setTestStatus('idle')
                     toast.error(json?.error?.message ?? 'Connection test failed')
                 }
                 return
             }
-            setDetectedEnv(json.data.env)
-            setCouriersCount(json.data.couriersAvailable?.length ?? 0)
+            const { balance, currency } = json.data ?? {}
+            setWalletBalance(balance ? `${currency ?? 'MYR'} ${balance}` : null)
+            setCouriersCount(0)
             setTestStatus('connected')
-            setEditingCredentials(false)
-            toast.success(`Connected to EasyParcel (${json.data.env})`)
+            toast.success('EasyParcel connection verified!')
         } catch {
             setTestStatus('idle')
             toast.error('Network error. Please try again.')
@@ -223,7 +222,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         if (!canSave) return
         setIsSaving(true)
         try {
-            const data: Record<string, unknown> = {
+            const data = {
                 easyParcelIntegration: {
                     enabled,
                     warehouse: {
@@ -235,9 +234,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         country: 'MY',
                     },
                     selectedCourier,
-                    // Include new keys only if user entered them
-                    ...(apiKey.trim() !== '' ? { apiKey: apiKey.trim() } : {}),
-                    ...(authKey.trim() !== '' ? { authKey: authKey.trim() } : {}),
                 },
             }
 
@@ -250,9 +246,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             const json = await res.json()
             if (!res.ok) throw new Error(json?.errors?.[0]?.message ?? 'Failed to save')
             toast.success('EasyParcel settings saved')
-            // Clear sensitive fields after save
-            setApiKey('')
-            setAuthKey('')
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : 'Failed to save settings')
         } finally {
@@ -330,7 +323,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     // --- Full settings (EP enabled) ---
     const hasWarehouse = !!(whName || whAddr1 || whPostcode)
-    const credentialsLocked = testStatus === 'connected' && !editingCredentials
     const warehouseAddress = [whAddr1, whCity, whPostcode, whState].filter(Boolean).join(', ')
 
     return (
@@ -366,88 +358,53 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
-            {/* ─── API Credentials ──────────────────────────── */}
+            {/* ─── API Credentials / OAuth Connection ──────────────── */}
             <div className="p-6 flex flex-col gap-4">
-                {credentialsLocked ? (
+                {testStatus === 'connected' ? (
                     <>
                         <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-3 text-[13px] text-[rgb(16,185,129)]">
                             <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            Connection Successful{couriersCount > 0 ? ` — ${couriersCount} couriers available` : detectedEnv ? ` (${detectedEnv})` : ''}
+                            {couriersCount > 0 ? `Connected — ${couriersCount} couriers available` : walletBalance ? `Connected — Wallet: ${walletBalance}` : 'Connected to EasyParcel'}
                         </div>
                         <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                             <div className="flex items-center gap-3">
                                 <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
-                                <p className="text-[13px] font-medium text-[var(--dash-text)]">Credentials locked while connected</p>
+                                <p className="text-[13px] font-medium text-[var(--dash-text)]">OAuth session active</p>
                             </div>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => { setEditingCredentials(true); setTestStatus('idle') }}
+                                onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
                                 className="flex items-center gap-1.5 shrink-0"
                             >
                                 <Pencil className="h-3.5 w-3.5" />
-                                Edit credentials
+                                Reconnect
                             </Button>
                         </div>
                     </>
                 ) : (
-                    <>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="ep-api-key" className="text-[13px] text-[var(--dash-text)]">API Key</Label>
-                                    <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: api</span>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        id="ep-api-key"
-                                        type={showApiKey ? 'text' : 'password'}
-                                        autoComplete="off"
-                                        placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter API Key'}
-                                        value={apiKey}
-                                        onChange={e => { setApiKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                        className={`${EP_INPUT} pr-10`}
-                                        style={EP_INPUT_STYLE}
-                                    />
-                                    <button type="button" aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
-                                        onClick={() => setShowApiKey(v => !v)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors">
-                                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="ep-auth-key" className="text-[13px] text-[var(--dash-text)]">Auth Key</Label>
-                                    <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: authentication</span>
-                                </div>
-                                <div className="relative">
-                                    <input
-                                        id="ep-auth-key"
-                                        type={showAuthKey ? 'text' : 'password'}
-                                        autoComplete="off"
-                                        placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter Auth Key'}
-                                        value={authKey}
-                                        onChange={e => { setAuthKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                        className={`${EP_INPUT} pr-10`}
-                                        style={EP_INPUT_STYLE}
-                                    />
-                                    <button type="button" aria-label={showAuthKey ? 'Hide Auth Key' : 'Show Auth Key'}
-                                        onClick={() => setShowAuthKey(v => !v)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors">
-                                        {showAuthKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="flex flex-col gap-3">
+                        <p className="text-[13px] text-[var(--dash-text-muted)]">
+                            You&apos;ll be redirected to EasyParcel to authorize access. Your credentials are stored securely and never exposed.
+                        </p>
+                        <div>
+                            <Button
+                                variant="dashPrimary" size="dash"
+                                onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
+                                className="flex items-center gap-2"
+                            >
+                                <Zap className="h-4 w-4" />
+                                Connect with EasyParcel
+                            </Button>
                         </div>
+                    </div>
+                )}
 
-                        {testStatus === 'invalid' && (
-                            <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--destructive))]">
-                                <XCircle className="h-4 w-4 shrink-0" />
-                                Invalid credentials. Please check your API Key and Auth Key in your EasyParcel dashboard.
-                            </div>
-                        )}
-                    </>
+                {testStatus === 'invalid' && (
+                    <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--destructive))]">
+                        <XCircle className="h-4 w-4 shrink-0" />
+                        Connection failed. Please try reconnecting.
+                    </div>
                 )}
             </div>
 
@@ -618,7 +575,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         {testStatus === 'testing' ? (
                             <><Loader2 className="h-4 w-4 animate-spin" />Testing connection…</>
                         ) : (
-                            <><Search className="h-4 w-4" />{editingCredentials ? 'Re-test Connection' : 'Test connection'}</>
+                            <><Search className="h-4 w-4" />Test connection</>
                         )}
                     </Button>
                 ) : (

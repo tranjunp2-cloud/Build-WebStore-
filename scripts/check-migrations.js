@@ -91,11 +91,15 @@ function getNewFieldsFromDiff() {
 
       if (!fullDiff) continue
 
-      // Identify group-typed fields from the diff so we can skip them.
+      // Identify group-typed and array-typed fields from the diff so we can skip them.
       // Strategy: for each added `name: 'xxx'` line, look at nearby lines (±6)
-      // for a sibling `type: 'group'` at the same indentation.
+      // for a sibling `type: 'group'` or `type: 'array'` at the same indentation.
+      // Groups have no DB column (sub-fields are flattened with prefix).
+      // Arrays have a separate child table — no column in the parent table.
       const diffLines = fullDiff.split('\n')
-      const groupFieldNames = new Set()
+      const noColumnFieldNames = new Set() // group + array fields
+      // arrayFieldLineIdx: line index → indent level, for determining sub-field ranges
+      const arrayFieldLineIdx = new Map() // lineIdx → indent
       for (let i = 0; i < diffLines.length; i++) {
         const nameMatch = diffLines[i].match(/^\+(\s*)name:\s*['"](\w+)['"]/)
         if (!nameMatch) continue
@@ -104,25 +108,60 @@ function getNewFieldsFromDiff() {
         for (let j = Math.max(0, i - 2); j <= Math.min(diffLines.length - 1, i + 8); j++) {
           if (j === i) continue
           const typeMatch = diffLines[j].match(/^\+(\s*)type:\s*['"](\w+)['"]/)
-          if (typeMatch && typeMatch[1].length === indent && typeMatch[2] === 'group') {
-            groupFieldNames.add(fieldName)
-            break
+          if (typeMatch && typeMatch[1].length === indent) {
+            if (typeMatch[2] === 'group') {
+              noColumnFieldNames.add(fieldName)
+              break
+            }
+            if (typeMatch[2] === 'array') {
+              noColumnFieldNames.add(fieldName)
+              arrayFieldLineIdx.set(i, indent)
+              break
+            }
           }
         }
       }
 
-      // Extract field names from added `name:` lines, skipping group fields.
-      const nameDiff = diffLines.filter(l => l.includes('name:')).join('\n')
+      // Build a set of line indices inside array blocks so we can skip their sub-fields.
+      // An array block starts at an array field's line and ends when we see a `+` line
+      // whose non-whitespace content starts at indent LESS THAN the array field's indent
+      // (i.e. we've moved to a sibling field object or closed the parent).
+      // Lines at the SAME indent as the array field belong to the same field definition
+      // (e.g. `type: 'array'`, `fields: [`), so we only break on strictly lesser indent.
+      // Sub-fields inside the array's `fields:` list have GREATER indent.
+      const arraySubfieldLineIndices = new Set()
+      for (const [startIdx, arrayIndent] of arrayFieldLineIdx) {
+        for (let i = startIdx + 1; i < diffLines.length; i++) {
+          const line = diffLines[i]
+          if (!line.startsWith('+')) continue
+          // Count leading whitespace after the `+` prefix
+          const contentMatch = line.match(/^\+(\s*)(\S)/)
+          if (!contentMatch) continue
+          const lineIndent = contentMatch[1].length
+          if (lineIndent < arrayIndent) break // moved above the array field's own level — exit
+          if (lineIndent > arrayIndent && line.includes('name:')) {
+            arraySubfieldLineIndices.add(i)
+          }
+        }
+      }
+
+      // Extract field names from added `name:` lines, skipping no-column fields and array sub-fields.
       const regex = /name:\s*['"](\w+)['"]/g
       let match
-      while ((match = regex.exec(nameDiff)) !== null) {
-        if (groupFieldNames.has(match[1])) continue // groups have no DB column
-        newFields.push({
-          field: match[1],
-          snake: toSnakeCase(match[1]),
-          table: tableName,
-          file: filename,
-        })
+      for (let i = 0; i < diffLines.length; i++) {
+        if (!diffLines[i].includes('name:')) continue
+        if (arraySubfieldLineIndices.has(i)) continue // skip sub-fields of array fields
+        regex.lastIndex = 0
+        while ((match = regex.exec(diffLines[i])) !== null) {
+          const fieldName = match[1]
+          if (noColumnFieldNames.has(fieldName)) continue // groups/arrays have no DB column
+          newFields.push({
+            field: fieldName,
+            snake: toSnakeCase(fieldName),
+            table: tableName,
+            file: filename,
+          })
+        }
       }
     } catch (err) {
       console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
@@ -153,7 +192,7 @@ function getNewFieldsFromDiff() {
 // the unprefixed form `merchant_qr_code_id` and (for uploads) `merchant_qr_code`.
 const KNOWN_GROUP_PREFIXES = [
   'theme', 'seo', 'payments', 'badge', 'ai_generation_metadata',
-  'payment_config', 'shipping_config',
+  'payment_config', 'shipping_config', 'easy_parcel_integration',
 ]
 
 function getMigrationColumns() {
