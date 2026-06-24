@@ -83,6 +83,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const [showAddressForm, setShowAddressForm] = useState(
         !(initialEpConfig?.warehouse?.name || initialEpConfig?.warehouse?.address1),
     )
+    const [whIsDefault, setWhIsDefault] = useState(true)
 
     // Credentials already set (server never returns them, but testedAt signals they exist)
     const credentialsAlreadySet = Boolean(initialEpConfig?.testedAt)
@@ -439,15 +440,17 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </div>
                         </div>
 
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <button type="button" onClick={() => setWhIsDefault(v => !v)} className="flex items-center gap-2 cursor-pointer select-none">
                             <span style={{
                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: 16, height: 16, borderRadius: 4,
-                                border: '1px solid rgba(255,255,255,0.35)',
-                                background: 'rgba(255,255,255,0.04)', flexShrink: 0,
-                            }} />
+                                width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                                border: whIsDefault ? '1px solid rgb(16,185,129)' : '1px solid rgba(255,255,255,0.35)',
+                                background: whIsDefault ? 'rgb(16,185,129)' : 'rgba(255,255,255,0.04)',
+                            }}>
+                                {whIsDefault && <CheckCircle2 className="h-3 w-3 text-white" style={{ strokeWidth: 3 }} />}
+                            </span>
                             <span className="text-[12px] text-[var(--dash-text-muted)]">Set as default pickup address</span>
-                        </label>
+                        </button>
 
                         <div className="flex items-center justify-end gap-3">
                             {hasWarehouse && (
