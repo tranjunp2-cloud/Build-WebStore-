@@ -8,7 +8,7 @@ import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
     CalendarClock, Navigation, ChevronDown,
-    RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw,
+    RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw, ScanBarcode,
 } from 'lucide-react'
 
 type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
@@ -30,6 +30,11 @@ type ShippingAddress = {
     country?: string | null
 }
 
+type EpTrackingHistoryEntry = {
+    description: string
+    eventTime: string
+}
+
 type OrderData = {
     id: number | string
     orderNumber: string
@@ -46,6 +51,10 @@ type OrderData = {
     customerName: string
     customerPhone: string | null
     trackingNumber: string | null
+    awbNo?: string | null
+    shippingCourier?: string | null
+    shippingTrackingStatus?: string | null
+    shippingTrackingHistory?: EpTrackingHistoryEntry[]
     createdAt: string
     items: OrderItem[]
     shippingAddress: ShippingAddress
@@ -269,6 +278,85 @@ function OtShippingCard({ order, trackingStatus }: { order: OrderData; trackingS
                     </div>
                 </div>
             </div>
+        </div>
+    )
+}
+
+function OtEpTracking({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
+    const [copied, setCopied] = useState(false)
+    const { awbNo, shippingCourier, shippingTrackingHistory } = order
+    const isDelivered = trackingStatus === 'delivered'
+
+    if (!awbNo) {
+        // No AWB yet — show a "preparing" placeholder only for non-terminal states
+        if (trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed') return null
+        return (
+            <div className="ot-card">
+                <div className="ot-card-head">
+                    <h3>Shipment Tracking</h3>
+                    <span className="ot-card-aux"><ScanBarcode size={12} /> EasyParcel</span>
+                </div>
+                <p style={{ fontSize: '0.875rem', color: 'var(--f4, #6b7280)', margin: '0.5rem 0' }}>
+                    Your order is being prepared — tracking number will appear once picked up.
+                </p>
+            </div>
+        )
+    }
+
+    const handleCopy = () => {
+        navigator.clipboard?.writeText(awbNo)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1600)
+    }
+
+    return (
+        <div className="ot-card">
+            <div className="ot-card-head">
+                <h3>Shipment Tracking</h3>
+                <span className="ot-card-aux"><ScanBarcode size={12} /> EasyParcel</span>
+            </div>
+
+            <div className="ot-tracking-row">
+                <span className="ot-tr-label"><Hash size={12} /> AWB No.</span>
+                <span className="ot-tr-value">{awbNo}</span>
+                <button className={`ot-tr-copy ${copied ? 'copied' : ''}`} onClick={handleCopy}>
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                    {copied ? 'Copied' : 'Copy'}
+                </button>
+            </div>
+
+            {shippingCourier && (
+                <div className="ot-tracking-row" style={{ marginTop: '0.5rem' }}>
+                    <span className="ot-tr-label"><Truck size={12} /> Courier</span>
+                    <span className="ot-tr-value">{shippingCourier}</span>
+                </div>
+            )}
+
+            {shippingTrackingHistory && shippingTrackingHistory.length > 0 && (
+                <ul className="ot-timeline" style={{ marginTop: '1rem' }}>
+                    {[...shippingTrackingHistory].reverse().map((entry, idx) => (
+                        <li key={idx} className={`ot-tl-item ${idx === 0 ? 'latest' : 'completed'}`}>
+                            <span className="ot-tl-node"><Package size={13} /></span>
+                            <div className="ot-tl-body">
+                                <div className="ot-tl-title">{entry.description}</div>
+                            </div>
+                            <div className="ot-tl-stamp">
+                                {entry.eventTime && (
+                                    <span className="date">
+                                        {new Date(entry.eventTime).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </span>
+                                )}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {!isDelivered && (
+                <p style={{ fontSize: '0.75rem', color: 'var(--f4, #6b7280)', marginTop: '0.75rem', marginBottom: 0 }}>
+                    Updates every 30–60 min — not realtime.
+                </p>
+            )}
         </div>
     )
 }
@@ -569,6 +657,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                     )}
                     <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
                     {!isNegativeTerminal && <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />}
+                    {!isNegativeTerminal && <OtEpTracking order={liveOrder} trackingStatus={trackingStatus} />}
                     <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />
                     <OtItems order={liveOrder} />
                 </div>

@@ -139,6 +139,13 @@ export default async function OrderTrackingPage({
         customerName: order.customerName ?? '',
         customerPhone: order.customerPhone ?? null,
         trackingNumber: order.trackingNumber ?? null,
+        awbNo: order.awbNo ?? null,
+        shippingCourier: order.shippingCourier ?? null,
+        shippingTrackingStatus: order.shippingTrackingStatus ?? null,
+        shippingTrackingHistory: (order.shippingTrackingHistory ?? []).map((h: any) => ({
+            description: h.description ?? '',
+            eventTime: h.eventTime ?? '',
+        })),
         createdAt: order.createdAt,
         items: (order.items ?? []).map((item: any) => ({
             productName: item.productName ?? '',

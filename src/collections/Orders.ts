@@ -16,7 +16,7 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
     pending: ['new', 'confirmed', 'cancelled'],  // 'new' = Stripe webhook success target
     new: ['confirmed', 'cancelled'],
     confirmed: ['ready_to_ship', 'cancelled'],
-    ready_to_ship: ['shipped'],
+    ready_to_ship: ['shipped', 'cancelled'],
     shipped: ['completed', 'refunded'],
     completed: ['refunded'],
     // Terminal states — no further transitions
@@ -397,6 +397,89 @@ export const Orders: CollectionConfig = {
             name: 'trackingNumber',
             type: 'text',
             admin: { description: 'Shipping tracking number' },
+        },
+        // --- EasyParcel Shipping ---
+        {
+            name: 'shippingCourier',
+            type: 'text',
+            admin: { description: 'EasyParcel courier ID (e.g. flash, jnt, poslaju)' },
+        },
+        {
+            name: 'shippingServiceId',
+            type: 'text',
+            admin: { description: 'EasyParcel service_id from rate response' },
+        },
+        {
+            name: 'awbNo',
+            type: 'text',
+            index: true,
+            admin: { description: 'Air Waybill (tracking) number — idempotency key for label creation' },
+        },
+        {
+            name: 'easyParcelOrderNo',
+            type: 'text',
+            admin: { description: 'EP order_no from EPSubmitOrderBulk — buyer-hidden', hidden: true },
+        },
+        {
+            name: 'labelUrl',
+            type: 'text',
+            admin: { description: 'PDF label URL from EPPayOrderBulk — buyer-hidden', hidden: true },
+        },
+        {
+            name: 'shippingTrackingStatus',
+            type: 'select',
+            index: true,
+            options: [
+                { label: 'Order Created', value: 'order_created' },
+                { label: 'Pending Pickup', value: 'pending_pickup' },
+                { label: 'Picked Up', value: 'picked_up' },
+                { label: 'In Transit', value: 'in_transit' },
+                { label: 'Out for Delivery', value: 'out_for_delivery' },
+                { label: 'Delivered', value: 'delivered' },
+                { label: 'Failed Delivery', value: 'failed_delivery' },
+                { label: 'Returned to Sender', value: 'returned_to_sender' },
+                { label: 'Lost', value: 'lost' },
+                { label: 'Cancelled', value: 'cancelled' },
+                { label: 'Exception', value: 'exception' },
+                { label: 'Processing', value: 'processing' },
+                { label: 'Unknown', value: 'unknown' },
+            ],
+            admin: { description: 'EP tracking status (synced by cron every 30min)' },
+        },
+        {
+            name: 'shippingTrackingLastUpdated',
+            type: 'date',
+            admin: { readOnly: true, description: 'Timestamp of last EP tracking sync by cron' },
+        },
+        {
+            name: 'parcelWeight',
+            type: 'number',
+            admin: { description: 'Parcel weight in grams (aggregated from order items)' },
+        },
+        {
+            name: 'codAmount',
+            type: 'number',
+            admin: { description: 'COD amount in sen (integer). NOT RM. Divide by 100 when calling EP API.' },
+        },
+        {
+            name: 'codStatus',
+            type: 'select',
+            options: [
+                { label: 'Pending', value: 'pending' },
+                { label: 'Collected', value: 'collected' },
+                { label: 'Settled', value: 'settled' },
+            ],
+            admin: { description: 'COD collection status from courier' },
+        },
+        {
+            name: 'shippingTrackingHistory',
+            type: 'array',
+            admin: { description: 'History of EP tracking events (synced by cron)' },
+            fields: [
+                { name: 'status', type: 'text' },
+                { name: 'description', type: 'text' },
+                { name: 'eventTime', type: 'date' },
+            ],
         },
         // --- Cancellation ---
         {
