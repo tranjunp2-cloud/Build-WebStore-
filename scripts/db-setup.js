@@ -4811,6 +4811,11 @@ const MIGRATIONS = [
     name: 'sso_step_events.idx_status_retry_created',
     sql: `CREATE INDEX IF NOT EXISTS sso_step_events_status_retry_created ON sso_step_events (status, retry_count, created_at);`,
   },
+  // ── GH-1350: orders locale snapshot ──
+  {
+    name: 'orders.locale',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {
