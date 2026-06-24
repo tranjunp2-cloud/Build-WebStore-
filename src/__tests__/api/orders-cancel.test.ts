@@ -761,10 +761,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
         expect(body.refundId).toBe('xendit-refund-123')
-        // Both emails sent: cancel first, then refund
+        // Both emails sent in order: cancel first, then refund
         expect(mockSendEmail).toHaveBeenCalledTimes(2)
-        expect(mockSendEmail).toHaveBeenNthCalledWith(1, expect.objectContaining({ to: 'buyer-x@test.com' }))
-        expect(mockSendEmail).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: 'buyer-x@test.com' }))
+        expect(mockSendEmail).toHaveBeenNthCalledWith(1, expect.objectContaining({ subject: 'Order cancelled' }))
+        expect(mockSendEmail).toHaveBeenNthCalledWith(2, expect.objectContaining({ subject: 'Order refunded' }))
         expect(vi.mocked(orderCancelledEmail)).toHaveBeenCalled()
         expect(vi.mocked(orderRefundedEmail)).toHaveBeenCalled()
     })

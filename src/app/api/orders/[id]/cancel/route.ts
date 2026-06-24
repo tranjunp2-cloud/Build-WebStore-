@@ -379,7 +379,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : Promise.resolve(null),
                     tenantId
-                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
+                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale).catch(() => null)
                         : Promise.resolve(null),
                 ])
 
