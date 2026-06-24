@@ -88,6 +88,17 @@ export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
             throw err
         }
 
+        // Decode JWT payload for debugging (no verification — just inspect claims)
+        try {
+            const parts = token.split('.')
+            if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'))
+                console.log('[EP Token Claims]', JSON.stringify({ sub: payload.sub, account_id: payload.account_id, scope: payload.scope, iat: payload.iat, exp: payload.exp }))
+            } else {
+                console.log('[EP Token] Not a JWT — format:', token.slice(0, 20) + '...')
+            }
+        } catch { /* non-critical */ }
+
         let walletRes
         try {
             walletRes = await walletBalance(token)

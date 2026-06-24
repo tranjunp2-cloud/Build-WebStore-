@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
         if (!tenant) return makeErrorRedirect()
 
         const tokens = await exchangeCodeForToken(code)
+        // Debug: log all token response fields except the actual tokens
+        const { access_token: _a, refresh_token: _r, ...tokenMeta } = tokens as any
+        console.log('[EP OAuth Callback] Token response metadata:', JSON.stringify(tokenMeta))
         const now = Date.now()
 
         // Best-effort: fetch account identifier for display in settings UI
