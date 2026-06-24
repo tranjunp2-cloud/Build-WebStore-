@@ -60,7 +60,7 @@ function shuffleArray<T>(arr: T[], rand: () => number): T[] {
 // in the block's render switch. AI gen would silently fall through to the
 // block's default variant, hiding the mismatch from QA.
 export const BROKEN_VARIANTS: Record<string, string[]> = {
-  hero: ['animated-gradient', 'video', 'split-video'],
+  hero: ['animated-gradient'],
   testimonials: ['grid', 'single'],
 }
 
