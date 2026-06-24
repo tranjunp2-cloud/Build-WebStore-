@@ -208,8 +208,9 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 }
                 return
             }
-            const { balance, currency } = json.data ?? {}
+            const { balance, currency, accountName: name } = json.data ?? {}
             setWalletBalance(balance ? `${currency ?? 'MYR'} ${balance}` : null)
+            if (name) setAccountName(name)
             setCouriersCount(0)
             setTestStatus('connected')
             toast.success('EasyParcel connection verified!')

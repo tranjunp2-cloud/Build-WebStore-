@@ -91,15 +91,22 @@ export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
         const walletRes = await walletBalance(token)
         const balance = walletRes.data?.current_balance ?? '0'
         const currency = walletRes.data?.currency_code ?? 'MYR'
+        const accountId = walletRes.data?.account_id
+        const accountName = accountId ? `EP #${accountId} · ${currency}` : undefined
 
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: { easyParcelIntegration: { testedAt: new Date().toISOString() } } as any,
+            data: {
+                easyParcelIntegration: {
+                    testedAt: new Date().toISOString(),
+                    ...(accountName ? { accountName } : {}),
+                },
+            } as any,
             overrideAccess: true,
         })
 
-        return NextResponse.json({ success: true, data: { balance, currency } })
+        return NextResponse.json({ success: true, data: { balance, currency, accountName } })
     } catch (error: unknown) {
         console.error('[EasyParcel Test Error]', error instanceof Error ? error.message : 'unknown')
         return NextResponse.json(
