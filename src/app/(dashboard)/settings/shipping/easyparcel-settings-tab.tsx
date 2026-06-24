@@ -349,9 +349,14 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         )}
 
                         <div className="flex items-center gap-3">
-                            <Button variant="outline" onClick={handleTestConnection} disabled={testStatus === 'testing'} className="min-w-[160px]">
+                            <Button
+                                onClick={handleTestConnection}
+                                disabled={testStatus === 'testing'}
+                                className="min-w-[160px] flex items-center gap-2"
+                                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600, borderRadius: 10 }}
+                            >
                                 {testStatus === 'testing' ? (
-                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Testing connection…</>
+                                    <><Loader2 className="h-4 w-4 animate-spin" />Testing connection…</>
                                 ) : editingCredentials ? (
                                     'Re-test Connection'
                                 ) : (
