@@ -2157,6 +2157,14 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             })
         }
 
+        // ── Logo Cloud: normalize logos[].name from AI-gen field variants ──
+        if (sanitized.blockType === 'logo-cloud' && Array.isArray(sanitized.logos)) {
+            sanitized.logos = (sanitized.logos as AIBlock[]).map((item: AIBlock, i: number) => ({
+                ...item,
+                name: String(item.name || item.company || item.brand || item.title || `Partner ${i + 1}`),
+            }))
+        }
+
         // ── Remove non-schema fields that AI might add ──
         delete sanitized.id
         delete sanitized.order
