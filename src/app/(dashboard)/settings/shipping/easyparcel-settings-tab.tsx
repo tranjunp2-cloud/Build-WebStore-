@@ -606,7 +606,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         onClick={handleTestConnection}
                         disabled={testStatus === 'testing'}
                         className="flex items-center gap-2 shrink-0 font-bold"
-                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 14, padding: '10px 20px' }}
+                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 10, padding: '10px 20px' }}
                     >
                         {testStatus === 'testing' ? (
                             <><Loader2 className="h-4 w-4 animate-spin" />Testing connection…</>
@@ -619,7 +619,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         onClick={handleSave}
                         disabled={!canSave}
                         className="flex items-center gap-2 shrink-0 font-bold"
-                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 14, padding: '10px 20px' }}
+                        style={{ background: '#3b82f6', color: '#fff', borderRadius: 10, padding: '10px 20px' }}
                     >
                         {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
                     </Button>
