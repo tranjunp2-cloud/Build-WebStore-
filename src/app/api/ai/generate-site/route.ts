@@ -869,6 +869,11 @@ export async function POST(req: NextRequest) {
             return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
         })
 
+        // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
+        // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
+        // buildGeneratedPages clones all blocks so mutation here is safe.
+        patchPageCtaUrls(rawPageDefinitions as Array<{ layout?: unknown[] }>, normalizedPageLinks)
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
         // GH-817: pass page links so injected/hollow nav reflects actual generated pages
@@ -1493,6 +1498,57 @@ function normalizeInternalUrl(url: unknown): string {
     if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
     if (url === '#contact' || url === 'contact') return '/contact'
     return url
+}
+
+/**
+ * Map a CTA URL to a canonical page slug from the generated site's page list.
+ * Returns '' when no matching page exists — callers omit the href rather than
+ * linking to a non-existent page.
+ */
+function resolveCtaSlugFromLinks(
+    rawUrl: unknown,
+    canonicalLinks: Array<{ url: string }>,
+): string {
+    const normalized = normalizeInternalUrl(rawUrl)
+    if (normalized === '#' || normalized === '') return ''
+    // Exact match (most common case — canonical slugs already align)
+    if (canonicalLinks.some(l => l.url === normalized)) return normalized
+    // Keyword match: /about-us → ['about','us'], /our-services → ['our','services']
+    // Try each segment so partial-slug variants resolve to the correct real page.
+    const segments = normalized.replace(/^\/+/, '').split(/[-_/]/).filter(Boolean)
+    for (const kw of segments) {
+        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
+        if (match) return match.url
+    }
+    return ''
+}
+
+/**
+ * Fix hero and cta block CTA URLs across all page definitions to use
+ * canonical slugs from the generated site. Runs after buildGeneratedPages
+ * so real page slugs are known. Mutates layouts in-place (pages are
+ * already cloned by buildGeneratedPages).
+ */
+function patchPageCtaUrls(
+    pageDefinitions: Array<{ layout?: unknown[] }>,
+    canonicalLinks: Array<{ label: string; url: string }>,
+): void {
+    for (const page of pageDefinitions) {
+        const layout = page.layout
+        if (!Array.isArray(layout)) continue
+        for (const block of layout as AIBlock[]) {
+            if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
+                block.ctaButtons = (block.ctaButtons as Array<AIBlock | string>).map(btn => {
+                    if (typeof btn === 'string') return { label: btn, url: '' }
+                    return { ...(btn as object), url: resolveCtaSlugFromLinks((btn as AIBlock).url, canonicalLinks) }
+                })
+            }
+            if (block.blockType === 'cta' && block.ctaButton && typeof block.ctaButton === 'object') {
+                (block.ctaButton as Record<string, unknown>).url =
+                    resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
+            }
+        }
+    }
 }
 
 function applyGeneratedSiteNavigation(
