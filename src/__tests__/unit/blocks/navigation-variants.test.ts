@@ -59,8 +59,8 @@ describe('[TC-S2-011] Navigation Block Variants', () => {
     })
 
     describe('Meta', () => {
-        it('has exactly 6 variants', () => {
-            expect(navigationMeta.variants).toHaveLength(6)
+        it('has exactly 5 variants (mega soft-deprecated from display list, issue #1237)', () => {
+            expect(navigationMeta.variants).toHaveLength(5)
         })
 
         it('variants match schema enum', () => {
