@@ -1502,21 +1502,24 @@ function normalizeInternalUrl(url: unknown): string {
 
 /**
  * Map a CTA URL to a canonical page slug from the generated site's page list.
- * Returns '' when no matching page exists — callers omit the href rather than
- * linking to a non-existent page.
+ * Returns '' when no matching internal page exists.
+ * External URLs (https, mailto, tel, etc.) are passed through unchanged.
  */
 function resolveCtaSlugFromLinks(
     rawUrl: unknown,
     canonicalLinks: Array<{ url: string }>,
 ): string {
     const normalized = normalizeInternalUrl(rawUrl)
-    if (normalized === '#' || normalized === '') return ''
+    if (normalized === '') return ''
+    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
+    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
     // Exact match (most common case — canonical slugs already align)
     if (canonicalLinks.some(l => l.url === normalized)) return normalized
-    // Keyword match: /about-us → ['about','us'], /our-services → ['our','services']
-    // Try each segment so partial-slug variants resolve to the correct real page.
-    const segments = normalized.replace(/^\/+/, '').split(/[-_/]/).filter(Boolean)
+    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
+    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
+    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
     for (const kw of segments) {
+        if (kw.length < 3) continue
         const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
         if (match) return match.url
     }
@@ -1528,6 +1531,7 @@ function resolveCtaSlugFromLinks(
  * canonical slugs from the generated site. Runs after buildGeneratedPages
  * so real page slugs are known. Mutates layouts in-place (pages are
  * already cloned by buildGeneratedPages).
+ * Buttons with no matching page are removed — prevents phantom-click hrefs.
  */
 function patchPageCtaUrls(
     pageDefinitions: Array<{ layout?: unknown[] }>,
@@ -1536,16 +1540,23 @@ function patchPageCtaUrls(
     for (const page of pageDefinitions) {
         const layout = page.layout
         if (!Array.isArray(layout)) continue
-        for (const block of layout as AIBlock[]) {
+        for (const block of layout as Array<AIBlock | null>) {
+            if (!block) continue
             if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
-                block.ctaButtons = (block.ctaButtons as Array<AIBlock | string>).map(btn => {
-                    if (typeof btn === 'string') return { label: btn, url: '' }
-                    return { ...(btn as object), url: resolveCtaSlugFromLinks((btn as AIBlock).url, canonicalLinks) }
-                })
+                block.ctaButtons = (block.ctaButtons as Array<Record<string, unknown> | string>)
+                    .flatMap((btn): AIBlock[] => {
+                        if (typeof btn === 'string') return []
+                        const url = resolveCtaSlugFromLinks(btn.url, canonicalLinks)
+                        return url ? [{ ...btn, url } as AIBlock] : []
+                    })
             }
             if (block.blockType === 'cta' && block.ctaButton && typeof block.ctaButton === 'object') {
-                (block.ctaButton as Record<string, unknown>).url =
-                    resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
+                const url = resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
+                if (url) {
+                    (block.ctaButton as Record<string, unknown>).url = url
+                } else {
+                    block.ctaButton = undefined
+                }
             }
         }
     }
