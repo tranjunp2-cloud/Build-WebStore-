@@ -204,6 +204,11 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 if (code === 'EP_NOT_CONNECTED') {
                     setTestStatus('idle')
                     toast.error('EasyParcel not connected. Please connect via OAuth.')
+                } else if (code === 'EP_WALLET_ERROR') {
+                    setTestStatus('idle')
+                    const epMsg = json?.error?.message ?? 'EP API error'
+                    toast.error(epMsg, { description: 'Check server logs or try reconnecting your EP account.' })
+                    console.error('[EP wallet error]', json?.error?.epBody)
                 } else {
                     setTestStatus('idle')
                     toast.error(json?.error?.message ?? 'Connection test failed')

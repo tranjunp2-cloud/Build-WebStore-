@@ -88,7 +88,22 @@ export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
             throw err
         }
 
-        const walletRes = await walletBalance(token)
+        let walletRes
+        try {
+            walletRes = await walletBalance(token)
+        } catch (walletErr) {
+            if (walletErr instanceof EasyParcelError && walletErr.code === 'HTTP_ERROR') {
+                const raw = walletErr.raw as { status?: number; body?: unknown } | undefined
+                console.error('[EasyParcel Wallet Error]', raw?.status, JSON.stringify(raw?.body))
+                const epReason = (raw?.body as any)?.reason ?? (raw?.body as any)?.data ?? 'Unknown'
+                return NextResponse.json(
+                    { success: false, error: { code: 'EP_WALLET_ERROR', message: `EP API error: ${epReason}`, epStatus: raw?.status, epBody: raw?.body } },
+                    { status: 502 },
+                )
+            }
+            throw walletErr
+        }
+
         const balance = walletRes.data?.current_balance ?? '0'
         const currency = walletRes.data?.currency_code ?? 'MYR'
         const accountId = walletRes.data?.account_id

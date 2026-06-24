@@ -33,7 +33,11 @@ async function epFetch<T>(
                 body: body ? JSON.stringify(body) : undefined,
                 signal: controller.signal,
             })
-            if (!res.ok) throw new EasyParcelError('HTTP_ERROR', `EP HTTP ${res.status}`, { status: res.status })
+            if (!res.ok) {
+                let epBody: unknown
+                try { epBody = await res.json() } catch { /* non-JSON body */ }
+                throw new EasyParcelError('HTTP_ERROR', `EP HTTP ${res.status}`, { status: res.status, body: epBody })
+            }
             return (await res.json()) as T
         } finally {
             clearTimeout(timer)
