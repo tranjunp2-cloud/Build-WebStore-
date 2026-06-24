@@ -2023,11 +2023,6 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             }
         }
 
-        // ── Logo Cloud: strip logos (needs real media) ──
-        if (sanitized.blockType === 'logo-cloud') {
-            sanitized.logos = []
-        }
-
         // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
         if (sanitized.blockType === 'google-maps') {
             if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
