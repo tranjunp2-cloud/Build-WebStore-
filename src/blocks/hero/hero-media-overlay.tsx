@@ -156,7 +156,7 @@ export function HeroMediaOverlay({
                 data-editor-control
                 className={[
                     'absolute inset-0 z-10 transition-colors duration-200 flex items-start justify-end p-2',
-                    isHovered && !isTextEditing ? 'bg-black/30 opacity-100 pointer-events-auto' : 'bg-black/0 opacity-0 pointer-events-none',
+                    (isHovered && !isTextEditing) || uploading ? 'bg-black/30 opacity-100 pointer-events-auto' : 'bg-black/0 opacity-0 pointer-events-none',
                 ].filter(Boolean).join(' ')}
             >
                 <div data-editor-control className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
