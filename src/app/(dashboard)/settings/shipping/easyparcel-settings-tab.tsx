@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -443,11 +443,11 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         <button type="button" onClick={() => setWhIsDefault(v => !v)} className="flex items-center gap-2 cursor-pointer select-none">
                             <span style={{
                                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                                border: whIsDefault ? '1px solid rgb(16,185,129)' : '1px solid rgba(255,255,255,0.35)',
-                                background: whIsDefault ? 'rgb(16,185,129)' : 'rgba(255,255,255,0.04)',
+                                width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                                border: whIsDefault ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.3)',
+                                background: whIsDefault ? '#3b82f6' : 'transparent',
                             }}>
-                                {whIsDefault && <CheckCircle2 className="h-3 w-3 text-white" style={{ strokeWidth: 3 }} />}
+                                {whIsDefault && <Check className="h-3 w-3 text-white" style={{ strokeWidth: 3 }} />}
                             </span>
                             <span className="text-[12px] text-[var(--dash-text-muted)]">Set as default pickup address</span>
                         </button>
