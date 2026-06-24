@@ -62,6 +62,12 @@ export function useUploadProgress() {
                 reject(new Error('Upload cancelled'))
             })
 
+            xhr.addEventListener('timeout', () => {
+                setIsUploading(false)
+                reject(new Error('Upload timed out'))
+            })
+
+            xhr.timeout = 120_000 // match Vercel maxDuration
             xhr.open('POST', '/api/media/upload')
             xhr.send(formData)
         })
