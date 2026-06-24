@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
                     tenant: tenantId, site: siteIdNum, orderNumber, items: orderItems,
                     subtotal, tax, shippingFee, total: 0, currency,
                     status: 'paid', paymentStatus: 'paid', paymentMethod: 'free', paymentProvider: 'xendit',
+                    locale: siteTyped.locale ?? 'en',
                     customerEmail: customer.email, customerName: customer.name, customerPhone: customer.phone || '',
                 } as Record<string, unknown>,
             })

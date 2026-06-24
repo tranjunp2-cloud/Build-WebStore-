@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
                     status: 'paid',
                     paymentStatus: 'paid',
                     paymentMethod: 'free',
+                    locale: siteTyped.locale ?? 'en',
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
