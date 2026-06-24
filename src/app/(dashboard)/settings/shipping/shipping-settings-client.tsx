@@ -2,16 +2,22 @@
 
 import { useState, useRef } from 'react'
 import { toast } from 'sonner'
+import { Calculator, Truck } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { ShippingConfig } from '@/lib/shipping'
 import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX, validateRate, parseRateRm, validateCrossField } from '@/lib/shipping'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ShippingRatesCard } from './shipping-rates-card'
 import { FreeShippingCard } from './free-shipping-card'
 import { SettingsFooter } from './settings-footer'
+import { EasyParcelSettingsTab } from './easyparcel-settings-tab'
+import type { EasyParcelIntegrationConfig } from './easyparcel-settings-tab'
 
 type Props = {
     siteId: string
+    tenantId: string
     initial: ShippingConfig | null
+    epConfig: EasyParcelIntegrationConfig | null
 }
 
 const DEFAULTS = {
@@ -32,7 +38,38 @@ function snap(w: string, e: string, fe: boolean, fa: string): Snapshot {
     return { westRm: w, eastRm: e, freeEnabled: fe, freeAboveRm: fa }
 }
 
-export function ShippingSettingsClient({ siteId, initial }: Props) {
+function StatusBadge({ live }: { live: boolean }) {
+    return live ? (
+        <span style={{
+            background: 'rgba(34,197,94,0.18)',
+            color: 'rgb(34,197,94)',
+            borderRadius: 20,
+            padding: '2px 8px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.3px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+        }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgb(34,197,94)', display: 'inline-block' }} />
+            LIVE
+        </span>
+    ) : (
+        <span style={{
+            background: 'rgba(107,114,128,0.18)',
+            color: 'rgb(107,114,128)',
+            borderRadius: 20,
+            padding: '2px 8px',
+            fontSize: 11,
+            fontWeight: 600,
+        }}>
+            OFF
+        </span>
+    )
+}
+
+export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
     const [westRateRm, setWestRateRm] = useState(senToRm(initial?.westRate ?? 800))
@@ -184,46 +221,82 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
         }
     }
 
+    const flatRateLive = initial?.enabled !== false
+    const epLive = epConfig?.enabled === true
+
     return (
         <div className="w-full pb-4">
             <div className="mb-6">
                 <h1 className="text-[32px] font-black text-[var(--dash-text)] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
                 <p className="mt-2 text-[14px] text-[var(--dash-text-muted)]">{s.pageSubtitle}</p>
             </div>
-            <div className="space-y-5">
-                <ShippingRatesCard
-                    westRateRm={westRateRm}
-                    eastRateRm={eastRateRm}
-                    freeEnabled={freeEnabled}
-                    freeAboveRm={freeAboveRm}
-                    onWestChange={v => { setWestRateRm(v); setWestRateError('') }}
-                    onEastChange={v => { setEastRateRm(v); setEastRateError('') }}
-                    westError={westRateError}
-                    eastError={eastRateError}
-                    onWestBlur={handleWestBlur}
-                    onEastBlur={handleEastBlur}
-                    westWarning={westRateWarning}
-                    eastWarning={eastRateWarning}
-                    helperText={s.helperRange}
-                />
-                <FreeShippingCard
-                    freeEnabled={freeEnabled}
-                    freeAboveRm={freeAboveRm}
-                    freeAboveError={freeAboveError}
-                    onToggle={v => { setFreeEnabled(v); if (!v) { setFreeAboveError(''); setFreeAboveWarning('') } }}
-                    onAmountChange={v => { setFreeAboveRm(v); setFreeAboveError('') }}
-                    onAmountBlur={handleFreeBlur}
-                    freeAboveWarning={freeAboveWarning}
-                />
-            </div>
-
-            <SettingsFooter
-                isDirty={isDirty}
-                isSaving={isSaving}
-                lastSaveSucceeded={lastSaveSucceeded}
-                onReset={handleReset}
-                onSave={handleSave}
-            />
+            <Tabs defaultValue={epConfig?.enabled ? 'easyparcel' : 'flat-rate'}>
+                <TabsList style={{
+                    background: 'var(--dash-secondary-bg)',
+                    border: '1px solid var(--dash-border)',
+                    borderRadius: 14,
+                    padding: 4,
+                    height: 'auto',
+                    gap: 4,
+                }}>
+                    <TabsTrigger
+                        value="flat-rate"
+                        className="flex items-center gap-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm"
+                        style={{ borderRadius: 10, padding: '10px 14px', height: 'auto' }}
+                    >
+                        <Calculator size={15} />
+                        <span className="font-semibold text-[14px]">Flat Rate</span>
+                        <StatusBadge live={flatRateLive} />
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="easyparcel"
+                        className="flex items-center gap-2 data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:shadow-sm"
+                        style={{ borderRadius: 10, padding: '10px 14px', height: 'auto' }}
+                    >
+                        <Truck size={15} />
+                        <span className="font-semibold text-[14px]">EasyParcel</span>
+                        <StatusBadge live={epLive} />
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="flat-rate">
+                    <div className="space-y-5 mt-5">
+                        <ShippingRatesCard
+                            westRateRm={westRateRm}
+                            eastRateRm={eastRateRm}
+                            freeEnabled={freeEnabled}
+                            freeAboveRm={freeAboveRm}
+                            onWestChange={v => { setWestRateRm(v); setWestRateError('') }}
+                            onEastChange={v => { setEastRateRm(v); setEastRateError('') }}
+                            westError={westRateError}
+                            eastError={eastRateError}
+                            onWestBlur={handleWestBlur}
+                            onEastBlur={handleEastBlur}
+                            westWarning={westRateWarning}
+                            eastWarning={eastRateWarning}
+                            helperText={s.helperRange}
+                        />
+                        <FreeShippingCard
+                            freeEnabled={freeEnabled}
+                            freeAboveRm={freeAboveRm}
+                            freeAboveError={freeAboveError}
+                            onToggle={v => { setFreeEnabled(v); if (!v) { setFreeAboveError(''); setFreeAboveWarning('') } }}
+                            onAmountChange={v => { setFreeAboveRm(v); setFreeAboveError('') }}
+                            onAmountBlur={handleFreeBlur}
+                            freeAboveWarning={freeAboveWarning}
+                        />
+                    </div>
+                    <SettingsFooter
+                        isDirty={isDirty}
+                        isSaving={isSaving}
+                        lastSaveSucceeded={lastSaveSucceeded}
+                        onReset={handleReset}
+                        onSave={handleSave}
+                    />
+                </TabsContent>
+                <TabsContent value="easyparcel">
+                    <EasyParcelSettingsTab tenantId={tenantId} initialEpConfig={epConfig} />
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }
