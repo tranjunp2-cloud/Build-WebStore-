@@ -68,9 +68,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // Warehouse fields
     const wh = initialEpConfig?.warehouse ?? {}
     const [whName, setWhName] = useState(wh.name ?? '')
-    const [whPhone, setWhPhone] = useState(wh.phone ?? '')
     const [whAddr1, setWhAddr1] = useState(wh.address1 ?? '')
-    const [whAddr2, setWhAddr2] = useState(wh.address2 ?? '')
     const [whCity, setWhCity] = useState(wh.city ?? '')
     const [whState, setWhState] = useState(wh.state ?? '')
     const [whPostcode, setWhPostcode] = useState(wh.postcode ?? '')
@@ -228,9 +226,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                     enabled,
                     warehouse: {
                         name: whName,
-                        phone: whPhone,
                         address1: whAddr1,
-                        address2: whAddr2,
                         city: whCity,
                         state: whState,
                         postcode: whPostcode,
@@ -333,7 +329,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // --- Full settings (EP enabled) ---
     const hasWarehouse = !!(whName || whAddr1 || whPostcode)
     const credentialsLocked = testStatus === 'connected' && !editingCredentials
-    const warehouseAddress = [whAddr1, whAddr2, whCity, whPostcode, whState].filter(Boolean).join(', ')
+    const warehouseAddress = [whAddr1, whCity, whPostcode, whState].filter(Boolean).join(', ')
 
     return (
         <div className="mt-5 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
@@ -490,23 +486,18 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="flex flex-col gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
                                 <Input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
                                     placeholder="e.g. HQ Warehouse" className="min-h-[40px] rounded-[10px]" />
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-phone" className="text-[12px] text-[var(--dash-text)]">Phone</Label>
-                                <Input id="wh-phone" value={whPhone} onChange={e => setWhPhone(e.target.value)}
-                                    placeholder="e.g. 601112345678" className="min-h-[40px] rounded-[10px]" />
-                            </div>
-                            <div className="flex flex-col gap-1.5 sm:col-span-2">
                                 <Label htmlFor="wh-addr1" className="text-[12px] text-[var(--dash-text)]">Address line 1</Label>
                                 <Input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
                                     placeholder="Address line 1" className="min-h-[40px] rounded-[10px]" />
                             </div>
-                            <div className="sm:col-span-2 grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-3 gap-3">
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
                                     <select id="wh-state" value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}
