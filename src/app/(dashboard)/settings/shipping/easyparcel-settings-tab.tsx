@@ -5,7 +5,6 @@ import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, W
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 
 // Matches TableSearch input style (Orders page standard)
 const EP_INPUT = "w-full h-9 rounded-md px-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)] placeholder:text-[var(--dash-text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -350,7 +349,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </p>
                     </div>
                 </div>
-                <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Enable EasyParcel" />
+                <button
+                    type="button"
+                    aria-pressed={enabled}
+                    onClick={() => setEnabled(v => !v)}
+                    className={`w-[44px] h-[24px] rounded-full border relative transition-all duration-200 shrink-0${!enabled ? ' bg-white/10 border-white/[0.08]' : ''}`}
+                    style={enabled ? {
+                        background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)',
+                        boxShadow: '0 0 12px hsl(var(--info)/0.40)',
+                        borderColor: 'transparent',
+                    } : undefined}
+                >
+                    <span className={`absolute top-1/2 -translate-y-1/2 left-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200${enabled ? ' translate-x-[20px]' : ''}`} />
+                </button>
             </div>
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
