@@ -4,6 +4,10 @@ const MAX_WIDTH = 1920
 export async function compressImage(file: File): Promise<File> {
     return new Promise((resolve) => {
         const img = new Image()
+        img.onerror = () => {
+            URL.revokeObjectURL(img.src)
+            resolve(file)
+        }
         img.onload = () => {
             URL.revokeObjectURL(img.src)
             if (img.width <= MAX_WIDTH && file.size <= MAX_SIZE) {
