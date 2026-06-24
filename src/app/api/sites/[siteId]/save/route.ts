@@ -279,6 +279,10 @@ export async function PATCH(
 
                     console.warn(`[Save] Retry without image refs after: ${errMsg.slice(0, 160)}`)
                     cleanupNonNumericImageFields(normalizedBlocks as Record<string, unknown>[])
+                    // Only strip logo-cloud logos[] image refs when the FK error is logo-related.
+                    // Stripping valid logo Media IDs due to an unrelated block FK error silently
+                    // destroys all logo images (200 response, data gone).
+                    const isLogoFkError = /pages_blocks_logo_cloud|pages_v_blocks_logo_cloud/i.test(errMsg)
                     for (const block of normalizedBlocks as Record<string, unknown>[]) {
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') delete block[field]
@@ -289,6 +293,8 @@ export async function PATCH(
                             for (const item of arr as Record<string, unknown>[]) {
                                 if (item && typeof item === 'object') {
                                     for (const f of ['image', 'logo', 'avatar']) {
+                                        // Don't wipe valid logo Media IDs unless the FK error is logos-related
+                                        if (arrayField === 'logos' && f === 'logo' && !isLogoFkError) continue
                                         if (typeof item[f] === 'number') delete item[f]
                                     }
                                 }

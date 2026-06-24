@@ -4827,6 +4827,11 @@ const MIGRATIONS = [
     name: 'media.square',
     sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS square varchar;`,
   },
+  // ── GH-1350: orders locale snapshot ──
+  {
+    name: 'orders.locale',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {

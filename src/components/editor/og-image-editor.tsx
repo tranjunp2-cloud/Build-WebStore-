@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useRef } from 'react'
 import { Loader2, Upload, X } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 interface OgImageEditorProps {
     currentOgImage?: string | null
@@ -18,7 +18,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
     const { t } = useI18n()
     const oi = t.editor.ogImageEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -28,13 +28,12 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
         }
-        setIsUploading(true)
         try {
             const processed = await processImageFile(file)
             const formData = new FormData()
             formData.append('file', processed)
             formData.append('alt', oi.alt)
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await upload(formData)
             if (!uploaded?.url) throw new Error('Upload returned no URL')
             if (!uploaded?.id) throw new Error('Upload returned no media ID')
             onOgImageChange(uploaded.id as number, uploaded.url as string)
@@ -43,7 +42,6 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
             console.error('OG image upload failed', err)
             toast.error(oi.error)
         } finally {
-            setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
@@ -85,8 +83,16 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
                 >
                     {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />}
                     <span className="text-xs font-medium text-[var(--editor-text-muted)]">
-                        {isUploading ? oi.uploading : oi.clickToUpload}
+                        {isUploading ? `${oi.uploading} ${progress}%` : oi.clickToUpload}
                     </span>
+                    {isUploading && (
+                        <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-blue-500/70 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    )}
                 </button>
             )}
             <p className="text-[10px] text-slate-500">{oi.hint}</p>

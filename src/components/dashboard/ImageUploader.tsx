@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Upload, X, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 export type UploadedImage = {
     id: string | number
@@ -38,6 +38,7 @@ export function ImageUploader({
     const [isUploading, setIsUploading] = useState(false)
     const [dragActive, setDragActive] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const { upload, progress, isUploading: fileUploading } = useUploadProgress()
 
     const handleUpload = async (files: FileList | File[]) => {
         if (value.length + files.length > maxImages) {
@@ -66,9 +67,8 @@ export function ImageUploader({
             try {
                 const formData = new FormData()
                 formData.append('file', file)
-                // Payload parses _payload for extra data, but we pass alt directly in the action.
 
-                const data = await uploadMediaAction(formData)
+                const data = await upload(formData)
                 const uploadedDoc = data
 
                 if (!uploadedDoc?.id || !uploadedDoc?.url) {
@@ -174,7 +174,17 @@ export function ImageUploader({
                         onClick={() => fileInputRef.current?.click()}
                     >
                         {isUploading ? (
-                            <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+                            <div className="flex flex-col items-center gap-2 w-full px-2">
+                                <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                                {fileUploading && (
+                                    <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-blue-500 transition-all duration-150"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <div className={cn("flex items-center justify-center", variant === 'square' ? "flex-col gap-2" : "flex-col gap-[6px]")}>
                                 <Upload className={cn("w-6 h-6", dragActive ? "text-blue-500" : "text-[#F8FAFC]/40")} />

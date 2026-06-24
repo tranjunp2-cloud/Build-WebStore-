@@ -329,6 +329,7 @@ export async function POST(request: Request) {
                     discountCode: discountRow.code,
                     discountAmount: discountSen,
                 } : {}),
+                locale: (site as any).locale ?? 'en',
             } as any,
         })
 
@@ -506,13 +507,13 @@ export async function POST(request: Request) {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`)
         const dashboardOrderUrl = `${baseUrl}/orders`
-        const siteLocale = (site as any).locale ?? 'ms'
+        const siteLocale = (site as any).locale ?? 'en'
 
         // COD: confirmation to buyer + new-order notification to seller(s)
         if (paymentMethod === 'cod') {
             const [codCmsConfig, sellerCmsConfig] = await Promise.all([
                 getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale),
-                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale),
             ])
 
             if (codCmsConfig?.enabled === false) {
@@ -577,7 +578,7 @@ export async function POST(request: Request) {
             const pcConfig = (site as any).paymentConfig
             const [btCmsConfig, btSellerCmsConfig] = await Promise.all([
                 getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', siteLocale),
-                getTemplateConfig(tenantId, 'new-order-seller', 'seller'),
+                getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale),
             ])
 
             if (btCmsConfig?.enabled === false) {

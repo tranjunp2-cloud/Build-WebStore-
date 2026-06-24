@@ -1,7 +1,6 @@
 import type { Payload } from 'payload'
 import { sendEmail } from '@/lib/email/send'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
-import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
@@ -31,6 +30,8 @@ export interface PaidOrderDoc {
     discountAmount?: number | null
     notes?: string | null
     createdAt?: string
+    /** Locale snapshot at order creation — used for buyer emails. */
+    locale?: string | null
     site?: string | number | { id: string | number; locale?: string }
     items: Array<{
         product: string | number | { id: string | number }
@@ -54,18 +55,17 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
     const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
     const tenantTyped = tenantDoc as unknown as TenantDoc | null
     const shopName = tenantTyped?.name ?? ''
-    const ownerEmails = await getTenantOwnerEmails(payload, tenantId)
-    const supportEmail = ownerEmails[0] ?? ''
+    const supportEmail = (await getTenantOwnerEmails(payload, tenantId))[0] ?? ''
     const siteSlug = tenantTyped?.slug ?? ''
     const orderPageUrl = buildStorefrontUrl(siteSlug, `/orders/${order.orderNumber}`)
-    const dashboardOrderUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/orders`
-    const siteLocale = (typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms') as 'en' | 'ms'
-
+    // Buyer locale: immutable snapshot at checkout. Fallback for legacy orders without field.
+    const buyerLocale: 'en' | 'ms' = (
+        order.locale
+        ?? (typeof order.site === 'object' ? (order.site as { locale?: string })?.locale : null)
+        ?? 'en'
+    ) as 'en' | 'ms'
     try {
-        const [buyerCmsConfig, sellerCmsConfig] = await Promise.all([
-            getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale),
-            getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale),
-        ])
+        const buyerCmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', buyerLocale).catch(() => null)
 
         if (buyerCmsConfig?.enabled === false) {
             console.log('[Reconcile] suppressed (disabled): order-confirmation')
@@ -97,7 +97,7 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 orderPageUrl,
                 currency: order.currency || 'MYR',
                 buyerNote: order.notes ?? null,
-                locale: siteLocale,
+                locale: buyerLocale,
             }, buyerCmsConfig ?? undefined)
 
             const sent = await sendEmail({ to: order.customerEmail, subject: emailData.subject, html: emailData.html })
@@ -106,28 +106,6 @@ export async function sendOrderPaidEmailsAndNotify(payload: Payload, order: Paid
                 : `[Reconcile] Confirmation email failed for ${order.customerEmail}`)
         }
 
-        if (sellerCmsConfig?.enabled === false) {
-            console.log('[Reconcile] suppressed (disabled): new-order-seller')
-        } else {
-            const seller = newOrderSellerEmail({
-                shopName,
-                orderNumber: order.orderNumber,
-                customerName: order.customerName,
-                orderPageUrl: dashboardOrderUrl,
-                items: (order.items || []).map((item) => ({
-                    name: item.productName ?? '',
-                    variant: item.variant || undefined,
-                    quantity: item.quantity,
-                    lineTotal: (item.unitPrice ?? 0) * item.quantity,
-                })),
-                orderTotal: order.total,
-                shippingFee: order.shippingFee ?? 0,
-                currency: order.currency || 'MYR',
-                locale: siteLocale,
-            }, sellerCmsConfig ?? undefined)
-            ownerEmails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
-                .catch((err: unknown) => console.error('[Reconcile] seller email failed', err)))
-        }
     } catch (emailErr) {
         console.error('[Reconcile] Failed to send confirmation email:', emailErr)
     }

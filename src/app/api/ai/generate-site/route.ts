@@ -2090,11 +2090,6 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             }
         }
 
-        // ── Logo Cloud: strip logos (needs real media) ──
-        if (sanitized.blockType === 'logo-cloud') {
-            sanitized.logos = []
-        }
-
         // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
         if (sanitized.blockType === 'google-maps') {
             if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
@@ -2227,6 +2222,14 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     items,
                 }
             })
+        }
+
+        // ── Logo Cloud: normalize logos[].name from AI-gen field variants ──
+        if (sanitized.blockType === 'logo-cloud' && Array.isArray(sanitized.logos)) {
+            sanitized.logos = (sanitized.logos as AIBlock[]).map((item: AIBlock, i: number) => ({
+                ...item,
+                name: String(item.name || item.company || item.brand || item.title || `Partner ${i + 1}`),
+            }))
         }
 
         // ── Remove non-schema fields that AI might add ──

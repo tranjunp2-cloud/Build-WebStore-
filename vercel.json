@@ -4,10 +4,12 @@
   "regions": ["sin1"],
   "functions": {
     "src/app/api/**/*.ts": {
-      "maxDuration": 60
+      "maxDuration": 120,
+      "bodySizeLimit": "200mb"
     },
     "src/app/(payload)/api/[...slug]/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 120,
+      "bodySizeLimit": "200mb"
     },
     "src/app/(payload)/admin/[[...segments]]/page.tsx": {
       "maxDuration": 60

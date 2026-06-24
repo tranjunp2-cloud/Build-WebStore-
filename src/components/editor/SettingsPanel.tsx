@@ -19,6 +19,7 @@ import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
+import LogoCloudSettings from './LogoCloudSettings'
 import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
@@ -29,6 +30,7 @@ import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config
 import type { MenuCategory, MenuItem } from '@/blocks/menu-food/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
+import type { LogoCloudConfig } from '@/blocks/logo-cloud/config'
 import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
@@ -2298,6 +2300,14 @@ function SettingsPanelInner({
                             {bt === 'team' && block && (
                                 <TeamSettings
                                     block={block as TeamConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
+
+                            {bt === 'logo-cloud' && block && (
+                                <LogoCloudSettings
+                                    block={block as LogoCloudConfig}
                                     blockIndex={currentBlockIndex}
                                     onBlockUpdate={onBlockUpdate}
                                 />

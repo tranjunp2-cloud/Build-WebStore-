@@ -84,10 +84,14 @@ export async function POST(req: Request) {
             : null
         const tenantTyped = tenantDoc as unknown as TenantDoc | null
         const shopName = tenantTyped?.name ?? ''
-        const siteLocale = typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms'
+        const buyerLocale: 'en' | 'ms' = (
+            (order as any).locale
+            ?? (typeof order.site === 'object' ? (order.site as any)?.locale : null)
+            ?? 'en'
+        ) as 'en' | 'ms'
 
         const cmsConfig = tenantId
-            ? await getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', siteLocale as 'en' | 'ms')
+            ? await getTemplateConfig(tenantId, 'bank-transfer-instructions', 'buyer', buyerLocale as 'en' | 'ms')
             : null
 
         if (cmsConfig?.enabled === false) {
@@ -100,7 +104,7 @@ export async function POST(req: Request) {
                 orderNumber,
                 customerName: order.customerName ?? '',
                 resumeUrl,
-                locale: siteLocale,
+                locale: buyerLocale,
             })
 
             await payload.sendEmail({
