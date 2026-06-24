@@ -84,7 +84,11 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         if (!order.customerEmail) return
         const tenant = typeof order.tenant === 'object' ? order.tenant : null
         const tenantId = tenant ? String((tenant as any).id) : null
-        const refundLocale: 'en' | 'ms' = ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms'
+        const refundLocale: 'en' | 'ms' = (
+            (order as any).locale
+            ?? (typeof order.site === 'object' ? (order.site as any)?.locale : null)
+            ?? 'en'
+        ) as 'en' | 'ms'
         const cmsConfig = tenantId
             ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', refundLocale).catch(() => null)
             : null

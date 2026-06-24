@@ -143,7 +143,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
     it('[TC-F10.16-FIX-1] Cancellation email sent to customerEmail field', async () => {
         // updated is constructed from the pre-fetched order (no extra findByID after CAS).
         mockFindByID
-            .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe' })
+            .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe', locale: 'ms' })
         // CAS uses default (success). No mockUpdate — replaced by CAS.
 
         const req = { json: () => Promise.resolve({ reason: 'Customer request' }) } as unknown as Request
@@ -185,7 +185,8 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 paymentMethod: 'qr_banking',
                 paymentStatus: 'unpaid',
                 customerEmail: 'qr@test.com',
-                customerName: 'QR Customer'
+                customerName: 'QR Customer',
+                locale: 'ms',
             })
         // CAS uses default (success). updated constructed from order.
 
@@ -575,6 +576,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 paymentMethod: 'stripe', paymentStatus: 'paid',
                 stripePaymentIntentId: 'pi_test123',
                 items: [], customerEmail: 'buyer@test.com',
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s1', stripeAccountId: 'acct_test123' }) // tenant fetch
 
@@ -676,6 +678,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 id: 'stripe-order-5', status: 'confirmed',
                 paymentMethod: 'stripe', paymentStatus: 'paid',
                 stripePaymentIntentId: 'pi_already', items: [], customerEmail: 'buyer2@test.com',
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s5', stripeAccountId: 'acct_test123' })
 
@@ -708,6 +711,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 stripeSessionId: 'cs_test_abc',
                 // no stripePaymentIntentId
                 items: [],
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s6', stripeAccountId: 'acct_test123' }) // tenant fetch
 
@@ -748,6 +752,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 paymentProvider: 'xendit', paymentStatus: 'paid',
                 xenditPaymentRequestId: 'req_test123',
                 items: [], customerEmail: 'buyer-x@test.com',
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-x1', xenditSecretKey: 'xnd_secret_key' }) // tenant for Xendit
 
@@ -777,6 +782,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
             id: 'free-order-1', status: 'confirmed',
             paymentMethod: 'free', paymentStatus: 'paid',
             paymentProvider: undefined, items: [],
+            locale: 'ms',
         })
         mockUpdate.mockResolvedValue({ id: 'free-order-1', status: 'cancelled', paymentStatus: 'paid' })
 

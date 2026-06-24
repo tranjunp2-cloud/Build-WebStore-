@@ -116,9 +116,11 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                     const ownerEmails = await getTenantOwnerEmails(payload, tenantId ?? '')
                     const supportEmail = ownerEmails[0] ?? ''
                     const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
-                    const siteLocale = typeof (order as any).site === 'object'
-                        ? ((order as any).site?.locale ?? 'ms')
-                        : 'ms'
+                    const buyerLocale: 'en' | 'ms' = (
+                        (order as any).locale
+                        ?? (typeof (order as any).site === 'object' ? (order as any).site?.locale : null)
+                        ?? 'en'
+                    ) as 'en' | 'ms'
 
                     const orderItems = ((order as any).items ?? [] as Array<{ productName: string; variant?: string | null; quantity: number; unitPrice: number }>).map((item: { productName: string; variant?: string | null; quantity: number; unitPrice: number }) => ({
                         name: item.productName,
@@ -129,7 +131,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                     }))
 
                     if (newStatus === 'confirmed') {
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale)
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', buyerLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log('[Email] suppressed (disabled): order-confirmation (confirmed)')
                         } else {
@@ -152,14 +154,14 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 orderDate: (order as any).createdAt,
                                 orderPageUrl: buildStorefrontUrl(shopSlug, `/orders/${orderNumber}`),
                                 currency: (order as any).currency ?? 'MYR',
-                                locale: siteLocale,
+                                locale: buyerLocale,
                                 event: 'confirmed',
                             }, cmsConfig ?? undefined)
                             payload.sendEmail({ to: customerEmail, subject: richEmail.subject, html: richEmail.html })
                                 .catch((err: unknown) => console.error('[Email confirmed notify]', err))
                         }
                     } else if (newStatus === 'completed') {
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-completed', 'buyer', siteLocale)
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-completed', 'buyer', buyerLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log('[Email] suppressed (disabled): order-completed')
                         } else {
@@ -183,13 +185,13 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 orderPageUrl: buildStorefrontUrl(shopSlug, `/orders/${orderNumber}`),
                                 currency: (order as any).currency ?? 'MYR',
                                 buyerNote: (order as any).notes ?? null,
-                                locale: siteLocale,
+                                locale: buyerLocale,
                             }, cmsConfig ?? undefined)
                             payload.sendEmail({ to: customerEmail, subject: completedEmail.subject, html: completedEmail.html })
                                 .catch((err: unknown) => console.error('[Email completed notify]', err))
                         }
                     } else if (newStatus === 'cancelled') {
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-cancelled', 'buyer', buyerLocale)
                         if (cmsConfig?.enabled === false) {
                             console.log('[Email] suppressed (disabled): order-cancelled')
                         } else {
@@ -214,7 +216,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 cancellationNote: notes ?? (order as any).cancelReason ?? null,
                                 shopUrl: buildStorefrontUrl(shopSlug),
                                 currency: (order as any).currency ?? 'MYR',
-                                locale: siteLocale,
+                                locale: buyerLocale,
                             }, cmsConfig ?? undefined)
                             payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
                                 .catch((err: unknown) => console.error('[Email cancel notify]', err))

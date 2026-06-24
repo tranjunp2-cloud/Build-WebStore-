@@ -371,15 +371,17 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 const tenantId = typeof (updated as any).tenant === 'object'
                     ? (updated as any).tenant.id
                     : (updated as any).tenant
-                const siteLocale: 'en' | 'ms' = typeof (updated as any).site === 'object'
-                    ? ((updated as any).site?.locale ?? 'ms')
-                    : 'ms'
+                const buyerLocale: 'en' | 'ms' = (
+                    (updated as any).locale
+                    ?? (typeof (updated as any).site === 'object' ? (updated as any).site?.locale : null)
+                    ?? 'en'
+                ) as 'en' | 'ms'
                 const [tenant, cancelCmsConfig] = await Promise.all([
                     tenantId
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : Promise.resolve(null),
                     tenantId
-                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale).catch(() => null)
+                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', buyerLocale).catch(() => null)
                         : Promise.resolve(null),
                 ])
 
@@ -414,7 +416,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                         cancellationNote: reason ?? null,
                         shopUrl,
                         currency: (updated as any).currency ?? 'MYR',
-                        locale: siteLocale,
+                        locale: buyerLocale,
                     }, cancelCmsConfig ?? undefined)
                     payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
                         .catch((err: unknown) => console.warn('[Order Cancel] Failed to send cancelled email:', err))
@@ -424,7 +426,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 // (Stripe refund email is sent by the charge.refunded webhook instead.)
                 if (xenditRefundId) {
                     const refundCmsConfig = tenantId
-                        ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', siteLocale).catch(() => null)
+                        ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', buyerLocale).catch(() => null)
                         : null
                     if (refundCmsConfig?.enabled !== false) {
                         const refundEmail = orderRefundedEmail({
@@ -444,7 +446,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                             refundDate: new Date().toISOString(),
                             shopUrl,
                             currency: (updated as any).currency ?? 'MYR',
-                            locale: siteLocale,
+                            locale: buyerLocale,
                         }, refundCmsConfig ?? undefined)
                         payload.sendEmail({ to: customerEmail, subject: refundEmail.subject, html: refundEmail.html })
                             .catch((err: unknown) => console.warn('[Order Cancel] Failed to send refunded email (Xendit):', err))

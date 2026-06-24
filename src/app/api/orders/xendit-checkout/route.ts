@@ -8,6 +8,9 @@ import { XenditError } from '@/lib/payment/xendit-client'
 import { buildOrderItems } from '../stripe-checkout/build-order-items'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementOrderStock, restockAll } from './decrement-stock'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 
@@ -22,6 +25,7 @@ interface XenditTenantDoc {
 interface XenditSiteDoc {
     id: string | number
     tenant: string | number | { id: string | number }
+    locale?: string
 }
 
 function setCookieToken(res: NextResponse, orderId: string | number, orderNumber: string) {
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
                 tenant: tenantId, site: siteIdNum, orderNumber, items: orderItems,
                 subtotal, shippingFee, tax, total, currency,
                 status: 'pending', paymentStatus: 'awaiting_payment',
+                locale: siteTyped.locale ?? 'en',
                 paymentProvider: 'xendit',
                 paymentMethod: 'ewallet',
                 paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -159,9 +164,33 @@ export async function POST(request: NextRequest) {
             subtotal, shippingFee, total, currency, paymentMethod: 'xendit',
             event: 'placed', orderDate: new Date().toISOString(),
             orderPageUrl: buildStorefrontUrl(siteSlug, `/orders/${orderNumber}`),
+            locale: (siteTyped.locale ?? 'en') as 'en' | 'ms',
         })
         payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
             .catch((err) => console.error('[xendit-checkout] buyer email failed:', err))
+
+        // Fire-and-forget: notify seller of new order (place-order time, not payment-confirmed)
+        const siteLocale = (siteTyped.locale ?? 'en') as 'en' | 'ms'
+        const dashboardOrderUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/orders`
+        Promise.all([
+            getTenantOwnerEmails(payload, tenantId),
+            getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale).catch(() => null),
+        ]).then(([ownerEmails, sellerCmsConfig]) => {
+            if (sellerCmsConfig?.enabled === false) return
+            const sellerEmail = newOrderSellerEmail({
+                shopName,
+                orderNumber,
+                customerName: customer.name,
+                orderPageUrl: dashboardOrderUrl,
+                items: orderItems.map(i => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })),
+                orderTotal: order.total,
+                shippingFee,
+                currency,
+                locale: siteLocale,
+            }, sellerCmsConfig ?? undefined)
+            ownerEmails.forEach(to => payload.sendEmail({ to, subject: sellerEmail.subject, html: sellerEmail.html })
+                .catch((err: unknown) => console.error('[xendit-checkout] seller email failed:', err)))
+        }).catch((err: unknown) => console.error('[xendit-checkout] seller email setup failed:', err))
 
         const res = NextResponse.json({ success: true, data: { type: 'redirect', sessionUrl: invoice.invoice_url, orderId: order.id, orderNumber } })
         setCookieToken(res, order.id, orderNumber)
