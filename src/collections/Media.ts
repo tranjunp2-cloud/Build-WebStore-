@@ -128,13 +128,6 @@ export const Media: CollectionConfig = {
         //   3. If missing with no S3 → clean 404 (not 500)
         // Logs showed ~90 x 500/24h from this path alone.
         handlers: [mediaFileFallbackHandler],
-        imageSizes: [
-            { name: 'thumbnail', width: 400, height: 300, position: 'centre' },
-            { name: 'card', width: 768, height: 512, position: 'centre' },
-            { name: 'hero', width: 1920, height: 1080, position: 'centre' },
-            { name: 'square', width: 600, height: 600, position: 'centre' },
-        ],
-        adminThumbnail: 'thumbnail',
         mimeTypes: ['image/*', 'video/*', 'application/pdf'],
     },
     admin: {
