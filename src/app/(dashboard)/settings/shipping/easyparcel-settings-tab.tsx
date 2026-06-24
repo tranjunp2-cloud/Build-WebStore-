@@ -476,22 +476,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
                                 onClick={() => setSelectedCourier(courier.id)}
                                 className={[
-                                    'flex items-center gap-3 rounded-[12px] border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+                                    'relative flex flex-col gap-1 rounded-[12px] border py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
                                     isSelected
-                                        ? 'border-[hsl(var(--primary)/0.6)] bg-[hsl(var(--primary)/0.08)]'
-                                        : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15]',
+                                        ? 'border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.06)] pl-7 pr-4'
+                                        : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] px-4',
                                 ].join(' ')}>
-                                <div className={['flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
-                                    isSelected ? 'border-[hsl(var(--primary))]' : 'border-white/[0.3]'].join(' ')}>
-                                    {isSelected && <div className="h-[7px] w-[7px] rounded-full bg-[hsl(var(--primary))]" />}
-                                </div>
-                                <div>
-                                    <p className={['text-[13px] font-semibold',
-                                        isSelected ? 'text-[hsl(var(--primary))]' : 'text-[var(--dash-text)]'].join(' ')}>
-                                        {courier.name}
-                                    </p>
-                                    <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
-                                </div>
+                                {isSelected && (
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 h-[8px] w-[8px] rounded-full bg-[rgb(16,185,129)]" />
+                                )}
+                                <p className={['text-[13px] font-semibold',
+                                    isSelected ? 'text-[rgb(16,185,129)]' : 'text-[var(--dash-text)]'].join(' ')}>
+                                    {courier.name}
+                                </p>
+                                <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
                             </button>
                         )
                     })}
