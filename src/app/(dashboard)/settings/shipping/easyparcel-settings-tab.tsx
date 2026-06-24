@@ -457,43 +457,45 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 )}
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+            {testStatus === 'connected' && <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />}
 
-            {/* ─── Courier picker ────────────────────────────── */}
-            <div className="p-6 flex flex-col gap-4">
-                <div>
-                    <p className="text-[14px] font-semibold text-[var(--dash-text)]">
-                        Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
-                    </p>
-                    <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                        Buyers are quoted this courier's live rate. All listed couriers support COD.
-                    </p>
+            {/* ─── Courier picker — only after connection verified ── */}
+            {testStatus === 'connected' && (
+                <div className="p-6 flex flex-col gap-4">
+                    <div>
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">
+                            Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
+                            Buyers are quoted this courier's live rate. All listed couriers support COD.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {COURIERS.map(courier => {
+                            const isSelected = selectedCourier === courier.id
+                            return (
+                                <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
+                                    onClick={() => setSelectedCourier(courier.id)}
+                                    className={[
+                                        'relative flex flex-col gap-1 rounded-[12px] border py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+                                        isSelected
+                                            ? 'border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.06)] pl-7 pr-4'
+                                            : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] px-4',
+                                    ].join(' ')}>
+                                    {isSelected && (
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 h-[8px] w-[8px] rounded-full bg-[rgb(16,185,129)]" />
+                                    )}
+                                    <p className={['text-[13px] font-semibold',
+                                        isSelected ? 'text-[rgb(16,185,129)]' : 'text-[var(--dash-text)]'].join(' ')}>
+                                        {courier.name}
+                                    </p>
+                                    <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
+                                </button>
+                            )
+                        })}
+                    </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {COURIERS.map(courier => {
-                        const isSelected = selectedCourier === courier.id
-                        return (
-                            <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
-                                onClick={() => setSelectedCourier(courier.id)}
-                                className={[
-                                    'relative flex flex-col gap-1 rounded-[12px] border py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
-                                    isSelected
-                                        ? 'border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.06)] pl-7 pr-4'
-                                        : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] px-4',
-                                ].join(' ')}>
-                                {isSelected && (
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 h-[8px] w-[8px] rounded-full bg-[rgb(16,185,129)]" />
-                                )}
-                                <p className={['text-[13px] font-semibold',
-                                    isSelected ? 'text-[rgb(16,185,129)]' : 'text-[var(--dash-text)]'].join(' ')}>
-                                    {courier.name}
-                                </p>
-                                <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
+            )}
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
