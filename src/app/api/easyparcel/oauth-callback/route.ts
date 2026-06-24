@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { exchangeCodeForToken } from '@/lib/shipping/easyparcel/token-manager'
+import { walletBalance } from '@/lib/shipping/easyparcel/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,15 @@ export async function GET(request: NextRequest) {
         const tokens = await exchangeCodeForToken(code)
         const now = Date.now()
 
+        // Best-effort: fetch account identifier for display in settings UI
+        let accountName: string | undefined
+        try {
+            const wallet = await walletBalance(tokens.access_token)
+            if (wallet.data?.account_id) {
+                accountName = `EP #${wallet.data.account_id} · ${wallet.data.currency_code}`
+            }
+        } catch { /* non-critical — proceed without account name */ }
+
         await payload.update({
             collection: 'tenants',
             id: tenantId,
@@ -56,6 +66,7 @@ export async function GET(request: NextRequest) {
                     tokenRefreshExpiresAt: new Date(now + tokens.refresh_token_expires_in * 1000).toISOString(),
                     enabled: true,
                     testedAt: new Date().toISOString(),
+                    ...(accountName ? { accountName } : {}),
                 },
             } as any,
             overrideAccess: true,
