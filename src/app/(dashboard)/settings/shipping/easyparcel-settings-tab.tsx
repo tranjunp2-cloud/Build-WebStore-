@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+
+// Matches TableSearch input style (Orders page standard)
+const EP_INPUT = "w-full h-9 rounded-md px-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)] placeholder:text-[var(--dash-text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+const EP_INPUT_STYLE = { background: 'transparent', color: 'var(--dash-text)' } as const
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
@@ -385,14 +388,15 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                     <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: api</span>
                                 </div>
                                 <div className="relative">
-                                    <Input
+                                    <input
                                         id="ep-api-key"
                                         type={showApiKey ? 'text' : 'password'}
                                         autoComplete="off"
                                         placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter API Key'}
                                         value={apiKey}
                                         onChange={e => { setApiKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                        className="pr-10"
+                                        className={`${EP_INPUT} pr-10`}
+                                        style={EP_INPUT_STYLE}
                                     />
                                     <button type="button" aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
                                         onClick={() => setShowApiKey(v => !v)}
@@ -407,14 +411,15 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                     <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: authentication</span>
                                 </div>
                                 <div className="relative">
-                                    <Input
+                                    <input
                                         id="ep-auth-key"
                                         type={showAuthKey ? 'text' : 'password'}
                                         autoComplete="off"
                                         placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter Auth Key'}
                                         value={authKey}
                                         onChange={e => { setAuthKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                        className="pr-10"
+                                        className={`${EP_INPUT} pr-10`}
+                                        style={EP_INPUT_STYLE}
                                     />
                                     <button type="button" aria-label={showAuthKey ? 'Hide Auth Key' : 'Show Auth Key'}
                                         onClick={() => setShowAuthKey(v => !v)}
@@ -489,19 +494,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         <div className="flex flex-col gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
-                                <Input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
-                                    placeholder="e.g. HQ Warehouse" />
+                                <input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
+                                    placeholder="e.g. HQ Warehouse" className={EP_INPUT} style={EP_INPUT_STYLE} />
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="wh-addr1" className="text-[12px] text-[var(--dash-text)]">Address line 1</Label>
-                                <Input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
-                                    placeholder="Address line 1" />
+                                <input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
+                                    placeholder="Address line 1" className={EP_INPUT} style={EP_INPUT_STYLE} />
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
                                     <select id="wh-state" value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}
-                                        className="h-10 w-full rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 text-sm text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--ring))] focus:ring-1 focus:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
                                         <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
                                         {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                                     </select>
@@ -509,7 +514,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
                                     <select id="wh-city" value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}
-                                        className="h-10 w-full rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 text-sm text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--ring))] focus:ring-1 focus:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
                                         <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
                                         {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                                     </select>
@@ -517,7 +522,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
                                     <select id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)} disabled={!selectedDistrictId || postcodesLoading}
-                                        className="h-10 w-full rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 text-sm text-[hsl(var(--foreground))] focus:outline-none focus:border-[hsl(var(--ring))] focus:ring-1 focus:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
                                         <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
                                         {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
                                     </select>
