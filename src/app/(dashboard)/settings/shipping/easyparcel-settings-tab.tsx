@@ -420,23 +420,25 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                 <Input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
                                     placeholder="Address line 1" className="min-h-[40px] rounded-[10px]" />
                             </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
-                                <select id="wh-state" value={whState} onChange={e => setWhState(e.target.value)}
-                                    className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
-                                    <option value="">State</option>
-                                    {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
-                                <Input id="wh-city" value={whCity} onChange={e => setWhCity(e.target.value)}
-                                    placeholder="City" className="min-h-[40px] rounded-[10px]" />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
-                                <Input id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)}
-                                    placeholder="e.g. 47500" className="min-h-[40px] rounded-[10px]" maxLength={5} inputMode="numeric" />
+                            <div className="sm:col-span-2 grid grid-cols-3 gap-3">
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
+                                    <select id="wh-state" value={whState} onChange={e => setWhState(e.target.value)}
+                                        className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
+                                        <option value="">State</option>
+                                        {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
+                                    <Input id="wh-city" value={whCity} onChange={e => setWhCity(e.target.value)}
+                                        placeholder="City" className="min-h-[40px] rounded-[10px]" />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
+                                    <Input id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)}
+                                        placeholder="e.g. 47500" className="min-h-[40px] rounded-[10px]" maxLength={5} inputMode="numeric" />
+                                </div>
                             </div>
                         </div>
 
