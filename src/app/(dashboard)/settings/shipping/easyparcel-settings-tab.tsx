@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -348,10 +349,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                 Invalid credentials. Please check your API Key and Auth Key in your EasyParcel dashboard.
                             </div>
                         )}
-
-                        <p className="text-[11px] text-[var(--dash-text-muted)]">
-                            EasyParcel requires identity verification on their platform. Prime does not handle KYC.
-                        </p>
                     </>
                 )}
             </div>
@@ -443,10 +440,12 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             </div>
                         </div>
 
-                        <label className="flex items-center gap-2 text-[12px] text-[var(--dash-text-muted)] cursor-pointer select-none">
-                            <input type="checkbox" className="h-[14px] w-[14px] rounded" />
-                            Set as default pickup address
-                        </label>
+                        <div className="flex items-center gap-2">
+                            <Checkbox id="wh-default" />
+                            <label htmlFor="wh-default" className="text-[12px] text-[var(--dash-text-muted)] cursor-pointer select-none">
+                                Set as default pickup address
+                            </label>
+                        </div>
 
                         <div className="flex items-center justify-end gap-3">
                             {hasWarehouse && (
