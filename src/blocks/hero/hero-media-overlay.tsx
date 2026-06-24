@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState, useEffect, type ReactNode } from 'react'
+import { useRef, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 const parentToast = {
     success: (msg: string) => window.parent.postMessage({ type: 'SHOW_TOAST', variant: 'success', message: msg }, window.location.origin),
@@ -40,7 +41,7 @@ export function HeroMediaOverlay({
     const containerRef = useRef<HTMLDivElement>(null)
     const imageFileRef = useRef<HTMLInputElement>(null)
     const videoFileRef = useRef<HTMLInputElement>(null)
-    const [uploading, setUploading] = useState(false)
+    const { upload, progress, isUploading: uploading } = useUploadProgress()
     const [isTextEditing, setIsTextEditing] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
 
@@ -98,14 +99,12 @@ export function HeroMediaOverlay({
             parentToast.error('Only JPG, PNG, and WebP images are supported')
             return
         }
-        setUploading(true)
         try {
             const compressed = await compressImage(file)
             const formData = new FormData()
             formData.append('file', compressed)
             formData.append('alt', altText)
-            const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await upload(formData)
             // Strip ".url" suffix to get the Payload upload field root (e.g. "image.url" → "image").
             // Send a hydrated object {id, url} so the block renders immediately AND the save route
             // can extract the integer Media ID via normalizeUploadField.
@@ -115,7 +114,6 @@ export function HeroMediaOverlay({
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Upload failed')
         } finally {
-            setUploading(false)
             if (imageFileRef.current) imageFileRef.current.value = ''
         }
     }
@@ -128,13 +126,11 @@ export function HeroMediaOverlay({
             return
         }
         if (!videoField) return
-        setUploading(true)
         try {
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', 'Hero video')
-            const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await upload(formData)
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: update src in-place — no React re-render, no flicker
@@ -149,7 +145,6 @@ export function HeroMediaOverlay({
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Video upload failed')
         } finally {
-            setUploading(false)
             if (videoFileRef.current) videoFileRef.current.value = ''
         }
     }
@@ -166,10 +161,18 @@ export function HeroMediaOverlay({
             >
                 <div data-editor-control className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
                     {uploading ? (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Uploading...
-                        </span>
+                        <div className="flex flex-col gap-1.5 px-3 py-1.5 min-w-[160px]">
+                            <span className="flex items-center gap-1.5 text-sm font-medium text-white">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                {progress < 100 ? `Uploading... ${progress}%` : 'Processing...'}
+                            </span>
+                            <div className="h-1 w-full rounded-full bg-white/20 overflow-hidden">
+                                <div
+                                    className="h-full rounded-full bg-teal-400 transition-all duration-150"
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
+                        </div>
                     ) : (
                         <>
                             {showImageButton && (

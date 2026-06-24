@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 interface FaviconEditorProps {
     currentFavicon?: string | null
@@ -16,7 +16,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
     const fe = t.editor.faviconEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
     useEffect(() => {
@@ -45,13 +45,12 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
             return
         }
 
-        setIsUploading(true)
         try {
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', fe.altFavicon)
 
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await upload(formData)
             const faviconUrl = uploaded?.url
             if (!faviconUrl) throw new Error('Upload succeeded but returned no URL')
 
@@ -67,7 +66,6 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
             console.error('Favicon upload error:', error)
             toast.error(fe.error)
         } finally {
-            setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
@@ -135,8 +133,16 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
                         )}
                     </div>
                     <span className="text-xs font-medium leading-4 text-[var(--editor-text-muted)]">
-                        {isUploading ? fe.uploading : fe.clickToUpload}
+                        {isUploading ? `${fe.uploading} ${progress}%` : fe.clickToUpload}
                     </span>
+                    {isUploading && (
+                        <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-blue-500/70 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    )}
                 </button>
             )}
         </div>

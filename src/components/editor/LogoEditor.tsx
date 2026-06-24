@@ -5,7 +5,7 @@ import { Loader2, Trash2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import {
     Dialog,
     DialogContent,
@@ -25,7 +25,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
     const le = t.editor.logoEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [showRemoveDialog, setShowRemoveDialog] = useState(false)
 
@@ -39,8 +39,6 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
         const file = e.target.files?.[0]
         if (!file) return
 
-        setIsUploading(true)
-
         try {
             // 1. Process & compress logo
             const processed = await processImageFile(file)
@@ -49,12 +47,12 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
-            // 2. Upload logo via server action (same as product form)
+            // 2. Upload logo via XHR (tracks progress)
             const formData = new FormData()
             formData.append('file', processed)
             formData.append('alt', le.altSiteLogo)
 
-            const uploadedLogo = await uploadMediaAction(formData)
+            const uploadedLogo = await upload(formData)
             const logoUrl = uploadedLogo.url as string
 
             onLogoChange(logoUrl)
@@ -63,7 +61,6 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             console.error('Logo upload error:', error)
             toast.error(le.error)
         } finally {
-            setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
@@ -132,8 +129,16 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                         )}
                     </div>
                     <span className="text-xs font-medium leading-4 text-[var(--editor-text-muted)]">
-                        {isUploading ? le.uploading : le.clickToUpload}
+                        {isUploading ? `${le.uploading} ${progress}%` : le.clickToUpload}
                     </span>
+                    {isUploading && (
+                        <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-blue-500/70 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    )}
                 </button>
             )}
             <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
