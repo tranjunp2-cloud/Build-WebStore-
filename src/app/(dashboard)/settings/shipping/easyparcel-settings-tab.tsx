@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Package, Truck, ShieldCheck, Zap, Timer, Wallet, Printer } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import { MY_STATES } from '@/lib/shipping'
 
 interface WarehouseData {
@@ -79,6 +78,10 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     )
 
     const [isSaving, setIsSaving] = useState(false)
+    const [editingCredentials, setEditingCredentials] = useState(false)
+    const [showAddressForm, setShowAddressForm] = useState(
+        !(initialEpConfig?.warehouse?.name || initialEpConfig?.warehouse?.address1),
+    )
 
     // Credentials already set (server never returns them, but testedAt signals they exist)
     const credentialsAlreadySet = Boolean(initialEpConfig?.testedAt)
@@ -119,6 +122,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             }
             setDetectedEnv(json.data.env)
             setTestStatus('connected')
+            setEditingCredentials(false)
             toast.success(`Connected to EasyParcel (${json.data.env})`)
         } catch {
             setTestStatus('idle')
@@ -238,286 +242,285 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     // --- Full settings (EP enabled) ---
-    return (
-        <div className="mt-5 flex flex-col gap-5">
-            {/* Header toggle */}
-            <div className="flex items-center justify-between rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] p-5">
-                <div>
-                    <span className="text-[15px] font-semibold text-[var(--dash-text)]">EasyParcel Integration</span>
-                    <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                        Disable to fall back to flat-rate shipping.
-                    </p>
-                </div>
-                <Switch
-                    checked={enabled}
-                    onCheckedChange={setEnabled}
-                    aria-label="Enable EasyParcel"
-                />
-            </div>
+    const hasWarehouse = !!(whName || whAddr1 || whPostcode)
+    const credentialsLocked = testStatus === 'connected' && !editingCredentials
+    const warehouseAddress = [whAddr1, whAddr2, whCity, whPostcode, whState].filter(Boolean).join(', ')
 
-            {/* 1. Connect card */}
-            <div className="flex flex-col gap-4 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] p-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">
-                        <ShieldCheck className="h-4 w-4 text-[hsl(var(--primary))]" />
+    return (
+        <div className="mt-5 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
+
+            {/* ─── Header ───────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-4 p-6">
+                <div className="flex items-center gap-4">
+                    <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.2)] shrink-0">
+                        <Zap className="h-6 w-6 text-[rgb(16,185,129)]" />
                     </div>
                     <div>
-                        <h4 className="text-[15px] font-semibold text-[var(--dash-text)]">API Credentials</h4>
-                        <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Find these in your EasyParcel dashboard → Settings → API.
+                        <h3 className="text-[18px] font-bold text-[var(--dash-text)]">Connect EasyParcel</h3>
+                        <p className="mt-1 text-[13px] text-[var(--dash-text-muted)]">
+                            Each store uses its own EasyParcel account. Charges are deducted straight from your wallet — no platform markup.
                         </p>
                     </div>
-                    {testStatus === 'connected' && (
-                        <Badge className="ml-auto bg-[hsl(var(--success)/0.15)] text-[hsl(var(--success))] border-[hsl(var(--success)/0.3)] border">
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Connected{detectedEnv ? ` (${detectedEnv})` : ''}
-                        </Badge>
+                </div>
+                <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Enable EasyParcel" />
+            </div>
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+            {/* ─── API Credentials ──────────────────────────── */}
+            <div className="p-6 flex flex-col gap-4">
+                {credentialsLocked ? (
+                    <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                        <div className="flex items-center gap-3">
+                            <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
+                            <div>
+                                <p className="text-[13px] font-medium text-[var(--dash-text)]">Credentials locked while connected</p>
+                                {detectedEnv && (
+                                    <p className="text-[12px] text-[var(--dash-text-muted)]">
+                                        Environment: <span className="text-[rgb(16,185,129)]">{detectedEnv}</span>
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { setEditingCredentials(true); setTestStatus('idle') }}
+                            className="flex items-center gap-1.5 shrink-0"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit credentials
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="ep-api-key" className="text-[13px] text-[var(--dash-text)]">API Key</Label>
+                                    <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: api</span>
+                                </div>
+                                <div className="relative">
+                                    <Input
+                                        id="ep-api-key"
+                                        type={showApiKey ? 'text' : 'password'}
+                                        autoComplete="off"
+                                        placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter API Key'}
+                                        value={apiKey}
+                                        onChange={e => { setApiKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
+                                        className="pr-10 min-h-[44px] rounded-[10px]"
+                                    />
+                                    <button type="button" aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
+                                        onClick={() => setShowApiKey(v => !v)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors">
+                                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="ep-auth-key" className="text-[13px] text-[var(--dash-text)]">Auth Key</Label>
+                                    <span className="text-[11px] text-[var(--dash-text-muted)]">ⓘ Field: authentication</span>
+                                </div>
+                                <div className="relative">
+                                    <Input
+                                        id="ep-auth-key"
+                                        type={showAuthKey ? 'text' : 'password'}
+                                        autoComplete="off"
+                                        placeholder={credentialsAlreadySet ? '•••••••••••••••••' : 'Enter Auth Key'}
+                                        value={authKey}
+                                        onChange={e => { setAuthKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
+                                        className="pr-10 min-h-[44px] rounded-[10px]"
+                                    />
+                                    <button type="button" aria-label={showAuthKey ? 'Hide Auth Key' : 'Show Auth Key'}
+                                        onClick={() => setShowAuthKey(v => !v)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors">
+                                        {showAuthKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {testStatus === 'invalid' && (
+                            <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--destructive))]">
+                                <XCircle className="h-4 w-4 shrink-0" />
+                                Invalid credentials. Please check your API Key and Auth Key in your EasyParcel dashboard.
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" onClick={handleTestConnection} disabled={testStatus === 'testing'} className="min-w-[160px]">
+                                {testStatus === 'testing' ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Testing connection…</>
+                                ) : editingCredentials ? (
+                                    'Re-test Connection'
+                                ) : (
+                                    'Test Connection'
+                                )}
+                            </Button>
+                            <p className="text-[11px] text-[var(--dash-text-muted)]">
+                                EasyParcel requires identity verification on their platform. Prime does not handle KYC.
+                            </p>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+            {/* ─── Pickup Addresses ─────────────────────────── */}
+            <div className="p-6 flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">
+                            Pickup addresses <span className="text-[var(--dash-text-muted)] font-normal">· origin</span>
+                        </p>
+                        <p className="mt-1 text-[12px] text-[var(--dash-text-muted)]">
+                            Saved warehouse / pickup locations — used for calculating charges &amp; arranging pickup. PrimeWeb keeps them for you; the postcode validates during &ldquo;Test connection&rdquo;.
+                        </p>
+                    </div>
+                    {hasWarehouse && !showAddressForm && (
+                        <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)} className="shrink-0">
+                            + Add address
+                        </Button>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="ep-api-key" className="text-[13px] text-[var(--dash-text)]">
-                            API Key
-                        </Label>
-                        <div className="relative">
-                            <Input
-                                id="ep-api-key"
-                                type={showApiKey ? 'text' : 'password'}
-                                autoComplete="off"
-                                placeholder={credentialsAlreadySet ? '•••••••• (set)' : 'Enter API Key'}
-                                value={apiKey}
-                                onChange={e => { setApiKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                className="pr-10 min-h-[44px] rounded-[10px]"
-                            />
-                            <button
-                                type="button"
-                                aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
-                                onClick={() => setShowApiKey(v => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors"
-                            >
-                                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
+                {/* Address card */}
+                {hasWarehouse && !showAddressForm && (
+                    <div className="flex items-start gap-3 rounded-[12px] border border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.05)] p-4">
+                        <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 border-[hsl(var(--primary))]">
+                            <div className="h-[8px] w-[8px] rounded-full bg-[hsl(var(--primary))]" />
                         </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="ep-auth-key" className="text-[13px] text-[var(--dash-text)]">
-                            Auth Key
-                        </Label>
-                        <div className="relative">
-                            <Input
-                                id="ep-auth-key"
-                                type={showAuthKey ? 'text' : 'password'}
-                                autoComplete="off"
-                                placeholder={credentialsAlreadySet ? '•••••••• (set)' : 'Enter Auth Key'}
-                                value={authKey}
-                                onChange={e => { setAuthKey(e.target.value); if (testStatus !== 'idle') setTestStatus('idle') }}
-                                className="pr-10 min-h-[44px] rounded-[10px]"
-                            />
-                            <button
-                                type="button"
-                                aria-label={showAuthKey ? 'Hide Auth Key' : 'Show Auth Key'}
-                                onClick={() => setShowAuthKey(v => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] transition-colors"
-                            >
-                                {showAuthKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[13px] font-semibold text-[var(--dash-text)]">{whName || 'Pickup Warehouse'}</span>
+                                <span style={{ background: 'rgba(16,185,129,0.15)', color: 'rgb(16,185,129)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>Active</span>
+                            </div>
+                            {warehouseAddress && (
+                                <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">{warehouseAddress}</p>
+                            )}
                         </div>
-                    </div>
-                </div>
-
-                {testStatus === 'invalid' && (
-                    <div
-                        role="alert"
-                        className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--destructive))]"
-                    >
-                        <XCircle className="h-4 w-4 shrink-0" />
-                        Invalid credentials. Please check your API Key and Auth Key in your EasyParcel dashboard.
+                        <Button variant="ghost" size="sm" onClick={() => setShowAddressForm(true)} className="text-[12px] shrink-0">
+                            Edit
+                        </Button>
                     </div>
                 )}
 
-                <div className="flex items-center gap-3">
-                    <Button
-                        variant="outline"
-                        onClick={handleTestConnection}
-                        disabled={testStatus === 'testing'}
-                        className="min-w-[140px]"
-                    >
-                        {testStatus === 'testing' ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Testing…
-                            </>
-                        ) : testStatus === 'connected' ? (
-                            <>
-                                <CheckCircle2 className="mr-2 h-4 w-4 text-[hsl(var(--success))]" />
-                                Re-test Connection
-                            </>
-                        ) : (
-                            'Test Connection'
-                        )}
-                    </Button>
-                    <p className="text-[11px] text-[var(--dash-text-muted)]">
-                        EasyParcel requires identity verification on their platform. Prime does not handle KYC.
+                {/* Add / Edit inline form */}
+                {(showAddressForm || !hasWarehouse) && (
+                    <div className="rounded-[12px] border border-white/[0.08] bg-white/[0.02] p-5 flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 text-[var(--dash-text-muted)]" />
+                            <span className="text-[11px] font-bold tracking-widest text-[var(--dash-text-muted)] uppercase">
+                                {hasWarehouse ? 'Edit pickup address' : 'Add pickup address'}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
+                                <Input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
+                                    placeholder="e.g. HQ Warehouse" className="min-h-[40px] rounded-[10px]" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="wh-phone" className="text-[12px] text-[var(--dash-text)]">Phone</Label>
+                                <Input id="wh-phone" value={whPhone} onChange={e => setWhPhone(e.target.value)}
+                                    placeholder="e.g. 601112345678" className="min-h-[40px] rounded-[10px]" />
+                            </div>
+                            <div className="flex flex-col gap-1.5 sm:col-span-2">
+                                <Label htmlFor="wh-addr1" className="text-[12px] text-[var(--dash-text)]">Address line 1</Label>
+                                <Input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
+                                    placeholder="Address line 1" className="min-h-[40px] rounded-[10px]" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
+                                <select id="wh-state" value={whState} onChange={e => setWhState(e.target.value)}
+                                    className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option value="">State</option>
+                                    {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
+                                <Input id="wh-city" value={whCity} onChange={e => setWhCity(e.target.value)}
+                                    placeholder="City" className="min-h-[40px] rounded-[10px]" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
+                                <Input id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)}
+                                    placeholder="e.g. 47500" className="min-h-[40px] rounded-[10px]" maxLength={5} inputMode="numeric" />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-1">
+                            {hasWarehouse && (
+                                <Button variant="ghost" size="sm" onClick={() => setShowAddressForm(false)}>Cancel</Button>
+                            )}
+                            <Button size="sm" onClick={() => setShowAddressForm(false)}
+                                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600 }}
+                                className="flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {hasWarehouse ? 'Update address' : 'Add address'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+            {/* ─── Courier picker ────────────────────────────── */}
+            <div className="p-6 flex flex-col gap-4">
+                <div>
+                    <p className="text-[14px] font-semibold text-[var(--dash-text)]">
+                        Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
+                        Buyers are quoted this courier's live rate. All listed couriers support COD.
                     </p>
                 </div>
-            </div>
-
-            {/* 2. Warehouse form */}
-            <div className="flex flex-col gap-4 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] p-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">
-                        <Package className="h-4 w-4 text-[hsl(var(--primary))]" />
-                    </div>
-                    <div>
-                        <h4 className="text-[15px] font-semibold text-[var(--dash-text)]">Pickup Warehouse</h4>
-                        <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Default sender address for all shipments.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="wh-name" className="text-[13px] text-[var(--dash-text)]">Contact Name</Label>
-                        <Input
-                            id="wh-name"
-                            value={whName}
-                            onChange={e => setWhName(e.target.value)}
-                            placeholder="e.g. Prime Store KL"
-                            className="min-h-[44px] rounded-[10px]"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="wh-phone" className="text-[13px] text-[var(--dash-text)]">Phone</Label>
-                        <Input
-                            id="wh-phone"
-                            value={whPhone}
-                            onChange={e => setWhPhone(e.target.value)}
-                            placeholder="e.g. 601112345678"
-                            className="min-h-[44px] rounded-[10px]"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <Label htmlFor="wh-addr1" className="text-[13px] text-[var(--dash-text)]">Address Line 1</Label>
-                        <Input
-                            id="wh-addr1"
-                            value={whAddr1}
-                            onChange={e => setWhAddr1(e.target.value)}
-                            placeholder="Street address"
-                            className="min-h-[44px] rounded-[10px]"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <Label htmlFor="wh-addr2" className="text-[13px] text-[var(--dash-text)]">Address Line 2 (optional)</Label>
-                        <Input
-                            id="wh-addr2"
-                            value={whAddr2}
-                            onChange={e => setWhAddr2(e.target.value)}
-                            placeholder="Unit, floor, etc."
-                            className="min-h-[44px] rounded-[10px]"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="wh-city" className="text-[13px] text-[var(--dash-text)]">City</Label>
-                        <Input
-                            id="wh-city"
-                            value={whCity}
-                            onChange={e => setWhCity(e.target.value)}
-                            placeholder="e.g. Petaling Jaya"
-                            className="min-h-[44px] rounded-[10px]"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="wh-postcode" className="text-[13px] text-[var(--dash-text)]">Postcode</Label>
-                        <Input
-                            id="wh-postcode"
-                            value={whPostcode}
-                            onChange={e => setWhPostcode(e.target.value)}
-                            placeholder="e.g. 47500"
-                            className="min-h-[44px] rounded-[10px]"
-                            maxLength={5}
-                            inputMode="numeric"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="wh-state" className="text-[13px] text-[var(--dash-text)]">State</Label>
-                        <select
-                            id="wh-state"
-                            value={whState}
-                            onChange={e => setWhState(e.target.value)}
-                            className="min-h-[44px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring"
-                        >
-                            <option value="">Select state</option>
-                            {MY_STATES.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. Courier picker */}
-            <div className="flex flex-col gap-4 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] p-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] shrink-0">
-                        <Truck className="h-4 w-4 text-[hsl(var(--primary))]" />
-                    </div>
-                    <div>
-                        <h4 className="text-[15px] font-semibold text-[var(--dash-text)]">Default Courier</h4>
-                        <p className="text-[12px] text-[var(--dash-text-muted)]">
-                            Preferred courier for label generation. All support COD.
-                        </p>
-                    </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {COURIERS.map(courier => {
                         const isSelected = selectedCourier === courier.id
                         return (
-                            <button
-                                key={courier.id}
-                                type="button"
-                                role="radio"
-                                aria-checked={isSelected}
+                            <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
                                 onClick={() => setSelectedCourier(courier.id)}
                                 className={[
-                                    'flex flex-col gap-1.5 rounded-[12px] border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+                                    'flex items-center gap-3 rounded-[12px] border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
                                     isSelected
                                         ? 'border-[hsl(var(--primary)/0.6)] bg-[hsl(var(--primary)/0.08)]'
                                         : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15]',
-                                ].join(' ')}
-                            >
-                                <span className={[
-                                    'text-[13px] font-semibold',
-                                    isSelected ? 'text-[hsl(var(--primary))]' : 'text-[var(--dash-text)]',
                                 ].join(' ')}>
-                                    {courier.name}
-                                </span>
-                                <span className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</span>
+                                <div className={['flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-2',
+                                    isSelected ? 'border-[hsl(var(--primary))]' : 'border-white/[0.3]'].join(' ')}>
+                                    {isSelected && <div className="h-[7px] w-[7px] rounded-full bg-[hsl(var(--primary))]" />}
+                                </div>
+                                <div>
+                                    <p className={['text-[13px] font-semibold',
+                                        isSelected ? 'text-[hsl(var(--primary))]' : 'text-[var(--dash-text)]'].join(' ')}>
+                                        {courier.name}
+                                    </p>
+                                    <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
+                                </div>
                             </button>
                         )
                     })}
                 </div>
             </div>
 
-            {/* Save footer */}
-            <div className="flex items-center justify-between rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] px-5 py-4">
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+            {/* ─── Save footer ──────────────────────────────── */}
+            <div className="flex items-center justify-between gap-4 px-6 py-5">
                 <p className="text-[12px] text-[var(--dash-text-muted)]">
                     {testStatus !== 'connected'
-                        ? 'Test your connection before saving.'
-                        : 'All settings saved to your tenant profile.'}
+                        ? 'Test the connection successfully to enable saving.'
+                        : 'Settings saved to your tenant profile.'}
                 </p>
-                <Button
-                    onClick={handleSave}
-                    disabled={!canSave}
-                >
+                <Button onClick={handleSave} disabled={!canSave}>
                     {isSaving ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving…
-                        </>
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</>
                     ) : (
                         'Save Settings'
                     )}
