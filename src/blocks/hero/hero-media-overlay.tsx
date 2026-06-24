@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, type ReactNode } from 'react'
+import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 
