@@ -3587,17 +3587,26 @@
         },
         "logoEditor": {
             "success": "Logo dikemas kini",
-            "faviconGenerated": " & Favicon dijana",
             "error": "Gagal mengemas kini logo",
             "uploading": "Memuat naik...",
             "clickToUpload": "Klik untuk muat naik",
             "altSiteLogo": "Logo Laman",
-            "altFavicon": "Favicon",
             "remove": "Buang",
             "removeTitle": "Buang Logo",
             "confirmRemove": "Buang logo ini? Ini akan mengosongkan logo dari laman anda.",
             "replace": "Ganti",
             "cancel": "Batal"
+        },
+        "faviconEditor": {
+            "success": "Favicon dikemaskini",
+            "error": "Gagal muat naik favicon",
+            "uploading": "Sedang memuat naik...",
+            "clickToUpload": "Klik untuk muat naik",
+            "altFavicon": "Favicon Laman Web",
+            "remove": "Buang",
+            "replace": "Ganti",
+            "invalidFormat": "Hanya fail .ico dan .png diterima",
+            "tooLarge": "Fail mestilah 100KB atau lebih kecil"
         },
         "ogImageEditor": {
             "invalidFormat": "Hanya imej JPG, PNG, atau WebP diterima",
@@ -3658,6 +3667,7 @@
             "businessName": "Nama Perniagaan",
             "businessNamePlaceholder": "Syarikat Anda",
             "uploadLogo": "Muat Naik Logo",
+            "uploadFavicon": "Muat Naik Favicon",
             "contactInfo": "Maklumat Hubungan",
             "phone": "Telefon",
             "phonePlaceholder": "+60 12-345-6789",

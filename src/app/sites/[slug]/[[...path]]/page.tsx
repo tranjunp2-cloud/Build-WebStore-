@@ -214,9 +214,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const canonicalPath = pagePath ? `/${pagePath}` : ''
     const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
 
+    const DEFAULT_FAVICON = '/favicon.ico'
+    const faviconUrl = (site.branding as { favicon?: string } | undefined)?.favicon || DEFAULT_FAVICON
+
     return {
         title,
         description,
+        icons: { icon: faviconUrl },
         alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title: title ?? undefined,

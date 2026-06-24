@@ -3587,17 +3587,26 @@
         },
         "logoEditor": {
             "success": "Logo updated",
-            "faviconGenerated": " & Favicon generated",
             "error": "Failed to update logo",
             "uploading": "Uploading...",
             "clickToUpload": "Click to upload",
             "altSiteLogo": "Site Logo",
-            "altFavicon": "Favicon",
             "remove": "Remove",
             "removeTitle": "Remove Logo",
             "confirmRemove": "Remove this logo? This will clear the logo from your site.",
             "replace": "Replace",
             "cancel": "Cancel"
+        },
+        "faviconEditor": {
+            "success": "Favicon updated",
+            "error": "Failed to upload favicon",
+            "uploading": "Uploading...",
+            "clickToUpload": "Click to upload",
+            "altFavicon": "Site Favicon",
+            "remove": "Remove",
+            "replace": "Replace",
+            "invalidFormat": "Only .ico and .png files are accepted",
+            "tooLarge": "File must be 100KB or smaller"
         },
         "ogImageEditor": {
             "invalidFormat": "Only JPG, PNG, or WebP images are accepted",
@@ -3658,6 +3667,7 @@
             "businessName": "Business Name",
             "businessNamePlaceholder": "Your Company",
             "uploadLogo": "Upload Logo",
+            "uploadFavicon": "Upload Favicon",
             "contactInfo": "Contact Info",
             "phone": "Phone",
             "phonePlaceholder": "+60 12-345-6789",

@@ -77,6 +77,7 @@ const IMAGE_SIGNATURES = [
     { bytes: [0xFF, 0xD8, 0xFF], offset: 0 },                 // JPEG
     { bytes: [0x89, 0x50, 0x4E, 0x47], offset: 0 },           // PNG
     { bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },           // WebP (RIFF????WEBP)
+    { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0 },           // ICO
 ]
 
 export const Media: CollectionConfig = {
