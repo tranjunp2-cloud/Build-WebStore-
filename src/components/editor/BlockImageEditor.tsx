@@ -1,10 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { ImagePlus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { compressImage } from '@/lib/media/compress-image'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 interface BlockImageEditorProps {
     imageUrl: string
@@ -15,7 +15,7 @@ interface BlockImageEditorProps {
 
 export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextChange }: BlockImageEditorProps) {
     const fileRef = useRef<HTMLInputElement>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -26,21 +26,19 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             return
         }
 
-        setIsUploading(true)
         try {
             const compressed = await compressImage(file)
             const formData = new FormData()
             formData.append('file', compressed)
             formData.append('alt', altText || 'Block image')
 
-            const uploaded = await uploadMediaAction(formData)
-            onImageChange(uploaded.id, uploaded.url)
+            const uploaded = await upload(formData)
+            onImageChange(uploaded.id as number, uploaded.url as string)
             toast.success('Image updated')
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Failed to upload image'
             toast.error(msg)
         } finally {
-            setIsUploading(false)
             if (fileRef.current) fileRef.current.value = ''
         }
     }
@@ -61,8 +59,14 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
                     </div>
                 )}
                 {isUploading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 px-4">
                         <Loader2 className="h-6 w-6 animate-spin text-white" />
+                        <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-teal-400 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
                     </div>
                 )}
             </div>
