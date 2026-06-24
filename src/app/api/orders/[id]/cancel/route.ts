@@ -361,9 +361,10 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // Send email to customer.
-        // Xendit/Stripe paid orders that were auto-refunded → send refund email (mentions refund amount + ETA).
-        // All other orders → send standard cancellation email.
+        // Always send order-cancelled email first.
+        // Xendit paid orders: also send order-refunded immediately (refund confirmed synchronously;
+        // no Xendit refund webhook exists to send it later).
+        // Stripe paid orders: charge.refunded webhook sends order-refunded after Stripe confirms.
         const customerEmail = (updated as any).customerEmail
         if (customerEmail) {
             try {
@@ -373,32 +374,59 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 const siteLocale: 'en' | 'ms' = typeof (updated as any).site === 'object'
                     ? ((updated as any).site?.locale ?? 'ms')
                     : 'ms'
-                const emailTemplate = (xenditRefundId || stripeCasDone) ? 'order-refunded' : 'order-cancelled'
-                const [tenant, cmsConfig] = await Promise.all([
+                const [tenant, cancelCmsConfig] = await Promise.all([
                     tenantId
                         ? payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
                         : Promise.resolve(null),
                     tenantId
-                        ? getTemplateConfig(tenantId, emailTemplate, 'buyer', siteLocale)
+                        ? getTemplateConfig(tenantId, 'order-cancelled', 'buyer', siteLocale)
                         : Promise.resolve(null),
                 ])
 
-                if (cmsConfig?.enabled === false) {
-                    console.log(`[Email] suppressed (disabled): ${emailTemplate} (cancel route)`)
-                } else {
-                    const shopName = (tenant as any)?.name ?? ''
-                    const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
-                    const shopUrl = buildStorefrontUrl(shopSlug)
-                    const emailItems = ((updated as any).items ?? []).map((item: any) => ({
-                        name: item.productName,
-                        variant: item.variant || null,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                        lineTotal: item.quantity * item.unitPrice,
-                    }))
+                const shopName = (tenant as any)?.name ?? ''
+                const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
+                const shopUrl = buildStorefrontUrl(shopSlug)
+                const emailItems = ((updated as any).items ?? []).map((item: any) => ({
+                    name: item.productName,
+                    variant: item.variant || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
+                }))
 
-                    if (xenditRefundId || stripeCasDone) {
-                        // Refund email: buyer knows money is coming back
+                if (cancelCmsConfig?.enabled === false) {
+                    console.log('[Email] suppressed (disabled): order-cancelled (cancel route)')
+                } else {
+                    const cancelEmail = orderCancelledEmail({
+                        shopName,
+                        orderNumber: (updated as any).orderNumber ?? String(updated.id),
+                        customerName: (updated as any).customerName ?? '',
+                        customerEmail,
+                        customerPhone: (updated as any).customerPhone ?? null,
+                        customerAddress: (updated as any).shippingAddress ?? null,
+                        items: emailItems,
+                        subtotal: (updated as any).subtotal ?? 0,
+                        shippingFee: (updated as any).shippingFee ?? 0,
+                        total: (updated as any).total ?? 0,
+                        paymentMethod: (updated as any).paymentMethod ?? 'cod',
+                        orderDate: (updated as any).createdAt,
+                        cancellationDate: new Date().toISOString(),
+                        cancellationNote: reason ?? null,
+                        shopUrl,
+                        currency: (updated as any).currency ?? 'MYR',
+                        locale: siteLocale,
+                    }, cancelCmsConfig ?? undefined)
+                    payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
+                        .catch((err: unknown) => console.warn('[Order Cancel] Failed to send cancelled email:', err))
+                }
+
+                // Xendit refund confirmed synchronously — send refund email immediately.
+                // (Stripe refund email is sent by the charge.refunded webhook instead.)
+                if (xenditRefundId) {
+                    const refundCmsConfig = tenantId
+                        ? await getTemplateConfig(tenantId, 'order-refunded', 'buyer', siteLocale).catch(() => null)
+                        : null
+                    if (refundCmsConfig?.enabled !== false) {
                         const refundEmail = orderRefundedEmail({
                             shopName,
                             orderNumber: (updated as any).orderNumber ?? String(updated.id),
@@ -417,31 +445,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                             shopUrl,
                             currency: (updated as any).currency ?? 'MYR',
                             locale: siteLocale,
-                        }, cmsConfig ?? undefined)
+                        }, refundCmsConfig ?? undefined)
                         payload.sendEmail({ to: customerEmail, subject: refundEmail.subject, html: refundEmail.html })
-                            .catch((err: unknown) => console.warn('[Order Cancel] Failed to send refund email:', err))
-                    } else {
-                        const cancelEmail = orderCancelledEmail({
-                            shopName,
-                            orderNumber: (updated as any).orderNumber ?? String(updated.id),
-                            customerName: (updated as any).customerName ?? '',
-                            customerEmail,
-                            customerPhone: (updated as any).customerPhone ?? null,
-                            customerAddress: (updated as any).shippingAddress ?? null,
-                            items: emailItems,
-                            subtotal: (updated as any).subtotal ?? 0,
-                            shippingFee: (updated as any).shippingFee ?? 0,
-                            total: (updated as any).total ?? 0,
-                            paymentMethod: (updated as any).paymentMethod ?? 'cod',
-                            orderDate: (updated as any).createdAt,
-                            cancellationDate: new Date().toISOString(),
-                            cancellationNote: reason ?? null,
-                            shopUrl,
-                            currency: (updated as any).currency ?? 'MYR',
-                            locale: siteLocale,
-                        }, cmsConfig ?? undefined)
-                        payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
-                            .catch((err: unknown) => console.warn('[Order Cancel] Failed to send email:', err))
+                            .catch((err: unknown) => console.warn('[Order Cancel] Failed to send refunded email (Xendit):', err))
                     }
                 }
             } catch (emailErr) {

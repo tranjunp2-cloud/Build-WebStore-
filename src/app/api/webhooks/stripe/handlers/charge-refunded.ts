@@ -104,7 +104,8 @@ export async function handleChargeRefunded(
     const shopName = tenant?.name ?? 'Shop'
     const siteSlug = tenant?.slug ?? String((tenant as any)?.id ?? '')
 
-    const cmsConfig = await getTemplateConfig(String(tenantId), 'order-refunded', 'buyer').catch(() => null)
+    const siteLocale = ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms'
+    const cmsConfig = await getTemplateConfig(String(tenantId), 'order-refunded', 'buyer', siteLocale).catch(() => null)
     if (cmsConfig?.enabled === false) return
 
     const email = orderRefundedEmail({
@@ -130,7 +131,7 @@ export async function handleChargeRefunded(
         refundDate: new Date().toISOString(),
         shopUrl: buildStorefrontUrl(siteSlug),
         currency: order.currency ?? 'MYR',
-        locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
+        locale: siteLocale,
     }, cmsConfig ?? undefined)
 
     payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
