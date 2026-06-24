@@ -314,9 +314,9 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 {/* Footer */}
                 <div className="flex items-center gap-5 p-6">
                     <Button
+                        variant="dashPrimary" size="dash"
                         onClick={() => setEnabled(true)}
                         className="flex items-center gap-2 shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)', color: '#fff', fontWeight: 600, borderRadius: 10, padding: '10px 20px' }}
                     >
                         <Zap className="h-4 w-4" />
                         Setup Connection
