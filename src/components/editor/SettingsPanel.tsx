@@ -904,7 +904,6 @@ function SettingsPanelInner({
                         {([
                             { key: 'default', label: s.navVariantDefault },
                             { key: 'centered', label: s.navVariantCentered },
-                            { key: 'mega', label: s.navVariantMega },
                             { key: 'transparent', label: s.navVariantTransparent },
                             { key: 'sidebar', label: s.navVariantSidebar },
                             { key: 'floating', label: s.navVariantFloating },
