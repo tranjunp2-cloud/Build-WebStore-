@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { MY_STATES } from '@/lib/shipping'
+
+type GeoState = { id: number; name: string; state_code: string; zone: string }
+type GeoDistrict = { id: number; name: string }
 
 interface WarehouseData {
     name?: string
@@ -77,6 +79,16 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         initialEpConfig?.selectedCourier ?? 'flash',
     )
 
+    // Geo cascading: state → district → postcode (mirrors checkout logic)
+    const [states, setStates] = useState<GeoState[]>([])
+    const [statesLoading, setStatesLoading] = useState(true)
+    const [selectedStateId, setSelectedStateId] = useState('')
+    const [districts, setDistricts] = useState<GeoDistrict[]>([])
+    const [districtsLoading, setDistrictsLoading] = useState(false)
+    const [selectedDistrictId, setSelectedDistrictId] = useState('')
+    const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
+    const [postcodesLoading, setPostcodesLoading] = useState(false)
+
     const [isSaving, setIsSaving] = useState(false)
     const [editingCredentials, setEditingCredentials] = useState(false)
     const [couriersCount, setCouriersCount] = useState(0)
@@ -87,6 +99,80 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     // Credentials already set (server never returns them, but testedAt signals they exist)
     const credentialsAlreadySet = Boolean(initialEpConfig?.testedAt)
+
+    // Load states on mount
+    useEffect(() => {
+        fetch('/api/geo/states')
+            .then(r => r.json())
+            .then(data => setStates(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setStatesLoading(false))
+    }, [])
+
+    // Pre-populate state from existing warehouse data
+    useEffect(() => {
+        if (states.length > 0 && whState && !selectedStateId) {
+            const match = states.find(s => s.name === whState)
+            if (!match) return
+            setSelectedStateId(String(match.id))
+            setDistrictsLoading(true)
+            fetch(`/api/geo/districts?stateId=${match.id}`)
+                .then(r => r.json())
+                .then(data => setDistricts(Array.isArray(data) ? data : []))
+                .catch(() => {})
+                .finally(() => setDistrictsLoading(false))
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [states])
+
+    // Pre-populate district + postcode from existing warehouse data
+    useEffect(() => {
+        if (districts.length > 0 && whCity && !selectedDistrictId) {
+            const match = districts.find(d => d.name === whCity)
+            if (!match) return
+            setSelectedDistrictId(String(match.id))
+            setPostcodesLoading(true)
+            fetch(`/api/geo/postcodes?districtId=${match.id}`)
+                .then(r => r.json())
+                .then(data => setPostcodeOpts(Array.isArray(data) ? data : []))
+                .catch(() => {})
+                .finally(() => setPostcodesLoading(false))
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [districts])
+
+    const handleStateChange = (stateId: string) => {
+        setSelectedStateId(stateId)
+        const st = states.find(s => s.id === Number(stateId))
+        setWhState(st?.name || '')
+        setWhCity('')
+        setWhPostcode('')
+        setSelectedDistrictId('')
+        setDistricts([])
+        setPostcodeOpts([])
+        if (!stateId) return
+        setDistrictsLoading(true)
+        fetch(`/api/geo/districts?stateId=${stateId}`)
+            .then(r => r.json())
+            .then(data => setDistricts(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setDistrictsLoading(false))
+    }
+
+    const handleDistrictChange = (districtId: string) => {
+        setSelectedDistrictId(districtId)
+        const d = districts.find(dist => dist.id === Number(districtId))
+        setWhCity(d?.name || '')
+        setWhPostcode('')
+        setPostcodeOpts([])
+        if (!districtId) return
+        setPostcodesLoading(true)
+        fetch(`/api/geo/postcodes?districtId=${districtId}`)
+            .then(r => r.json())
+            .then(data => setPostcodeOpts(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setPostcodesLoading(false))
+    }
 
     const canSave = testStatus === 'connected' && !isSaving
 
@@ -423,21 +509,27 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             <div className="sm:col-span-2 grid grid-cols-3 gap-3">
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
-                                    <select id="wh-state" value={whState} onChange={e => setWhState(e.target.value)}
+                                    <select id="wh-state" value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}
                                         className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
-                                        <option value="">State</option>
-                                        {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
+                                        {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
-                                    <Input id="wh-city" value={whCity} onChange={e => setWhCity(e.target.value)}
-                                        placeholder="City" className="min-h-[40px] rounded-[10px]" />
+                                    <select id="wh-city" value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}
+                                        className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
+                                        <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
+                                        {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                                    </select>
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
-                                    <Input id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)}
-                                        placeholder="e.g. 47500" className="min-h-[40px] rounded-[10px]" maxLength={5} inputMode="numeric" />
+                                    <select id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)} disabled={!selectedDistrictId || postcodesLoading}
+                                        className="min-h-[40px] rounded-[10px] border border-input bg-background px-3 text-[14px] text-[var(--dash-text)] focus:outline-none focus:ring-2 focus:ring-ring">
+                                        <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
+                                        {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
                                 </div>
                             </div>
                         </div>
