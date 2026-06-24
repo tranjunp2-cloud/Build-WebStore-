@@ -94,15 +94,17 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     const searchParams = useSearchParams()
 
-    // Handle OAuth callback query params
+    // Handle OAuth callback query params — auto-test on connect to populate account name
     useEffect(() => {
         const ep = searchParams.get('ep')
         if (ep === 'connected') {
-            setTestStatus('connected')
-            toast.success('EasyParcel connected successfully!')
             if (typeof window !== 'undefined') {
                 window.history.replaceState({}, '', '/settings/shipping')
             }
+            // Auto-test to fetch account name and wallet balance
+            handleTestConnection().then(() => {
+                toast.success('EasyParcel connected successfully!')
+            })
         } else if (ep === 'error') {
             toast.error('EasyParcel connection failed. Please try again.')
             if (typeof window !== 'undefined') {
