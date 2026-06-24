@@ -464,7 +464,7 @@ export default function ProductsPage() {
                         {/* Row 2: Sort — shadcn Select (design system, themed) */}
                         <Select value={sortBy} onValueChange={setSortBy}>
                             <SelectTrigger className="w-full h-[50px] rounded-[16px] border-[var(--dash-border)] px-4 text-[16px] font-medium text-[var(--dash-text)] shadow-none">
-                                <SelectValue />
+                                <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
                             </SelectTrigger>
                             <SelectContent>
                                 {SORT_OPTIONS.map((option) => (
