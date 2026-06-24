@@ -4814,7 +4814,7 @@ const MIGRATIONS = [
   // ── GH-1350: orders locale snapshot ──
   {
     name: 'orders.locale',
-    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar DEFAULT 'en';`,
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
   },
 ];
 
