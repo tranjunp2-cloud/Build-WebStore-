@@ -7,6 +7,8 @@ import { ProductFormValues } from './schema'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 export function DescriptionSeoSection() {
     const { register, watch, setValue, getValues, formState: { errors } } = useFormContext<ProductFormValues>()
@@ -109,11 +111,11 @@ export function DescriptionSeoSection() {
                             <span className="text-[12px] font-semibold text-primary">{t.dashboard.products.form.sections?.writeWithAi || 'Write with AI'}</span>
                         </button>
                     </div>
-                    <textarea
+                    <Textarea
                         {...register('description')}
                         placeholder="Enter detailed product description..."
                         rows={6}
-                        className="w-full rounded-2xl border border-white/[0.08] bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors resize-y"
+                        className="resize-y min-h-[144px]"
                     />
                 </div>
 
@@ -144,13 +146,10 @@ export function DescriptionSeoSection() {
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
                         <label className="text-[14px] font-medium text-foreground m-0">{t.dashboard.products.form.sections?.metaTitle || 'Meta Title'}</label>
-                        <input
+                        <Input
                             {...register('metaTitle')}
                             placeholder="Title for SEO"
-                            className={cn(
-                                "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors",
-                                errors.metaTitle ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn(errors.metaTitle && "border-destructive focus-visible:border-destructive")}
                         />
                         {errors.metaTitle && <span className="text-[12px] text-destructive">{errors.metaTitle.message}</span>}
                     </div>
@@ -160,27 +159,21 @@ export function DescriptionSeoSection() {
                             <label className="text-[14px] font-medium text-foreground m-0">{t.dashboard.products.form.sections?.metaDesc || 'Meta Description'}</label>
                             <span className="text-[12px] text-foreground/40">{t.dashboard.products.form.sections?.metaDescMax || '(max 160 chars)'}</span>
                         </div>
-                        <textarea
+                        <Textarea
                             {...register('metaDescription')}
                             placeholder="Brief description for search engines (150-160 chars)"
                             rows={3}
-                            className={cn(
-                                "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors resize-none",
-                                errors.metaDescription ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn(errors.metaDescription && "border-destructive focus-visible:border-destructive")}
                         />
                         {errors.metaDescription && <span className="text-[12px] text-destructive">{errors.metaDescription.message}</span>}
                     </div>
 
                     <div className="flex flex-col gap-2">
                         <label className="text-[14px] font-medium text-foreground m-0">{t.dashboard.products.form.sections?.urlSlug || 'URL Slug'} <span className="text-foreground">*</span></label>
-                        <input
+                        <Input
                             {...register('urlSlug')}
                             placeholder="product-url"
-                            className={cn(
-                                "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors",
-                                errors.urlSlug ? "border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn(errors.urlSlug && "border-destructive focus-visible:border-destructive")}
                         />
                         {errors.urlSlug && <span className="text-[12px] text-destructive">{errors.urlSlug.message}</span>}
                     </div>

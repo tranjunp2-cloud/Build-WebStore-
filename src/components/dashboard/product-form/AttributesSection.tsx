@@ -5,6 +5,7 @@ import { Trash2, Plus } from 'lucide-react'
 import { ProductFormValues } from './schema'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
 
 const MAX_ATTRIBUTES = 20
 
@@ -33,28 +34,22 @@ export function AttributesSection() {
                         return (
                             <div key={field.id} className="flex gap-3 items-start">
                                 <div className="flex-1 flex flex-col gap-1">
-                                    <input
+                                    <Input
                                         type="text"
                                         placeholder={sectionsT?.attributeKey || 'Attribute name'}
                                         {...register(`attributes.${idx}.key`)}
-                                        className={cn(
-                                            "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                            rowErrors?.key ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                        )}
+                                        className={cn(rowErrors?.key && "border-destructive focus-visible:border-destructive")}
                                     />
                                     {rowErrors?.key && (
                                         <span className="text-[12px] text-destructive">{rowErrors.key.message}</span>
                                     )}
                                 </div>
                                 <div className="flex-1 flex flex-col gap-1">
-                                    <input
+                                    <Input
                                         type="text"
                                         placeholder={sectionsT?.attributeValue || 'Value'}
                                         {...register(`attributes.${idx}.value`)}
-                                        className={cn(
-                                            "w-full rounded-2xl border bg-background px-4 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                            rowErrors?.value ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                                        )}
+                                        className={cn(rowErrors?.value && "border-destructive focus-visible:border-destructive")}
                                     />
                                     {rowErrors?.value && (
                                         <span className="text-[12px] text-destructive">{rowErrors.value.message}</span>
