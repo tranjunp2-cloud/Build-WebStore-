@@ -33,6 +33,9 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
         <Dialog open={isOpen} onOpenChange={(v) => { if (!v) close() }}>
             <DialogContent
                 className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden"
+                // No separate description: the labeled tracking-number input is self-describing.
+                // Tell Radix it's intentional so it doesn't log the missing-Description warning.
+                aria-describedby={undefined}
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Icon */}

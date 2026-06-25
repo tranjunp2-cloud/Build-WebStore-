@@ -69,6 +69,9 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
         <Dialog open onOpenChange={(v) => { if (!v && !isLoading) onClose() }}>
             <DialogContent
                 className="max-w-md rounded-xl"
+                // No separate description: the labeled reason radios are self-describing.
+                // Tell Radix it's intentional so it doesn't log the missing-Description warning.
+                aria-describedby={undefined}
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Header */}
