@@ -574,6 +574,7 @@ export default function BusinessInfoForm({
                         <SlugPicker
                             businessName={form.businessName}
                             onSlugChange={handleSlugChange}
+                            skipInitialCheck={!!initialValues?.businessName}
                         />
                     )}
 
