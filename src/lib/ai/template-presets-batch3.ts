@@ -23,7 +23,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-right' },
+          { blockType: 'hero', variant: 'gradient' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'grid', count: 6 },
           { blockType: 'stats', variant: 'counter', count: 4 },
@@ -96,7 +96,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'stats', variant: 'large', count: 4 },
           { blockType: 'features', variant: 'icon-grid', count: 6 },
@@ -169,7 +169,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-right' },
+          { blockType: 'hero', variant: 'parallax' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'alternating', count: 3 },
           { blockType: 'cta', variant: 'banner' },
@@ -241,7 +241,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'centered' },
           { blockType: 'logo-cloud' },
           { blockType: 'team', variant: 'spotlight', count: 3 },
           { blockType: 'features', variant: 'icon-grid', count: 8 },
@@ -390,7 +390,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'gradient' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid', count: 4 },
           { blockType: 'countdown-timer', variant: 'dramatic' },
@@ -461,7 +461,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-right' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'masonry', count: 6 },
           { blockType: 'features', variant: 'grid', count: 4 },
@@ -534,7 +534,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'magazine' },
+          { blockType: 'hero', variant: 'parallax' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'detailed', count: 3 },
           { blockType: 'gallery', variant: 'grid', count: 6 },
@@ -680,7 +680,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'blog-list', variant: 'cards-overlay', count: 1 },
           { blockType: 'blog-list', variant: 'grid', count: 6 },
@@ -751,7 +751,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-right' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'social-proof', variant: 'badges', count: 4 },
           { blockType: 'blog-list', variant: 'masonry', count: 6 },
@@ -824,7 +824,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'magazine' },
+          { blockType: 'hero', variant: 'minimal' },
           { blockType: 'logo-cloud' },
           { blockType: 'blog-list', variant: 'headline', count: 5 },
           { blockType: 'cta', variant: 'banner' },
@@ -975,7 +975,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'parallax' },
           { blockType: 'logo-cloud' },
           { blockType: 'stats', variant: 'large', count: 4 },
           { blockType: 'gallery', variant: 'masonry', count: 8 },
@@ -1047,7 +1047,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-right' },
+          { blockType: 'hero', variant: 'gradient' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'alternating', count: 3 },
           { blockType: 'gallery', variant: 'grid', count: 6 },
@@ -1120,7 +1120,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'hero', variant: 'slideshow' },
           { blockType: 'logo-cloud' },
           { blockType: 'booking-widget', variant: 'compact' },
           { blockType: 'gallery', variant: 'grid', count: 6 },

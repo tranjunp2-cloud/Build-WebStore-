@@ -868,7 +868,7 @@ const VARIANT_ALIASES: Record<string, string> = {
 }
 
 /** Category-weighted variant preferences — preferred variants per category per block type */
-const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
+export const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
     restaurant: {
         hero: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
         features: ['grid-3', 'icon-top', 'zigzag', 'list'],
@@ -918,7 +918,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
-        hero: ['gradient', 'cards-overlay', 'minimal', 'parallax'],
+        hero: ['gradient', 'minimal', 'cards-overlay', 'parallax', 'split-left', 'slideshow'],
         features: ['zigzag', 'grid-2', 'icon-left', 'carousel'],
         testimonials: ['spotlight', 'cards', 'video-text'],
         footer: ['minimal', 'dark-gradient', 'simple'],
@@ -1030,7 +1030,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         team: ['grid', 'bio-modal', 'compact-row'],
     },
     fitness: {
-        hero: ['fullscreen', 'parallax', 'gradient', 'cards-overlay'],
+        hero: ['fullscreen', 'parallax', 'cards-overlay', 'gradient', 'split-left', 'magazine'],
         features: ['grid-4', 'zigzag', 'icon-top', 'carousel'],
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['dark-gradient', 'simple', 'centered-stack'],
