@@ -38,10 +38,12 @@ describe('TC-GH1290-BTN-03: dashPrimary variant applies gradient class', () => {
     })
 })
 
-describe('TC-GH1290-BTN-04: dash size applies h-[36px]', () => {
+describe('TC-GH1290-BTN-04: dash size applies h-9 (36px)', () => {
     it('includes the dash size height token', () => {
         render(<Button size="dash">Go</Button>)
-        expect(screen.getByRole('button', { name: 'Go' }).className).toContain('h-[36px]')
+        // Design-system unification (PR #1400): dash size moved from the literal
+        // h-[36px] to the h-9 scale token (same 36px) so all sizes share one height scale.
+        expect(screen.getByRole('button', { name: 'Go' }).className).toContain('h-9')
     })
 })
 
