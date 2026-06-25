@@ -26,6 +26,7 @@ vi.mock('framer-motion', () => {
     }
     return {
         motion: {
+            create: (Component) => React.forwardRef(({ children, ...rest }, ref) => React.createElement(Component, { ...rest, ref }, children)),
             section: createPrimitive('section'),
             div: createPrimitive('div'),
             article: createPrimitive('article'),

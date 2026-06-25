@@ -12,6 +12,15 @@ vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
 }))
 
+// unstable_cache needs Next's incrementalCache, absent in unit tests. Make it a
+// passthrough so the cached storefront helpers run their real payload.find logic
+// (which is mocked above); revalidateTag becomes a no-op.
+vi.mock('next/cache', () => ({
+    unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+    revalidateTag: vi.fn(),
+    revalidatePath: vi.fn(),
+}))
+
 // Mock Payload CMS
 let mockSite: Record<string, unknown> | null = null
 let mockTenant: Record<string, unknown> | null = null
