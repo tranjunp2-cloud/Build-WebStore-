@@ -1,10 +1,16 @@
 import type { CollectionConfig } from 'payload'
+import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
 
 export const Sites: CollectionConfig = {
     slug: 'sites',
     admin: {
         useAsTitle: 'name',
         description: 'Each tenant can have one or more websites.',
+    },
+    hooks: {
+        // Bust the storefront data cache on any site write (admin edits included).
+        afterChange: [revalidateSiteAfterChange],
+        afterDelete: [revalidateSiteAfterDelete],
     },
     access: {
         // Authenticated users can create sites
