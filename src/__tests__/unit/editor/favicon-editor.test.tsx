@@ -45,18 +45,22 @@ vi.mock('sonner', () => ({
     },
 }))
 
-vi.mock('@/app/(dashboard)/actions/media', () => ({
-    uploadMediaAction: vi.fn(),
+vi.mock('@/hooks/use-upload-progress', () => ({
+    useUploadProgress: vi.fn(),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────
 import { FaviconEditor } from '@/components/editor/FaviconEditor'
 import { toast } from 'sonner'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 // ── Image dimension mock ──────────────────────────────────────────────────
 // Mutated per test to control what checkFaviconDimensions() resolves to
 const mockDimensions = { width: 200, height: 200 }
+
+// ── Upload mock ────────────────────────────────────────────────────────────
+// Configured per-test via mockUpload.mockResolvedValue(...)
+let mockUpload: Mock
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -98,6 +102,15 @@ beforeEach(() => {
             }
         },
     )
+
+    // Set up useUploadProgress mock — upload fn configured per-test
+    mockUpload = vi.fn()
+    vi.mocked(useUploadProgress).mockReturnValue({
+        upload: mockUpload,
+        progress: 0,
+        isUploading: false,
+        reset: vi.fn(),
+    })
 })
 
 afterEach(() => {
@@ -108,7 +121,7 @@ afterEach(() => {
 
 describe('TC-F05-FAV-01: ICO file accepted; dimension check skipped', () => {
     it('uploads ICO without running dimension validation', async () => {
-        ;(uploadMediaAction as Mock).mockResolvedValue({ id: 1, url: 'https://cdn/favicon.ico' })
+        mockUpload.mockResolvedValue({ id: 1, url: 'https://cdn/favicon.ico' })
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
@@ -123,7 +136,7 @@ describe('TC-F05-FAV-01: ICO file accepted; dimension check skipped', () => {
 })
 
 describe('TC-F05-FAV-04: PNG over 500KB → hard size reject', () => {
-    it('shows tooLarge error and does not call uploadMediaAction', async () => {
+    it('shows tooLarge error and does not call upload', async () => {
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
@@ -132,14 +145,14 @@ describe('TC-F05-FAV-04: PNG over 500KB → hard size reject', () => {
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('File must be 500KB or smaller')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
 
 describe('TC-F05-FAV-05: PNG 80KB, 200×200 → clean success (no warnings)', () => {
     it('uploads with neither size nor dimension warning', async () => {
-        ;(uploadMediaAction as Mock).mockResolvedValue({ id: 2, url: 'https://cdn/favicon.png' })
+        mockUpload.mockResolvedValue({ id: 2, url: 'https://cdn/favicon.png' })
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
@@ -155,7 +168,7 @@ describe('TC-F05-FAV-05: PNG 80KB, 200×200 → clean success (no warnings)', ()
 
 describe('TC-F05-FAV-06: PNG 150KB, 200×200 → soft size warning, upload proceeds', () => {
     it('shows tooLargeWarning then completes upload', async () => {
-        ;(uploadMediaAction as Mock).mockResolvedValue({ id: 3, url: 'https://cdn/favicon.png' })
+        mockUpload.mockResolvedValue({ id: 3, url: 'https://cdn/favicon.png' })
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
@@ -184,7 +197,7 @@ describe('TC-F05-FAV-07: PNG with 8×8 dimensions → tooSmall reject', () => {
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Favicon must be at least 16×16px')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
@@ -201,7 +214,7 @@ describe('TC-F05-FAV-08: PNG with 1024×1024 dimensions → tooBig reject', () =
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Favicon must be 512×512px or smaller')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
@@ -210,7 +223,7 @@ describe('TC-F05-FAV-09: PNG 100×200 (non-square) → notSquare warning, upload
     it('shows notSquare warning then completes upload', async () => {
         mockDimensions.width = 100
         mockDimensions.height = 200
-        ;(uploadMediaAction as Mock).mockResolvedValue({ id: 4, url: 'https://cdn/favicon.png' })
+        mockUpload.mockResolvedValue({ id: 4, url: 'https://cdn/favicon.png' })
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
@@ -237,7 +250,7 @@ describe('TC-F05-FAV-10: Text file disguised as PNG (text/plain) → format reje
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Only .ico, .png, .jpg, and .webp files are accepted')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
@@ -252,7 +265,7 @@ describe('TC-F05-FAV-11: GIF file → format reject', () => {
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Only .ico, .png, .jpg, and .webp files are accepted')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
@@ -267,7 +280,7 @@ describe('TC-F05-FAV-12: BMP file → format reject', () => {
         await waitFor(() => {
             expect(toast.error).toHaveBeenCalledWith('Only .ico, .png, .jpg, and .webp files are accepted')
         })
-        expect(uploadMediaAction).not.toHaveBeenCalled()
+        expect(mockUpload).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
