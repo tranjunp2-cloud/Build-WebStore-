@@ -109,6 +109,10 @@ export async function POST(req: NextRequest) {
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
+    // Track slug sync for revert on failure (GH-1371): if generation fails with
+    // 0 pages created, restore the previous slug so the user can retry freely.
+    let _prevTenantSlug: string | undefined
+    let _syncedTenantId: string | number | null = null
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -293,6 +297,9 @@ export async function POST(req: NextRequest) {
                         id: resolvedTenantId,
                         data: { slug: newSlug } as Record<string, unknown>,
                     })
+                    // Track for revert on failure (GH-1371)
+                    _prevTenantSlug = currentSlug
+                    _syncedTenantId = resolvedTenantId
                 }
                 // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
                 else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
@@ -304,6 +311,9 @@ export async function POST(req: NextRequest) {
                             id: resolvedTenantId,
                             data: { slug: newSlug } as Record<string, unknown>,
                         })
+                        // Track for revert on failure (GH-1371)
+                        _prevTenantSlug = currentSlug
+                        _syncedTenantId = resolvedTenantId
                     }
                 }
             } catch (err) {
@@ -1387,6 +1397,16 @@ export async function POST(req: NextRequest) {
                                     data: { generationStatus: status },
                                 })
                                 .catch(() => {})
+                            // GH-1371: revert tenant slug if no pages were created so user can retry
+                            if (_createdPagesCount === 0 && _prevTenantSlug && _syncedTenantId) {
+                                await _payload
+                                    .update({
+                                        collection: 'tenants',
+                                        id: _syncedTenantId,
+                                        data: { slug: _prevTenantSlug } as Record<string, unknown>,
+                                    })
+                                    .catch(() => {})
+                            }
                         }
                     } finally {
                         try { controller.close() } catch { /* already closed */ }
@@ -1439,6 +1459,16 @@ export async function POST(req: NextRequest) {
                 id: _siteForCatch.id as string | number,
                 data: { generationStatus: status },
             }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
+            // GH-1371: revert tenant slug if no pages were created so user can retry
+            if (_createdPagesCount === 0 && _prevTenantSlug && _syncedTenantId) {
+                await _payload
+                    .update({
+                        collection: 'tenants',
+                        id: _syncedTenantId,
+                        data: { slug: _prevTenantSlug } as Record<string, unknown>,
+                    })
+                    .catch((_e: unknown) => console.error('[AI Generate] Failed to revert tenant slug:', _e))
+            }
         }
 
         const errMsg = error instanceof Error ? error.message : String(error)
