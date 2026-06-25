@@ -11,7 +11,11 @@
 |:---|:---|:---|:---|:---|:---|:---:|
 | **TC-SSOPW2-01** | API | Missing v2_token in request body | — | POST `/api/auth/sso-session` with empty body | 401 `{ error: 'invalid_token' }` | High |
 | **TC-SSOPW2-02** | API | Forged/invalid v2_token | — | POST with `v2_token` that Payload rejects | 401 `{ error: 'invalid_token' }` | High |
-| **TC-SSOPW2-03** | API | Rate limit exceeded | >10 requests/min from same IP | POST with valid token on >10th attempt | 429 `{ error: 'rate_limited' }` + `Retry-After` header | High |
+| **TC-SSOPW2-03** | API | Rate limit exceeded (IP bucket) | >300 req/min from same IP | POST with valid token after IP bucket exhausted | 429 `{ error: 'rate_limited', message: 'Too many sign-in attempts...', retryAfter: N }` + `Retry-After` header | High |
+| **TC-SSO.RL-01** | API | IP bucket raised to 300 — shared-WiFi users all pass | Default env, 200 users same IP | POST valid token — verify limit arg is 300 | `checkRateLimit` called with limit=300; all requests pass | High |
+| **TC-SSO.RL-02** | API | Per-user bucket blocks spammer despite IP having capacity | IP bucket not exhausted | POST valid token 11th time as same user | 429 `{ error: 'rate_limited' }` from user bucket | High |
+| **TC-SSO.RL-03** | API | Normal login passes both IP and per-user buckets | Fresh buckets | POST valid token once | 200; `checkRateLimit` called twice: IP (300) then user (10) | High |
+| **TC-SSO.RL-08** | API | `SSO_RATE_LIMIT_PER_MIN` env var overrides IP bucket limit | `SSO_RATE_LIMIT_PER_MIN=500` | POST valid token | `checkRateLimit` called with limit=500 on IP bucket | Medium |
 | **TC-SSOPW2-04a** | API | All tenants suspended — login blocked | User has 1 tenant, status=suspended | POST with valid token | 403 `{ error: 'account_suspended' }` | High |
 | **TC-SSOPW2-04b** | API | Mixed tenant statuses — login allowed | User has 2 tenants, 1 suspended 1 active | POST with valid token | 200 `{ ok: true }` | Medium |
 | **TC-SSOPW2-05** | API | New user (no tenants, no wizard) → onboarding | User has no tenants, has_seen_ai_wizard=false | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
