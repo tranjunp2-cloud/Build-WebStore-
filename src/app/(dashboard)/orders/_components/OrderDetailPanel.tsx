@@ -870,7 +870,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 handleAction(status === 'shipped' ? 'completed' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')
                             }}
                             disabled={primaryDisabled}
-                            className="w-full h-12 rounded-2xl text-[16px] gap-2 disabled:opacity-30"
+                            className="w-full h-9 rounded-lg text-[13px] gap-2 disabled:opacity-30"
                             style={{ boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
                         >
                             {isLoading && <Loader2 className="animate-spin" />}
@@ -891,7 +891,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 variant="dashSecondary"
                                 onClick={() => setIsCancelModalOpen(true)}
                                 disabled={cancelDisabled}
-                                className="flex-1 h-[50px] rounded-2xl text-[16px] font-semibold hover:opacity-80 disabled:opacity-30 [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))]"
+                                className="flex-1 h-9 rounded-lg text-[13px] font-semibold hover:opacity-80 disabled:opacity-30 [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))]"
                             >
                                 {a.cancelOrder}
                             </Button>
@@ -901,7 +901,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 variant="dashSecondary"
                                 onClick={handleRefund}
                                 disabled={refundDisabled}
-                                className="flex-1 h-[50px] rounded-2xl text-[16px] font-semibold hover:opacity-80 disabled:opacity-30"
+                                className="flex-1 h-9 rounded-lg text-[13px] font-semibold hover:opacity-80 disabled:opacity-30"
                             >
                                 <IconRefund />
                                 {a.refund}
@@ -998,22 +998,16 @@ export function OrderDetailPanel({
                     {d.title} {order?.orderNumber || orderId}
                 </span>
 
-                {/* Close button — layout_HCW45V: 36×36, padding 8px 8px 0 */}
-                <button
-                    className="flex items-start justify-center text-dash-text-muted hover:opacity-70 transition-opacity"
-                    style={{
-                        width: 36,
-                        height: 36,
-                        padding: '8px 8px 0px',
-                        borderRadius: 12,
-                    }}
+                {/* Close button — shared <Button> ghost icon */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-dash-text-muted hover:text-dash-text rounded-xl"
                     aria-label="Close order details"
                     onClick={onClose}
                 >
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" />
-                    </svg>
-                </button>
+                    <X className="h-5 w-5" />
+                </Button>
             </div>
 
             {isLoading && !order ? (

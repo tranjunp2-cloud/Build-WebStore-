@@ -9,6 +9,9 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
@@ -64,10 +67,12 @@ function SelectPrimaryPanel({
             >
 
                 {/* Close chevron button — Figma circular outlined accent */}
-                <button
+                <Button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full transition-colors shrink-0 z-10"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-[20px] left-[-18px] h-[36px] w-[36px] rounded-full shrink-0 z-10"
                     style={{
                         background: 'var(--dash-surface)',
                         border: '1px solid var(--dash-border)',
@@ -75,7 +80,7 @@ function SelectPrimaryPanel({
                     }}
                 >
                     <ChevronRight className="h-5 w-5" />
-                </button>
+                </Button>
 
                 {/* Content */}
                 <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
@@ -91,11 +96,12 @@ function SelectPrimaryPanel({
                         {options.map(opt => {
                             const isSelected = selected === opt.value;
                             return (
-                                <button
+                                <Button
                                     key={opt.value ?? '__platform__'}
                                     type="button"
                                     onClick={() => setSelected(opt.value)}
-                                    className="flex items-center gap-[12px] w-full p-[16px] rounded-[8px] transition-all text-left font-['Inter']"
+                                    variant="ghost"
+                                    className="flex items-center gap-[12px] w-full p-[16px] h-auto rounded-[8px] transition-all justify-start font-['Inter']"
                                     style={isSelected
                                         ? { border: '1px solid hsl(var(--primary))', background: 'hsl(var(--primary)/0.06)' }
                                         : { border: '1px solid var(--dash-border)', background: 'var(--dash-surface)' }
@@ -125,7 +131,7 @@ function SelectPrimaryPanel({
                                     >
                                         {opt.label}
                                     </span>
-                                </button>
+                                </Button>
                             );
                         })}
                     </div>
@@ -233,36 +239,40 @@ function TxtChallengeCard({
                         TXT Record #{i + 1}
                     </p>
 
-                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Name</label>
+                    <Label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Name</Label>
                     <div className="flex items-center gap-2 mt-1 mb-3">
                         <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.domain}
                         </code>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => copy(`name-${i}`, v.domain)}
                             aria-label={`Copy TXT record name ${v.domain}`}
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 h-8 w-8 rounded-[8px]"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
-                        </button>
+                        </Button>
                     </div>
 
-                    <label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Value</label>
+                    <Label className="text-[12px] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>Value</Label>
                     <div className="flex items-center gap-2 mt-1 mb-2">
                         <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] font-mono break-all" style={{ color: 'var(--dash-text)' }}>
                             {v.value}
                         </code>
-                        <button
+                        <Button
                             type="button"
                             onClick={() => copy(`value-${i}`, v.value)}
                             aria-label="Copy TXT record value"
-                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 h-8 w-8 rounded-[8px]"
                             style={{ border: '1px solid var(--dash-border)', color: 'var(--dash-text-muted)' }}
                         >
                             {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[hsl(var(--success))]" /> : <Copy className="h-4 w-4" />}
-                        </button>
+                        </Button>
                     </div>
 
                     {v.reason && (
@@ -591,13 +601,12 @@ export function DomainsClient({
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-0">
-                                    <input
+                                    <Input
                                         type="text"
                                         value={slugInput}
                                         onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
-                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] text-[14px] font-mono focus:outline-none transition-colors"
+                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] rounded-r-none text-[14px] font-mono"
                                         style={{
-                                            border: '1px solid var(--dash-border)',
                                             borderRight: 'none',
                                             background: 'var(--dash-surface)',
                                             color: 'var(--dash-text)',
@@ -742,13 +751,15 @@ export function DomainsClient({
                                                         >
                                                             <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{ip.trim()}</span>
                                                         </div>
-                                                        <button
+                                                        <Button
                                                             type="button"
                                                             onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }}
-                                                            className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-[44px] w-[44px] rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] shrink-0"
                                                         >
                                                             <Copy className="h-5 w-5" />
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 ))}
                                                 <p className="text-[12px] text-slate-400">{t?.Domains?.pointToIps || 'Point your domain to any of these IPs.'}</p>
@@ -764,13 +775,15 @@ export function DomainsClient({
                                                 >
                                                     <span className="text-[14px] font-mono" style={{ color: 'var(--dash-text)' }}>{DNS_CNAME}</span>
                                                 </div>
-                                                <button
+                                                <Button
                                                     type="button"
                                                     onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success(t?.Domains?.copied || 'Copied!'); }}
-                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] transition-colors shrink-0"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-[44px] w-[44px] rounded-[12px] bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] shrink-0"
                                                 >
                                                     <Copy className="h-5 w-5" />
-                                                </button>
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -852,16 +865,24 @@ export function DomainsClient({
                                 {/* Remove button — visible on all screen sizes */}
                                 <div className="flex items-center gap-3 pb-[25px]">
                                     {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
-                                    <Button
-                                        type="button"
-                                        variant="dashSecondary"
-                                        onClick={() => setRemovingDomain(domain)}
-                                        disabled={isPending || isPrimary === true}
-                                        className="h-[44px] px-[16px] rounded-[12px] text-[14px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
-                                        title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
-                                    >
-                                        {t?.Domains?.removeDomain || 'Remove Domain'}
-                                    </Button>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="dashSecondary"
+                                                    onClick={() => setRemovingDomain(domain)}
+                                                    disabled={isPending || isPrimary === true}
+                                                    className="h-[44px] px-[16px] rounded-[12px] text-[14px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
+                                                >
+                                                    {t?.Domains?.removeDomain || 'Remove Domain'}
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </div>
                                 </div>
                             </div>
@@ -946,47 +967,17 @@ export function DomainsClient({
             )}
 
             {/* ── Remove Domain Confirmation Modal (TC-F19.14 QA) ─────────── */}
-            {removingDomain && typeof document !== 'undefined' && createPortal(
-                <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-                >
-                    <div
-                        className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200"
-                        style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
-                    >
-                        <div className="flex flex-col">
-                            <div className="m-0 p-0 text-[20px] font-semibold leading-[1.4em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>
-                                {t?.Domains?.removeDomainTitle || 'Remove domain'}
-                            </div>
-                            <div className="m-0 p-0 mt-[8px] text-[14px] font-normal leading-[1.428em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>
-                                {(t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain)}
-                            </div>
-                        </div>
-                        <div className="mt-[24px] flex items-center gap-[12px]">
-                            <Button
-                                type="button"
-                                onClick={() => setRemovingDomain(null)}
-                                variant="dashSecondary"
-                                className="flex-1 h-[50px] rounded-[16px] text-[16px] font-medium font-['Inter']"
-                            >
-                                {t?.Domains?.cancel || 'Cancel'}
-                            </Button>
-                            {/* Shared <Button> dashSecondary, soft-destructive (GH-1290 Bug 1) — đồng bộ với nút Cancel kế bên */}
-                            <Button
-                                type="button"
-                                variant="dashSecondary"
-                                onClick={handleRemoveConfirm}
-                                disabled={isPending}
-                                className="flex-1 h-[50px] rounded-[16px] gap-2 text-[16px] font-semibold [border:1px_solid_hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.2)]"
-                            >
-                                {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
-                                {t?.Domains?.removeDomain || 'Remove Domain'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+            <ConfirmModal
+                open={!!removingDomain}
+                onConfirm={handleRemoveConfirm}
+                onCancel={() => setRemovingDomain(null)}
+                title={t?.Domains?.removeDomainTitle || 'Remove domain'}
+                description={removingDomain ? (t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain) : undefined}
+                confirmLabel={t?.Domains?.removeDomain || 'Remove Domain'}
+                cancelLabel={t?.Domains?.cancel || 'Cancel'}
+                variant="danger"
+                loading={isPending}
+            />
         </div>
     );
 }

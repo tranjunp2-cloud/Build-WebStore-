@@ -173,26 +173,29 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
             {/* Improve Text floating menu */}
             {showImproveMenu && selectedText && (
                 <div
-                    className="absolute z-50 flex flex-col gap-1 p-2 bg-[var(--dash-secondary-bg)] border border-[var(--dash-border)] rounded-xl shadow-2xl min-w-[180px]"
+                    className="absolute z-50 flex flex-col gap-1 p-2 bg-popover border border-border rounded-xl shadow-2xl min-w-[180px]"
                     style={{ top: improveMenuPos.top, left: improveMenuPos.left }}
                 >
-                    <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">{t.dashboard.blog.editor.aiImproveLabel}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1">{t.dashboard.blog.editor.aiImproveLabel}</span>
                     {[
                         { label: t.dashboard.blog.editor.aiMakeProfessional, instruction: 'Rewrite this text to sound more professional and polished' },
                         { label: t.dashboard.blog.editor.aiMakeShorter, instruction: 'Make this text shorter and more concise while keeping the meaning' },
                         { label: t.dashboard.blog.editor.aiImproveWriting, instruction: 'Improve the grammar, clarity, and readability of this text' },
                     ].map((action) => (
+                        // Kept as raw <button>: absolute-positioned floating menu over CKEditor — Radix
+                        // DropdownMenu cannot anchor to a selection rect; custom positioning is required.
                         <button
                             key={action.label}
                             onClick={() => handleImproveText(action.instruction)}
-                            className="text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
+                            className="text-left px-3 py-2 text-sm text-foreground hover:bg-muted rounded-lg transition-colors"
                         >
                             {action.label}
                         </button>
                     ))}
+                    {/* Kept as raw <button>: same reason as above */}
                     <button
                         onClick={() => setShowImproveMenu(false)}
-                        className="text-left px-3 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                        className="text-left px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                         {t.dashboard.blog.editor.cancel}
                     </button>
