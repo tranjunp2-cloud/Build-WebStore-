@@ -79,6 +79,10 @@ export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Prop
             className="relative"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onClick={(e) => {
+                if ((e.target as HTMLElement).closest('[data-editor-control]')) return
+                setIsHovered(v => !v)
+            }}
         >
             {children}
             {/* Button floats above the logo — onMouseEnter/Leave on the button itself cancel the hide timer */}
