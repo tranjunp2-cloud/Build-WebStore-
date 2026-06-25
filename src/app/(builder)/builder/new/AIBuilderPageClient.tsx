@@ -409,6 +409,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const prepareGenerationSession = useCallback((info: BusinessInfo) => {
         reset()
+        // Re-apply userId immediately after reset: reset() clears INITIAL_STATE
+        // (userId: null), but the userId effect won't re-run since its deps haven't
+        // changed. Without this, partialize stores userId: null with stale gen data,
+        // and the next reload triggers isUnownedSession → blank form (GH-1371).
+        if (userId) setUserId(userId)
         hasUserEditsRef.current = false
         setGenerationTimeMs(0)
         setBusinessInfo(info)
@@ -419,7 +424,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             progress: 8,
         })
         addMessage({ role: 'assistant', content: `🚀 ${t.onboarding.generating.startingMessage}` })
-    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, t])
+    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, setUserId, userId, t])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {

@@ -233,17 +233,30 @@ describe('builderStore — streaming reload recovery (GH-1371)', () => {
 
     // ── Cross-user contamination ───────────────────────────────────────────
 
-    describe('reset clears session owner (TC-F01.STUCK-10)', () => {
-        it('reset clears userId and businessInfo preventing cross-user contamination', () => {
-            act('setUserId', 'user-A')
-            act('setBusinessInfo', SAMPLE_BUSINESS_INFO)
+    describe('userId in partialize after generation cycle (TC-F01.STUCK-10)', () => {
+        it('partialize stores non-null userId after reset+re-apply — prevents isUnownedSession on reload', () => {
+            // Simulates the full gen cycle in AIBuilderPageClient:
+            //   1. userId effect sets userId on mount
+            //   2. prepareGenerationSession calls reset() → userId cleared
+            //   3. prepareGenerationSession immediately re-applies userId (GH-1371 fix)
+            //   4. gen completes → done state persisted with userId !== null
+            // → on reload: isUnownedSession = false → no spurious reset → preview shows
+            act('setUserId', 'user-A')       // step 1: userId effect on mount
             act('setStatus', 'streaming')
 
-            act('reset')
+            act('reset')                      // step 2: prepareGenerationSession reset
+            act('setUserId', 'user-A')        // step 3: re-apply (component fix)
+            act('setBusinessInfo', SAMPLE_BUSINESS_INFO)
+            act('addBlock', { blockType: 'hero' })
+            act('setSiteId', 'site-123')
+            act('setStatus', 'done')          // step 4: gen complete
 
-            expect(getState().userId).toBeNull()
-            expect(getState().businessInfo).toBeNull()
-            expect(getState().status).toBe('idle')
+            const options = getPersistOptions()
+            const persisted = options?.partialize(getState())
+
+            expect(persisted?.userId).toBe('user-A')   // non-null → isUnownedSession = false on reload
+            expect(persisted?.status).toBe('done')
+            expect(persisted?.siteId).toBe('site-123')
         })
     })
 })
