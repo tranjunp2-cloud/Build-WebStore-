@@ -467,7 +467,10 @@
             "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
             "cancelButton": "Batalkan penjanaan",
             "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
-            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini.",
+            "interrupted": "Penjanaan telah terganggu. Sila cuba lagi.",
+            "leaveWarning": "Laman web sedang dijana. Pergi juga?",
+            "timeoutRecover": "Masa penjanaan tamat. Kembali ke borang."
         },
         "completion": {
             "successMessage": "telah berjaya dicipta!",
@@ -3605,8 +3608,12 @@
             "altFavicon": "Favicon Laman Web",
             "remove": "Buang",
             "replace": "Ganti",
-            "invalidFormat": "Hanya fail .ico dan .png diterima",
-            "tooLarge": "Fail mestilah 100KB atau lebih kecil"
+            "invalidFormat": "Hanya fail .ico, .png, .jpg, dan .webp diterima",
+            "tooLarge": "Fail mestilah 500KB atau lebih kecil",
+            "tooLargeWarning": "Favicon lebih besar daripada 100KB — ini mungkin melambatkan pemuatan tab browser",
+            "tooSmall": "Favicon mestilah sekurang-kurangnya 16×16px",
+            "tooBig": "Favicon mestilah 512×512px atau lebih kecil",
+            "notSquare": "Favicon segi empat sama (1:1) disyorkan — imej bukan segi empat sama mungkin kelihatan herot"
         },
         "ogImageEditor": {
             "invalidFormat": "Hanya imej JPG, PNG, atau WebP diterima",

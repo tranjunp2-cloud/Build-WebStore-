@@ -4,16 +4,16 @@
 
 > **Feature:** F36 — EasyParcel Delivery Integration (Malaysia)
 > **Wave:** 7 | **Priority:** P1 | **Ref PRD:** [F36-easyparcel-delivery.md](../prd/F36-easyparcel-delivery.md) (overview & index); phase details merged into [F14-shipping.md](../prd/F14-shipping.md), [F10-orders-management.md](../prd/F10-orders-management.md), [F19-store-configuration.md](../prd/F19-store-configuration.md)
-> **Provider:** EasyParcel (aggregator MY) — per-merchant API key, non-custody, platform RM0.
+> **Provider:** EasyParcel (aggregator MY) — per-merchant OAuth account, non-custody, platform RM0.
 > **Depends on:** F09 Storefront ✅, F10 Order lifecycle + cancel-restock ✅, F34 Xendit Payment (song hành).
 
 > [!IMPORTANT]
-> **Guardrail xuyên suốt:** Platform KHÔNG giữ/markup tiền cước hay COD. Mọi call EasyParcel dùng API key của merchant → cước trừ ví merchant. Giá hiển thị = raw EasyParcel (RM→sen ×100), không markup.
+> **Guardrail xuyên suốt:** Platform KHÔNG giữ/markup tiền cước hay COD. Mọi call EasyParcel dùng OAuth token của merchant → cước trừ ví merchant. Giá hiển thị = raw EasyParcel (RM→sen ×100), không markup.
 > **Currency (NFR-1):** internal lưu **sen**; EasyParcel dùng **RM**. `/100` khi gửi, `×100` khi nhận. Sai = lệch 100× → mọi story đụng tiền BẮT BUỘC có test chống regression.
 
 ---
 
-## US-F36-01: Connect EasyParcel Account (API Key + Warehouse)
+## US-F36-01: Connect EasyParcel Account (OAuth 2.0 Authorization-Code)
 
 **Wave 7** | **P0** | **L** | **Status:** Draft
 
@@ -21,56 +21,50 @@
 
 ```
 As a   SME Owner
-I want dán API key + auth key EasyParcel và nhập địa chỉ kho (origin) trong settings/shipping
-So that shop của tôi tính được cước thật và mua được nhãn vận đơn qua tài khoản EasyParcel riêng
+I want bấm "Connect with EasyParcel" để kết nối tài khoản EasyParcel qua OAuth
+So that shop của tôi có quyền tính cước và mua nhãn vận đơn qua API, và tôi nhập địa chỉ kho (origin) trong settings
 ```
 
-> **Warehouse = Prime source of truth (KHÔNG sync từ EP):** EasyParcel API không có endpoint đọc địa chỉ kho/sender từ account → merchant nhập 1 lần trong Prime, dùng cho **cả** rate-check **lẫn** label/pickup. KHÔNG cần set gì trên dashboard EP. Postcode kho **force validate** ngay tại Test connection. Nguồn: `plans/reports/researcher-260617-1107-easyparcel-address-sync.md`.
+> **OAuth 2.0 Authorization-Code flow (not API keys):** Merchant never shares secrets. Workflow: merchant redirects to EasyParcel → logs in + grants scope → callback returns authorization code → backend exchanges code for access token (10h) + refresh token (1yr). Tokens stored securely per tenant, auto-refreshed on expiry.
+>
+> **Warehouse = Prime source of truth (KHÔNG sync từ EP):** EasyParcel OAuth doesn't return stored addresses → merchant enters 1 warehouse address in Prime, reused for all rate-check + label/pickup operations. Force-validate via rate-check call.
 
 ### Acceptance Criteria
 
-#### AC-1: Test connection thành công → lưu key + list courier
+#### AC-1: OAuth redirect → token exchange → account connected
 
 ```gherkin
-GIVEN tenant chưa connect, mở settings/shipping > tab "EasyParcel"
-  AND nhập api_key + auth_key (2 ô) — KHÔNG có ô chọn environment
-  AND điền warehouse address (line1/2, city, state, postcode, country=MY)
-WHEN  bấm "Test connection"
-THEN  backend tự dò env: gọi EPRateCheckingBulk bằng CHÍNH warehouse postcode trên production trước, FAIL → thử demo
-  AND env nào validate → warehouse postcode coi như hợp lệ (force validate)
-  AND lưu config vào tenant.easyParcelIntegration (api_key, auth_key, warehouse, detectedEnv)
-  AND trả về danh sách courier khả dụng để chọn (single-select)
-  AND hiển thị toast "EasyParcel connected"
+GIVEN tenant chưa kết nối, mở settings/shipping > tab "EasyParcel"
+  AND bấm "Connect with EasyParcel ↗"
+WHEN  OAuth popup opens (https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...)
+  AND merchant logs in + grants scope
+THEN  EasyParcel redirects callback with authorization code
+  AND backend POSTs to https://api.easyparcel.com/oauth/token
+        (grant_type=authorization_code, code, redirect_uri, Basic auth client_id:client_secret)
+  AND receives access_token (10h) + refresh_token (1yr) + expires_at
+  AND stores securely in tenant.easyParcelIntegration.oauthTokens
+  AND popup closes
+  AND settings page shows green "Connected — Account: [Name] (Live)" + wallet balance
+  AND warehouse/courier selection sections unlock for input
 ```
 
-> 📌 Source: PRD FR A-1, A-2, A-6 + §10 verify note #1 (2 key) + #3 (demo dùng HTTPS `https://demo.connect.easyparcel.my/?ac=`)
+> 📌 Source: PRD §8 (OAuth 2.0 Authorization-Code), spec v2026-03 _authentication.md
 
-#### AC-2: Key sai → KHÔNG lưu, báo lỗi rõ
-
-```gherkin
-GIVEN nhập api_key hoặc auth_key sai
-WHEN  bấm "Test connection"
-THEN  backend trả error code "EASYPARCEL_INVALID_KEY"
-  AND hiển thị inline error "API key hoặc auth key không hợp lệ"
-  AND config KHÔNG được lưu (tenant không kẹt trạng thái sai)
-  AND key KHÔNG bị lộ ra response/log
-```
-
-> 📌 Source: PRD FR A-2, A-8, NFR-3
-
-#### AC-3: Warehouse postcode sai → KHÔNG lưu (force validate)
+#### AC-2: Warehouse postcode force-validated at first save
 
 ```gherkin
-GIVEN key hợp lệ nhưng warehouse postcode không gửi được từ EasyParcel (origin invalid)
-WHEN  bấm "Test connection"
-THEN  backend trả error code "EASYPARCEL_INVALID_WAREHOUSE"
-  AND inline error "Địa chỉ kho không hợp lệ — kiểm tra lại postcode"
-  AND config KHÔNG được lưu (không cho connect với origin sai)
+GIVEN tenant connected via OAuth, now filling warehouse address
+  AND entered address with city, state, postcode, country=MY
+WHEN  bấm "Save"
+THEN  backend calls POST /shipment/quotations with warehouse (sender) details as test
+  AND quotation call succeeds → postcode valid, warehouse accepted
+  AND quotation call fails (invalid postcode/state combo) → reject save with error "Postcode invalid"
+  AND config KHÔNG được lưu (force validate once; can edit later without re-test)
 ```
 
 > 📌 Source: PRD FR A-2 (force validate warehouse)
 
-#### AC-4: IDOR — chỉ owner tenant sửa được
+#### AC-3: IDOR + session auth — chỉ owner tenant sửa được
 
 ```gherkin
 GIVEN user A không thuộc tenant của site
@@ -81,26 +75,39 @@ THEN  trả 403 Forbidden (mirror hasSiteAccess)
 
 > 📌 Source: PRD FR A-6, NFR-3
 
+#### AC-4: Token auto-refresh on 401
+
+```gherkin
+GIVEN access token đã hết hạn (> 10h)
+WHEN  backend makes rate/order call lấy 401 Unauthorized
+THEN  backend POSTs to oauth/token với refresh_token (grant_type=refresh_token)
+  AND gets new access_token
+  AND retries original request
+  AND succeeds (idempotent)
+```
+
+> 📌 Source: spec v2026-03 _authentication.md (Refresh Token Flow)
+
 ### Additional Criteria
 
-- [ ] Form 2 ô key riêng (api_key + auth_key) — không gộp 1 ô. KHÔNG có selector environment.
-- [ ] Auto-detect env: thử production trước, fail → demo; lưu `detectedEnv`. 2 base URL (HTTPS) vẫn là const trong code.
-- [ ] Warehouse = Prime SoT: 1 field `warehouse` dùng cho cả rate (`pick_code/pick_state`) lẫn label/pickup (`pick_*`). KHÔNG sync từ EP, KHÔNG đọc từ dashboard EP.
-- [ ] Warehouse form dùng **geo cascade có sẵn**: State → City → Postcode = 3 dropdown qua `/api/geo/{states,districts,postcodes}` (dataset `malaysia_*` đã seed); chỉ `line1/2` free text. KHÔNG dựng dataset mới.
-- [ ] **Recommend (DRY):** tách cascade inline của checkout thành component dùng chung (`AddressCascadeFields`) — quyết lúc implement; fallback gọi thẳng 4 endpoint geo nếu né đụng checkout.
-- [ ] Force validate warehouse postcode tại Test connection (dùng chính origin trong rate-check); sai → `EASYPARCEL_INVALID_WAREHOUSE`, không lưu.
-- [ ] Cân nhắc encrypt at-rest cho 2 key; không có secret global trong code (chỉ const base URL).
-- [ ] EasyParcel API timeout/5xx → error code rõ, không crash settings.
+- [ ] Warehouse = Prime SoT: 1 block (line1/2/city/state/postcode/country) dùng cho **cả** rate-check **lẫn** label/pickup. KHÔNG sync từ EasyParcel.
+- [ ] Warehouse form dùng **geo cascade có sẵn**: State → City → Postcode = 3 dropdown qua `/api/geo/{states,districts,postcodes}` (dataset `malaysia_*` đã seed); chỉ `line1/2` free text. **Recommend:** reuse checkout `AddressCascadeFields` component (DRY).
+- [ ] Cpon fields: line1 required, line2 optional, city required, state required (cascade), postcode required (5 digits), country hardcoded MY.
+- [ ] Force validate: first-time save (or Validate button if UX prefers) → rate-check call. Sai → error. Đúng → lưu. Edit sau không cần re-validate.
+- [ ] OAuth tokens stored in `tenant.easyParcelIntegration.oauthTokens` (access + refresh + expires_at). Encrypt at-rest if possible; decrypt on use.
+- [ ] Disconnect button: clears tokens. Merchant can re-authorize anytime.
+- [ ] Errors: OAuth flow errors (invalid state, user denied, invalid redirect_uri) → red Alert with retry. Network errors → generic "Failed to connect, retry" + details in logs only.
 
 ### Market Notes
 
-- MY SME hầu hết đã có sẵn tài khoản EasyParcel (~70k SME) → flow "dán key" quen thuộc, không OAuth.
+- OAuth avoids storing merchant secrets. Security + compliance benefit (no key rotation needed, tokens expire automatically).
+- Merchant never sees or manages keys — EasyParcel dashboard handles all auth lifecycle.
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] Cột mới của `easyParcelIntegration` → `scripts/db-setup.js` MIGRATIONS (CI gate) (NFR-9)
-- [ ] Test: invalid key không lưu; IDOR 403; key không lộ trong log/response
+- [ ] `tenant.easyParcelIntegration.oauthTokens` (access, refresh, expires_at, connected_at) → `scripts/db-setup.js` MIGRATIONS (NFR-9)
+- [ ] Test: OAuth callback success → tokens stored + page updates; token expired → auto-refresh OK; IDOR 403; warehouse postcode invalid → reject save
 
 ---
 
@@ -226,7 +233,7 @@ GIVEN tenant EasyParcel ON + đã chọn selectedCourier
   AND POST /api/orders/calculate-shipping { siteId, dest postcode/state, items }
 WHEN  getRates() chạy
 THEN  tính tổng weight = sum(Products.weight × qty); product = 0/thiếu → hằng số DEFAULT_PARCEL
-  AND gọi EPRateCheckingBulk(origin warehouse, dest, weight, dims) cho selectedCourier
+  AND gọi POST /shipment/quotations (OAuth Bearer token) với origin warehouse, dest, weight, dims cho selectedCourier
   AND trả { courier, serviceId, fee(sen), eta } của đúng courier shop chọn (KHÔNG mảng nhiều courier)
 ```
 
@@ -375,26 +382,26 @@ So that tôi không cần màn tạo vận đơn riêng, cước trừ thẳng v
 
 ### Acceptance Criteria
 
-#### AC-1: Tạo label thành công (2 bước submit→pay) qua nút "Ready to Ship"
+#### AC-1: Tạo label thành công (single submit, ví trừ ngay) qua nút "Ready to Ship"
 
 ```gherkin
 GIVEN order đã paid/confirmed, EP tenant, merchant mở order trong OrderDetailPanel (có sẵn)
 WHEN  bấm "Ready to Ship" → mở modal (prefill weight/dims) → POST /api/orders/[id]/create-label
-THEN  gọi EPSubmitOrderBulk (giữ chỗ) → EPPayOrderBulk (trừ ví + sinh AWB) bằng api key merchant
+THEN  gọi POST /shipment/submit_orders (OAuth Bearer token, wallet auto-deduct) → returns shipment_number + awb_number + tracking_url
   AND trừ ví EasyParcel merchant
-  AND lưu awbNo + labelUrl + easyParcelOrderNo + trackingNumber=awbNo
+  AND lưu shipmentNumber + awbNo + easyParcelOrderNo + trackingNumber=awbNo (awb_url/label PDF tới async qua webhook topic 2 hoặc POST /shipment/list)
   AND order → ready_to_ship (KHÔNG có màn/route "Tạo vận đơn" riêng)
-  AND merchant thấy nút in label (labelUrl)
+  AND nút in label hiện khi awb_url đã có (async)
 ```
 
-> 📌 Source: PRD FR C-1, C-6 + §10 verify note #2 (label = 2 bước)
+> 📌 Source: PRD FR C-1, C-6 + §8 (label = single submit, wallet auto-deduct)
 
 #### AC-2: Idempotent — chặn tạo label lần 2
 
 ```gherkin
 GIVEN order đã có awbNo
 WHEN  gọi create-label lần 2
-THEN  bị chặn (KHÔNG gọi EPPayOrderBulk lại)
+THEN  bị chặn (KHÔNG gọi /shipment/submit_orders lại — wallet already deducted)
   AND KHÔNG trừ ví lần 2
   AND trả về AWB/label đã có
 ```
@@ -459,8 +466,8 @@ So that hàng được lấy theo lịch phù hợp với shop
 ```gherkin
 GIVEN merchant tạo label trong modal Ready-to-Ship
 WHEN  chọn pickup (default) HOẶC dropoff + chọn ngày lấy
-THEN  pickup truyền collection_date (YYYY-MM-DD, giờ MY UTC+8) trong EPSubmitOrderBulk
-  AND KHÔNG gọi endpoint EPPickUpBooking (không tồn tại trong API)
+THEN  pickup truyền collection_date (YYYY-MM-DD, giờ MY UTC+8) trong POST /shipment/submit_orders
+  AND KHÔNG gọi endpoint pickup riêng (EasyParcel tự sắp theo collection_date)
   AND dropoff vẫn truyền collection_date (tùy courier)
 ```
 
@@ -518,7 +525,7 @@ THEN  fallback conservative (vd 12:00 hoặc chỉ cho ngày làm việc kế)
 
 ## US-F36-08: COD via EasyParcel — Eligibility, Checkout & Label Creation
 
-**Wave 7** | **P1** | **L** | **Status:** Draft
+**Wave 7** | **P1** | **L** | **Status:** Deferred — blocked on sandbox/support verify of COD submit field (see PRD §8/§9)
 
 ### Story
 
@@ -605,7 +612,7 @@ THEN  hiển thị <Alert> thông tin phí COD max(flat, 4%) theo courier đã c
 ```gherkin
 GIVEN order paymentMethod='cod' + buyer West MY + codAmount trong giới hạn courier
 WHEN  merchant tạo label qua modal Ready to Ship → POST /api/orders/[id]/create-label
-THEN  EPSubmitOrderBulk gửi cod_enabled=true + cod_amount (RM = codAmount/100)
+THEN  POST /shipment/submit_orders gửi feature.cod_enabled=true + cod_amount (RM = codAmount/100)
   AND modal hiện COD badge + "Thu hộ: RM X" + fee note trước khi confirm
   AND codStatus = 'pending' (unchanged — tiền chưa thu)
   AND cước ship vẫn trừ ví merchant (tách biệt khỏi COD amount)
@@ -751,8 +758,8 @@ So that tôi biết hàng đang ở đâu mà không cần hỏi shop
 ```gherkin
 GIVEN có orders shipped/chưa completed có awbNo
 WHEN  GET /api/cron/sync-tracking chạy (cron-secret auth, mỗi 30-60 phút)
-THEN  gom orders group theo tenant (đúng api key)
-  AND gọi EPParcelStatusBulk theo batch
+THEN  gom orders group theo tenant (đúng OAuth token)
+  AND gọi POST /shipment/tracking_status + POST /shipment/details theo batch (fallback polling)
   AND cập nhật shippingTrackingStatus = 1 trong 13 status chuẩn EasyParcel (đã normalize mọi courier)
   AND idempotent + backoff (không spam API)
 ```
@@ -762,34 +769,34 @@ THEN  gom orders group theo tenant (đúng api key)
 #### AC-2: Tracking nhúng order detail (KHÔNG màn riêng) + dual-field
 
 ```gherkin
-GIVEN order có awbNo + shippingTrackingStatus
+GIVEN order có awbNo + shippingTrackingStatus (numeric code from webhook/polling)
 WHEN  buyer mở sites/[slug]/orders/[orderNumber]
 THEN  làm giàu component có sẵn OtShippingCard + OtTimeline (KHÔNG dựng trang/scene mới)
-  AND hiển thị courier + AWB + trạng thái tracking mới nhất
+  AND hiển thị courier + AWB + trạng thái tracking mới nhất (numeric → display label mapping)
   AND order.status (lifecycle) tách khỏi shippingTrackingStatus (display) — dual-field
   AND merchant order detail (OrderDetailPanel) có badge tracking tương ứng
 ```
 
-> 📌 Source: PRD FR C-8
+> 📌 Source: PRD §8 (status codes 0-11), design §2.4 dual-field table
 
-#### AC-2b: 13 status EasyParcel → chỉ 4 gợi ý lifecycle (manual)
+#### AC-2b: 11 numeric status codes → chỉ 4 gợi ý lifecycle (manual)
 
 ```gherkin
-GIVEN shippingTrackingStatus thuộc 13 enum EasyParcel
+GIVEN shippingTrackingStatus ∈ {0,2,3,4,5,6,7,8,11} (numeric codes from webhook/polling)
 WHEN  render tracking
-THEN  In Transit / Out for Delivery / On Hold / Exception → CHỈ hiển thị, KHÔNG đổi order.status
-  AND Collected → gợi ý merchant bấm shipped; Returned → refunded; Cancelled/Admin Cancel/Expired → cancelled
+THEN  4 Delivery In Transit / Out for Delivery / On Hold / Exception → CHỈ hiển thị, KHÔNG đổi order.status
+  AND 3 Collected → gợi ý merchant bấm shipped; 6 Returned → refunded; 0 Cancelled → cancelled
   AND mọi transition vẫn do merchant bấm tay (KHÔNG auto)
 ```
 
-> 📌 Source: PRD §6.C dual-field table · `researcher-260617-1406-easyparcel-status-mapping.md`
+> 📌 Source: PRD §8 numeric status code table (0/2/3/4/5/6/7/8/11)
 
-#### AC-3: Delivered → KHÔNG auto-complete (manual)
+#### AC-3: Delivered (code 5) → KHÔNG auto-complete (manual)
 
 ```gherkin
-GIVEN cron nhận trạng thái "delivered"
+GIVEN webhook/polling nhận shipment_status_code = 5 (Delivered)
 WHEN  cập nhật order
-THEN  CHỈ update shippingTrackingStatus (field hiển thị)
+THEN  CHỈ update shippingTrackingStatus = 5 (field hiển thị)
   AND KHÔNG tự chuyển order sang completed
   AND merchant tự bấm "Completed" (giữ manual order lifecycle hiện tại)
 ```
@@ -798,14 +805,15 @@ THEN  CHỈ update shippingTrackingStatus (field hiển thị)
 
 ### Additional Criteria
 
-- [ ] Không có webhook tracking → polling có độ trễ 30-60 phút (chấp nhận cho MVP).
+- [ ] **Webhook listeners (primary):** Subscribe topics 1 (status), 2 (awb), 3 (tracking) → async updates. **Polling fallback:** cron /api/cron/sync-tracking → POST /shipment/tracking_status + /shipment/details (every 30-60 min).
 - [ ] Cron auth bằng cron-secret; reject nếu thiếu/sai secret.
+- [ ] Numeric status codes (0-11) → display labels per dual-field mapping table (PRD §8, design §2.4).
 - [ ] KHÔNG show số dư ví EP / KHÔNG cron cảnh báo ví (đã bỏ); ví thiếu chỉ lộ khi tạo label fail (US-F36-06 AC-3).
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test: cron batch theo tenant dùng đúng api key; idempotent
+- [ ] Test: webhook listener receives topic 1/2/3 → order updates; polling cron batches correctly; numeric codes map to display labels
 - [ ] Cột order mới (shippingTrackingStatus) → MIGRATIONS (NFR-9)
 
 ---
@@ -833,7 +841,7 @@ So that I can process refunds through the existing Refund button without needing
 ```gherkin
 GIVEN an order where delivery failed (buyer no-show, COD refusal, or undeliverable)
   AND courier auto-returns the parcel to sender address (no new label, no EP API call)
-WHEN  cron /api/cron/sync-tracking polls EPParcelStatusBulk
+WHEN  webhook listener receives topic 1 (status) or cron /api/cron/sync-tracking polls POST /shipment/tracking_status
   AND receives a status that maps to 'Returned'
 THEN  shippingTrackingStatus is set to 'Returned' on the order
   AND no EasyParcel API call is made for the return leg
@@ -905,10 +913,10 @@ GIVEN order đã mua label nhưng chưa pickup
 WHEN  hủy đơn → POST /api/orders/[id]/refund (có sẵn, Stripe/manual)
 THEN  refund tiền HÀNG + restock (reuse)
   AND ship: message hướng dẫn merchant tự hủy shipment trên dashboard EasyParcel (credit hoàn ví)
-  AND không có API cancel programmatic cho MVP
+  AND MVP không wire cancel programmatic (product decision — `POST /shipment/cancel` có sẵn nhưng out-of-scope MVP)
 ```
 
-> 📌 Source: PRD FR D-5, D-6 + §10 RESOLVED (không có endpoint cancel → xử lý qua dashboard)
+> 📌 Source: PRD FR D-5, D-6 + §8 (cancel endpoint có sẵn; MVP defer sang dashboard)
 
 #### AC-3: Đã pickup → /refund có sẵn: refund hàng, cước mất
 

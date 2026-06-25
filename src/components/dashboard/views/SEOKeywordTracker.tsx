@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { addTrackedKeyword, deleteTrackedKeyword } from '@/app/(dashboard)/actions'
 import { useI18n } from '@/i18n'
+import { Switch } from '@/components/ui/switch'
 
 export interface TrackedKeyword {
     id: string | number;
@@ -165,8 +166,7 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
     const [checked, setChecked] = useState(defaultChecked)
     const [saving, setSaving] = useState(false)
 
-    const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newValue = e.target.checked
+    const handleChange = async (newValue: boolean) => {
         setChecked(newValue)
         if (!siteId) return
         setSaving(true)
@@ -193,18 +193,14 @@ export function AutoMetaToggle({ defaultChecked, siteId }: { defaultChecked: boo
                     {autoMeta.description || 'Automatically creates SEO-optimized title and description tags for new pages and products.'}
                 </span>
             </div>
-            {/* Only the switch itself toggles — clicking the label/description does nothing */}
-            <label className={`relative shrink-0 select-none ${saving ? 'cursor-wait' : 'cursor-pointer'}`}>
-                <input type="checkbox" checked={checked} onChange={handleChange} disabled={saving} className="peer sr-only" aria-label={autoMeta.label || 'Auto-Generate Meta Tags'} />
-                <div className="w-[52px] h-[28px] rounded-full bg-[#374151] peer-checked:bg-[#3B82F6] transition-colors peer-disabled:opacity-50" />
-                <span className="absolute top-1/2 -translate-y-1/2 left-[7px] text-[9px] font-bold text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none">
-                    {autoMeta.on || 'ON'}
-                </span>
-                <span className="absolute top-1/2 -translate-y-1/2 right-[6px] text-[9px] font-bold text-[#9CA3AF] opacity-100 peer-checked:opacity-0 transition-opacity pointer-events-none">
-                    {autoMeta.off || 'OFF'}
-                </span>
-                <div className="absolute top-[3px] left-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-[24px] pointer-events-none" />
-            </label>
+            {/* Shared <Switch> — same component as the product status toggle (teal when on). */}
+            <Switch
+                checked={checked}
+                onCheckedChange={handleChange}
+                disabled={saving}
+                className="shrink-0"
+                aria-label={autoMeta.label || 'Auto-Generate Meta Tags'}
+            />
         </div>
     )
 }

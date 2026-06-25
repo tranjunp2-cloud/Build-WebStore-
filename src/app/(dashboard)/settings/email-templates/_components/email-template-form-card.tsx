@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 
 const LIMITS = { subject: 200, greeting: 500, ctaLabel: 100, closing: 2000 }
 
@@ -34,9 +35,9 @@ function FieldRow({ label, required, hint, textarea, rows = 2, value, limit, var
     return (
         <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <Label className="text-sm font-medium text-foreground">
                     {label}{required && <span className="text-destructive ml-0.5">*</span>}
-                </label>
+                </Label>
                 <CharCounter len={len} limit={limit} />
             </div>
             {textarea ? (
@@ -141,18 +142,20 @@ export function EmailTemplateFormCard({
                 </div>
                 <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-white/[0.06] p-1 shrink-0 ml-4">
                     {(['en', 'ms'] as const).map((l) => (
-                        <button
+                        <Button
                             key={l}
                             type="button"
                             onClick={() => onLocaleChange(l)}
-                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${locale === l
-                                ? 'bg-white dark:bg-white/[0.12] text-slate-900 dark:text-white shadow'
+                            variant="ghost"
+                            size="sm"
+                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all h-auto ${locale === l
+                                ? 'bg-white dark:bg-white/[0.12] text-slate-900 dark:text-white shadow hover:bg-white dark:hover:bg-white/[0.12]'
                                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
                             <LocaleFlag locale={l} className="w-4 rounded-[2px]" />
                             {l.toUpperCase()}
-                        </button>
+                        </Button>
                     ))}
                 </div>
             </div>

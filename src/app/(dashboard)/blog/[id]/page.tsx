@@ -22,6 +22,10 @@ import { validateImageMagicBytes, MAX_IMAGE_SIZE } from '@/lib/validate-image'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { CategoryModal } from '../_components/CategoryModal'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 
 const BlogRichEditor = dynamic(
     () => import('../_components/BlogRichEditor').then(mod => mod.BlogRichEditor),
@@ -498,13 +502,16 @@ export default function BlogEditorPage() {
             <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-[12px] w-full">
                 {/* Row 1: Back + Breadcrumb + Title */}
                 <div className="flex flex-row items-center gap-[16px] min-w-0">
-                    <button
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => router.push('/blog')}
                         aria-label="Back to blog list"
-                        className="flex items-center justify-center w-[36px] h-[36px] rounded-[12px] hover:bg-[hsl(var(--muted))] transition-colors shrink-0"
+                        className="shrink-0"
                     >
-                        <ArrowLeft className="w-[18px] h-[18px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.66} />
-                    </button>
+                        <ArrowLeft className="w-[18px] h-[18px]" strokeWidth={1.66} />
+                    </Button>
                     <div className="flex flex-col gap-[4px] min-w-0">
                         <div className="flex flex-row items-center gap-[8px] flex-wrap">
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
@@ -526,10 +533,11 @@ export default function BlogEditorPage() {
                 {/* Row 2: Action Buttons — below on mobile, right-aligned on desktop */}
                 <div className="flex flex-row items-center gap-[12px] shrink-0">
                     {/* AI Assistant Button — icon-only on mobile per Figma */}
-                    <button
+                    <Button
+                        type="button"
                         onClick={() => setShowAIGenerator(true)}
-                        className="flex flex-row items-center justify-center h-[44px] xl:h-[48px] w-[68px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95"
-                        style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                        size="dash"
+                        className="w-[68px] xl:w-auto"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <g clipPath="url(#clip0_30970_14228)">
@@ -545,32 +553,35 @@ export default function BlogEditorPage() {
                                 </clipPath>
                             </defs>
                         </svg>
-                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.aiAssistant}</span>
-                    </button>
+                        <span className="hidden xl:inline">{t.dashboard.blog.editor.aiAssistant}</span>
+                    </Button>
 
                     {/* Save Draft Button — icon-only on mobile per Figma */}
-                    <button
+                    <Button
+                        type="button"
                         onClick={() => handleSave('draft')}
                         disabled={isSaving || success}
-                        className="flex flex-row items-center justify-center h-[46px] xl:h-[50px] w-[70px] xl:w-auto xl:px-[24px] gap-[8px] rounded-[16px] bg-[hsl(var(--secondary))] panel-outline hover:bg-[hsl(var(--secondary))]/80 transition-colors disabled:opacity-50"
+                        variant="dashSecondary"
+                        size="dash"
+                        className="w-[70px] xl:w-auto panel-outline"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12.6667 2.5C13.1063 2.50626 13.5256 2.68598 13.8333 3L17 6.16667C17.314 6.47438 17.4937 6.89372 17.5 7.33333V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H12.6667Z" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M14.1666 17.5007V11.6673C14.1666 11.4463 14.0788 11.2343 13.9225 11.0781C13.7662 10.9218 13.5543 10.834 13.3333 10.834H6.66659C6.44557 10.834 6.23361 10.9218 6.07733 11.0781C5.92105 11.2343 5.83325 11.4463 5.83325 11.6673V17.5007" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M5.83325 2.5V5.83333C5.83325 6.05435 5.92105 6.26631 6.07733 6.42259C6.23361 6.57887 6.44557 6.66667 6.66659 6.66667H12.4999" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-foreground">{t.dashboard.blog.editor.saveDraft}</span>
-                    </button>
+                        <span className="hidden xl:inline">{t.dashboard.blog.editor.saveDraft}</span>
+                    </Button>
 
                     {/* Publish Button — always shows icon + text */}
-                    <button
+                    <Button
+                        type="button"
                         onClick={() => handleSave('published')}
                         disabled={isSaving || success}
-                        className="flex flex-row items-center justify-center px-[24px] h-[48px] gap-[8px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
-                        style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                        size="dash"
                     >
                         {isSaving ? (
-                            <Loader2 className="w-[20px] h-[20px] text-white animate-spin" />
+                            <Loader2 className="w-[20px] h-[20px] animate-spin" />
                         ) : (
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <g clipPath="url(#clip0_30970_13422)">
@@ -584,8 +595,8 @@ export default function BlogEditorPage() {
                                 </defs>
                             </svg>
                         )}
-                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.publish}</span>
-                    </button>
+                        {t.dashboard.blog.editor.publish}
+                    </Button>
                 </div>
             </div>
 
@@ -599,18 +610,24 @@ export default function BlogEditorPage() {
                                 {t.dashboard.blog.editor.draftRecoveryMessage || 'Unsaved draft found. Restore it?'}
                             </p>
                             <div className="flex items-center gap-2">
-                                <button
+                                <Button
+                                    type="button"
                                     onClick={restoreDraft}
-                                    className="px-3 py-1.5 rounded-lg bg-warning/20 text-sm font-medium text-warning hover:bg-warning/30 transition-colors"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="bg-warning/20 text-warning hover:bg-warning/30 hover:text-warning"
                                 >
                                     {t.dashboard.blog.editor.draftRestore || 'Restore'}
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    type="button"
                                     onClick={dismissDraft}
-                                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground"
                                 >
                                     {t.dashboard.blog.editor.draftDismiss || 'Dismiss'}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -624,44 +641,40 @@ export default function BlogEditorPage() {
                     <div className="flex flex-col p-[24px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-col gap-[8px]">
                             <div className="flex flex-row justify-between items-center h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-foreground">{t.dashboard.blog.editor.postTitle}</label>
-                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-destructive" : "text-[hsl(var(--muted-foreground))]")}>
+                                <Label htmlFor="blog-title" className="font-semibold text-foreground">{t.dashboard.blog.editor.postTitle}</Label>
+                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-destructive" : "text-muted-foreground")}>
                                     {form.title.length}/255 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
-                            <div className="flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
-                                <input
-                                    type="text"
-                                    value={form.title}
-                                    onChange={(e) => updateField('title', e.target.value)}
-                                    maxLength={255}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
-                                    placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                />
-                            </div>
+                            <Input
+                                id="blog-title"
+                                type="text"
+                                value={form.title}
+                                onChange={(e) => updateField('title', e.target.value)}
+                                maxLength={255}
+                                placeholder={t.dashboard.blog.editor.titlePlaceholder}
+                                className="h-[48px]"
+                            />
                         </div>
                     </div>
 
                     <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
-                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">
+                            <Label htmlFor="blog-slug" className="text-muted-foreground">
                                 {t.dashboard.blog.editor.urlSlugLabel}
-                            </label>
+                            </Label>
                         </div>
                         <div className="flex flex-row items-center gap-[8px]">
-                            <div className="w-[124px] h-[20px]">
-                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">yoursite.com/blog/</span>
-                            </div>
-                            <div className="flex-1 flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
-                                <input
-                                    type="text"
-                                    value={form.slug}
-                                    onChange={(e) => updateField('slug', formatSlugInput(e.target.value))}
-                                    onBlur={(e) => updateField('slug', slugify(e.target.value))}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
-                                    placeholder="ksd-vdf"
-                                />
-                            </div>
+                            <span className="w-[124px] text-[14px] text-muted-foreground shrink-0">yoursite.com/blog/</span>
+                            <Input
+                                id="blog-slug"
+                                type="text"
+                                value={form.slug}
+                                onChange={(e) => updateField('slug', formatSlugInput(e.target.value))}
+                                onBlur={(e) => updateField('slug', slugify(e.target.value))}
+                                placeholder="ksd-vdf"
+                                className="flex-1 h-[48px]"
+                            />
                         </div>
                         {error === 'slug_invalid' && (
                             <p className="text-xs text-destructive">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
@@ -670,9 +683,9 @@ export default function BlogEditorPage() {
 
                     <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
-                            <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">
+                            <Label className="text-muted-foreground">
                                 {t.dashboard.blog.editor.thumbnailLabel}
-                            </label>
+                            </Label>
                         </div>
                         {thumbnailPreview ? (
                             <div className="relative w-full h-[256px] rounded-[16px]">
@@ -682,12 +695,15 @@ export default function BlogEditorPage() {
                                     alt="Thumbnail preview"
                                     className="w-full h-[256px] object-cover rounded-[16px]"
                                 />
-                                <button
+                                <Button
+                                    type="button"
                                     onClick={(e) => { e.preventDefault(); setThumbnailPreview(null); setThumbnailFile(null); setThumbnailId(null) }}
-                                    className="absolute top-[8px] right-[8px] flex items-center justify-center rounded-[8px] bg-[hsl(var(--background)/0.6)] px-[12px] py-[6px] text-[12px] font-[500] text-white hover:bg-[hsl(var(--background)/0.8)] transition-colors panel-outline"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="absolute top-[8px] right-[8px] panel-outline"
                                 >
                                     {t.dashboard.blog.editor.replace}
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             <label className="flex flex-col items-center justify-center cursor-pointer gap-[12px] py-[68px] h-[256px] border-2 border-dashed border-[hsl(var(--border))] rounded-[16px] bg-transparent hover:bg-white/5 transition-colors">
@@ -702,6 +718,8 @@ export default function BlogEditorPage() {
                                         <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.uploadHint}</span>
                                     </div>
                                 </div>
+                                {/* raw <input type="file"> intentionally kept: hidden file-picker inside <label>,
+                                    the shared <Input> component is for visible text inputs only */}
                                 <input
                                     type="file"
                                     accept="image/png, image/jpeg, image/jpg"
@@ -748,60 +766,61 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.category}</label>
+                                <Label className="text-muted-foreground">{t.dashboard.blog.editor.category}</Label>
                             </div>
                             <Popover open={isCategoryDropdownOpen} onOpenChange={setIsCategoryDropdownOpen}>
                                 <PopoverTrigger asChild>
-                                    <div className="w-full flex items-center justify-between h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground cursor-pointer outline-none">
+                                    <div className="w-full flex items-center justify-between h-[48px] bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground cursor-pointer outline-none">
                                         <span className="truncate">{categories.find(c => String(c.id) === String(form.category))?.name || t.dashboard.blog.editor.noCategory}</span>
                                         <ChevronDown className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))] shrink-0" />
                                     </div>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1.5 rounded-xl relative shadow-xl" style={{ minWidth: 'var(--radix-popover-trigger-width)', backgroundColor: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }} align="start">
                                     <div className="flex flex-col max-h-[250px] overflow-y-auto px-0.5 gap-0.5 scrollbar-thin scrollbar-track-transparent" style={{ scrollbarColor: 'var(--dash-border) transparent' }}>
-                                        <button
-                                            className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] rounded-lg text-left transition-colors", !form.category ? "font-[500]" : "font-[400]")}
-                                            style={{ backgroundColor: !form.category ? 'var(--dash-surface-hover)' : undefined, color: 'var(--dash-text)' }}
-                                            onMouseEnter={e => { if (form.category) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
-                                            onMouseLeave={e => { if (form.category) (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
-                                            onClick={() => { updateField('category', ''); setIsCategoryDropdownOpen(false); }}
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className={cn("w-full justify-start px-3 py-[10px] text-[14px] h-auto rounded-lg", !form.category ? "font-medium bg-[var(--dash-surface-hover)]" : "font-normal")}
+                                            style={{ color: 'var(--dash-text)' }}
+                                            onClick={() => { updateField('category', ''); setIsCategoryDropdownOpen(false) }}
                                         >
                                             <span className="truncate w-full">{t.dashboard.blog.editor.noCategory}</span>
-                                        </button>
+                                        </Button>
                                         {categories.map((cat) => (
-                                            <button
+                                            <Button
                                                 key={cat.id}
-                                                className={cn("flex w-full items-center px-3 py-[10px] text-[14px] font-['Inter'] leading-[1.4285714285714286em] rounded-lg text-left transition-colors", String(form.category) === String(cat.id) ? "font-[500]" : "font-[400]")}
-                                                style={{ backgroundColor: String(form.category) === String(cat.id) ? 'var(--dash-surface-hover)' : undefined, color: 'var(--dash-text)' }}
-                                                onMouseEnter={e => { if (String(form.category) !== String(cat.id)) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
-                                                onMouseLeave={e => { if (String(form.category) !== String(cat.id)) (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
-                                                onClick={() => { updateField('category', String(cat.id)); setIsCategoryDropdownOpen(false); }}
+                                                type="button"
+                                                variant="ghost"
+                                                className={cn("w-full justify-start px-3 py-[10px] text-[14px] h-auto rounded-lg", String(form.category) === String(cat.id) ? "font-medium bg-[var(--dash-surface-hover)]" : "font-normal")}
+                                                style={{ color: 'var(--dash-text)' }}
+                                                onClick={() => { updateField('category', String(cat.id)); setIsCategoryDropdownOpen(false) }}
                                             >
                                                 <span className="truncate w-full">{cat.name}</span>
-                                            </button>
+                                            </Button>
                                         ))}
                                     </div>
-                                    <div className="h-px my-1.5 mx-1" style={{ backgroundColor: 'var(--dash-border)' }} />
-                                    <button
-                                        onClick={() => { setIsCategoryDropdownOpen(false); setIsCategoryModalOpen(true); }}
-                                        className="flex w-full items-center gap-2 px-3 py-[10px] text-[14px] font-[500] font-['Inter'] leading-[1.4285714285714286em] text-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] rounded-lg transition-colors"
-                                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--dash-surface-hover)' }}
-                                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '' }}
+                                    <div className="h-px my-1.5 mx-1 bg-border" />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="w-full justify-start gap-2 px-3 py-[10px] text-[14px] font-medium h-auto rounded-lg text-primary hover:text-primary"
+                                        onClick={() => { setIsCategoryDropdownOpen(false); setIsCategoryModalOpen(true) }}
                                     >
                                         <Settings2 className="w-4 h-4 shrink-0" />
                                         <span>{t.dashboard.blog.editor.manageCategories}</span>
-                                    </button>
+                                    </Button>
                                 </PopoverContent>
                             </Popover>
                         </div>
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.author}</label>
+                                <Label className="text-muted-foreground">{t.dashboard.blog.editor.author}</Label>
                             </div>
-                            <div className="flex flex-row items-center h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px]">
-                                <User className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.5} />
-                                <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground">
+                            {/* Author is read-only — display shell intentionally kept as div */}
+                            <div className="flex flex-row items-center h-[48px] bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] rounded-lg px-[12px] gap-[10px]">
+                                <User className="w-[16px] h-[16px] text-muted-foreground" strokeWidth={1.5} />
+                                <span className="text-[14px] text-foreground">
                                     {getAuthorName()}
                                 </span>
                             </div>
@@ -809,19 +828,23 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[8px]">
                             <div className="h-[20px]">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.publishDate}</label>
+                                <Label className="text-muted-foreground">{t.dashboard.blog.editor.publishDate}</Label>
                             </div>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <button className="flex flex-row items-center w-full h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] px-[12px] gap-[10px] text-left outline-none cursor-pointer">
-                                        <Calendar className="w-[16px] h-[16px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.5} />
+                                    <Button
+                                        type="button"
+                                        variant="dashSecondary"
+                                        className="flex flex-row items-center w-full h-10 px-[12px] gap-[10px] justify-start panel-outline"
+                                    >
+                                        <Calendar className="w-[16px] h-[16px] text-muted-foreground shrink-0" strokeWidth={1.5} />
                                         <span className={cn(
-                                            "font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] flex-grow truncate",
-                                            !publishDate ? "text-[hsl(var(--muted-foreground))]" : "text-foreground"
+                                            "text-[14px] flex-grow truncate text-left",
+                                            !publishDate ? "text-muted-foreground" : "text-foreground"
                                         )}>
                                             {publishDate ? format(publishDate, "MMM d, yyyy") : ""}
                                         </span>
-                                    </button>
+                                    </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="dash-shell w-auto p-0 border-[hsl(var(--border))] text-foreground" align="start" style={{ backgroundColor: 'var(--dash-bg)' }}>
                                     <CalendarUI
@@ -842,36 +865,35 @@ export default function BlogEditorPage() {
                                 <Sparkles className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
                                 <span className="font-['Inter'] font-[700] text-[18px] leading-[1.5555555555555556em] text-foreground">{t.dashboard.blog.editor.seoTitle}</span>
                             </div>
-                            <button
+                            <Button
+                                type="button"
                                 onClick={(e) => {
                                     e.preventDefault()
                                     handleGenerateSEO()
                                 }}
                                 disabled={isGeneratingSEO || (!form.title.trim() && !getContentText(form.content).trim())}
-                                className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
-                                style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                                className="w-[151.23px] h-[32px] rounded-xl text-[12px]"
                             >
-                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-white" strokeWidth={1.5} />}
-                                <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-white">{t.dashboard.blog.editor.generateSeo}</span>
-                            </button>
+                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] animate-spin" /> : <Sparkles className="w-[16px] h-[16px]" strokeWidth={1.5} />}
+                                {t.dashboard.blog.editor.generateSeo}
+                            </Button>
                         </div>
 
                         <div className="flex flex-col gap-[7px]">
                             <div className="h-[20px] w-full">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.metaTitle}</label>
+                                <Label htmlFor="seo-title" className="text-muted-foreground">{t.dashboard.blog.editor.metaTitle}</Label>
                             </div>
-                            <div className="flex flex-row items-center px-[12px] py-[4px] h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))] w-full">
-                                <input
-                                    type="text"
-                                    value={form.seoTitle}
-                                    onChange={e => updateField('seoTitle', e.target.value)}
-                                    maxLength={60}
-                                    className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
-                                    placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
-                                />
-                            </div>
+                            <Input
+                                id="seo-title"
+                                type="text"
+                                value={form.seoTitle}
+                                onChange={e => updateField('seoTitle', e.target.value)}
+                                maxLength={60}
+                                placeholder={t.dashboard.blog.editor.seoTitlePlaceholder}
+                                className="h-[48px]"
+                            />
                             <div className="h-[16px] w-full flex items-center">
-                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">
+                                <span className="text-[12px] text-muted-foreground">
                                     {form.seoTitle.length}/60 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
@@ -879,19 +901,18 @@ export default function BlogEditorPage() {
 
                         <div className="flex flex-col gap-[9px]">
                             <div className="h-[20px] w-full">
-                                <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.metaDesc}</label>
+                                <Label htmlFor="seo-desc" className="text-muted-foreground">{t.dashboard.blog.editor.metaDesc}</Label>
                             </div>
-                            <div className="flex flex-row items-start px-[12px] py-[8px] h-[113px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))] w-full">
-                                <textarea
-                                    value={form.seoDescription}
-                                    onChange={e => updateField('seoDescription', e.target.value)}
-                                    maxLength={160}
-                                    className="w-full h-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-foreground placeholder:text-[hsl(var(--muted-foreground))] resize-none"
-                                    placeholder={t.dashboard.blog.editor.seoDescPlaceholder}
-                                />
-                            </div>
+                            <Textarea
+                                id="seo-desc"
+                                value={form.seoDescription}
+                                onChange={e => updateField('seoDescription', e.target.value)}
+                                maxLength={160}
+                                placeholder={t.dashboard.blog.editor.seoDescPlaceholder}
+                                className="h-[113px]"
+                            />
                             <div className="h-[16px] w-full flex items-center">
-                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[hsl(var(--muted-foreground))]">
+                                <span className="text-[12px] text-muted-foreground">
                                     {form.seoDescription.length}/160 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
@@ -922,12 +943,15 @@ export default function BlogEditorPage() {
                                     <span className="font-['Inter'] font-[400] text-[12px] xl:text-[14px] leading-[16px] xl:leading-[20px] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.aiModalDesc}</span>
                                 </div>
                             </div>
-                            <button
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={(e) => { e.preventDefault(); setShowAIGenerator(false) }}
-                                className="flex items-center justify-center w-[36px] h-[36px] rounded-[12px] hover:bg-white/5 transition-colors shrink-0"
+                                className="shrink-0"
                             >
-                                <X className="w-[20px] h-[20px] text-[hsl(var(--muted-foreground))]" strokeWidth={1.67} />
-                            </button>
+                                <X className="w-[20px] h-[20px]" strokeWidth={1.67} />
+                            </Button>
                         </div>
 
                         <div
@@ -938,14 +962,12 @@ export default function BlogEditorPage() {
                                 <div className="flex items-center w-full h-[20px]">
                                     <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground">{t.dashboard.blog.editor.aiTopicLabel}</span>
                                 </div>
-                                <div className="flex flex-row items-center px-[16px] py-[16px] xl:py-[4px] h-[58px] xl:h-[48px] bg-[hsl(var(--background))] [border:1px_solid_hsl(var(--input-border))] rounded-[16px] xl:rounded-[8px] focus-within:[border-color:hsl(var(--primary))] focus-within:ring-1 focus-within:ring-[hsl(var(--primary))]">
-                                    <input
-                                        value={aiPrompt}
-                                        onChange={e => setAiPrompt(e.target.value)}
-                                        placeholder={t.dashboard.blog.editor.titlePlaceholder}
-                                        className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[16px] leading-[24px] text-foreground placeholder:text-[hsl(var(--muted-foreground))]"
-                                    />
-                                </div>
+                                <Input
+                                    value={aiPrompt}
+                                    onChange={e => setAiPrompt(e.target.value)}
+                                    placeholder={t.dashboard.blog.editor.titlePlaceholder}
+                                    className="h-[58px] xl:h-[48px] rounded-2xl xl:rounded-lg text-base"
+                                />
                             </div>
 
                             <div className="flex flex-col gap-[12px] w-full">
@@ -958,10 +980,12 @@ export default function BlogEditorPage() {
                                         { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: t.dashboard.blog.editor.aiToneFriendlyDesc },
                                         { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: t.dashboard.blog.editor.aiTonePersuasiveDesc },
                                     ] as const).map((tone) => (
-                                        <button
+                                        <Button
                                             key={tone.key}
+                                            type="button"
                                             onClick={(e) => { e.preventDefault(); setAiTone(tone.key) }}
-                                            className="flex flex-row items-center gap-[12px] shrink-0 xl:flex-1 h-[70px] xl:h-[56px] px-[17px] xl:px-0 xl:justify-center transition-all relative rounded-[16px]"
+                                            variant="ghost"
+                                            className="flex flex-row items-center gap-[12px] shrink-0 xl:flex-1 h-[70px] xl:h-[56px] px-[17px] xl:px-0 xl:justify-center transition-all relative rounded-xl"
                                             style={aiTone === tone.key ? {
                                                 border: '1px solid hsl(var(--primary))',
                                                 background: 'hsl(var(--primary)/0.1)',
@@ -973,38 +997,36 @@ export default function BlogEditorPage() {
                                         >
                                             <span className="text-[24px] xl:text-[18px] leading-[32px] shrink-0">{tone.emoji}</span>
                                             <div className="flex flex-col items-start xl:items-center flex-1 xl:flex-initial">
-                                                <span className={`font-['Inter'] font-[600] xl:font-[500] text-[14px] leading-[20px] ${aiTone === tone.key ? 'text-[hsl(var(--primary))]' : 'text-foreground'}`}>{tone.label}</span>
-                                                <span className="xl:hidden font-['Inter'] font-[500] text-[12px] leading-[16px] text-[hsl(var(--muted-foreground))]">{tone.desc}</span>
+                                                <span className={`font-semibold xl:font-medium text-[14px] leading-[20px] ${aiTone === tone.key ? 'text-primary' : 'text-foreground'}`}>{tone.label}</span>
+                                                <span className="xl:hidden text-[12px] leading-[16px] text-muted-foreground">{tone.desc}</span>
                                             </div>
-                                            {aiTone === tone.key && <Check className="xl:hidden w-[20px] h-[20px] text-[hsl(var(--primary))] shrink-0" strokeWidth={2} />}
-                                        </button>
+                                            {aiTone === tone.key && <Check className="xl:hidden w-[20px] h-[20px] text-primary shrink-0" strokeWidth={2} />}
+                                        </Button>
                                     ))}
                                 </div>
                             </div>
 
                             {(!isGenerating && !generatedAiContent) && (
-                                <button
+                                <Button
+                                    type="button"
                                     onClick={handleGenerateWithAI}
                                     disabled={!aiPrompt.trim()}
-                                    className="flex flex-row justify-center items-center gap-[8px] w-full h-[56px] xl:h-[48px] rounded-[16px] xl:rounded-[10px] shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none transition-all"
-                                    style={{ background: !aiPrompt.trim() ? 'hsl(var(--primary)/0.5)' : 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                                    className="w-full text-base"
                                 >
-                                    <Sparkles className="w-[20px] h-[20px] text-white" strokeWidth={1.67} />
-                                    <span className={`font-['Inter'] font-[600] text-[16px] leading-[24px] ${!aiPrompt.trim() ? 'text-[hsl(var(--muted-foreground))]' : 'text-white'}`}>
-                                        {t.dashboard.blog.editor.aiGenerateBtn}
-                                    </span>
-                                </button>
+                                    <Sparkles className="w-[20px] h-[20px]" strokeWidth={1.67} />
+                                    {t.dashboard.blog.editor.aiGenerateBtn}
+                                </Button>
                             )}
                             {isGenerating && (
                                 <div className="w-full flex">
-                                    <button
+                                    <Button
+                                        type="button"
                                         disabled
-                                        className="flex flex-row justify-center items-center gap-[4px] w-full h-[56px] rounded-[16px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-all"
-                                        style={{ background: 'hsl(var(--primary)/0.5)' }}
+                                        className="w-full text-base opacity-50"
                                     >
-                                        <Loader2 className="w-[28px] h-[28px] text-[hsl(var(--muted-foreground))] animate-spin" />
-                                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[hsl(var(--muted-foreground))]">{t.dashboard.blog.editor.aiGenerating}</span>
-                                    </button>
+                                        <Loader2 className="w-[28px] h-[28px] animate-spin" />
+                                        {t.dashboard.blog.editor.aiGenerating}
+                                    </Button>
                                 </div>
                             )}
 
@@ -1027,8 +1049,8 @@ export default function BlogEditorPage() {
                                             <div className="w-full h-full overflow-y-auto pb-[16px] nice-scrollbar">
                                                 {generatedAiData?.title && (
                                                     <div className="mb-4">
-                                                        <h3 className="text-lg font-bold text-white mb-1">{generatedAiData.title}</h3>
-                                                        <p className="text-xs text-gray-500 mb-4">{t.dashboard.blog.editor.slugLabel} {slugify(generatedAiData.title)}</p>
+                                                        <h3 className="text-lg font-bold text-foreground mb-1">{generatedAiData.title}</h3>
+                                                        <p className="text-xs text-muted-foreground mb-4">{t.dashboard.blog.editor.slugLabel} {slugify(generatedAiData.title)}</p>
                                                     </div>
                                                 )}
                                                 <div className="w-full font-['Inter'] font-[400] text-[14px] leading-[1.625em] tracking-[-0.0107em] text-foreground whitespace-pre-wrap border-t border-[hsl(var(--border))] pt-4">
@@ -1046,16 +1068,20 @@ export default function BlogEditorPage() {
                                 className="flex flex-col xl:flex-row justify-end items-stretch xl:items-center self-stretch gap-[12px] p-[24px] xl:h-[101px] xl:pr-[24px] rounded-b-[16px] animate-in fade-in slide-in-from-bottom-2 duration-300 flex-shrink-0"
                                 style={{ background: 'var(--dash-bg)', borderTop: '1px solid var(--dash-border)' }}
                             >
-                                <button
+                                <Button
+                                    type="button"
                                     onClick={handleGenerateWithAI}
                                     disabled={isGenerating}
-                                    className="flex flex-row justify-center items-center gap-[6px] h-[48px] px-[16px] bg-[hsl(var(--background))] border-[1px] border-[hsl(var(--border))] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 active:scale-95 transition-all w-full xl:w-auto"
+                                    variant="dashSecondary"
+                                    size="dash"
+                                    className="h-[48px] px-[16px] w-full xl:w-auto panel-outline"
                                 >
-                                    <RefreshCw className="w-[16px] h-[16px] !text-white" />
-                                    <span className="font-['Inter'] font-[500] text-[14px] !text-white">{t.dashboard.blog.editor.aiRegenerate}</span>
-                                </button>
+                                    <RefreshCw className="w-[16px] h-[16px]" />
+                                    {t.dashboard.blog.editor.aiRegenerate}
+                                </Button>
 
-                                <button
+                                <Button
+                                    type="button"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         if (generatedAiData) {
@@ -1073,19 +1099,18 @@ export default function BlogEditorPage() {
                                         }
                                         setShowAIGenerator(false);
                                     }}
-                                    className="flex flex-row justify-center items-center gap-[6px] w-full xl:w-[187px] h-[48px] px-[10px] border-[1px] border-[hsl(var(--border))] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 active:scale-95 transition-all"
-                                    style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                                    className="w-full xl:w-[187px] h-[48px] rounded-[10px]"
                                 >
-                                    <Check className="w-[16px] h-[16px] !text-white" />
-                                    <span className="font-['Inter'] font-[500] text-[14px] !text-white">{t.dashboard.blog.editor.aiInsertBtn}</span>
-                                </button>
+                                    <Check className="w-[16px] h-[16px]" />
+                                    {t.dashboard.blog.editor.aiInsertBtn}
+                                </Button>
                             </div>
                         )}
                     </div>
                 </div>,
                 document.body
             )}
-            {isCategoryModalOpen && typeof document !== 'undefined' && createPortal(
+            {isCategoryModalOpen && (
                 <CategoryModal
                     onClose={() => setIsCategoryModalOpen(false)}
                     onCategoryUpdated={() => {
@@ -1093,8 +1118,7 @@ export default function BlogEditorPage() {
                             .then(docs => setCategories(docs || []))
                             .catch(() => { })
                     }}
-                />,
-                document.body
+                />
             )}
         </div >
     )

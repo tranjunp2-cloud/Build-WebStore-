@@ -215,12 +215,12 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 {/* Fixed Footer Actions */}
                 <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-background border-t border-white/[0.08] px-8 py-[18px]">
                     <div className="flex flex-row items-center gap-3 w-full bg-background">
-                        {/* Shared <Button> dashSecondary / dashPrimary (GH-1290 Bug 1) — giữ size full-width h-12 rounded-2xl */}
+                        {/* Shared <Button> dashSecondary / dashPrimary — dash size (h-9, rounded-lg) like every other action button */}
                         <Button
                             type="button"
                             variant="dashSecondary"
                             onClick={() => router.push('/products')}
-                            className="flex-1 h-12 rounded-2xl text-[16px]"
+                            className="flex-1 h-9 rounded-lg text-[13px]"
                         >
                             {t.dashboard.products.form.cancel}
                         </Button>
@@ -228,9 +228,9 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                             type="submit"
                             variant="dashPrimary"
                             disabled={isSaving}
-                            className="flex-1 h-12 rounded-2xl text-[16px] disabled:opacity-50"
+                            className="flex-1 h-9 rounded-lg text-[13px] disabled:opacity-50"
                         >
-                            <Save className="w-5 h-5 flex-shrink-0" />
+                            <Save className="w-4 h-4 flex-shrink-0" />
                             <span>{isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}</span>
                         </Button>
                     </div>

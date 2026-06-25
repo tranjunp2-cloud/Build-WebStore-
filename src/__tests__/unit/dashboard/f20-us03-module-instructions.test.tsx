@@ -140,9 +140,11 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         })
 
         // Assert
-        // 1. Tab Builder (🚀 AI Website Builder) phải ở trạng thái active color (bg-[hsl(var(--primary))])
-        const builderTab = screen.getByRole('button', { name: /AI Website Builder/i })
-        expect(builderTab).toHaveClass('bg-[hsl(var(--primary))]')
+        // 1. Tab Builder (🚀 AI Website Builder) phải ở trạng thái active (data-state="active")
+        // The underline variant marks active via data-state="active" + data-[state=active]:text-[hsl(var(--primary))]
+        // (bg-[hsl(var(--primary))] was removed when tabs migrated to shared Radix underline variant)
+        const builderTab = screen.getByRole('tab', { name: /AI Website Builder/i })
+        expect(builderTab).toHaveAttribute('data-state', 'active')
 
         // 2. Element builder phải được scrollIntoView
         expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })

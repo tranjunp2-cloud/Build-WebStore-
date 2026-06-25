@@ -10,20 +10,29 @@ import {
     Plus,
     Edit,
     Trash,
-    Trash2,
     Loader2,
-    Search,
     SearchX,
     AlertTriangle,
     FolderOpen,
     File,
     ChevronLeft,
-    X,
-    XCircle
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { TableSearch } from '@/components/ui/table-search'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from '@/components/ui/select'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { ImageUploader, UploadedImage } from '@/components/dashboard/ImageUploader'
 import { TablePagination } from '@/components/ui/table-pagination'
@@ -394,31 +403,26 @@ export default function CategoryManager() {
                             {t.dashboard.products.categories.subtitle || 'Manage product categories (up to 3 levels deep)'}
                         </p>
                     </div>
-                    <button
+                    <Button
                         onClick={() => handleOpenForm()}
-                        className="flex items-center gap-2 bg-gradient-to-r from-[#3b82f6] to-[#2dd4bf] !text-white px-5 py-2.5 rounded-[12px] text-[14px] font-semibold hover:opacity-90 transition-all shadow-lg shadow-[hsl(var(--primary)/0.2)] border-none cursor-pointer w-full sm:w-auto justify-center"
+                        variant="dashPrimary"
+                        size="dash"
+                        className="w-full sm:w-auto justify-center"
                     >
                         <Plus className="w-4 h-4" />
                         {t.dashboard.products.categories.addCategory || 'Add Category'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
-            {/* Search Bar */}
+            {/* Search Bar — shared <TableSearch> (same as Products list / Blog) */}
             <div className="mb-6">
-                {/* focus-within: focus border chuẩn DS thay vì raw input không state (GH-1290 Bug 3) */}
-                <div
-                    className="flex items-center gap-3 bg-[var(--dash-surface)] rounded-[12px] px-4 border border-[var(--dash-border)] transition-colors focus-within:border-[hsl(var(--primary))] focus-within:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
-                >
-                    <Search className="w-4 h-4 text-[var(--dash-text-muted)] shrink-0" />
-                    <input
-                        type="text"
-                        placeholder={t.dashboard.products.categories.search || 'Search categories...'}
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="flex-1 bg-transparent border-none text-[var(--dash-text)] text-[14px] py-3 outline-none placeholder:text-[var(--dash-text-muted)]"
-                    />
-                </div>
+                <TableSearch
+                    value={searchQuery}
+                    onSearch={setSearchQuery}
+                    placeholder={t.dashboard.products.categories.search || 'Search categories...'}
+                    className="max-w-full"
+                />
             </div>
 
             {/* Content box */}
@@ -512,10 +516,10 @@ export default function CategoryManager() {
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
                             <form id="cat-form" onSubmit={handleSave} className="flex flex-col gap-6">
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-[14px] font-medium text-[var(--dash-text)]">
+                                    <Label>
                                         {t.dashboard.products.categories.form.name || 'Category Name'} <span className="text-[hsl(var(--destructive))]">*</span>
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="text"
                                         required
                                         value={formData.name}
@@ -528,52 +532,49 @@ export default function CategoryManager() {
                                             }));
                                         }}
                                         placeholder={t.dashboard.products.categories.form.namePlaceholder}
-                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-[hsl(var(--primary))] transition-colors"
-                                        style={{ border: '1px solid var(--dash-border)' }}
                                     />
                                 </div>
 
                                 <div className="flex flex-col gap-2">
-                                    <label className="text-[14px] font-medium text-[var(--dash-text)]">
+                                    <Label>
                                         {t.dashboard.products.categories.form.parent || 'Parent Category'}
-                                    </label>
-                                    <div className="relative">
-                                        <select
-                                            value={formData.parent || ''}
-                                            onChange={e => setFormData({...formData, parent: e.target.value || null})}
-                                            className="w-full bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 pr-10 text-[16px] text-[var(--dash-text)] outline-none focus:border-[hsl(var(--primary))] transition-colors appearance-none"
-                                            style={{ border: '1px solid var(--dash-border)' }}
-                                        >
-                                            <option value="">{t.dashboard.products.categories.form.parentNone || '--None--'}</option>
+                                    </Label>
+                                    <Select
+                                        value={formData.parent ? String(formData.parent) : '__none__'}
+                                        onValueChange={val => setFormData({...formData, parent: val === '__none__' ? null : val})}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={t.dashboard.products.categories.form.parentNone || '--None--'} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">{t.dashboard.products.categories.form.parentNone || '--None--'}</SelectItem>
                                             {categories
-                                                .filter(c => c.id !== formData.id) // Prevent self as parent
+                                                .filter(c => c.id !== formData.id)
                                                 .map(c => (
-                                                <option key={c.id} value={c.id}>
-                                                    {c.breadcrumbs || c.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--dash-text-muted)] pointer-events-none" />
-                                    </div>
+                                                    <SelectItem key={c.id} value={String(c.id)}>
+                                                        {c.breadcrumbs || c.name}
+                                                    </SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[14px] font-semibold text-[var(--dash-text)] m-0 block">
-                                        {t.dashboard.products.categories.form.description || 'Description'} <span className="text-[var(--dash-text-muted)]">{t.dashboard.products.categories.form.optional || '(Optional)'}</span>
-                                    </label>
-                                    <textarea
+                                    <Label>
+                                        {t.dashboard.products.categories.form.description || 'Description'} <span className="text-muted-foreground">{t.dashboard.products.categories.form.optional || '(Optional)'}</span>
+                                    </Label>
+                                    <Textarea
                                         value={formData.description}
                                         onChange={e => setFormData({...formData, description: e.target.value})}
                                         placeholder={t.dashboard.products.categories.form.descriptionPlaceholder || 'Short description for SEO (optional)'}
-                                        className="w-full h-[80px] bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[14px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--primary)/0.5)] transition-all resize-none"
-                                        style={{ border: '1px solid var(--dash-border)' }}
+                                        className="h-[80px]"
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[14px] font-semibold text-[var(--dash-text)] m-0 block">
-                                        {t.dashboard.products.categories.form.image || 'Category Image'} <span className="text-[var(--dash-text-muted)]">{t.dashboard.products.categories.form.optional || '(Optional)'}</span>
-                                    </label>
+                                    <Label>
+                                        {t.dashboard.products.categories.form.image || 'Category Image'} <span className="text-muted-foreground">{t.dashboard.products.categories.form.optional || '(Optional)'}</span>
+                                    </Label>
                                     <ImageUploader
                                         value={formData.image ? [formData.image] : []}
                                         onChange={(imgs) => setFormData({...formData, image: imgs.length > 0 ? imgs[0] : null})}
@@ -585,16 +586,14 @@ export default function CategoryManager() {
                                 </div>
 
                                 <div className="flex flex-col gap-2 pt-2">
-                                    <label className="text-[14px] font-medium text-[var(--dash-text)]">
+                                    <Label>
                                         {t.dashboard.products.categories.form.slug || 'URL Slug'}
-                                    </label>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type="text"
                                         value={formData.slug}
                                         onChange={e => setFormData({...formData, slug: e.target.value})}
                                         placeholder={t.dashboard.products.categories.form.slugPlaceholder || 'category-url'}
-                                        className="bg-[var(--dash-bg)] rounded-[12px] px-4 py-3 text-[16px] text-[var(--dash-text)] placeholder:text-[var(--dash-text-muted)] outline-none focus:border-[hsl(var(--primary))] transition-colors"
-                                        style={{ border: '1px solid var(--dash-border)' }}
                                     />
                                 </div>
                             </form>
@@ -604,107 +603,63 @@ export default function CategoryManager() {
                             className="px-6 py-4 flex justify-end gap-3 bg-[var(--dash-secondary-bg)] rounded-b-[16px] shrink-0"
                             style={{ borderTop: '1px solid var(--dash-border)' }}
                         >
-                            <button
+                            <Button
                                 type="button"
+                                variant="dashSecondary"
+                                size="dash"
                                 onClick={() => setIsFormOpen(false)}
-                                className="px-6 py-2 h-[46px] rounded-[12px] text-[16px] font-medium text-[var(--dash-text)] bg-[var(--dash-bg)] hover:bg-[var(--dash-surface-hover)] transition-colors cursor-pointer"
-                                style={{ border: '1px solid var(--dash-border)' }}
                             >
                                 {t.dashboard.products.categories.form.cancel || 'Cancel'}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 form="cat-form"
                                 type="submit"
-                                className="flex items-center gap-2 px-6 py-2 h-[46px] rounded-[12px] text-[16px] font-semibold !text-white bg-gradient-to-r from-blue-500 to-teal-400 border-none outline-none shadow-[0_4px_6px_-4px_hsl(var(--primary)/0.3),0_10px_15px_-3px_hsl(var(--primary)/0.3)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                                variant="dashPrimary"
+                                size="dash"
+                                disabled={isSaving}
                             >
-                                {isSaving && <Loader2 className="w-5 h-5 animate-spin" />}
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {isSaving ? t.dashboard.products.categories.form.saving : (t.dashboard.products.categories.form.save || 'Save Category')}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Delete Modal */}
-            {isDeleteOpen && categoryToDelete && (() => {
+            {categoryToDelete && (() => {
                 const hasChildren = categories.some(c => {
                     const parentId = typeof c.parent === 'object' && c.parent ? c.parent.id : c.parent;
                     return parentId === categoryToDelete.id;
                 });
 
                 return (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div
-                        className="bg-[var(--dash-secondary-bg)] rounded-[16px] shadow-[0_25px_60px_rgba(0,0,0,0.5)] w-full max-w-[420px] flex flex-col max-h-[85vh] overflow-y-auto"
-                        style={{ border: '1px solid var(--dash-border)' }}
-                    >
-                        <div
-                            className="flex items-center justify-between px-6 py-5"
-                            style={{ borderBottom: '1px solid var(--dash-border)' }}
-                        >
-                            <div className="text-[18px] font-bold text-[var(--dash-text)] flex items-center gap-2.5 m-0 leading-none">
-                                <Trash2 className="w-5 h-5 shrink-0" aria-hidden />
-                                <span>{t.dashboard.products.categories.deleteModal.title || 'Delete Category'}</span>
-                            </div>
-                            <button
-                                onClick={() => setIsDeleteOpen(false)}
-                                className="w-8 h-8 rounded-[8px] flex items-center justify-center bg-transparent text-[var(--dash-text-muted)] hover:border-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)] transition-all cursor-pointer outline-none"
-                                style={{ border: '1px solid var(--dash-border)' }}
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <div className="p-6">
-                            <div className="text-center py-2 flex flex-col items-center">
-                                <div className="w-12 h-12 flex items-center justify-center mb-4">
-                                    <XCircle className="w-12 h-12 text-[hsl(var(--destructive))]" strokeWidth={1.5} />
-                                </div>
-                                <p className="text-[14px] text-[var(--dash-text-muted)] m-0">
-                                    {t.dashboard.products.categories.deleteModal.warning1 || 'Are you sure you want to delete'}
-                                </p>
-                                <div className="text-[16px] font-semibold text-[var(--dash-text)] mt-1">
-                                    {categoryToDelete.name}
-                                </div>
-
+                    <ConfirmModal
+                        open={isDeleteOpen}
+                        onConfirm={handleDelete}
+                        onCancel={() => { setIsDeleteOpen(false) }}
+                        title={t.dashboard.products.categories.deleteModal.title || 'Delete Category'}
+                        description={
+                            <span className="flex flex-col gap-3">
+                                <span>
+                                    {t.dashboard.products.categories.deleteModal.warning1 || 'Are you sure you want to delete'}{' '}
+                                    <span className="font-semibold text-foreground">{categoryToDelete.name}</span>?
+                                </span>
                                 {hasChildren && (
-                                    <div className="mt-5 p-3 pr-4 shadow-[0_0_0_1px_rgba(245,158,11,0.2)] bg-[hsl(var(--warning)/0.1)] rounded-[8px] text-[13px] text-[hsl(var(--warning))] text-left flex items-start gap-2.5 w-full">
+                                    <span className="flex items-start gap-2 rounded-lg bg-[hsl(var(--warning)/0.1)] px-3 py-2 text-[13px] text-[hsl(var(--warning))] text-left shadow-[0_0_0_1px_rgba(245,158,11,0.2)]">
                                         <AlertTriangle className="w-4 h-4 shrink-0 mt-[1px]" aria-hidden />
                                         <span className="leading-snug">
                                             {t.dashboard.products.categories.deleteModal.subCategoryWarning || 'This category has child categories. They will be unlinked from the tree (not permanently deleted).'}
                                         </span>
-                                    </div>
+                                    </span>
                                 )}
-                            </div>
-                        </div>
-
-                        <div
-                            className="flex justify-end gap-3 px-6 py-4 bg-[var(--dash-secondary-bg)] rounded-b-[16px]"
-                            style={{ borderTop: '1px solid var(--dash-border)' }}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => setIsDeleteOpen(false)}
-                                className="px-5 py-2.5 rounded-[8px] text-[14px] font-medium text-[var(--dash-text)] bg-transparent hover:bg-[var(--dash-surface-hover)] transition-colors cursor-pointer"
-                                style={{ border: '1px solid var(--dash-border)' }}
-                            >
-                                {t.dashboard.products.categories.deleteModal.cancel || 'Cancel'}
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-[8px] text-[14px] font-semibold !text-white bg-[hsl(var(--destructive))] border-none outline-none hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                                {isDeleting ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Trash2 className="w-4 h-4" />
-                                )}
-                                {isDeleting ? t.dashboard.products.categories.deleteModal.deleting : (t.dashboard.products.categories.deleteModal.confirm || 'Delete')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                            </span>
+                        }
+                        confirmLabel={isDeleting ? (t.dashboard.products.categories.deleteModal.deleting || 'Deleting...') : (t.dashboard.products.categories.deleteModal.confirm || 'Delete')}
+                        cancelLabel={t.dashboard.products.categories.deleteModal.cancel || 'Cancel'}
+                        variant="danger"
+                        loading={isDeleting}
+                    />
                 );
             })()}
         </div>

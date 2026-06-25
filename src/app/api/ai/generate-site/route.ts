@@ -45,6 +45,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -276,17 +277,20 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
-        if (resolvedTenantId) {
+        // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
+        // Syncing before SSE caused "Already taken" on retry after interrupted generation
+        // because the slug was claimed even when no site was created. The sync now runs
+        // only after runGenPipeline() succeeds, so a failed/aborted gen never locks the slug.
+        const syncTenantSlug = async () => {
+            if (!resolvedTenantId) return
             try {
                 const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
                 const currentSlug = tenant?.slug as string | undefined
                 const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
                 const businessName = businessInfo?.businessName || ''
 
-                // Case 1: User explicitly chose a slug in the builder → always sync, regardless of current slug
+                // Case 1: User explicitly chose a slug in the builder → always sync
                 if (userChosenSlug && userChosenSlug !== currentSlug) {
-                    // Slug was already verified available on client-side, but double-check uniqueness
                     const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
                     await payload.update({
                         collection: 'tenants',
@@ -294,7 +298,7 @@ export async function POST(req: NextRequest) {
                         data: { slug: newSlug } as Record<string, unknown>,
                     })
                 }
-                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
+                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade
                 else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
                     const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
@@ -1339,6 +1343,9 @@ export async function POST(req: NextRequest) {
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
+                        // F23: sync tenant slug now that generation succeeded (GH-1371)
+                        await syncTenantSlug()
+
                         // products_generated event
                         if (productsCreatedCount > 0) {
                             controller.enqueue(
@@ -1410,6 +1417,9 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             timeMs,
         } = await runGenPipeline()
+
+        // F23: sync tenant slug now that generation succeeded (GH-1371)
+        await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
         import('@/lib/sso/sso-api-client')
@@ -1491,41 +1501,6 @@ function cloneBlockData<T>(value: T): T {
     return JSON.parse(JSON.stringify(value))
 }
 
-function normalizeInternalUrl(url: unknown): string {
-    if (typeof url !== 'string') return '#'
-    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
-    if (url === '#about' || url === 'about') return '/about'
-    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
-    if (url === '#contact' || url === 'contact') return '/contact'
-    return url
-}
-
-/**
- * Map a CTA URL to a canonical page slug from the generated site's page list.
- * Returns '' when no matching internal page exists.
- * External URLs (https, mailto, tel, etc.) are passed through unchanged.
- */
-function resolveCtaSlugFromLinks(
-    rawUrl: unknown,
-    canonicalLinks: Array<{ url: string }>,
-): string {
-    const normalized = normalizeInternalUrl(rawUrl)
-    if (normalized === '') return ''
-    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
-    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
-    // Exact match (most common case — canonical slugs already align)
-    if (canonicalLinks.some(l => l.url === normalized)) return normalized
-    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
-    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
-    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
-    for (const kw of segments) {
-        if (kw.length < 3) continue
-        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
-        if (match) return match.url
-    }
-    return ''
-}
-
 /**
  * Fix hero and cta block CTA URLs across all page definitions to use
  * canonical slugs from the generated site. Runs after buildGeneratedPages
@@ -1557,6 +1532,10 @@ function patchPageCtaUrls(
                 } else {
                     block.ctaButton = undefined
                 }
+            }
+            if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
+                block.plans = (block.plans as Array<Record<string, unknown>>)
+                    .map(p => resolvePricingPlanCta(p, canonicalLinks))
             }
         }
     }

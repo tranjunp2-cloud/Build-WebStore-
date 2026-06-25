@@ -10,6 +10,7 @@ import { ALLOWED_PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 const CUSTOM_FEATURE_IDS = [...ALLOWED_PERMISSIONS] as const;
 const CUSTOM_FEATURE_FALLBACKS: Record<string, string> = {
@@ -141,9 +142,15 @@ export function StaffDrawer({
                     <h2 className="text-[24px] font-bold text-dash-text leading-[1.333em] font-['Inter']">
                         {isEditMode ? (t?.Staff?.drawer?.editTitle || 'Edit Staff Permissions') : (t?.Staff?.drawer?.inviteTitle || 'Invite New Staff')}
                     </h2>
-                    <button onClick={onClose} className="p-0 m-0 border-none shadow-none outline-none appearance-none bg-transparent hover:bg-dash-surface-hover rounded-[8px] flex items-center justify-center w-[32px] h-[32px] text-dash-text-muted hover:text-dash-text transition-colors">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-[32px] w-[32px] rounded-[8px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-[var(--dash-surface-hover)]"
+                    >
                         <X className="w-5 h-5" strokeWidth={1.6} />
-                    </button>
+                    </Button>
                 </div>
 
 
@@ -152,9 +159,9 @@ export function StaffDrawer({
                     
                     {/* Email Input */}
                     <div className="flex flex-col gap-[8px] px-[24px] pt-[24px]">
-                        <label className="text-[14px] font-medium text-dash-text font-['Inter']">
+                        <Label className="text-[14px] font-medium text-dash-text font-['Inter']">
                             {isEditMode ? (t?.Staff?.drawer?.email || 'Login Email') : (t?.Staff?.drawer?.email || 'Email Address')}
-                        </label>
+                        </Label>
                         <Input
                             type="email"
                             value={email}
@@ -178,9 +185,9 @@ export function StaffDrawer({
 
                     {/* Role Selection */}
                     <div className="flex flex-col gap-[16px] px-[24px] pt-[24px] pb-[24px]">
-                        <label className="text-[14px] font-semibold text-dash-text font-['Inter']">
+                        <Label className="text-[14px] font-semibold text-dash-text font-['Inter']">
                             {t?.Staff?.drawer?.roles?.label || 'Select Role'}
-                        </label>
+                        </Label>
                         <div className="flex flex-col gap-[12px]">
 
                             {/* Manager Option */}

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Monitor, Smartphone, RefreshCw, RotateCcw, FlaskConical, Mail } from 'lucide-react'
 import type { EmailTemplateType } from '@/lib/email/types'
 import type { EmailTemplateConfig } from '@/lib/email/types'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 interface Props {
     templateType: EmailTemplateType
@@ -81,32 +83,52 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         Live Preview
                     </span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        type="button"
-                        onClick={() => setPreviewMode('desktop')}
-                        title="Desktop"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                    >
-                        <Monitor className="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setPreviewMode('mobile')}
-                        title="Mobile"
-                        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                    >
-                        <Smartphone className="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleRefresh}
-                        title="Refresh"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors"
-                    >
-                        <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
+                <TooltipProvider>
+                    <div className="flex items-center gap-1">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={() => setPreviewMode('desktop')}
+                                    variant="ghost"
+                                    size="icon"
+                                    className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                >
+                                    <Monitor className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Desktop</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={() => setPreviewMode('mobile')}
+                                    variant="ghost"
+                                    size="icon"
+                                    className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                >
+                                    <Smartphone className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Mobile</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={handleRefresh}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white"
+                                >
+                                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Refresh</TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
             </div>
 
             {/* Mock inbox subject bar — styled as an inbox preview row */}
@@ -130,13 +152,14 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                 {fetchError ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-400">
                         <span className="text-xs text-destructive">Preview unavailable — check console for details</span>
-                        <button
+                        <Button
                             type="button"
                             onClick={handleRefresh}
-                            className="text-xs text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.8)] underline"
+                            variant="link"
+                            className="text-xs h-auto p-0"
                         >
                             Retry
-                        </button>
+                        </Button>
                     </div>
                 ) : (
                     <iframe
@@ -188,14 +211,15 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-white/[0.06] bg-[hsl(var(--card))] px-4 py-2.5 text-xs text-slate-500">
                 <span>Rendered with sample data · won&apos;t be sent to real customers</span>
-                <button
+                <Button
                     type="button"
                     onClick={onReset}
-                    className="flex items-center gap-1.5 text-xs text-slate-300 underline underline-offset-2 hover:text-white transition-colors"
+                    variant="link"
+                    className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white h-auto p-0"
                 >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset to default
-                </button>
+                </Button>
             </div>
         </div>
     )

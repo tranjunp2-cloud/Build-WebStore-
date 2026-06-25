@@ -9,6 +9,7 @@ import type { TemplateRow } from './EmailTemplatesClient'
 import { EmailTemplateFormCard } from './email-template-form-card'
 import { EmailPreviewPane } from './EmailPreviewPane'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
@@ -84,14 +85,22 @@ export function EmailTemplateEditView({
         <div className="w-full">
             {/* Header */}
             <div className="flex items-center gap-3 mb-4 flex-wrap">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.06] text-slate-400 hover:bg-white/10 hover:text-white transition-colors shrink-0"
-                    title={et.backToList}
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                </button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                type="button"
+                                onClick={onBack}
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{et.backToList}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
 
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] shrink-0">
                     <Mail className="h-5 w-5 text-white" />
@@ -118,31 +127,41 @@ export function EmailTemplateEditView({
                 </div>
 
                 {/* Header action buttons */}
-                <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                        type="button"
-                        onClick={onSendTest}
-                        disabled={isSendingTest}
-                        variant="dashSecondary"
-                        size="dash"
-                        className="text-xs"
-                        title={et.sendTestTitle}
-                    >
-                        <Send className="h-3.5 w-3.5" />
-                        {isSendingTest ? et.sending : et.sendTest}
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={onOpenInNewTab}
-                        variant="dashSecondary"
-                        size="dash"
-                        className="text-xs"
-                        title={et.openInNewTabTitle}
-                    >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        {et.openInNewTab}
-                    </Button>
-                </div>
+                <TooltipProvider>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={onSendTest}
+                                    disabled={isSendingTest}
+                                    variant="dashSecondary"
+                                    size="dash"
+                                    className="text-xs"
+                                >
+                                    <Send className="h-3.5 w-3.5" />
+                                    {isSendingTest ? et.sending : et.sendTest}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{et.sendTestTitle}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    onClick={onOpenInNewTab}
+                                    variant="dashSecondary"
+                                    size="dash"
+                                    className="text-xs"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    {et.openInNewTab}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{et.openInNewTabTitle}</TooltipContent>
+                        </Tooltip>
+                    </div>
+                </TooltipProvider>
             </div>
 
             {/* Save error banner */}

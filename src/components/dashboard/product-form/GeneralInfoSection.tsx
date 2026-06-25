@@ -5,6 +5,7 @@ import { ProductFormValues } from './schema'
 import { CategorySelect, Category } from '../CategorySelect'
 import { ImageUploader } from '../ImageUploader'
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
 
 const generateSlug = (text: string) => {
     return text
@@ -38,7 +39,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                 <label className="text-[14px] font-medium text-foreground flex items-center gap-1 leading-[1.43]">
                     {t.dashboard.products.form.sections?.productName || 'Product Name *'}
                 </label>
-                <input
+                <Input
                     {...register('name', {
                         onChange: (e) => {
                             if (!isEdit) {
@@ -47,7 +48,6 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                         }
                     })}
                     placeholder={t.dashboard.products.form.sections?.productNamePlaceholder || 'Enter product name'}
-                    className="w-full rounded-2xl border border-white/[0.08] bg-background px-4 py-3 text-[16px] text-foreground placeholder:text-foreground/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
                 />
                 {errors.name && (
                     <p className="text-xs text-destructive mt-1">{errors.name.message}</p>

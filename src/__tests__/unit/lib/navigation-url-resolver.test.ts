@@ -203,3 +203,150 @@ describe('[TC-F05-nav-resolver] resolveInternalUrlPath', () => {
         expect(resolveInternalUrlPath('/Missing-Page?x=1', map)).toBe('/missing-page')
     })
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// resolveCtaSlugFromLinks (GH-1359 manual drag CTA mapping)
+// ──────────────────────────────────────────────────────────────────────────
+
+import { resolveCtaSlugFromLinks } from '@/lib/navigation-url'
+
+describe('[TC-F01.CTA-DRAG] resolveCtaSlugFromLinks — CTA resolution', () => {
+    const canonicalLinks = [
+        { url: '/' },
+        { url: '/contact' },
+        { url: '/about' },
+    ]
+
+    // ── TC-F05-cta-resolver-01: #contact resolves to /contact ──────────
+    it('TC-F05-cta-resolver-01: #contact with /contact in pages → resolves to /contact', () => {
+        const result = resolveCtaSlugFromLinks('#contact', canonicalLinks)
+        expect(result).toBe('/contact')
+    })
+
+    // ── TC-F05-cta-resolver-02: no match returns empty string ─────────
+    it('TC-F05-cta-resolver-02: #about with /services (no match) → returns empty string', () => {
+        const links = [{ url: '/' }, { url: '/services' }]
+        const result = resolveCtaSlugFromLinks('#about', links)
+        expect(result).toBe('')
+    })
+
+    // ── TC-F05-cta-resolver-03: https passthrough ────────────────────
+    it('TC-F05-cta-resolver-03: https://x.com → passthrough unchanged', () => {
+        const result = resolveCtaSlugFromLinks('https://x.com', canonicalLinks)
+        expect(result).toBe('https://x.com')
+    })
+
+    // ── TC-F05-cta-resolver-04: mailto passthrough ───────────────────
+    it('TC-F05-cta-resolver-04: mailto:a@b.com → passthrough unchanged', () => {
+        const result = resolveCtaSlugFromLinks('mailto:a@b.com', canonicalLinks)
+        expect(result).toBe('mailto:a@b.com')
+    })
+
+    // ── TC-F05-cta-resolver-05: fuzzy keyword match (≥3 chars) ───────
+    it('TC-F05-cta-resolver-05: #contact-us with /contact → fuzzy match to /contact', () => {
+        const result = resolveCtaSlugFromLinks('#contact-us', canonicalLinks)
+        expect(result).toBe('/contact')
+    })
+
+    // ── Additional: tel passthrough ──────────────────────────────────
+    it('tel: protocol → passthrough unchanged', () => {
+        const result = resolveCtaSlugFromLinks('tel:+1234567890', canonicalLinks)
+        expect(result).toBe('tel:+1234567890')
+    })
+
+    // ── Additional: whatsapp passthrough ─────────────────────────────
+    it('whatsapp: protocol → passthrough unchanged', () => {
+        const result = resolveCtaSlugFromLinks('whatsapp:+1234567890', canonicalLinks)
+        expect(result).toBe('whatsapp:+1234567890')
+    })
+
+    // ── Additional: sms passthrough ──────────────────────────────────
+    it('sms: protocol → passthrough unchanged', () => {
+        const result = resolveCtaSlugFromLinks('sms:+1234567890', canonicalLinks)
+        expect(result).toBe('sms:+1234567890')
+    })
+
+    // ── Additional: #home normalizes to / ────────────────────────────
+    it('#home → normalizes to / (homepage alias)', () => {
+        const result = resolveCtaSlugFromLinks('#home', canonicalLinks)
+        expect(result).toBe('/')
+    })
+
+    // ── Additional: empty URL returns empty ───────────────────────────
+    it('empty string → returns empty string', () => {
+        const result = resolveCtaSlugFromLinks('', canonicalLinks)
+        expect(result).toBe('')
+    })
+
+    // ── Additional: null/undefined returns empty ─────────────────────
+    it('null → returns empty string', () => {
+        const result = resolveCtaSlugFromLinks(null, canonicalLinks)
+        expect(result).toBe('')
+    })
+
+    it('undefined → returns empty string', () => {
+        const result = resolveCtaSlugFromLinks(undefined, canonicalLinks)
+        expect(result).toBe('')
+    })
+
+    // ── Additional: fuzzy with short keyword (<3 chars) not matched ──
+    it('fuzzy match with short keyword (<3 chars) → not matched (no-hit)', () => {
+        const links = [{ url: '/about' }]
+        // 'a' is 1 char, filtered out in fuzzy matching
+        const result = resolveCtaSlugFromLinks('#a', links)
+        expect(result).toBe('')
+    })
+
+    // ── Additional: #ABOUT (uppercase) not in normalize table → passthrough, no match ─
+    it('#ABOUT (uppercase, not normalized) → no exact match, fuzzy attempts, returns empty', () => {
+        const links = [{ url: '/' }, { url: '/about' }]
+        const result = resolveCtaSlugFromLinks('#ABOUT', links)
+        // normalizeInternalUrl doesn't handle #ABOUT (case-sensitive), returns as-is
+        // No fuzzy match because 'ABOUT' keyword search looks for link URLs containing 'ABOUT'
+        // but links have '/about' (lowercase), so no match
+        expect(result).toBe('')
+    })
+
+    // ── Additional: / placeholder normalizes correctly ───────────────
+    it('/ bare slash normalizes to / (homepage)', () => {
+        const result = resolveCtaSlugFromLinks('#', canonicalLinks)
+        expect(result).toBe('/')
+    })
+
+    // ── Additional: empty links array returns empty ──────────────────
+    it('empty links array → no match (empty result)', () => {
+        const result = resolveCtaSlugFromLinks('#contact', [])
+        expect(result).toBe('')
+    })
+})
+
+// ── resolvePricingPlanCta (GH-1359 — shared by AI-gen + manual-drag) ──────────
+import { resolvePricingPlanCta } from '@/lib/navigation-url'
+
+describe('[TC-F01.CTA-DRAG] resolvePricingPlanCta — pricing CTA + actionType sync', () => {
+    const links = [{ url: '/' }, { url: '/contact' }, { url: '/about' }]
+
+    it('TC-F01.CTA-DRAG-09: placeholder # → /contact + actionType internal', () => {
+        const result = resolvePricingPlanCta({ name: 'Pro', ctaUrl: '#', ctaActionType: 'external' }, links)
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.ctaActionType).toBe('internal')
+    })
+
+    it('TC-F01.CTA-DRAG-10: resolvable #about → /about + internal', () => {
+        const result = resolvePricingPlanCta({ name: 'Starter', ctaUrl: '#about' }, links)
+        expect(result.ctaUrl).toBe('/about')
+        expect(result.ctaActionType).toBe('internal')
+    })
+
+    it('TC-F01.CTA-DRAG-11: unresolvable slug → fallback /contact + internal', () => {
+        const result = resolvePricingPlanCta({ name: 'Enterprise', ctaUrl: '#services' }, [{ url: '/' }])
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.ctaActionType).toBe('internal')
+    })
+
+    it('TC-F01.CTA-DRAG-12: external http URL → preserved, actionType untouched', () => {
+        const result = resolvePricingPlanCta({ name: 'Pro', ctaUrl: 'https://buy.stripe.com/x', ctaActionType: 'external' }, links)
+        expect(result.ctaUrl).toBe('https://buy.stripe.com/x')
+        expect(result.ctaActionType).toBe('external')
+    })
+})

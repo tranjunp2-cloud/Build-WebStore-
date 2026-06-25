@@ -1,3 +1,5 @@
+import { basename, resolve } from 'path'
+
 import type { CollectionConfig, PayloadHandler } from 'payload'
 import { APIError } from 'payload'
 
@@ -40,15 +42,16 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     // 1. Try local disk first (dev + legacy files). Match the staticDir env
     // logic above so we check the same path Payload's upload handler writes to.
     const localDir = process.env.VERCEL === '1' ? '/tmp/media' : 'public/media'
+    // safeFilename declared here so it is accessible in the S3 redirect below (fix TS2552).
+    const safeFilename = basename(filename)
     try {
         const fs = await import('fs/promises')
-        const path = await import('path')
-        const localPath = path.resolve(localDir, filename)
+        const localPath = resolve(localDir, safeFilename)
         const data = await fs.readFile(localPath)
         return new Response(data, {
             status: 200,
             headers: {
-                'Content-Type': mimeFromFilename(filename),
+                'Content-Type': mimeFromFilename(safeFilename),
                 'Content-Length': String(data.byteLength),
                 'Cache-Control': 'public, max-age=31536000, immutable',
             },
@@ -61,7 +64,7 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     const bucket = process.env.S3_BUCKET
     const endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT
     if (bucket && endpoint) {
-        return Response.redirect(`${endpoint}/${bucket}/${filename}`, 302)
+        return Response.redirect(`${endpoint}/${bucket}/${safeFilename}`, 302)
     }
 
     // 3. Nothing found — return clean 404 (not 500).
@@ -99,7 +102,7 @@ export const Media: CollectionConfig = {
                         sig.bytes.every((b, i) => head[sig.offset + i] === b),
                     )
                     if (!valid) {
-                        throw new APIError('Invalid image file — only JPEG, PNG, and WebP are accepted', 400)
+                        throw new APIError('Invalid image file — only JPEG, PNG, WebP, and ICO are accepted', 400)
                     }
                 } catch (e) {
                     if (e instanceof APIError) throw e

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import { SitesPageClient } from './SitesPageClient'
+import { isUsableSite } from '@/lib/dashboard/get-tenant-site-state'
 
 type SiteDoc = {
     id: string
@@ -38,9 +39,7 @@ export default async function MySitesPage() {
         sites = result.docs as unknown as SiteDoc[]
     }
 
-    const usableSites = sites.filter(
-        (s) => !s.generationStatus || s.generationStatus === 'none' || s.generationStatus === 'completed',
-    )
+    const usableSites = sites.filter(isUsableSite)
     const failedSites = sites.filter((s) => s.generationStatus === 'failed')
 
     return (

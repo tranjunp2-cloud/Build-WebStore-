@@ -33,15 +33,15 @@ export function DiscountSaveBar({ dirty, isNew, saving, onCancel, onSave }: Disc
             </span>
 
             <div className="flex items-center gap-2">
-                <button
+                <Button
                     type="button"
                     onClick={onCancel}
                     disabled={saving}
-                    className="rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50"
-                    style={{ color: 'var(--dash-text-muted)', background: 'var(--dash-surface-hover)' }}
+                    variant="dashSecondary"
+                    size="sm"
                 >
                     {d.cancel}
-                </button>
+                </Button>
 
                 <Button
                     type="button"

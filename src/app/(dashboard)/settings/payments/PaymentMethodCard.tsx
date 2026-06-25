@@ -3,6 +3,7 @@
 import React from 'react';
 import { Lock, Check, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/i18n';
 
 type IconTone = 'brand' | 'purple' | 'amber' | 'teal' | '';
@@ -66,37 +67,15 @@ export function PaymentMethodCard({
                             <p className="text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]">{desc}</p>
                         </div>
 
-                        {/* Toggle switch */}
+                        {/* Toggle switch — shared <Switch> (GH-1222) for consistency with Shipping
+                            and other settings toggles. */}
                         <div className="relative shrink-0 group/sw">
-                            <input
-                                type="checkbox"
-                                className="absolute opacity-0 w-0 h-0"
+                            <Switch
                                 checked={isActive}
                                 disabled={locked}
-                                onChange={() => !locked && onChange(!on)}
-                                tabIndex={-1}
-                                aria-hidden="true"
+                                onCheckedChange={() => !locked && onChange(!on)}
+                                aria-label={title}
                             />
-                            <button
-                                className={cn(
-                                    'w-[44px] h-[24px] rounded-full border relative transition-all duration-200',
-                                    !isActive && 'bg-white/10 border-white/[0.08]',
-                                    locked && 'opacity-45 cursor-not-allowed',
-                                )}
-                                style={isActive ? {
-                                    background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)',
-                                    boxShadow: '0 0 12px hsl(var(--info)/0.40)',
-                                    borderColor: 'transparent',
-                                } : undefined}
-                                onClick={() => !locked && onChange(!on)}
-                                aria-pressed={isActive}
-                                disabled={locked}
-                            >
-                                <span className={cn(
-                                    'absolute top-1/2 -translate-y-1/2 left-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200',
-                                    isActive && 'translate-x-[20px]',
-                                )} />
-                            </button>
 
                             {locked && (
                                 <div className="absolute -top-[7px] -right-[7px] w-[18px] h-[18px] rounded-full bg-[hsl(var(--card))] border border-white/[0.08] grid place-items-center text-warning">

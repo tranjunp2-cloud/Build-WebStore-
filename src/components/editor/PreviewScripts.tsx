@@ -27,7 +27,9 @@ export function PreviewScripts() {
             // keep window.location.origin fallback
         }
 
-        const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
+        // NOTE: 'DIV' intentionally excluded — a background wrapper DIV must not qualify as
+        // editable text (GH-1367 Bug 1). Editable text is authored via semantic tags below.
+        const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
         // cartWidget has no user-editable text fields — block contenteditable entirely
         const noTextEditBlockTypes = new Set(['cartWidget'])
@@ -307,6 +309,27 @@ export function PreviewScripts() {
             window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, parentOrigin)
         }
 
+        // GH-1367 Bug 1: returns true only when the cursor is over a real rendered text node,
+        // not over padding/background/empty area of a block. Lets background clicks fall through
+        // to block selection instead of wrongly activating the text edit toolbar.
+        const clickLandedOnTextNode = (x: number, y: number): boolean => {
+            const doc = document as Document & {
+                caretRangeFromPoint?: (x: number, y: number) => Range | null
+                caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node | null } | null
+            }
+            if (typeof doc.caretRangeFromPoint === 'function') {
+                const range = doc.caretRangeFromPoint(x, y)
+                return !!range && range.startContainer?.nodeType === Node.TEXT_NODE
+            }
+            // Firefox
+            if (typeof doc.caretPositionFromPoint === 'function') {
+                const pos = doc.caretPositionFromPoint(x, y)
+                return !!pos && pos.offsetNode?.nodeType === Node.TEXT_NODE
+            }
+            // No caret API support (ultra-rare) → preserve legacy behavior, don't block editing
+            return true
+        }
+
         const onTextClick = (e: MouseEvent) => {
             let target = e.target as HTMLElement
             if ((target as HTMLElement).closest('[data-editor-control]')) return
@@ -317,6 +340,10 @@ export function PreviewScripts() {
             if (blockType && excludedBlockTypes.includes(blockType)) return
             // whatsapp-button and cartWidget use InlineEdit — global contenteditable must not activate
             if (blockType && noTextEditBlockTypes.has(blockType)) return
+
+            // GH-1367 Bug 1: only activate text editing when the click landed on actual text glyphs.
+            // Background/padding clicks fall through so onClick() block-selection takes over.
+            if (!clickLandedOnTextNode(e.clientX, e.clientY)) return
 
             // Walk up from click target to find nearest valid editable element
             // (click may land on <b>, <i>, <u> inside a valid element)

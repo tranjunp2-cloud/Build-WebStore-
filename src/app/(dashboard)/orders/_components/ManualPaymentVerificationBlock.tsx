@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Loader2, X, ZoomIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 import { RejectPaymentModal } from './RejectPaymentModal'
 
 function ProofLightbox({ url, onClose }: { url: string; onClose: () => void }) {
@@ -219,47 +220,24 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                     </div>
 
                     {/* Action buttons */}
-                    <button
+                    <Button
+                        variant="dashPrimary"
                         onClick={handleApprove}
                         disabled={isApproving}
-                        className="flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
-                        style={{
-                            height: 48,
-                            width: '100%',
-                            borderRadius: 12,
-                            background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
-                            fontFamily: 'Inter, sans-serif',
-                            fontWeight: 600,
-                            fontSize: 15,
-                            color: '#FFFFFF',
-                            opacity: isApproving ? 0.5 : 1,
-                            cursor: isApproving ? 'not-allowed' : 'pointer',
-                        }}
+                        className="w-full h-9 rounded-lg text-[13px] disabled:opacity-50"
                     >
                         {isApproving && <Loader2 className="w-4 h-4 animate-spin" />}
                         {isApproving ? pv.approving : pv.approve}
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
+                        variant="dashSecondary"
                         onClick={() => setIsRejectModalOpen(true)}
                         disabled={isApproving}
-                        className="flex items-center justify-center transition-opacity hover:opacity-80"
-                        style={{
-                            height: 48,
-                            width: '100%',
-                            borderRadius: 12,
-                            border: '1px solid hsl(var(--destructive)/0.4)',
-                            background: 'transparent',
-                            fontFamily: 'Inter, sans-serif',
-                            fontWeight: 600,
-                            fontSize: 15,
-                            color: 'hsl(var(--destructive))',
-                            cursor: isApproving ? 'not-allowed' : 'pointer',
-                            opacity: isApproving ? 0.4 : 1,
-                        }}
+                        className="w-full h-9 rounded-lg text-[13px] [border:1px_solid_hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] disabled:opacity-50"
                     >
                         {pv.reject}
-                    </button>
+                    </Button>
                 </div>
 
                 {isRejectModalOpen && (

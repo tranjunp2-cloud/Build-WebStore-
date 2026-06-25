@@ -48,15 +48,16 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.12] Allows toggling COD and saves changes', async () => {
-        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
         });
 
         // Toggle COD on (marks form dirty)
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const codSwitch = checkboxes[0]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        const switches = screen.getAllByRole('switch');
+        const codSwitch = switches[0];
         fireEvent.click(codSwitch);
 
         // Click Save changes button (form requires explicit save, no auto-save)
@@ -69,14 +70,15 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.13] Expands QR Widget if toggling QR Banking without an image (Gatekeeping Rule)', async () => {
-        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
         });
 
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        const switches = screen.getAllByRole('switch');
+        const qrSwitch = switches[1];
 
         // Click to enable without image - Auto-expands the widget
         fireEvent.click(qrSwitch);
@@ -93,9 +95,8 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
         });
 
-        // Click QR Toggle to show upload widget
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        // Click QR Toggle to show upload widget — Stripe not connected → COD[0], QR[1]
+        const qrSwitch = screen.getAllByRole('switch')[1];
         fireEvent.click(qrSwitch);
 
         const file = new File(['x'.repeat(3 * 1024 * 1024)], 'large_qr.png', { type: 'image/png' });
@@ -118,9 +119,8 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
         });
 
-        // Click QR Toggle to show upload widget
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
+        // Click QR Toggle to show upload widget — Stripe not connected → COD[0], QR[1]
+        const qrSwitch = screen.getAllByRole('switch')[1];
         fireEvent.click(qrSwitch);
 
         const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -134,27 +134,30 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         const getPaymentSettingsMock = vi.mocked(actionsMock.getPaymentSettings);
         getPaymentSettingsMock.mockResolvedValueOnce({
             success: true,
-            payments: { 
-                payment_cod: false, 
-                payment_qr: true, 
-                qr_image: { id: 'img-123', url: 'https://example.com/qr.png' } 
+            payments: {
+                payment_cod: false,
+                payment_qr: true,
+                qr_image: { id: 'img-123', url: 'https://example.com/qr.png' }
             }
         });
 
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
-        
+
+        // Stripe not connected → COD[0], QR[1]; wait until QR switch is aria-checked=true
         await waitFor(() => {
-            expect((container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement).checked).toBe(true); // Stripe not connected → COD[0], QR[1]
+            const switches = screen.getAllByRole('switch');
+            expect(switches[1].getAttribute('aria-checked')).toBe('true');
         });
 
-        const qrSwitch = container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement; // Stripe not connected → COD[0], QR[1]
         const removeBtn = container.querySelector('button[title="Remove"]') as HTMLButtonElement | null;
         if (removeBtn) {
             fireEvent.click(removeBtn);
         }
 
+        // After removing image, handleRemoveImage sets paymentQr=false → QR switch becomes unchecked
         await waitFor(() => {
-            expect(qrSwitch.checked).toBe(false);
+            const switches = screen.getAllByRole('switch');
+            expect(switches[1].getAttribute('aria-checked')).toBe('false');
         });
     });
 
@@ -165,32 +168,32 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
             payments: { payment_cod: true, payment_qr: false, qr_image: null },
         });
 
-        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
         });
 
         // Act: try to toggle COD off (it is the only active method)
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const codSwitch = checkboxes[0];
+        // Stripe not connected → COD[0], QR[1]
+        const codSwitch = screen.getAllByRole('switch')[0];
         fireEvent.click(codSwitch);
 
-        // Assert: error toast fired, COD still checked, save NOT called
+        // Assert: error toast fired, COD still aria-checked=true (guard blocked toggle), save NOT called
         expect(toast.error).toHaveBeenCalledWith('At least one payment method must stay active.');
-        expect(codSwitch.checked).toBe(true);
+        expect(codSwitch.getAttribute('aria-checked')).toBe('true');
         expect(updatePaymentSettings).not.toHaveBeenCalled();
     });
 
     it('[TC-F19.18] Auto-scrolls Bank Transfer form into view when toggled on', async () => {
         // Arrange: default render (no QR)
-        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
         });
 
         // Act: toggle QR on (expands widget — no image so expand-gate triggers)
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const qrSwitch = checkboxes[1];
+        // Stripe not connected → COD[0], QR[1]
+        const qrSwitch = screen.getAllByRole('switch')[1];
         fireEvent.click(qrSwitch);
 
         // Assert: scrollIntoView called (expand triggered the useEffect)
@@ -217,8 +220,9 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         });
 
         // Make form dirty so Save is enabled (toggle COD on)
-        const checkboxes = document.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        fireEvent.click(checkboxes[0]); // toggle COD on to mark dirty
+        // Stripe not connected → COD[0], QR[1]
+        const codSwitch = screen.getAllByRole('switch')[0];
+        fireEvent.click(codSwitch); // toggle COD on to mark dirty
 
         // Act: click Save with empty bank transfer fields
         const saveBtn = screen.getByRole('button', { name: /save changes/i });
@@ -233,24 +237,26 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
     it('[TC-F19.20] Cancel button reverts unsaved changes', async () => {
         // Arrange: default (COD off)
-        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
+        render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
         });
 
-        // Make form dirty: toggle COD on
-        const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
-        const codSwitch = checkboxes[0];
+        // Make form dirty: toggle COD on — Stripe not connected → COD[0], QR[1]
+        const codSwitch = screen.getAllByRole('switch')[0];
         fireEvent.click(codSwitch);
-        expect(codSwitch.checked).toBe(true);
+        // COD is now on → aria-checked="true"
+        expect(codSwitch.getAttribute('aria-checked')).toBe('true');
 
         // Act: click Cancel — no confirm dialog, reverts immediately
         const cancelBtn = screen.getByRole('button', { name: /cancel/i });
         fireEvent.click(cancelBtn);
 
-        // Assert: COD reverts to unchecked (server state)
+        // Assert: COD reverts to unchecked (server state = false by default mock)
         await waitFor(() => {
-            expect(codSwitch.checked).toBe(false);
+            // Re-query after re-render triggered by cancel
+            const switches = screen.getAllByRole('switch');
+            expect(switches[0].getAttribute('aria-checked')).toBe('false');
         });
     });
 });

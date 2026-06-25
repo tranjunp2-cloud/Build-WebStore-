@@ -16,11 +16,11 @@ Tài liệu wireframe & UI spec low-fi cho **EasyParcel Delivery Integration**. 
 
 ## 1. Feature Summary
 
-> **🚚 Delivery Model:** AGGREGATOR (EasyParcel) — per-merchant API key, **non-custody** (platform RM0). UI có courier picker, "Tạo vận đơn" (mua AWB), in label, đặt pickup, tracking sync. **Hybrid:** chưa cấu hình đủ → fallback flat-rate F14 (UI cũ không vỡ).
+> **🚚 Delivery Model:** AGGREGATOR (EasyParcel) — per-merchant OAuth account, **non-custody** (platform RM0). UI có courier picker, "Tạo vận đơn" (mua AWB), in label, đặt pickup, tracking sync. **Hybrid:** chưa cấu hình đủ → fallback flat-rate F14 (UI cũ không vỡ).
 
 F36 gồm 5 surface chính, theo 4 phase PRD:
 
-- **Screen A — EasyParcel Settings (Phase A):** Tab "EasyParcel" trong `settings/shipping`. Merchant dán 2 key (`api` + `authentication`), nhập warehouse origin (geo cascade), "Test connection" (auto-detect env), chọn 1 courier cho shop.
+- **Screen A — EasyParcel Settings (Phase A):** Tab "EasyParcel" trong `settings/shipping`. Merchant bấm **Connect with EasyParcel** (OAuth redirect — không dán key; env Demo/Live do tài khoản merchant authorize quyết định), nhập warehouse origin (geo cascade), chọn 1 courier cho shop.
 - **Screen B — Checkout Rate (Phase B):** Buyer nhập địa chỉ (reuse F14 cascade) → phí ship thật vào thẳng Order Summary (1 dòng "Shipping", KHÔNG section vận chuyển, KHÔNG SST). Hybrid: chưa cấu hình → giữ UI fee đơn F14.
 - **Screen C — Create Label (Phase C):** KHÔNG màn riêng. Mua label gắn vào nút **"Ready to Ship"** có sẵn trong `OrderDetailPanel` → AWB + label PDF; in label; pickup/dropoff. Non-EP: `ShipOrderModal` manual giữ nguyên (nhánh do config tenant, KHÔNG tab toggle).
 - **Screen D — Order Tracking (Phase C):** KHÔNG màn riêng — làm giàu component có sẵn của trang đơn buyer (`OrderTrackingClient`: `OtShippingCard` + `OtTimeline`) + badge tracking trong `OrderDetailPanel` merchant. Dual-field: `order.status` (lifecycle, manual) tách khỏi `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron poll 30–60′).
@@ -56,14 +56,10 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │  ↳ Staff     │ │ Mỗi cửa hàng dùng tài khoản EasyParcel│ │
 │              │ │ riêng. Cước trừ thẳng ví của bạn.    │ │
 │              │ │                                      │ │
-│              │ │ API Key (api)                        │ │
-│              │ │ ┌──────────────────────────────┐     │ │
-│              │ │ │ ••••••••••••••••••••          │     │ │
-│              │ │ └──────────────────────────────┘     │ │
-│              │ │ Auth Key (authentication)            │ │
-│              │ │ ┌──────────────────────────────┐     │ │
-│              │ │ │ ••••••••••••••••••••          │     │ │
-│              │ │ └──────────────────────────────┘     │ │
+│              │ │   [ 🔌 Connect with EasyParcel ↗ ]  │ │
+│              │ │   OAuth — đăng nhập tài khoản EP,    │ │
+│              │ │   không cần dán key. Warehouse +    │ │
+│              │ │   courier mở khoá sau khi connect.  │ │
 │              │ │                                      │ │
 │              │ │ 🏭 Warehouse (origin)                │ │
 │              │ │ Address Line 1                       │ │
@@ -82,11 +78,11 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 ```text
 │ ┌──────────────────────────────────────┐ │
-│ │ ✅ Connected — Production (tự nhận)  │ │ ◄── green Alert
+│ │ ✅ Connected — Live (account + ví)   │ │ ◄── green Alert
 │ │                                      │ │
 │ │ 🚚 Courier (chọn 1 cho shop)         │ │
 │ │  (•) J&T Express    [Phổ biến SME]   │ │
-│ │  ( ) Pos Laju       [Phổ biến SME]   │ │
+│ │  ( ) DHL eCommerce  [Phổ biến SME]   │ │
 │ │  ( ) Flash Express  [Phổ biến SME]   │ │
 │ │  ＋ Xem thêm courier (3)             │ │
 │ │  (không show giá — giá thật ở        │ │
@@ -96,26 +92,25 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 ```
 
 **Components (shadcn/ui mapping):**
-- Tabs: `<Tabs>` "Flat Rate" / "EasyParcel" (default = Flat Rate khi chưa connect)
-- Connect toggle: `<Switch>` (enabled)
-- Keys: `<Input type="password">` × 2 (api + authentication) — luôn masked, có nút 👁 reveal. KHÔNG có RadioGroup env — auto-detect ở Test connection (production trước, fail → demo)
-- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse có sẵn (`/api/geo/{states,districts,postcodes}`, bảng `malaysia_*`). Warehouse = **Prime SoT** (dùng cho cả rate + label/pickup), KHÔNG sync từ EP — merchant nhập, postcode force-validate ở Test connection. Cascade trả `zone` (west/east) → dùng cho COD West-MY. DRY: cân nhắc tách `AddressCascadeFields` dùng chung với checkout
-- Test connection: `<Button variant="outline">` + `<Loader2>` khi gọi `EPRateCheckingBulk` (validate cả key lẫn warehouse postcode)
-- Courier: `<RadioGroup>` **single-select** từ response (`courier_id` stable key, `courier_name` + logo, **KHÔNG show giá** — giá thật chỉ ở checkout). Chỉ **1 courier** active/shop (`selectedCourier`). Default = **J&T**; top 3 (J&T, Pos Laju, Flash) + `<Badge>` "Phổ biến SME"; còn lại gập trong `<Collapsible>`/`<details>` "＋ Xem thêm courier". KHÔNG có setting label mode (vận đơn luôn manual ở Phase C)
-- Parcel weight/dims: KHÔNG có form trong settings — lấy từ `Products.weight` + `Products.dimensions` (có sẵn); product=0 → fallback hằng số hệ thống (`DEFAULT_PARCEL` const trong code)
+- Tabs: `<Tabs>` "Flat Rate" / "EasyParcel" (default = Flat Rate chưa kết nối)
+- Connect button: `<Button variant="default">` "Connect with EasyParcel ↗" (blue) → redirects OAuth popup to `https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...`
+- OAuth callback (backend): POST `/oauth/token` exchanges `code` + Basic auth → `access_token` (10h) + `refresh_token` (1yr), stores securely per tenant.oauthTokens
+- Connected state: Green `<Alert>` showing account name + wallet balance + Disconnect button
+- Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → dùng cho COD West-MY. Force-validate postcode via rate-check call.
+- Courier: `<RadioGroup>` **single-select** từ response tại OAuth connect (`courier_id`, `courier_name`, logo). Chỉ **4 couriers** (COD-supporting: J&T, DHL eCommerce, Flash, Aramex) — no "See more" collapse.
+- Parcel weight/dims: KHÔNG có form — lấy từ `Products.weight` + `Products.dimensions`; product=0 → const `DEFAULT_PARCEL`
 
 **States:**
 | State | UI |
 |-------|-----|
-| Disconnected | Chỉ hiện block Connect; phần chọn courier ẩn |
-| Testing | Test button → spinner "Đang kiểm tra..."; form disabled |
-| Connected OK | Green `<Alert>` "Connected — env tự nhận"; lộ phần chọn courier; Save enabled |
-| Invalid key | Red `<Alert>` `EASYPARCEL_INVALID_KEY` — "API key hoặc Auth key không hợp lệ" (đã thử cả production + demo); KHÔNG lưu |
-| Invalid warehouse | Red `<Alert>` `EASYPARCEL_INVALID_WAREHOUSE` — "Địa chỉ kho không hợp lệ — kiểm tra lại postcode" (key OK nhưng origin sai); KHÔNG lưu |
-| API error | Red `<Alert>` "EasyParcel tạm lỗi, thử lại" — không lộ key trong message/log |
-| Saving | Save → spinner; on success Toast "Đã lưu cấu hình EasyParcel" |
+| Disconnected | "Status: Not Connected"; "Connect with EasyParcel ↗" button; warehouse/courier locked |
+| Connecting | Button → "Redirecting..." (OAuth popup opens in new tab) |
+| Connected OK | Green `<Alert>` "Connected — Account: [Name] (Live)" + wallet balance + Disconnect button; warehouse/courier unlock, Save enabled |
+| OAuth error | Red `<Alert>` reason (invalid redirect_uri, user denied, etc.); retry Connect |
+| Warehouse validation fail | Red `<Alert>` "Postcode invalid — check warehouse address"; re-enter address |
+| Saving | Save button → spinner; on success Toast "Saved EasyParcel configuration" |
 
-> **Security note:** PATCH key yêu cầu auth + IDOR check (chỉ owner tenant, mirror `hasSiteAccess`). 2 key lưu trong `tenant.easyParcelIntegration` (`apiKey` + `authKey`), masked ở response.
+> **Security note:** OAuth tokens (access + refresh) stored securely per tenant.oauthTokens. Refresh token lifecycle auto-managed on token-expired responses (401). PATCH authorized via session auth + IDOR check (`hasSiteAccess`).
 
 ---
 
@@ -245,7 +240,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 └───────────────────────────────────────────────┘
 ```
 
-**Sau khi tạo OK (2 bước: EPSubmitOrderBulk → EPPayOrderBulk):**
+**Sau khi tạo OK (1 bước: `POST /shipment/submit_orders` — ví bị trừ ngay khi submit):**
 
 ```text
 ┌───────────────────────────────────────────────┐
@@ -287,7 +282,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - Weight: `<Input type="number">` prefill từ `order.parcelWeight` (snapshot `Σ(qty×Products.weight)` lúc checkout; =0 → `DEFAULT_PARCEL`). Sửa được.
 - Dims (thùng): `<Input type="number">` × 3 (L/W/H) = thùng thật merchant gói — prefill `DEFAULT_PARCEL` box (đơn 1 món → `Products.dimensions`). **KHÔNG gộp dims đa-SP.** Sửa được.
 - Pickup: `<RadioGroup>` pickup/dropoff + `<DatePicker>` (`collection_date`) — **CUT-OFF-AWARE**: `min = HÔM NAY` nếu T2–T6 & giờ MYT (server-side) < cut-off của `selectedCourier` (J&T 13:50 / Flash 14:00 / Pos 12:50 — const `COURIER_CUTOFF`), ngược lại `min = ngày làm việc kế`; default = min; disable quá khứ + Sat/Sun; holiday để API bump; KHÔNG time picker. Hint: "Lấy hôm nay nếu tạo trước HH:MM". Dropoff vẫn truyền `collection_date`.
-- Primary: `<Button>` "Tạo & trừ ví" → spinner 2 bước; idempotent theo bước **pay** (đã có `awbNo` → disable)
+- Primary: `<Button>` "Tạo & trừ ví" → spinner 1 bước (submit, ví trừ ngay); idempotent theo `awbNo` (đã có `awbNo` → disable)
 - Print: `<Button variant="outline">` mở `labelUrl` (PDF) tab mới
 - Copy AWB: `<Button size="icon">` + clipboard
 
@@ -302,7 +297,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Ready (non-COD) | Form prefill; "Tạo & trừ ví" enabled |
 | Ready (COD order) | Form prefill + COD badge + codAmount + fee note; "Tạo & trừ ví" enabled |
 | Đã có AWB | Form khóa; chỉ hiện In nhãn / pickup (idempotent — chống double-charge) |
-| Creating | Spinner "Đang giữ chỗ..." → "Đang trừ ví..." (2 bước) |
+| Creating | Spinner "Đang tạo & trừ ví..." (1 bước — submit_orders trừ ví ngay) |
 | Wallet low | Red `<Alert>` `EASYPARCEL_WALLET_LOW` + link nạp + Thử lại; order unchanged |
 | API error | Red `<Alert>` generic + Thử lại; order unchanged |
 | COD East MY | Red `<Alert>` "EasyParcel COD chỉ West Malaysia" + disable nút tạo |
@@ -368,7 +363,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 **Dual-field + mapping (EasyParcel normalize mọi courier về 1 enum 13 giá trị):**
 
-> EasyParcel ẩn toàn bộ từ vựng raw của từng courier (J&T, Pos Laju, Flash, Ninja Van... top 10) → `EPParcelStatusBulk` chỉ trả 13 status chuẩn. KHÔNG map full vào lifecycle; chỉ 4/13 là *gợi ý* cho merchant (vẫn bấm tay).
+> EasyParcel ẩn toàn bộ từ vựng raw của từng courier (J&T, Pos Laju, Flash, Ninja Van... top 10) → webhook (topic 3) + `POST /shipment/tracking_status` trả `shipment_status_code` dạng số (0,2,3,4,5,6,7,8,11), normalize về enum display chuẩn. KHÔNG map full vào lifecycle; chỉ các code giao/hủy/hoàn là *gợi ý* cho merchant (vẫn bấm tay).
 > **Cột "Buyer label (public)"** = nhãn buyer thấy trên trang đơn — đã collapse + ẩn vocab nội bộ (`Exception`/`Admin Cancel`/`Expired` KHÔNG render thô, per NFR-10). Buyer còn 1 badge top-level 6 giá trị riêng từ `order.status` (`getTrackingStatus()`, `OrderTrackingClient.tsx:13`): processing/in-transit/delivered/cancelled/refunded/payment_failed.
 
 | EasyParcel `shippingTrackingStatus` (13) | Buyer label (public) | Gợi ý `order.status` (manual, seller) |
@@ -497,10 +492,10 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 
 | Screen | Loading | Empty | Error | Success | Validation |
 |--------|---------|-------|-------|---------|-----------|
-| A Settings | Test spinner / Save spinner | Chỉ block Connect | Red Alert `INVALID_KEY` / API err, không lộ key | Toast "Đã lưu" + green Connected | Key trống → disable Test; warehouse thiếu field → helper |
+| A Settings | Connect redirect / Save spinner | Chỉ block Connect | Red Alert `EP_NOT_CONNECTED` / OAuth err, không lộ token | Toast "Đã lưu" + green Connected (account + ví) | Chưa connect → warehouse/courier khoá; warehouse thiếu field → helper |
 | B Checkout | Skeleton 1 row (debounce 300ms) | "Nhập địa chỉ để xem cước" | **Fallback flat-rate F14** (im lặng) + log | 1 dòng "Shipping" trong Order Summary / FREE badge | Postcode `^\d{5}$` (reuse F14) |
 | B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | East MY → disabled + helper; over limit → disabled; courier không hỗ trợ → disabled |
-| C Create label | Spinner 2 bước (submit→pay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | COD East MY → block + disable nút; idempotent khi có AWB |
+| C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | COD East MY → block + disable nút; idempotent khi có AWB |
 | C COD label | COD badge + codAmount prefill | — | East MY block (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
 | D Tracking | Timeline skeleton | "Đang chuẩn bị hàng" | "Chưa lấy được trạng thái" | Timeline mốc mới | — |
 | D COD status | — | codStatus badge ẩn (non-COD) | — | Badge pending/collected/settled | Merchant update thủ công; no API auto-transition |
@@ -515,7 +510,7 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 |-----------|-----------|-------|
 | Tabs | `Tabs`, `TabsList`, `TabsTrigger` | Flat Rate / EasyParcel (Screen A) |
 | Card group | `Card`, `CardHeader`, `CardContent`, `CardFooter` | Mọi block settings + courier item |
-| Secret input | `Input type="password"` + reveal toggle | api key + auth key |
+| Connect button | `Button variant="default"` → OAuth redirect | Connect with EasyParcel (no secret inputs) |
 | Text/number input | `Input` | Warehouse, weight, dims |
 | Dropdown | `Select` | MY states (geo cascade) |
 | Radio | `RadioGroup`, `RadioGroupItem` | Courier picker (settings, single-select), return fee responsibility (Case 2), pickup |
@@ -542,7 +537,6 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 | Wallet-low color | `amber-600` text / `amber-50` bg | Create label error |
 | Success / Connected | `green-600` / `green-50` | Connected alert, FREE badge |
 | Error border / alert | `red-500` / `destructive` | Validation, wallet low, API err |
-| Masked key char | `••••` | API/Auth key display |
 | Rate debounce | 300ms | Checkout recalc |
 
 ---
@@ -565,126 +559,148 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 - ❌ Multi-warehouse picker (1 origin/merchant cho MVP)
 - ❌ COD reconciliation dashboard (chỉ lưu `codAmount`; đối soát xem trên EasyParcel)
 - ❌ Auto-cancel shipment trong app (xử lý trên dashboard EasyParcel)
-- ❌ Webhook tracking realtime (polling cron 30–60′)
 - ❌ Màn/route "Tạo vận đơn" riêng + tab toggle manual/EP (label gắn vào nút "Ready to Ship" có sẵn)
 - ❌ RMA collection + buyer return-request UI (return = reuse nút Refund/Cancel có sẵn)
-- ❌ **Reverse label / EP-paid return pickup** (đảo origin↔dest qua `EPSubmitOrderBulk`) — buyer tự gửi + nhập tracking tay đã đủ cho MVP; pickup tại địa chỉ buyer lẻ chưa chắc mọi courier MY hỗ trợ. Backlog post-MVP.
+- ❌ **Reverse label / EP-paid return pickup** (đảo origin↔dest qua `POST /shipment/submit_orders`) — buyer tự gửi + nhập tracking tay đã đủ cho MVP; pickup tại địa chỉ buyer lẻ chưa chắc mọi courier MY hỗ trợ. Backlog post-MVP.
 
 ---
 
-## 9. Field Mapping — Checkout → EasyParcel
+## 9. Field Mapping — Checkout → EasyParcel v2026-03 API
 
-> Source: `plans/reports/researcher-260617-1430-easyparcel-field-mapping-final.md`
+> Source: EasyParcel OpenAPI v2026-03 spec (GitHub official, https://github.com/easyparcel/OpenAPI)
+>
+> **Key changes from legacy API:**
+> - `subdivision_code`: ISO 3166-2 format (MY-XX, e.g., MY-07 Penang, MY-14 Kuala Lumpur) — NOT 3-letter state abbreviation
+> - `phone_number_country_code` + `phone_number`: SEPARATE fields (country code like "MY", phone digits only)
+> - `address_1` / `address_2`: SEPARATE fields (not concatenated)
+> - `city`: REQUIRED (separate from postcode)
+> - **Postcode**: 5-digit format, required for both sender + receiver
 
-### 9.1 Rate Check Params (EPRateCheckingBulk)
+### 9.1 Quotation Request Params (POST /shipment/quotations)
 
-| Prime Field | EasyParcel Param | Transform | Confidence |
+| Prime Field | v2026-03 Param | Transform | Notes |
 |---|---|---|---|
-| Sender postcode (warehouse) | `pick_code` | copy as-is | CONFIRMED |
-| Sender state (warehouse) | `pick_state` | `mapState()` → 3-letter code | CONFIRMED |
-| Sender country | `pick_country` | hardcode `"MY"` | CONFIRMED |
-| Receiver postcode | `send_code` | copy as-is | CONFIRMED |
-| Receiver state | `send_state` | `mapState()` → 3-letter code | CONFIRMED |
-| Receiver country | `send_country` | hardcode `"MY"` | CONFIRMED |
-| Package weight | `weight` | `aggregateWeightKg()` → kg decimal | CONFIRMED |
-| Package width | `width` | copy as-is (cm) | CONFIRMED |
-| Package length | `length` | copy as-is (cm) | CONFIRMED |
-| Package height | `height` | copy as-is (cm) | CONFIRMED |
+| Warehouse postcode | `sender.postcode` | copy as-is (5 digits) | sender = warehouse (origin) |
+| Warehouse state | `sender.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | e.g., "MY-07" = Penang |
+| Warehouse country | `sender.country` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
+| Buyer postcode | `receiver.postcode` | copy as-is (5 digits) | — |
+| Buyer state | `receiver.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | same mapping |
+| Buyer country | `receiver.country` | hardcode `"MY"` | — |
+| Package weight | `weight` | `aggregateWeightKg()` → double, 2 decimals | kg, NOT grams |
+| Package width | `width` | parse to integer | cm |
+| Package length | `length` | parse to integer | cm |
+| Package height | `height` | parse to integer | cm |
+| Parcel value | `parcel_value` | RM float (order total ÷ 100) | parcel declared value |
 
-### 9.2 Order Create Receiver Params (EPSubmitOrderBulk)
+### 9.2 Submit Order Params (POST /shipment/submit_orders)
 
-| Prime Field | EasyParcel Param | Transform | Confidence |
+| Prime Field | v2026-03 Param | Transform | Notes |
 |---|---|---|---|
-| Buyer name | `send_name` | copy as-is | CONFIRMED |
-| Buyer phone | `send_mobile` | `normalizePhone()` | CONFIRMED |
-| Buyer email | `send_email` | copy as-is | CONFIRMED |
-| Shipping line 1 | `send_addr1` | `buildAddress()[0]` | CONFIRMED |
-| Shipping line 2 | `send_addr2` | `buildAddress()[1]` | CONFIRMED |
-| Shipping city | `send_city` | copy as-is | CONFIRMED |
-| Shipping state | `send_state` | `mapState()` → 3-letter code | CONFIRMED |
-| Shipping postcode | `send_code` | copy as-is | CONFIRMED |
-| Shipping country | `send_country` | hardcode `"MY"` | CONFIRMED |
-| Package weight | `weight` | `aggregateWeightKg()` → kg decimal | CONFIRMED |
-| Package width | `width` | copy as-is (cm) | CONFIRMED |
-| Package length | `length` | copy as-is (cm) | CONFIRMED |
-| Package height | `height` | copy as-is (cm) | CONFIRMED |
+| Warehouse info | `sender.*` | see below (6 fields) | sender = warehouse (origin) |
+| Buyer info | `receiver.*` | see below (6 fields) | receiver = shipping address |
+| Collection date | `collection_date` | YYYY-MM-DD format | date-picker, cut-off-aware |
+| Service ID | `service_id` | from quotation response | e.g., "EP-CS0D9" |
+| Items array | `item[]` | one per product line | content, weight, dims, value, qty |
+| Track SMS | `feature.sms_tracking` | boolean (order setting) | optional |
+| Track Email | `feature.email_tracking` | boolean (order setting) | optional |
+| Track WhatsApp | `feature.whatsapp_tracking` | boolean (order setting) | optional |
+| AWB branding | `feature.awb_branding` | boolean (order setting) | optional |
 
-### 9.3 State Code Mapping (16 states)
+**Sender / Receiver structure (6 common fields):**
 
-| Prime Full State Name | EasyParcel Code | Confidence |
+| Prime Field | v2026-03 Param | Transform | Notes |
+|---|---|---|---|
+| Name | `name` | copy as-is | required |
+| Company | `company` | copy as-is | optional |
+| Phone country code | `phone_number_country_code` | hardcode `"MY"` | ISO country code |
+| Phone number | `phone_number` | `normalizePhone()` → digits only | e.g., "0122134567" (no +60) |
+| Email | `email` | copy as-is | optional |
+| Address line 1 | `address_1` | `addressLine(order)[0]` | primary address |
+| Address line 2 | `address_2` | `addressLine(order)[1]` | optional, secondary |
+| City | `city` | copy as-is | **required** (separate from postcode) |
+| Postcode | `postcode` | copy as-is (5 digits) | — |
+| Subdivision code | `subdivision_code` | `mapToISO3166_2()` → "MY-XX" | ISO 3166-2 |
+| Country code | `country_code` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
+
+### 9.3 State → ISO 3166-2 MY Mapping (All 16 states)
+
+| Prime Full State Name | ISO 3166-2 Code | Notes |
 |---|---|---|
-| Johor | `jhr` | CONFIRMED |
-| Kedah | `kdh` | CONFIRMED |
-| Kelantan | `ktn` | CONFIRMED |
-| Kuala Lumpur | `kul` | CONFIRMED |
-| Labuan | `lbn` | INFERRED (std abbreviation) |
-| Melaka | `mlk` | INFERRED (std abbreviation) |
-| Negeri Sembilan | `nsn` | INFERRED (std abbreviation) |
-| Pahang | `phg` | INFERRED (std abbreviation) |
-| Pulau Pinang | `png` | CONFIRMED |
-| Perak | `prk` | INFERRED (std abbreviation) |
-| Perlis | `pls` | INFERRED (std abbreviation) |
-| Putrajaya | `pjy` | INFERRED (std abbreviation) |
-| Sabah | `sbh` | INFERRED (std abbreviation) |
-| Sarawak | `swk` | INFERRED (std abbreviation) |
-| Selangor | `sgr` | CONFIRMED |
-| Terengganu | `trg` | INFERRED (std abbreviation) |
+| Johor | MY-01 | — |
+| Kedah | MY-02 | — |
+| Kelantan | MY-03 | — |
+| Kuala Lumpur | MY-14 | Federal Territory |
+| Labuan | MY-15 | Federal Territory |
+| Melaka | MY-04 | — |
+| Negeri Sembilan | MY-05 | — |
+| Pahang | MY-06 | — |
+| Pulau Pinang | MY-07 | Penang |
+| Perak | MY-08 | — |
+| Perlis | MY-09 | — |
+| Putrajaya | MY-16 | Federal Territory |
+| Sabah | MY-12 | East Malaysia |
+| Sarawak | MY-13 | East Malaysia |
+| Selangor | MY-10 | — |
+| Terengganu | MY-11 | — |
 
-6 CONFIRMED (jhr, kdh, ktn, kul, png, sgr) from GitHub apih/easyparcel README examples. 10 INFERRED follow ISO 3166-2:MY standard — verify all 16 in sandbox before go-live.
+**All 16 must be verified in sandbox before production go-live.** Const `SUBDIVISION_CODE_MAP` in code.
 
-### 9.4 Transform Functions (Pseudo-code)
+### 9.4 Transform Functions (Pseudo-code, v2026-03)
 
-#### mapState(primeStateName)
+#### mapToISO3166_2(primeStateName) — MY states only
 
 ```
-INPUT:  "Selangor"
-OUTPUT: "sgr"
+INPUT:  "Selangor" OR "Pulau Pinang"
+OUTPUT: "MY-10" OR "MY-07"
 
-const stateMap = {
-  "Johor": "jhr", "Kedah": "kdh", "Kelantan": "ktn", "Kuala Lumpur": "kul",
-  "Labuan": "lbn", "Melaka": "mlk", "Negeri Sembilan": "nsn", "Pahang": "phg",
-  "Pulau Pinang": "png", "Perak": "prk", "Perlis": "pls", "Putrajaya": "pjy",
-  "Sabah": "sbh", "Sarawak": "swk", "Selangor": "sgr", "Terengganu": "trg"
+const subdivisionMap = {
+  "Johor": "MY-01", "Kedah": "MY-02", "Kelantan": "MY-03", "Kuala Lumpur": "MY-14",
+  "Labuan": "MY-15", "Melaka": "MY-04", "Negeri Sembilan": "MY-05", "Pahang": "MY-06",
+  "Pulau Pinang": "MY-07", "Perak": "MY-08", "Perlis": "MY-09", "Putrajaya": "MY-16",
+  "Sabah": "MY-12", "Sarawak": "MY-13", "Selangor": "MY-10", "Terengganu": "MY-11"
 };
-return stateMap[primeStateName] || null;  // null → fail loudly, do not send unmapped state
+return subdivisionMap[primeStateName] || null;  // FAIL if unmapped
 ```
 
-#### normalizePhone(phone)
+#### normalizePhone(phone) — v2026-03 uses digits-only format
 
 ```
 INPUT:  "+60-12-2134567"  OR  "0122134567"  OR  "122134567"
-OUTPUT: "0122134567" (digits-only, leading 0, no +60 prefix)
+OUTPUT: "0122134567" (leading 0, no +60 prefix, no dashes)
 
 1. Strip all non-digits: phone.replace(/\D/g, "")
-2. If result starts with "60": remove "60", prepend "0"
-3. If result doesn't start with "0": prepend "0"
-4. Validate 10 <= length <= 11; reject if not
+2. If starts with "60": remove "60", prepend "0"
+3. If doesn't start with "0": prepend "0"
+4. Validate 10 ≤ length ≤ 11; else FAIL
 5. Return result
 
 "+60122134567" → "0122134567" ✓
 "0122134567"   → "0122134567" ✓
 "122134567"    → "0122134567" ✓
-"6012"         → FAIL (too short)
+"6012"         → FAIL (length < 10)
 ```
 
-#### buildAddress(line1, line2)
+#### addressLine(order) — split address into line1 + line2
 
 ```
-EasyParcel supports send_addr1 + send_addr2 as separate fields — NO concat needed.
+EasyParcel v2026-03 supports address_1 + address_2 as separate fields — NO concat.
 
-INPUT (both lines): line1="123 Main St", line2="Apt 4B"
-OUTPUT: send_addr1="123 Main St", send_addr2="Apt 4B"
+INPUT (order.shippingAddress):
+  { address: "123 Main St, Apt 4B" }
+  OR
+  { addressLine1: "123 Main St", addressLine2: "Apt 4B" }
 
-INPUT (single line): line1="123 Main St, Apt 4B", line2=""
-OUTPUT: send_addr1="123 Main St", send_addr2="Apt 4B"  (split on first comma)
+OUTPUT:
+  address_1 = "123 Main St"
+  address_2 = "Apt 4B"
 
 LOGIC:
-- If line2 provided: send_addr1 = line1, send_addr2 = line2
-- Else if line1 contains comma: split on first comma
-- Else: send_addr1 = line1, send_addr2 = ""
+- If both addressLine1 + addressLine2 provided: use as-is
+- Else if single address + contains comma: split on first comma
+- Else: address_1 = address, address_2 = ""
 ```
 
-#### aggregateWeightKg(items)
+#### aggregateWeightKg(items) — DB stores grams, API needs kg
 
 ```
 CRITICAL: DB stores weight in GRAMS. EasyParcel expects KILOGRAMS as decimal.
@@ -701,10 +717,11 @@ return weight_kg
 
 ### 9.5 Key Gotchas
 
-- **Phone param is `send_mobile`**, not `send_phone`. Using the wrong name silently sends no phone.
-- **Postcode param is `send_code`**, not `send_postcode`. Applies to both EPRateCheckingBulk and EPSubmitOrderBulk — field name is consistent.
-- **Country must be `"MY"`** (ISO 3166-1 alpha-2), not `"Malaysia"`. Full name not accepted by API.
-- **Address has 2 separate fields** (`send_addr1` / `send_addr2`). Do not concatenate into one string.
+- **Phone is split into 2 fields:** `phone_number_country_code` (e.g. `"MY"`) + `phone_number` (digits-only, no +60 prefix). Don't send a single combined phone string.
+- **Postcode param is `postcode`** (same field name on `POST /shipment/quotations` and `POST /shipment/submit_orders`).
+- **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
+- **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.
+- **Address has 2 separate fields** (`address_1` / `address_2`). Do not concatenate into one string.
 - **Weight: DB=grams → EP=kg.** `aggregateWeightKg` divides by 1000. Never divide a value already converted.
 - **Money: DB=sen → EP=RM.** Divide by 100 when sending to EasyParcel rate/order calls. Multiply by 100 when receiving prices back. Wrong direction = 100× error (NFR-1).
 
@@ -712,7 +729,7 @@ return weight_kg
 
 ## 10. Open Questions
 
-- Courier logo: dùng `courier_logo` URL từ response `EPRateCheckingBulk` trực tiếp, hay cache/proxy? (ảnh external → cân nhắc CSP / next/image domain allowlist)
+- Courier logo: dùng `courier_logo` URL từ response `POST /shipment/quotations` trực tiếp, hay cache/proxy? (ảnh external → cân nhắc CSP / next/image domain allowlist)
 - Pickup date picker: giới hạn min = ngày làm việc kế tiếp — cần xác nhận lịch nghỉ courier có ảnh hưởng validation không (MVP: cho chọn tự do, courier tự sắp).
 - Hi-fi Claude Design: có generate cho Screen A (Settings) + Screen C (Create label) như F14 không, hay giữ low-fi cho MVP?
 - **[DEV QUYẾT — liên quan expand DB] Buyer Return (Case 2 §2.5) lưu gì vào bảng `orders`?** Case 1 (Courier RTS) = 0 field mới (dùng lại `shippingTrackingStatus`). Case 2 cần lưu tracking buyer tự gửi + ai chịu phí + (có thể) số tiền. 3 phương án, đánh đổi:

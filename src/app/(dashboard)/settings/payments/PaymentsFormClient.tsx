@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
@@ -602,7 +603,7 @@ export function PaymentsFormClient({
 
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
@@ -709,7 +710,7 @@ export function PaymentsFormClient({
             {/* ─── Xendit (F34) ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
                         {pt.xenditSectionTitle}
                     </h2>
@@ -733,7 +734,7 @@ export function PaymentsFormClient({
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-purple-400 shrink-0" style={{ boxShadow: '0 0 10px #c084fc' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.manualSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.manualSectionDesc}</span>
                 </div>
@@ -809,8 +810,8 @@ export function PaymentsFormClient({
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'hsl(var(--primary) / 0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--primary) / 0.04)';
                                         }}
                                         onMouseLeave={e => {
                                             (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
@@ -836,7 +837,7 @@ export function PaymentsFormClient({
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                         style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)'}` }}
-                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -868,7 +869,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
@@ -892,7 +893,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)'}` }}
-                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -941,27 +942,25 @@ export function PaymentsFormClient({
                     )}
                 </div>
                 <div className="flex gap-2">
-                    <button
+                    <Button
                         type="button"
+                        variant="dashSecondary"
+                        size="sm"
                         onClick={handleCancel}
                         disabled={isSavingAll}
-                        className="inline-flex items-center h-[34px] px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {pt.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        size="sm"
                         onClick={handleSaveAll}
                         disabled={!isDirty || isSavingAll}
-                        className="inline-flex items-center gap-[6px] h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
-                        style={{
-                            background: 'linear-gradient(135deg, #2563eb 0%, #9333ea 100%)',
-                            boxShadow: isDirty ? '0 6px 18px rgba(37,99,235,0.35)' : 'none',
-                        }}
+                        className="gap-1.5"
                     >
                         <Save className="w-[13px] h-[13px]" />
                         {isSavingAll ? pt.saving : pt.saveChanges}
-                    </button>
+                    </Button>
                 </div>
             </div>
 

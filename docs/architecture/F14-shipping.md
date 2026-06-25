@@ -399,16 +399,22 @@ Reference: [`docs/qa/F14-shipping.md`](../qa/F14-shipping.md) — 20 TC mapped t
 
 ---
 
-## 15. Out of Scope (Wave 7+)
+## 15. Out of Scope (Wave 6)
 
-- ❌ Carrier API integration (EasyParcel, J&T)
-- ❌ Tracking number live updates / webhook
-- ❌ Label printing
+- ❌ Carrier API integration (moved to F36 EasyParcel wave 7+)
+- ❌ Tracking number live updates / webhook (F36 uses webhooks + polling)
+- ❌ Label printing (F36)
 - ❌ Per-product shipping override
 - ❌ Multi-seller cart shipping split
 - ❌ Estimated delivery days config
 - ❌ Postcode → state cross-check
 - ❌ Multi-currency rates
+
+---
+
+## 16. Wave 7+ Integration Point (F36 EasyParcel)
+
+**F36 adds real-time courier rates via EasyParcel OAuth + v2026-03 API.** Flat-rate fallback remains as hybrid fallback when EasyParcel not configured or unavailable (timeout/error). Tracking status arrives via webhook (topics 1/2/3) + numeric codes (0-11), mapped to dual-field: `order.status` (lifecycle, manual) vs `shippingTrackingStatus` (display, cron-synced). No changes required to F14 logic; F36 branches `getRates()` → EasyParcel vs flat-rate before reaching F14 calculation.
 
 ---
 

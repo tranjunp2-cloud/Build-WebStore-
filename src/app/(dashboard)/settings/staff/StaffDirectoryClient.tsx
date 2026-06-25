@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n';
 import { Users, UserPlus, Trash2, Loader2, Search, Edit2, SearchX } from 'lucide-react';
 import { toast } from 'sonner';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { TableEmptyState } from '@/components/ui/table-empty-state';
 import { Button } from '@/components/ui/button';
@@ -250,25 +251,35 @@ export function StaffDirectoryClient({
                                             {(!canEdit && !canDelete) ? (
                                                 <span className="text-[14px] font-normal text-[var(--dash-text-muted)] leading-[1.428em] font-['Inter']">—</span>
                                             ) : (
+                                                <TooltipProvider>
                                                 <div className="flex items-center gap-1">
                                                     {canEdit && (
-                                                        <TableActionButton
-                                                            onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
-                                                            title={t?.Staff?.tooltip?.edit || 'Edit Details'}
-                                                        >
-                                                            <Edit2 className="w-4 h-4" />
-                                                        </TableActionButton>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <TableActionButton
+                                                                    onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
+                                                                >
+                                                                    <Edit2 className="w-4 h-4" />
+                                                                </TableActionButton>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>{t?.Staff?.tooltip?.edit || 'Edit Details'}</TooltipContent>
+                                                        </Tooltip>
                                                     )}
                                                     {canDelete && (
-                                                        <TableActionButton
-                                                            variant="danger"
-                                                            onClick={() => handleRemove(user.id)}
-                                                            title={t?.Staff?.tooltip?.remove || 'Remove User'}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </TableActionButton>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <TableActionButton
+                                                                    variant="danger"
+                                                                    onClick={() => handleRemove(user.id)}
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </TableActionButton>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>{t?.Staff?.tooltip?.remove || 'Remove User'}</TooltipContent>
+                                                        </Tooltip>
                                                     )}
                                                 </div>
+                                                </TooltipProvider>
                                             )}
                                         </TableCell>
                                     </TableRow>

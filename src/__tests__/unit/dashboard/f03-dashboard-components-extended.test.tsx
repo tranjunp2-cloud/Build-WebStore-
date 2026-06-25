@@ -308,7 +308,8 @@ describe('PeriodSelector', () => {
     it('defaults to 7d when URL param is 7d', () => {
         render(<PeriodSelector />)
         const selectedBtn = screen.getByText('Last 7 days')
-        expect(selectedBtn.className).toContain('bg-[hsl(var(--card))]')
+        // Revamp: segmented control marks the active tab with the `active` class
+        expect(selectedBtn.className).toContain('active')
     })
 
     it('renders all period labels', () => {

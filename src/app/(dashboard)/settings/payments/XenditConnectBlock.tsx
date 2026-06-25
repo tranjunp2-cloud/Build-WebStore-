@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Link, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { XenditConnectModal } from './XenditConnectModal';
 
@@ -61,19 +62,15 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
 
                 {/* CTA */}
                 <div className="flex flex-col items-end gap-2 shrink-0 relative z-[1]">
-                    <button
+                    <Button
                         type="button"
                         onClick={() => setShowModal(true)}
                         disabled={!tenantId}
-                        className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-[#042033] transition-all hover:brightness-110 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
-                        style={{
-                            background: 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                            boxShadow: '0 4px 14px rgba(14,165,233,0.30)',
-                        }}
+                        className="h-[44px] gap-2 whitespace-nowrap"
                     >
                         {pt.xenditConnectCta}
                         <ArrowRight className="w-4 h-4" />
-                    </button>
+                    </Button>
                     <div className="inline-flex items-center gap-[6px] text-[11.5px] whitespace-nowrap" style={{ color: 'var(--dash-text-muted)' }}>
                         <ShieldCheck className="w-3 h-3 text-emerald-500" />
                         {pt.xenditTrust}

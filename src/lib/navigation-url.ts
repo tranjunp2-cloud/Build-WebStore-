@@ -189,3 +189,65 @@ export function rewriteLiveUrl(
         slugCanonical.get(path.replace(/^\//, ''))
     return (hit ?? path.toLowerCase()) + tail
 }
+
+/**
+ * Map common AI/template CTA placeholders (`#contact`, `#about`, `#`, …) to
+ * the canonical page path they intend. First step inside
+ * `resolveCtaSlugFromLinks`; also reused directly by the AI-gen nav/footer
+ * link normalization.
+ */
+export function normalizeInternalUrl(url: unknown): string {
+    if (typeof url !== 'string') return '#'
+    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
+    if (url === '#about' || url === 'about') return '/about'
+    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
+    if (url === '#contact' || url === 'contact') return '/contact'
+    return url
+}
+
+/**
+ * Map a CTA URL to a canonical page slug from a site's page list.
+ * Returns '' when no matching internal page exists (caller decides whether to
+ * drop the button or fall back). External URLs (https, mailto, tel, etc.) are
+ * passed through unchanged. Keyword-segment fuzzy matching (segments ≥3 chars)
+ * lets locale-custom slugs (`/hubungi`, `/about-us`) still resolve.
+ */
+export function resolveCtaSlugFromLinks(
+    rawUrl: unknown,
+    canonicalLinks: Array<{ url: string }>,
+): string {
+    const normalized = normalizeInternalUrl(rawUrl)
+    if (normalized === '') return ''
+    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
+    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
+    // Exact match (most common case — canonical slugs already align)
+    if (canonicalLinks.some(l => l.url === normalized)) return normalized
+    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
+    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
+    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
+    for (const kw of segments) {
+        if (kw.length < 3) continue
+        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
+        if (match) return match.url
+    }
+    return ''
+}
+
+/**
+ * Resolve a pricing plan's action CTA. Returns a new plan with:
+ *  - `ctaUrl` → canonical internal slug, defaulting to `/contact` (every site
+ *    ships a contact page) when the placeholder `#`/empty or no page matches.
+ *  - `ctaActionType` → `'internal'` for an internal path so the editor shows
+ *    the page picker; external (http) URLs keep their existing type.
+ * Shared by AI-gen (`patchPageCtaUrls`) and manual-drag (`patchBlockCtaUrls`).
+ */
+export function resolvePricingPlanCta(
+    plan: Record<string, unknown>,
+    canonicalLinks: Array<{ url: string }>,
+): Record<string, unknown> {
+    const raw = typeof plan.ctaUrl === 'string' ? plan.ctaUrl.trim() : ''
+    const resolved = raw && raw !== '#' ? resolveCtaSlugFromLinks(plan.ctaUrl, canonicalLinks) : ''
+    const ctaUrl = resolved || '/contact'
+    const ctaActionType = ctaUrl.startsWith('/') ? 'internal' : plan.ctaActionType
+    return { ...plan, ctaUrl, ctaActionType }
+}
