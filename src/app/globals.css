@@ -882,7 +882,7 @@ html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-col
 /* The floating block action toolbar is a deliberately DARK pill in BOTH themes.
    The remap above assumes its slate/amber icons + white-tint dividers/hover sit
    on a light surface and darkens them → low contrast on the dark pill in light
-   mode. Re-assert the bright (dark-theme) values for this toolbar only. The
+   mode. Re-assert each utility's true Tailwind value for this toolbar only. The
    extra .block-action-toolbar class raises specificity so these win without
    !important; dark mode is untouched. */
 html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400 { color: #94a3b8; }
