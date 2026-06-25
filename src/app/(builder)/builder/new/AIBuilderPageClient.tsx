@@ -160,6 +160,10 @@ function LivePreview({
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
     const { t } = useI18n()
     const router = useRouter()
+    // Prevents SSR/hydration flash: server renders initial state (form), but Zustand
+    // persist rehydrates synchronously only after client-side mount. Without this guard
+    // the form flashes for ~500ms before React re-renders with the rehydrated done state.
+    const [isMounted, setIsMounted] = useState(false)
     const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false)
     const [isMobileViewport, setIsMobileViewport] = useState(false)
     const [previewMode, setPreviewMode] = useState<BuilderPreviewMode>('desktop')
@@ -215,6 +219,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         contentBrief,
         reset,
     } = useBuilderStore()
+
+    useEffect(() => { setIsMounted(true) }, [])
 
     // Security: clear persisted session if it belongs to a different user.
     // Prevents cross-user localStorage contamination when sharing a browser.
@@ -861,6 +867,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 <p className="text-sm text-white/40">{t.onboarding.completion.redirecting}</p>
             </div>
         )
+    }
+
+    // Block render until client-side mount: Zustand persist rehydrates from
+    // localStorage only after React hydration, so the first render uses initial
+    // state (form). This dark screen prevents the ~500ms form flash on reload.
+    if (!isMounted) {
+        return <div className="fixed inset-0 bg-[#06090F]" />
     }
 
     if (step === 'info' && status !== 'done') {
