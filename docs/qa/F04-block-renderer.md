@@ -159,14 +159,14 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 | **TC-EDIT-03** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Padding wrapper around heading → NO text-edit toolbar |
 | **TC-EDIT-04** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Empty Logo Cloud block click → NO `TEXT_EDITING_STARTED` |
 | **TC-EDIT-05** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Newsletter: bg click (no edit) vs headline click (edit started) |
-| **TC-EDIT-06** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Toolbar uses theme-aware `bg-[var(--editor-surface-elevated)]/95` + `.block-action-toolbar` opt-out marker |
-| **TC-EDIT-07** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Icon base classes preserved (amber-300 AI, red-400 delete); light-mode recolor via globals.css opt-out |
+| **TC-EDIT-06** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Toolbar uses a consistent dark pill `bg-[#334155]/98` (both themes) + `.block-action-toolbar` opt-out marker |
+| **TC-EDIT-07** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Single dark-pill surface drives both modes; icon base classes preserved (amber-300 AI, red-400 delete) |
 | **TC-EDIT-08** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Action buttons include `hover:bg-white/10` class (hover state) |
 | **TC-EDIT-09** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Drag grip button present & `onDragStart` fires on pointerDown |
 
 **Root Causes & Fixes:**
 - **Bug 1 (GH-1367)**: `PreviewScripts.tsx` added `clickLandedOnTextNode(x,y)` guard (lines 315–331) — uses `document.caretRangeFromPoint` (Chrome) or `caretPositionFromPoint` (Firefox) to detect text node vs element node. Background/padding clicks return false; text hits return true.
-- **Bug 2 (GH-1367)**: `BlockActionBar.tsx` keeps the theme-aware elevated surface (`bg-[var(--editor-surface-elevated)]/95` — white in light, dark in dark) and adds a `.block-action-toolbar` marker. On the white light-mode pill the editor-shell remap left icons too light / AI muddy brown, so scoped rules in `globals.css` re-assert dark high-contrast values in light mode only (slate icons `#334155`, AI `#c2410c`, delete `#dc2626`, dividers/hover dark tint). Dark mode unchanged.
+- **Bug 2 (GH-1367)**: `BlockActionBar.tsx` uses a single dark pill (`bg-[#334155]/98` + `border-white/30` + light 1px ring + drop shadow) in BOTH editor themes so it stays identifiable floating over any website content (white or dark). Icons stay light (`text-slate-300/400`, `amber-300`, `red-400`). In light mode the editor-shell remap would darken those, so scoped `.block-action-toolbar` rules in `globals.css` re-assert the dark-theme values (slate `#94a3b8`, AI `#fcd34d`, delete `#f87171`, white-tint dividers/hover) so light renders identically to dark.
 
 **Test Coverage Strategy:**
 - TC-EDIT-01..05: Mock `caretRangeFromPoint` per test case to simulate text vs background hits. Assert postMessage type.

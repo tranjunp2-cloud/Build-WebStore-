@@ -7,8 +7,8 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
         vi.clearAllMocks()
     })
 
-    // TC-EDIT-06: Toolbar keeps theme-aware elevated surface + remap opt-out marker
-    it('TC-EDIT-06 (GH-1367): toolbar uses theme-aware elevated surface + opt-out marker', () => {
+    // TC-EDIT-06: Toolbar is a consistent dark pill in both themes + remap opt-out marker
+    it('TC-EDIT-06 (GH-1367): toolbar uses a consistent dark pill surface + opt-out marker', () => {
         // Arrange
         const mockHandlers = {
             onMoveUp: vi.fn(),
@@ -35,10 +35,10 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
         // Assert
         const toolbar = container.querySelector('.block-action-toolbar')
         expect(toolbar).toBeInTheDocument()
-        // Theme-aware surface: white in light mode, dark in dark mode (via --editor-surface-elevated)
-        expect(toolbar?.className).toContain('bg-[var(--editor-surface-elevated)]/95')
-        // Marker class is load-bearing: the globals.css `.block-action-toolbar` rules give the
-        // light-mode pill dark, high-contrast icons/dividers/hover (GH-1367); jsdom can't see CSS.
+        // Single dark pill in both themes so it stays visible over any website background
+        expect(toolbar?.className).toContain('bg-[#334155]/98')
+        // Marker class is load-bearing: the globals.css `.block-action-toolbar` rules keep the
+        // light-mode pill's icons light to match dark (GH-1367); jsdom can't see CSS.
         expect(toolbar?.className).toContain('block-action-toolbar')
     })
 
@@ -68,9 +68,9 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
             />
         )
 
-        // Assert — single theme-aware surface class drives both modes (no separate dark: bg)
+        // Assert — single dark pill surface drives both modes (no theme-specific bg)
         const toolbar = container.querySelector('.block-action-toolbar')
-        expect(toolbar?.className).toContain('bg-[var(--editor-surface-elevated)]/95')
+        expect(toolbar?.className).toContain('bg-[#334155]/98')
 
         // Assert — AI icon color: text-amber-300
         const aiButton = screen.getByTitle('Edit with AI')
