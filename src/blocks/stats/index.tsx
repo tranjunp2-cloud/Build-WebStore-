@@ -63,7 +63,11 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
     //   "4.5★", "4.9" (single decimal) — Lỗi F parseFloat
     //   "$1,000,000", "1.000.000" (comma/dot thousand separator) — strip first
     // Multi-distinct values like "24/7" still render static (2 digit runs).
-    const stripped = value.replace(/[,_]/g, '') // thousand separators
+    //
+    // Defensive: strip HTML markup that AI occasionally hallucinates into stat
+    // values (e.g. <span style="font-variant-numeric:...">500</span> → "500").
+    const clean = value.replace(/<[^>]*>/g, '').trim() || value
+    const stripped = clean.replace(/[,_]/g, '') // thousand separators
     const numericMatch = stripped.match(/-?\d+\.?\d*/g) ?? []
     const isSingleNumeric = numericMatch.length === 1
     const numericValue = isSingleNumeric ? parseFloat(numericMatch[0]!) : NaN
@@ -91,7 +95,7 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
         return () => clearInterval(timer)
     }, [isInView, isNumeric, numericValue, duration, shouldReduce])
 
-    if (!isNumeric) return <span ref={ref}>{value}</span>
+    if (!isNumeric) return <span ref={ref}>{clean}</span>
 
     // Plan 260415 Lỗi E — format count với số thập phân + preserve thousand separators.
     // Dùng `toLocaleString()` không tham số để browser tự detect locale — hỗ trợ
@@ -99,7 +103,7 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
     const formattedCount = hasDecimal
         ? count.toFixed(decimals)
         : Math.floor(count).toLocaleString()
-    const formatted = value.replace(/-?[\d.,]+/, formattedCount)
+    const formatted = clean.replace(/-?[\d.,]+/, formattedCount)
     return <span ref={ref} style={{ fontVariantNumeric: 'tabular-nums' }}>{formatted}</span>
 }
 
