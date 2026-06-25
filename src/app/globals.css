@@ -1059,6 +1059,10 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
   select {
     appearance: none;
     margin: 0;
+    /* Preflight is OFF, so the `border` utility sets width+color but not style —
+       browsers then fall back to the UA default `border-style: inset` (beveled:
+       top/left darker than bottom/right). Force solid so borders render evenly. */
+    border-style: solid;
   }
 
   textarea {

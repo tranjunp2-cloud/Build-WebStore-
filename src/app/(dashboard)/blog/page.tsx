@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { CategoryModal } from './_components/CategoryModal'
 import { useI18n } from '@/i18n'
@@ -11,8 +10,6 @@ import {
     Pencil,
     FileText,
     SearchX,
-    X,
-    Loader2,
     Eye,
     Clock,
     Tag,
@@ -36,6 +33,8 @@ import { Badge } from '@/components/ui/badge'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { Button } from '@/components/ui/button'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
 type BlogPost = {
     id: string
@@ -289,14 +288,11 @@ export default function BlogListPage() {
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
                         <FileText className="h-8 w-8 text-destructive" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">{t.dashboard.blog.loadFailed}</h3>
-                    <p className="text-sm text-gray-400">{error}</p>
-                    <button
-                        onClick={fetchPosts}
-                        className="rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 py-2 text-sm font-medium !text-white hover:opacity-90 transition-colors"
-                    >
+                    <h3 className="text-lg font-semibold text-foreground">{t.dashboard.blog.loadFailed}</h3>
+                    <p className="text-sm text-muted-foreground">{error}</p>
+                    <Button onClick={fetchPosts} variant="dashPrimary" size="dash">
                         {t.dashboard.blog.tryAgain}
-                    </button>
+                    </Button>
                 </div>
             </div>
         )
@@ -400,22 +396,24 @@ export default function BlogListPage() {
 
             {selectedIds.size > 0 && (
                 <div className="flex items-center gap-[12px] mt-[24px] -mb-[8px] w-full">
-                    <button
+                    <Button
                         onClick={handleBulkPublish}
                         disabled={bulkActionLoading}
-                        className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[hsl(var(--primary))] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
+                        variant="dashPrimary"
+                        size="dash"
                     >
                         <Eye className="w-[16px] h-[16px]" />
-                        <span>{t.dashboard.blog.actions.bulkPublish || 'Publish'}</span>
-                    </button>
-                    <button
+                        {t.dashboard.blog.actions.bulkPublish || 'Publish'}
+                    </Button>
+                    <Button
                         onClick={() => setShowBulkDeleteModal(true)}
                         disabled={bulkActionLoading}
-                        className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[#FF6B6B] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
+                        variant="destructive"
+                        size="dash"
                     >
                         <Trash2 className="w-[16px] h-[16px]" />
-                        <span>{t.dashboard.blog.actions.delete}</span>
-                    </button>
+                        {t.dashboard.blog.actions.delete}
+                    </Button>
                 </div>
             )}
 
@@ -494,28 +492,31 @@ export default function BlogListPage() {
                         </div>
 
                         {/* Action Buttons Row */}
-                        <div className="flex flex-row items-center gap-2 border-t border-[hsl(var(--border))] pt-3">
-                            <button
+                        <div className="flex flex-row items-center gap-2 border-t border-border pt-3">
+                            <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
-                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--success)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                variant="ghost"
+                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
                             >
-                                <Eye className="w-4 h-4 text-[hsl(var(--success))]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--success))]">{t.dashboard.blog.actions.view}</span>
-                            </button>
-                            <button
+                                <Eye className="w-4 h-4" />
+                                {t.dashboard.blog.actions.view}
+                            </Button>
+                            <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
-                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--primary)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                variant="ghost"
+                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
                             >
-                                <Pencil className="w-4 h-4 text-[hsl(var(--primary))]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--primary))]">{t.dashboard.blog.actions.edit}</span>
-                            </button>
-                            <button
+                                <Pencil className="w-4 h-4" />
+                                {t.dashboard.blog.actions.edit}
+                            </Button>
+                            <Button
                                 onClick={() => openDeleteConfirm(post)}
-                                className="flex items-center justify-center gap-1.5 bg-[hsl(var(--destructive)/0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                                variant="ghost"
+                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
                             >
-                                <Trash2 className="w-4 h-4 text-[hsl(var(--destructive))]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[hsl(var(--destructive))]">{t.dashboard.blog.actions.delete}</span>
-                            </button>
+                                <Trash2 className="w-4 h-4" />
+                                {t.dashboard.blog.actions.delete}
+                            </Button>
                         </div>
                     </div>
                 ))}
@@ -651,17 +652,19 @@ export default function BlogListPage() {
 
                                     {/* Status — clickable to toggle; TableCell stops row navigation */}
                                     <TableCell onClick={(e) => e.stopPropagation()}>
-                                        <button
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
                                             onClick={() => handleToggleStatus(post)}
                                             title={post.status === 'published' ? t.dashboard.blog.actions.moveToDraft : t.dashboard.blog.actions.publish}
-                                            className="cursor-pointer transition-colors"
+                                            className="h-auto p-0 hover:bg-transparent"
                                         >
                                             {post.status === 'published' ? (
                                                 <Badge variant="success" dot>{t.dashboard.blog.filters.published}</Badge>
                                             ) : (
                                                 <Badge variant="secondary" dot>{t.dashboard.blog.filters.draft}</Badge>
                                             )}
-                                        </button>
+                                        </Button>
                                     </TableCell>
 
                                     {/* Author */}
@@ -709,170 +712,67 @@ export default function BlogListPage() {
 
 
             {/* Delete Confirmation Modal — AC-2, Figma: 31958-7172 */}
-            {
-                deleteTarget && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div
-                            className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
-                            style={{
-                                maxWidth: 347,
-                                background: 'var(--dash-surface)',
-                                border: '1px solid hsl(var(--primary)/0.3)',
-                            }}
-                        >
-                            {/* Icon */}
-                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)] shrink-0">
-                                <Trash2 className="w-[27px] h-[24px] text-[hsl(var(--destructive))]" strokeWidth={1.5} />
-                            </div>
-
-                            {/* Text block */}
-                            <div className="flex flex-col gap-[4px] w-full">
-                                {/* Title */}
-                                <div className="flex justify-center items-center w-full px-[92px]">
-                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-foreground">
-                                        {t.dashboard.blog.actions.deleteConfirmTitle}
-                                    </h3>
-                                </div>
-                                {/* Body */}
-                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[hsl(var(--muted-foreground))] w-full">
-                                    {t.dashboard.blog.actions.deleteConfirmDetails.replace('{title}', deleteTarget.title)}
-                                    {'\n'}{t.dashboard.blog.actions.deleteConfirmWarn}
-                                </p>
-                            </div>
-
-                            {/* Warning box — only for published */}
+            <ConfirmModal
+                open={!!deleteTarget}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={handleConfirmDelete}
+                title={t.dashboard.blog.actions.deleteConfirmTitle}
+                description={
+                    deleteTarget ? (
+                        <span>
+                            {t.dashboard.blog.actions.deleteConfirmDetails.replace('{title}', deleteTarget.title)}
+                            {'\n'}{t.dashboard.blog.actions.deleteConfirmWarn}
                             {deleteTarget.status === 'published' && (
-                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[hsl(var(--warning)/0.1)] w-full">
-                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[hsl(var(--warning))]" style={{ maxWidth: 296 }}>
-                                        {t.dashboard.blog.actions.deletePublishedWarning}
-                                    </p>
-                                </div>
+                                <span className="block mt-2 text-warning text-xs">
+                                    {t.dashboard.blog.actions.deletePublishedWarning}
+                                </span>
                             )}
-
-                            {/* Buttons */}
-                            <div className="flex flex-row justify-center items-center gap-[16px] w-full">
-                                {/* Cancel */}
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[hsl(var(--background))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
-                                >
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-foreground">
-                                        {t.dashboard.blog.actions.cancel}
-                                    </span>
-                                </button>
-                                {/* Delete */}
-                                <button
-                                    onClick={handleConfirmDelete}
-                                    disabled={isDeleting}
-                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[hsl(var(--destructive))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isDeleting ? (
-                                        <Loader2 className="w-4 h-4 animate-spin !text-white" />
-                                    ) : (
-                                        <Trash2 className="w-[16px] h-[16px] !text-white" />
-                                    )}
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] !text-white">
-                                        {isDeleting ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body
-                )
-            }
+                        </span>
+                    ) : undefined
+                }
+                confirmLabel={t.dashboard.blog.actions.delete}
+                cancelLabel={t.dashboard.blog.actions.cancel}
+                variant="danger"
+                loading={isDeleting}
+            />
 
             {/* Bulk Delete Confirmation Modal — TC-F17-01-12, Figma: 31958-7197 */}
-            {
-                showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
-                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div
-                            className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
-                            style={{
-                                maxWidth: 347,
-                                background: 'var(--dash-surface)',
-                                border: '1px solid hsl(var(--primary)/0.3)',
-                            }}
-                        >
-                            {/* Icon */}
-                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)] shrink-0">
-                                <Trash2 className="w-[27px] h-[24px] text-[hsl(var(--destructive))]" strokeWidth={1.5} />
-                            </div>
+            <ConfirmModal
+                open={showBulkDeleteModal}
+                onCancel={() => setShowBulkDeleteModal(false)}
+                onConfirm={async () => {
+                    await handleBulkDelete()
+                    setShowBulkDeleteModal(false)
+                }}
+                title={t.dashboard.blog.actions.bulkDeleteTitle.replace('{count}', selectedIds.size.toString())}
+                description={
+                    <span>
+                        {t.dashboard.blog.actions.bulkDeleteConfirm.replace('{count}', selectedIds.size.toString())}
+                        {'\n'}{t.dashboard.blog.actions.bulkDeleteWarning}
+                        {hasPublishedInSelection && (
+                            <span className="block mt-2 text-warning text-xs">
+                                {t.dashboard.blog.actions.bulkDeletePublishedWarning}
+                            </span>
+                        )}
+                    </span>
+                }
+                confirmLabel={t.dashboard.blog.actions.delete}
+                cancelLabel={t.dashboard.blog.actions.cancel}
+                variant="danger"
+                loading={bulkActionLoading}
+            />
 
-                            {/* Text block */}
-                            <div className="flex flex-col gap-[4px] w-full">
-                                {/* Title */}
-                                <div className="flex justify-center items-center w-full px-[92px]">
-                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-foreground">
-                                        {t.dashboard.blog.actions.bulkDeleteTitle.replace('{count}', selectedIds.size.toString())}
-                                    </h3>
-                                </div>
-                                {/* Body */}
-                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[hsl(var(--muted-foreground))] w-full">
-                                    {t.dashboard.blog.actions.bulkDeleteConfirm.replace('{count}', selectedIds.size.toString())}
-                                    {'\n'}{t.dashboard.blog.actions.bulkDeleteWarning}
-                                </p>
-                            </div>
-
-                            {/* Warning box — only when selection has published posts */}
-                            {hasPublishedInSelection && (
-                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[hsl(var(--warning)/0.1)] w-full">
-                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[hsl(var(--warning))]" style={{ maxWidth: 296 }}>
-                                        {t.dashboard.blog.actions.bulkDeletePublishedWarning}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Buttons */}
-                            <div className="flex flex-row justify-center items-center gap-[16px] w-full">
-                                {/* Cancel */}
-                                <button
-                                    onClick={() => setShowBulkDeleteModal(false)}
-                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[hsl(var(--background))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
-                                >
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-foreground">
-                                        {t.dashboard.blog.actions.cancel}
-                                    </span>
-                                </button>
-                                {/* Delete */}
-                                <button
-                                    onClick={async () => {
-                                        await handleBulkDelete()
-                                        setShowBulkDeleteModal(false)
-                                    }}
-                                    disabled={bulkActionLoading}
-                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[hsl(var(--destructive))] border border-[hsl(var(--input-border))] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {bulkActionLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin !text-white" />
-                                    ) : (
-                                        <Trash2 className="w-[16px] h-[16px] !text-white" />
-                                    )}
-                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] !text-white">
-                                        {bulkActionLoading ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body
-                )
-            }
-
-            {
-                isCategoryModalOpen && typeof document !== 'undefined' && createPortal(
-                    <CategoryModal
-                        onClose={() => setIsCategoryModalOpen(false)}
-                        onCategoryUpdated={() => {
-                            getBlogCategoriesAction()
-                                .then(docs => setCategories(docs || []))
-                                .catch(() => { })
-                            fetchPosts()
-                        }}
-                    />,
-                    document.body
-                )
-            }
+            {isCategoryModalOpen && (
+                <CategoryModal
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    onCategoryUpdated={() => {
+                        getBlogCategoriesAction()
+                            .then(docs => setCategories(docs || []))
+                            .catch(() => { })
+                        fetchPosts()
+                    }}
+                />
+            )}
         </div>
     )
 }
