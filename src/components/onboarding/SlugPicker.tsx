@@ -20,6 +20,9 @@ interface SlugPickerProps {
     onSlugChange?: (slug: string, available: boolean) => void
     /** Platform domain suffix for preview */
     platformDomain?: string
+    /** When true, skip the API check on initial mount (e.g. form pre-filled from draft).
+     *  The check fires normally on any subsequent slug change by the user. */
+    skipInitialCheck?: boolean
 }
 
 /** Client-side slugify for instant preview (mirrors server-side logic) */
@@ -37,7 +40,7 @@ function clientSlugify(name: string): string {
     return slug.length >= 3 ? slug : ''
 }
 
-export default function SlugPicker({ businessName = '', onSlugChange, platformDomain }: SlugPickerProps) {
+export default function SlugPicker({ businessName = '', onSlugChange, platformDomain, skipInitialCheck }: SlugPickerProps) {
     const { t } = useI18n()
     const f = t.onboarding.form
     const [slug, setSlug] = useState('')
@@ -46,6 +49,9 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
     const [suggestion, setSuggestion] = useState('')
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const abortRef = useRef<AbortController | null>(null)
+    // When skipInitialCheck=true, suppress the API call triggered by the first
+    // businessName→slug auto-generation (e.g. form pre-filled from a reloaded draft).
+    const skipNextCheckRef = useRef(!!skipInitialCheck)
 
     const domain = platformDomain || process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
@@ -111,6 +117,12 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
     useEffect(() => {
         if (!slug) {
             setStatus('idle')
+            return
+        }
+
+        // Skip the first automatic check when form is pre-filled from a draft reload
+        if (skipNextCheckRef.current) {
+            skipNextCheckRef.current = false
             return
         }
 

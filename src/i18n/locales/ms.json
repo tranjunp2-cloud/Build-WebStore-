@@ -467,7 +467,10 @@
             "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
             "cancelButton": "Batalkan penjanaan",
             "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
-            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini.",
+            "interrupted": "Penjanaan telah terganggu. Sila cuba lagi.",
+            "leaveWarning": "Laman web sedang dijana. Pergi juga?",
+            "timeoutRecover": "Masa penjanaan tamat. Kembali ke borang."
         },
         "completion": {
             "successMessage": "telah berjaya dicipta!",
