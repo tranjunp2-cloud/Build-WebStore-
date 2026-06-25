@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, ZoomIn, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
 interface StepData {
@@ -177,21 +178,32 @@ export function ModuleGuidesTab() {
 
   return (
     <div className="w-full flex flex-col pt-2">
-      {/* Module Tabs Header */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {MODULES_DATA.map((module) => (
-          <button
-            key={module.id}
-            onClick={() => handleTabClick(module.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold rounded-[20px] border transition-all duration-200 ${
-              activeModule === module.id
-                ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))] !text-white'
-                : 'bg-[hsl(var(--card))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))]'
-            }`}
-          >
-            <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
-          </button>
-        ))}
+      {/* Module Tabs Header — underline tabs (matches DashboardTabs / Discounts / Team & Account
+          via the global `.dash-tab-trigger` underline on data-state=active). Wraps on narrow
+          screens (no horizontal scrollbar). */}
+      <div
+        className="flex flex-wrap gap-0 mb-6"
+        style={{ borderBottom: '1px solid var(--dash-divider)' }}
+      >
+        {MODULES_DATA.map((module) => {
+          const isActive = activeModule === module.id
+          return (
+            <button
+              key={module.id}
+              type="button"
+              data-state={isActive ? 'active' : 'inactive'}
+              onClick={() => handleTabClick(module.id)}
+              className={cn(
+                'dash-tab-trigger flex items-center gap-1.5 px-4 pb-2.5 rounded-none text-[13px] font-semibold transition-colors -mb-px cursor-pointer whitespace-nowrap',
+                isActive
+                  ? 'text-[var(--dash-text)]'
+                  : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]'
+              )}
+            >
+              <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Module Contents Array */}
