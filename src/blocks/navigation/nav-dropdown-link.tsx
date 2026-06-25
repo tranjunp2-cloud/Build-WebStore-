@@ -6,6 +6,9 @@ import { EyeOff } from 'lucide-react'
 import type { NavLink } from './config'
 import { NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
+
+const MotionSmartLink = motion.create(SmartLink)
 
 const NAV_SURFACE_TEXT = `var(--text, #fafafa)`
 
@@ -21,7 +24,7 @@ export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
 
     if (!hasChildren) {
         return (
-            <motion.a
+            <MotionSmartLink
                 key={i}
                 href={resolveHref(link?.url)}
                 whileHover={{ y: -1 }}
@@ -29,7 +32,7 @@ export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
             >
                 {link.label}
                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-            </motion.a>
+            </MotionSmartLink>
         )
     }
 
@@ -63,9 +66,9 @@ export function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         }}
                     >
                         {link.children!.map((child, ci) => (
-                            <a key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
+                            <SmartLink key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
                                 {child.label}
-                            </a>
+                            </SmartLink>
                         ))}
                     </motion.div>
                 )}
