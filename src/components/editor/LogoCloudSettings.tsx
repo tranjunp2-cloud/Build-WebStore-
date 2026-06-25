@@ -35,15 +35,17 @@ function getLogoAlt(item: LogoItem): string {
     return item.name
 }
 
-/** Safely extract logo as plain object for spread (handles number MediaID edge case) */
-function getLogoObj(item: LogoItem): Record<string, unknown> {
-    const l = item.logo as unknown
-    if (typeof l === 'object' && l !== null) return l as Record<string, unknown>
-    return { url: '', alt: item.name }
-}
-
 export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: LogoCloudSettingsProps) {
     const [removeVersion, setRemoveVersion] = useState(0)
+    const [uploadingSlots, setUploadingSlots] = useState<Set<number>>(new Set())
+
+    const handleUploadingChange = (i: number, uploading: boolean) => {
+        setUploadingSlots(prev => {
+            const next = new Set(prev)
+            uploading ? next.add(i) : next.delete(i)
+            return next
+        })
+    }
 
     const logos = block.logos ?? []
     const count = logos.length
@@ -87,14 +89,10 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
         onBlockUpdate(blockIndex, { logos: updated })
     }
 
-    const handleAltChange = (i: number, alt: string) => {
-        const updated = logos.map((l, idx) => {
-            if (idx !== i) return l
-            const logoVal = l.logo as unknown
-            // Skip non-object logo values (numeric Payload Media ID, null, etc.) — don't corrupt the relation
-            if (typeof logoVal !== 'object' || logoVal === null) return l
-            return { ...l, logo: { ...getLogoObj(l), alt } }
-        })
+    const handleImageClear = (i: number) => {
+        const updated = logos.map((l, idx) =>
+            idx !== i ? l : { ...l, logo: { url: '', alt: getLogoAlt(l) } }
+        )
         onBlockUpdate(blockIndex, { logos: updated })
     }
 
@@ -123,7 +121,7 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
                             <button
                                 type="button"
                                 aria-label={`Remove logo ${i + 1}`}
-                                disabled={count <= 1}
+                                disabled={count <= 1 || uploadingSlots.has(i)}
                                 onClick={() => handleRemoveAt(i)}
                                 className="text-red-400 hover:text-red-300 disabled:opacity-30"
                             ><X className="h-4 w-4" aria-hidden /></button>
@@ -133,15 +131,19 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
                         imageUrl={getLogoUrl(logo)}
                         altText={getLogoAlt(logo)}
                         onImageChange={(id, url) => handleImageChange(i, id, url)}
-                        onAltTextChange={(alt) => handleAltChange(i, alt)}
+                        onRemove={() => handleImageClear(i)}
+                        onUploadingChange={(uploading) => handleUploadingChange(i, uploading)}
                     />
-                    <Input
-                        defaultValue={logo.name}
-                        placeholder="Company name"
-                        variant="editor"
-                        className="mt-1.5"
-                        onBlur={(e: FieldBlurEvent) => handleNameBlur(i, e.target.value)}
-                    />
+                    <div className="mt-1.5">
+                        <label className="text-[11px] font-medium text-slate-400">Company name</label>
+                        <Input
+                            defaultValue={logo.name}
+                            placeholder="e.g. Acme Corp"
+                            variant="editor"
+                            className="mt-0.5"
+                            onBlur={(e: FieldBlurEvent) => handleNameBlur(i, e.target.value)}
+                        />
+                    </div>
                 </div>
             ))}
             <button

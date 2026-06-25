@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ImagePlus, Loader2 } from 'lucide-react'
+import { Loader2, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { compressImage } from '@/lib/media/compress-image'
@@ -10,10 +10,12 @@ interface BlockImageEditorProps {
     imageUrl: string
     altText: string
     onImageChange: (id: number, url: string) => void
-    onAltTextChange: (alt: string) => void
+    onAltTextChange?: (alt: string) => void
+    onRemove?: () => void
+    onUploadingChange?: (isUploading: boolean) => void
 }
 
-export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextChange }: BlockImageEditorProps) {
+export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextChange, onRemove, onUploadingChange }: BlockImageEditorProps) {
     const fileRef = useRef<HTMLInputElement>(null)
     const [isUploading, setIsUploading] = useState(false)
 
@@ -27,6 +29,7 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
         }
 
         setIsUploading(true)
+        onUploadingChange?.(true)
         try {
             const compressed = await compressImage(file)
             const formData = new FormData()
@@ -41,46 +44,13 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             toast.error(msg)
         } finally {
             setIsUploading(false)
+            onUploadingChange?.(false)
             if (fileRef.current) fileRef.current.value = ''
         }
     }
 
     return (
-        <div className="space-y-3">
-            {/* Preview */}
-            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                {imageUrl ? (
-                    <img
-                        src={imageUrl}
-                        alt={altText}
-                        className="h-32 w-full object-cover"
-                    />
-                ) : (
-                    <div className="flex h-32 items-center justify-center text-slate-500">
-                        <ImagePlus className="h-8 w-8" />
-                    </div>
-                )}
-                {isUploading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        <Loader2 className="h-6 w-6 animate-spin text-white" />
-                    </div>
-                )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2">
-                <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={isUploading}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-white/10 disabled:opacity-50"
-                >
-                    <ImagePlus className="h-3.5 w-3.5" />
-                    Change
-                </button>
-                {/* AI image generation — hidden until feature is implemented */}
-            </div>
-
+        <div className="space-y-2">
             <input
                 ref={fileRef}
                 type="file"
@@ -89,17 +59,63 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
                 onChange={handleFileSelect}
             />
 
-            {/* Alt text */}
-            <div>
-                <label className="text-[11px] font-medium text-slate-400">Alt text (SEO)</label>
-                <input
-                    type="text"
-                    defaultValue={altText}
-                    onBlur={(e) => onAltTextChange(e.target.value)}
-                    placeholder="Describe this image..."
-                    className="mt-1 h-8 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-white placeholder:text-slate-500 outline-none focus:border-blue-500/50"
-                />
-            </div>
+            {imageUrl ? (
+                <div className="rounded-[12px] border border-white/[0.08] bg-white/5 p-2">
+                    <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.03]">
+                        <img src={imageUrl} alt={altText} className="max-h-full max-w-full object-contain" />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => fileRef.current?.click()}
+                            disabled={isUploading}
+                            className="text-[11px] text-slate-300 hover:text-white disabled:opacity-50"
+                        >
+                            {isUploading ? 'Uploading…' : 'Replace'}
+                        </button>
+                        {onRemove && (
+                            <button
+                                type="button"
+                                onClick={onRemove}
+                                disabled={isUploading}
+                                className="inline-flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                Remove
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-white/20 bg-white/5 px-0 py-6 text-center transition-colors hover:bg-white/10 disabled:opacity-60"
+                >
+                    {isUploading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                    ) : (
+                        <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />
+                    )}
+                    <span className="text-xs font-medium text-slate-400">
+                        {isUploading ? 'Uploading…' : 'Click to upload'}
+                    </span>
+                </button>
+            )}
+
+            {onAltTextChange && (
+                <div>
+                    <label className="text-[11px] font-medium text-slate-400">Alt text (SEO)</label>
+                    <input
+                        type="text"
+                        defaultValue={altText}
+                        onBlur={(e) => onAltTextChange(e.target.value)}
+                        placeholder="Describe this image..."
+                        className="mt-1 h-8 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-white placeholder:text-slate-500 outline-none focus:border-blue-500/50"
+                    />
+                </div>
+            )}
         </div>
     )
 }
