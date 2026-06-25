@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -95,9 +94,9 @@ function NavLogoLink({
     const resolveHref = useLocalHref()
     const injectedHref = block?._logoHref as string | undefined
     return (
-        <Link href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
+        <SmartLink href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
             {children}
-        </Link>
+        </SmartLink>
     )
 }
 

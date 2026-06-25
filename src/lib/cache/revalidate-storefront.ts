@@ -69,3 +69,26 @@ export const revalidatePageAfterDelete: CollectionAfterDeleteHook = ({ doc }) =>
     bustSitePages(pageSiteId(doc as Record<string, unknown>))
     return doc
 }
+
+// ── Tenants collection ──────────────────────────────────────────────────────
+// Tenant identity (slug, customDomains) drives the `tenants`-tagged lookups
+// (getCachedTenantBySlug/ByDomain/getCachedSiteByTenant). Editing a tenant in
+// the Payload admin bypasses the dashboard domain action, so bust here too —
+// otherwise a re-pointed slug/domain serves stale content for up to the TTL.
+const bustTenants = () => {
+    try {
+        revalidateTag('tenants')
+    } catch {
+        // Out-of-request scope (seed/migration) — nothing to revalidate.
+    }
+}
+
+export const revalidateTenantAfterChange: CollectionAfterChangeHook = ({ doc }) => {
+    bustTenants()
+    return doc
+}
+
+export const revalidateTenantAfterDelete: CollectionAfterDeleteHook = ({ doc }) => {
+    bustTenants()
+    return doc
+}
