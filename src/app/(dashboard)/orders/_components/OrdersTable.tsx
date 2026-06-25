@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
@@ -86,76 +87,6 @@ function StatusBadge({ status, label }: { status: OrderStatus; label: string }) 
     )
 }
 
-// ───────── CHECKBOX (row selection with indeterminate support) ─────────
-// Kept as a checkbox (not Switch) because it needs indeterminate state for
-// "select all" semantics which Switch does not model.
-function Checkbox({
-    checked,
-    indeterminate,
-    onChange,
-    inputRef,
-    'aria-label': ariaLabel,
-}: {
-    checked: boolean
-    indeterminate?: boolean
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-    inputRef?: React.Ref<HTMLInputElement>
-    'aria-label'?: string
-}) {
-    return (
-        <label className="relative flex items-center justify-center cursor-pointer" style={{ width: 18, height: 18 }}>
-            <input
-                ref={inputRef}
-                type="checkbox"
-                checked={checked}
-                onChange={onChange}
-                aria-label={ariaLabel}
-                className="peer sr-only"
-            />
-            <div
-                style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 6,
-                    border: checked || indeterminate ? '1px solid hsl(var(--primary))' : '1px solid hsl(var(--input-border))',
-                    background: checked || indeterminate ? 'hsl(var(--primary))' : 'transparent',
-                    transition: 'background 0.2s, border 0.2s'
-                }}
-            />
-            {checked && !indeterminate && (
-                <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                >
-                    <path
-                        d="M10 3L4.5 8.5L2 6"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                </svg>
-            )}
-            {indeterminate && (
-                <svg
-                    width="10"
-                    height="2"
-                    viewBox="0 0 10 2"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                >
-                    <rect width="10" height="2" rx="1" fill="currentColor" />
-                </svg>
-            )}
-        </label>
-    )
-}
-
 interface InnerTableProps {
     orders: Order[]
     loading: boolean
@@ -173,27 +104,6 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
     const o = t.dashboard.orders
     const statusLabels = o.status
     const methodLabels = (o.detail as Record<string, unknown>).paymentMethods as Record<string, string>
-    const allSelected = orders.length > 0 && orders.every(ord => selectedRows.has(ord.id))
-    const someSelected = orders.some(ord => selectedRows.has(ord.id)) && !allSelected
-    const allCheckboxRef = useRef<HTMLInputElement>(null)
-
-    useEffect(() => {
-        if (allCheckboxRef.current) {
-            allCheckboxRef.current.indeterminate = someSelected
-        }
-    }, [someSelected])
-
-    function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
-        if (e.target.checked) {
-            const next = new Set(selectedRows)
-            orders.forEach(ord => next.add(ord.id))
-            onSelectionChange(next)
-        } else {
-            const next = new Set(selectedRows)
-            orders.forEach(ord => next.delete(ord.id))
-            onSelectionChange(next)
-        }
-    }
 
     function toggleRow(id: string) {
         const next = new Set(selectedRows)
@@ -228,7 +138,7 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
                                         checked={isSelected}
-                                        onChange={() => toggleRow(order.id)}
+                                        onCheckedChange={() => toggleRow(order.id)}
                                         aria-label={`Select order ${order.id}`}
                                     />
                                 </div>
