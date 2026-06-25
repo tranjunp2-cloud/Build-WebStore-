@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, User, Mail, Loader2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { getCustomerDetailAction, updateContactStatusAction } from '../actions'
@@ -329,14 +330,14 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                 {/* Update button — contact-form only, pinned at bottom */}
                 {record.source === 'contact-form' && (
                     <div className="px-6 pb-6 pt-2 shrink-0">
-                        <button
+                        <Button
+                            variant="dashPrimary"
                             onClick={handleUpdate}
                             disabled={updating || localStatus === serverStatusRef.current}
-                            className="w-full h-[44px] rounded-[10px] text-[14px] font-medium !text-white cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
-                            style={{ background: 'linear-gradient(90deg, #3b82f6 0%, #2dd4bf 100%)' }}
+                            className="w-full"
                         >
-                            {updating ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : c.update}
-                        </button>
+                            {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : c.update}
+                        </Button>
                     </div>
                 )}
             </div>
