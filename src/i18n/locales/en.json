@@ -3608,8 +3608,12 @@
             "altFavicon": "Site Favicon",
             "remove": "Remove",
             "replace": "Replace",
-            "invalidFormat": "Only .ico and .png files are accepted",
-            "tooLarge": "File must be 100KB or smaller"
+            "invalidFormat": "Only .ico, .png, .jpg, and .webp files are accepted",
+            "tooLarge": "File must be 500KB or smaller",
+            "tooLargeWarning": "Favicon is larger than 100KB — this may slow down browser tab loading",
+            "tooSmall": "Favicon must be at least 16×16px",
+            "tooBig": "Favicon must be 512×512px or smaller",
+            "notSquare": "A square favicon (1:1) is recommended — non-square images may appear distorted"
         },
         "ogImageEditor": {
             "invalidFormat": "Only JPG, PNG, or WebP images are accepted",
