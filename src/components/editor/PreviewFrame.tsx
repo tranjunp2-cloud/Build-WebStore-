@@ -935,8 +935,10 @@ function PreviewFrameInner({
                 // Non-destructive: reads current images from Zustand store, only updates the clicked slot.
                 // Pre-fills null slots up to totalImagesInBlock so existing stock placeholders are preserved
                 // as null entries (gallery will show real images where set, otherwise falls back per-slot).
-                // Must use newMediaId (numeric Payload media ID) — normalizeUploadField strips objects
-                // without .id to null before persistence.
+                // Store the populated object { id, url, alt } (mirrors Strategy 7): the gallery render gate
+                // (gallery/index.tsx) only shows a real image when `typeof image === 'object' && image.url`,
+                // so a bare integer would fall back to the stock image until reload. normalizeUploadField
+                // extracts the numeric .id before persistence, so the DB write is unaffected.
                 if (!matched && imageClickData.imageIndex !== undefined && imageClickData.blockType === 'gallery') {
                     const idx = imageClickData.imageIndex
                     const currentBlock = blocks[blockIndex] as Record<string, unknown>
@@ -951,7 +953,12 @@ function PreviewFrameInner({
                     while (currentImages.length < totalSlots) {
                         currentImages.push({ image: null, caption: '' })
                     }
-                    currentImages[idx] = { ...currentImages[idx], image: newMediaId }
+                    // Preserve existing alt text if the slot already held a populated image object
+                    const existingImg = currentImages[idx]?.image
+                    const existingAlt = existingImg && typeof existingImg === 'object'
+                        ? String((existingImg as Record<string, unknown>).alt ?? '')
+                        : ''
+                    currentImages[idx] = { ...currentImages[idx], image: { id: newMediaId, url: newUrl, alt: existingAlt } }
                     updateBlock(blockIndex, { images: currentImages })
                     matched = true
                 }
@@ -1013,7 +1020,10 @@ function PreviewFrameInner({
             onImageReplaced?.()
         } catch (error) {
             console.error('Image replace error:', error)
-            toast.error(t.editor.preview.imageReplaceFailed)
+            // GH-1381 Case 2: surface the specific reason (e.g. "Invalid image file…", "Unauthorized")
+            // instead of a bare generic toast, so the user knows whether it's format/auth/server.
+            const reason = error instanceof Error && error.message ? error.message : ''
+            toast.error(t.editor.preview.imageReplaceFailed, reason ? { description: reason } : undefined)
         } finally {
             setIsImageProcessing(false)
         }
