@@ -23,6 +23,7 @@
 | **TC-F05-FAV-10** | Format | `.txt` disguised as PNG (text/plain) → format reject | `toast.error` invalidFormat; no upload | P1 | ✓ |
 | **TC-F05-FAV-11** | Format | `.gif` (image/gif) → format reject | `toast.error` invalidFormat; no upload | P1 | ✓ |
 | **TC-F05-FAV-12** | Format | `.bmp` (image/bmp) → format reject | `toast.error` invalidFormat; no upload | P1 | ✓ |
+| **TC-F05-FAV-13** | Concurrency | File selected while upload in progress (`isUploading: true`) → ignored | No upload, no toast | P1 | ✓ |
 
 ---
 

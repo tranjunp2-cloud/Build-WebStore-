@@ -120,12 +120,26 @@ afterEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe('TC-F05-FAV-01: ICO file accepted; dimension check skipped', () => {
-    it('uploads ICO without running dimension validation', async () => {
+    it('uploads image/x-icon without running dimension validation', async () => {
         mockUpload.mockResolvedValue({ id: 1, url: 'https://cdn/favicon.ico' })
         const onFaviconChange = vi.fn()
         const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
 
         triggerUpload(getFileInput(container), makeFile('image/x-icon', 'favicon.ico', 50 * 1024))
+
+        await waitFor(() => {
+            expect(onFaviconChange).toHaveBeenCalledWith('https://cdn/favicon.ico')
+        })
+        expect(toast.success).toHaveBeenCalledWith('Favicon updated')
+        expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('uploads image/vnd.microsoft.icon (IANA standard MIME) without dimension validation', async () => {
+        mockUpload.mockResolvedValue({ id: 5, url: 'https://cdn/favicon.ico' })
+        const onFaviconChange = vi.fn()
+        const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
+
+        triggerUpload(getFileInput(container), makeFile('image/vnd.microsoft.icon', 'favicon.ico', 50 * 1024))
 
         await waitFor(() => {
             expect(onFaviconChange).toHaveBeenCalledWith('https://cdn/favicon.ico')
@@ -281,6 +295,26 @@ describe('TC-F05-FAV-12: BMP file → format reject', () => {
             expect(toast.error).toHaveBeenCalledWith('Only .ico, .png, .jpg, and .webp files are accepted')
         })
         expect(mockUpload).not.toHaveBeenCalled()
+        expect(onFaviconChange).not.toHaveBeenCalled()
+    })
+})
+
+describe('TC-F05-FAV-13: File selected while upload in progress → ignored', () => {
+    it('returns early without calling upload when isUploading is true', () => {
+        vi.mocked(useUploadProgress).mockReturnValue({
+            upload: mockUpload,
+            progress: 50,
+            isUploading: true,
+            reset: vi.fn(),
+        })
+        const onFaviconChange = vi.fn()
+        const { container } = render(<FaviconEditor currentFavicon={null} onFaviconChange={onFaviconChange} />)
+
+        triggerUpload(getFileInput(container), makeFile('image/png', 'favicon.png', 50 * 1024))
+
+        expect(mockUpload).not.toHaveBeenCalled()
+        expect(toast.error).not.toHaveBeenCalled()
+        expect(toast.warning).not.toHaveBeenCalled()
         expect(onFaviconChange).not.toHaveBeenCalled()
     })
 })
