@@ -27,6 +27,12 @@
 | **TC-SSOPW2-11** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — happy path (dashboard) | SSO user with completed onboarding | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/dashboard`, no `/verify-otp` bounce | High |
 | **TC-SSOPW2-12** | E2E *(deferred — no Playwright impl yet)* | Full SSO flow — new user (onboarding) | SSO user, tenant onboardingCompleted=false, wizard not seen | SSO login → `/sso/authorization` page | Loading screen → cookie set → redirect to `/onboarding` | High |
 | **TC-SSOPW2-13** | Security | Client redirect guard | Server returns malicious redirectTo | SsoAuthorizationClient receives `redirectTo: '//evil.com'` | Falls back to `/dashboard` — no external redirect | High |
+| **TC-SSOPW2-14** | API | Web Store: 0 steps done → /onboarding | tenant-owner, onboarding complete, no sso_step_events rows | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | High |
+| **TC-SSOPW2-15** | API | Web Store: step 1 done → /settings/shipping | tenant-owner, step 1 completed in sso_step_events | POST with valid token | 200 `{ ok: true, redirectTo: '/settings/shipping' }` | High |
+| **TC-SSOPW2-16** | API | Web Store: steps 1+2 done → /products/new | tenant-owner, steps 1+2 completed | POST with valid token | 200 `{ ok: true, redirectTo: '/products/new' }` | High |
+| **TC-SSOPW2-17** | API | Web Store: all 3 steps done → /dashboard | tenant-owner, all steps completed | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` | High |
+| **TC-SSOPW2-18** | API | Web Store: DB error → fail-open /dashboard | sso_step_events query throws | POST with valid token | 200 `{ ok: true, redirectTo: '/dashboard' }` — SSO not blocked | High |
+| **TC-SSOPW2-19** | API | Web Store: has_seen_ai_wizard=false + onboarding done + 0 steps → /onboarding | Tenant onboardingCompleted=true, wizard not seen, no steps | POST with valid token | 200 `{ ok: true, redirectTo: '/onboarding' }` | Medium |
 
 ---
 
