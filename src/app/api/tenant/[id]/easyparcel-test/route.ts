@@ -88,51 +88,18 @@ export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
             throw err
         }
 
-        // Decode JWT payload for debugging (no verification — just inspect claims)
-        try {
-            const parts = token.split('.')
-            if (parts.length === 3) {
-                const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'))
-                console.log('[EP Token Claims]', JSON.stringify({ sub: payload.sub, account_id: payload.account_id, scope: payload.scope, iat: payload.iat, exp: payload.exp }))
-            } else {
-                console.log('[EP Token] Not a JWT — format:', token.slice(0, 20) + '...')
-            }
-        } catch { /* non-critical */ }
-
-        let walletRes
-        try {
-            walletRes = await walletBalance(token)
-        } catch (walletErr) {
-            if (walletErr instanceof EasyParcelError && walletErr.code === 'HTTP_ERROR') {
-                const raw = walletErr.raw as { status?: number; body?: unknown } | undefined
-                console.error('[EasyParcel Wallet Error]', raw?.status, JSON.stringify(raw?.body))
-                const epReason = (raw?.body as any)?.reason ?? (raw?.body as any)?.data ?? 'Unknown'
-                return NextResponse.json(
-                    { success: false, error: { code: 'EP_WALLET_ERROR', message: `EP API error: ${epReason}`, epStatus: raw?.status, epBody: raw?.body } },
-                    { status: 502 },
-                )
-            }
-            throw walletErr
-        }
-
+        const walletRes = await walletBalance(token)
         const balance = walletRes.data?.current_balance ?? '0'
         const currency = walletRes.data?.currency_code ?? 'MYR'
-        const accountId = walletRes.data?.account_id
-        const accountName = accountId ? `EP #${accountId} · ${currency}` : undefined
 
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: {
-                easyParcelIntegration: {
-                    testedAt: new Date().toISOString(),
-                    ...(accountName ? { accountName } : {}),
-                },
-            } as any,
+            data: { easyParcelIntegration: { testedAt: new Date().toISOString() } } as any,
             overrideAccess: true,
         })
 
-        return NextResponse.json({ success: true, data: { balance, currency, accountName } })
+        return NextResponse.json({ success: true, data: { balance, currency } })
     } catch (error: unknown) {
         console.error('[EasyParcel Test Error]', error instanceof Error ? error.message : 'unknown')
         return NextResponse.json(

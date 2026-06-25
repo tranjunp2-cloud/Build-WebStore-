@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { exchangeCodeForToken } from '@/lib/shipping/easyparcel/token-manager'
-import { walletBalance } from '@/lib/shipping/easyparcel/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,19 +43,7 @@ export async function GET(request: NextRequest) {
         if (!tenant) return makeErrorRedirect()
 
         const tokens = await exchangeCodeForToken(code)
-        // Debug: log all token response fields except the actual tokens
-        const { access_token: _a, refresh_token: _r, ...tokenMeta } = tokens as any
-        console.log('[EP OAuth Callback] Token response metadata:', JSON.stringify(tokenMeta))
         const now = Date.now()
-
-        // Best-effort: fetch account identifier for display in settings UI
-        let accountName: string | undefined
-        try {
-            const wallet = await walletBalance(tokens.access_token)
-            if (wallet.data?.account_id) {
-                accountName = `EP #${wallet.data.account_id} · ${wallet.data.currency_code}`
-            }
-        } catch { /* non-critical — proceed without account name */ }
 
         await payload.update({
             collection: 'tenants',
@@ -69,7 +56,6 @@ export async function GET(request: NextRequest) {
                     tokenRefreshExpiresAt: new Date(now + tokens.refresh_token_expires_in * 1000).toISOString(),
                     enabled: true,
                     testedAt: new Date().toISOString(),
-                    ...(accountName ? { accountName } : {}),
                 },
             } as any,
             overrideAccess: true,

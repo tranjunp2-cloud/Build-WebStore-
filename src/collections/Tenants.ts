@@ -637,11 +637,6 @@ export const Tenants: CollectionConfig = {
                     type: 'date',
                     admin: { readOnly: true, description: 'Timestamp of last successful EP connection test' },
                 },
-                {
-                    name: 'accountName',
-                    type: 'text',
-                    admin: { readOnly: true, description: 'EP connected account identifier (e.g. EP #10841459 · MYR)' },
-                },
             ],
         },
     ],

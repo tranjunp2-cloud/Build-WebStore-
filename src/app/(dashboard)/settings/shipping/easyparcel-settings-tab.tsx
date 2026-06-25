@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Search, Check } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -28,7 +28,6 @@ interface WarehouseData {
 export interface EasyParcelIntegrationConfig {
     enabled?: boolean
     // accessToken is server-only, never returned to client
-    accountName?: string
     warehouse?: WarehouseData | null
     selectedCourier?: string
     testedAt?: string
@@ -61,7 +60,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         initialEpConfig?.testedAt ? 'connected' : 'idle',
     )
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
-    const [accountName, setAccountName] = useState<string | null>(initialEpConfig?.accountName ?? null)
 
     // Warehouse fields
     const wh = initialEpConfig?.warehouse ?? {}
@@ -94,17 +92,15 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
     const searchParams = useSearchParams()
 
-    // Handle OAuth callback query params — auto-test on connect to populate account name
+    // Handle OAuth callback query params
     useEffect(() => {
         const ep = searchParams.get('ep')
         if (ep === 'connected') {
+            setTestStatus('connected')
+            toast.success('EasyParcel connected successfully!')
             if (typeof window !== 'undefined') {
                 window.history.replaceState({}, '', '/settings/shipping')
             }
-            // Auto-test to fetch account name and wallet balance
-            handleTestConnection().then(() => {
-                toast.success('EasyParcel connected successfully!')
-            })
         } else if (ep === 'error') {
             toast.error('EasyParcel connection failed. Please try again.')
             if (typeof window !== 'undefined') {
@@ -204,42 +200,20 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 if (code === 'EP_NOT_CONNECTED') {
                     setTestStatus('idle')
                     toast.error('EasyParcel not connected. Please connect via OAuth.')
-                } else if (code === 'EP_WALLET_ERROR') {
-                    setTestStatus('idle')
-                    const epMsg = json?.error?.message ?? 'EP API error'
-                    toast.error(epMsg, { description: 'Check server logs or try reconnecting your EP account.' })
-                    console.error('[EP wallet error]', json?.error?.epBody)
                 } else {
                     setTestStatus('idle')
                     toast.error(json?.error?.message ?? 'Connection test failed')
                 }
                 return
             }
-            const { balance, currency, accountName: name } = json.data ?? {}
+            const { balance, currency } = json.data ?? {}
             setWalletBalance(balance ? `${currency ?? 'MYR'} ${balance}` : null)
-            if (name) setAccountName(name)
             setCouriersCount(0)
             setTestStatus('connected')
             toast.success('EasyParcel connection verified!')
         } catch {
             setTestStatus('idle')
             toast.error('Network error. Please try again.')
-        }
-    }
-
-    async function handleDisconnect() {
-        try {
-            const res = await fetch(`/api/tenant/${tenantId}/easyparcel-disconnect`, {
-                method: 'DELETE',
-                credentials: 'include',
-            })
-            if (!res.ok) throw new Error()
-            setTestStatus('idle')
-            setWalletBalance(null)
-            setAccountName(null)
-            toast.success('EasyParcel disconnected')
-        } catch {
-            toast.error('Failed to disconnect. Please try again.')
         }
     }
 
@@ -394,18 +368,16 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                             <div className="flex items-center gap-3">
                                 <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
-                                <div>
-                                    <p className="text-[13px] font-medium text-[var(--dash-text)]">{accountName ?? 'OAuth session active'}</p>
-                                    {accountName && <p className="text-[12px] text-[var(--dash-text-muted)]">OAuth session active</p>}
-                                </div>
+                                <p className="text-[13px] font-medium text-[var(--dash-text)]">OAuth session active</p>
                             </div>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={handleDisconnect}
-                                className="flex items-center gap-1.5 shrink-0 border-[hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.08)]"
+                                onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
+                                className="flex items-center gap-1.5 shrink-0"
                             >
-                                Disconnect
+                                <Pencil className="h-3.5 w-3.5" />
+                                Reconnect
                             </Button>
                         </div>
                     </>
