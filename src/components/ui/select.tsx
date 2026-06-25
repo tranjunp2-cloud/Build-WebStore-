@@ -70,7 +70,7 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(({ className, children, position = "popper", style, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -81,6 +81,11 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
+      // Guaranteed opaque panel + readable text: the `bg-popover` / `text-popover-foreground`
+      // utilities don't take effect inside the dash shell portal (panel renders transparent, text
+      // falls back to inherited black → unreadable in dark mode). Inline styles win over any class
+      // purge/override and resolve the theme tokens correctly. Callers can still pass `style`.
+      style={{ backgroundColor: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", ...style }}
       {...props}
     >
       <SelectScrollUpButton />
