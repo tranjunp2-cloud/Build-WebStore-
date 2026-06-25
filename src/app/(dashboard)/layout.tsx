@@ -6,6 +6,7 @@ import configPromise from '@payload-config'
 import type { PlatformUser } from '@/types/user'
 import type { SidebarBadgeKey } from '@/components/dashboard/Sidebar'
 import { getCachedSidebarBadgeCounts } from '@/lib/dashboard/sidebar-badge-counts-cached'
+import { getTenantSiteState } from '@/lib/dashboard/get-tenant-site-state'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
 import { NotificationProvider } from '@/providers/NotificationProvider'
@@ -38,19 +39,25 @@ export default async function DashboardLayout({
     // counts (F18 #1138) in one payload session, in parallel.
     let userAvatarUrl: string | null = null
     let badgeCounts: Partial<Record<SidebarBadgeKey, number>> = {}
+    // Fail-open: default true so a transient DB error never hides a real site (GH-1392).
+    let hasWebsite = true
     if (user) {
         try {
             const payload = await getPayload({ config: configPromise })
-            // allSettled so an avatar failure never blanks the badges (and vice versa).
-            const [avatarRes, countsRes] = await Promise.allSettled([
+            // allSettled so one failure never blanks the others. Site-state piggybacks
+            // on this session — no extra getPayload()/query session (GH-1392).
+            const [avatarRes, countsRes, siteStateRes] = await Promise.allSettled([
                 payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Promise<Record<string, unknown>>,
                 getCachedSidebarBadgeCounts(tenantId),
+                getTenantSiteState(payload, tenantId),
             ])
             if (avatarRes.status === 'fulfilled') {
                 const av = avatarRes.value?.avatar as { url?: string } | null | undefined
                 if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
             }
             if (countsRes.status === 'fulfilled') badgeCounts = countsRes.value
+            // Only override the fail-open default on a successful read.
+            if (siteStateRes.status === 'fulfilled') hasWebsite = siteStateRes.value.hasUsableSite
         } catch (err) { console.warn('[layout] payload session failed:', err) }
     }
 
@@ -76,7 +83,7 @@ export default async function DashboardLayout({
             <ThemeProvider initialTheme={initialTheme}>
                 <I18nProvider defaultLocale="en">
                     <TooltipProvider delayDuration={300}>
-                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts}>
+                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin} isProduction={isProduction} badgeCounts={badgeCounts} hasWebsite={hasWebsite}>
                             {children}
                         </CMSLayoutClient>
                         {typedUser && (
