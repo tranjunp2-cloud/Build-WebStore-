@@ -157,6 +157,326 @@ describe('PreviewScripts', () => {
         expect(tableWrapper.getAttribute('contenteditable')).toBeNull()
     })
 
+    // ── TC-EDIT-01..05: Text Hit Detection via caretRangeFromPoint ──────────────────────────────
+    // GH-1367 Bug 1: clickLandedOnTextNode guard prevents text-edit toolbar on background/padding clicks
+
+    describe('[TC-EDIT-01..05] clickLandedOnTextNode — Text vs Background Detection (GH-1367)', () => {
+        // jsdom does not implement HTMLElement.innerText (returns undefined). The real onTextClick
+        // path reads target.innerText to reject empty elements, so without a polyfill every positive
+        // text-hit case would early-return. Mirror real browsers by falling back to textContent.
+        const hadInnerText = Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'innerText')
+
+        // Mock the browser caret APIs at test level
+        beforeEach(() => {
+            Object.defineProperty(HTMLElement.prototype, 'innerText', {
+                get() {
+                    return this.textContent
+                },
+                configurable: true,
+            })
+            // By default, mock caretRangeFromPoint to return a non-text hit (element node)
+            // Individual tests override this as needed
+            Object.defineProperty(document, 'caretRangeFromPoint', {
+                value: vi.fn(() => ({
+                    startContainer: { nodeType: Node.ELEMENT_NODE }, // Element node (not text)
+                })),
+                writable: true,
+                configurable: true,
+            })
+        })
+
+        afterEach(() => {
+            // Clean up caret API mocks
+            delete (document as any).caretRangeFromPoint
+            delete (document as any).caretPositionFromPoint
+            // Restore innerText to its original (absent) state to avoid leaking into other suites
+            if (!hadInnerText) {
+                delete (HTMLElement.prototype as any).innerText
+            }
+        })
+
+        // TC-EDIT-01: Background click (padding area) → NO TEXT_EDITING_STARTED
+        it('TC-EDIT-01 (GH-1367): background/padding click → NO TEXT_EDITING_STARTED message', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="0" data-block-type="hero" style="padding: 40px;">
+                    <div style="background: lightblue; padding: 20px;">
+                        <h1 style="margin: 0;">Hero Title</h1>
+                    </div>
+                </div>
+            `
+            mockPostMessage.mockClear()
+            render(<PreviewScripts />)
+
+            const blockEl = document.querySelector('[data-block-index="0"]')!
+            const paddingArea = blockEl.querySelector('div')! // The light-blue padding wrapper
+
+            // Mock caretRangeFromPoint to return element node (padding hit)
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.ELEMENT_NODE }, // Element, not text
+            }))
+
+            // Act — click on padding area (not on the H1 text)
+            paddingArea.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 50,
+                    clientY: 100,
+                })
+            )
+
+            // Assert — TEXT_EDITING_STARTED should NOT be posted
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages).toHaveLength(0)
+        })
+
+        // TC-EDIT-02: Heading text click → TEXT_EDITING_STARTED
+        it('TC-EDIT-02 (GH-1367): heading text click → TEXT_EDITING_STARTED posted', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="0" data-block-type="hero">
+                    <h1 id="hero-heading">Hero Title</h1>
+                </div>
+            `
+            mockPostMessage.mockClear()
+
+            // Mock caretRangeFromPoint BEFORE rendering (so it's in effect for the listener)
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.TEXT_NODE }, // Text node
+            }))
+
+            render(<PreviewScripts />)
+
+            const heading = document.getElementById('hero-heading')!
+
+            // Act — click on heading text
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                clientX: 50,
+                clientY: 50,
+            })
+            heading.dispatchEvent(clickEvent)
+
+            // Assert — TEXT_EDITING_STARTED should be posted
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages.length).toBeGreaterThan(0)
+            expect(textEditingMessages[0][0]).toEqual(
+                expect.objectContaining({
+                    type: 'TEXT_EDITING_STARTED',
+                    blockIndex: 0,
+                })
+            )
+        })
+
+        // TC-EDIT-03: Padding on heading (element wrapper) → NO TEXT_EDITING_STARTED
+        it('TC-EDIT-03 (GH-1367): click on padding wrapper around heading → NO TEXT_EDITING_STARTED', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="0" data-block-type="hero">
+                    <div style="padding: 20px;" id="padding-wrapper">
+                        <h2>Section Title</h2>
+                    </div>
+                </div>
+            `
+            mockPostMessage.mockClear()
+            render(<PreviewScripts />)
+
+            const paddingWrapper = document.getElementById('padding-wrapper')!
+
+            // Mock caretRangeFromPoint to return element node (padding area hit, not text)
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.ELEMENT_NODE }, // Element, not text
+            }))
+
+            // Act — click on the padding div (not the H2)
+            paddingWrapper.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 30,
+                    clientY: 30,
+                })
+            )
+
+            // Assert — TEXT_EDITING_STARTED should NOT be posted
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages).toHaveLength(0)
+        })
+
+        // TC-EDIT-04: Empty Logo Cloud block (no text content) → NO TEXT_EDITING_STARTED
+        it('TC-EDIT-04 (GH-1367): empty Logo Cloud block click → NO TEXT_EDITING_STARTED', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="2" data-block-type="logo-cloud">
+                    <div style="padding: 40px; background: #f5f5f5;"></div>
+                </div>
+            `
+            mockPostMessage.mockClear()
+            render(<PreviewScripts />)
+
+            const blockEl = document.querySelector('[data-block-index="2"]')!
+            const emptyArea = blockEl.querySelector('div')!
+
+            // Mock caretRangeFromPoint to return element node (empty background)
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.ELEMENT_NODE }, // Element (empty area)
+            }))
+
+            // Act — click on empty logo cloud area
+            emptyArea.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 100,
+                    clientY: 100,
+                })
+            )
+
+            // Assert — TEXT_EDITING_STARTED should NOT be posted (no editable text element)
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages).toHaveLength(0)
+        })
+
+        // TC-EDIT-05: Newsletter background vs headline text
+        it('TC-EDIT-05 (GH-1367): newsletter block — click bg → no edit, click headline → edit started', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="3" data-block-type="newsletter">
+                    <div id="newsletter-bg" style="background: url(img.jpg); padding: 60px;">
+                        <h3 id="newsletter-headline">Subscribe Today</h3>
+                        <input type="email" placeholder="Email" />
+                    </div>
+                </div>
+            `
+            mockPostMessage.mockClear()
+            render(<PreviewScripts />)
+
+            const background = document.getElementById('newsletter-bg')!
+            const headline = document.getElementById('newsletter-headline')!
+
+            // ACT 1: Click on background (element node)
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.ELEMENT_NODE },
+            }))
+            background.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 200,
+                    clientY: 200,
+                })
+            )
+
+            // ASSERT 1: No TEXT_EDITING_STARTED on background click
+            let textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages).toHaveLength(0)
+
+            // ACT 2: Click on headline (text node)
+            mockPostMessage.mockClear()
+            ;(document as any).caretRangeFromPoint = vi.fn(() => ({
+                startContainer: { nodeType: Node.TEXT_NODE },
+            }))
+            headline.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 200,
+                    clientY: 180,
+                })
+            )
+
+            // ASSERT 2: TEXT_EDITING_STARTED posted on headline click
+            textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages.length).toBeGreaterThan(0)
+        })
+
+        // Firefox fallback: caretPositionFromPoint when caretRangeFromPoint unavailable
+        it('TC-EDIT-02 variant: Firefox fallback caretPositionFromPoint → TEXT_EDITING_STARTED', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="0" data-block-type="hero">
+                    <h2 id="firefox-heading">Firefox Text</h2>
+                </div>
+            `
+            mockPostMessage.mockClear()
+
+            // Remove caretRangeFromPoint, add Firefox's caretPositionFromPoint
+            delete (document as any).caretRangeFromPoint
+            ;(document as any).caretPositionFromPoint = vi.fn(() => ({
+                offsetNode: { nodeType: Node.TEXT_NODE },
+            }))
+
+            render(<PreviewScripts />)
+
+            const heading = document.getElementById('firefox-heading')!
+
+            // Act — click on heading (Firefox path)
+            heading.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 80,
+                    clientY: 60,
+                })
+            )
+
+            // Assert — TEXT_EDITING_STARTED posted via Firefox fallback
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages.length).toBeGreaterThan(0)
+        })
+
+        // Legacy fallback: no caret API → allow editing (returns true by default)
+        it('legacy fallback: no caret API available → allow text editing', () => {
+            // Arrange
+            document.body.innerHTML = `
+                <div data-block-index="0" data-block-type="hero">
+                    <p id="legacy-text">Legacy Browser Text</p>
+                </div>
+            `
+            mockPostMessage.mockClear()
+
+            // Remove both caret APIs (simulating ultra-old browser)
+            delete (document as any).caretRangeFromPoint
+            delete (document as any).caretPositionFromPoint
+
+            render(<PreviewScripts />)
+
+            const text = document.getElementById('legacy-text')!
+
+            // Act — click on text (no caret API available)
+            text.dispatchEvent(
+                new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: 60,
+                    clientY: 70,
+                })
+            )
+
+            // Assert — TEXT_EDITING_STARTED posted (fallback allows editing)
+            const textEditingMessages = mockPostMessage.mock.calls.filter(
+                call => call[0]?.type === 'TEXT_EDITING_STARTED'
+            )
+            expect(textEditingMessages.length).toBeGreaterThan(0)
+        })
+    })
+
     describe('replaceDropHintCSS', () => {
         it('should replace drop hint text in CSS', () => {
             const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
