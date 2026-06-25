@@ -190,7 +190,7 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
                 if (!stat || typeof stat !== 'object') return stat
                 const raw = typeof stat.value === 'string' ? stat.value : String(stat.value ?? '')
                 const clean = raw.replace(/<[^>]*>/g, '').trim()
-                return clean !== raw ? { ...stat, value: clean || raw } : stat
+                return clean !== raw ? { ...stat, value: clean } : stat
             })
         }
 

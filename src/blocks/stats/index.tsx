@@ -66,7 +66,7 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
     //
     // Defensive: strip HTML markup that AI occasionally hallucinates into stat
     // values (e.g. <span style="font-variant-numeric:...">500</span> → "500").
-    const clean = value.replace(/<[^>]*>/g, '').trim() || value
+    const clean = value.replace(/<[^>]*>/g, '').trim()
     const stripped = clean.replace(/[,_]/g, '') // thousand separators
     const numericMatch = stripped.match(/-?\d+\.?\d*/g) ?? []
     const isSingleNumeric = numericMatch.length === 1
