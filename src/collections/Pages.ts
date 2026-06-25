@@ -69,7 +69,6 @@ const NavigationBlock = {
             options: [
                 { label: 'Default', value: 'default' },
                 { label: 'Centered', value: 'centered' },
-                { label: 'Mega', value: 'mega' },
                 { label: 'Transparent', value: 'transparent' },
                 { label: 'Sidebar', value: 'sidebar' },
                 { label: 'Floating', value: 'floating' },

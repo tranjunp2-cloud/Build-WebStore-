@@ -4811,6 +4811,22 @@ const MIGRATIONS = [
     name: 'sso_step_events.idx_status_retry_created',
     sql: `CREATE INDEX IF NOT EXISTS sso_step_events_status_retry_created ON sso_step_events (status, retry_count, created_at);`,
   },
+  {
+    name: 'media.thumbnail',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS thumbnail varchar;`,
+  },
+  {
+    name: 'media.card',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS card varchar;`,
+  },
+  {
+    name: 'media.hero',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS hero varchar;`,
+  },
+  {
+    name: 'media.square',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS square varchar;`,
+  },
   // ── GH-1350: orders locale snapshot ──
   {
     name: 'orders.locale',
