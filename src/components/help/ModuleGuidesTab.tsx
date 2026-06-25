@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { X, BookOpen, BarChart3, Rocket, PenLine, Settings, ZoomIn, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface StepData {
   num: number
@@ -181,30 +182,15 @@ export function ModuleGuidesTab() {
       {/* Module Tabs Header — underline tabs (matches DashboardTabs / Discounts / Team & Account
           via the global `.dash-tab-trigger` underline on data-state=active). Wraps on narrow
           screens (no horizontal scrollbar). */}
-      <div
-        className="flex flex-wrap gap-0 mb-6"
-        style={{ borderBottom: '1px solid var(--dash-divider)' }}
-      >
-        {MODULES_DATA.map((module) => {
-          const isActive = activeModule === module.id
-          return (
-            <button
-              key={module.id}
-              type="button"
-              data-state={isActive ? 'active' : 'inactive'}
-              onClick={() => handleTabClick(module.id)}
-              className={cn(
-                'dash-tab-trigger flex items-center gap-1.5 px-4 pb-2.5 rounded-none text-[13px] font-semibold transition-colors -mb-px cursor-pointer whitespace-nowrap',
-                isActive
-                  ? 'text-[var(--dash-text)]'
-                  : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]'
-              )}
-            >
+      <Tabs value={activeModule} onValueChange={handleTabClick} className="mb-6">
+        <TabsList variant="underline">
+          {MODULES_DATA.map((module) => (
+            <TabsTrigger key={module.id} variant="underline" value={module.id}>
               <module.Icon className="w-4 h-4 shrink-0" aria-hidden /> {module.label}
-            </button>
-          )
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {/* Module Contents Array */}
       {MODULES_DATA.map((module) => (

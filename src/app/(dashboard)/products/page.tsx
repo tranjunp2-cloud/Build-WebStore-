@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2 } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Plus, Tag } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
@@ -18,12 +18,14 @@ import { ProductDetailsMobile } from '@/components/dashboard/product-form/Produc
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { TablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
@@ -308,12 +310,11 @@ export default function ProductsPage() {
             <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <AlertCircle className="mx-auto h-12 w-12 text-[hsl(var(--destructive))]/60" />
-                    <h2 className="mt-4 text-lg font-semibold text-white">{t.dashboard.products.list.failedToLoad}</h2>
-                    <p className="mt-1 text-sm text-gray-500">{error}</p>
-                    <button onClick={loadProducts}
-                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 py-2.5 text-sm font-medium !text-white hover:bg-[hsl(var(--primary))] transition-colors">
+                    <h2 className="mt-4 text-lg font-semibold text-foreground">{t.dashboard.products.list.failedToLoad}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                    <Button onClick={loadProducts} className="mt-4">
                         <RefreshCw className="h-4 w-4" /> {t.dashboard.products.list.retry}
-                    </button>
+                    </Button>
                 </div>
             </div>
         )
@@ -332,24 +333,29 @@ export default function ProductsPage() {
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
                     <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-[12px]">
-                        <div className="w-full md:flex-1 flex items-center bg-[hsl(var(--secondary))] border border-white/[0.08] rounded-[16px] px-4 h-[50px] min-h-[50px] shrink-0 focus-within:border-white focus-within:ring-1 focus-within:ring-white transition-all duration-200">
-                            <input
-                                value={aiPrompt}
-                                onChange={e => setAiPrompt(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
-                                }}
-                                placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                                className="w-full bg-transparent text-[16px] text-foreground outline-none border-none focus:border-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none placeholder:text-slate-400"
-                            />
-                        </div>
-                        <button
+                        {/* Input — shared dashboard input style (border + focus ring khớp component chung) */}
+                        <Input
+                            value={aiPrompt}
+                            onChange={e => setAiPrompt(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
+                            }}
+                            placeholder={t.dashboard.products.list.aiChatPlaceholder}
+                            style={{ background: 'transparent', color: 'var(--dash-text)' }}
+                            className="w-full md:flex-1 h-9 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                        />
+                        {/* Create — shared dashboard primary button (size="dash") */}
+                        <Button
+                            variant="dashPrimary"
+                            size="dash"
                             onClick={() => {
                                 if (aiPrompt.trim()) handleCreateAi()
                             }}
-                            className="rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 md:w-[100px] w-full h-[48px] md:h-[50px] flex items-center justify-center text-[16px] font-semibold text-white shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity border-none outline-none focus:outline-none focus:ring-0 focus:ring-offset-0">
+                            className="w-full md:w-auto justify-center"
+                        >
+                            <Plus className="h-4 w-4" />
                             {t.dashboard.products.list.aiChatBtn}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -367,6 +373,7 @@ export default function ProductsPage() {
                         <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
                             <Button asChild variant="dashSecondary" size="dash" className="w-full sm:w-auto justify-center">
                                 <Link href="/products/categories">
+                                    <Tag className="w-3.5 h-3.5" />
                                     {t.dashboard.products.list.category}
                                 </Link>
                             </Button>
@@ -378,72 +385,38 @@ export default function ProductsPage() {
                         </div>
                     </div>
 
-                    {/* Status Tabs */}
-                    <div className="flex items-center md:gap-4 border-b border-white/[0.08] overflow-x-auto no-scrollbar">
-                        {/* All tab */}
-                        <button onClick={() => setFilterStatus('all')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'all' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                    {/* Status filter — shared <Tabs variant="underline"> (same component everywhere) */}
+                    <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+                        <TabsList variant="underline">
+                            <TabsTrigger variant="underline" value="all">
                                 {t.dashboard.products.list.filterAll}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'all' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.all}
-                            </span>
-                            {filterStatus === 'all' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-
-                        {/* Active tab */}
-                        <button onClick={() => setFilterStatus('active')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))] shrink-0" />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'active' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.all}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="active">
+                                <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))] shrink-0" />
                                 {t.dashboard.products.list.filterActive}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'active' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.active}
-                            </span>
-                            {filterStatus === 'active' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-
-                        {/* Draft tab */}
-                        <button onClick={() => setFilterStatus('draft')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'draft' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.active}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="draft">
+                                <Image src="/images/figma/draft-tab.svg" width={14} height={14} alt="Draft" className={cn("shrink-0", filterStatus !== 'draft' && "opacity-60")} />
                                 {t.dashboard.products.list.filterDraft}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'draft' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.draft}
-                            </span>
-                            {filterStatus === 'draft' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-
-                        {/* Archived tab */}
-                        <button onClick={() => setFilterStatus('archived')}
-                            className="flex-1 md:flex-none min-w-max bg-transparent flex h-[44px] items-center justify-center px-3 gap-1.5 relative transition-colors cursor-pointer border-none outline-none">
-                            <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
-                            <span className={cn("text-[13px] font-medium", filterStatus === 'archived' ? "text-[hsl(var(--primary))]" : "text-foreground/60")}>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.draft}
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger variant="underline" value="archived">
+                                <Image src="/images/figma/archived-tab.svg" width={14} height={14} alt="Archived" className={cn("shrink-0", filterStatus !== 'archived' && "opacity-60")} />
                                 {t.dashboard.products.list.filterArchived}
-                            </span>
-                            <span className={cn("flex h-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                                filterStatus === 'archived' ? "bg-[hsl(var(--primary))]/20 text-[hsl(var(--primary))]" : "bg-white/5 text-foreground/60")}>
-                                {statusCounts.archived}
-                            </span>
-                            {filterStatus === 'archived' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 to-teal-400" />
-                            )}
-                        </button>
-                    </div>
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                                    {statusCounts.archived}
+                                </span>
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
@@ -451,13 +424,13 @@ export default function ProductsPage() {
                         <div className="relative w-full h-[50px]">
                             <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
-                            <input
+                            <Input
                                 type="text"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
                                 style={{ background: 'transparent', color: 'var(--dash-text)' }}
-                                className="w-full h-full rounded-[16px] border border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] outline-none transition-colors focus:border-[hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                             />
                         </div>
 
@@ -476,10 +449,11 @@ export default function ProductsPage() {
                         </Select>
 
                         {/* Row 3: Filter Button — full-width, centered */}
-                        <button
+                        <Button
+                            variant="dashSecondary"
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={{ background: 'transparent', border: isAdvancedFiltersOpen ? '1px solid hsl(var(--primary)/0.5)' : '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                            className="w-full h-[50px] flex items-center justify-center gap-2 rounded-[16px] text-[16px] font-medium transition-colors outline-none"
+                            style={isAdvancedFiltersOpen ? { border: '1px solid hsl(var(--primary)/0.5)' } : undefined}
+                            className="w-full h-[50px] rounded-[16px] text-[16px] font-medium"
                         >
                             <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             <span>
@@ -487,7 +461,7 @@ export default function ProductsPage() {
                                     ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
                                     : ''}
                             </span>
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}
@@ -510,14 +484,15 @@ export default function ProductsPage() {
 
                         {/* Filter Button — trigger styled to match DS chips (transparent);
                             the advanced filters panel below is kept as-is. */}
-                        <button
+                        <Button
+                            variant="dashSecondary"
+                            size="dash"
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={{ background: 'transparent', border: '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                            className="flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-[13px] font-medium transition-colors whitespace-nowrap outline-none"
+                            className="whitespace-nowrap"
                         >
                             <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
                             {t.dashboard.products.list.filterBtn}
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Advanced Filters Panel */}
@@ -531,15 +506,16 @@ export default function ProductsPage() {
                                     </svg>
                                     <div className="text-foreground text-[16px] md:text-[18px] font-semibold leading-[28px]">{t.dashboard.products.list.advancedFilters}</div>
                                 </div>
-                                <button
+                                <Button
+                                    variant="ghost"
                                     onClick={() => { setSelectedCategories([]); setSaleStatus('All Products'); setShowLowStock(false); setIsAdvancedFiltersOpen(false); }}
-                                    className="flex items-center gap-[8px] bg-transparent border-none outline-none text-foreground/50 hover:text-foreground transition-colors"
+                                    className="flex items-center gap-[8px] text-foreground/50 hover:text-foreground h-auto px-1 py-0"
                                 >
                                     <span className="text-[13px] font-medium leading-[20px]">{t.dashboard.products.list.clearAll}</span>
                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                </button>
+                                </Button>
                             </div>
 
                             {/* Filter Sections — stacked on mobile, 3-col on desktop */}
@@ -573,7 +549,7 @@ export default function ProductsPage() {
                                 </div>
 
                                 {/* Divider (mobile only) */}
-                                <div className="md:hidden w-full h-[1px] bg-white/10" />
+                                <div className="md:hidden w-full h-[1px] bg-border" />
 
                                 {/* ── Sale Status ── */}
                                 <div className="flex flex-col gap-[10px] min-w-0">
@@ -601,7 +577,7 @@ export default function ProductsPage() {
                                 </div>
 
                                 {/* Divider (mobile only) */}
-                                <div className="md:hidden w-full h-[1px] bg-white/10" />
+                                <div className="md:hidden w-full h-[1px] bg-border" />
 
                                 {/* ── Stock Status ── */}
                                 <div className="flex flex-col gap-[10px] min-w-0">
@@ -619,7 +595,7 @@ export default function ProductsPage() {
                                             </svg>
                                             <span className={cn("text-[14px] font-medium leading-[20px] transition-colors", showLowStock ? "text-[hsl(var(--warning))]" : "text-foreground")}>{t.dashboard.products.list.showLowStock}</span>
                                         </div>
-                                        <div className={cn("w-[44px] h-[24px] rounded-full flex items-center p-[4px] shrink-0 transition-colors duration-300", showLowStock ? "bg-[hsl(var(--warning))]" : "bg-white/10")}>
+                                        <div className={cn("w-[44px] h-[24px] rounded-full flex items-center p-[4px] shrink-0 transition-colors duration-300", showLowStock ? "bg-[hsl(var(--warning))]" : "bg-muted")}>
                                             <div className={cn("w-[16px] h-[16px] bg-white rounded-full shrink-0 transition-transform duration-300 shadow-[0_2px_4px_rgba(0,0,0,0.1)]", showLowStock ? "translate-x-[20px]" : "translate-x-0")} />
                                         </div>
                                     </div>
@@ -903,12 +879,13 @@ export default function ProductsPage() {
                                             </Link>
 
                                             {/* Delete Button */}
-                                            <button
+                                            <Button
+                                                variant="ghost"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="flex items-center justify-center w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 active:scale-[0.95] hover:bg-[hsl(var(--destructive))]/20 transition-all"
+                                                className="w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))] p-0"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
-                                            </button>
+                                            </Button>
                                         </div>
                                     </div>
                                 )

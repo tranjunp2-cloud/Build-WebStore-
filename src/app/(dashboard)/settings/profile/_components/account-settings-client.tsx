@@ -17,9 +17,6 @@ type Props = {
     hideHeading?: boolean
 }
 
-const TRIGGER_CLASS =
-    'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
-    'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
 
 export function AccountSettingsClient({ initialUser, hideHeading = false }: Props) {
     const { t } = useI18n()
@@ -45,11 +42,11 @@ export function AccountSettingsClient({ initialUser, hideHeading = false }: Prop
             <ProfileBanner user={user} role={role} onUserUpdate={onUserUpdate} />
 
             <Tabs defaultValue="general" className="flex flex-col gap-8">
-                <TabsList className="flex w-full justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
-                    <TabsTrigger value="general" className={TRIGGER_CLASS}>
+                <TabsList variant="underline">
+                    <TabsTrigger value="general" variant="underline">
                         {t.profile.tabs.general}
                     </TabsTrigger>
-                    <TabsTrigger value="security" className={TRIGGER_CLASS}>
+                    <TabsTrigger value="security" variant="underline">
                         {t.profile.tabs.security}
                     </TabsTrigger>
                 </TabsList>

@@ -19,12 +19,6 @@ type Props = {
     referrers?: PerformingItem[]
 }
 
-// Underline tab trigger — identical to Team & Account / Discounts (shared <Tabs>).
-const TRIGGER_CLASS =
-    'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
-    'data-[state=active]:bg-transparent data-[state=active]:shadow-none ' +
-    'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
-
 function getRankClass(index: number) {
     switch (index) {
         case 0: return 'bg-amber-500/15 text-amber-500'  // r1
@@ -77,12 +71,9 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
     return (
         <div className="bg-dash-surface border border-dash-border rounded-xl p-6 shadow-sm">
             <Tabs defaultValue="pages" className="flex flex-col gap-4">
-                <TabsList
-                    className="flex w-full justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0"
-                    style={{ borderBottom: '1px solid var(--dash-divider)' }}
-                >
+                <TabsList variant="underline">
                     {TABS.map((tab) => (
-                        <TabsTrigger key={tab.id} value={tab.id} className={TRIGGER_CLASS}>
+                        <TabsTrigger key={tab.id} variant="underline" value={tab.id}>
                             <tab.icon className="w-4 h-4 shrink-0" aria-hidden />
                             {tab.name}
                         </TabsTrigger>

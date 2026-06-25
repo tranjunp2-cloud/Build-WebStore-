@@ -96,9 +96,6 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
 
     const customizedCount = activeTypes.filter((tp) => findRow(tp)).length
 
-    const TRIGGER_CLS =
-        'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
-        'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
 
     return (
         <div className="w-full">
@@ -106,25 +103,26 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
             <p className="text-sm text-[var(--dash-text-muted)] mb-6">{et.subtitle}</p>
 
             <Tabs value={audienceTab} onValueChange={(v) => onTabChange(v as 'buyer' | 'seller')}>
-                {/* Tabs row — full-width baseline border; blue underline only under the active tab. */}
-                <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
-                    <TabsList className="flex w-auto justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0">
-                        <TabsTrigger value="buyer" className={TRIGGER_CLS}>
+                {/* Tabs row — TabsList carries the baseline divider so the active underline aligns
+                    exactly like every other tab bar; the summary count floats on the right. */}
+                <div className="relative mb-4">
+                    <TabsList variant="underline">
+                        <TabsTrigger value="buyer" variant="underline">
                             <User className="h-4 w-4" />
                             {et.buyerEmails}
-                            <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
                                 {allBuyer.length}
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="seller" className={TRIGGER_CLS}>
+                        <TabsTrigger value="seller" variant="underline">
                             <Store className="h-4 w-4" />
                             {et.sellerEmails}
-                            <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
                                 {allSeller.length}
                             </span>
                         </TabsTrigger>
                     </TabsList>
-                    <span className="text-xs text-[var(--dash-text-muted)]">
+                    <span className="absolute right-0 top-2 text-xs text-[var(--dash-text-muted)] pointer-events-none">
                         {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
                     </span>
                 </div>
