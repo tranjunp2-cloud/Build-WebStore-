@@ -20,6 +20,11 @@
  *   TC-F05-save-20  → normalizeBlocksForPersistence: cta block with invalid ctaStyle → coerced to 'primary' (GH-1283)
  *   TC-F05-save-20b → normalizeBlocksForPersistence: cta block with valid ctaStyle → unchanged
  *   TC-F05-save-21  → normalizeBlocksForPersistence: contact block with email='' → coerced to null (GH-generate-site)
+ *   TC-GH1381-04a → normalizeBlocksForPersistence: gallery images[].image {id,url,alt} → id extracted (GH-1381)
+ *   TC-GH1381-04b → normalizeBlocksForPersistence: gallery mixed image types (object + int + null)
+ *   TC-GH1381-04c → normalizeBlocksForPersistence: gallery image {url} without id → null
+ *   TC-GH1381-04d → normalizeBlocksForPersistence: gallery with no images array → untouched
+ *   TC-GH1381-04e → normalizeBlocksForPersistence: portfolio/team/other array images also normalized
  *
  * Source:
  *   src/lib/block-normalization.ts
@@ -729,5 +734,159 @@ describe('normalizeBlocksForPersistence — contact email coercion (generate-sit
 
         // Assert — hero block email untouched
         expect(result[0].email).toBe('')
+    })
+})
+
+// GH-1381 — Gallery "Change Image" bug fix normalization
+// Covers: PreviewFrame stores populated {id,url,alt} objects, normalizeUploadField extracts id
+describe('normalizeBlocksForPersistence — gallery images normalization (GH-1381)', () => {
+    it('TC-GH1381-04a: gallery block images[].image as {id,url,alt} object → id extracted', () => {
+        // Arrange — PreviewFrame stores this after image upload to enable immediate render
+        // (see PreviewFrame.tsx:960 image: { id: newMediaId, url: newUrl, alt: existingAlt })
+        const blocks = [
+            {
+                blockType: 'gallery',
+                headline: 'Product Gallery',
+                images: [
+                    {
+                        image: {
+                            id: 42,
+                            url: 'https://cdn.example.com/product.jpg',
+                            alt: 'Product launch',
+                        },
+                        caption: 'Launch event',
+                    },
+                    {
+                        image: {
+                            id: 99,
+                            url: 'https://cdn.example.com/team.jpg',
+                            alt: 'Team photo',
+                        },
+                        caption: 'Team',
+                    },
+                ],
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — image fields now contain only integer IDs (ready for Payload persistence)
+        const images = result[0].images as Array<Record<string, unknown>>
+        expect(images[0].image).toBe(42)
+        expect(images[1].image).toBe(99)
+        expect(typeof images[0].image).toBe('number')
+        expect(typeof images[1].image).toBe('number')
+        // Captions and other fields preserved
+        expect(images[0].caption).toBe('Launch event')
+        expect(images[1].caption).toBe('Team')
+    })
+
+    it('TC-GH1381-04b: gallery images[].image mixed types (bare int + object) → all normalized', () => {
+        // Arrange — gallery with both legacy bare ints and new object format
+        const blocks = [
+            {
+                blockType: 'gallery',
+                headline: 'Mixed',
+                images: [
+                    // New format: object with id/url
+                    {
+                        image: { id: 100, url: 'https://example.com/new.jpg', alt: 'New' },
+                        caption: 'New style',
+                    },
+                    // Legacy: bare integer
+                    {
+                        image: 200,
+                        caption: 'Legacy style',
+                    },
+                    // Empty: null
+                    {
+                        image: null,
+                        caption: 'Empty',
+                    },
+                ],
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert
+        const images = result[0].images as Array<Record<string, unknown>>
+        expect(images[0].image).toBe(100) // object → id extracted
+        expect(images[1].image).toBe(200) // int → kept as-is
+        expect(images[2].image).toBeNull() // null → null
+    })
+
+    it('TC-GH1381-04c: gallery images[].image object without id → null (invalid)', () => {
+        // Arrange — malformed object (e.g., url-only from legacy AI)
+        const blocks = [
+            {
+                blockType: 'gallery',
+                headline: 'Malformed',
+                images: [
+                    {
+                        image: {
+                            url: 'https://example.com/orphan.jpg',
+                            alt: 'Missing id',
+                        },
+                        caption: 'Bad format',
+                    },
+                ],
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — can't extract id → null
+        const images = result[0].images as Array<Record<string, unknown>>
+        expect(images[0].image).toBeNull()
+        expect(images[0].caption).toBe('Bad format') // caption preserved
+    })
+
+    it('TC-GH1381-04d: gallery with no images array → block untouched', () => {
+        // Arrange
+        const blocks = [
+            {
+                blockType: 'gallery',
+                headline: 'Empty gallery',
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert
+        expect(result[0]).not.toHaveProperty('images')
+        expect(result[0].headline).toBe('Empty gallery')
+    })
+
+    it('TC-GH1381-04e: non-gallery block with images array → each image normalized too', () => {
+        // Arrange — portfolio-grid also has array images, should normalize
+        const blocks = [
+            {
+                blockType: 'portfolio-grid',
+                headline: 'Portfolio',
+                projects: [
+                    {
+                        image: { id: 123, url: 'https://example.com/proj1.jpg', alt: 'Project 1' },
+                        title: 'Project 1',
+                    },
+                    {
+                        image: 456, // legacy int
+                        title: 'Project 2',
+                    },
+                ],
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — portfolio-grid.projects[].image also normalized
+        const projects = result[0].projects as Array<Record<string, unknown>>
+        expect(projects[0].image).toBe(123)
+        expect(projects[1].image).toBe(456)
     })
 })

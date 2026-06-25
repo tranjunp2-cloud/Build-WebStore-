@@ -283,6 +283,9 @@ export async function PATCH(
                     // Stripping valid logo Media IDs due to an unrelated block FK error silently
                     // destroys all logo images (200 response, data gone).
                     const isLogoFkError = /pages_blocks_logo_cloud|pages_v_blocks_logo_cloud/i.test(errMsg)
+                    // GH-1381: same guard for gallery images[] — an unrelated block's FK error must not
+                    // wipe valid gallery Media IDs (silent data loss: success response, image gone on reload).
+                    const isGalleryFkError = /pages_blocks_gallery|pages_v_blocks_gallery/i.test(errMsg)
                     for (const block of normalizedBlocks as Record<string, unknown>[]) {
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') delete block[field]
@@ -295,6 +298,8 @@ export async function PATCH(
                                     for (const f of ['image', 'logo', 'avatar']) {
                                         // Don't wipe valid logo Media IDs unless the FK error is logos-related
                                         if (arrayField === 'logos' && f === 'logo' && !isLogoFkError) continue
+                                        // Don't wipe valid gallery image Media IDs unless the FK error is gallery-related
+                                        if (arrayField === 'images' && f === 'image' && !isGalleryFkError) continue
                                         if (typeof item[f] === 'number') delete item[f]
                                     }
                                 }
