@@ -290,6 +290,21 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.58 | AC-2 (02) | Func | **[Positive]** Chọn Template thay vì AI Builder | **1.** Tại màn hình onboarding, chọn "Chọn Template" thay vì "Tạo bằng AI".<br>**2.** Chuyển tới `/templates`, chọn 1 template.<br>**3.** Xác nhận chọn template. | Hệ thống tạo website từ template đã chọn. Chuyển hướng tới `/editor/:id`. Website hiển thị đúng layout của template. | Medium | [ ] |
 | TC-F01.98 | AC-2 (02) | State | **[UI State]** Template gallery rỗng (0 templates) | **1.** Xóa hoặc ẩn toàn bộ templates trong DB.<br>**2.** Chọn "Chọn Template" ở onboarding. | Hiển thị Empty State: "Chưa có template nào. Hãy tạo bằng AI". Cung cấp nút quay lại AI Builder. Không hiển trang trắng hoặc lỗi. | Medium | [ ] |
 
+### 3.11 Streaming Stuck Recovery (GH-1371)
+
+| TC-ID | AC | Category | Mô tả | Steps | Expected | Priority | Status |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.STUCK-01 | AC1 | Unit | **[Unit]** partialize converts streaming → idle | Gọi `partialize()` khi `status='streaming'` | `persisted.status === 'idle'`, `persisted.step === 'info'`, `blocks/messages/progress` cleared, `businessInfo` giữ nguyên | Critical | [ ] |
+| TC-F01.STUCK-02 | AC1 | Unit | **[Unit]** partialize không ảnh hưởng done status | Gọi `partialize()` khi `status='done'` | `persisted.status === 'done'`, `siteId` giữ nguyên | Critical | [ ] |
+| TC-F01.STUCK-03 | AC3 | Unit | **[Unit]** onRehydrateStorage resets stale streaming state | Gọi callback với `state.status='streaming'` | `state.status === 'idle'`, `step === 'info'`, `blocks/messages` cleared, `businessInfo` preserved | Critical | [ ] |
+| TC-F01.STUCK-04 | AC3 | Unit | **[Unit]** onRehydrateStorage giữ error behavior cũ | Gọi callback với `state.status='error'` + error object | `state.error === null`, `state.status === 'idle'` | High | [ ] |
+| TC-F01.STUCK-05 | AC1 | Recovery | **[Recovery]** Reload F5 giữa lúc gen → form hiện lại | Đang gen → F5 reload | Form hiện lại với `businessInfo` preserved. Toast "Generation was interrupted". KHÔNG bị stuck loading | Critical | [ ] |
+| TC-F01.STUCK-06 | AC2 | Recovery | **[Recovery]** Back browser giữa lúc gen → forward lại | Đang gen → Back → Forward | Form hiện lại. Không stuck. `businessInfo` preserved | Critical | [ ] |
+| TC-F01.STUCK-07 | AC2 | Recovery | **[Recovery]** Reload 5 lần liên tiếp không lần nào stuck | Reload 5 lần trong khi gen (hoặc sau gen) | Mỗi lần reload đều về form, không stuck. | Critical | [ ] |
+| TC-F01.STUCK-08 | AC6 | Unit | **[Unit]** partialize converts error → idle (existing behavior preserved) | Gọi `partialize()` khi `status='error'` | `persisted.status === 'idle'`, `persisted.error === null` | High | [ ] |
+| TC-F01.STUCK-09 | AC5 | UI | **[UI]** beforeunload cảnh báo khi đang streaming | Đang gen → thử close tab / navigate away | Browser hiện cảnh báo "Leave page?" | Medium | [ ] |
+| TC-F01.STUCK-10 | AC2 | Sec | **[Security]** Cross-user: reset clears userId | User A gen → reload → login User B | State User A không còn. `userId` và `businessInfo` cleared | Critical | [ ] |
+
 ---
 
 ## 4. Hành Trình Trải Nghiệm End-to-End (E2E UAT Flow)

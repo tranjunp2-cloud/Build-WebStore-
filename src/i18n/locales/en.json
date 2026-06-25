@@ -467,7 +467,10 @@
             "timeoutWarning": "Taking longer than expected...",
             "cancelButton": "Cancel generation",
             "draftExpired": "Your previous AI builder draft expired after 24 hours.",
-            "saveFailed": "Failed to save the latest preview changes."
+            "saveFailed": "Failed to save the latest preview changes.",
+            "interrupted": "Generation was interrupted. Please try again.",
+            "leaveWarning": "Website is being generated. Leave anyway?",
+            "timeoutRecover": "Generation timeout. Returning to form."
         },
         "completion": {
             "successMessage": "has been created successfully!",

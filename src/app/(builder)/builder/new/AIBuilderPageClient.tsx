@@ -366,16 +366,27 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
     }, [setStep, status, step])
 
+    // Watchdog: if status is streaming on mount but no SSE connection is active
+    // (e.g. user reloaded mid-generation), reset immediately so user isn't stuck.
+    useEffect(() => {
+        if (status !== 'streaming') return
+        if (abortControllerRef.current) return
+        setStatus('idle')
+        setStep('info')
+        toast.message(t.onboarding.generating.interrupted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (draftSaveState !== 'dirty' && draftSaveState !== 'saving') return
+            if (draftSaveState !== 'dirty' && draftSaveState !== 'saving' && status !== 'streaming') return
             event.preventDefault()
             event.returnValue = ''
         }
 
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-    }, [draftSaveState])
+    }, [draftSaveState, status])
 
     useEffect(() => {
         if (typeof window === 'undefined') return
