@@ -45,6 +45,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -1500,41 +1501,6 @@ function cloneBlockData<T>(value: T): T {
     return JSON.parse(JSON.stringify(value))
 }
 
-function normalizeInternalUrl(url: unknown): string {
-    if (typeof url !== 'string') return '#'
-    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
-    if (url === '#about' || url === 'about') return '/about'
-    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
-    if (url === '#contact' || url === 'contact') return '/contact'
-    return url
-}
-
-/**
- * Map a CTA URL to a canonical page slug from the generated site's page list.
- * Returns '' when no matching internal page exists.
- * External URLs (https, mailto, tel, etc.) are passed through unchanged.
- */
-function resolveCtaSlugFromLinks(
-    rawUrl: unknown,
-    canonicalLinks: Array<{ url: string }>,
-): string {
-    const normalized = normalizeInternalUrl(rawUrl)
-    if (normalized === '') return ''
-    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
-    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
-    // Exact match (most common case — canonical slugs already align)
-    if (canonicalLinks.some(l => l.url === normalized)) return normalized
-    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
-    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
-    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
-    for (const kw of segments) {
-        if (kw.length < 3) continue
-        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
-        if (match) return match.url
-    }
-    return ''
-}
-
 /**
  * Fix hero and cta block CTA URLs across all page definitions to use
  * canonical slugs from the generated site. Runs after buildGeneratedPages
@@ -1566,6 +1532,10 @@ function patchPageCtaUrls(
                 } else {
                     block.ctaButton = undefined
                 }
+            }
+            if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
+                block.plans = (block.plans as Array<Record<string, unknown>>)
+                    .map(p => resolvePricingPlanCta(p, canonicalLinks))
             }
         }
     }

@@ -221,7 +221,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 
 ---
 
-### 3.12 Mobile Reorder — Chạm An Toàn (US-F01-10)
+### 3.13 Mobile Reorder — Chạm An Toàn (US-F01-10)
 
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -233,7 +233,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 
 ---
 
-### 3.13 Giới Hạn Kinh Doanh & Bảo Mật (Business Rules & Security)
+### 3.14 Giới Hạn Kinh Doanh & Bảo Mật (Business Rules & Security)
 
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -253,7 +253,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 
 ---
 
-### 3.15 Navigation Dynamic Mapping (GH-817)
+### 3.16 Navigation Dynamic Mapping (GH-817)
 
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -283,14 +283,31 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 
 ---
 
-### 3.14 Luồng Phụ — Template Flow (US-F01-02)
+### 3.15 Luồng Phụ — Template Flow (US-F01-02)
 
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | TC-F01.58 | AC-2 (02) | Func | **[Positive]** Chọn Template thay vì AI Builder | **1.** Tại màn hình onboarding, chọn "Chọn Template" thay vì "Tạo bằng AI".<br>**2.** Chuyển tới `/templates`, chọn 1 template.<br>**3.** Xác nhận chọn template. | Hệ thống tạo website từ template đã chọn. Chuyển hướng tới `/editor/:id`. Website hiển thị đúng layout của template. | Medium | [ ] |
 | TC-F01.98 | AC-2 (02) | State | **[UI State]** Template gallery rỗng (0 templates) | **1.** Xóa hoặc ẩn toàn bộ templates trong DB.<br>**2.** Chọn "Chọn Template" ở onboarding. | Hiển thị Empty State: "Chưa có template nào. Hãy tạo bằng AI". Cung cấp nút quay lại AI Builder. Không hiển trang trắng hoặc lỗi. | Medium | [ ] |
 
-### 3.11 Streaming Stuck Recovery (GH-1371)
+### 3.11 CTA Internal-Link Mapping (GH-1359)
+
+| TC-ID | AC | Category | Tiêu đề | Các bước | Kết quả mong đợi | Mức độ | Status |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.CTA-DRAG-01 | AC1 | Unit | **[Unit]** Kéo hero vào site có `/about`+`/contact` → cả 2 nút resolve canonical | **1.** Tạo hero với 2 CTA: "Get Started"(`#contact`) + "Learn More"(`#about`).<br>**2.** Kéo vào site có pages: `[{slug:'/'}, {slug:'/about'}, {slug:'/contact'}]`.<br>**3.** Kiểm tra ctaButtons sau khi drop. | Hero có 2 nút CTA. Nút 1: `url='/contact'`, Nút 2: `url='/about'`. Cả 2 nút được giữ lại. | Critical | [ ] |
+| TC-F01.CTA-DRAG-02 | AC2 | Unit | **[Unit]** Site thiếu `/contact` → ẩn nút "Get Started", giữ "Learn More" (per-button hide) | **1.** Tạo hero với 2 CTA: "Get Started"(`#contact`) + "Learn More"(`#about`).<br>**2.** Kéo vào site có pages: `[{slug:'/'}, {slug:'/about'}]` (KHÔNG có `/contact`).<br>**3.** Kiểm tra ctaButtons sau khi drop. | Hero chỉ còn 1 nút: "Learn More" (`url='/about'`). Nút "Get Started" bị ẩn (dropped). | Critical | [ ] |
+| TC-F01.CTA-DRAG-03 | AC3 | Unit | **[Unit]** Pricing plan `ctaUrl: '#'` → fallback `/contact`, KHÔNG ẩn nút | **1.** Tạo pricing block với 3 plans, mỗi plan có `ctaUrl='#'`.<br>**2.** Kéo vào site có pages đầy đủ `[{slug:'/'}, {slug:'/contact'}]`.<br>**3.** Kiểm tra `plans[].ctaUrl` sau khi drop. | Tất cả 3 plans giữ nguyên (`plans.length === 3`). Mỗi plan: `ctaUrl === '/contact'` (fallback). | Critical | [ ] |
+| TC-F01.CTA-DRAG-04 | AC4 | Unit | **[Unit]** Site MS (slug canonical) → CTA resolve đúng, không broken | **1.** Tạo hero với CTA `#contact`.<br>**2.** Kéo vào site MS-style pages: `[{slug:'/'}, {slug:'/contact'}]`.<br>**3.** Kiểm tra ctaButtons[0].url. | CTA resolve thành `/contact`. Không bị drop. Supports fuzzy match (`#contact-us` → `/contact`). | High | [ ] |
+| TC-F01.CTA-DRAG-05 | AC5 | Unit | **[Unit]** Block không có CTA (newsletter) → trả nguyên block, không đổi | **1.** Tạo newsletter block: `{blockType:'newsletter', buttonLabel:'Subscribe', placeholder:'Email'}` (no ctaButtons, no plans).<br>**2.** Kéo vào site.<br>**3.** Kiểm tra block sau drop. | Block trả nguyên: `toEqual(inputBlock)`. Tất cả fields giữ nguyên. Không có field được modify. | Medium | [ ] |
+| TC-F01.CTA-DRAG-06 | AC2 | Recovery | **[Recovery]** Pages rỗng → nav CTA bị ẩn hết, pricing fallback `/contact` | **1.** Tạo hero 2 CTA + pricing block.<br>**2.** Kéo vào site với `pages=[]` (rỗng).<br>**3.** Kiểm tra ctaButtons + plans. | Hero: `ctaButtons.length === 0` (tất cả bị ẩn). Pricing: `plans[].ctaUrl === '/contact'` (fallback fallback). | High | [ ] |
+| TC-F01.CTA-DRAG-07 | AC5 | Regression | **[Regression]** Sửa CTA URL thủ công ở settings panel vẫn lưu đúng (helper chỉ chạy lúc insert) | **1.** Kéo hero vào. CTA auto-resolve thành `/contact`.<br>**2.** Mở settings editor, thay đổi manually thành `/about`.<br>**3.** Save. Kiểm tra DB. | URL được lưu thành `/about` (manual edit được preserve). Helper KHÔNG re-run trên existing blocks khi edit. | High | [ ] |
+| TC-F01.CTA-DRAG-08 | AC5 | Unit | **[Unit]** Pricing ctaUrl resolve thành internal → `ctaActionType` đồng bộ `internal` | **1.** Tạo pricing plan `{ctaUrl:'#', ctaActionType:'external'}`.<br>**2.** Kéo vào site có `/contact`.<br>**3.** Kiểm tra plan sau drop. | `ctaUrl === '/contact'` và `ctaActionType === 'internal'` → editor hiển thị "Internal Page" + page picker, không phải ô URL external. | Medium | [ ] |
+| TC-F01.CTA-DRAG-09 | AC4 | Unit | **[Unit]** `resolvePricingPlanCta` (dùng chung AI-gen + manual): `#`/unresolvable → `/contact`+internal; `#about` có page → `/about`+internal; external http → giữ nguyên+external | **1.** Gọi helper với các ctaUrl: `'#'`, `'#about'`, `'#services'` (no page), `'https://...'`.<br>**2.** Kiểm tra ctaUrl + ctaActionType. | Lần lượt: `/contact`+internal; `/about`+internal; `/contact`+internal; URL gốc+external. Áp dụng cho **cả** website AI-generate (patchPageCtaUrls) lẫn manual drag. | High | [ ] |
+| TC-F01.CTA-AIGEN-01 | AC1 | Manual/QC | **[Manual]** Generate website mới có block Pricing → CTA plan không broken, action hiển thị Internal Page | **1.** Generate 1 website (SaaS/agency có pricing).<br>**2.** Vào editor, mở CTA Settings của plan. | Action = "Style: Internal Page", URL trỏ `/contact` (hoặc page hợp lệ), click trên live site điều hướng đúng. | High | [ ] |
+
+---
+
+### 3.12 Streaming Stuck Recovery (GH-1371)
 
 | TC-ID | AC | Category | Mô tả | Steps | Expected | Priority | Status |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
