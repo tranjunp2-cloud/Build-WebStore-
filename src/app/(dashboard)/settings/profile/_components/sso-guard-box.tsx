@@ -20,7 +20,7 @@ export function SsoGuardBox({ ssoUrl, variant = 'general' }: Props) {
     return (
         <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[12px] p-[24px] w-full">
             <div className="flex flex-col gap-3">
-                <h2 className="text-[24px] font-bold text-white leading-8">{title}</h2>
+                <h2 className="text-[24px] font-bold text-foreground leading-8">{title}</h2>
                 <div className="flex flex-col items-start">
                     <p className="text-[16px] text-[hsl(var(--muted-foreground))] leading-6">{notice}</p>
                     {ssoUrl ? (

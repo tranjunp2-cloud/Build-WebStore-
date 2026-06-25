@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
@@ -95,44 +96,41 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
 
     const customizedCount = activeTypes.filter((tp) => findRow(tp)).length
 
+    const TRIGGER_CLS =
+        'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
+        'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
+
     return (
         <div className="w-full">
             <h1 className="text-2xl font-bold text-[var(--dash-text)] mb-1">{et.title}</h1>
             <p className="text-sm text-[var(--dash-text-muted)] mb-6">{et.subtitle}</p>
 
-            {/* Tabs row — full-width baseline border; blue underline only under the active tab.
-                Preflight is off (tailwind.config.js) so Tailwind border utils have no border-style
-                and render invisible — paint borders via inline shorthand instead. */}
-            <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
-                <div className="flex gap-0">
-                    {(['buyer', 'seller'] as const).map((tab) => {
-                        const count = tab === 'buyer' ? allBuyer.length : allSeller.length
-                        const isActive = audienceTab === tab
-                        return (
-                            <button
-                                key={tab}
-                                type="button"
-                                onClick={() => onTabChange(tab)}
-                                className={`flex items-center gap-2 px-4 pb-2.5 text-sm font-medium transition-colors -mb-px ${
-                                    isActive ? 'text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)]'
-                                }`}
-                                style={{ borderBottom: isActive ? '2px solid var(--dash-accent)' : '2px solid transparent' }}
-                            >
-                                {tab === 'buyer' ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
-                                {tab === 'buyer' ? et.buyerEmails : et.sellerEmails}
-                                <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
-                                    {count}
-                                </span>
-                            </button>
-                        )
-                    })}
+            <Tabs value={audienceTab} onValueChange={(v) => onTabChange(v as 'buyer' | 'seller')}>
+                {/* Tabs row — full-width baseline border; blue underline only under the active tab. */}
+                <div className="flex items-center justify-between mb-4" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
+                    <TabsList className="flex w-auto justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0">
+                        <TabsTrigger value="buyer" className={TRIGGER_CLS}>
+                            <User className="h-4 w-4" />
+                            {et.buyerEmails}
+                            <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
+                                {allBuyer.length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="seller" className={TRIGGER_CLS}>
+                            <Store className="h-4 w-4" />
+                            {et.sellerEmails}
+                            <span className="text-xs rounded-full px-1.5 py-0.5 font-semibold bg-black/[0.06] dark:bg-white/10 text-[var(--dash-text-muted)]">
+                                {allSeller.length}
+                            </span>
+                        </TabsTrigger>
+                    </TabsList>
+                    <span className="text-xs text-[var(--dash-text-muted)]">
+                        {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
+                    </span>
                 </div>
-                <span className="text-xs text-[var(--dash-text-muted)]">
-                    {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
-                </span>
-            </div>
 
             {/* Table */}
+            <TabsContent value={audienceTab} className="mt-0">
             <div className="mb-4">
                 <Table>
                     <colgroup>
@@ -262,6 +260,8 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                     {et.footerDesc}
                 </span>
             </div>
+            </TabsContent>
+            </Tabs>
         </div>
     )
 }

@@ -95,7 +95,7 @@ export function ProfileBanner({ user, role, onUserUpdate }: Props) {
                                 <span className="text-[10px] text-[hsl(var(--muted-foreground))] uppercase tracking-[-0.5px] leading-[15px]">
                                     {t.profile.general.phone}
                                 </span>
-                                <span className="text-[14px] text-white leading-5">{user.phone}</span>
+                                <span className="text-[14px] text-foreground leading-5">{user.phone}</span>
                             </div>
                         </>
                     )}
