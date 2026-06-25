@@ -17,12 +17,12 @@ export function ProductImageFallback({ className, size = 'md' }: ProductImageFal
     return (
         <div
             className={cn(
-                'flex h-full w-full items-center justify-center bg-[#1E293B]/50 transition-colors',
+                'flex h-full w-full items-center justify-center bg-muted/30 transition-colors',
                 className
             )}
         >
-            <div className="flex flex-col items-center justify-center text-gray-500">
-                <Package className={cn('text-gray-500', iconSizes[size])} strokeWidth={1.5} />
+            <div className="flex flex-col items-center justify-center text-muted-foreground">
+                <Package className={cn('text-muted-foreground', iconSizes[size])} strokeWidth={1.5} />
             </div>
         </div>
     )
