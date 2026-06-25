@@ -182,6 +182,18 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             })
         }
 
+        // Stats block: strip HTML tags from stat.value — AI occasionally hallucinates
+        // markup (e.g. <span style="font-variant-numeric:...">500</span>) into values.
+        // This covers all save paths (generate-site, edit-block, apply-template, publish).
+        if (b.blockType === 'stats' && Array.isArray(b.stats)) {
+            b.stats = (b.stats as Record<string, unknown>[]).map((stat) => {
+                if (!stat || typeof stat !== 'object') return stat
+                const raw = typeof stat.value === 'string' ? stat.value : String(stat.value ?? '')
+                const clean = raw.replace(/<[^>]*>/g, '').trim()
+                return clean !== raw ? { ...stat, value: clean || raw } : stat
+            })
+        }
+
         if (b.blockType === 'socialWidget') {
             b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
         }
