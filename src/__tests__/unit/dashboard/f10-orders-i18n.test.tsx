@@ -50,6 +50,7 @@ vi.mock('lucide-react', () => ({
     CheckCircle: () => <span data-testid="icon-checkcircle" />,
     CheckCircle2: () => <span data-testid="icon-checkcircle2" />,
     XCircle: () => <span data-testid="icon-xcircle" />,
+    X: () => <span data-testid="icon-x" />,
     Calendar: () => <span data-testid="icon-calendar" />,
     CreditCard: () => <span data-testid="icon-creditcard" />,
     ArrowDownUp: () => <span data-testid="icon-arrowdownup" />,
