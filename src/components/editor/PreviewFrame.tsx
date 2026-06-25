@@ -647,7 +647,8 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
-                if (['navigation', 'footer', 'breadcrumb'].includes(e.data.blockType)) return
+                // logo-cloud uses LogoImageOverlay for image replacement — suppress generic ImageToolbar
+                if (['navigation', 'footer', 'breadcrumb', 'logo-cloud'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
