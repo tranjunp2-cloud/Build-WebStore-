@@ -1821,7 +1821,7 @@ export function sanitizeBlockData(
         s.stats = s.stats.map((stat: unknown) => {
             if (typeof stat === 'string') return { value: stat, label: stat }
             const sObj = (typeof stat === 'object' && stat !== null ? stat : {}) as Record<string, unknown>
-            const rawValue = String(sObj.value || sObj.number || '0')
+            const rawValue = String(sObj.value || sObj.number || '0').replace(/<[^>]*>/g, '').trim()
             return {
                 value: clampStatValue(rawValue),
                 label: String(sObj.label || sObj.text || 'Stat'),
