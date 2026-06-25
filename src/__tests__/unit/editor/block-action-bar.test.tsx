@@ -7,8 +7,8 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
         vi.clearAllMocks()
     })
 
-    // TC-EDIT-06: Light theme toolbar uses dark background (light=dark pill)
-    it('TC-EDIT-06 (GH-1367): light-mode toolbar uses dark bg-slate-900/95', () => {
+    // TC-EDIT-06: Toolbar keeps theme-aware elevated surface + remap opt-out marker
+    it('TC-EDIT-06 (GH-1367): toolbar uses theme-aware elevated surface + opt-out marker', () => {
         // Arrange
         const mockHandlers = {
             onMoveUp: vi.fn(),
@@ -33,18 +33,18 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
         )
 
         // Assert
-        const toolbar = container.querySelector(
-            '[class*="bg-slate-900/95"]'
-        )
+        const toolbar = container.querySelector('.block-action-toolbar')
         expect(toolbar).toBeInTheDocument()
-        expect(toolbar?.className).toContain('bg-slate-900/95')
-        // Marker class is load-bearing: the globals.css `.block-action-toolbar` rules opt this
-        // dark pill out of the editor-shell light-mode remap so icons/dividers stay bright (GH-1367).
+        // Theme-aware surface: white in light mode, dark in dark mode (via --editor-surface-elevated)
+        expect(toolbar?.className).toContain('bg-[var(--editor-surface-elevated)]/95')
+        // Marker class is load-bearing: the globals.css `.block-action-toolbar` rules give the
+        // light-mode pill dark, high-contrast icons/dividers/hover (GH-1367); jsdom can't see CSS.
         expect(toolbar?.className).toContain('block-action-toolbar')
     })
 
-    // TC-EDIT-07: Dark mode variant is present + icon colors correct
-    it('TC-EDIT-07 (GH-1367): dark mode includes var(--editor-surface-elevated) + correct icon colors', () => {
+    // TC-EDIT-07: Icon base classes preserved (dark mode uses them directly; light mode is
+    // recolored via the globals.css opt-out keyed off these same classes)
+    it('TC-EDIT-07 (GH-1367): icon base classes preserved (amber-300 AI, red-400 delete)', () => {
         // Arrange
         const mockHandlers = {
             onMoveUp: vi.fn(),
@@ -68,11 +68,9 @@ describe('[TC-EDIT-06..09] BlockActionBar — Light/Dark Theme & Drag (GH-1367)'
             />
         )
 
-        // Assert — dark mode class present
-        const toolbar = container.querySelector(
-            '[class*="dark:bg-[var(--editor-surface-elevated)]/95"]'
-        )
-        expect(toolbar).toBeInTheDocument()
+        // Assert — single theme-aware surface class drives both modes (no separate dark: bg)
+        const toolbar = container.querySelector('.block-action-toolbar')
+        expect(toolbar?.className).toContain('bg-[var(--editor-surface-elevated)]/95')
 
         // Assert — AI icon color: text-amber-300
         const aiButton = screen.getByTitle('Edit with AI')

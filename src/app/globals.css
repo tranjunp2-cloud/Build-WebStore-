@@ -878,18 +878,19 @@ html:not(.dark) .editor-shell .hover\:bg-white\/10:hover { background-color: rgb
 html:not(.dark) .editor-shell .hover\:bg-white\/15:hover { background-color: rgba(0,0,0,0.09); }
 html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-color: rgba(0,0,0,0.08); }
 
-/* ── GH-1367: Block action toolbar opt-out of the light-mode remap ─────────── */
-/* The floating block action toolbar is a deliberately DARK pill in BOTH themes.
-   The remap above assumes its slate/amber icons + white-tint dividers/hover sit
-   on a light surface and darkens them → low contrast on the dark pill in light
-   mode. Re-assert each utility's true Tailwind value for this toolbar only. The
-   extra .block-action-toolbar class raises specificity so these win without
-   !important; dark mode is untouched. */
-html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400 { color: #94a3b8; }
-html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #cbd5e1; }
-html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #fcd34d; }
-html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(255,255,255,0.1); }
-html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.1); }
+/* ── GH-1367: Block action toolbar light-mode icon contrast ───────────────── */
+/* The toolbar keeps the theme's elevated surface (white in light, dark in dark).
+   On the white light-mode pill the editor-shell remap leaves the slate icons too
+   light and turns the amber AI icon a muddy brown; the white-tint dividers/hover
+   also wash out. Re-assert dark, high-contrast icon/divider/hover values for this
+   toolbar in LIGHT mode only — dark mode is untouched. The extra
+   .block-action-toolbar class wins on specificity (no !important needed). */
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400,
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #334155; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #c2410c; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-red-400 { color: #dc2626; }
+html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(15,23,42,0.12); }
+html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(15,23,42,0.06); }
 
 /* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
 /* bg overrides turn input bgs white (same as page bg) → need distinct bg */
