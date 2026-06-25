@@ -63,14 +63,14 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
     }
 
     const handleMoveUp = (i: number) => {
-        if (i === 0) return
+        if (i === 0 || uploadingSlots.size > 0) return
         const updated = [...logos]
         ;[updated[i - 1], updated[i]] = [updated[i], updated[i - 1]]
         onBlockUpdate(blockIndex, { logos: updated })
     }
 
     const handleMoveDown = (i: number) => {
-        if (i >= count - 1) return
+        if (i >= count - 1 || uploadingSlots.size > 0) return
         const updated = [...logos]
         ;[updated[i], updated[i + 1]] = [updated[i + 1], updated[i]]
         onBlockUpdate(blockIndex, { logos: updated })
@@ -107,14 +107,14 @@ export default function LogoCloudSettings({ block, blockIndex, onBlockUpdate }: 
                             <button
                                 type="button"
                                 aria-label={`Move logo ${i + 1} up`}
-                                disabled={i === 0}
+                                disabled={i === 0 || uploadingSlots.size > 0}
                                 onClick={() => handleMoveUp(i)}
                                 className="text-gray-400 hover:text-white disabled:opacity-30 px-1 text-sm leading-none"
                             >↑</button>
                             <button
                                 type="button"
                                 aria-label={`Move logo ${i + 1} down`}
-                                disabled={i >= count - 1}
+                                disabled={i >= count - 1 || uploadingSlots.size > 0}
                                 onClick={() => handleMoveDown(i)}
                                 className="text-gray-400 hover:text-white disabled:opacity-30 px-1 text-sm leading-none"
                             >↓</button>
