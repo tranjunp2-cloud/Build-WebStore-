@@ -55,7 +55,7 @@ export function BlockActionBar({
 
     return (
         <div
-            className="absolute z-[55] flex items-center gap-0.5 rounded-xl border border-white/10 bg-[var(--editor-surface-elevated)]/95 px-1.5 py-1 shadow-2xl backdrop-blur-sm animate-in fade-in duration-150"
+            className="block-action-toolbar absolute z-[55] flex items-center gap-0.5 rounded-xl border border-slate-700/60 bg-slate-900/95 px-1.5 py-1 shadow-2xl backdrop-blur-sm animate-in fade-in duration-150 dark:border-white/10 dark:bg-[var(--editor-surface-elevated)]/95"
             style={{
                 top: position.top - 44,
                 left: position.left + position.width / 2,
