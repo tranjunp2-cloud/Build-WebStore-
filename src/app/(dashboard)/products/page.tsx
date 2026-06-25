@@ -395,7 +395,7 @@ export default function ProductsPage() {
                                 </span>
                             </TabsTrigger>
                             <TabsTrigger variant="underline" value="active">
-                                <span className="h-2 w-2 rounded-full bg-[hsl(var(--success))] shrink-0" />
+
                                 {t.dashboard.products.list.filterActive}
                                 <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
                                     {statusCounts.active}
