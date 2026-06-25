@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck, Unlink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 
 interface Props {
@@ -135,27 +136,24 @@ export function StripeConnectBlock({
 
             {/* CTA */}
             <div className="flex flex-col items-end gap-2 shrink-0 relative z-[1]">
-                <button
+                <Button
                     type="button"
                     onClick={handleClick}
                     disabled={isLoading}
-                    className="inline-flex items-center gap-2 h-[44px] px-[18px] rounded-[10px] text-[14px] font-semibold text-[#042033] transition-all hover:brightness-110 whitespace-nowrap disabled:opacity-70 disabled:cursor-wait"
-                    style={{
-                        background: isVerifyMode
-                            ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-                            : isOnboardMode
-                                ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-                                : 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                        boxShadow: (isVerifyMode || isOnboardMode)
-                            ? '0 4px 14px rgba(251,191,36,0.30)'
-                            : '0 4px 14px rgba(14,165,233,0.30)',
-                    }}
+                    className="h-[44px] gap-2 whitespace-nowrap"
+                    // Connect mode keeps the shared blue->teal gradient (white text from the
+                    // variant). Onboard/Verify stay amber (distinct state) — bg overridden inline,
+                    // text remains white.
+                    style={(isVerifyMode || isOnboardMode) ? {
+                        background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                        boxShadow: '0 4px 14px rgba(251,191,36,0.30)',
+                    } : undefined}
                 >
                     {isLoading
                         ? <><Loader2 className="w-4 h-4 animate-spin" />{loadingLabel}</>
                         : <>{ctaLabel}<ArrowRight className="w-4 h-4" /></>
                     }
-                </button>
+                </Button>
                 {isOnboardMode && (
                     <button
                         type="button"
