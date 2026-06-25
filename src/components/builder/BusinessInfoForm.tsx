@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
@@ -79,6 +79,13 @@ export default function BusinessInfoForm({
     // Slug picker state (F23)
     const [chosenSlug, setChosenSlug] = useState('')
     const [slugAvailable, setSlugAvailable] = useState(true) // true by default — slug is optional
+
+    // Stable callback so SlugPicker's checkAvailability useCallback doesn't
+    // invalidate on every BusinessInfoForm re-render (causing redundant API calls).
+    const handleSlugChange = useCallback((slug: string, available: boolean) => {
+        setChosenSlug(slug)
+        setSlugAvailable(available)
+    }, [])
 
     // URL extraction state
     const [inputMode, setInputMode] = useState<'manual' | 'url'>('manual')
@@ -566,10 +573,8 @@ export default function BusinessInfoForm({
                     {form.businessName.trim().length >= 3 && (
                         <SlugPicker
                             businessName={form.businessName}
-                            onSlugChange={(slug, available) => {
-                                setChosenSlug(slug)
-                                setSlugAvailable(available)
-                            }}
+                            onSlugChange={handleSlugChange}
+                            skipInitialCheck={!!initialValues?.businessName}
                         />
                     )}
 

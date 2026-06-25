@@ -502,7 +502,13 @@ export function PaymentsFormClient({
 
     const handleSaveXenditKeys = async (secretKey: string, callbackToken: string) => {
         const res = await saveXenditKeys(secretKey, callbackToken);
-        if (!res.success) throw new Error(res.error ?? 'Không thể lưu keys.');
+        if (!res.success) {
+            const errKey = res.error as keyof typeof pt;
+            const msg = errKey && errKey in pt && typeof pt[errKey] === 'string'
+                ? (pt[errKey] as string)
+                : (res.error ?? pt.xenditValidationRequired);
+            throw new Error(msg);
+        }
         setXenditIsConnected(true);
         toast.success(pt.xenditConnectSuccess);
     };

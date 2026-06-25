@@ -2,6 +2,7 @@
  * Tests for OgImageEditor component (src/components/editor/og-image-editor.tsx)
  * TC-IDs: TC-F05-12-15, TC-F05-12-16, TC-F05-12-17, TC-F05-12-18, TC-F05-12-19
  * GH-1263: Fix — send numeric media ID (not URL string) to Payload upload field
+ * GH-1284: Updated mocks — component now uses useUploadProgress (XHR) instead of uploadMediaAction
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -43,14 +44,14 @@ vi.mock('@/lib/utils/image', () => ({
     processImageFile: vi.fn(),
 }))
 
-vi.mock('@/app/(dashboard)/actions/media', () => ({
-    uploadMediaAction: vi.fn(),
+vi.mock('@/hooks/use-upload-progress', () => ({
+    useUploadProgress: vi.fn(),
 }))
 
 import { OgImageEditor } from '@/components/editor/og-image-editor'
 import { toast } from 'sonner'
 import { processImageFile } from '@/lib/utils/image'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -65,9 +66,18 @@ function triggerFileInput(input: HTMLInputElement, file: File): void {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
+let mockUpload: Mock
+
 describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockUpload = vi.fn()
+        vi.mocked(useUploadProgress).mockReturnValue({
+            upload: mockUpload,
+            progress: 0,
+            isUploading: false,
+            reset: vi.fn(),
+        })
         ;(processImageFile as Mock).mockResolvedValue(makeImageFile())
     })
 
@@ -93,7 +103,7 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
     describe('TC-F05-12-15: Upload → callback receives numeric mediaId + URL (GH-1263 core fix)', () => {
         it('calls onOgImageChange with (number, string) after successful upload', async () => {
             const onOgImageChange = vi.fn()
-            ;(uploadMediaAction as Mock).mockResolvedValue({ id: 42, url: 'https://cdn.example.com/og.jpg', alt: 'og' })
+            mockUpload.mockResolvedValue({ id: 42, url: 'https://cdn.example.com/og.jpg', alt: 'og' })
 
             render(<OgImageEditor currentOgImage={null} onOgImageChange={onOgImageChange} />)
 
@@ -111,7 +121,7 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
         })
 
         it('shows success toast after upload', async () => {
-            ;(uploadMediaAction as Mock).mockResolvedValue({ id: 7, url: 'https://cdn.example.com/og.jpg' })
+            mockUpload.mockResolvedValue({ id: 7, url: 'https://cdn.example.com/og.jpg' })
 
             render(<OgImageEditor currentOgImage={null} onOgImageChange={vi.fn()} />)
             triggerFileInput(document.querySelector('input[type="file"]') as HTMLInputElement, makeImageFile())
@@ -135,7 +145,7 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
     })
 
     describe('TC-F05-12-18: Invalid file format rejected before upload', () => {
-        it('shows format error toast and does not call uploadMediaAction for PDF', async () => {
+        it('shows format error toast and does not call upload for PDF', async () => {
             const onOgImageChange = vi.fn()
             render(<OgImageEditor currentOgImage={null} onOgImageChange={onOgImageChange} />)
 
@@ -146,7 +156,7 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
                 expect(toast.error).toHaveBeenCalledWith('Only JPG, PNG, or WebP images are accepted')
             })
 
-            expect(uploadMediaAction).not.toHaveBeenCalled()
+            expect(mockUpload).not.toHaveBeenCalled()
             expect(onOgImageChange).not.toHaveBeenCalled()
         })
     })
@@ -154,7 +164,7 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
     describe('TC-F05-12-19: Upload returns no ID → error, callback not called', () => {
         it('shows error toast and does not call onOgImageChange when uploaded.id is missing', async () => {
             const onOgImageChange = vi.fn()
-            ;(uploadMediaAction as Mock).mockResolvedValue({ url: 'https://cdn.example.com/og.jpg' })
+            mockUpload.mockResolvedValue({ url: 'https://cdn.example.com/og.jpg' })
 
             render(<OgImageEditor currentOgImage={null} onOgImageChange={onOgImageChange} />)
             triggerFileInput(document.querySelector('input[type="file"]') as HTMLInputElement, makeImageFile())
@@ -166,9 +176,9 @@ describe('OgImageEditor (TC-F05-12-15 to TC-F05-12-19 / GH-1263)', () => {
             expect(onOgImageChange).not.toHaveBeenCalled()
         })
 
-        it('shows error toast and does not call onOgImageChange when uploadMediaAction returns null', async () => {
+        it('shows error toast and does not call onOgImageChange when upload returns null', async () => {
             const onOgImageChange = vi.fn()
-            ;(uploadMediaAction as Mock).mockResolvedValue(null)
+            mockUpload.mockResolvedValue(null)
 
             render(<OgImageEditor currentOgImage={null} onOgImageChange={onOgImageChange} />)
             triggerFileInput(document.querySelector('input[type="file"]') as HTMLInputElement, makeImageFile())

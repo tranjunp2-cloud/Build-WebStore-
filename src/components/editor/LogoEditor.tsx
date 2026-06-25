@@ -5,7 +5,7 @@ import { Loader2, Trash2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 import {
     Dialog,
     DialogContent,
@@ -17,33 +17,7 @@ import {
 
 interface LogoEditorProps {
     currentLogo?: string | null
-    onLogoChange: (logoUrl: string, faviconUrl?: string) => void
-}
-
-async function generateFavicon(imageUrl: string): Promise<Blob | null> {
-    return new Promise((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = imageUrl
-        img.onload = () => {
-            const canvas = document.createElement('canvas')
-            canvas.width = 32
-            canvas.height = 32
-            const ctx = canvas.getContext('2d')
-            if (!ctx) return resolve(null)
-
-            // Draw image centered/fitted into 32x32
-            const ratio = Math.min(32 / img.width, 32 / img.height)
-            const w = img.width * ratio
-            const h = img.height * ratio
-            const x = (32 - w) / 2
-            const y = (32 - h) / 2
-
-            ctx.drawImage(img, x, y, w, h)
-            canvas.toBlob((blob) => resolve(blob), 'image/png')
-        }
-        img.onerror = () => resolve(null)
-    })
+    onLogoChange: (logoUrl: string) => void
 }
 
 export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
@@ -51,7 +25,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
     const le = t.editor.logoEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [showRemoveDialog, setShowRemoveDialog] = useState(false)
 
@@ -65,8 +39,6 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
         const file = e.target.files?.[0]
         if (!file) return
 
-        setIsUploading(true)
-
         try {
             // 1. Process & compress logo
             const processed = await processImageFile(file)
@@ -75,34 +47,20 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
-            // 2. Upload logo via server action (same as product form)
+            // 2. Upload logo via XHR (tracks progress)
             const formData = new FormData()
             formData.append('file', processed)
             formData.append('alt', le.altSiteLogo)
 
-            const uploadedLogo = await uploadMediaAction(formData)
+            const uploadedLogo = await upload(formData)
             const logoUrl = uploadedLogo.url as string
 
-            // 3. Auto-generate favicon from the uploaded logo
-            let faviconUrl: string | undefined
-
-            const faviconBlob = await generateFavicon(logoUrl.startsWith('/') ? window.location.origin + logoUrl : logoUrl)
-            if (faviconBlob) {
-                const faviconForm = new FormData()
-                faviconForm.append('file', new File([faviconBlob], 'favicon.png', { type: 'image/png' }))
-                faviconForm.append('alt', le.altFavicon)
-
-                const faviconData = await uploadMediaAction(faviconForm)
-                faviconUrl = faviconData.url as string
-            }
-
-            onLogoChange(logoUrl, faviconUrl)
-            toast.success(le.success + (faviconUrl ? le.faviconGenerated : ''))
+            onLogoChange(logoUrl)
+            toast.success(le.success)
         } catch (error) {
             console.error('Logo upload error:', error)
             toast.error(le.error)
         } finally {
-            setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
@@ -171,8 +129,16 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                         )}
                     </div>
                     <span className="text-xs font-medium leading-4 text-[var(--editor-text-muted)]">
-                        {isUploading ? le.uploading : le.clickToUpload}
+                        {isUploading ? `${le.uploading} ${progress}%` : le.clickToUpload}
                     </span>
+                    {isUploading && (
+                        <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-blue-500/70 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    )}
                 </button>
             )}
             <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>

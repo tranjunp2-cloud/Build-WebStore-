@@ -32,6 +32,9 @@ vi.mock('@/lib/payment/stripe', () => ({
         checkout: { sessions: { retrieve: mockStripeSessionsRetrieve } },
     })),
 }))
+vi.mock('@/lib/payment/xendit', () => ({
+    createRefund: vi.fn(),
+}))
 
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -53,6 +56,9 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 }))
 
 import { POST } from '@/app/api/orders/[id]/cancel/route'
+import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
+import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
+import { createRefund as xenditCreateRefund } from '@/lib/payment/xendit'
 
 // ─── TC-F10.16: Order cancellation ───────────────────────────────────
 
@@ -67,8 +73,9 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         mockDrizzleExecute.mockReset()
         mockStripeRefundsCreate.mockReset()
         mockStripeSessionsRetrieve.mockReset()
-        // Default: Stripe refunds.create succeeds (overridden per-test as needed)
+        // Default: Stripe/Xendit refunds.create succeeds (overridden per-test as needed)
         mockStripeRefundsCreate.mockResolvedValue({ id: undefined })
+        vi.mocked(xenditCreateRefund).mockResolvedValue({ id: undefined } as any)
         // Default: CAS succeeds (returns 1 row) + restockItem SQL calls succeed (non-variant path).
         // Tests that use mockResolvedValueOnce sequences MUST prepend a CAS row first.
         mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
@@ -136,7 +143,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
     it('[TC-F10.16-FIX-1] Cancellation email sent to customerEmail field', async () => {
         // updated is constructed from the pre-fetched order (no extra findByID after CAS).
         mockFindByID
-            .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe' })
+            .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe', locale: 'ms' })
         // CAS uses default (success). No mockUpdate — replaced by CAS.
 
         const req = { json: () => Promise.resolve({ reason: 'Customer request' }) } as unknown as Request
@@ -178,7 +185,8 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 paymentMethod: 'qr_banking',
                 paymentStatus: 'unpaid',
                 customerEmail: 'qr@test.com',
-                customerName: 'QR Customer'
+                customerName: 'QR Customer',
+                locale: 'ms',
             })
         // CAS uses default (success). updated constructed from order.
 
@@ -560,7 +568,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
     // ─── TC-F10-03-26–31: Stripe paid order cancel auto-refund (Issue #1326) ──────
     // Detection: paymentStatus='paid' + paymentMethod NOT in ['bank_transfer','cod'] + paymentProvider != 'xendit'
 
-    it('[TC-F10-03-26] Stripe paid order cancel → CAS + auto-refund + refund email, no cancel email', async () => {
+    it('[TC-F10-03-26] Stripe paid order cancel → CAS + auto-refund + cancel email (refund email sent by webhook)', async () => {
         const stripeCtx = { params: Promise.resolve({ id: 'stripe-order-1' }) }
         mockFindByID
             .mockResolvedValueOnce({
@@ -568,6 +576,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 paymentMethod: 'stripe', paymentStatus: 'paid',
                 stripePaymentIntentId: 'pi_test123',
                 items: [], customerEmail: 'buyer@test.com',
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s1', stripeAccountId: 'acct_test123' }) // tenant fetch
 
@@ -586,8 +595,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
             { payment_intent: 'pi_test123' },
             expect.objectContaining({ stripeAccount: 'acct_test123', idempotencyKey: 'cancel-stripe-order-1' })
         )
-        // Refund email sent (not cancel email)
+        // Cancel email sent (not refund — charge.refunded webhook handles refund email)
         expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'buyer@test.com' }))
+        expect(vi.mocked(orderCancelledEmail)).toHaveBeenCalled()
+        expect(vi.mocked(orderRefundedEmail)).not.toHaveBeenCalled()
     })
 
     it('[TC-F10-03-27] Stripe cancel blocked when stripeAccountId missing → 422 STRIPE_NOT_REFUNDABLE', async () => {
@@ -667,6 +678,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 id: 'stripe-order-5', status: 'confirmed',
                 paymentMethod: 'stripe', paymentStatus: 'paid',
                 stripePaymentIntentId: 'pi_already', items: [], customerEmail: 'buyer2@test.com',
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s5', stripeAccountId: 'acct_test123' })
 
@@ -684,8 +696,10 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.data.paymentStatus).toBe('refunded')
         // Rollback must NOT be called for charge_already_refunded
         expect(mockDrizzleExecute).toHaveBeenCalledTimes(1) // only Stripe CAS, no rollback
-        // Refund email sent — buyer is owed money regardless
+        // Cancel email sent — buyer notified of cancellation; refund email sent later by charge.refunded webhook
         expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'buyer2@test.com' }))
+        expect(vi.mocked(orderCancelledEmail)).toHaveBeenCalled()
+        expect(vi.mocked(orderRefundedEmail)).not.toHaveBeenCalled()
     })
 
     it('[TC-F10-03-31] Stripe cancel fetches stripePaymentIntentId fallback via session when not cached', async () => {
@@ -697,6 +711,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 stripeSessionId: 'cs_test_abc',
                 // no stripePaymentIntentId
                 items: [],
+                locale: 'ms',
             })
             .mockResolvedValueOnce({ id: 'tenant-s6', stripeAccountId: 'acct_test123' }) // tenant fetch
 
@@ -726,6 +741,39 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         )
     })
 
+    // ─── TC-F10-03-33: Xendit paid order cancel sends 2 emails (cancel + refund) ────
+    // No Xendit refund webhook exists — refund email must be sent synchronously from cancel route.
+
+    it('[TC-F10-03-33] Xendit paid order cancel → sends cancel email then refund email (no Xendit refund webhook)', async () => {
+        const xenditCtx = { params: Promise.resolve({ id: 'xendit-order-1' }) }
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'xendit-order-1', status: 'confirmed',
+                paymentProvider: 'xendit', paymentStatus: 'paid',
+                xenditPaymentRequestId: 'req_test123',
+                items: [], customerEmail: 'buyer-x@test.com',
+                locale: 'ms',
+            })
+            .mockResolvedValueOnce({ id: 'tenant-x1', xenditSecretKey: 'xnd_secret_key' }) // tenant for Xendit
+
+        vi.mocked(xenditCreateRefund).mockResolvedValue({ id: 'xendit-refund-123' } as any)
+        // Xendit CAS uses default mock ({ rows: [{ id: 1 }] })
+
+        const req = { json: () => Promise.resolve({ reason: 'Buyer request' }) } as unknown as Request
+        const res = await POST(req, xenditCtx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.refundId).toBe('xendit-refund-123')
+        // Both emails sent in order: cancel first, then refund
+        expect(mockSendEmail).toHaveBeenCalledTimes(2)
+        expect(mockSendEmail).toHaveBeenNthCalledWith(1, expect.objectContaining({ subject: 'Order cancelled' }))
+        expect(mockSendEmail).toHaveBeenNthCalledWith(2, expect.objectContaining({ subject: 'Order refunded' }))
+        expect(vi.mocked(orderCancelledEmail)).toHaveBeenCalled()
+        expect(vi.mocked(orderRefundedEmail)).toHaveBeenCalled()
+    })
+
     it('[TC-F10-03-32] free-discount paid order bypasses Stripe block and cancels via generic CAS', async () => {
         // Regression: paymentMethod='free' was not in the exclusion list, causing free orders to
         // enter the Stripe block and return 422 STRIPE_NOT_REFUNDABLE (no Stripe charge exists).
@@ -734,6 +782,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
             id: 'free-order-1', status: 'confirmed',
             paymentMethod: 'free', paymentStatus: 'paid',
             paymentProvider: undefined, items: [],
+            locale: 'ms',
         })
         mockUpdate.mockResolvedValue({ id: 'free-order-1', status: 'cancelled', paymentStatus: 'paid' })
 

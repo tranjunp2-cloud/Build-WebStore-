@@ -20,13 +20,13 @@ const BLOCK_CONFIGS = [
     { name: 'gallery', meta: galleryMeta, schema: GalleryConfigSchema, expectedCount: 6, minFields: {} },
     { name: 'footer', meta: footerMeta, schema: FooterConfigSchema, expectedCount: 4, minFields: {} },
     { name: 'contact', meta: contactMeta, schema: ContactConfigSchema, expectedCount: 6, minFields: {} },
-    { name: 'navigation', meta: navigationMeta, schema: NavigationConfigSchema, expectedCount: 6, minFields: {} },
+    { name: 'navigation', meta: navigationMeta, schema: NavigationConfigSchema, expectedCount: 5, minFields: {} },
 ] as const
 
 describe('[TC-S2-015] All Block Variant Counts', () => {
-    it('total variant count across 8 blocks is 60', () => {
+    it('total variant count across 8 blocks is 59', () => {
         const total = BLOCK_CONFIGS.reduce((sum, b) => sum + b.meta.variants.length, 0)
-        expect(total).toBe(60)
+        expect(total).toBe(59)
     })
 
     for (const block of BLOCK_CONFIGS) {

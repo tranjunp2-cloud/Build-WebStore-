@@ -39,12 +39,12 @@ const baseProps = {
     onBlockUpdate: vi.fn(),
 }
 
-// ── TC-NAV-06: 6 variant buttons render in menu tab ───────────────────────────
+// ── TC-NAV-06: 5 variant buttons render in menu tab (mega soft-deprecated) ────
 
-describe('TC-NAV-06 — SettingsPanel menu tab renders 6 nav variant buttons', () => {
+describe('TC-NAV-06 — SettingsPanel menu tab renders 5 nav variant buttons', () => {
     beforeEach(() => { vi.clearAllMocks() })
 
-    it('shows all 6 variant labels after switching to menu tab', () => {
+    it('shows all 5 variant labels after switching to menu tab', () => {
         // Arrange
         const onHeaderUpdate = vi.fn()
 
@@ -60,13 +60,13 @@ describe('TC-NAV-06 — SettingsPanel menu tab renders 6 nav variant buttons', (
             </I18nProvider>,
         )
 
-        // Assert
+        // Assert — mega is soft-deprecated and no longer shown in UI (issue #1237)
         expect(screen.getByRole('button', { name: 'Default' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Centered' })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Mega' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Transparent' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Sidebar' })).toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Floating' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Mega' })).not.toBeInTheDocument()
     })
 })
 
@@ -78,7 +78,6 @@ describe('TC-NAV-07 — clicking variant button calls onHeaderUpdate with varian
     it.each([
         ['Default', 'default'],
         ['Centered', 'centered'],
-        ['Mega', 'mega'],
         ['Transparent', 'transparent'],
         ['Sidebar', 'sidebar'],
         ['Floating', 'floating'],

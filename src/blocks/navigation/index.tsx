@@ -401,7 +401,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
@@ -483,7 +483,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
                         <NavLogo
                             logo={mergedBlock.logo}
@@ -494,10 +494,10 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                     </motion.div>
                 </NavLogoLink>
 
-                {/* Desktop Links */}
+                {/* Desktop Links — flex-1 justify-center prevents logo overlap vs absolute approach */}
                 <NavDesktopLinks
                     links={links}
-                    className="hidden md:flex gap-1 absolute left-1/2 -translate-x-1/2 w-[60%]"
+                    className="hidden md:flex gap-1 flex-1 justify-center"
                 />
 
                 {/* CTA + Language Switcher + Mobile */}
@@ -949,7 +949,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"

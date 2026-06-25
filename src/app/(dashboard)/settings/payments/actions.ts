@@ -6,7 +6,8 @@ import { getCurrentTenantId } from '@/lib/auth';
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription';
 import type { PlanCode } from '@/collections/PlanSubscriptions';
 import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
-import { xenditFetch, XenditError } from '@/lib/payment/xendit-client';
+import { xenditFetch, XenditError } from '@/lib/payment/xendit-client'
+import { setCallbackUrl } from '@/lib/payment/xendit';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -237,14 +238,32 @@ export async function saveXenditKeys(secretKey: string, callbackToken: string) {
         } catch (err: unknown) {
             if (err instanceof XenditError) {
                 if (err.status === 401) {
-                    return { success: false, error: 'Invalid Secret Key — please copy it again from your Xendit dashboard.' };
+                    return { success: false, error: 'xenditInvalidSecretKey' }
                 }
                 if (err.status === 403) {
-                    return { success: false, error: 'This Secret Key is missing "Money-in products → Write" permission. Please re-create the key with that permission enabled in Xendit.' };
+                    return { success: false, error: 'xenditMissingPermission' }
                 }
                 // 400/422/other = key valid + has permission, minimal payload rejected as expected → proceed
             }
             // Network or unexpected error → proceed silently
+        }
+
+        // POST /callback_urls/invoice registers ECH as webhook receiver and returns callback_token
+        // (= merchant's Webhook Verification Token). Comparing it against user input catches wrong
+        // tokens before they silently break payment webhooks.
+        // XENDIT_WEBHOOK_URL overrides NEXT_PUBLIC_SERVER_URL in local dev (ngrok/Cloudflare tunnel).
+        const baseUrl = (process.env.XENDIT_WEBHOOK_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? '').replace(/\/$/, '')
+        const webhookUrl = `${baseUrl}/api/webhooks/xendit`
+        try {
+            const cbResult = await setCallbackUrl('invoice', webhookUrl, secretKey.trim())
+            if (cbResult.callback_token !== callbackToken.trim()) {
+                return { success: false, error: 'xenditTokenMismatch' }
+            }
+        } catch (cbErr: unknown) {
+            const xenditMsg = cbErr instanceof Error ? cbErr.message : String(cbErr)
+            console.error('[saveXenditKeys] setCallbackUrl failed:', xenditMsg, '| url:', webhookUrl)
+            const isUrlError = xenditMsg.includes('URL_NOT_VALID')
+            return { success: false, error: isUrlError ? 'xenditWebhookUrlInvalid' : 'xenditWebhookRegisterFailed' }
         }
 
         await payload.update({

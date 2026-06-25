@@ -63,7 +63,7 @@ export const navigationMeta = {
     name: 'Navigation',
     description: 'Site navigation bar with logo, links, and optional CTA',
     icon: '🧭',
-    variants: ['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'],
+    variants: ['default', 'centered', 'transparent', 'sidebar', 'floating'],
     defaultVariant: 'default',
     editableFields: ['logoText', 'links', 'ctaButton'],
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],

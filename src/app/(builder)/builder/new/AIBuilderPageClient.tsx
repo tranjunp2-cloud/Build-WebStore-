@@ -160,6 +160,10 @@ function LivePreview({
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
     const { t } = useI18n()
     const router = useRouter()
+    // Prevents SSR/hydration flash: server renders initial state (form), but Zustand
+    // persist rehydrates synchronously only after client-side mount. Without this guard
+    // the form flashes for ~500ms before React re-renders with the rehydrated done state.
+    const [isMounted, setIsMounted] = useState(false)
     const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false)
     const [isMobileViewport, setIsMobileViewport] = useState(false)
     const [previewMode, setPreviewMode] = useState<BuilderPreviewMode>('desktop')
@@ -215,6 +219,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         contentBrief,
         reset,
     } = useBuilderStore()
+
+    useEffect(() => { setIsMounted(true) }, [])
 
     // Security: clear persisted session if it belongs to a different user.
     // Prevents cross-user localStorage contamination when sharing a browser.
@@ -366,16 +372,27 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
     }, [setStep, status, step])
 
+    // Watchdog: if status is streaming on mount but no SSE connection is active
+    // (e.g. user reloaded mid-generation), reset immediately so user isn't stuck.
+    useEffect(() => {
+        if (status !== 'streaming') return
+        if (abortControllerRef.current) return
+        setStatus('idle')
+        setStep('info')
+        toast.message(t.onboarding.generating.interrupted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (draftSaveState !== 'dirty' && draftSaveState !== 'saving') return
+            if (draftSaveState !== 'dirty' && draftSaveState !== 'saving' && status !== 'streaming') return
             event.preventDefault()
             event.returnValue = ''
         }
 
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-    }, [draftSaveState])
+    }, [draftSaveState, status])
 
     useEffect(() => {
         if (typeof window === 'undefined') return
@@ -398,6 +415,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const prepareGenerationSession = useCallback((info: BusinessInfo) => {
         reset()
+        // Re-apply userId immediately after reset: reset() clears INITIAL_STATE
+        // (userId: null), but the userId effect won't re-run since its deps haven't
+        // changed. Without this, partialize stores userId: null with stale gen data,
+        // and the next reload triggers isUnownedSession → blank form (GH-1371).
+        if (userId) setUserId(userId)
         hasUserEditsRef.current = false
         setGenerationTimeMs(0)
         setBusinessInfo(info)
@@ -408,7 +430,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             progress: 8,
         })
         addMessage({ role: 'assistant', content: `🚀 ${t.onboarding.generating.startingMessage}` })
-    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, t])
+    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, setUserId, userId, t])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {
@@ -847,7 +869,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         )
     }
 
-    if (step === 'info') {
+    // Block render until client-side mount: Zustand persist rehydrates from
+    // localStorage only after React hydration, so the first render uses initial
+    // state (form). This dark screen prevents the ~500ms form flash on reload.
+    if (!isMounted) {
+        return <div className="fixed inset-0 bg-[#06090F]" />
+    }
+
+    if (step === 'info' && status !== 'done') {
         if (showPaywall) {
             return <PaywallCard onBack={() => setShowPaywall(false)} />
         }

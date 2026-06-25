@@ -147,6 +147,32 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho giao diện côn
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html — open `F36 EasyParcel Delivery.html` (project PW2-Design). Dev action: import qua `claude_design` MCP → đọc README → implement theo hi-fi.
+>
+> **[F36 EasyParcel] Dòng "Shipping" là hybrid** (nguồn: `docs/prd/F36-easyparcel-delivery.md`): nếu tenant bật EasyParcel → hiển thị **giá courier thật** của 1 courier shop đã chọn (vd `Shipping (J&T): RM 5.42`); chưa bật / lỗi / timeout → giữ flat-rate `Shipping (West MY): RM 8.00` như trên. **Buyer KHÔNG chọn courier** — KHÔNG thêm section "chọn đơn vị vận chuyển", KHÔNG thêm dòng phí mới. Logic ẩn ở `POST /api/orders/calculate-shipping` (hybrid, single-courier). Sau đặt hàng, buyer xem courier + AWB + tracking ở trang đơn (làm giàu `OrderTrackingClient` có sẵn).
+
+#### User Flow — Cước ship ở Checkout (hybrid, F36)
+
+```text
+Actor: Buyer (guest)
+
+1. Buyer  → nhập địa chỉ giao (State → City → Postcode cascade)
+   System → debounce 300ms → POST /api/orders/calculate-shipping {siteId, dest, items}
+
+2. System → getRates():
+   ├─ EasyParcel ON + đủ cấu hình → EPRateCheckingBulk(origin kho, dest, weight)
+   │     cho ĐÚNG 1 courier shop đã chọn → fee thật (RM→sen)
+   └─ OFF / lỗi / timeout → flat-rate West/East (fallback IM LẶNG, không chặn)
+
+3. System → render dòng "Shipping" trong Order Summary; Total tự cập nhật
+   vd EP:  Shipping (J&T): RM 5.42    |    fallback: Shipping (West MY): RM 8.00
+   Buyer KHÔNG chọn courier (không có picker)
+
+4. Buyer  → [Place Order]
+   System → lưu order: shippingCourier + shippingServiceId + shippingFee (sen)
+            ở cả nhánh COD/bank + Stripe + Xendit
+```
+
 ---
 
 ## 5. Mobile Optimized UX (Giao diện 375px)

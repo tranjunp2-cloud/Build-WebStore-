@@ -19,6 +19,9 @@ export const metadata: Metadata = {
     twitter: {
         card: 'summary_large_image',
     },
+    // Explicit icons reference (overridable by child layouts/pages).
+    // favicon.ico is served from public/ as a static asset.
+    icons: { icon: '/favicon.ico' },
 }
 
 // Plan 260415 nav-bugfix hotfix: add viewport meta so mobile browsers render

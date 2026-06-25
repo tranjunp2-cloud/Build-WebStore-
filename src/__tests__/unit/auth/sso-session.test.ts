@@ -149,6 +149,8 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
             const res = await POST(makeReq({ v2_token: 'any' }) as any) as any
             expect(res.status).toBe(429)
             expect(res.data.error).toBe('rate_limited')
+            expect(res.data.message).toMatch(/Too many sign-in attempts/)
+            expect(typeof res.data.retryAfter).toBe('number')
             expect(res.headers['Retry-After']).toMatch(/^\d+$/)
             expect(Number(res.headers['Retry-After'])).toBeGreaterThan(0)
         })
@@ -163,7 +165,41 @@ describe('[TC-SSOPW2] POST /api/auth/sso-session', () => {
                 json: vi.fn().mockResolvedValue({ v2_token: 'valid' }),
             }
             await POST(reqWithBothIPs as any)
-            expect(mockCheckRateLimit).toHaveBeenCalledWith('sso-session:10.20.30.40', 10, 60_000)
+            expect(mockCheckRateLimit).toHaveBeenCalledWith('sso-session:10.20.30.40', 300, 60_000)
+        })
+
+        it('TC-SSO.RL-01: IP bucket uses 300 limit — shared-WiFi users all allowed', async () => {
+            await POST(makeReq({ v2_token: 'valid' }) as any)
+            expect(mockCheckRateLimit).toHaveBeenCalledWith('sso-session:1.2.3.4', 300, 60_000)
+        })
+
+        it('TC-SSO.RL-02: per-user bucket blocks spammer even when IP has capacity', async () => {
+            mockCheckRateLimit
+                .mockResolvedValueOnce({ allowed: true, remaining: 299, resetAt: 0 })
+                .mockResolvedValueOnce({ allowed: false, remaining: 0, resetAt: Date.now() + 10_000 })
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.status).toBe(429)
+            expect(res.data.error).toBe('rate_limited')
+            expect(res.data.message).toMatch(/Too many sign-in attempts/)
+            expect(typeof res.data.retryAfter).toBe('number')
+        })
+
+        it('TC-SSO.RL-03: normal login passes both IP and per-user buckets', async () => {
+            const res = await POST(makeReq({ v2_token: 'valid' }) as any) as any
+            expect(res.status).toBe(200)
+            expect(mockCheckRateLimit).toHaveBeenCalledTimes(2)
+            expect(mockCheckRateLimit).toHaveBeenNthCalledWith(1, 'sso-session:1.2.3.4', 300, 60_000)
+            expect(mockCheckRateLimit).toHaveBeenNthCalledWith(2, 'sso-session:user:42', 10, 60_000)
+        })
+
+        it('TC-SSO.RL-08: SSO_RATE_LIMIT_PER_MIN env var overrides IP bucket limit', async () => {
+            process.env.SSO_RATE_LIMIT_PER_MIN = '500'
+            try {
+                await POST(makeReq({ v2_token: 'valid' }) as any)
+                expect(mockCheckRateLimit).toHaveBeenNthCalledWith(1, 'sso-session:1.2.3.4', 500, 60_000)
+            } finally {
+                delete process.env.SSO_RATE_LIMIT_PER_MIN
+            }
         })
     })
 

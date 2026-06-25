@@ -2,25 +2,37 @@ import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT, decodeJwt } from 'jose'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimit, RateLimitResult } from '@/lib/rateLimit'
+
+function rateLimited(r: RateLimitResult) {
+    const retryAfter = Math.max(0, Math.ceil((r.resetAt - Date.now()) / 1000))
+    return NextResponse.json(
+        {
+            error: 'rate_limited',
+            message: `Too many sign-in attempts. Please wait ${retryAfter}s and try again.`,
+            retryAfter,
+        },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    )
+}
 
 export async function POST(req: NextRequest) {
-    // Rate limiting: 10 attempts per minute per IP (mirrors other auth endpoints)
     // x-real-ip is set by Vercel infrastructure (not client-spoofable).
     // XFF rightmost entry is the Vercel-appended real IP; leftmost is client-controlled.
     const ip =
         req.headers.get('x-real-ip')?.trim() ||
         req.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() ||
         'unknown'
-    const rateLimit = await checkRateLimit(`sso-session:${ip}`, 10, 60_000)
-    if (!rateLimit.allowed) {
-        return NextResponse.json(
-            { error: 'rate_limited' },
-            {
-                status: 429,
-                headers: { 'Retry-After': String(Math.max(0, Math.ceil((rateLimit.resetAt - Date.now()) / 1000))) },
-            },
-        )
+
+    // IP-level flood guard. Raised from 10 → SSO_RATE_LIMIT_PER_MIN (default 300) to
+    // support shared-IP scenarios: at events 200 users share one WiFi NAT outbound IP.
+    // Read inside POST (not module scope) so env override takes effect per-request.
+    // parseInt avoids the || 300 falsy trap (Number('0') is falsy → would ignore explicit 0).
+    const _parsed = parseInt(process.env.SSO_RATE_LIMIT_PER_MIN ?? '', 10)
+    const SSO_IP_LIMIT = Number.isFinite(_parsed) && _parsed > 0 ? _parsed : 300
+    const ipRateLimit = await checkRateLimit(`sso-session:${ip}`, SSO_IP_LIMIT, 60_000)
+    if (!ipRateLimit.allowed) {
+        return rateLimited(ipRateLimit)
     }
 
     try {
@@ -38,14 +50,28 @@ export async function POST(req: NextRequest) {
         // Fast-fail: verify JWT collection claim before hitting the DB.
         // Prevents tokens from other auth-enabled collections (e.g. api-clients) from
         // being accepted even if payload.auth() would validate their signature.
-        let jwtClaims: { collection?: unknown }
+        let jwtClaims: { collection?: unknown; id?: unknown }
         try {
-            jwtClaims = decodeJwt(v2Token) as { collection?: unknown }
+            jwtClaims = decodeJwt(v2Token) as { collection?: unknown; id?: unknown }
         } catch {
             return NextResponse.json({ error: 'invalid_token' }, { status: 401 })
         }
         if (jwtClaims.collection !== 'users') {
             return NextResponse.json({ error: 'invalid_token' }, { status: 401 })
+        }
+
+        // Per-user bucket: isolates each user's login rate regardless of shared IP.
+        // Uses unverified id claim — safe as a partition key only; payload.auth() below
+        // is the real validator. claimedId null (missing claim) → skip user bucket silently.
+        const claimedId =
+            typeof jwtClaims.id === 'string' || typeof jwtClaims.id === 'number'
+                ? String(jwtClaims.id)
+                : null
+        if (claimedId) {
+            const userRateLimit = await checkRateLimit(`sso-session:user:${claimedId}`, 10, 60_000)
+            if (!userRateLimit.allowed) {
+                return rateLimited(userRateLimit)
+            }
         }
 
         const secret = process.env.PAYLOAD_SECRET

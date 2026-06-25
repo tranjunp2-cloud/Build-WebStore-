@@ -1,10 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { compressImage } from '@/lib/media/compress-image'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
 interface BlockImageEditorProps {
     imageUrl: string
@@ -17,7 +17,7 @@ interface BlockImageEditorProps {
 
 export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextChange, onRemove, onUploadingChange }: BlockImageEditorProps) {
     const fileRef = useRef<HTMLInputElement>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -28,7 +28,6 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             return
         }
 
-        setIsUploading(true)
         onUploadingChange?.(true)
         try {
             const compressed = await compressImage(file)
@@ -36,14 +35,13 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             formData.append('file', compressed)
             formData.append('alt', altText || 'Block image')
 
-            const uploaded = await uploadMediaAction(formData)
-            onImageChange(uploaded.id, uploaded.url)
+            const uploaded = await upload(formData)
+            onImageChange(uploaded.id as number, uploaded.url as string)
             toast.success('Image updated')
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Failed to upload image'
             toast.error(msg)
         } finally {
-            setIsUploading(false)
             onUploadingChange?.(false)
             if (fileRef.current) fileRef.current.value = ''
         }
@@ -61,8 +59,19 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
 
             {imageUrl ? (
                 <div className="rounded-[12px] border border-white/[0.08] bg-white/5 p-2">
-                    <div className="flex h-16 w-full items-center justify-center overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.03]">
+                    <div className="relative flex h-16 w-full items-center justify-center overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.03]">
                         <img src={imageUrl} alt={altText} className="max-h-full max-w-full object-contain" />
+                        {isUploading && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/50 px-3">
+                                <Loader2 className="h-4 w-4 animate-spin text-white" />
+                                <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-teal-400 transition-all duration-150"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <div className="mt-2 flex items-center justify-between">
                         <button

@@ -15,6 +15,9 @@ import { discountReserveErrorResponse } from '@/lib/discounts/messages'
 import { computeOrderTotal } from '@/lib/orders/order-total'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { getTemplateConfig } from '@/lib/email/get-template-config'
 import { decrementVariantStock, restockItem } from '@/app/api/orders/lib/stock-utils'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
@@ -35,6 +38,7 @@ interface TenantDoc {
 interface SiteDoc {
     id: string | number
     tenant: string | number | { id: string | number }
+    locale?: string
     paymentConfig?: { cardEnabled?: boolean; fpxEnabled?: boolean }
 }
 
@@ -266,6 +270,7 @@ export async function POST(request: NextRequest) {
                     status: 'paid',
                     paymentStatus: 'paid',
                     paymentMethod: 'free',
+                    locale: siteTyped.locale ?? 'en',
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
@@ -348,6 +353,7 @@ export async function POST(request: NextRequest) {
                 currency,
                 status: 'pending',
                 paymentMethod: orderPaymentMethod,
+                locale: siteTyped.locale ?? 'en',
                 // 'awaiting_payment' (not default 'unpaid') so the 24h payment-expiry cron can auto-cancel it
                 paymentStatus: 'awaiting_payment',
                 paymentExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -537,11 +543,35 @@ export async function POST(request: NextRequest) {
             event: 'placed',
             orderDate: new Date().toISOString(),
             orderPageUrl,
+            locale: (siteTyped.locale ?? 'en') as 'en' | 'ms',
         })
         if (canSendBuyerEmail) {
             payload.sendEmail({ to: customer.email, subject: buyerEmail.subject, html: buyerEmail.html })
                 .catch((err) => console.error('[stripe-checkout] buyer confirmation email failed:', err))
         }
+
+        // Fire-and-forget: notify seller of new order (place-order time, not payment-confirmed)
+        const siteLocale = (siteTyped.locale ?? 'en') as 'en' | 'ms'
+        const dashboardOrderUrl = `${process.env.NEXT_PUBLIC_SERVER_URL ?? ''}/orders`
+        Promise.all([
+            getTenantOwnerEmails(payload, tenantId),
+            getTemplateConfig(tenantId, 'new-order-seller', 'seller', siteLocale).catch(() => null),
+        ]).then(([ownerEmails, sellerCmsConfig]) => {
+            if (sellerCmsConfig?.enabled === false) return
+            const sellerEmail = newOrderSellerEmail({
+                shopName,
+                orderNumber,
+                customerName: customer.name,
+                orderPageUrl: dashboardOrderUrl,
+                items: orderItems.map(i => ({ name: i.productName, variant: i.variant || undefined, quantity: i.quantity, lineTotal: i.unitPrice * i.quantity })),
+                orderTotal: order.total,
+                shippingFee,
+                currency,
+                locale: siteLocale,
+            }, sellerCmsConfig ?? undefined)
+            ownerEmails.forEach(to => payload.sendEmail({ to, subject: sellerEmail.subject, html: sellerEmail.html })
+                .catch((err: unknown) => console.error('[stripe-checkout] seller email failed:', err)))
+        }).catch((err: unknown) => console.error('[stripe-checkout] seller email setup failed:', err))
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
         const res = NextResponse.json({

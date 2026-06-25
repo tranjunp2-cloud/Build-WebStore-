@@ -203,22 +203,36 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             partialize: (state) => ({
                 userId: state.userId,
                 businessInfo: state.businessInfo,
-                step: state.step,
-                status: state.status === 'error' ? 'idle' : state.status,
-                messages: state.messages,
-                blocks: state.blocks,
+                // streaming cannot survive reload (SSE connection is lost) — reset to form
+                step: state.status === 'streaming' ? 'info' : state.step,
+                status: (state.status === 'error' || state.status === 'streaming') ? 'idle' : state.status,
+                messages: state.status === 'streaming' ? [] : state.messages,
+                blocks: state.status === 'streaming' ? [] : state.blocks,
                 theme: state.theme,
                 siteId: state.siteId,
                 siteName: state.siteName,
-                progress: state.progress,
+                progress: state.status === 'streaming' ? { step: '', label: '', progress: 0 } : state.progress,
                 // Never persist error — it may contain sensitive server details
                 error: null,
             }),
-            // Clear old cached errors from localStorage (before this fix)
+            // Defensive fallback for stale localStorage that still has streaming state
             onRehydrateStorage: () => (state) => {
                 if (state?.error) {
                     state.error = null
                     state.status = state.status === 'error' ? 'idle' : state.status
+                }
+                // SSE connection was lost on reload — streaming state cannot be resumed
+                if (state?.status === 'streaming') {
+                    state.status = 'idle'
+                    state.step = 'info'
+                    state.blocks = []
+                    state.messages = []
+                    state.progress = { step: '', label: '', progress: 0 }
+                }
+                // Defensive: done status should always have step='chat' (not 'info')
+                // Handles old localStorage sessions written before this fix
+                if (state?.status === 'done' && state?.step === 'info') {
+                    state.step = 'chat'
                 }
             },
         }
