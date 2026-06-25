@@ -1,3 +1,5 @@
+import { basename, resolve } from 'path'
+
 import type { CollectionConfig, PayloadHandler } from 'payload'
 import { APIError } from 'payload'
 
@@ -40,11 +42,11 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     // 1. Try local disk first (dev + legacy files). Match the staticDir env
     // logic above so we check the same path Payload's upload handler writes to.
     const localDir = process.env.VERCEL === '1' ? '/tmp/media' : 'public/media'
+    // safeFilename declared here so it is accessible in the S3 redirect below (fix TS2552).
+    const safeFilename = basename(filename)
     try {
         const fs = await import('fs/promises')
-        const path = await import('path')
-        const safeFilename = path.basename(filename)
-        const localPath = path.resolve(localDir, safeFilename)
+        const localPath = resolve(localDir, safeFilename)
         const data = await fs.readFile(localPath)
         return new Response(data, {
             status: 200,
