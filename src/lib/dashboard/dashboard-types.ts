@@ -11,8 +11,6 @@ export interface GlanceStat {
     value: number
     /** percentage delta vs previous period */
     delta: number
-    /** comparison note, e.g. "vs prev 7d" */
-    note: string
     /** render value as a percentage */
     unit?: '%'
     /** render value as MYR currency */
@@ -20,7 +18,8 @@ export interface GlanceStat {
 }
 
 export interface GlanceData {
-    sub: string
+    /** Date-range portion only, e.g. "18 – 24 Jun 2026" or "25 Jun 2026" for today. */
+    rangeLabel: string
     stats: {
         views: GlanceStat
         leads: GlanceStat
@@ -55,7 +54,6 @@ export interface TopPerfRow {
 
 export interface TrafficData {
     total: number
-    period: string
     isHourly: boolean
     days: TrafficDay[]
     top: {
@@ -69,7 +67,6 @@ export interface TrafficData {
 // ── SEO health + automation ──────────────────────────────────────────────────
 export interface SeoIssue {
     sev: 'high' | 'med' | 'low'
-    text: string
     count: number
     /**
      * Which fix path this issue maps to:
@@ -81,10 +78,10 @@ export interface SeoIssue {
 
 export interface SeoData {
     score: number
-    /** Meta Tags / Content Quality / Technical SEO, each 0-100 */
-    breakdown: { name: string; pct: number }[]
+    /** Structured breakdown using i18n keys for labels. */
+    breakdown: { key: 'meta' | 'content' | 'technical'; pct: number }[]
     issues: SeoIssue[]
-    topIssue: { count: number; text: string } | null
+    topIssue: { count: number; fixType: 'title' | 'description' | 'alt' } | null
     missingSeoItems: MissingSeoItem[]
     siteId: string | number | null
     autoMetaEnabled: boolean

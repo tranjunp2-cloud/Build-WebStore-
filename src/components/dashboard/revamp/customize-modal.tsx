@@ -4,11 +4,14 @@
  * Customize dashboard — reorder + show/hide blocks (flat list).
  * Ports the design CustomizeModal (native drag + arrows + toggle); persists the
  * ordered VISIBLE block ids to the tenant via updateDashboardPreferences.
+ * All text driven by t.dashboard.revamp.customize.*
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { GripVertical, ChevronUp, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
+import { useI18n } from '@/i18n'
 import { updateDashboardPreferences } from '@/app/(dashboard)/actions'
 import {
     DEFAULT_DASHBOARD_BLOCKS, buildCustomizeRows,
@@ -16,23 +19,31 @@ import {
 } from '@/lib/dashboard-utils'
 import { BlockIcon } from './atoms'
 
-const BLOCK_LABELS: Record<DashboardBlockId, string> = {
-    onboarding: 'Onboarding checklist',
-    glance: 'At-a-glance stats',
-    traffic: 'Traffic & performance',
-    seo: 'SEO health',
-    tools: 'SEO action tools',
-    orders: 'Pending orders',
-}
-
 export function CustomizeModal({ defaultVisible, onboardingComplete = false }: { defaultVisible: DashboardBlockId[]; onboardingComplete?: boolean }) {
     const router = useRouter()
+    const { t } = useI18n()
+    const czT = t.dashboard.revamp.customize
+    const soon = t.dashboard.revamp.soon
+
+    /** Map block id → translated label (built inside the component so useI18n is in scope). */
+    const blockLabel = (id: DashboardBlockId): string => {
+        const map: Record<DashboardBlockId, string> = {
+            onboarding: czT.blockOnboarding,
+            glance: czT.blockGlance,
+            traffic: czT.blockTraffic,
+            seo: czT.blockSeo,
+            tools: czT.blockTools,
+            orders: czT.blockOrders,
+        }
+        return map[id]
+    }
+
     const [open, setOpen] = useState(false)
     const [saving, setSaving] = useState(false)
+    // Portal target is only available on the client — gate so SSR/hydration stays clean
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
 
-    // Onboarding is a temporary guidance block — once 100% done it disappears from the page,
-    // so drop it from the modal too (no buggy ON/OFF that does nothing). Its saved pref is
-    // preserved on save so the checklist can return if a step later becomes incomplete.
     const onboardingWasVisible = defaultVisible.includes('onboarding')
     const makeRows = (visible: DashboardBlockId[]) => {
         const rows = buildCustomizeRows(visible)
@@ -67,21 +78,20 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
     const handleSave = async () => {
         setSaving(true)
         const visibleIds = draft.filter(b => b.visible).map(b => b.id)
-        // Onboarding was hidden from the modal but keep its pref so the checklist isn't lost
         if (onboardingComplete && onboardingWasVisible && !visibleIds.includes('onboarding')) {
             visibleIds.unshift('onboarding')
         }
         try {
             const res = await updateDashboardPreferences(visibleIds)
             if (res?.success) {
-                toast.success('Dashboard layout saved')
+                toast.success(czT.saved)
                 setOpen(false)
                 router.refresh()
             } else {
-                toast.error('Failed to save layout')
+                toast.error(czT.saveError)
             }
         } catch {
-            toast.error('Failed to save layout')
+            toast.error(czT.saveError)
         } finally {
             setSaving(false)
         }
@@ -95,18 +105,21 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
     return (
         <>
             <button className="btn btn-secondary" onClick={openModal} data-testid="customize-dashboard-btn">
-                <SlidersHorizontal aria-hidden />Customize
+                <SlidersHorizontal aria-hidden />{czT.button}
             </button>
 
-            {open && (
+            {open && mounted && createPortal(
+                /* Portaled to <body> + wrapped in .dash-revamp so it escapes the dashboard's
+                   stacking contexts (toolbar/cards) yet keeps the scoped --dr-* tokens + styles. */
+                <div className="dash-revamp">
                 <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false) }}>
                     <div className="modal" role="dialog" aria-modal="true">
                         <div className="modal-head">
                             <div>
-                                <h3>Customize dashboard</h3>
-                                <p>Drag to reorder, or toggle blocks on and off. Saved for your account.</p>
+                                <h3>{czT.title}</h3>
+                                <p>{czT.description}</p>
                             </div>
-                            <button className="onb-dismiss" onClick={() => setOpen(false)} aria-label="Close"><X aria-hidden /></button>
+                            <button className="onb-dismiss" onClick={() => setOpen(false)} aria-label={czT.close}><X aria-hidden /></button>
                         </div>
                         <div className="modal-body">
                             {draft.map((b, i) => (
@@ -121,37 +134,39 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
                                     onDrop={e => { e.preventDefault(); onDrop(b.id) }}
                                     onDragEnd={() => { setDragId(null); setOverId(null) }}
                                 >
-                                    <span className="cz-handle" title="Drag to reorder"><GripVertical aria-hidden /></span>
+                                    <span className="cz-handle" title={czT.dragToReorder}><GripVertical aria-hidden /></span>
                                     <div className="cz-arrows">
-                                        <button disabled={i === 0} onClick={() => move(i, i - 1)} title="Move up"><ChevronUp aria-hidden /></button>
-                                        <button disabled={i === draft.length - 1} onClick={() => move(i, i + 1)} title="Move down"><ChevronDown aria-hidden /></button>
+                                        <button disabled={i === 0} onClick={() => move(i, i - 1)} title={czT.moveUp}><ChevronUp aria-hidden /></button>
+                                        <button disabled={i === draft.length - 1} onClick={() => move(i, i + 1)} title={czT.moveDown}><ChevronDown aria-hidden /></button>
                                     </div>
                                     <span className="cz-ic"><BlockIcon name={b.icon} /></span>
                                     <span className="cz-label">
-                                        {BLOCK_LABELS[b.id]}
-                                        {b.soon && <span className="cs-badge" style={{ fontSize: 9.5, padding: '1px 7px' }}>Soon</span>}
+                                        {blockLabel(b.id)}
+                                        {b.soon && <span className="cs-badge" style={{ fontSize: 9.5, padding: '1px 7px' }}>{soon}</span>}
                                     </span>
                                     <div
                                         className={`cz-check ${b.visible ? 'on' : ''}`}
                                         role="switch"
                                         aria-checked={b.visible}
-                                        aria-label={`${BLOCK_LABELS[b.id]} visibility`}
+                                        aria-label={`${blockLabel(b.id)} visibility`}
                                         onClick={() => toggle(b.id)}
                                     />
                                 </div>
                             ))}
                         </div>
                         <div className="modal-foot">
-                            <button className="reset" onClick={reset}>Reset to default</button>
+                            <button className="reset" onClick={reset}>{czT.reset}</button>
                             <div style={{ display: 'flex', gap: 10 }}>
-                                <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving}>Cancel</button>
+                                <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving}>{czT.cancel}</button>
                                 <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                                    <Check aria-hidden />{saving ? 'Saving…' : 'Save layout'}
+                                    <Check aria-hidden />{saving ? czT.saving : czT.save}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
+                </div>,
+                document.body,
             )}
         </>
     )

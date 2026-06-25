@@ -254,14 +254,21 @@ const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2 // 83
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_RADIUS
 const GAUGE_GAP = 0.28 // open arc at the bottom (~100°)
 
-/** Score → arc colour + status label (unified scale: ≥80 good · ≥50 warning · else danger). */
+/** Score → arc colour + fallback label (unified scale: ≥80 good · ≥50 warning · else danger). */
 function gaugeStatus(score: number): { color: string; label: string; labelColor: string } {
     if (score >= 80) return { color: 'var(--dr-success)', label: 'Healthy', labelColor: 'var(--dr-success-fg)' }
     if (score >= 50) return { color: 'var(--dr-warning)', label: 'Needs improvement', labelColor: 'var(--dr-warning-fg)' }
     return { color: 'var(--dr-danger)', label: 'At risk', labelColor: 'var(--dr-danger-fg)' }
 }
 
-export function Gauge({ score, animate = true }: { score: number; animate?: boolean }) {
+/** Maps a score to the i18n key suffix under t.dashboard.revamp.seo.*. */
+export function gaugeStatusKey(score: number): 'gaugeHealthy' | 'gaugeNeedsImprovement' | 'gaugeAtRisk' {
+    if (score >= 80) return 'gaugeHealthy'
+    if (score >= 50) return 'gaugeNeedsImprovement'
+    return 'gaugeAtRisk'
+}
+
+export function Gauge({ score, animate = true, label }: { score: number; animate?: boolean; label?: string }) {
     const [val, setVal] = useState(animate ? 0 : score)
     const rafRef = useRef<number | null>(null)
 
@@ -287,7 +294,8 @@ export function Gauge({ score, animate = true }: { score: number; animate?: bool
     const arcLen = GAUGE_CIRC * (1 - GAUGE_GAP)
     const startAngle = 90 + (GAUGE_GAP * 360) / 2
     const dash = (Math.min(Math.max(val, 0), 100) / 100) * arcLen
-    const { color, label, labelColor } = gaugeStatus(score)
+    const { color, label: fallbackLabel, labelColor } = gaugeStatus(score)
+    const displayLabel = label ?? fallbackLabel
 
     return (
         <div className="gauge-wrap">
@@ -314,7 +322,7 @@ export function Gauge({ score, animate = true }: { score: number; animate?: bool
                     <div className="g-outof">/ 100</div>
                 </div>
             </div>
-            <div className="g-label" style={{ color: labelColor }}>{label}</div>
+            <div className="g-label" style={{ color: labelColor }}>{displayLabel}</div>
         </div>
     )
 }

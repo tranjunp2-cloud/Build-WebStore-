@@ -24,24 +24,21 @@ const pctChange = (curr: number, prev: number) => {
     return ((curr - prev) / prev) * 100
 }
 
-/** Build the toolbar sub-text with the concrete date range covered (e.g. "Daily · 18 – 24 Jun 2026"). */
-const periodMeta = (period: DashboardPeriodKey, now: Date): { sub: string; note: string } => {
-    if (period === 'today') return { sub: `Hourly · ${format(now, 'd MMM yyyy')}`, note: 'vs yesterday' }
+/** Build just the date-range string (client handles the "Daily ·" / "Hourly ·" prefix via i18n). */
+const periodMeta = (period: DashboardPeriodKey, now: Date): { rangeLabel: string } => {
+    if (period === 'today') return { rangeLabel: format(now, 'd MMM yyyy') }
     const days = period === '30d' ? 30 : 7
     const start = subDays(startOfDay(now), days - 1)
     const sameMonthYear = start.getMonth() === now.getMonth() && start.getFullYear() === now.getFullYear()
     const startLabel = sameMonthYear ? format(start, 'd') : format(start, 'd MMM')
-    return {
-        sub: `Daily · ${startLabel} – ${format(now, 'd MMM yyyy')}`,
-        note: period === '30d' ? 'vs prev 30d' : 'vs prev 7d',
-    }
+    return { rangeLabel: `${startLabel} – ${format(now, 'd MMM yyyy')}` }
 }
 
 /** Empty-state glance payload (zeroed) — used when there is no tenant/usable site. */
 export function emptyGlanceData(): GlanceData {
-    const zero = { value: 0, delta: 0, note: '—' }
+    const zero = { value: 0, delta: 0 }
     return {
-        sub: "No data yet — your site isn't live",
+        rangeLabel: '',
         stats: {
             views: { ...zero },
             leads: { ...zero },
@@ -57,7 +54,7 @@ export async function getGlanceData(period: DashboardPeriodKey): Promise<GlanceD
     if (!tenantId) return emptyGlanceData()
 
     const now = new Date()
-    const { sub, note } = periodMeta(period, now)
+    const { rangeLabel } = periodMeta(period, now)
     const daysDiff = period === 'today' ? 1 : period === '30d' ? 30 : 7
     const startDate = period === 'today' ? startOfDay(now) : subDays(startOfDay(now), daysDiff)
     const prevStartDate = subDays(startDate, daysDiff)
@@ -110,12 +107,12 @@ export async function getGlanceData(period: DashboardPeriodKey): Promise<GlanceD
     }
 
     return {
-        sub,
+        rangeLabel,
         stats: {
-            views: { value: views, delta: pctChange(views, prevViewsRes.totalDocs), note },
-            leads: { value: leads, delta: pctChange(leads, prevLeadsRes.totalDocs), note },
-            engage: { value: engage, delta: pctChange(engage, prevEngageRes.totalDocs), note },
-            revenue: { value: revenue, delta: pctChange(revenue, prevRevenue), note, currency: true },
+            views: { value: views, delta: pctChange(views, prevViewsRes.totalDocs) },
+            leads: { value: leads, delta: pctChange(leads, prevLeadsRes.totalDocs) },
+            engage: { value: engage, delta: pctChange(engage, prevEngageRes.totalDocs) },
+            revenue: { value: revenue, delta: pctChange(revenue, prevRevenue), currency: true },
         },
         sparks: {
             views: seriesValues(viewsSeriesRes as unknown as { rows?: MetricRow[] }),

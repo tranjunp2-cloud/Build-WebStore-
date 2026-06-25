@@ -8,9 +8,6 @@ import { subDays, startOfDay, format } from 'date-fns'
 import { getCurrentTenantId } from '@/lib/auth'
 import type { DashboardPeriodKey, TopPerfRow, TrafficData } from './dashboard-types'
 
-const periodLabel = (period: DashboardPeriodKey): string =>
-    period === 'today' ? 'today' : period === '30d' ? 'last 30 days' : 'last 7 days'
-
 /** Rank a url→count map into the top rows with share% of the tab total. */
 function toRows(map: Record<string, number>): TopPerfRow[] {
     const entries = Object.entries(map)
@@ -28,7 +25,6 @@ function toRows(map: Record<string, number>): TopPerfRow[] {
 
 const emptyTraffic = (period: DashboardPeriodKey): TrafficData => ({
     total: 0,
-    period: periodLabel(period),
     isHourly: period === 'today',
     days: [],
     top: { pages: [], blogs: [], referrers: [] },
@@ -105,7 +101,6 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
 
     return {
         total: viewsRes.totalDocs,
-        period: periodLabel(period),
         isHourly,
         days: series,
         top: {

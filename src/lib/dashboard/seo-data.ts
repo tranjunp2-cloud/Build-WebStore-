@@ -160,9 +160,9 @@ export async function getSeoData(): Promise<SeoData> {
 
     const totalMissingTitle = missingTitleCount + invalidPageTitleCount + invalidBlogTitleCount
     const allIssues: SeoIssue[] = [
-        { sev: sevByCount(missingAltCount), text: 'products missing image Alt text', count: missingAltCount, fixType: 'alt' },
-        { sev: sevByCount(missingDescCount), text: 'pages without a meta description', count: missingDescCount, fixType: 'description' },
-        { sev: sevByCount(totalMissingTitle), text: 'items missing a meta title', count: totalMissingTitle, fixType: 'title' },
+        { sev: sevByCount(missingAltCount), count: missingAltCount, fixType: 'alt' },
+        { sev: sevByCount(missingDescCount), count: missingDescCount, fixType: 'description' },
+        { sev: sevByCount(totalMissingTitle), count: totalMissingTitle, fixType: 'title' },
     ]
     const issues = allIssues.filter(i => i.count > 0)
 
@@ -173,12 +173,12 @@ export async function getSeoData(): Promise<SeoData> {
     return {
         score,
         breakdown: [
-            { name: 'Meta Tags', pct: metaTagsScore },
-            { name: 'Content Quality', pct: contentQualityScore },
-            { name: 'Technical SEO', pct: technicalSeoScore },
+            { key: 'meta' as const, pct: metaTagsScore },
+            { key: 'content' as const, pct: contentQualityScore },
+            { key: 'technical' as const, pct: technicalSeoScore },
         ],
         issues,
-        topIssue: topIssue ? { count: topIssue.count, text: topIssue.text } : null,
+        topIssue: topIssue ? { count: topIssue.count, fixType: topIssue.fixType } : null,
         missingSeoItems,
         siteId,
         autoMetaEnabled,

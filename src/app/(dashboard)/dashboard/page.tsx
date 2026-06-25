@@ -15,6 +15,7 @@ import { TrafficPerformance } from '@/components/dashboard/revamp/traffic-perfor
 import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
 import { SeoTools } from '@/components/dashboard/revamp/seo-tools'
 import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
+import { DashboardToolbarHeader } from '@/components/dashboard/revamp/dashboard-toolbar-header'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
 import './dashboard-revamp.css'
@@ -117,12 +118,12 @@ export default async function DashboardRoot({ searchParams }: Props) {
     // "Publish" step opens the editor with the publish modal pre-opened (only when a site exists)
     const launchHref = siteId ? `/editor/${siteId}?publish=1` : '/builder/new'
 
-    // Onboarding steps (design's 4) fed by real flags + routes
+    // Onboarding steps — id/done/href only; name/desc/cta come from i18n in OnboardingCard
     const steps: OnboardingStep[] = [
-        { id: 'products', name: 'Verify your products', desc: 'AI added demo items. Please check inventory, prices, and variations.', done: hasProducts, href: '/products', cta: 'Review' },
-        { id: 'design', name: 'Customize your design', desc: 'Update images, text, and colors to match your personal brand.', done: isDesignCustomized, href: editHref, cta: 'Edit' },
-        { id: 'shipping', name: 'Set up shipping fees', desc: 'Current default is COD & Free delivery. Update rates to avoid shipping losses.', done: hasShippingConfigured, href: '/settings/shipping', cta: 'Set up' },
-        { id: 'launch', name: 'Publish your website', desc: 'Ready to sell? Make your store live and start accepting orders today.', done: hasPublishedSite, href: launchHref, cta: 'Publish' },
+        { id: 'products', done: hasProducts, href: '/products' },
+        { id: 'design', done: isDesignCustomized, href: editHref },
+        { id: 'shipping', done: hasShippingConfigured, href: '/settings/shipping' },
+        { id: 'launch', done: hasPublishedSite, href: launchHref },
     ]
     const allStepsDone = steps.every(s => s.done)
     const showOnboarding = blocks.includes('onboarding') && !allStepsDone
@@ -137,9 +138,9 @@ export default async function DashboardRoot({ searchParams }: Props) {
             case 'onboarding':
                 return showOnboarding ? <OnboardingCard key="onboarding" steps={steps} /> : null
             case 'glance':
-                return <AtAGlance key="glance" data={glance} showHeader={showOnboarding} />
+                return <AtAGlance key="glance" data={glance} showHeader={showOnboarding} period={period} />
             case 'traffic':
-                return traffic ? <TrafficPerformance key="traffic" data={traffic} /> : null
+                return traffic ? <TrafficPerformance key="traffic" data={traffic} period={period} /> : null
             case 'seo':
                 return seo ? <SeoHealth key="seo" data={seo} /> : null
             case 'tools':
@@ -165,10 +166,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
     return (
         <div className="dash-revamp">
             <div className="dash-toolbar">
-                <div className="dt-left">
-                    <h1 className="dt-title">Dashboard</h1>
-                    <span className="dt-sub">{glance.sub}</span>
-                </div>
+                <DashboardToolbarHeader period={period} rangeLabel={glance.rangeLabel} />
                 <div className="dt-right">
                     <PeriodSelector />
                     <CustomizeModal defaultVisible={blocks} onboardingComplete={allStepsDone} />

@@ -8,7 +8,7 @@
 import type { ReactNode } from 'react'
 import {
     LayoutGrid, BarChart3, SearchCheck, Wrench, PackageCheck, ListChecks,
-    TrendingUp, TrendingDown, Minus, Clock, HelpCircle, Info, type LucideIcon,
+    TrendingUp, TrendingDown, Minus, Clock, Info, type LucideIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
@@ -76,6 +76,23 @@ export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: str
     )
 }
 
+/**
+ * Small info "?" icon with a Radix tooltip. Uses TooltipContent's portal so the popup
+ * is NOT clipped by a parent's overflow (e.g. the overflow:hidden stat-card).
+ */
+export function InfoTooltip({ tip }: { tip: string }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button type="button" className="stat-info" aria-label={tip}>
+                    <Info aria-hidden />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{tip}</TooltipContent>
+        </Tooltip>
+    )
+}
+
 /** Corner badge + hover tooltip, absolutely positioned over a locked block. */
 export function ComingSoonCorner({ label, tip }: { label: string; tip?: string }) {
     return (
@@ -101,6 +118,6 @@ export function ComingSoonLock({ children, label, tip }: { children: ReactNode; 
 
 export function HelpTip({ tip }: { tip: string }) {
     return (
-        <span className="help-tip" data-tip={tip}><HelpCircle aria-hidden /></span>
+        <span className="help-tip" data-tip={tip}><Info aria-hidden /></span>
     )
 }

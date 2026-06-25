@@ -3,14 +3,18 @@
 /**
  * SEO automation — sitemap resubmit + auto-meta toggle (both real, persisted).
  * Ports the design SeoTools styling; wires the existing /api/seo endpoints.
- * Auto-alt row from the design is omitted (no backend yet) rather than faked.
+ * All text driven by t.dashboard.revamp.tools.*
  */
 import { useState } from 'react'
 import { Network, TextSearch, Zap, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 import { SectionHead, HelpTip } from './atoms'
 
 export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number | null; autoMetaEnabled: boolean }) {
+    const { t, ti } = useI18n()
+    const toolsT = t.dashboard.revamp.tools
+
     const [autoMeta, setAutoMeta] = useState(autoMetaEnabled)
     const [savingMeta, setSavingMeta] = useState(false)
     const [generating, setGenerating] = useState(false)
@@ -27,10 +31,10 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
                 body: JSON.stringify({ siteId: String(siteId), enabled: next }),
             })
             if (!res.ok) throw new Error('failed')
-            toast.success(next ? 'Auto meta tags turned on' : 'Auto meta tags turned off')
+            toast.success(next ? toolsT.metaOn : toolsT.metaOff)
         } catch {
             setAutoMeta(!next)
-            toast.error('Could not update setting')
+            toast.error(toolsT.metaError)
         } finally {
             setSavingMeta(false)
         }
@@ -48,12 +52,12 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
             const data = await res.json()
             if (data.success) {
                 const count = data.data?.pageCount ?? 0
-                toast.success(count > 0 ? `Sitemap submitted — ${count} URLs sent to Google` : 'Sitemap regenerated')
+                toast.success(count > 0 ? ti(toolsT.sitemapDone, { count }) : toolsT.sitemapRegenerated)
             } else {
-                toast.error('Could not generate sitemap')
+                toast.error(toolsT.sitemapError)
             }
         } catch {
-            toast.error('Could not generate sitemap')
+            toast.error(toolsT.sitemapError)
         } finally {
             setGenerating(false)
         }
@@ -61,7 +65,7 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
 
     return (
         <div className="section">
-            <SectionHead icon="wrench" title="SEO action tools" sub="AI works quietly in the background so customers can find your store on Google" />
+            <SectionHead icon="wrench" title={toolsT.title} sub={toolsT.subtitle} />
 
             <div className="card tool-card automation-list">
                 {/* Sitemap */}
@@ -69,14 +73,14 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
                     <span className="sw-ic"><Network aria-hidden /></span>
                     <div className="sw-text">
                         <div className="t">
-                            Sitemap
-                            <HelpTip tip="A sitemap lists every page in your store. We hand it to Google so it can find and list all your products." />
+                            {toolsT.sitemap}
+                            <HelpTip tip={toolsT.sitemapTip} />
                         </div>
-                        <div className="d">Submit your sitemap so Google can discover and index all your pages.</div>
+                        <div className="d">{toolsT.sitemapDesc}</div>
                     </div>
                     <button className="btn btn-secondary btn-sm" onClick={generateSitemap} disabled={!siteId || generating}>
                         {generating ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
-                        Resubmit to Google
+                        {toolsT.resubmit}
                     </button>
                 </div>
 
@@ -85,17 +89,17 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
                     <span className="sw-ic"><TextSearch aria-hidden /></span>
                     <div className="sw-text">
                         <div className="t">
-                            Auto-write search titles &amp; descriptions
-                            <HelpTip tip="This is the headline customers see on Google. AI writes a short, tempting one for every page automatically." />
-                            {autoMeta && <span className="active-badge"><Zap aria-hidden />Active</span>}
+                            {toolsT.autoMeta}
+                            <HelpTip tip={toolsT.autoMetaTip} />
+                            {autoMeta && <span className="active-badge"><Zap aria-hidden />{toolsT.active}</span>}
                         </div>
-                        <div className="d">AI writes short, catchy titles that draw customers in when they search on Google.</div>
+                        <div className="d">{toolsT.autoMetaDesc}</div>
                     </div>
                     <div
                         className={`switch ${autoMeta ? 'on' : ''}`}
                         role="switch"
                         aria-checked={autoMeta}
-                        aria-label="Auto-write search titles and descriptions"
+                        aria-label={toolsT.autoMeta}
                         onClick={toggleMeta}
                         style={savingMeta ? { cursor: 'wait' } : undefined}
                     />

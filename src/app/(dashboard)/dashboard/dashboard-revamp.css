@@ -221,8 +221,8 @@ button { font-family: inherit; border: none; background: none; cursor: pointer; 
 }
 
 .dark .dash-revamp .segmented button.active {
-  /* Active tab = page background tone (#0B1120) in dark mode, per design */
-  background: var(--dr-canvas);
+  /* Active tab = page background tone in dark mode (per design) */
+  background: #0B1120;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -604,13 +604,25 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .stat-top {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 9px;
   margin-bottom: 14px;
   position: relative;
 }
 
+/* Left block: main icon + title cluster as one unit (mirrors the % block on the right).
+   items-center keeps the 32px icon chip and the title (1 OR 2+ lines) on one shared
+   horizontal axis — the text block always hugs the chip, no "broken" offset. */
+.dash-revamp .stat-top-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
 .dash-revamp .stat-change {
-  margin-left: auto;
+  /* right block — separated from the left block via .stat-top justify-between */
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -637,7 +649,31 @@ html[data-period-pending="1"] .dash-revamp .stream {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--dr-ink-3);
-  padding-top: 7px;
+  /* No hard padding-top — vertical centering is handled by the parent (.stat-top-left).
+     Title text + info icon stay glued together and centered (icon "flies" with the text). */
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Info "?" icon trigger — fixed geometry + shrink-0 so it never distorts with title length */
+.dash-revamp .stat-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--dr-ink-4);
+  cursor: help;
+  transition: color .12s;
+}
+.dash-revamp .stat-info svg {
+  width: 14px;
+  height: 14px;
+}
+.dash-revamp .stat-info:hover {
+  color: var(--dr-ink-2);
 }
 
 .dash-revamp .stat-val {
@@ -684,7 +720,11 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 .dash-revamp .delta-note {
-  font-size: 11.5px;
+  /* Comparison note (e.g. "vs 30h lepas") — keep on ONE line, never wrap.
+     Slightly smaller + tighter tracking so the longer localized strings still fit. */
+  font-size: 10px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   color: var(--dr-ink-4);
 }
 
@@ -884,6 +924,8 @@ html[data-period-pending="1"] .dash-revamp .stream {
   font-size: 12px;
   font-weight: 600;
   color: var(--dr-ink-3);
+  /* transparent border keeps active-state border from shifting layout */
+  border: 1px solid transparent;
   transition: all .12s;
   display: inline-flex;
   align-items: center;
@@ -903,7 +945,9 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 .dark .dash-revamp .tp-tabs button.active {
-  background: var(--dr-surface-2);
+  /* Match the period filter's active tab (#0B1120) + faint white border */
+  background: #0B1120;
+  border-color: hsl(0 0% 100% / 0.03);
 }
 
 .dash-revamp .tp-tabs button:disabled {
@@ -1110,7 +1154,9 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .seo-hist .hist-msg {
   font-size: 11.5px;
   color: var(--dr-ink-4);
-  max-width: 42ch;
+  /* Full-width within the dashed frame — no artificial wrap */
+  width: 100%;
+  max-width: none;
 }
 
 .dash-revamp .progress-list {
@@ -1317,6 +1363,7 @@ html[data-period-pending="1"] .dash-revamp .stream {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   color: var(--dr-ink-4);
   cursor: help;
   position: relative;
