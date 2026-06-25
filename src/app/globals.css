@@ -83,6 +83,7 @@
   --editor-border-subtle: rgba(0, 0, 0, 0.05);
   --editor-overlay-bg: rgba(0, 0, 0, 0.04);
   --editor-overlay-hover: rgba(0, 0, 0, 0.06);
+  --editor-slider-track: #CBD5E1;              /* slate-300 — visible groove on white panel */
 }
 
 /* Dashboard + Editor semantic tokens — dark mode overrides */
@@ -110,6 +111,7 @@
   --editor-border-subtle: rgba(255, 255, 255, 0.04);
   --editor-overlay-bg: rgba(255, 255, 255, 0.04);
   --editor-overlay-hover: rgba(255, 255, 255, 0.06);
+  --editor-slider-track: #0B1120;              /* = editor-bg — darker groove on slate-800 panel */
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

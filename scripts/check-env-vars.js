@@ -28,6 +28,9 @@ const BUILT_IN_VARS = new Set([
     'NEXT_RUNTIME', 'NEXT_PHASE', 'npm_lifecycle_event',
     '__NEXT_PRIVATE_PREBUNDLED_REACT',
     'BASE_URL', 'TEST_EMAIL', 'TEST_PASSWORD', 'HEADLESS',
+    // Local dev override for Xendit webhook URL (ngrok/Cloudflare tunnel).
+    // Not set on staging/prod — NEXT_PUBLIC_SERVER_URL is used there.
+    'XENDIT_WEBHOOK_URL',
 ])
 
 // ─── Parse env vars from a file ──────────────────────────────────

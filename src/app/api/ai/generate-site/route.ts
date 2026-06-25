@@ -869,6 +869,11 @@ export async function POST(req: NextRequest) {
             return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
         })
 
+        // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
+        // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
+        // buildGeneratedPages clones all blocks so mutation here is safe.
+        patchPageCtaUrls(rawPageDefinitions as Array<{ layout?: unknown[] }>, normalizedPageLinks)
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
         // GH-817: pass page links so injected/hollow nav reflects actual generated pages
@@ -1495,6 +1500,68 @@ function normalizeInternalUrl(url: unknown): string {
     return url
 }
 
+/**
+ * Map a CTA URL to a canonical page slug from the generated site's page list.
+ * Returns '' when no matching internal page exists.
+ * External URLs (https, mailto, tel, etc.) are passed through unchanged.
+ */
+function resolveCtaSlugFromLinks(
+    rawUrl: unknown,
+    canonicalLinks: Array<{ url: string }>,
+): string {
+    const normalized = normalizeInternalUrl(rawUrl)
+    if (normalized === '') return ''
+    // Pass external URLs through unchanged — renderer (useLocalHref) handles them.
+    if (/^(https?:|\/\/|mailto:|tel:|whatsapp:|sms:)/.test(normalized)) return normalized
+    // Exact match (most common case — canonical slugs already align)
+    if (canonicalLinks.some(l => l.url === normalized)) return normalized
+    // Strip leading /# before splitting so '#about-us' resolves like '/about-us'.
+    // Skip segments < 3 chars to prevent single-char false-positives (e.g. 'a' matching '/about').
+    const segments = normalized.replace(/^[/#]+/, '').split(/[-_/]/).filter(Boolean)
+    for (const kw of segments) {
+        if (kw.length < 3) continue
+        const match = canonicalLinks.find(l => l.url !== '/' && l.url.includes(kw))
+        if (match) return match.url
+    }
+    return ''
+}
+
+/**
+ * Fix hero and cta block CTA URLs across all page definitions to use
+ * canonical slugs from the generated site. Runs after buildGeneratedPages
+ * so real page slugs are known. Mutates layouts in-place (pages are
+ * already cloned by buildGeneratedPages).
+ * Buttons with no matching page are removed — prevents phantom-click hrefs.
+ */
+function patchPageCtaUrls(
+    pageDefinitions: Array<{ layout?: unknown[] }>,
+    canonicalLinks: Array<{ label: string; url: string }>,
+): void {
+    for (const page of pageDefinitions) {
+        const layout = page.layout
+        if (!Array.isArray(layout)) continue
+        for (const block of layout as Array<AIBlock | null>) {
+            if (!block) continue
+            if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
+                block.ctaButtons = (block.ctaButtons as Array<Record<string, unknown> | string>)
+                    .flatMap((btn): AIBlock[] => {
+                        if (typeof btn === 'string') return []
+                        const url = resolveCtaSlugFromLinks(btn.url, canonicalLinks)
+                        return url ? [{ ...btn, url } as AIBlock] : []
+                    })
+            }
+            if (block.blockType === 'cta' && block.ctaButton && typeof block.ctaButton === 'object') {
+                const url = resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
+                if (url) {
+                    (block.ctaButton as Record<string, unknown>).url = url
+                } else {
+                    block.ctaButton = undefined
+                }
+            }
+        }
+    }
+}
+
 function applyGeneratedSiteNavigation(
     blocks: AIBlock[],
     businessName: string,
@@ -2023,11 +2090,6 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             }
         }
 
-        // ── Logo Cloud: strip logos (needs real media) ──
-        if (sanitized.blockType === 'logo-cloud') {
-            sanitized.logos = []
-        }
-
         // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
         if (sanitized.blockType === 'google-maps') {
             if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
@@ -2160,6 +2222,14 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     items,
                 }
             })
+        }
+
+        // ── Logo Cloud: normalize logos[].name from AI-gen field variants ──
+        if (sanitized.blockType === 'logo-cloud' && Array.isArray(sanitized.logos)) {
+            sanitized.logos = (sanitized.logos as AIBlock[]).map((item: AIBlock, i: number) => ({
+                ...item,
+                name: String(item.name || item.company || item.brand || item.title || `Partner ${i + 1}`),
+            }))
         }
 
         // ── Remove non-schema fields that AI might add ──

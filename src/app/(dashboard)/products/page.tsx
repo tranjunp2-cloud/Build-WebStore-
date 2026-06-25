@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { TableSearch } from '@/components/ui/table-search'
 import { FilterChip } from '@/components/ui/filter-chip'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
@@ -106,13 +107,11 @@ export default function ProductsPage() {
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
     const [sortBy, setSortBy] = useState('Latest')
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false)
     const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
     const [saleStatus, setSaleStatus] = useState<string>('All Products')
     const [showLowStock, setShowLowStock] = useState<boolean>(false)
     const [mounted, setMounted] = useState(false)
-    const dropdownRef = useRef<HTMLDivElement>(null)
     const [currentPage, setCurrentPage] = useState(1)
 
     const SORT_OPTIONS = [
@@ -137,13 +136,6 @@ export default function ProductsPage() {
 
     useEffect(() => {
         setMounted(true)
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsDropdownOpen(false)
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
     const [quickViewProduct, setQuickViewProduct] = useState<DetailedProduct | null>(null)
 
@@ -469,31 +461,19 @@ export default function ProductsPage() {
                             />
                         </div>
 
-                        {/* Row 2: Sort Button — full-width, label left + icon right */}
-                        <div className="relative w-full" ref={dropdownRef}>
-                            <button
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                style={{ background: 'transparent', border: isDropdownOpen ? '1px solid hsl(var(--primary)/0.5)' : '1px solid var(--dash-border)', color: 'var(--dash-text)' }}
-                                className="w-full h-[50px] flex items-center justify-between px-4 rounded-[16px] text-[16px] font-medium transition-colors outline-none"
-                            >
-                                <span>{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
-                            </button>
-                            {isDropdownOpen && (
-                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-20">
-                                    <div className="bg-[hsl(var(--secondary))] rounded-[12px] shadow-[0_8px_24px_rgba(0,0,0,0.3)] flex flex-col py-2">
-                                        {SORT_OPTIONS.map((option) => (
-                                            // Theme-aware colors (GH-1290 Bug 2): tránh text-white cứng (vô hình ở light mode)
-                                            <button key={option} onClick={() => { setSortBy(option); setIsDropdownOpen(false) }}
-                                                className="w-full px-4 py-[10px] text-left text-[15px] leading-[22px] bg-transparent transition-colors outline-none border-none hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
-                                                style={{ color: sortBy === option ? 'var(--dash-text)' : 'var(--dash-text-muted)', fontWeight: sortBy === option ? 500 : 400 }}>
-                                                {sortTranslateMap[option]}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {/* Row 2: Sort — shadcn Select (design system, themed) */}
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="w-full h-[50px] rounded-[16px] border-[var(--dash-border)] px-4 text-[16px] font-medium text-[var(--dash-text)] shadow-none">
+                                <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {SORT_OPTIONS.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                        {sortTranslateMap[option]}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
                         {/* Row 3: Filter Button — full-width, centered */}
                         <button

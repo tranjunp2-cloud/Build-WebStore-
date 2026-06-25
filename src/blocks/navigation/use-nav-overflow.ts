@@ -21,6 +21,9 @@ const MORE_BTN_PX = 88
 export function useNavOverflow(links: NavLink[], budgetOffset: number = 0) {
     const containerRef = useRef<HTMLDivElement>(null)
     const itemRefs = useRef<(HTMLElement | null)[]>([])
+    // Init to links.length so SSR HTML renders all nav links — avoids a "More ▼" flash
+    // on initial page load. On client-side navigation (after hydration), useLayoutEffect
+    // fires before React's paint so overflow collapse is not user-visible.
     const [visibleCount, setVisibleCount] = useState(links.length)
 
     // Track labels so measure re-fires when a label changes width (e.g. user edits

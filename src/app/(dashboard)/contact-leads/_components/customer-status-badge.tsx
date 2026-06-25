@@ -16,14 +16,16 @@ const STATUS_VARIANT: Record<CustomerStatus, BadgeVariant> = {
     read:       'outline',
 }
 
-// GH-1192: contact-lead status tags = NỀN ĐẶC semantic + chữ trắng (filled, theo yêu cầu).
-// `!` để override màu tint của Badge variant. Riêng contact-lead — không đụng badge chỗ khác.
+// GH-1337: tinted pill badges per Figma spec. !rounded-full overrides Badge rounded-md.
+// subscribed uses hardcoded hex (no exact Tailwind token for #8a81f5).
+// whitespace-nowrap: preventive for future locale labels that exceed ~9 chars.
 const STATUS_SOLID: Record<CustomerStatus, string> = {
-    new:        '!bg-[hsl(var(--warning))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
-    read:       '!bg-[hsl(var(--info))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
-    contacted:  '!bg-[hsl(var(--success))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
-    ignored:    '!bg-[hsl(var(--muted-foreground))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
-    subscribed: '!bg-[hsl(var(--info))] !text-white dark:!text-[hsl(var(--background))] !border-transparent',
+    new:        '!bg-amber-400/10 !border-amber-400/30 !text-amber-400 !rounded-full whitespace-nowrap',
+    read:       '!bg-indigo-400/10 !border-indigo-400/30 !text-indigo-400 !rounded-full whitespace-nowrap',
+    contacted:  '!bg-teal-400/10 !border-teal-400/30 !text-teal-400 !rounded-full whitespace-nowrap',
+    // ! required: .dash-shell remaps plain text-gray-400 → --dash-text-muted (globals.css)
+    ignored:    '!bg-gray-400/10 !border-gray-400/30 !text-gray-400 !rounded-full whitespace-nowrap',
+    subscribed: '!bg-[rgba(167,139,250,0.1)] !border-[rgba(138,129,245,0.3)] !text-[#8a81f5] !rounded-full whitespace-nowrap',
 }
 
 export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
@@ -42,7 +44,6 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
             <TooltipTrigger asChild>
                 <Badge
                     variant={STATUS_VARIANT[status]}
-                    dot
                     className={cn(STATUS_SOLID[status], 'cursor-default')}
                 >
                     {labelMap[status]}

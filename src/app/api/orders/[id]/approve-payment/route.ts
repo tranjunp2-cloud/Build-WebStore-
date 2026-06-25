@@ -137,8 +137,12 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                     const emailSub = await getActivePlanSubscription(payload, tenantId)
                     const canSend = !emailSub || await canUse(payload, emailSub.plan as PlanCode, 'email_confirmation')
                     if (canSend) {
-                        const siteLocale: 'en' | 'ms' = ((siteObj as any)?.locale ?? 'ms') as 'en' | 'ms'
-                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', siteLocale).catch(() => null)
+                        const buyerLocale: 'en' | 'ms' = (
+                            (updated as any)?.locale
+                            ?? (siteObj as any)?.locale
+                            ?? 'en'
+                        ) as 'en' | 'ms'
+                        const cmsConfig = await getTemplateConfig(tenantId, 'order-confirmation', 'buyer', buyerLocale).catch(() => null)
                         if (cmsConfig?.enabled !== false) {
                             const ownerEmails = await getTenantOwnerEmails(payload, tenantId)
                             const orderItems = ((updated as any).items ?? []).map((item: any) => ({
@@ -166,7 +170,7 @@ export const PATCH = withFeatureGuard('order_management')(withAuth<RouteContext>
                                 orderDate: (updated as any)?.createdAt,
                                 orderPageUrl,
                                 currency: (updated as any)?.currency ?? 'MYR',
-                                locale: siteLocale,
+                                locale: buyerLocale,
                                 event: 'confirmed',
                             }, cmsConfig ?? undefined)
                             payload.sendEmail({

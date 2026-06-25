@@ -18,6 +18,8 @@ Tài liệu này cung cấp wireframe & UI spec low-fi cho tính năng Shipping 
 ## 1. Feature Summary
 
 > **🚚 Delivery Model:** SELF-DELIVERY — seller tự lo giao hàng. UI không có carrier picker, không có "Print Label", không có tracking URL field. `trackingNumber` chỉ là free-text input trong Order detail (F10), không thuộc F14 scope.
+>
+> **[F36 update — EasyParcel]** Wave 7+ thêm **EasyParcel** (courier aggregator) làm **tab thứ 2** cạnh Flat Rate trong Shipping Settings (§2.1b). Khi tenant bật EasyParcel: checkout dùng **giá courier thật** (1 courier/shop, buyer không chọn); chưa bật / lỗi / timeout → **fallback flat-rate** này (không vỡ). Tab Flat Rate giữ nguyên 100%. Nguồn: PRD `docs/prd/F36-easyparcel-delivery.md`.
 
 Wave 6 Shipping bao gồm 3 surface chính:
 
@@ -49,9 +51,14 @@ Wave 6 Shipping bao gồm 3 surface chính:
 **Path:** `Dashboard > Settings > Shipping` (`/dashboard/settings/shipping`)
 **Trạng thái:** Seller đã đăng nhập, đã cấu hình ban đầu (West RM 8, East RM 15, free toggle off).
 
+> **[F36] Tab wrapper:** Màn Shipping giờ là 2 tab — **Flat Rate** (mặc định, wireframe dưới) + **EasyParcel** (§2.1b). Footer `[Reset] [Save]` dùng chung. Nội dung Flat Rate bên dưới **giữ nguyên** Wave 6.
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │ [≡ Logo]  Search...                           [👤 Admin]│ ◄── Global Header
+│              │ ┌────────────┬─────────────┐             │
+│              │ │ Flat Rate ●│ EasyParcel  │ ◄── Tabs (F36)
+│              │ └────────────┴─────────────┘             │
 ├──────────────┬──────────────────────────────────────────┤
 │ 🏠 Dashboard │ Store Settings > Shipping                │
 │ 📦 Products  │                                          │
@@ -100,6 +107,146 @@ Wave 6 Shipping bao gồm 3 surface chính:
 | Saving | Save button → spinner + label "Saving..." |
 | Success | `<Toast>` "Shipping settings updated" (3s auto-dismiss) |
 | Validation Error | Input border red + helper text "Rate must be 0 – RM 1,000" |
+
+**[F36] Dynamic state của tab Flat Rate (phụ thuộc trạng thái EasyParcel):**
+
+| EasyParcel | Hiển thị thêm ở tab Flat Rate |
+|---|---|
+| **OFF** (chưa kết nối) | `<Badge>` **Active** (xanh dương) cạnh tiêu đề "Shipping Rates by Region" → báo "cụm cấu hình đang chạy thật ở checkout". + **Upsell** helper/alert-link dưới mô tả: *"Tip: Connect EasyParcel để tự lấy live rates từ J&T, Pos Laju, Ninja Van tại checkout. → Sang tab EasyParcel"* |
+| **ON + Connected** | Amber `<Alert>` đầu thẻ: *"⚠️ Fallback Mode Active — flat rate chỉ dùng khi EasyParcel API timeout/lỗi ở checkout."* (badge Active ẩn) |
+
+```text
+┌──────────────────────────────────────┐
+│ 🚚 Shipping Rates by Region  [Active] │ ◄── badge xanh khi EP OFF
+│ Set flat rates for Malaysian regions │
+│ 💡 Tip: Connect EasyParcel → live    │ ◄── upsell link khi chưa connect
+│    rates · Sang tab EasyParcel ↗     │
+│ ───── HOẶC khi EP ON + Connected: ── │
+│ ⚠️ Fallback Mode Active — flat rate  │ ◄── amber banner (thay badge)
+│   chỉ chạy khi EasyParcel lỗi/timeout │
+└──────────────────────────────────────┘
+```
+
+> **Live Preview sync:** Khi EasyParcel ON + Connected, bảng Live Preview (khối Free Shipping) đổi dòng `Shipping (Flat Rate – West) RM 8.00` → giả lập cước EasyParcel `Shipping (EasyParcel – J&T Express) RM 5.42`, **tổng (Buyer pays) cập nhật theo**. (1 courier shop đã chọn — không phải multi.)
+
+---
+
+### 2.1.b Screen A — EasyParcel tab (F36) <a id="screen-a-easyparcel"></a>
+
+> **🎨 Claude Design (hi-fi reference):** https://claude.ai/design/p/a2811344-f556-4b61-b1af-abfe95541560?file=F36+EasyParcel+Delivery.html
+> - Open file: `F36 EasyParcel Delivery.html` (project **PW2-Design**) — visual reference hi-fi cho Screen A (Settings) + các screen F36 khác.
+> - **Dev action:** import qua `claude_design` MCP (cần `/design-login` nếu chưa cấp scope) → đọc README → implement theo `F36 EasyParcel Delivery.html`. Wireframe ASCII bên dưới là low-fi; UI cuối phải khớp hi-fi.
+>
+> **Nguồn:** F36 PRD (`docs/prd/F36-easyparcel-delivery.md`, single-courier) + **Progressive Disclosure** (chỉ hiện thứ cần ở đúng thời điểm). Connect UI **mirror F34 `XenditConnectBlock`**.
+
+**Path:** `Dashboard > Settings > Shipping > tab "EasyParcel"`
+
+Tab theo **4 trạng thái** rõ rệt:
+
+**(1) Disconnected — Empty State (Switch OFF):** ẩn toàn bộ form, chỉ 1 banner lớn.
+
+```text
+┌──────────────────────────────────────────┐
+│ ┌ Flat Rate ┬ EasyParcel ● ┐             │
+│                  🔌                       │
+│      Connect your EasyParcel Account      │
+│  Offer live, real-time shipping rates     │
+│  from top Malaysian couriers to buyers    │
+│  directly at checkout.                    │
+│         [ Setup Connection ]              │ ◄── bấm = bật Switch → (2)
+└──────────────────────────────────────────┘
+```
+
+**(2) Setup / Editing (Switch ON, chưa test OK):** form hiện. **"Test connection" = Primary button cuối thẻ**; phải test OK mới mở khóa Save tổng.
+
+```text
+│ 🔌 Connect EasyParcel               [●ON] │
+│ API Key (api)      [•••••••••• 👁]        │
+│ Auth Key (auth)    [•••••••••• 👁]        │ ◄── 2 key (KHÔNG env selector — auto-detect)
+│ 🏭 Warehouse (origin)                     │
+│ Address line 1  [______________________] │
+│ State ▼  City/District ▼  Postcode ▼      │ ◄── geo cascade /api/geo/*
+│        [ 🔍 Test connection ]   (Primary) │ ◄── gate Save
+│ ⓘ Chọn courier mở khóa sau khi test OK    │
+└──────────────────────────────────────────┘
+   Footer: [Cancel]  [Save] (disabled tới khi test OK)
+```
+
+**(3) Connected (test OK):** credentials **khóa read-only** (chống gõ đè làm rớt kết nối); Test → đổi thành **[Edit Credentials]** + **[Disconnect]** (destructive). Lộ chọn **1 courier** (grid 2-col, single-select, no price).
+
+```text
+│ ✅ Connected — Production (tự nhận env)    │
+│ API / Auth / Warehouse   🔒 (read-only)    │
+│         [ Edit Credentials ] [ Disconnect ]│ ◄── thay nút Test
+│ 🚚 Courier (chọn 1 cho shop)               │
+│ ┌(•) J&T [Phổ biến]┐ ┌( ) Pos Laju [Phổ biến]┐ │ ◄── grid 2-col radio
+│ ┌( ) Flash [Phổ biến]┐ ┌ ＋ Xem thêm (3)     ┐ │
+│ (không show giá — giá thật ở checkout)     │
+│                           [Cancel] [Save]  │
+```
+
+**(4) Edit Mode — Temporary Validation Lock (sửa key/kho khi đã connected):** kết nối cũ không còn chắc → **bắt buộc re-test**.
+- Ẩn **[Disconnect]**, thay bằng **[🔍 Re-test Connection]** (Primary).
+- **Blur/disable** phần chọn courier + overlay *"Please re-test your connection to unlock configurations"*.
+- **Khóa Save** footer (không cho lưu cấu hình lỗi ra storefront).
+- Re-test **OK** → restore [Disconnect] + mở khóa courier + Save sáng lại. **FAIL** → giữ khóa + báo lỗi.
+
+**Components (shadcn/ui):**
+- Tabs: `<Tabs>` Flat Rate / EasyParcel
+- Empty state (1): `<Card>` icon + copy + `<Button>` "Setup Connection" (toggle `<Switch>`)
+- Connect: `<Switch>` + 2× `<Input type="password">` (api + authentication) + eye reveal — **mirror `XenditConnectBlock`** (F34)
+- Warehouse: `line1/2` = `<Input>`; **State → City → Postcode = geo cascade `<Select>`** reuse `/api/geo/{states,districts,postcodes}`. Warehouse = **Prime source of truth**; postcode force-validate ở Test connection
+- Test/Re-test: `<Button>` **Primary** — auto-detect env (production → demo). **Gate Save**. KHÔNG có RadioGroup environment
+- Disconnect: `<Button variant="destructive">` (chỉ ở state Connected, không Edit-mode)
+- Courier: `<RadioGroup>` **single-select** (`selectedCourier` = 1 `courier_id`) render **grid 2-col** (tiết kiệm chiều cao), default **J&T**; top-3 + `<Badge>` "Phổ biến SME"; còn lại `<Collapsible>` "＋ Xem thêm". **KHÔNG show giá**
+- Footer `[Cancel] [Save]` — dùng chung tab Flat Rate; khóa khi chưa test OK / Edit-mode
+
+**Khác tab Flat Rate (KISS — đã bỏ):** KHÔNG default-parcel (lấy từ `Products.*`), KHÔNG auto/manual label (luôn manual ở F10), KHÔNG hiển thị số dư ví.
+
+**States:**
+| State | UI |
+|-------|-----|
+| Disconnected | Empty-state banner + `[Setup Connection]`; form ẩn |
+| Setup/Editing | Form; Test = Primary; Save disabled tới khi test OK; courier ẩn |
+| Testing | Spinner "Đang kiểm tra…"; form disabled |
+| Invalid | Red `<Alert>` `EASYPARCEL_INVALID_KEY` / `EASYPARCEL_INVALID_WAREHOUSE` — **KHÔNG lưu** |
+| Connected | Credentials 🔒 read-only; `[Edit][Disconnect]`; courier grid; Save enabled |
+| Edit-mode lock | `[Re-test]` Primary; courier blur + overlay; Save khóa tới khi re-test OK |
+| Saving | Save → spinner; success Toast "Đã lưu cấu hình EasyParcel" |
+
+> ✅ **DECISION (chốt 2026-06-18) — giữ KISS single-courier, KHÔNG thêm 4 mục đề xuất sau** (chúng đảo ngược fidelity-fix PRD #1232; đã cân nhắc & loại):
+> 1. **Courier hiển thị giá "From RM 5.40" + checkbox multi-select** → **bỏ.** Giữ single-select radio, **không show giá** (settings chưa có origin/dest/weight → "from" dễ sai).
+> 2. **Default Parcel Weight/Dimensions form** → **bỏ.** Weight/dims lấy từ `Products.*` + hằng số `DEFAULT_PARCEL`.
+> 3. **Fulfillment Mode (auto/manual)** → **bỏ.** Luôn manual qua nút "Ready to Ship" (F10).
+> 4. **Environment selector / "Secret Key"** → **bỏ.** Auto-detect env; key = `api` + `authentication` (không gọi "secret").
+> → Nếu sau này cần rich-settings (đa courier + parcel + fulfilment): phải mở rộng scope + cập nhật PRD #1232 trước khi vẽ.
+
+#### User Flow — Kết nối EasyParcel (Phase A)
+
+```text
+Actor: Merchant (seller)
+
+1. Merchant → Settings › Shipping › tab "EasyParcel"
+   System   → Switch OFF: empty-state "Connect your EasyParcel Account" + [Setup Connection]
+
+2. Merchant → bấm [Setup Connection] (hoặc gạt Switch ON)
+   System   → hiện form: API Key + Auth Key + Warehouse (State→City→Postcode cascade)
+              Save KHÓA; [🔍 Test connection] = Primary
+
+3. Merchant → nhập 2 key + địa chỉ kho → bấm [Test connection]
+   System   → EPRateCheckingBulk (auto-detect env: prod→demo) bằng key + warehouse postcode
+              ├─ OK            → ✅ "Connected — Production"; lộ phần chọn courier
+              ├─ key sai       → ❌ EASYPARCEL_INVALID_KEY — KHÔNG lưu
+              └─ postcode sai  → ❌ EASYPARCEL_INVALID_WAREHOUSE — KHÔNG lưu
+
+4. Merchant → chọn 1 courier (radio, default J&T) → [Save]
+   System   → lưu tenant.easyParcelIntegration (key masked, selectedCourier); Toast "Đã lưu"
+              → Phase B (checkout) mở khoá cho site
+
+   [Edit sau khi connected] Merchant sửa key/kho
+   System   → khóa courier (overlay) + đổi nút → [Re-test Connection] + khóa Save
+              re-test OK → mở khoá lại; FAIL → giữ khóa
+```
 
 ---
 
@@ -335,8 +482,8 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 ## 7. Out of Scope (Wave 7+)
 
-- ❌ Carrier picker dropdown (J&T, Pos Laju, Ninja Van)
-- ❌ Tracking number input + tracking link in order detail
+- ✅ ~~Carrier picker dropdown (J&T, Pos Laju, Ninja Van)~~ → **đã vào scope qua F36 EasyParcel** (1 courier/shop, §2.1b)
+- ✅ ~~Tracking number input + tracking link in order detail~~ → **F36**: AWB tự đổ vào `trackingNumber` + tracking status (F10 drawer)
 - ❌ Estimated delivery days field (per-region days)
 - ❌ Per-product shipping override (ShippingDimensionsSection trong product form sẽ scoped riêng cho carrier integration)
 - ❌ Multi-seller free shipping isolation UI

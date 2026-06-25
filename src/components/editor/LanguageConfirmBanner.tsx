@@ -54,7 +54,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
     }
 
     return (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm px-4">
             <div
                 className="relative w-full max-w-[520px] overflow-hidden rounded-[14px] border border-[var(--editor-border)] bg-[var(--editor-surface)]"
                 style={{ boxShadow: DIALOG_SHADOW }}
@@ -67,7 +67,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                     >
                         <Languages size={18} />
                     </div>
-                    <h2 className="text-base font-bold text-white mb-1.5 tracking-tight">
+                    <h2 className="text-base font-bold text-[var(--editor-text)] mb-1.5 tracking-tight">
                         {detected.full} language detected
                     </h2>
                     <p className="text-[13px] text-[var(--editor-text-muted)] leading-relaxed">
@@ -81,7 +81,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
 
                 {/* Body */}
                 <div className="px-6 pb-4">
-                    <p className="text-[12.5px] font-semibold text-white/70 mb-3">
+                    <p className="text-[12.5px] font-semibold text-[var(--editor-text-muted)] mb-3">
                         You want to continue building in:
                     </p>
 
@@ -103,7 +103,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
 
                                     {/* Main: name + pill + note */}
                                     <span className="flex flex-col gap-1 min-w-0">
-                                        <span className="text-[14px] font-semibold leading-none text-white">
+                                        <span className="text-[14px] font-semibold leading-none text-[var(--editor-text)]">
                                             {opt.full}
                                         </span>
                                         {opt.reco && (
@@ -148,7 +148,7 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
                     <button
                         type="button"
                         onClick={() => onAction('dismiss', detectedLocale)}
-                        className="rounded-lg px-4 py-1.5 text-[13px] font-semibold text-[var(--editor-text-muted)] transition-colors hover:text-white"
+                        className="rounded-lg px-4 py-1.5 text-[13px] font-semibold text-[var(--editor-text-muted)] transition-colors hover:text-[var(--editor-text)]"
                     >
                         Cancel
                     </button>
