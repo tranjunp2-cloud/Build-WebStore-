@@ -151,6 +151,21 @@ export default function EditorPage() {
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
 
+    // Auto-open the publish modal when arriving from an external "Publish" CTA
+    // (e.g. the dashboard onboarding "Publish your website" step → /editor/:id?publish=1).
+    // Waits for editor data to finish loading, then strips the param so a refresh won't reopen.
+    const publishAutoOpenedRef = useRef(false)
+    useEffect(() => {
+        if (publishAutoOpenedRef.current || isLoading) return
+        if (searchParams.get('publish') !== '1') return
+        publishAutoOpenedRef.current = true
+        setIsPublishModalOpen(true)
+        const next = new URLSearchParams(searchParams.toString())
+        next.delete('publish')
+        const qs = next.toString()
+        router.replace(`/editor/${siteId}${qs ? `?${qs}` : ''}`)
+    }, [isLoading, searchParams, router, siteId])
+
     // Workspace layout (left/right sidebar visibility, persisted in localStorage)
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)

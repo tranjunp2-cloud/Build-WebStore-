@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Sparkles, AlertTriangle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { AIFixModal } from './AIFixModal'
-import { useTabContext } from './DashboardTabContent'
 
 export interface SEOIssueCounts {
     missingTitle: number
@@ -23,7 +22,6 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
     missingSeoItems?: MissingSeoItem[]
 }) {
     const { t, ti } = useI18n()
-    const { setActiveTab } = useTabContext()
     const warnings = t.dashboard.seo
     const [isFixModalOpen, setIsFixModalOpen] = useState(false)
 
@@ -49,7 +47,8 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
 
     const handleNavigate = (e: React.MouseEvent | React.KeyboardEvent) => {
         if ((e.target as HTMLElement).closest('button, [role="dialog"]')) return
-        setActiveTab('seo')
+        // Single-column revamp: scroll to the SEO section instead of switching tabs
+        document.getElementById('seo')?.scrollIntoView({ behavior: 'smooth' })
     }
 
     return (

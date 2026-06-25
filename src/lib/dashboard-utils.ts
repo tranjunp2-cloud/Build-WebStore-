@@ -266,6 +266,92 @@ export function getMockRank(keyword: string): number {
     return (hash % 50) + 1
 }
 
+// ─── F03 Revamp ── Single-column dashboard block model ───────────────────────
+/**
+ * Block IDs for the single-column dashboard stream (matches the Claude design).
+ * Each block is a full-width section; `glance` holds the 4 stat cards as a unit.
+ */
+export type DashboardBlockId = 'onboarding' | 'glance' | 'traffic' | 'seo' | 'tools' | 'orders'
+
+const ALL_BLOCK_IDS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools', 'orders']
+
+/** Default visible blocks, in order. `orders` (Coming Soon / F10) intentionally OFF. */
+export const DEFAULT_DASHBOARD_BLOCKS: DashboardBlockId[] = ['onboarding', 'glance', 'traffic', 'seo', 'tools']
+
+/** Legacy stat-pref names saved before the revamp (stat-level granularity is gone). */
+const LEGACY_STAT_NAMES = new Set(['views', 'leads', 'engagement', 'revenue'])
+
+/**
+ * Runtime migration (no DB change) for `dashboardPreferences`. Returns the ordered
+ * list of VISIBLE block IDs that drives the stream render order.
+ *  1. null/empty → DEFAULT_DASHBOARD_BLOCKS
+ *  2. legacy stat-name data (views/leads/engagement) → reset to DEFAULT (granularity changed)
+ *  3. otherwise: keep valid block IDs in saved order, drop unknowns + duplicates
+ */
+export function normalizeDashboardBlocks(raw: string[] | null | undefined): DashboardBlockId[] {
+    if (!raw || raw.length === 0) return [...DEFAULT_DASHBOARD_BLOCKS]
+
+    // Old stat-level prefs → reset (blocks are section-level now)
+    if (raw.some(item => LEGACY_STAT_NAMES.has(item))) return [...DEFAULT_DASHBOARD_BLOCKS]
+
+    const visible: DashboardBlockId[] = []
+    for (const item of raw) {
+        const id = item as DashboardBlockId
+        if (ALL_BLOCK_IDS.includes(id) && !visible.includes(id)) visible.push(id)
+    }
+    return visible.length > 0 ? visible : [...DEFAULT_DASHBOARD_BLOCKS]
+}
+
+export interface DashboardBlockMeta {
+    id: DashboardBlockId
+    /** lucide icon name (matches design) */
+    icon: string
+    /** key under i18n `dashboard.overview.customizeModal.blocks.*` */
+    labelKey: string
+    /** Coming Soon block (F10) — rendered with overlay, default OFF */
+    soon?: boolean
+}
+
+/** Metadata for every block in the Customize modal + stream (drives render + labels). */
+export const ALL_BLOCKS: DashboardBlockMeta[] = [
+    { id: 'onboarding', icon: 'list-checks', labelKey: 'onboarding' },
+    { id: 'glance', icon: 'layout-grid', labelKey: 'glance' },
+    { id: 'traffic', icon: 'bar-chart-3', labelKey: 'traffic' },
+    { id: 'seo', icon: 'search-check', labelKey: 'seo' },
+    { id: 'tools', icon: 'wrench', labelKey: 'tools' },
+    { id: 'orders', icon: 'package-check', labelKey: 'orders', soon: true },
+]
+
+export interface CustomizeBlockRow extends DashboardBlockMeta {
+    visible: boolean
+}
+
+/**
+ * Build the full ordered list for the Customize modal from saved visible blocks.
+ *
+ * Fixed-schema layout: every block keeps a stable position in the ALL_BLOCKS frame.
+ * Toggling a block OFF only flips its visibility — hidden blocks stay anchored at their
+ * canonical schema slot (NOT appended to the bottom), so they never jump position across
+ * save/reopen. Visible slots are filled in the saved order, preserving drag-reordering.
+ */
+export function buildCustomizeRows(visibleBlocks: DashboardBlockId[]): CustomizeBlockRow[] {
+    const visibleSet = new Set(visibleBlocks)
+    const rows: CustomizeBlockRow[] = []
+    let vi = 0 // pointer into the saved visible order
+    for (const meta of ALL_BLOCKS) {
+        if (visibleSet.has(meta.id)) {
+            // This canonical slot is a "visible slot" → fill with the next saved visible block
+            const id = visibleBlocks[vi++]
+            const m = ALL_BLOCKS.find(b => b.id === id) ?? meta
+            rows.push({ ...m, visible: true })
+        } else {
+            // Hidden block stays anchored at its canonical schema position
+            rows.push({ ...meta, visible: false })
+        }
+    }
+    return rows
+}
+
 // ─── Analytics ── Referrer domain extraction (from analytics/page.tsx) ────────
 /**
  * Extract a clean referrer domain from a raw referrer string.

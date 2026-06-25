@@ -165,11 +165,6 @@ vi.mock('@dnd-kit/utilities', () => ({
     CSS: { Transform: { toString: vi.fn(() => '') } },
 }))
 
-// ── Mock DashboardTabContent (useTabContext used by SEOHealthWidget) ─────────
-vi.mock('@/components/dashboard/DashboardTabContent', () => ({
-    useTabContext: () => ({ activeTab: 'overview', setActiveTab: vi.fn() }),
-}))
-
 // ── Mock next/navigation (used by PeriodSelector / DashboardActionList) ──────
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: vi.fn() })),
