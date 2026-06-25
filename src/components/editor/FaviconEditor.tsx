@@ -46,6 +46,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
     }, [])
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isUploading) return
         const file = e.target.files?.[0]
         if (!file) return
 
@@ -131,6 +132,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
                 type="file"
                 className="hidden"
                 ref={fileInputRef}
+                disabled={isUploading}
                 accept=".ico,.png,.jpg,.jpeg,.webp"
                 onChange={handleFileSelect}
             />
