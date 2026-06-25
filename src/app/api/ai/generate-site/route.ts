@@ -109,10 +109,6 @@ export async function POST(req: NextRequest) {
     let _site: Record<string, unknown> | null = null
     let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
     let _createdPagesCount = 0
-    // Track slug sync for revert on failure (GH-1371): if generation fails with
-    // 0 pages created, restore the previous slug so the user can retry freely.
-    let _prevTenantSlug: string | undefined
-    let _syncedTenantId: string | number | null = null
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -280,28 +276,28 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
-        if (resolvedTenantId) {
+        // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
+        // Syncing before SSE caused "Already taken" on retry after interrupted generation
+        // because the slug was claimed even when no site was created. The sync now runs
+        // only after runGenPipeline() succeeds, so a failed/aborted gen never locks the slug.
+        const syncTenantSlug = async () => {
+            if (!resolvedTenantId) return
             try {
                 const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
                 const currentSlug = tenant?.slug as string | undefined
                 const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
                 const businessName = businessInfo?.businessName || ''
 
-                // Case 1: User explicitly chose a slug in the builder → always sync, regardless of current slug
+                // Case 1: User explicitly chose a slug in the builder → always sync
                 if (userChosenSlug && userChosenSlug !== currentSlug) {
-                    // Slug was already verified available on client-side, but double-check uniqueness
                     const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
                     await payload.update({
                         collection: 'tenants',
                         id: resolvedTenantId,
                         data: { slug: newSlug } as Record<string, unknown>,
                     })
-                    // Track for revert on failure (GH-1371)
-                    _prevTenantSlug = currentSlug
-                    _syncedTenantId = resolvedTenantId
                 }
-                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
+                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade
                 else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
                     const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
@@ -311,9 +307,6 @@ export async function POST(req: NextRequest) {
                             id: resolvedTenantId,
                             data: { slug: newSlug } as Record<string, unknown>,
                         })
-                        // Track for revert on failure (GH-1371)
-                        _prevTenantSlug = currentSlug
-                        _syncedTenantId = resolvedTenantId
                     }
                 }
             } catch (err) {
@@ -1349,6 +1342,9 @@ export async function POST(req: NextRequest) {
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
+                        // F23: sync tenant slug now that generation succeeded (GH-1371)
+                        await syncTenantSlug()
+
                         // products_generated event
                         if (productsCreatedCount > 0) {
                             controller.enqueue(
@@ -1397,16 +1393,6 @@ export async function POST(req: NextRequest) {
                                     data: { generationStatus: status },
                                 })
                                 .catch(() => {})
-                            // GH-1371: revert tenant slug if no pages were created so user can retry
-                            if (_createdPagesCount === 0 && _prevTenantSlug && _syncedTenantId) {
-                                await _payload
-                                    .update({
-                                        collection: 'tenants',
-                                        id: _syncedTenantId,
-                                        data: { slug: _prevTenantSlug } as Record<string, unknown>,
-                                    })
-                                    .catch(() => {})
-                            }
                         }
                     } finally {
                         try { controller.close() } catch { /* already closed */ }
@@ -1430,6 +1416,9 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             timeMs,
         } = await runGenPipeline()
+
+        // F23: sync tenant slug now that generation succeeded (GH-1371)
+        await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
         import('@/lib/sso/sso-api-client')
@@ -1459,16 +1448,6 @@ export async function POST(req: NextRequest) {
                 id: _siteForCatch.id as string | number,
                 data: { generationStatus: status },
             }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
-            // GH-1371: revert tenant slug if no pages were created so user can retry
-            if (_createdPagesCount === 0 && _prevTenantSlug && _syncedTenantId) {
-                await _payload
-                    .update({
-                        collection: 'tenants',
-                        id: _syncedTenantId,
-                        data: { slug: _prevTenantSlug } as Record<string, unknown>,
-                    })
-                    .catch((_e: unknown) => console.error('[AI Generate] Failed to revert tenant slug:', _e))
-            }
         }
 
         const errMsg = error instanceof Error ? error.message : String(error)
