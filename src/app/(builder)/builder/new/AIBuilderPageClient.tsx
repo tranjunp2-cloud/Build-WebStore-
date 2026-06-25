@@ -858,7 +858,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         )
     }
 
-    if (step === 'info') {
+    if (step === 'info' && status !== 'done') {
         if (showPaywall) {
             return <PaywallCard onBack={() => setShowPaywall(false)} />
         }

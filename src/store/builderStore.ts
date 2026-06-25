@@ -229,6 +229,11 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                     state.messages = []
                     state.progress = { step: '', label: '', progress: 0 }
                 }
+                // Defensive: done status should always have step='chat' (not 'info')
+                // Handles old localStorage sessions written before this fix
+                if (state?.status === 'done' && state?.step === 'info') {
+                    state.step = 'chat'
+                }
             },
         }
     )
