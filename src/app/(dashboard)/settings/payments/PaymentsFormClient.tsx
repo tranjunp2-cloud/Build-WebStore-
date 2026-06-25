@@ -810,8 +810,8 @@ export function PaymentsFormClient({
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'hsl(var(--primary) / 0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--primary) / 0.04)';
                                         }}
                                         onMouseLeave={e => {
                                             (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
@@ -837,7 +837,7 @@ export function PaymentsFormClient({
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                         style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)'}` }}
-                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -869,7 +869,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
@@ -893,7 +893,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)'}` }}
-                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
