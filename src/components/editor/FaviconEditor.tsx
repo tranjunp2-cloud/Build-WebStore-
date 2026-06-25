@@ -6,6 +6,26 @@ import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
+function checkFaviconDimensions(file: File): Promise<'ok' | 'tooSmall' | 'tooBig' | 'notSquare'> {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file)
+        const img = new Image()
+        img.onload = () => {
+            URL.revokeObjectURL(url)
+            const { width, height } = img
+            if (width < 16 || height < 16) return resolve('tooSmall')
+            if (width > 512 || height > 512) return resolve('tooBig')
+            if (width !== height) return resolve('notSquare')
+            resolve('ok')
+        }
+        img.onerror = () => {
+            URL.revokeObjectURL(url)
+            resolve('ok') // Cannot determine — let server handle
+        }
+        img.src = url
+    })
+}
+
 interface FaviconEditorProps {
     currentFavicon?: string | null
     onFaviconChange: (faviconUrl: string) => void
@@ -29,20 +49,42 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
         const file = e.target.files?.[0]
         if (!file) return
 
-        // Validate format — SVG excluded: no magic bytes → server rejects it.
+        // Format validation — SVG excluded (XSS risk without server-side sanitize).
         // image/vnd.microsoft.icon is the IANA standard; image/x-icon is legacy — both used across browsers/OS.
-        const allowed = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png']
+        const allowed = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/jpeg', 'image/webp']
         if (!allowed.includes(file.type)) {
             toast.error(fe.invalidFormat)
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
         }
 
-        // Validate size ≤ 100KB
-        if (file.size > 100 * 1024) {
+        // Size validation — hard 500KB, soft 100KB warning
+        if (file.size > 500 * 1024) {
             toast.error(fe.tooLarge)
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
+        }
+        if (file.size > 100 * 1024) {
+            toast.warning(fe.tooLargeWarning)
+        }
+
+        // Dimension validation — skip ICO (multi-resolution by nature, Image API unreliable)
+        const isIco = file.type === 'image/x-icon' || file.type === 'image/vnd.microsoft.icon'
+        if (!isIco) {
+            const dimResult = await checkFaviconDimensions(file)
+            if (dimResult === 'tooSmall') {
+                toast.error(fe.tooSmall)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                return
+            }
+            if (dimResult === 'tooBig') {
+                toast.error(fe.tooBig)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                return
+            }
+            if (dimResult === 'notSquare') {
+                toast.warning(fe.notSquare)
+            }
         }
 
         setIsUploading(true)
@@ -89,7 +131,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
                 type="file"
                 className="hidden"
                 ref={fileInputRef}
-                accept=".ico,.png"
+                accept=".ico,.png,.jpg,.jpeg,.webp"
                 onChange={handleFileSelect}
             />
 

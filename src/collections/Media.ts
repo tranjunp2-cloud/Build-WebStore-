@@ -99,7 +99,7 @@ export const Media: CollectionConfig = {
                         sig.bytes.every((b, i) => head[sig.offset + i] === b),
                     )
                     if (!valid) {
-                        throw new APIError('Invalid image file — only JPEG, PNG, and WebP are accepted', 400)
+                        throw new APIError('Invalid image file — only JPEG, PNG, WebP, and ICO are accepted', 400)
                     }
                 } catch (e) {
                     if (e instanceof APIError) throw e
