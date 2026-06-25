@@ -13,7 +13,7 @@ import {
 } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
-import { generatePageSchemas } from '@/lib/seo/json-ld'
+import { generatePageSchemas, serializeJsonLd } from '@/lib/seo/json-ld'
 import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
@@ -569,7 +569,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 <script
                     key={`jsonld-${i}`}
                     type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+                    dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
                 />
             ))}
 
