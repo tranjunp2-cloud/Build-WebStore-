@@ -24,6 +24,7 @@ import {
     getCachedVisitorHomepage,
     getCachedNavigationPages,
 } from '@/lib/cache/tenant'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 // Force dynamic — reads headers() (custom-domain) + cookies (getCurrentUser) per
 // request, so the route stays dynamic. Heavy Payload reads on the anonymous
@@ -323,7 +324,8 @@ export default async function TenantSitePage({ params }: Props) {
                         </div>
                     )}
                     <div
-                        className="prose prose-lg prose-invert max-w-none"
+                        className="prose prose-lg max-w-none"
+                        style={proseThemeVars}
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">

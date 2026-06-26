@@ -1,14 +1,15 @@
 'use client'
 
+import { useEffect, useTransition } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
 
 export function PeriodSelector() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const pathname = usePathname()
     const { t } = useI18n()
+    const [isPending, startTransition] = useTransition()
 
     const currentPeriod = searchParams.get('period') || '7d'
 
@@ -18,31 +19,42 @@ export function PeriodSelector() {
         { id: '30d', label: t.dashboard.overview.periods['30d'] },
     ]
 
-    const handleSelect = (id: string) => {
+    // While the new period data loads, dim the stream in place (preserves scroll + block heights).
+    // Flag lives on <html> so the scoped CSS can fade the whole .dash-revamp stream.
+    useEffect(() => {
+        const el = document.documentElement
+        if (isPending) el.setAttribute('data-period-pending', '1')
+        else el.removeAttribute('data-period-pending')
+        return () => el.removeAttribute('data-period-pending')
+    }, [isPending])
+
+    const handleSelect = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+        // Buttons (not <a href="#">) — guard against any default and stop a scroll-to-top
+        e.preventDefault()
+        if (id === currentPeriod) return
         const params = new URLSearchParams(searchParams.toString())
         params.set('period', id)
-        router.push(`${pathname}?${params.toString()}`)
+        // scroll:false keeps the viewport where it is; useTransition keeps the old content
+        // mounted (no unmount / height collapse) until the refetched data is ready.
+        startTransition(() => {
+            router.push(`${pathname}?${params.toString()}`, { scroll: false })
+        })
     }
 
+    // Markup matches the revamp design's `.segmented` pill (styled by dashboard-revamp.css,
+    // scoped under .dash-revamp in the dashboard toolbar).
     return (
-        <div className="flex flex-1 sm:flex-none items-center gap-[2px] rounded-[8px] bg-[hsl(var(--secondary))] p-[3px]">
-            {PERIODS.map(p => {
-                const isActive = currentPeriod === p.id
-                return (
-                    <button
-                        key={p.id}
-                        onClick={() => handleSelect(p.id)}
-                        className={cn(
-                            "px-[14px] py-[6px] text-[13px] font-semibold rounded-[6px] transition-all leading-none",
-                            isActive
-                                ? "bg-[hsl(var(--card))] text-[hsl(var(--primary))] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)]"
-                                : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-white/5"
-                        )}
-                    >
-                        {p.label}
-                    </button>
-                )
-            })}
+        <div className="segmented" data-pending={isPending ? '1' : undefined}>
+            {PERIODS.map(p => (
+                <button
+                    key={p.id}
+                    type="button"
+                    className={currentPeriod === p.id ? 'active' : ''}
+                    onClick={(e) => handleSelect(e, p.id)}
+                >
+                    {p.label}
+                </button>
+            ))}
         </div>
     )
 }

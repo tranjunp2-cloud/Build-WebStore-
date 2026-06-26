@@ -2578,6 +2578,159 @@
             "accountSuspendedBody": "Your account has been suspended. Please contact support. You will now be logged out.",
             "acknowledge": "Acknowledge",
             "loggingOut": "Logging out..."
+        },
+        "revamp": {
+            "title": "Dashboard",
+            "periodSub": {
+                "today": "Hourly · {range}",
+                "daily": "Daily · {range}"
+            },
+            "glance": {
+                "title": "At a glance",
+                "views": "Page views",
+                "leads": "Leads",
+                "engagement": "Engagement",
+                "revenue": "Revenue",
+                "viewsTip": "Total visits from customers across all pages on your website.",
+                "leadsTip": "Potential customers who left their contact details (email, phone) via signup forms on your website.",
+                "engagementTip": "High-value customer actions — like clicking Buy Now, Add to Cart, or social media links.",
+                "revenueSoonTip": "Revenue tracking is coming soon. This card will calculate metrics from paid and completed orders.",
+                "noteToday": "vs yesterday",
+                "note7d": "vs prev 7d",
+                "note30d": "vs prev 30d"
+            },
+            "comingSoon": "Coming Soon",
+            "soon": "Soon",
+            "onboarding": {
+                "title": "Finish setting up your store",
+                "subtitle": {
+                    "one": "Complete {count} more step to launch your website.",
+                    "other": "Complete {count} more steps to launch your website."
+                },
+                "steps": {
+                    "products": {
+                        "name": "Verify your products",
+                        "desc": "AI added demo items. Please check inventory, prices, and variations.",
+                        "cta": "Review"
+                    },
+                    "design": {
+                        "name": "Customize your design",
+                        "desc": "Update images, text, and colors to match your personal brand.",
+                        "cta": "Edit"
+                    },
+                    "shipping": {
+                        "name": "Set up shipping fees",
+                        "desc": "Current default is COD & Free delivery. Update rates to avoid shipping losses.",
+                        "cta": "Set up"
+                    },
+                    "launch": {
+                        "name": "Publish your website",
+                        "desc": "Ready to sell? Make your store live and start accepting orders today.",
+                        "cta": "Publish"
+                    }
+                }
+            },
+            "traffic": {
+                "title": "Traffic & performance",
+                "subtitle": "Daily pageviews and what's driving them",
+                "totalPageviews": "total pageviews · {period}",
+                "topPerforming": "Top performing",
+                "tabs": {
+                    "pages": "Pages",
+                    "blogs": "Blogs",
+                    "referrers": "Referrers",
+                    "products": "Products"
+                },
+                "productsSoonTip": "Product analytics — coming soon",
+                "emptyChartTitle": "No traffic in this period",
+                "emptyChartDesc": "Once visitors land on your site, daily pageviews will show up here.",
+                "emptyListTitle": "Nothing to rank yet",
+                "emptyListDesc": "Top pages, blogs and referrers appear once you have traffic.",
+                "periodToday": "today",
+                "period7d": "last 7 days",
+                "period30d": "last 30 days"
+            },
+            "seo": {
+                "title": "SEO health",
+                "subtitle": "How discoverable your store is on search engines",
+                "scoreHistory": "SEO score history",
+                "scoreHistoryTip": "We'll record your score weekly so you can track trends — coming soon.",
+                "scoreHistoryMsg": "In development — we'll log your score every week so you can watch it climb.",
+                "gaugeHealthy": "Healthy",
+                "gaugeNeedsImprovement": "Needs improvement",
+                "gaugeAtRisk": "At risk",
+                "breakdownMeta": "Meta Tags",
+                "breakdownContent": "Content Quality",
+                "breakdownTechnical": "Technical SEO",
+                "criticalIssue": "Most critical issue: {count} {text}. Fixing these will lift your score.",
+                "fixAll": "AI Fix All Issues",
+                "issuesTitle": "SEO issues",
+                "open": "{count} open",
+                "allClear": "All clear",
+                "allResolvedTitle": "All issues resolved",
+                "allResolvedDesc": "No outstanding SEO issues — your store is fully optimised. We'll flag new ones here as they appear.",
+                "fix": "Fix",
+                "edit": "Edit",
+                "altEditTip": "Automatic AI alt-text editing is coming soon. For now, click to update image descriptions directly in your product manager.",
+                "issueAlt": {
+                    "one": "product missing image Alt text",
+                    "other": "products missing image Alt text"
+                },
+                "issueDescription": {
+                    "one": "page without a meta description",
+                    "other": "pages without a meta description"
+                },
+                "issueTitle": {
+                    "one": "item missing a meta title",
+                    "other": "items missing a meta title"
+                }
+            },
+            "tools": {
+                "title": "SEO action tools",
+                "subtitle": "AI works quietly in the background so customers can find your store on Google",
+                "sitemap": "Sitemap",
+                "sitemapTip": "A sitemap lists every page in your store. We hand it to Google so it can find and list all your products.",
+                "sitemapDesc": "Submit your sitemap so Google can discover and index all your pages.",
+                "resubmit": "Resubmit to Google",
+                "autoMeta": "Auto-write search titles & descriptions",
+                "autoMetaTip": "This is the headline customers see on Google. AI writes a short, tempting one for every page automatically.",
+                "autoMetaDesc": "AI writes short, catchy titles that draw customers in when they search on Google.",
+                "active": "Active",
+                "sitemapDone": "Sitemap submitted — {count} URLs sent to Google",
+                "sitemapRegenerated": "Sitemap regenerated",
+                "sitemapError": "Could not generate sitemap",
+                "metaOn": "Auto meta tags turned on",
+                "metaOff": "Auto meta tags turned off",
+                "metaError": "Could not update setting"
+            },
+            "orders": {
+                "title": "Pending orders",
+                "subtitle": "Orders awaiting fulfilment",
+                "awaiting": "Awaiting",
+                "mockOrder": "Customer order · {count} items",
+                "soonTip": "Order fulfilment queue is in development — coming soon."
+            },
+            "customize": {
+                "button": "Customize",
+                "title": "Customize dashboard",
+                "description": "Drag to reorder, or toggle blocks on and off. Saved for your account.",
+                "reset": "Reset to default",
+                "cancel": "Cancel",
+                "save": "Save layout",
+                "saving": "Saving…",
+                "saved": "Dashboard layout saved",
+                "saveError": "Failed to save layout",
+                "dragToReorder": "Drag to reorder",
+                "moveUp": "Move up",
+                "moveDown": "Move down",
+                "close": "Close",
+                "blockOnboarding": "Onboarding checklist",
+                "blockGlance": "At-a-glance stats",
+                "blockTraffic": "Traffic & performance",
+                "blockSeo": "SEO health",
+                "blockTools": "SEO action tools",
+                "blockOrders": "Pending orders"
+            }
         }
     },
     "auth": {

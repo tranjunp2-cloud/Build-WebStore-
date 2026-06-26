@@ -16,6 +16,7 @@ import type { NavPage, SiteRendererProps } from '@/components/site-renderer/Site
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
 import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
 import { serializeJsonLd } from '@/lib/seo/json-ld'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 export const dynamic = 'force-dynamic'
 
@@ -238,6 +239,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-blockquote:border-l-4
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
+                    style={proseThemeVars}
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                 />
 

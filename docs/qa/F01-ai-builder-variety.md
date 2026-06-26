@@ -1391,14 +1391,20 @@ enforcer-padded hero subheadline.
 | TC-1266-06 | frontend | split-video, no videoUrl, `isOwner=false` | NO placeholder; image fallback rendered | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
 | TC-1266-07 | frontend | split-video, no videoUrl, `isOwner=true` | placeholder text "No video URL provided" present | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
 | TC-1266-08 | frontend | split-video, videoUrl set, `isOwner=false` | `<video>` rendered; no placeholder | component | `src/__tests__/unit/blocks/gh-1266-split-video-render.test.tsx` |
+| TC-1266-10 | backend | `BROKEN_VARIANTS.hero` contains video/split-video/animated-gradient; `selectVariant` never returns banned variant across 50 seeds × 14 categories (RC1 defense) | no banned variant returned | unit | `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` |
+| TC-1266-11 | backend | tech/fitness hero pools ≥6 distinct variants; all values in hero enum; openai `CATEGORY_VARIANT_WEIGHTS` matches composer pools for tech+fitness (RC2 scope only) | pools aligned, no unknown values | unit | `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` |
+| TC-1266-12 | backend | `selectVariant('hero', seed, category)` across seeds 1–10 for tech and fitness → ≥3 distinct variants (RC2/RC4 variety) | ≥3 distinct per category | unit | `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` |
+| TC-1266-13 | backend | batch3 homepage hero distribution: no single variant >35% share; gradient/parallax/slideshow each present (RC3) | max share ≤35%, 3 new variants present | unit | `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` |
+| TC-1266-14 | backend | all `CATEGORY_HERO_VARIANTS` pool values exist in hero enum; no pool contains a banned variant (regression guard) | 0 invalid/banned entries | unit | `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` |
 
 ### Coverage Summary
 
-- **Backend tests:** 26 cases covering coercion logic (basic scenarios + edge cases + integration)
+- **Backend tests:** 26 cases covering coercion logic (basic scenarios + edge cases + integration) + 12 new cases for pool defense and diversity
 - **Frontend tests:** 27 cases covering render branches (public/owner, video/fallback, multiple state changes)
-- **Total:** 53 regression tests, all ✅ passing
+- **Total:** 65 regression tests, all ✅ passing
 - **Files created:**
   - `src/__tests__/unit/ai/gh-1266-coerce-video-variants.test.ts` (26 tests)
+  - `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` (12 tests)
 
 ---
 

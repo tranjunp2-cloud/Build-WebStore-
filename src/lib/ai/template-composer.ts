@@ -59,8 +59,10 @@ function shuffleArray<T>(arr: T[], rand: () => number): T[] {
 // Plan 260417 Wave 1 A3 — variants declared in Zod enum but NOT implemented
 // in the block's render switch. AI gen would silently fall through to the
 // block's default variant, hiding the mismatch from QA.
+// GH-1266: video/split-video require a videoUrl the composer never supplies —
+// exclude from seed-based selection so the seeded path cannot emit a broken hero.
 export const BROKEN_VARIANTS: Record<string, string[]> = {
-  hero: ['animated-gradient'],
+  hero: ['animated-gradient', 'video', 'split-video'],
   testimonials: ['grid', 'single'],
 }
 
@@ -79,7 +81,7 @@ function simpleHash(str: string): number {
  * disabledSet: optional set of `${blockType}:${variantName}` keys to exclude.
  * If all variants are excluded, falls back to defaultVariant even if disabled (safer than crash).
  */
-function selectVariant(
+export function selectVariant(
   blockType: string,
   seed: number,
   category: string,
@@ -120,15 +122,15 @@ export type TemplatePage = {
 
 // ── Hero variant mapping per category ───────────────────────────────────────
 
-const CATEGORY_HERO_VARIANTS: Record<string, string[]> = {
+export const CATEGORY_HERO_VARIANTS: Record<string, string[]> = {
   restaurant: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
   ecommerce: ['slideshow', 'cards-overlay', 'gradient', 'split-right', 'magazine'],
   beauty: ['gradient', 'minimal', 'parallax', 'split-left', 'magazine'],
-  tech: ['gradient', 'minimal', 'parallax', 'cards-overlay'],
+  tech: ['gradient', 'minimal', 'cards-overlay', 'parallax', 'split-left', 'slideshow'],
   health: ['centered', 'split-left', 'minimal', 'gradient', 'parallax'],
   education: ['centered', 'split-right', 'gradient', 'magazine', 'parallax'],
   realestate: ['fullscreen', 'parallax', 'slideshow', 'split-left', 'magazine'],
-  fitness: ['fullscreen', 'parallax', 'gradient', 'cards-overlay'],
+  fitness: ['fullscreen', 'parallax', 'cards-overlay', 'gradient', 'split-left', 'magazine'],
   creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
   business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
   fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
