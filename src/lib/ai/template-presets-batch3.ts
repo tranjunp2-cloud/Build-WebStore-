@@ -241,7 +241,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'minimal' },
           { blockType: 'logo-cloud' },
           { blockType: 'team', variant: 'spotlight', count: 3 },
           { blockType: 'features', variant: 'icon-grid', count: 8 },
