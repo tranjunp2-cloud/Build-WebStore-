@@ -55,11 +55,12 @@ export function Sparkline({ data, color }: { data: number[]; color: string }) {
                 stroke="none"
                 points={`0,${H} ${points} ${W},${H}`}
             />
-            {/* Stroke line */}
+            {/* Stroke line — non-scaling so the stretched viewBox doesn't thicken it */}
             <polyline
                 fill="none"
                 stroke={color}
-                strokeWidth="2"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 points={points}
@@ -87,15 +88,28 @@ export function BarChart({
     isHourly?: boolean
 }) {
     const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+    const wrapRef = useRef<HTMLDivElement>(null)
+    const [width, setWidth] = useState(640)
+
+    // Measure the real container width so the viewBox maps 1:1 (full-width, no squeeze/centering).
+    useEffect(() => {
+        const el = wrapRef.current
+        if (!el) return
+        const measure = () => setWidth(el.clientWidth || 640)
+        measure()
+        const ro = new ResizeObserver(measure)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [])
 
     if (!days || days.length === 0) return null
 
-    const W = 340
-    const H = 160
-    const PAD_L = 36   // space for y-axis labels
-    const PAD_B = 24   // space for x-axis labels
-    const PAD_T = 8
-    const PAD_R = 4
+    const W = Math.max(width, 200)
+    const H = 240
+    const PAD_L = 40   // space for y-axis labels
+    const PAD_B = 28   // space for x-axis labels
+    const PAD_T = 12
+    const PAD_R = 10
 
     const chartW = W - PAD_L - PAD_R
     const chartH = H - PAD_T - PAD_B
@@ -108,15 +122,17 @@ export function BarChart({
         y: PAD_T + chartH - (chartH * i) / 3,
     }))
 
-    const barW = Math.max(2, chartW / days.length - 2)
     const gap = chartW / days.length
+    const barW = Math.max(2, Math.min(gap - 6, 32)) // cap so a few bars don't become huge
+    const everyX = isHourly ? 3 : days.length > 14 ? Math.ceil(days.length / 10) : 1 // thin x-labels
 
     return (
-        <div className="barchart" style={{ position: 'relative' }}>
+        <div className="barchart" ref={wrapRef} style={{ position: 'relative', width: '100%' }}>
             <svg
                 viewBox={`0 0 ${W} ${H}`}
                 width="100%"
                 height={H}
+                preserveAspectRatio="none"
                 onMouseLeave={() => setHoverIdx(null)}
             >
                 <defs>
@@ -133,29 +149,18 @@ export function BarChart({
                 {/* Grid lines */}
                 {yTicks.map((tick) => (
                     <g key={tick.value} className="bc-grid">
-                        <line
-                            x1={PAD_L}
-                            y1={tick.y}
-                            x2={W - PAD_R}
-                            y2={tick.y}
-                            stroke="currentColor"
-                            strokeOpacity="0.08"
-                            strokeWidth="1"
-                        />
-                        {/* Y-axis labels */}
-                        <text
-                            x={PAD_L - 4}
-                            y={tick.y + 4}
-                            textAnchor="end"
-                            fontSize="9"
-                            className="bc-ylabel"
-                            fill="currentColor"
-                            fillOpacity="0.45"
-                        >
+                        {/* colour + stroke-width from .bc-grid line CSS — no inline opacity */}
+                        <line x1={PAD_L} y1={tick.y} x2={W - PAD_R} y2={tick.y} />
+                        {/* Y-axis labels — colour/size from .bc-ylabel CSS */}
+                        <text x={PAD_L - 6} y={tick.y + 4} textAnchor="end" className="bc-ylabel">
                             {fmtNum(tick.value)}
                         </text>
                     </g>
                 ))}
+
+                {/* Axis baselines — Y (left) + X (bottom), stronger than grid */}
+                <line className="bc-axis" x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={PAD_T + chartH} />
+                <line className="bc-axis" x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} />
 
                 {/* Bars */}
                 {days.map((d, i) => {
@@ -192,18 +197,12 @@ export function BarChart({
                                 fill={isHi ? 'url(#barGradHi)' : 'url(#barGrad)'}
                                 opacity={hoverIdx !== null && !isHi ? 0.55 : 1}
                             />
-                            {/* X-axis label */}
-                            <text
-                                x={x + barW / 2}
-                                y={H - 6}
-                                textAnchor="middle"
-                                fontSize="9"
-                                className="bc-xlabel"
-                                fill="currentColor"
-                                fillOpacity="0.45"
-                            >
-                                {label}
-                            </text>
+                            {/* X-axis label (thinned to avoid overlap on dense series) */}
+                            {(i % everyX === 0 || i === days.length - 1) && (
+                                <text x={x + barW / 2} y={H - 8} textAnchor="middle" className="bc-xlabel">
+                                    {label}
+                                </text>
+                            )}
                         </g>
                     )
                 })}

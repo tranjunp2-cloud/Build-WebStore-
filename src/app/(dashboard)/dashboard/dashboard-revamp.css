@@ -861,6 +861,12 @@ html[data-period-pending="1"] .dash-revamp .stream {
   stroke-width: 1;
 }
 
+/* Solid axis baselines (Y-left, X-bottom) — stronger than the faint grid */
+.dash-revamp .bc-axis {
+  stroke: var(--dr-line-3);
+  stroke-width: 1.5;
+}
+
 .dash-revamp .bc-ylabel {
   fill: var(--dr-ink-4);
   font-size: 10px;
