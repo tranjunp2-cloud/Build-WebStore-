@@ -255,7 +255,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 // (focus-visible chỉ hiện khi keyboard nav, không khi click chuột).
 
 const INPUT_BASE_CLASS =
-    'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
+    'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-muted)] bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
 
 function FormFieldInput({ field, error, errorId, inlineRows }: { field: FormField; error?: boolean; errorId?: string; inlineRows?: number }) {
     const name = field.fieldName || field.fieldType || 'field'
