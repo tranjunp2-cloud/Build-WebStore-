@@ -17,6 +17,8 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ### Bug Fixes
 
+- **GH-1364** fix(contact, newsletter): input visibility + form fallback — **Newsletter:** `src/blocks/newsletter/index.tsx` line 176 added `bg-[rgba(var(--brand-primary-rgb),0.03)] placeholder:text-[var(--text-muted)]` CSS classes to brand-variant input, fixing invisible placeholder text in light-mode storefront (inverse variant already had proper white/light colors). **Contact:** `src/blocks/contact/index.tsx` added `DEFAULT_FORM_FIELDS` constant (name/email/phone/message) + fallback logic on line 176 to render sensible defaults when `formFields` array is empty, preventing blank form renders.
+
 - **[#1179]** fix(cart): validate quantity against variant stock not aggregate inventory — `src/components/storefront/product-add-to-cart-section.tsx` now uses `selectedVariant?.stock` as inventory source when variant is selected, preventing UX mismatch with server-side CAS. Component previously checked `product.inventory` (aggregate), causing users to be able to add quantities unavailable in the selected variant. Affected by TC-F09.237x, TC-F09.238x regression tests.
 
 ---

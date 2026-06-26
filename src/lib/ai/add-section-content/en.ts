@@ -78,6 +78,7 @@ export const BLOCK_CONTENT_EN = {
         formFields: [
             { fieldName: 'name', label: 'Your Name', fieldType: 'text', required: true },
             { fieldName: 'email', label: 'Email Address', fieldType: 'email', required: true },
+            { fieldName: 'phone', label: 'Phone', fieldType: 'phone', required: false },
             { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
         ],
     },

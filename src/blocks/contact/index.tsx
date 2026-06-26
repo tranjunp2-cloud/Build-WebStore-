@@ -155,6 +155,13 @@ type ContactFormProps = {
     inline?: boolean
 }
 
+const DEFAULT_FORM_FIELDS: FormField[] = [
+    { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
+    { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
+    { fieldName: 'phone', label: 'Phone', fieldType: 'phone', required: false },
+    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
+]
+
 /**
  * Plan 260415 contact-bugfix — Standard form wired vào useContactForm hook.
  * - POST tới /api/contact-submit
@@ -166,7 +173,8 @@ type ContactFormProps = {
  * - Honeypot field (name="website") ẩn cho bot
  */
 function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →', inline = false }: ContactFormProps) {
-    const requiredFieldNames = formFields
+    const fields = formFields.length > 0 ? formFields : DEFAULT_FORM_FIELDS
+    const requiredFieldNames = fields
         .filter(f => f.required)
         .map(f => f.fieldName || f.fieldType || 'message')
 
@@ -202,7 +210,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 
     return (
         <form className={className} onSubmit={handleSubmit} noValidate>
-            {formFields.map((field, i) => {
+            {fields.map((field, i) => {
                 const fieldName = field.fieldName || field.fieldType || `field-${i}`
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
