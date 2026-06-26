@@ -14,6 +14,7 @@ import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -321,7 +322,8 @@ export default async function TenantSitePage({ params }: Props) {
                         </div>
                     )}
                     <div
-                        className="prose prose-lg prose-invert max-w-none"
+                        className="prose prose-lg max-w-none"
+                        style={proseThemeVars}
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">

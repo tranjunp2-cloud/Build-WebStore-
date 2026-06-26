@@ -13,6 +13,7 @@ import type { TenantMembership } from '@/lib/normalize-tenants'
 import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,6 +191,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-blockquote:border-l-4
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
+                    style={proseThemeVars}
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                 />
 
