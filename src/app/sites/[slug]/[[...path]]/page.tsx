@@ -14,8 +14,22 @@ import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { serializeJsonLd } from '@/lib/seo/json-ld'
+import {
+    getCachedTenantBySlug,
+    getCachedTenantByDomain,
+    getCachedSiteByTenant,
+    getCachedVisitorPage,
+    getCachedVisitorHomepage,
+    getCachedNavigationPages,
+} from '@/lib/cache/tenant'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
-// Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
+// Force dynamic — reads headers() (custom-domain) + cookies (getCurrentUser) per
+// request, so the route stays dynamic. Heavy Payload reads on the anonymous
+// visitor path are served from unstable_cache (5-min TTL, tag-invalidated on
+// publish/edit); the owner-preview path stays uncached to show live drafts.
 export const dynamic = 'force-dynamic'
 
 type Props = {
@@ -34,36 +48,18 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     if (slug === 'custom') {
         const hostname = reqHeaders.get('x-tenant-hostname')
         if (!hostname) return null
-        
-        const tenantsResult = await payload.find({
-            collection: 'tenants',
-            where: { 'customDomains.domain': { equals: hostname } },
-            limit: 1,
-        })
-        tenant = tenantsResult.docs[0]
+        // Cached identity lookup (depth:0) — only tenant.id is consumed below.
+        tenant = await getCachedTenantByDomain(hostname)
     } else {
-        // Find tenant by subdomain slug
-        const tenantsResult = await payload.find({
-            collection: 'tenants',
-            where: { slug: { equals: slug } },
-            limit: 1,
-        })
-        tenant = tenantsResult.docs[0]
+        // Find tenant by subdomain slug (cached).
+        tenant = await getCachedTenantBySlug(slug)
     }
 
     if (!tenant) return null
 
-    // Find the site for this tenant
-    const sitesResult = await payload.find({
-        collection: 'sites',
-        where: { tenant: { equals: tenant.id } },
-        limit: 1,
-    })
-
-    const site = sitesResult.docs[0]
-    if (!site) return null
-
-    // Check ownership (used for draft gate + tracking skip)
+    // Check ownership (used for draft gate + tracking skip + cache gating).
+    // Computed before the site/page reads so the owner-preview path can opt out
+    // of the published-only cache and see live drafts.
     interface TenantRef {
         tenant: string | number | { id: string | number }
     }
@@ -71,6 +67,19 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
         typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []).includes(String(tenant.id))
+
+    // Find the site for this tenant.
+    // Owner → live (uncached) so just-saved drafts/settings show immediately.
+    // Visitor → cached published view (5-min TTL, tag-invalidated on publish/edit).
+    const site = isOwner
+        ? (await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenant.id } },
+            limit: 1,
+        })).docs[0]
+        : await getCachedSiteByTenant(String(tenant.id))
+
+    if (!site) return null
 
     // Require authentication to view draft sites
     if (site.status === 'draft') {
@@ -85,62 +94,57 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     // Find the page by slug
     const pageSlug = pagePath === '' ? '/' : `/${pagePath}`
+
     // BUG-F05-01: explicitly fetch published versions for live site.
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
     // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still access per spec)
     // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
-    const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
-    const deletedFilter = [{ deletedAt: { exists: false } }]
-    const pagesResult = await payload.find({
-        collection: 'pages',
-        where: {
-            and: [
-                { site: { equals: site.id } },
-                { slug: { equals: pageSlug } },
-                ...visibilityFilter,
-                ...deletedFilter,
-            ],
-        },
-        limit: 1,
-        depth: 3,
-        draft: isOwner && site.status !== 'published' ? true : false,
-    })
-
-    let page = pagesResult.docs[0]
-
-    // Fallback: homepage may have slug 'home' (legacy) — match by isHomepage flag
-    if (!page && pagePath === '') {
-        const homepageFallback = await payload.find({
+    let page
+    if (isOwner) {
+        // Owner path stays uncached + draft-aware. No visibility filter (owners
+        // can open hidden pages); soft-deleted pages still excluded.
+        const deletedFilter = [{ deletedAt: { exists: false } }]
+        const ownerDraft = site.status !== 'published'
+        const pagesResult = await payload.find({
             collection: 'pages',
-            where: {
-                and: [
-                    { site: { equals: site.id } },
-                    { isHomepage: { equals: true } },
-                    ...visibilityFilter,
-                    ...deletedFilter,
-                ],
-            },
+            where: { and: [{ site: { equals: site.id } }, { slug: { equals: pageSlug } }, ...deletedFilter] },
             limit: 1,
             depth: 3,
-            draft: isOwner && site.status !== 'published' ? true : false,
+            draft: ownerDraft,
         })
-        page = homepageFallback.docs[0]
+        page = pagesResult.docs[0]
+        // Fallback: homepage may have slug 'home' (legacy) — match by isHomepage flag
+        if (!page && pagePath === '') {
+            const homepageFallback = await payload.find({
+                collection: 'pages',
+                where: { and: [{ site: { equals: site.id } }, { isHomepage: { equals: true } }, ...deletedFilter] },
+                limit: 1,
+                depth: 3,
+                draft: ownerDraft,
+            })
+            page = homepageFallback.docs[0]
+        }
+    } else {
+        // Visitor path: cached, published + visible + non-deleted (filters mirrored
+        // inside the cache helpers). Same result as the uncached query, just cached.
+        page = await getCachedVisitorPage(String(site.id), pageSlug)
+        if (!page && pagePath === '') {
+            page = await getCachedVisitorHomepage(String(site.id))
+        }
     }
 
     // Fetch ALL pages (including hidden/deleted) so SiteRenderer can build hiddenSlugs
     // and filter nav links client-side. Visibility/404 enforcement is handled above
     // on the current-page lookup; passing partial data here would break the filter.
-    const navigationPages = await payload.find({
-        collection: 'pages',
-        where: {
-            and: [
-                { site: { equals: site.id } },
-            ],
-        },
-        limit: 100,
-        sort: 'createdAt',
-    })
+    const navigationPages = isOwner
+        ? await payload.find({
+            collection: 'pages',
+            where: { and: [{ site: { equals: site.id } }] },
+            limit: 100,
+            sort: 'createdAt',
+        })
+        : { docs: await getCachedNavigationPages(String(site.id)) }
 
     // Blog listing page: /blogs or /blogs?category=X&page=N
     if (!page && pagePath === 'blogs') {
@@ -192,24 +196,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = blogPost?.seo?.metaDescription || page?.seo?.description || site.seo?.metaDescription
     type BlogMedia = { url?: string }
     const blogThumb = blogPost ? (blogPost as unknown as { thumbnail?: BlogMedia | string }).thumbnail : null
-    const ogImage = blogThumb && typeof blogThumb === 'object' ? blogThumb.url ?? null : null
+    const blogOgImage = blogThumb && typeof blogThumb === 'object' ? blogThumb.url ?? null : null
+    const ogImage = blogOgImage
+        || (page?.seo as any)?.ogImage
+        || (site.seo as any)?.ogImage
+        || (site.branding as any)?.logo
+        || null
 
-    // Resolve canonical URL from middleware-injected headers
+    // Resolve canonical URL — prefer primary custom domain, then middleware header, then subdomain
     const reqHeaders = await headers()
     const tenantHostname = reqHeaders.get('x-tenant-hostname')
-    const tenantSlug = reqHeaders.get('x-tenant-slug')
-    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
-
-    let baseUrl: string
-    if (tenantHostname) {
-        baseUrl = `https://${tenantHostname}`
-    } else if (tenantSlug) {
-        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
-    } else if (slug !== 'custom') {
-        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
-    } else {
-        baseUrl = ''
-    }
+    const baseUrl = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
 
     const canonicalPath = pagePath ? `/${pagePath}` : ''
     const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
@@ -228,6 +225,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             type: blogPost ? 'article' : 'website',
             ...(canonical ? { url: canonical } : {}),
             ...(ogImage ? { images: [{ url: ogImage }] } : {}),
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: title ?? undefined,
+            description: description ?? undefined,
+            ...(ogImage ? { images: [ogImage] } : {}),
         },
         robots: page?.seo?.noIndex ? { index: false, follow: false } : undefined,
     }
@@ -296,7 +299,7 @@ export default async function TenantSitePage({ params }: Props) {
 
         return (
             <div className="min-h-screen bg-[#0B1120] text-white">
-                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
                 <article className="max-w-3xl mx-auto px-6 py-16">
                     {catName && (
                         <span className="text-sm font-bold uppercase tracking-wider text-blue-500 mb-4 block">{catName}</span>
@@ -321,7 +324,8 @@ export default async function TenantSitePage({ params }: Props) {
                         </div>
                     )}
                     <div
-                        className="prose prose-lg prose-invert max-w-none"
+                        className="prose prose-lg max-w-none"
+                        style={proseThemeVars}
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
@@ -344,13 +348,33 @@ export default async function TenantSitePage({ params }: Props) {
     const payload = await getPayload({ config })
     const imageLibraryS3 = await resolveImageLibraryS3Map(payload, site.id)
 
+    const origin = resolveStorefrontOrigin(data.tenant as any, { slug })
+    const orgJsonLd = pagePath === '' && origin ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': 'Organization', '@id': `${origin}#org`,
+                name: site.name, url: origin,
+                ...((site.branding as any)?.logo ? { logo: (site.branding as any).logo } : {}),
+            },
+            {
+                '@type': 'WebSite', '@id': `${origin}#website`,
+                name: site.name, url: origin,
+                publisher: { '@id': `${origin}#org` },
+            },
+        ],
+    } : null
+
     return (
-        <SiteRenderer
-            site={{ ...site, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
-            page={page as unknown as PageData}
-            pages={pages as unknown as NavPage[]}
-            siteId={String(site.id)}
-            isOwner={isOwner}
-        />
+        <>
+            {orgJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(orgJsonLd) }} />}
+            <SiteRenderer
+                site={{ ...site, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
+                page={page as unknown as PageData}
+                pages={pages as unknown as NavPage[]}
+                siteId={String(site.id)}
+                isOwner={isOwner}
+            />
+        </>
     )
 }

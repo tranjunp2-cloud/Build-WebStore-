@@ -233,4 +233,113 @@ Sau khi hoàn tất:
 - Auto Meta Gen lỗi nền (Publish Flow): Âm thầm retry (background error log) không cản trở flow bán hàng. 
 
 ---
-*(End of Wireframe Document)*
+
+## 5. REVAMP v2 — Hợp nhất 3 Tab → Layout 1 Cột (2026-06-24)
+
+> **Branch:** `feat/F03-dashboard-ui-ux-revamp` · **Plan kỹ thuật:** [`plans/260624-1114-dashboard-single-column-revamp/IMPLEMENTATION_PLAN.md`](../../plans/260624-1114-dashboard-single-column-revamp/IMPLEMENTATION_PLAN.md)
+> Section này **bổ sung** cho §1–§4 ở trên. Layout đổi từ 3 tab (Overview/Analytics/SEO) → **một luồng cuộn dọc 1 cột**. Reorder/ẩn-hiện block làm trong Customize Modal (không drag inline).
+
+### 5.1 Vertical Anatomy & Information Hierarchy
+
+Khi bỏ Tab, người dùng tiếp cận thông tin bằng **scroll**. Thứ tự block xếp theo **tần suất biến động dữ liệu** (động → tĩnh): chỉ số thay đổi hàng giờ đập vào mắt trước, chỉ số ổn định (tối ưu theo chu kỳ) nằm dưới.
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Toolbar — sticky top-right]   [ Filter: Today|7d|30d ] [ Tùy chỉnh ]│  ← luôn cố định
+├─────────────────────────────────────────────────────────────────────┤
+│ ① DashboardOnboarding (full-width, slide-up ẩn khi đủ checklist)     │  ← hành động cần làm NGAY
+├─────────────────────────────────────────────────────────────────────┤
+│ ② AT-A-GLANCE — 4 cards: Views · Leads · Engagement · Revenue*       │  ← ĐỘNG NHẤT (hàng giờ)
+│    [ 15,240 +12%↗ ] [ 340 -5%↘ ] [ 1,200 +8%↗ ] [ Revenue (Soon)* ] │     → đập vào mắt đầu tiên
+├─────────────────────────────────────────────────────────────────────┤
+│ ③ TRAFFIC & PERFORMANCE  (#section-analytics)                        │  ← động (hàng ngày)
+│    Daily Pageview Bar Chart (+ trục Y) → TopPerformingList           │
+│    [ Pages | Blogs | Referrers | Products(Soon) ]                    │
+├─────────────────────────────────────────────────────────────────────┤
+│ ④ SEO HEALTH & OPTIMIZATION  (#section-seo-health)                   │  ← ỔN ĐỊNH hơn (theo chu kỳ)
+│    [ Gauge 75/100 | SEO History (placeholder) ]  · 3 progress bars   │     → tối ưu định kỳ, ko cần
+│    ✨ AI Fix All · footer: preview lỗi nghiêm trọng nhất             │     đập mắt mỗi lần vào
+├─────────────────────────────────────────────────────────────────────┤
+│ ⑤ SEO ACTION TOOLS  (#section-seo-tools)                             │  ← hạ tầng kỹ thuật (ít đổi)
+│    Sitemap & Meta · SEO Issues List · Keyword Tracker (placeholder)  │
+├─────────────────────────────────────────────────────────────────────┤
+│ ⑥ Pending Orders (OFF mặc định — F10, bật qua Customize)            │  ← cuối cùng
+└─────────────────────────────────────────────────────────────────────┘
+* Revenue = Coming Soon overlay (xem §5.2)
+```
+
+**Nguyên tắc thứ tự (lý do để chống misalignment khi UAT):**
+- **Traffic trên SEO** vì traffic là chỉ số động — thay đổi theo giờ/ngày, user cần thấy ngay khi mở dashboard. SEO ổn định hơn, là việc tối ưu theo chu kỳ → đặt dưới.
+- **Onboarding trên cùng** (trên cả At-a-Glance) vì là hành động bắt buộc để mở khóa dữ liệu.
+- **F10/placeholder xuống đáy** — không chiếm vùng "above the fold".
+
+**Điều hướng thay Tab:** SEOHealthWidget (nếu giữ ở Overview) + mọi link nội bộ → **scroll-to anchor** (`scrollIntoView({behavior:'smooth'})`) tới `#section-seo-health`, không còn `setActiveTab`.
+
+**Mobile (375px):** At-a-Glance giữ lưới 2×2 (như §1.3); các section ③④⑤ stack dọc full-width.
+
+### 5.2 Quy chuẩn "Coming Soon" / Preview State (F10)
+
+Áp dụng cho: **Revenue card · Pending Orders section · Top Products tab · SEO History · Keyword Tracker**. Dùng 1 component tái sử dụng `ComingSoonOverlay` (DRY).
+
+```text
+┌──────────────────────────────┐
+│ Revenue          [Coming Soon]│  ← Badge variant="secondary" (xám)
+│ ┌──────────────────────────┐ │
+│ │  RM ----    --%          │ │  ← nội dung mờ (opacity-60)
+│ │  _--_/^--_/\_  (sparkline)│ │
+│ └──────────────────────────┘ │
+└──────────────────────────────┘
+   (hover → Tooltip giải thích)
+```
+
+| Thuộc tính | Quy chuẩn | Token / Class thực tế |
+|------------|-----------|------------------------|
+| **Opacity nội dung** | Mờ nhẹ phần data, giữ đọc được | `opacity-60` (đồng bộ precedent disabled/loading trong repo) |
+| **Badge** | Pill xám low-contrast, chữ "Coming Soon" / "Soon" / "Beta" | `<Badge variant="secondary">` → `bg-slate-400/[0.14] text-slate-600 dark:text-slate-300` |
+| **Vị trí badge** | Góc trên-phải của card/section | absolute top-right |
+| **Cursor khi hover** | `not-allowed` cho vùng tương tác (tab/nút bị khóa) | `cursor-not-allowed`. Card chỉ-xem (Revenue) giữ cursor mặc định |
+| **Tooltip** | Hiện khi hover, giải thích tính năng đang phát triển | shadcn `Tooltip` (Radix), bg `--popover`, text `--popover-foreground/0.85` |
+| **Tooltip copy (Revenue)** | — | "Tính năng tính doanh thu từ đơn đã thanh toán đang được phát triển (F10)." |
+| **Pending Orders (khi bật)** | Render skeleton data ảo + badge "Beta" | skeleton + `<Badge variant="secondary">Beta</Badge>` |
+
+> Lưu ý: component có sẵn `studio/_components/coming-soon-empty.tsx` dùng token admin-scoped (`--accent*`). Dashboard **không** dùng lại trực tiếp — `ComingSoonOverlay` mới dùng token semantic của dashboard (`--primary`, `--muted-foreground`, Badge `secondary`) để đồng bộ màu.
+
+### 5.3 Unified Empty State (chưa có site khả dụng)
+
+Khi `!hasUsableSites`: render **At-a-Glance ở trạng thái zero-data** → ngay dưới hiện **MỘT** khối Empty State lớn, action-oriented (không rải empty state nhỏ rời rạc). **Ẩn hoàn toàn** section ③④⑤⑥.
+
+```text
+├─────────────────────────────────────────────────────────────────────┤
+│ ② AT-A-GLANCE (zero data)                                            │
+│    [ Views 0 ] [ Leads 0 ] [ Engagement 0 ] [ Revenue (Soon) ]      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│                  [ Illustration: Dashboard & Rocket ]                 │  ← khích lệ
+│                     (glow primary/0.2, blur-60px)                     │
+│                                                                       │
+│              Website của bạn chưa được kích hoạt                      │  ← H2, --foreground
+│   Hoàn thành các bước hướng dẫn phía trên để mở khóa                  │  ← --muted-foreground
+│           hệ thống Phân tích dữ liệu & Tối ưu SEO.                    │
+│                                                                       │
+│                  [ ✨ Thiết lập Website ngay ]                        │  ← CTA gradient info→primary
+│                                                                       │     scroll-up tới Onboarding ①
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+| Thành phần | Quy chuẩn (bám house style §1.2 / `DashboardEmptyState.tsx`) |
+|------------|-------------------------------------------------------------|
+| **Illustration** | Rocket hiện có (200–256px) + glow `hsl(var(--primary)/0.2) blur-60px`. **Tái dùng** illustration cũ (không vẽ mới). |
+| **Container** | Centered, max-width ~448px, gap 18px icon↔text |
+| **Title** | H2 30px bold, `hsl(var(--foreground))` |
+| **Description** | 16px medium, `hsl(var(--muted-foreground))` |
+| **CTA** | 1 nút mạnh duy nhất, gradient `from-[hsl(var(--info))] to-[hsl(var(--primary))]`, text trắng, hover scale 1.02 |
+| **CTA target** | ⚠️ **Khác** `DashboardEmptyState` (vốn → `/builder/new`): nút này **scroll-up tới `#dashboard-onboarding`** để user hoàn thành checklist. (Nếu chưa có site nào cả → fallback `/builder/new`.) |
+
+> Phân biệt 2 empty state: `DashboardEmptyState` (§1.2, chưa có *site nào* → tạo mới) vs `UnifiedEmptyState` (§5.3, *có site nhưng chưa khả dụng/chưa publish* → hoàn thành onboarding). Logic trigger: `hasUsableSites` (giữ nguyên điều kiện, đổi cách render — không `return null`).
+
+### 5.4 Trạng thái "Không có data trong kỳ" (7d/30d rỗng)
+
+Khác với §5.3 — site khả dụng nhưng kỳ lọc không có data: **không ẩn block**. AnalyticsChart + TopPerformingList tự render `AnalyticsEmptyState` riêng (giữ logic hiện tại). SEO Issues List rỗng → hiện trạng thái "allGood".
+
+---
+*(End of Wireframe Document — Revamp v2 added 2026-06-24)*

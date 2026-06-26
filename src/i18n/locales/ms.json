@@ -2653,6 +2653,159 @@
             "accountSuspendedBody": "Akaun anda telah digantung. Sila hubungi sokongan. Anda akan dilog keluar sekarang.",
             "acknowledge": "Akui",
             "loggingOut": "Melog keluar..."
+        },
+        "revamp": {
+            "title": "Papan Pemuka",
+            "periodSub": {
+                "today": "Setiap jam · {range}",
+                "daily": "Harian · {range}"
+            },
+            "glance": {
+                "title": "Sekilas pandang",
+                "views": "Paparan halaman",
+                "leads": "Prospek",
+                "engagement": "Penglibatan",
+                "revenue": "Hasil",
+                "viewsTip": "Jumlah lawatan pelanggan ke semua halaman di laman web anda.",
+                "leadsTip": "Bakal pelanggan yang meninggalkan maklumat hubungan (e-mel, telefon) melalui borang pendaftaran di laman web anda.",
+                "engagementTip": "Tindakan pelanggan bernilai tinggi — seperti klik Beli Sekarang, Tambah ke Troli, atau pautan media sosial.",
+                "revenueSoonTip": "Penjejakan hasil akan datang. Kad ini akan mengira metrik daripada pesanan yang telah dibayar dan selesai.",
+                "noteToday": "vs semalam",
+                "note7d": "vs 7h lepas",
+                "note30d": "vs 30h lepas"
+            },
+            "comingSoon": "Akan Datang",
+            "soon": "Akan datang",
+            "onboarding": {
+                "title": "Lengkapkan persediaan kedai anda",
+                "subtitle": {
+                    "one": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda.",
+                    "other": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda."
+                },
+                "steps": {
+                    "products": {
+                        "name": "Sahkan produk anda",
+                        "desc": "AI telah menambah item demo. Sila semak inventori, harga dan variasi.",
+                        "cta": "Semak"
+                    },
+                    "design": {
+                        "name": "Sesuaikan reka bentuk anda",
+                        "desc": "Kemas kini imej, teks dan warna untuk sepadan dengan jenama anda.",
+                        "cta": "Sunting"
+                    },
+                    "shipping": {
+                        "name": "Tetapkan kadar penghantaran",
+                        "desc": "Lalai semasa ialah COD & penghantaran percuma. Kemas kini kadar untuk mengelak kerugian penghantaran.",
+                        "cta": "Sediakan"
+                    },
+                    "launch": {
+                        "name": "Terbitkan laman web anda",
+                        "desc": "Sedia untuk menjual? Lancarkan kedai anda dan mula menerima pesanan hari ini.",
+                        "cta": "Terbitkan"
+                    }
+                }
+            },
+            "traffic": {
+                "title": "Trafik & prestasi",
+                "subtitle": "Paparan halaman harian dan punca yang mendorongnya",
+                "totalPageviews": "jumlah paparan halaman · {period}",
+                "topPerforming": "Prestasi terbaik",
+                "tabs": {
+                    "pages": "Halaman",
+                    "blogs": "Blog",
+                    "referrers": "Perujuk",
+                    "products": "Produk"
+                },
+                "productsSoonTip": "Analitik produk — akan datang",
+                "emptyChartTitle": "Tiada trafik dalam tempoh ini",
+                "emptyChartDesc": "Sebaik pelawat tiba di laman anda, paparan halaman harian akan dipaparkan di sini.",
+                "emptyListTitle": "Tiada apa untuk disenaraikan lagi",
+                "emptyListDesc": "Halaman, blog dan perujuk teratas akan muncul sebaik anda mempunyai trafik.",
+                "periodToday": "hari ini",
+                "period7d": "7 hari lepas",
+                "period30d": "30 hari lepas"
+            },
+            "seo": {
+                "title": "Kesihatan SEO",
+                "subtitle": "Sejauh mana kedai anda mudah ditemui di enjin carian",
+                "scoreHistory": "Sejarah skor SEO",
+                "scoreHistoryTip": "Kami akan merekod skor anda setiap minggu supaya anda boleh menjejaki trend — akan datang.",
+                "scoreHistoryMsg": "Sedang dibangunkan — kami akan mencatat skor anda setiap minggu supaya anda boleh melihatnya meningkat.",
+                "gaugeHealthy": "Sihat",
+                "gaugeNeedsImprovement": "Perlu penambahbaikan",
+                "gaugeAtRisk": "Berisiko",
+                "breakdownMeta": "Tag Meta",
+                "breakdownContent": "Kualiti Kandungan",
+                "breakdownTechnical": "SEO Teknikal",
+                "criticalIssue": "Isu paling kritikal: {count} {text}. Membaikinya akan meningkatkan skor anda.",
+                "fixAll": "AI Baiki Semua Isu",
+                "issuesTitle": "Isu SEO",
+                "open": "{count} terbuka",
+                "allClear": "Semua selesai",
+                "allResolvedTitle": "Semua isu telah diselesaikan",
+                "allResolvedDesc": "Tiada isu SEO yang tertangguh — kedai anda dioptimumkan sepenuhnya. Kami akan menandakan isu baharu di sini apabila ia muncul.",
+                "fix": "Baiki",
+                "edit": "Sunting",
+                "altEditTip": "Penyuntingan teks Alt automatik dengan AI akan datang. Buat masa ini, klik untuk mengemas kini penerangan imej terus dalam pengurus produk anda.",
+                "issueAlt": {
+                    "one": "produk tiada teks Alt imej",
+                    "other": "produk tiada teks Alt imej"
+                },
+                "issueDescription": {
+                    "one": "halaman tiada penerangan meta",
+                    "other": "halaman tiada penerangan meta"
+                },
+                "issueTitle": {
+                    "one": "item tiada tajuk meta",
+                    "other": "item tiada tajuk meta"
+                }
+            },
+            "tools": {
+                "title": "Alat tindakan SEO",
+                "subtitle": "AI bekerja secara senyap di latar belakang supaya pelanggan dapat menemui kedai anda di Google",
+                "sitemap": "Peta laman",
+                "sitemapTip": "Peta laman menyenaraikan setiap halaman dalam kedai anda. Kami menyerahkannya kepada Google supaya ia dapat mencari dan menyenaraikan semua produk anda.",
+                "sitemapDesc": "Serahkan peta laman anda supaya Google dapat menemui dan mengindeks semua halaman anda.",
+                "resubmit": "Serah semula ke Google",
+                "autoMeta": "Tulis tajuk & penerangan carian secara automatik",
+                "autoMetaTip": "Inilah tajuk yang pelanggan lihat di Google. AI menulis tajuk yang ringkas dan menarik untuk setiap halaman secara automatik.",
+                "autoMetaDesc": "AI menulis tajuk ringkas dan menarik yang memikat pelanggan apabila mereka mencari di Google.",
+                "active": "Aktif",
+                "sitemapDone": "Peta laman diserahkan — {count} URL dihantar ke Google",
+                "sitemapRegenerated": "Peta laman dijana semula",
+                "sitemapError": "Tidak dapat menjana peta laman",
+                "metaOn": "Tag meta automatik dihidupkan",
+                "metaOff": "Tag meta automatik dimatikan",
+                "metaError": "Tidak dapat mengemas kini tetapan"
+            },
+            "orders": {
+                "title": "Pesanan belum selesai",
+                "subtitle": "Pesanan menunggu pemenuhan",
+                "awaiting": "Menunggu",
+                "mockOrder": "Pesanan pelanggan · {count} item",
+                "soonTip": "Baris gilir pemenuhan pesanan sedang dibangunkan — akan datang."
+            },
+            "customize": {
+                "button": "Sesuaikan",
+                "title": "Sesuaikan papan pemuka",
+                "description": "Seret untuk susun semula, atau togol blok hidup dan mati. Disimpan untuk akaun anda.",
+                "reset": "Set semula kepada lalai",
+                "cancel": "Batal",
+                "save": "Simpan susun atur",
+                "saving": "Menyimpan…",
+                "saved": "Susun atur papan pemuka disimpan",
+                "saveError": "Gagal menyimpan susun atur",
+                "dragToReorder": "Seret untuk susun semula",
+                "moveUp": "Alih ke atas",
+                "moveDown": "Alih ke bawah",
+                "close": "Tutup",
+                "blockOnboarding": "Senarai semak permulaan",
+                "blockGlance": "Statistik sekilas pandang",
+                "blockTraffic": "Trafik & prestasi",
+                "blockSeo": "Kesihatan SEO",
+                "blockTools": "Alat tindakan SEO",
+                "blockOrders": "Pesanan belum selesai"
+            }
         }
     },
     "auth": {

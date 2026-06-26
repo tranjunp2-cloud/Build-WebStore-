@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
@@ -13,6 +14,9 @@ import type { TenantMembership } from '@/lib/normalize-tenants'
 import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
+import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { serializeJsonLd } from '@/lib/seo/json-ld'
+import { proseThemeVars } from '@/lib/theme/prose-theme'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,13 +85,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const seo = data.post.seo as Record<string, unknown> | undefined
     const siteName = data.site.name || 'Store'
+    const title = (seo?.metaTitle as string) || `${data.post.title} — ${siteName}`
+    const description = (seo?.metaDescription as string) || `Read ${data.post.title} on ${siteName}`
+
+    const thumbUrl = typeof data.post.thumbnail === 'object' && data.post.thumbnail
+        ? (data.post.thumbnail as Record<string, unknown>).url as string
+        : null
+
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const origin = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
 
     return {
-        title: (seo?.metaTitle as string) || `${data.post.title} — ${siteName}`,
-        description: (seo?.metaDescription as string) || `Read ${data.post.title} on ${siteName}`,
+        title,
+        description,
+        ...(origin ? { alternates: { canonical: `${origin}/blog/${blogSlug}` } } : {}),
         openGraph: {
             title: (seo?.metaTitle as string) || (data.post.title as string),
             description: (seo?.metaDescription as string) || undefined,
+            type: 'article',
+            ...(origin ? { url: `${origin}/blog/${blogSlug}` } : {}),
+            ...(thumbUrl ? { images: [{ url: thumbUrl }] } : {}),
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+            ...(thumbUrl ? { images: [thumbUrl] } : {}),
         },
     }
 }
@@ -125,6 +149,29 @@ export default async function BlogDetailPage({ params }: Props) {
 
     const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
 
+    const origin = resolveStorefrontOrigin(tenant as any, { slug })
+    const articleJsonLd = origin ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title as string,
+        ...(thumbnail ? { image: thumbnail } : {}),
+        ...(post.publishedAt
+            ? { datePublished: new Date(post.publishedAt as string).toISOString() }
+            : (post.createdAt ? { datePublished: new Date(post.createdAt as string).toISOString() } : {})),
+        ...(post.updatedAt ? { dateModified: new Date(post.updatedAt as string).toISOString() } : {}),
+        ...(author ? { author: { '@type': 'Person', name: author } } : {}),
+    } : null
+
+    const breadcrumbJsonLd = origin ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: origin },
+            { '@type': 'ListItem', position: 2, name: 'Blog', item: `${origin}/blogs` },
+            { '@type': 'ListItem', position: 3, name: post.title as string, item: `${origin}/blog/${blogSlug}` },
+        ],
+    } : null
+
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
@@ -132,6 +179,8 @@ export default async function BlogDetailPage({ params }: Props) {
             isOwner={isOwner}
         >
             <ScrollToTop />
+            {articleJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(articleJsonLd) }} />}
+            {breadcrumbJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />}
             <article className="max-w-3xl mx-auto px-4 py-8">
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm opacity-60 mb-8">
@@ -190,6 +239,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-blockquote:border-l-4
                         prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
+                    style={proseThemeVars}
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                 />
 
