@@ -61,7 +61,11 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
                 aria-haspopup="true"
                 aria-expanded={open}
             >
-                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden">
+                {/* !text-white: initials + bg-blue-600 sit on the SAME element, so the
+                    `.dash-shell .bg-blue-600 .text-white` descendant remap doesn't apply and
+                    plain text-white falls through to --dash-text (dark in light mode). The `!`
+                    keeps the initial white, matching the profile avatar (profile-banner.tsx). */}
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold !text-white shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden">
                     {showImage ? (
                         <Image
                             src={avatarUrl}

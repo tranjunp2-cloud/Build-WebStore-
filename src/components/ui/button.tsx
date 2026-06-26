@@ -35,6 +35,11 @@ const buttonVariants = cva(
                     'bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] !text-white font-semibold shadow-none hover:opacity-90 focus-visible:ring-cyan-500',
                 dashSecondary:
                     '[border:1px_solid_hsl(var(--input-border))] bg-transparent text-[var(--dash-text)] font-medium hover:bg-white/[0.05] focus-visible:ring-zinc-400',
+                // GH-1192 dash ghost: subtle action inside .dash-shell (pairs with size="dash"/"sm").
+                // Mirrors the revamp `.btn-ghost` (transparent + muted ink, hover surface + full ink).
+                // Token colors survive the `.dash-shell` legacy remap, so no `!` needed here.
+                dashGhost:
+                    'bg-transparent text-[var(--dash-text-muted)] font-medium hover:bg-white/[0.05] hover:text-[var(--dash-text)] focus-visible:ring-zinc-400',
             },
             size: {
                 // Unified radius: all sizes inherit base `rounded-lg` (8px). Height scale only.

@@ -160,11 +160,11 @@ export function ImageUploader({
                 {value.length < maxImages && (
                     <div
                         className={cn(
-                            "relative shrink-0 flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
+                            "group relative shrink-0 flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
                             variant === 'square' 
                                 ? "w-[147px] h-[147px] rounded-2xl border-2 border-dashed" 
                                 : "w-full h-[92px] rounded-[12px] border border-solid gap-[6px]",
-                            dragActive ? "border-blue-500 bg-blue-500/10" : "border-white/10 hover:border-white/20 hover:bg-white/5",
+                            dragActive ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.1)]" : "border-white/10 hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.06)]",
                             isUploading && "pointer-events-none opacity-50"
                         )}
                         onDragEnter={handleDrag}
@@ -187,10 +187,11 @@ export function ImageUploader({
                             </div>
                         ) : (
                             <div className={cn("flex items-center justify-center", variant === 'square' ? "flex-col gap-2" : "flex-col gap-[6px]")}>
-                                <Upload className={cn("w-6 h-6", dragActive ? "text-blue-500" : "text-[#F8FAFC]/40")} />
-                                <span className={cn("font-medium", 
+                                <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-[hsl(var(--primary))]" : "text-[#F8FAFC]/40 group-hover:text-[hsl(var(--primary))]")} />
+                                <span className={cn("font-medium transition-colors",
                                     variant === 'square' ? "text-[12px] leading-[1.33]" : "text-[12px] leading-[1.21]",
-                                    dragActive ? "text-blue-400" : (variant === 'wide' ? "text-[#374151]" : "text-[#F8FAFC]/40"))}>
+                                    dragActive ? "text-[hsl(var(--primary))]" : (variant === 'wide' ? "text-[#374151]" : "text-[#F8FAFC]/40"),
+                                    !dragActive && "group-hover:text-[hsl(var(--primary))]")}>
                                     {placeholderText}
                                 </span>
                             </div>

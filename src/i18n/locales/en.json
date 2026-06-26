@@ -175,11 +175,18 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Registration form", "Course schedule", "Course gallery..."]
+                        "items": [
+                            "Registration form",
+                            "Course schedule",
+                            "Course gallery..."
+                        ]
                     },
                     "block2": {
                         "title": "Contact Form",
-                        "items": ["Subject, Message", "Send consultation email"]
+                        "items": [
+                            "Subject, Message",
+                            "Send consultation email"
+                        ]
                     }
                 },
                 "training": {
@@ -193,11 +200,18 @@
                     ],
                     "block1": {
                         "title": "Course Blocks",
-                        "items": ["Course list", "Class schedule", "Instructors..."]
+                        "items": [
+                            "Course list",
+                            "Class schedule",
+                            "Instructors..."
+                        ]
                     },
                     "block2": {
                         "title": "Registration & Payment",
-                        "items": ["Registration form", "Payment schedule"]
+                        "items": [
+                            "Registration form",
+                            "Payment schedule"
+                        ]
                     }
                 },
                 "retail": {
@@ -211,11 +225,18 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Products", "Cart", "Filters..."]
+                        "items": [
+                            "Products",
+                            "Cart",
+                            "Filters..."
+                        ]
                     },
                     "block2": {
                         "title": "Checkout",
-                        "items": ["Delivery information", "Payment"]
+                        "items": [
+                            "Delivery information",
+                            "Payment"
+                        ]
                     }
                 },
                 "fnb": {
@@ -229,11 +250,18 @@
                     ],
                     "block1": {
                         "title": "Menu Blocks",
-                        "items": ["Dish categories", "Combos", "Table booking..."]
+                        "items": [
+                            "Dish categories",
+                            "Combos",
+                            "Table booking..."
+                        ]
                     },
                     "block2": {
                         "title": "Order & Delivery",
-                        "items": ["Cart", "Delivery address"]
+                        "items": [
+                            "Cart",
+                            "Delivery address"
+                        ]
                     }
                 },
                 "events": {
@@ -247,11 +275,18 @@
                     ],
                     "block1": {
                         "title": "Event Blocks",
-                        "items": ["Countdown", "Ticket registration form", "Schedule..."]
+                        "items": [
+                            "Countdown",
+                            "Ticket registration form",
+                            "Schedule..."
+                        ]
                     },
                     "block2": {
                         "title": "Attendance Confirmation",
-                        "items": ["Send email", "QR check-in"]
+                        "items": [
+                            "Send email",
+                            "QR check-in"
+                        ]
                     }
                 },
                 "other": {
@@ -265,11 +300,18 @@
                     ],
                     "block1": {
                         "title": "Block Library",
-                        "items": ["Hero, Form", "Gallery", "Button..."]
+                        "items": [
+                            "Hero, Form",
+                            "Gallery",
+                            "Button..."
+                        ]
                     },
                     "block2": {
                         "title": "Contact Form",
-                        "items": ["Subject, Message", "Send email"]
+                        "items": [
+                            "Subject, Message",
+                            "Send email"
+                        ]
                     }
                 }
             }
@@ -278,35 +320,68 @@
             "title": "Why choose PrimeWeb?",
             "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
             "stats": {
-                "customers": { "value": "10,000+", "label": "Active customers" },
-                "published": { "value": "50,000+", "label": "Websites published" },
-                "blocks": { "value": "900+", "label": "Block templates ready" },
-                "speed": { "value": "5 min", "label": "Build a website with AI" }
+                "customers": {
+                    "value": "10,000+",
+                    "label": "Active customers"
+                },
+                "published": {
+                    "value": "50,000+",
+                    "label": "Websites published"
+                },
+                "blocks": {
+                    "value": "900+",
+                    "label": "Block templates ready"
+                },
+                "speed": {
+                    "value": "5 min",
+                    "label": "Build a website with AI"
+                }
             },
             "cards": {
                 "easyToUse": {
                     "title": "Easy to use — fast to deploy",
-                    "points": ["Design with simple drag & drop", "No coding knowledge required", "Dramatically reduces deployment time"]
+                    "points": [
+                        "Design with simple drag & drop",
+                        "No coding knowledge required",
+                        "Dramatically reduces deployment time"
+                    ]
                 },
                 "dataSync": {
                     "title": "Seamless data connectivity",
-                    "points": ["Centralise data from multiple channels", "Connect forms, email, and more"]
+                    "points": [
+                        "Centralise data from multiple channels",
+                        "Connect forms, email, and more"
+                    ]
                 },
                 "security": {
                     "title": "High security, stable operations",
-                    "points": ["Secure infrastructure, performance-optimised", "Friendly interface across all devices"]
+                    "points": [
+                        "Secure infrastructure, performance-optimised",
+                        "Friendly interface across all devices"
+                    ]
                 },
                 "yourContent": {
                     "title": "Your content",
-                    "points": ["Visual editor, fast editing", "AI description and SEO suggestions"]
+                    "points": [
+                        "Visual editor, fast editing",
+                        "AI description and SEO suggestions"
+                    ]
                 },
                 "automation": {
                     "title": "Engagement & automation",
-                    "points": ["Multi-channel customer engagement", "Nurture throughout the customer journey", "Automate repetitive tasks"]
+                    "points": [
+                        "Multi-channel customer engagement",
+                        "Nurture throughout the customer journey",
+                        "Automate repetitive tasks"
+                    ]
                 },
                 "fullAi": {
                     "title": "Full AI capabilities",
-                    "points": ["Build websites via chat", "AI writes descriptions, optimises SEO", "Automate content creation"]
+                    "points": [
+                        "Build websites via chat",
+                        "AI writes descriptions, optimises SEO",
+                        "Automate content creation"
+                    ]
                 }
             }
         },
@@ -1319,8 +1394,8 @@
                 "description": "Description",
                 "attributes": "Attributes",
                 "deleteConfirm": "Are you certain?",
-                "deleteProduct": "DELETE PRODUCT",
-                "editProduct": "EDIT PRODUCT"
+                "deleteProduct": "Delete Product",
+                "editProduct": "Edit Product"
             },
             "title": "Products",
             "addProduct": "Add Product",
@@ -4419,10 +4494,10 @@
             "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
             "manageButton": "Manage Account in SSO",
             "urlMissing": "SSO portal URL is not configured. Contact admin.",
-            "generalTitle": "🔒 Information managed by SSO",
+            "generalTitle": " Information managed by SSO",
             "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
             "generalLink": "To make changes, please visit the SSO portal",
-            "securityTitle": "🛡️ SSO Protected Account",
+            "securityTitle": " SSO Protected Account",
             "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
             "securityLink": "Manage SSO Account"
         },

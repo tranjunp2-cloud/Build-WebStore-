@@ -192,10 +192,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
 
             {/* Footer — language switch; icon-only when collapsed (phase-02) */}
             {mini ? (
-                <div
-                    className="flex flex-col items-center gap-3 px-3 py-[17px]"
-                    style={{ borderTop: '1px solid var(--dash-divider)' }}
-                >
+                <div className="dash-sidebar-footer flex flex-col items-center gap-3 px-3 py-[17px]">
                     <button
                         onClick={toggleLocale}
                         aria-label={locale === 'ms' ? 'Switch to English' : 'Switch to Malay'}
@@ -205,10 +202,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     </button>
                 </div>
             ) : (
-            <div
-                className="flex flex-col gap-3 px-3 py-[17px]"
-                style={{ borderTop: '1px solid var(--dash-divider)' }}
-            >
+            <div className="dash-sidebar-footer flex flex-col gap-3 px-3 py-[17px]">
                 <LanguageToggle locale={locale} toggleLocale={toggleLocale} />
             </div>
             )}
@@ -226,7 +220,8 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         onClick={() => setMobileOpen(false)}
                     />
                     <aside
-                        className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
+                        // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
+                        className="dark sb-dark absolute left-0 top-[56px] bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
                         {renderSidebarContent(false)}
@@ -238,7 +233,8 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
             <aside
                 id="dashboard-sidebar"
                 className={cn(
-                    'fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
+                    // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
+                    'dark sb-dark fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
                     animateCollapse && 'transition-[width] duration-200',
                     collapsed ? 'w-[64px]' : 'w-[250px]'
                 )}

@@ -326,11 +326,13 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
                     {/* Footer Actions (Node 30928:4057) */}
                     <div className="mt-auto pt-[24px] border-t border-[#414754]/10 flex justify-between items-center shrink-0">
+                        {/* Delete — destructive outline (viền + chữ đỏ hiện sẵn, hover tô nền đỏ nhạt).
+                            dashSecondary + token destructive: chuẩn light/dark, cùng size dash với Edit. */}
                         <Button
-                            variant="ghost"
+                            variant="dashSecondary"
                             size="dash"
                             onClick={() => onDelete(product)}
-                            className="flex items-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 uppercase tracking-widest text-xs font-bold"
+                            className="flex items-center gap-2 [border:1px_solid_hsl(var(--destructive)/0.4)] text-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.1)]"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             {t.dashboard?.products?.quickView?.deleteProduct || 'DELETE PRODUCT'}
@@ -342,7 +344,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                 router.push(`/products/${product.id}`)
                                 onClose()
                             }}
-                            className="flex items-center gap-2 uppercase tracking-widest text-xs font-black"
+                            className="flex items-center gap-2"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                             {t.dashboard?.products?.quickView?.editProduct || 'EDIT PRODUCT'}
