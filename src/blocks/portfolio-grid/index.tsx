@@ -10,6 +10,7 @@ import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 void _CSS_VARS
 
@@ -37,21 +38,40 @@ type ProjectCardProps = {
     project: Project
     className?: string
     imageIndex?: number
+    /** Payload field path for the MediaUploadOverlay — omit for fallback-only slots. */
+    uploadField?: string
 }
 
-function ProjectCard({ project, className = '', imageIndex }: ProjectCardProps) {
+function ProjectCard({ project, className = '', imageIndex, uploadField }: ProjectCardProps) {
     const Wrapper = project.linkUrl ? 'a' : 'div'
     const linkProps = project.linkUrl
         ? { href: project.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' }
         : {}
     return (
         <Wrapper {...linkProps} className={`group relative overflow-hidden rounded-2xl block ${className}`}>
-            <img
-                src={project.imageUrl}
-                alt={project.title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                data-image-index={imageIndex}
-            />
+            {uploadField ? (
+                <MediaUploadOverlay
+                    field={uploadField}
+                    altText={project.title}
+                    valueShape="media"
+                    positionClass="relative"
+                    className="w-full h-full"
+                >
+                    <img
+                        src={project.imageUrl}
+                        alt={project.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        data-image-index={imageIndex}
+                    />
+                </MediaUploadOverlay>
+            ) : (
+                <img
+                    src={project.imageUrl}
+                    alt={project.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    data-image-index={imageIndex}
+                />
+            )}
             {/* Hover overlay — pointer-events-none so mouse events reach the <img> for editor image-replace */}
             <div
                 className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
@@ -123,10 +143,21 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {/* Showcase variant: first item large */}
             {variant === 'showcase' && filtered.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <ProjectCard project={filtered[0].project} className="aspect-[4/3]" imageIndex={filtered[0].index} />
+                    <ProjectCard
+                        project={filtered[0].project}
+                        className="aspect-[4/3]"
+                        imageIndex={filtered[0].index}
+                        uploadField={filtered[0].index < rawProjects.length ? `projects.${filtered[0].index}.image` : undefined}
+                    />
                     <div className="grid grid-cols-2 gap-6">
                         {filtered.slice(1, 5).map(({ project, index }) => (
-                            <ProjectCard key={index} project={project} className="aspect-square" imageIndex={index} />
+                            <ProjectCard
+                                key={index}
+                                project={project}
+                                className="aspect-square"
+                                imageIndex={index}
+                                uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
+                            />
                         ))}
                     </div>
                 </div>
@@ -141,6 +172,7 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
                             project={project}
                             className={`break-inside-avoid ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-square'}`}
                             imageIndex={index}
+                            uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
                         />
                     ))}
                 </div>
@@ -150,7 +182,13 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {variant === 'grid' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filtered.map(({ project, index }) => (
-                        <ProjectCard key={index} project={project} className="aspect-[4/3]" imageIndex={index} />
+                        <ProjectCard
+                            key={index}
+                            project={project}
+                            className="aspect-[4/3]"
+                            imageIndex={index}
+                            uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
+                        />
                     ))}
                 </div>
             )}
@@ -159,7 +197,13 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {variant === 'showcase' && filtered.length > 5 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filtered.slice(5).map(({ project, index }) => (
-                        <ProjectCard key={index} project={project} className="aspect-[4/3]" imageIndex={index} />
+                        <ProjectCard
+                            key={index}
+                            project={project}
+                            className="aspect-[4/3]"
+                            imageIndex={index}
+                            uploadField={index < rawProjects.length ? `projects.${index}.image` : undefined}
+                        />
                     ))}
                 </div>
             )}

@@ -3310,6 +3310,7 @@
         },
         "imageToolbar": {
             "changeImage": "Tukar Gambar",
+            "uploading": "Memuat naik...",
             "generateAI": "Jana Gambar AI"
         },
         "saveStatus": {

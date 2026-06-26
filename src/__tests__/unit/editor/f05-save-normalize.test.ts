@@ -889,4 +889,72 @@ describe('normalizeBlocksForPersistence — gallery images normalization (GH-138
         expect(projects[0].image).toBe(123)
         expect(projects[1].image).toBe(456)
     })
+
+    // ──────── GH-1381 FOLLOW-UP: url-group fields (before-after, etc.) ────────
+    // These are Payload group fields {url, alt, label} that should NOT be normalized
+    // (NOT in UPLOAD_FIELDS). The upload overlay sets only .url subfield to preserve siblings.
+
+    it('TC-GH1381-UO-020: before-after group field {url,alt,label} NOT normalized', () => {
+        // Arrange — before-after block with url-group fields (NOT media relations)
+        const blocks = [
+            {
+                blockType: 'before-after',
+                variant: 'slider',
+                beforeImage: {
+                    url: 'https://cdn/before.jpg',
+                    alt: 'Before state',
+                    label: 'Before',
+                },
+                afterImage: {
+                    url: 'https://cdn/after.jpg',
+                    alt: 'After state',
+                    label: 'After',
+                },
+            },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — url-group fields stay as objects (NOT extracted to id)
+        const block = result[0] as Record<string, unknown>
+        const beforeImage = block.beforeImage as Record<string, unknown>
+        expect(beforeImage.url).toBe('https://cdn/before.jpg')
+        expect(beforeImage.alt).toBe('Before state')
+        expect(beforeImage.label).toBe('Before')
+        const afterImage = block.afterImage as Record<string, unknown>
+        expect(afterImage.url).toBe('https://cdn/after.jpg')
+        expect(afterImage.alt).toBe('After state')
+        expect(afterImage.label).toBe('After')
+    })
+
+    it('TC-GH1381-UO-021: before-after .url upload preserves alt/label siblings', () => {
+        // Arrange — simulate the upload flow: overlay sets only .url, siblings preserved
+        const blocks = [
+            {
+                blockType: 'before-after',
+                variant: 'slider',
+                beforeImage: {
+                    url: 'https://old/before.jpg',
+                    alt: 'Original before',
+                    label: 'Baseline',
+                },
+                afterImage: {
+                    url: 'https://old/after.jpg',
+                    alt: 'Original after',
+                    label: 'Result',
+                },
+            },
+        ]
+
+        // Act — simulates: callback.onFieldChange('beforeImage.url', 'https://new/before.jpg')
+        blocks[0].beforeImage.url = 'https://new/before.jpg'
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — url updated, but alt/label intact (NOT nulled by normalization)
+        const beforeImage = result[0].beforeImage as Record<string, unknown>
+        expect(beforeImage.url).toBe('https://new/before.jpg')
+        expect(beforeImage.alt).toBe('Original before') // Preserved
+        expect(beforeImage.label).toBe('Baseline') // Preserved
+    })
 })

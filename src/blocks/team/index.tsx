@@ -18,6 +18,7 @@ import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { X } from 'lucide-react'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 const FALLBACK_MEMBERS: TeamConfig['members'] = [
     { name: 'Team Lead', role: 'Founder' },
@@ -96,10 +97,10 @@ function InitialsAvatar({ name, size = 'md', imageIndex }: { name: string; size?
  */
 function MemberAvatar({ member, imageIndex }: { member: TeamMember; imageIndex?: number }) {
     const [imgError, setImgError] = useState(false)
-    if (!member.image?.url || imgError) {
-        return <InitialsAvatar name={member.name} imageIndex={imageIndex} />
-    }
-    return (
+    const fieldPath = imageIndex !== undefined ? `members.${imageIndex}.image` : 'members.0.image'
+    const inner = (!member.image?.url || imgError) ? (
+        <InitialsAvatar name={member.name} imageIndex={imageIndex} />
+    ) : (
         <img
             src={member.image.url}
             alt={member.image.alt || `${member.name} portrait`}
@@ -108,6 +109,17 @@ function MemberAvatar({ member, imageIndex }: { member: TeamMember; imageIndex?:
             onError={() => setImgError(true)}
             data-image-index={imageIndex}
         />
+    )
+    return (
+        <MediaUploadOverlay
+            field={fieldPath}
+            altText={member.image?.alt || `${member.name} portrait`}
+            valueShape="media"
+            buttonPosition="top-center"
+            positionClass="relative inline-block"
+        >
+            {inner}
+        </MediaUploadOverlay>
     )
 }
 
@@ -502,19 +514,16 @@ function BioModalVariant({
  */
 function CompactAvatar({ member, imageIndex }: { member: TeamMember; imageIndex: number }) {
     const [imgError, setImgError] = useState(false)
-    if (!member.image?.url || imgError) {
-        return (
-            <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: CSS_VARS.primary }}
-                aria-hidden="true"
-                data-image-index={imageIndex}
-            >
-                {getInitials(member.name)}
-            </div>
-        )
-    }
-    return (
+    const inner = (!member.image?.url || imgError) ? (
+        <div
+            className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
+            style={{ background: CSS_VARS.primary }}
+            aria-hidden="true"
+            data-image-index={imageIndex}
+        >
+            {getInitials(member.name)}
+        </div>
+    ) : (
         <img
             src={member.image.url}
             alt={member.image.alt || `${member.name} portrait`}
@@ -523,6 +532,17 @@ function CompactAvatar({ member, imageIndex }: { member: TeamMember; imageIndex:
             onError={() => setImgError(true)}
             data-image-index={imageIndex}
         />
+    )
+    return (
+        <MediaUploadOverlay
+            field={`members.${imageIndex}.image`}
+            altText={member.image?.alt || `${member.name} portrait`}
+            valueShape="media"
+            buttonPosition="top-center"
+            positionClass="relative inline-block"
+        >
+            {inner}
+        </MediaUploadOverlay>
     )
 }
 

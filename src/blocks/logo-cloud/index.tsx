@@ -7,7 +7,7 @@ import { RichText } from '../shared/RichText'
 import { Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
-import { LogoImageOverlay } from './LogoImageOverlay'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 void _CSS_VARS
 
@@ -64,13 +64,13 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
                                 }}
                             >
-                                <LogoImageOverlay logoIndex={i} altText={item.logo?.alt || item.name}>
+                                <MediaUploadOverlay field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
                                     {item.logo?.url ? (
                                         <Image src={item.logo.url} alt={item.logo?.alt || item.name} width={0} height={0} sizes="256px" className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                                     ) : (
                                         <LogoPlaceholder name={item.name} imageIndex={i} />
                                     )}
-                                </LogoImageOverlay>
+                                </MediaUploadOverlay>
                             </div>
                         ))}
                     </div>
@@ -86,13 +86,13 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <LogoHeadline text={headline} />
                 <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 max-w-5xl mx-auto">
                     {logos.map((item, i) => (
-                        <LogoImageOverlay key={i} logoIndex={i} altText={item.logo?.alt || item.name}>
+                        <MediaUploadOverlay key={i} field={`logos.${i}.logo`} altText={item.logo?.alt || item.name} valueShape="media" buttonPosition="top-center">
                             {item.logo?.url ? (
                                 <Image src={item.logo.url} alt={item.logo?.alt || item.name} width={0} height={0} sizes="256px" className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                             ) : (
                                 <LogoPlaceholder name={item.name} imageIndex={i} />
                             )}
-                        </LogoImageOverlay>
+                        </MediaUploadOverlay>
                     ))}
                 </div>
             </SectionWrapper>

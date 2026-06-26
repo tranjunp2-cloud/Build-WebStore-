@@ -7,6 +7,7 @@ import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 void _CSS_VARS
 
@@ -38,13 +39,21 @@ export function GalleryMasonryBlock({ block, theme: _theme }: BlockProps<Gallery
                     <div className={`grid ${gridCols} gap-4`}>
                         {images.map((img, i) => (
                             <div key={i} className="relative group overflow-hidden rounded-2xl aspect-square">
-                                <img
-                                    src={img?.url}
-                                    alt={img?.alt || ''}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
+                                <MediaUploadOverlay
+                                    field={`images.${i}`}
+                                    altText={img?.alt || img?.caption || 'gallery image'}
+                                    valueShape="url-group"
+                                    positionClass="relative"
+                                    className="w-full h-full"
+                                >
+                                    <img
+                                        src={img?.url}
+                                        alt={img?.alt || ''}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    />
+                                </MediaUploadOverlay>
                                 <div
-                                    className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                    className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                                     style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
                                     {img.caption && <Body size="small" className="text-white font-medium">{img.caption}</Body>}
@@ -56,13 +65,21 @@ export function GalleryMasonryBlock({ block, theme: _theme }: BlockProps<Gallery
                     <div className={`${columnsClass} gap-4 space-y-4`}>
                         {images.map((img, i) => (
                             <div key={i} className="relative group overflow-hidden rounded-2xl break-inside-avoid">
-                                <img
-                                    src={img?.url}
-                                    alt={img?.alt || ''}
-                                    className="w-full h-auto transition-transform duration-500 group-hover:scale-110"
-                                />
+                                <MediaUploadOverlay
+                                    field={`images.${i}`}
+                                    altText={img?.alt || img?.caption || 'gallery image'}
+                                    valueShape="url-group"
+                                    positionClass="relative"
+                                    className="w-full"
+                                >
+                                    <img
+                                        src={img?.url}
+                                        alt={img?.alt || ''}
+                                        className="w-full h-auto transition-transform duration-500 group-hover:scale-110"
+                                    />
+                                </MediaUploadOverlay>
                                 <div
-                                    className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                    className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                                     style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
                                     {img.caption && <Body size="small" className="text-white font-medium">{img.caption}</Body>}

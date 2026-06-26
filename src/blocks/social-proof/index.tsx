@@ -10,6 +10,7 @@ import { Heading, Body, Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getTeamAvatar } from '@/lib/images/industry-images'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -31,20 +32,31 @@ function StarRating({ rating, color }: { rating: number; color: string }) {
 
 function Avatar({ src, name, color, imageIndex }: { src?: string; name: string; color: string; imageIndex?: number }) {
     const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    const fieldPath = imageIndex !== undefined ? `reviews.${imageIndex}.avatar` : undefined
 
-    if (src) {
-        return (
-            <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
-        )
-    }
-
-    return (
+    const inner = src ? (
+        <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
+    ) : (
         <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
             style={{ backgroundColor: color }}
         >
             {initials}
         </div>
+    )
+
+    if (!fieldPath) return inner
+
+    return (
+        <MediaUploadOverlay
+            field={fieldPath}
+            altText={name}
+            valueShape="media"
+            buttonPosition="top-center"
+            positionClass="relative inline-block"
+        >
+            {inner}
+        </MediaUploadOverlay>
     )
 }
 

@@ -6,6 +6,7 @@ import type { AboutConfig, TimelineItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
+import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
 import {
     SectionLabel,
     DiagonalStripe,
@@ -81,13 +82,15 @@ function AboutImage({
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.15 }}
         >
-            <img
-                src={imageUrl}
-                alt={alt}
-                className="w-full h-auto object-cover aspect-[4/3] max-h-[500px]"
-                style={{ borderRadius: 'var(--radius-lg)' }}
-                loading="lazy"
-            />
+            <MediaUploadOverlay field="image" altText={alt}>
+                <img
+                    src={imageUrl}
+                    alt={alt}
+                    className="w-full h-auto object-cover aspect-[4/3] max-h-[500px]"
+                    style={{ borderRadius: 'var(--radius-lg)' }}
+                    loading="lazy"
+                />
+            </MediaUploadOverlay>
         </motion.div>
     )
 }

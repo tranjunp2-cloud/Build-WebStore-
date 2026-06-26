@@ -833,6 +833,16 @@ function PreviewFrameInner({
                 // Payload upload fields: image, backgroundImage, posterImage, logo, avatar, etc.
                 // Values can be: number (ID), populated object {id,url}, or null (cleared/stripped by save)
                 const IMAGE_FIELD_NAMES = ['image', 'backgroundImage', 'background_image', 'posterImage', 'logo', 'avatar', 'thumbnail']
+                // GH-1381: only these root upload fields are normalized back to an integer id on save
+                // (normalizeBlocksForPersistence → UPLOAD_FIELDS). For them we can safely store the
+                // populated object { id, url, alt } so the preview updates immediately. Fields NOT in
+                // this set (posterImage / thumbnail / background_image) must stay a bare id — storing an
+                // object there would persist the raw object (or null a string-url field) and lose data.
+                const NORMALIZABLE_UPLOAD_FIELDS = new Set(['image', 'backgroundImage', 'logo', 'avatar'])
+                const buildImageValue = (fieldName: string, existingAlt = ''): unknown =>
+                    NORMALIZABLE_UPLOAD_FIELDS.has(fieldName)
+                        ? { id: newMediaId, url: newUrl, alt: existingAlt }
+                        : newMediaId
                 const blockData = block as Record<string, unknown>
                 let matched = false
 
@@ -846,7 +856,11 @@ function PreviewFrameInner({
                                 (typeof val === 'object' && 'url' in (val as Record<string, unknown>) &&
                                     src.includes(String((val as Record<string, unknown>).url)))
                             if (isMatch) {
-                                updateBlock(blockIndex, { [fieldName]: newMediaId })
+                                // Preserve existing alt if the field already held a populated image object
+                                const existingAlt = typeof val === 'object' && val !== null
+                                    ? String((val as Record<string, unknown>).alt ?? '')
+                                    : ''
+                                updateBlock(blockIndex, { [fieldName]: buildImageValue(fieldName, existingAlt) })
                                 matched = true
                                 break
                             }
@@ -858,7 +872,7 @@ function PreviewFrameInner({
                     if (!matched) {
                         for (const fieldName of IMAGE_FIELD_NAMES) {
                             if (fieldName in blockData && (blockData[fieldName] === null || typeof blockData[fieldName] === 'number')) {
-                                updateBlock(blockIndex, { [fieldName]: newMediaId })
+                                updateBlock(blockIndex, { [fieldName]: buildImageValue(fieldName) })
                                 matched = true
                                 break
                             }
