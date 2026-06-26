@@ -284,6 +284,9 @@ function PreviewFrameInner({
     }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
+    // GH-1367 Bug 3: keeps the iframe frozen while the inline-edit save flushes in the
+    // background, even though the text toolbar (gated by textEditingData) is already hidden.
+    const [isFlushingEdit, setIsFlushingEdit] = useState(false)
     const [iframeScrollY, setIframeScrollY] = useState(0)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
@@ -361,6 +364,11 @@ function PreviewFrameInner({
     const textEditStopTimerRef = useRef<number | null>(null)
     const currentLiveTextRef = useRef<string | null>(null)
     const pendingInlineEditRef = useRef<InlineEditPayload | null>(null)
+    // GH-1367 Bug 3 (M1): monotonic token per inline-edit session. A background save's
+    // .finally() must only clear shared state if it still owns the current session —
+    // otherwise a save that resolves after the user re-targets another text would clobber
+    // the new session's pending payload / re-enable autosave mid-edit.
+    const editSessionSeqRef = useRef(0)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -587,6 +595,9 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
+                // New session — invalidate any in-flight save's .finally() so it won't clobber
+                // this session's pending payload / autosave suspension (GH-1367 Bug 3 M1).
+                editSessionSeqRef.current += 1
                 // Suspend all auto-saves while inline editing is active.
                 // Also clear any pending timer that carries stale blocks from before this session.
                 setIsInlineEditing(true)
@@ -608,14 +619,25 @@ function PreviewFrameInner({
                     }
                     currentLiveTextRef.current = null
                     applyInlineEditPayload(pendingInlineEditRef.current)
-                    // Save FIRST (blocks already updated by TEXT_EDITED), then resume
-                    // auto-saves and unfreeze iframe so it reloads with the just-saved data.
-                    // Prefer onInlineEditSave (component's handleSave) — it bypasses the
-                    // isSaving guard that can block performSave when a concurrent save is in flight.
+                    // GH-1367 Bug 3: hide the text toolbar IMMEDIATELY (decoupled from save).
+                    // Previously setTextEditingData(null) ran inside .finally(), so the toolbar
+                    // lingered for the full save+reload round-trip (~3s). Now it clears at once
+                    // and the block action toolbar can take over instantly.
+                    setTextEditingData(null)
+                    // Keep the iframe frozen via isFlushingEdit until the save resolves so it
+                    // reloads with the just-saved data (no stale reload / black gap).
+                    setIsFlushingEdit(true)
+                    // Save in the background. Prefer onInlineEditSave (component's handleSave) —
+                    // it bypasses the isSaving guard that can block performSave when a concurrent
+                    // save is in flight.
+                    const flushSession = editSessionSeqRef.current
                     void (onInlineEditSaveRef.current?.() ?? performSave(true)).finally(() => {
+                        // A newer edit session started while this save was in flight — skip cleanup
+                        // so we don't clobber the new session's pending payload / autosave state.
+                        if (editSessionSeqRef.current !== flushSession) return
                         pendingInlineEditRef.current = null
                         setIsInlineEditing(false)
-                        setTextEditingData(null)
+                        setIsFlushingEdit(false)
                     })
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
@@ -764,6 +786,10 @@ function PreviewFrameInner({
         setIsEditing(false)
         setIsSubmitting(false)
         setTextEditingData(null)
+        // GH-1367 Bug 3: also release the inline-edit save freeze. A token-guarded save .finally()
+        // may skip clearing it (stale session); reset it here so navigation/key changes can't leave
+        // the preview iframe permanently frozen. Self-heals on the next save's iframeKey bump.
+        setIsFlushingEdit(false)
         setImageClickData(null)
         setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
@@ -1215,12 +1241,14 @@ function PreviewFrameInner({
     // If the user is actively editing text, freeze the iframeKey so it doesn't navigate.
     // Once they blur/stop editing, it safely syncs up and reloads the preview.
     const previousIframeKey = useRef(iframeKey)
-    const effectiveIframeKey = (textEditingData || isEditing) ? previousIframeKey.current : iframeKey
+    // isFlushingEdit keeps the freeze alive while the inline-edit save flushes (GH-1367 Bug 3),
+    // even though textEditingData was already cleared to hide the toolbar.
+    const effectiveIframeKey = (textEditingData || isEditing || isFlushingEdit) ? previousIframeKey.current : iframeKey
     useEffect(() => {
-        if (!textEditingData && !isEditing) {
+        if (!textEditingData && !isEditing && !isFlushingEdit) {
             previousIframeKey.current = iframeKey
         }
-    }, [iframeKey, textEditingData, isEditing])
+    }, [iframeKey, textEditingData, isEditing, isFlushingEdit])
 
     const iframeSrc = useMemo(() => {
         const url = new URL(`/preview/${siteId}`, 'http://localhost')
