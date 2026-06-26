@@ -263,5 +263,28 @@ describe('PreviewFrame', () => {
             expect(mockStoreState.setIsInlineEditing).not.toHaveBeenCalledWith(false)
             expect(container.querySelector('[data-wysiwyg-toolbar]')).not.toBeNull() // B still editing
         })
+
+        // TC-EDIT-15 (A1): a navigation/key change while a save is still flushing must release the
+        // isFlushingEdit freeze via the reset effect — otherwise the preview iframe stays stuck on
+        // the old key and never reloads. Guards against the token-guarded .finally() leaking the freeze.
+        it('TC-EDIT-15 (GH-1367 A1): reset effect releases the flush freeze so the iframe is not stuck frozen', () => {
+            let resolveSave: (() => void) | undefined
+            mockStoreState.performSave = vi.fn(() => new Promise<void>((r) => { resolveSave = () => r() }))
+            const { container, rerender } = render(<PreviewFrame {...defaultProps} iframeKey={1} />)
+            const getSrc = () => (container.querySelector('iframe') as HTMLIFrameElement).getAttribute('src')
+
+            // Edit → stop → save in flight: iframe frozen at v=1 while isFlushingEdit is true
+            startEditing(container)
+            stopEditing()
+            act(() => { vi.advanceTimersByTime(150) })
+            expect(getSrc()).toContain('v=1')
+
+            // A key change (e.g. autosave refresh / navigation) must unfreeze even though the save
+            // promise is still pending — the reset effect clears isFlushingEdit.
+            rerender(<PreviewFrame {...defaultProps} iframeKey={2} />)
+            expect(getSrc()).toContain('v=2')
+
+            resolveSave?.()
+        })
     })
 })
