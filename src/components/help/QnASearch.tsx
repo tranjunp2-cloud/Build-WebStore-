@@ -35,12 +35,12 @@ export const QnASearch: React.FC<QnASearchProps> = ({
 
     return (
         <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="w-[18px] h-[18px] text-slate-400" aria-hidden />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="w-[18px] h-[18px] text-muted-foreground" aria-hidden />
             </div>
             <Input
                 type="text"
-                className="h-auto py-3 pl-11 pr-11 rounded-lg shadow-sm [&::-ms-clear]:hidden [&::-webkit-search-cancel-button]:hidden"
+                className="pl-10 pr-10 [&::-ms-clear]:hidden [&::-webkit-search-cancel-button]:hidden"
                 placeholder={placeholder}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -49,7 +49,7 @@ export const QnASearch: React.FC<QnASearchProps> = ({
                 <button
                     type="button"
                     onClick={handleClear}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center justify-center bg-transparent border-none appearance-none outline-none text-slate-400 hover:text-white transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center justify-center bg-transparent border-none appearance-none outline-none text-muted-foreground hover:text-foreground transition-colors"
                 >
                     <X className="h-5 w-5" />
                 </button>

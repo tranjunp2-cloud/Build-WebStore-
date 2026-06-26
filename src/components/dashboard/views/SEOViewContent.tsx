@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n'
 import { AutoMetaToggle } from './SEOKeywordTracker'
 import { GenerateSitemapButton } from './GenerateSitemapButton'
 import { AIFixModal } from '@/components/dashboard/AIFixModal'
+import { Button } from '@/components/ui/button'
 import type { TrackedKeyword } from './SEOKeywordTracker'
 import type { MissingSeoItem } from './SEOView'
 
@@ -109,14 +110,17 @@ export function SEOViewContent({
                             <div className="text-[16px] leading-[1.375em] font-bold text-white w-full">
                                 {ti(seo.scoreLabel || 'Score: {score}/100', { score })}
                             </div>
-                            <button
+                            {/* Shared <Button variant="dashPrimary"> — same blue→teal gradient DS token. */}
+                            <Button
+                                variant="dashPrimary"
+                                size="dash"
                                 onClick={() => setIsFixModalOpen(true)}
                                 disabled={!siteId || missingSeoItems.length === 0}
-                                className="flex items-center justify-center gap-2 px-[16px] pt-[8.5px] pb-[9px] bg-[linear-gradient(167deg,#3B82F6_0%,#2DD4BF_100%)] text-white rounded-[8px] font-semibold text-[13px] leading-[1.21em] hover:opacity-90 transition-opacity whitespace-nowrap w-fit disabled:opacity-50"
+                                className="w-fit"
                             >
                                 <Sparkles className="w-4 h-4 shrink-0" aria-hidden />
                                 {seo.fixAllButton || 'AI Fix All Issues'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
 

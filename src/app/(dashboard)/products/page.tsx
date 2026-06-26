@@ -332,8 +332,9 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-[12px]">
-                        {/* Input — shared dashboard input style (border + focus ring khớp component chung) */}
+                    <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-2">
+                        {/* Input — shared <Input> nguyên bản design-system (nền card, viền --input-border,
+                            focus ring chuẩn), chỉ override cỡ chữ 13px như ô search. */}
                         <Input
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
@@ -341,8 +342,7 @@ export default function ProductsPage() {
                                 if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                            style={{ background: 'transparent', color: 'var(--dash-text)' }}
-                            className="w-full md:flex-1 h-9 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                            className="w-full md:flex-1 text-[13px]"
                         />
                         {/* Create — shared dashboard primary button (size="dash") */}
                         <Button
@@ -452,7 +452,9 @@ export default function ProductsPage() {
                         <Button
                             variant="dashSecondary"
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={isAdvancedFiltersOpen ? { border: '1px solid hsl(var(--primary)/0.5)' } : undefined}
+                            style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
                             className="w-full h-[50px] rounded-[16px] text-[16px] font-medium"
                         >
                             <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
@@ -465,7 +467,7 @@ export default function ProductsPage() {
                     </div>
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}
-                    <div className="hidden md:flex items-center gap-[17px] w-full">
+                    <div className="hidden md:flex items-center gap-2 w-full">
                         {/* Search Input — shared <TableSearch> (GH-1222 DS) */}
                         <TableSearch
                             value={searchQuery}
@@ -484,11 +486,15 @@ export default function ProductsPage() {
 
                         {/* Filter Button — trigger styled to match DS chips (transparent);
                             the advanced filters panel below is kept as-is. */}
+                        {/* Active (teal) khi đang có filter áp dụng — khớp trạng thái active của chip Sort. */}
                         <Button
                             variant="dashSecondary"
                             size="dash"
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
                             className="whitespace-nowrap"
+                            style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                : { background: 'hsl(var(--card))' }}
                         >
                             <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
                             {t.dashboard.products.list.filterBtn}
@@ -541,7 +547,7 @@ export default function ProductsPage() {
                                                             <rect x="1" y="1" width="18" height="18" rx="3" fill="transparent" strokeWidth="2" />
                                                         </svg>
                                                     )}
-                                                    <span className={cn("text-[14px] font-medium leading-[20px] truncate", isSelected ? "text-foreground" : "text-foreground/80")}>{cat}</span>
+                                                    <span className={cn("text-[14px] font-medium leading-[20px] truncate", isSelected ? "text-[hsl(var(--primary))] font-semibold" : "text-foreground/80")}>{cat}</span>
                                                 </label>
                                             );
                                         })}
@@ -569,7 +575,7 @@ export default function ProductsPage() {
                                                         <circle cx="10" cy="10" r="9" fill="transparent" stroke="var(--dash-border)" strokeWidth="2" className="group-hover:stroke-[hsl(var(--primary))]/50 transition-colors" />
                                                     )}
                                                 </svg>
-                                                <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-foreground" : "text-foreground/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
+                                                <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-[hsl(var(--primary))] font-semibold" : "text-foreground/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
                                                 {status === 'On Sale' && <span className="bg-[#FB2C36]/20 border border-[#FB2C36]/30 text-[hsl(var(--destructive))] rounded-[4px] px-[6px] py-[2px] text-[12px] font-medium leading-[16px]">🔥</span>}
                                             </label>
                                         ))}

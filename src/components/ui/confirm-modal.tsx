@@ -50,7 +50,7 @@ export function ConfirmModal({
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v && !loading) onCancel() }}>
             <DialogContent
-                className="max-w-sm rounded-xl text-center [&>button]:hidden"
+                className="max-w-sm rounded-lg text-center [&>button]:hidden"
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Icon — centered tinted square (danger = destructive, default = primary) */}

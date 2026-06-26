@@ -90,7 +90,6 @@ export function PaymentsFormClient({
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
     // Xendit Connect states (Model C)
     const [xenditIsConnected, setXenditIsConnected] = useState(xenditConnected ?? false);
-    const [isDirty, setIsDirty] = useState(false);
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +105,20 @@ export function PaymentsFormClient({
         qrImageId: string | number | null; qrPreviewUrl: string | null; qrFileName: string | null;
         accountHolderName: string; bankName: string; accountNumber: string;
     } | null>(null);
+
+    // isDirty = state hiện tại KHÁC snapshot server (giá trị đã lưu). Tự động false khi chưa đổi gì,
+    // hoặc khi user sửa rồi revert đúng về giá trị gốc → thanh unsaved chỉ hiện khi thực sự có thay đổi.
+    const isDirty = !!serverPaymentValues && (
+        paymentCod !== serverPaymentValues.paymentCod ||
+        paymentQr !== serverPaymentValues.paymentQr ||
+        cardEnabled !== serverPaymentValues.cardEnabled ||
+        fpxEnabled !== serverPaymentValues.fpxEnabled ||
+        // Chuẩn hóa nullish: null vs undefined (snapshot khi chưa có ảnh QR) không tính là thay đổi.
+        (qrImageId ?? null) !== (serverPaymentValues.qrImageId ?? null) ||
+        (accountHolderName ?? '') !== (serverPaymentValues.accountHolderName ?? '') ||
+        (bankName ?? '') !== (serverPaymentValues.bankName ?? '') ||
+        (accountNumber ?? '') !== (serverPaymentValues.accountNumber ?? '')
+    );
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const sub = t.common.subscriptionErrors;
@@ -376,7 +389,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setCardEnabled(checked);
-        setIsDirty(true);
     };
 
     const handleToggleFpx = (checked: boolean) => {
@@ -384,7 +396,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setFpxEnabled(checked);
-        setIsDirty(true);
     };
 
     const handleToggleCod = (checked: boolean) => {
@@ -392,7 +403,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setPaymentCod(checked);
-        setIsDirty(true);
     };
 
     const handleToggleQr = (checked: boolean) => {
@@ -407,7 +417,6 @@ export function PaymentsFormClient({
         bankFormUserTriggeredRef.current = checked;
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-        setIsDirty(true);
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -428,7 +437,6 @@ export function PaymentsFormClient({
             const serverUrl = getImageUrl(uploadRes.doc as Media);
             if (serverUrl) setQrPreviewUrl(serverUrl);
             setPaymentQr(true);
-            setIsDirty(true);
             toast.dismiss('upload-qr');
             toast.success(pt.uploadingQr);
         } catch (e: unknown) {
@@ -442,23 +450,19 @@ export function PaymentsFormClient({
     const handleRemoveImage = () => {
         setQrImageId(null); setQrPreviewUrl(null); setQrFileName(null); setPaymentQr(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        setIsDirty(true);
     };
 
     const handleAccountHolderNameChange = useCallback((val: string) => {
         setAccountHolderName(val);
-        setIsDirty(true);
         if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountHolderName: undefined }));
     }, []);
 
     const handleBankNameChange = useCallback((val: string) => {
         setBankName(val);
-        setIsDirty(true);
     }, []);
 
     const handleAccountNumberChange = useCallback((val: string) => {
         setAccountNumber(val);
-        setIsDirty(true);
         if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountNumber: undefined }));
     }, []);
 
@@ -491,14 +495,12 @@ export function PaymentsFormClient({
             if (!serverPaymentValues.paymentQr) setQrWidgetExpanded(false);
         }
         setBankTransferErrors({});
-        setIsDirty(false);
     };
 
     const handleXenditDisconnect = async () => {
         const res = await disconnectXendit();
         if (!res.success) { toast.error('Failed to disconnect Xendit'); return; }
         setXenditIsConnected(false);
-        setIsDirty(false);
     };
 
     const handleSaveXenditKeys = async (secretKey: string, callbackToken: string) => {
@@ -543,7 +545,6 @@ export function PaymentsFormClient({
                 account_number: accountNumber || null,
             });
             if (res.success) {
-                setIsDirty(false);
                 setBankTransferErrors({});
                 // Update server snapshot so Cancel targets the just-saved state
                 setServerPaymentValues({
@@ -923,7 +924,8 @@ export function PaymentsFormClient({
                 </div>
             </section>
 
-            {/* Save bar — sticky bottom so it sticks at viewport bottom when scrolling */}
+            {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh. */}
+            {isDirty && (
             <div
                 className="sticky bottom-4 z-40 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
                 style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
@@ -963,6 +965,7 @@ export function PaymentsFormClient({
                     </Button>
                 </div>
             </div>
+            )}
 
         </div>
     );

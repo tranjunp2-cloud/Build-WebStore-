@@ -31,7 +31,7 @@ type Props = {
 }
 
 // Geometry only — colors/border/focus inherited from shared <Input> primitive
-const INPUT_CLS = 'min-h-[44px] rounded-[10px] pl-10 pr-3 text-[15px]'
+const INPUT_CLS = 'h-9 rounded-lg pl-10 pr-3 text-[13px]'
 
 const CHIP_CLS =
     'rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-0.5 text-[11px] text-[var(--dash-text-muted)]'

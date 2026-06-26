@@ -358,7 +358,7 @@ function AIChatPanelInner({
                                         <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
                                             <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                             {msg.createdAt ? (
-                                                <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
+                                                <p className="mt-1.5 text-right text-[10px] text-white/80">{msg.createdAt}</p>
                                             ) : null}
                                         </div>
                                     </div>
@@ -397,7 +397,7 @@ function AIChatPanelInner({
                                                     {ac.undo}
                                                 </button>
                                                 {msg.createdAt ? (
-                                                    <span className="text-[10px] text-white/40">{msg.createdAt}</span>
+                                                    <span className="text-[10px] text-white/65">{msg.createdAt}</span>
                                                 ) : null}
                                             </div>
                                         </div>
@@ -413,7 +413,7 @@ function AIChatPanelInner({
                                     )}>
                                         <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                         {msg.createdAt ? (
-                                            <p className="mt-1.5 text-[10px] text-white/40">{msg.createdAt}</p>
+                                            <p className="mt-1.5 text-[10px] text-white/65">{msg.createdAt}</p>
                                         ) : null}
                                     </div>
                                 </div>
