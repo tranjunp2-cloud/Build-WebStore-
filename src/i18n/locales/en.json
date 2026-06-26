@@ -3005,7 +3005,7 @@
                                 "Open the <strong>AI CHAT</strong> tab in the left sidebar of the Editor.",
                                 "Type what you want to change — e.g., <strong>\"Can you change the color to pink?\"</strong> or <strong>\"Add a new section\"</strong>.",
                                 "AI will process your request and show <strong>\"Preparing changes for preview...\"</strong> while updating.",
-                                "Use the <strong>quick suggestion chips</strong> at the bottom (e.g., \"Change color\", \"+ Add section\") for common actions.",
+                                "Press <strong>Enter</strong> to send, or <strong>Shift+Enter</strong> for a new line — the input box grows as you type.",
                                 "Changes are applied in real-time to the preview — review and keep or ask for further adjustments."
                             ]
                         },

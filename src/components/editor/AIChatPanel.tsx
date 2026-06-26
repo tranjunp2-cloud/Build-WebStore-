@@ -41,7 +41,7 @@ interface AIChatPanelProps {
     compact?: boolean
 }
 
-// Auto-grow textarea cap: ~6 lines of 13px/leading-relaxed text before scrolling.
+// Auto-grow textarea cap: ~6 lines of 13px/leading-5 (20px) text + py-1.5 before scrolling.
 const MAX_TEXTAREA_HEIGHT = 132
 
 function formatChatTime(date = new Date()) {
@@ -476,6 +476,7 @@ function AIChatPanelInner({
                                 type="button"
                                 onClick={() => void handleSendChat()}
                                 disabled={!input.trim() || isProcessing}
+                                aria-label={ac.send}
                                 className={cn(
                                     'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
                                     input.trim() && !isProcessing
