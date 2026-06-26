@@ -181,6 +181,7 @@ const DEMO_CONTENT_MAP: Record<string, (variant: string) => DemoContent> = {
     formFields: [
       { label: 'Name', fieldName: 'name', fieldType: 'text', placeholder: 'Your name', required: true },
       { label: 'Email', fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
+      { label: 'Phone', fieldName: 'phone', fieldType: 'phone', placeholder: 'Your phone number', required: false },
       { label: 'Message', fieldName: 'message', fieldType: 'textarea', placeholder: 'How can we help?', required: true },
     ],
   }),
