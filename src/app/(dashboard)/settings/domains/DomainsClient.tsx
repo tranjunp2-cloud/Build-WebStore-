@@ -758,6 +758,7 @@ export function DomainsClient({
                                                         <Button
                                                             type="button"
                                                             onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }}
+                                                            aria-label={`Copy A record IP ${idx + 1}`}
                                                             variant="ghost"
                                                             size="icon"
                                                             className="bg-[hsl(var(--primary)/0.1)] border border-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.2)] shrink-0"
