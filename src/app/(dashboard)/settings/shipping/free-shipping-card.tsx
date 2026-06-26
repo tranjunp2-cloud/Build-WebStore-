@@ -59,7 +59,7 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                         aria-invalid={freeAboveError ? true : undefined}
                         aria-describedby={freeAboveError ? 'ship-free-threshold-err' : undefined}
                         className={cn(
-                            "min-h-[44px] rounded-[10px] pl-10 pr-3 text-[15px]",
+                            "h-9 rounded-lg pl-10 pr-3 text-[13px]",
                             freeAboveError && "border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))] focus-visible:ring-[hsl(var(--destructive)/0.3)]"
                         )}
                         placeholder="100.00"

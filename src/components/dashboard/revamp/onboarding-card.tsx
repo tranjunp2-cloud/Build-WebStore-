@@ -8,6 +8,7 @@
 import Link from 'next/link'
 import { Check, Pencil, Eye } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 
 export interface OnboardingStep {
     id: 'products' | 'design' | 'shipping' | 'launch'
@@ -60,13 +61,17 @@ export function OnboardingCard({ steps }: { steps: OnboardingStep[] }) {
                                 <div className="step-name">{stepT.name}</div>
                                 <div className="step-desc" style={{ whiteSpace: 'pre-line' }}>{stepT.desc}</div>
                             </div>
-                            <Link
-                                href={s.href}
-                                className={`btn btn-sm step-btn ${s.done ? 'btn-ghost' : isNext ? 'btn-primary' : 'btn-secondary'}`}
+                            <Button
+                                asChild
+                                size="sm"
+                                variant={s.done ? 'dashGhost' : isNext ? 'dashPrimary' : 'dashSecondary'}
+                                className="shrink-0"
                             >
-                                {s.done && <Ico aria-hidden />}
-                                {s.done ? stepT.cta : `${stepT.cta} →`}
-                            </Link>
+                                <Link href={s.href}>
+                                    {s.done && <Ico aria-hidden />}
+                                    {s.done ? stepT.cta : `${stepT.cta} →`}
+                                </Link>
+                            </Button>
                         </div>
                     )
                 })}

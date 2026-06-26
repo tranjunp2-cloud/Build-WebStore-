@@ -347,7 +347,7 @@ export default function BlogListPage() {
             </div>
 
             {/* Filters — shared <TableSearch> + <FilterChip> primitives (GH-1222 DS) */}
-            <div className="flex flex-col xl:flex-row xl:items-center gap-3 w-full mt-[32px]">
+            <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full mt-[32px]">
                 <TableSearch
                     value={search}
                     onSearch={setSearch}

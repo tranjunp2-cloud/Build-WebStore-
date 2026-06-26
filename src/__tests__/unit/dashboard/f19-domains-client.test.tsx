@@ -230,7 +230,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
             { domain: 'store.custom.com', status: 'pending' }
         ]} />);
 
-        const clipboardBtns = container.querySelectorAll('button.h-\\[44px\\]');
+        const clipboardBtns = container.querySelectorAll('button[aria-label^="Copy A record IP"]');
         expect(clipboardBtns.length).toBeGreaterThanOrEqual(1);
 
         fireEvent.click(clipboardBtns[0]); // A Record

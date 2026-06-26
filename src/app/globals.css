@@ -633,9 +633,12 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell header {
     background-color: var(--dash-sidebar-bg) !important;
 }
-/* Light mode: bỏ viền ngang dưới header (TopHeader dùng --dash-divider trực tiếp).
-   Dark giữ nguyên đường viền header. */
-html:not(.dark) .dash-shell header { border-bottom-color: transparent; }
+/* Bỏ viền ngang dưới header ở cả light + dark (TopHeader dùng --dash-divider trực tiếp).
+   Line này cũng là đường dưới logo của sidebar → bỏ cho cả header + sidebar. */
+.dash-shell header { border-bottom-color: transparent; }
+
+/* Sidebar footer (LanguageToggle): giữ viền trên ở cả light + dark. */
+.dash-sidebar-footer { border-top: 1px solid var(--dash-divider); }
 
 /* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
 .dash-shell .text-slate-300,
@@ -1465,4 +1468,41 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
   width: 320px !important;
   max-width: 320px !important;
 }
+
+/* ── Sidebar always-dark (.sb-dark) ──────────────────────────────────────────
+   Sidebar (dashboard + editor menu drawer + logo segment) phải trông Y HỆT dark
+   ở cả light lẫn dark. Class `dark` trên các container đó đã flip token --dash-*;
+   block này khôi phục các utility bị `html:not(.dark) .dash-shell …` remap sang
+   rgba(0,0,0,…) (chỉ chạy ở light) về lại giá trị dark — chỉ trong .sb-dark. */
+.sb-dark .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .bg-white\/5 { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-white\/8 { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .bg-white\/10 { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-white\/\[0\.08\] { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(255,255,255,0.02) !important; }
+.sb-dark .hover\:bg-white\/5:hover,
+.sb-dark .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-\[\#0B1120\]\/50 { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[\#0B1120\]\/60 { background-color: rgba(11,17,32,0.6) !important; }
+.sb-dark .bg-\[\#0B1120\]\/80 { background-color: rgba(11,17,32,0.8) !important; }
+.sb-dark .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.1\)\] { background-color: rgba(255,255,255,0.1) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.2\)\] { background-color: rgba(255,255,255,0.2) !important; }
+.sb-dark .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(248,250,252,0.3) !important; }
+
+/* SET CỨNG màu dark trực tiếp (không qua token/cascade) — sidebar luôn dark thật.
+   Dark palette: bg #060B18, surface #161E2E, secondary/muted #1F2937, border #2A3645,
+   text #FFFFFF, text-muted #9CA3AF, teal #2DD4BF. */
+.sb-dark { --primary: var(--p-teal-400) !important; --dash-sidebar-bg: #060B18 !important; --dash-divider: #232E3D !important; }
+.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: #060B18 !important; }
+.sb-dark .text-dash-text { color: #FFFFFF !important; }
+.sb-dark .text-dash-text-muted { color: #9CA3AF !important; }
+.sb-dark .hover\:text-dash-text:hover { color: #FFFFFF !important; }
+.sb-dark .bg-dash-surface { background-color: #161E2E !important; }
+.sb-dark .bg-dash-surface-hover { background-color: #1F2937 !important; }
+.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: #1F2937 !important; }
+.sb-dark .border-dash-border { border-color: #2A3645 !important; }
 }

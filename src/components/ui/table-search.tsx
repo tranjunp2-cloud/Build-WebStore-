@@ -53,15 +53,15 @@ export function TableSearch({
                 style={{ color: 'var(--dash-text-muted)' }}
             />
             {/* Uses the shared <Input> so the border (solid, box-border, full wrap)
-                matches every other field in the CMS. Transparent fill keeps it level
-                with the FilterChip pills it sits next to. */}
+                matches every other field in the CMS. White fill (bg-card) in light
+                mode so the box reads as a real input, not the page background. */}
             <Input
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder={placeholder}
                 autoComplete="off"
-                className="h-9 pl-9 pr-3 text-[13px] bg-transparent"
+                className="h-9 pl-9 pr-3 text-[13px] bg-[hsl(var(--card))]"
             />
         </div>
     )

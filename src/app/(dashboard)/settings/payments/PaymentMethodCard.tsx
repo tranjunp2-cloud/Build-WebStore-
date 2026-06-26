@@ -41,10 +41,12 @@ export function PaymentMethodCard({
 
     return (
         <div className={cn(
-            'rounded-[16px] p-[20px_22px] border transition-all duration-200',
+            // preflight OFF → class `border` thiếu border-style; phải có `border-solid` mới hiện viền.
+            'rounded-[16px] p-[20px_22px] border border-solid transition-all duration-200',
             'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
             locked ? 'bg-[hsl(var(--background))] border-dash-border' : 'bg-[hsl(var(--card))] border-dash-border',
-            highlight && !locked && 'border-[hsl(var(--info)/0.3)] shadow-[0_0_0_1px_hsl(var(--info)/0.18),0_8px_24px_-8px_hsl(var(--info)/0.18)]',
+            // Viền đồng nhất xám (dash-border) cho mọi card bất kể bật/tắt — trạng thái active
+            // đã thể hiện qua toggle + pill "Active". (Trước đây bật thì viền xanh info → lệch nhau.)
         )}>
             <div className="flex items-start gap-4">
                 {/* Icon */}

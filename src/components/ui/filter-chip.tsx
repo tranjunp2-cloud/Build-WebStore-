@@ -44,9 +44,9 @@ export function FilterChip<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
-                    background: active ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+                    background: active ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--card))',
                     border: active ? '1px solid hsl(var(--primary) / 0.4)' : '1px solid hsl(var(--input-border))',
                     color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                 }}
@@ -63,7 +63,7 @@ export function FilterChip<T extends string>({
 
             {open && (
                 <div
-                    className="absolute top-[calc(100%+4px)] left-0 min-w-[140px] max-h-[300px] overflow-y-auto z-50 rounded-[12px]"
+                    className="absolute top-[calc(100%+4px)] left-0 min-w-[140px] max-h-[300px] overflow-y-auto z-50 rounded-lg"
                     style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                 >
                     {options.map(o => (
@@ -75,8 +75,10 @@ export function FilterChip<T extends string>({
                             // (preflight is off, so utility hovers still need both directions).
                             className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
                             style={{
-                                color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)',
-                                fontWeight: o.key === value ? 500 : 400,
+                                // Selected option → teal (primary) text + nền teal nhạt: trạng thái active rõ ràng.
+                                color: o.key === value ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
+                                fontWeight: o.key === value ? 600 : 400,
+                                background: o.key === value ? 'hsl(var(--primary) / 0.1)' : 'transparent',
                             }}
                         >
                             {o.label}
