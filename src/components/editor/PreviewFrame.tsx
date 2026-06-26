@@ -786,6 +786,10 @@ function PreviewFrameInner({
         setIsEditing(false)
         setIsSubmitting(false)
         setTextEditingData(null)
+        // GH-1367 Bug 3: also release the inline-edit save freeze. A token-guarded save .finally()
+        // may skip clearing it (stale session); reset it here so navigation/key changes can't leave
+        // the preview iframe permanently frozen. Self-heals on the next save's iframeKey bump.
+        setIsFlushingEdit(false)
         setImageClickData(null)
         setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
