@@ -13,6 +13,7 @@ import { Gauge, MiniLinePlaceholder, gaugeStatusKey } from './charts'
 import { SectionHead } from './atoms'
 import { AIFixModal } from '@/components/dashboard/AIFixModal'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 import type { SeoData, SeoIssue } from '@/lib/dashboard/dashboard-types'
 import type { MissingSeoItem } from '@/components/dashboard/views/SEOView'
 
@@ -114,9 +115,9 @@ export function SeoHealth({ data }: { data: SeoData }) {
                                 text: tp(issueLabelKeys(data.topIssue.fixType, seoT), data.topIssue.count),
                             })}
                         </span>
-                        <button className="btn btn-ai btn-sm" onClick={openFixAll} disabled={!canFixAll}>
+                        <Button variant="dashPrimary" size="sm" onClick={openFixAll} disabled={!canFixAll}>
                             <Sparkles aria-hidden />{seoT.fixAll}
-                        </button>
+                        </Button>
                     </div>
                 )}
 

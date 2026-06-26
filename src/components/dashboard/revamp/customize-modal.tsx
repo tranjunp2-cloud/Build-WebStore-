@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { GripVertical, ChevronUp, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 import { updateDashboardPreferences } from '@/app/(dashboard)/actions'
 import {
     DEFAULT_DASHBOARD_BLOCKS, buildCustomizeRows,
@@ -104,9 +105,9 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
 
     return (
         <>
-            <button className="btn btn-secondary" onClick={openModal} data-testid="customize-dashboard-btn">
+            <Button variant="dashSecondary" size="dash" onClick={openModal} data-testid="customize-dashboard-btn">
                 <SlidersHorizontal aria-hidden />{czT.button}
-            </button>
+            </Button>
 
             {open && mounted && createPortal(
                 /* Portaled to <body> + wrapped in .dash-revamp so it escapes the dashboard's
@@ -159,10 +160,10 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
                         <div className="modal-foot">
                             <button className="reset" onClick={reset}>{czT.reset}</button>
                             <div style={{ display: 'flex', gap: 10 }}>
-                                <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving}>{czT.cancel}</button>
-                                <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                                <Button variant="dashSecondary" size="dash" onClick={() => setOpen(false)} disabled={saving}>{czT.cancel}</Button>
+                                <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={saving}>
                                     <Check aria-hidden />{saving ? czT.saving : czT.save}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

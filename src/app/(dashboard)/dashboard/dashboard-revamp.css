@@ -20,7 +20,9 @@
 
 /* Scoped reset — must NOT leak to the shell (sidebar/header) since Tailwind preflight is off */
 .dash-revamp, .dash-revamp * { box-sizing: border-box; }
-.dash-revamp button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; padding: 0; }
+/* :where() zeroes specificity so this stays a low-priority default for unstyled native
+   buttons, but never overrides utility classes on shared <Button> (bg/border/padding). */
+:where(.dash-revamp button) { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; padding: 0; }
 
 /* ═══════════════════════════════════════════════════════════════════
    TOKEN DEFINITIONS — mapped to system semantic tokens
@@ -214,10 +216,11 @@
   background: hsl(var(--foreground) / 0.04);
 }
 
-/* Active (clicked): lifted onto an elevated surface with a thin shadow, crisp foreground text */
+/* Active (clicked): lifted onto an elevated surface with a thin shadow + teal label
+   (matches the Help center tab pattern: elevated pill + text-[hsl(var(--primary))]). */
 .dash-revamp .segmented button.active {
   background: var(--dr-surface);
-  color: var(--dr-ink-1);
+  color: var(--dr-teal);
   box-shadow: var(--dr-shadow-card);
 }
 
@@ -935,7 +938,8 @@ html[data-period-pending="1"] .dash-revamp .stream {
 
 .dash-revamp .tp-tabs button.active {
   background: var(--dr-surface);
-  color: var(--dr-ink-1);
+  /* teal label to match Help-center tabs + the period segmented control */
+  color: var(--dr-teal);
   box-shadow: var(--dr-shadow-card);
 }
 
