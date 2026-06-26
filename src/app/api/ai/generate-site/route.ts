@@ -1191,6 +1191,42 @@ export async function POST(req: NextRequest) {
         try {
             const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             productImageStats = imgStats
+            // Best-effort: resolve/create a category for sample products now that site.id is available.
+            // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
+            let sampleCategoryId: number | undefined
+            try {
+                const composerCategory = resolveComposerCategory(
+                    `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+                )
+                const { docs: catDocs } = await payload.find({
+                    collection: 'categories',
+                    where: { tenant: { equals: resolvedTenantId }, site: { equals: site.id }, deletedAt: { exists: false } },
+                    limit: 20,
+                    depth: 0,
+                })
+                if (catDocs.length === 0) {
+                    const created = await payload.create({
+                        collection: 'categories',
+                        data: {
+                            name: composerCategory.charAt(0).toUpperCase() + composerCategory.slice(1),
+                            slug: `${composerCategory}-${site.id}`,
+                            tenant: resolvedTenantId,
+                            site: site.id,
+                        },
+                    })
+                    sampleCategoryId = created.id as number
+                } else {
+                    const want = composerCategory.toLowerCase()
+                    const hit = catDocs.find(c => {
+                        const slug = String((c as any).slug ?? '').toLowerCase()
+                        const name = String((c as any).name ?? '').toLowerCase()
+                        return slug.includes(want) || name.includes(want)
+                    }) ?? catDocs[0]
+                    sampleCategoryId = hit!.id as number
+                }
+            } catch (err) {
+                console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
+            }
             for (const product of sampleProducts) {
                 // Guard: name must be at least 3 chars (Products schema minLength)
                 const name = product.name?.trim()
@@ -1217,6 +1253,9 @@ export async function POST(req: NextRequest) {
                     description: product.description,
                     ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
                     price: product.price,
+                    sku: product.sku,
+                    inventory: product.inventory,
+                    ...(sampleCategoryId ? { category: [sampleCategoryId] } : {}),
                     status: 'active' as const,
                 }
                 try {

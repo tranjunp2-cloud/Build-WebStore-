@@ -33,10 +33,11 @@ export async function getCategoriesAction() {
     // Solve N+1 & Compute Efficiently: Group by in Database to prevent loading all Product records to RAM
     const { sql } = await import('drizzle-orm')
     const countResult = await (payload.db as any).drizzle.execute(
-        sql`SELECT r.categories_id as category_id, COUNT(DISTINCT r.parent_id)::int as count 
+        sql`SELECT r.categories_id as category_id, COUNT(DISTINCT r.parent_id)::int as count
             FROM products_rels r
             JOIN products p ON p.id = r.parent_id
-            WHERE r.path = 'category' AND p.deleted_at IS NULL 
+            JOIN categories c ON c.id = r.categories_id
+            WHERE r.path = 'category' AND p.deleted_at IS NULL AND c.tenant_id = p.tenant_id
             GROUP BY r.categories_id`
     )
 
