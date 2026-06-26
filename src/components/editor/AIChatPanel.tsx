@@ -3,9 +3,7 @@
 
 import React, { memo, useEffect, useRef, useState } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
-import { RotateCcw, Send, Sparkles, X, WandSparkles } from 'lucide-react'
-import { AddSectionPromptChips } from './AddSectionPromptChips'
-import { Button } from '@/components/ui/button'
+import { RotateCcw, Send, Sparkles, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
 import { useI18n } from '@/i18n'
@@ -42,6 +40,9 @@ interface AIChatPanelProps {
     onBlockContextDismiss?: () => void
     compact?: boolean
 }
+
+// Auto-grow textarea cap: ~6 lines of 13px/leading-relaxed text before scrolling.
+const MAX_TEXTAREA_HEIGHT = 132
 
 function formatChatTime(date = new Date()) {
     return date.toLocaleTimeString([], {
@@ -82,6 +83,7 @@ function AIChatPanelInner({
         content: ac.welcomeMessage,
     }])
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
     // Skip the save effect's first run per chatStorageKey.
     // Root cause: effects run in declaration order within the same render cycle.
     // Hydration effect (1st) calls setMessages — state hasn't updated yet when
@@ -129,6 +131,17 @@ function AIChatPanelInner({
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
+
+    // Auto-resize textarea to fit content: grows from 1 line up to MAX_TEXTAREA_HEIGHT,
+    // then scrolls internally. Runs on typing and on programmatic clears (after send).
+    useEffect(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.style.height = 'auto'
+        const next = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)
+        el.style.height = `${next}px`
+        el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden'
+    }, [input])
 
     useEffect(() => {
         if (!externalActivity) return
@@ -425,27 +438,7 @@ function AIChatPanelInner({
                 </div>
 
                 <div className={cn('border-t border-white/[0.06] bg-[rgb(var(--editor-bg-rgb)/0.8)] backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
-                    <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
-                        <button
-                            type="button"
-                            onClick={() => setInput('Change web color to mint green')}
-                            className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
-                        >
-                            {ac.changeColorPrompt}
-                        </button>
-                        <AddSectionPromptChips
-                            compact={compact}
-                            desktopMinimal={!compact}
-                            desktopLabelOverride={ac.addSectionPrompt}
-                            onPromptSelect={prompt => setInput(prompt)}
-                        />
-                    </div>
-
-                    <div className={cn(
-                        'group relative rounded-xl border border-white/[0.08] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[var(--editor-surface-elevated)] focus-within:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]',
-                        compact && 'px-4 py-3',
-                        blockContext && 'pt-2',
-                    )}>
+                    <div className="group rounded-xl border border-white/[0.08] bg-[rgb(var(--editor-surface-elevated-rgb)/0.8)] px-3 py-2.5 transition-all focus-within:border-cyan-400/40 focus-within:bg-[var(--editor-surface-elevated)] focus-within:shadow-[0_0_0_1px_hsl(var(--info)/0.1)]">
                         {blockContext && (
                             <div className="mb-2 flex items-center gap-1.5">
                                 <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/20">
@@ -462,36 +455,38 @@ function AIChatPanelInner({
                                 </button>
                             </div>
                         )}
-                        <textarea
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    void handleSendChat()
-                                }
-                            }}
-                            placeholder={ac.inputPlaceholder}
-                            aria-label="Chat message"
-                            rows={1}
-                            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
-                            style={{ minHeight: '24px', maxHeight: '120px' }}
-                            disabled={isProcessing}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => void handleSendChat()}
-                            disabled={!input.trim() || isProcessing}
-                            className={cn(
-                                'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
-                                input.trim() && !isProcessing
-                                    ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
-                                    : 'bg-white/[0.06] text-slate-500',
-                                isProcessing && 'cursor-not-allowed',
-                            )}
-                        >
-                            <Send className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-end gap-2">
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        void handleSendChat()
+                                    }
+                                }}
+                                placeholder={ac.inputPlaceholder}
+                                aria-label="Chat message"
+                                rows={1}
+                                className="min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-1.5 text-[13px] leading-5 text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                                disabled={isProcessing}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => void handleSendChat()}
+                                disabled={!input.trim() || isProcessing}
+                                className={cn(
+                                    'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all',
+                                    input.trim() && !isProcessing
+                                        ? 'bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                        : 'bg-white/[0.06] text-slate-500',
+                                    isProcessing && 'cursor-not-allowed',
+                                )}
+                            >
+                                <Send className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between px-0.5">
