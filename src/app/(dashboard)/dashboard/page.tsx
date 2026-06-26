@@ -1,23 +1,28 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import { Suspense } from 'react'
-import { OverviewSkeleton, AnalyticsSkeleton, SEOSkeleton } from '@/components/dashboard/DashboardSkeleton'
-import { OverviewView } from '@/components/dashboard/views/OverviewView'
-import { AnalyticsView } from '@/components/dashboard/views/AnalyticsView'
-import { SEOView } from '@/components/dashboard/views/SEOView'
-import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
-import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
-import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
-import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
-import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
+import { normalizeDashboardBlocks, parsePeriod, type DashboardBlockId } from '@/lib/dashboard-utils'
+import { getGlanceData, emptyGlanceData } from '@/lib/dashboard/glance-data'
+import { getTrafficData } from '@/lib/dashboard/traffic-data'
+import { getSeoData } from '@/lib/dashboard/seo-data'
+import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
+import { CustomizeModal } from '@/components/dashboard/revamp/customize-modal'
+import { OnboardingCard, type OnboardingStep } from '@/components/dashboard/revamp/onboarding-card'
+import { AtAGlance } from '@/components/dashboard/revamp/at-a-glance'
+import { TrafficPerformance } from '@/components/dashboard/revamp/traffic-performance'
+import { SeoHealth } from '@/components/dashboard/revamp/seo-health'
+import { SeoTools } from '@/components/dashboard/revamp/seo-tools'
+import { PendingOrders } from '@/components/dashboard/revamp/pending-orders'
+import { DashboardToolbarHeader } from '@/components/dashboard/revamp/dashboard-toolbar-header'
+import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+import './dashboard-revamp.css'
 
 export async function generateMetadata(): Promise<Metadata> {
     const cookieStore = await cookies()
-    const locale = cookieStore.get('prefer_lang')?.value ?? 'en'
-    const isMs = locale === 'ms'
+    const isMs = (cookieStore.get('prefer_lang')?.value ?? 'en') === 'ms'
     return {
         title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
         description: isMs
@@ -27,23 +32,26 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export const dynamic = 'force-dynamic'
+
 interface Props {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function DashboardRoot({ searchParams }: Props) {
     const resolvedParams = await searchParams
-    const rawTab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
+    const period = parsePeriod(typeof resolvedParams.period === 'string' ? resolvedParams.period : undefined)
 
-    // We fetch preferences here so we can pass it down to modal safely
-    let dashboardPreferences: string[] | undefined = undefined
+    const aiStatusFailed = typeof resolvedParams.ai_status === 'string' && resolvedParams.ai_status === 'failed'
+
+    let dashboardPreferences: string[] | undefined
     let hasUsableSites = false
+    let hasFailedSite = false
     let siteId: string | null = null
     let hasPublishedSite = false
     let isDesignCustomized = false
     let hasProducts = false
-    let hasPaymentConfigured = false
     let hasShippingConfigured = false
+
     const tenantId = await getCurrentTenantId()
     if (tenantId) {
         const payload = await getPayload({ config })
@@ -68,17 +76,16 @@ export default async function DashboardRoot({ searchParams }: Props) {
         })
         hasUsableSites = usableSiteCount.totalDocs > 0
 
+        // No usable site → distinguish a failed AI generation from a brand-new (no site) account
+        if (!hasUsableSites) {
+            const failedSiteCount = await payload.count({
+                collection: 'sites',
+                where: { and: [{ tenant: { equals: tenantId } }, { generationStatus: { equals: 'failed' } }] },
+            })
+            hasFailedSite = failedSiteCount.totalDocs > 0
+        }
+
         if (hasUsableSites) {
-            // Onboarding status — skipped when no usable sites; tenantResult already in scope above
-            const tenantPayments = (tenantResult as { payments?: Record<string, boolean> })?.payments
-            hasPaymentConfigured = !!(
-                tenantPayments?.payment_cod || tenantPayments?.payment_qr ||
-                tenantPayments?.payment_card || tenantPayments?.payment_fpx ||
-                tenantPayments?.xendit_tng || tenantPayments?.xendit_grabpay ||
-                tenantPayments?.xendit_duitnow || tenantPayments?.xendit_fpx ||
-                tenantPayments?.xendit_shopeepay || tenantPayments?.xendit_boost ||
-                tenantPayments?.xendit_mae
-            )
             const [onboardingSitesResult, onboardingProductsCount] = await Promise.all([
                 payload.find({
                     collection: 'sites',
@@ -90,7 +97,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
                                 { generationStatus: { equals: 'none' } },
                                 { generationStatus: { equals: null } },
                                 { generationStatus: { exists: false } },
-                            ]},
+                            ] },
                         ],
                     },
                     limit: 1,
@@ -106,60 +113,69 @@ export default async function DashboardRoot({ searchParams }: Props) {
         }
     }
 
-    // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
-    const tab = hasUsableSites ? rawTab : 'overview'
+    const blocks = normalizeDashboardBlocks(dashboardPreferences)
+    const editHref = siteId ? `/editor/${siteId}` : '/builder/new'
+    // "Publish" step opens the editor with the publish modal pre-opened (only when a site exists)
+    const launchHref = siteId ? `/editor/${siteId}?publish=1` : '/builder/new'
+
+    // Onboarding steps — id/done/href only; name/desc/cta come from i18n in OnboardingCard
+    const steps: OnboardingStep[] = [
+        { id: 'products', done: hasProducts, href: '/products' },
+        { id: 'design', done: isDesignCustomized, href: editHref },
+        { id: 'shipping', done: hasShippingConfigured, href: '/settings/shipping' },
+        { id: 'launch', done: hasPublishedSite, href: launchHref },
+    ]
+    const allStepsDone = steps.every(s => s.done)
+    const showOnboarding = blocks.includes('onboarding') && !allStepsDone
+
+    // Fetch block data only when the store has a usable site
+    const [glance, traffic, seo] = hasUsableSites
+        ? await Promise.all([getGlanceData(period), getTrafficData(period), getSeoData()])
+        : [emptyGlanceData(), null, null]
+
+    const renderBlock = (id: DashboardBlockId) => {
+        switch (id) {
+            case 'onboarding':
+                return showOnboarding ? <OnboardingCard key="onboarding" steps={steps} /> : null
+            case 'glance':
+                return <AtAGlance key="glance" data={glance} showHeader={showOnboarding} period={period} />
+            case 'traffic':
+                return traffic ? <TrafficPerformance key="traffic" data={traffic} period={period} /> : null
+            case 'seo':
+                return seo ? <SeoHealth key="seo" data={seo} /> : null
+            case 'tools':
+                return seo ? <SeoTools key="tools" siteId={seo.siteId} autoMetaEnabled={seo.autoMetaEnabled} /> : null
+            case 'orders':
+                return <PendingOrders key="orders" />
+            default:
+                return null
+        }
+    }
+
+    // Brand-new account (no usable site) → original empty/failed state only (no toolbar, no stats)
+    if (!hasUsableSites) {
+        return (
+            <div className="dash-revamp">
+                <div className="stream">
+                    {hasFailedSite || aiStatusFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
+                </div>
+            </div>
+        )
+    }
 
     return (
-        <div className="space-y-6">
-            <DashboardTabContent defaultTab={tab}>
-                {/* Onboarding checklist — above toolbar per Figma; hidden when all 4 steps done */}
-                {hasUsableSites && !(hasProducts && isDesignCustomized && hasPaymentConfigured && hasShippingConfigured && hasPublishedSite) && (
-                    <DashboardOnboarding
-                        hasPublishedSite={hasPublishedSite}
-                        siteId={siteId}
-                        hasProducts={hasProducts}
-                        isDesignCustomized={isDesignCustomized}
-                        hasPaymentConfigured={hasPaymentConfigured}
-                        hasShippingConfigured={hasShippingConfigured}
-                    />
-                )}
+        <div className="dash-revamp">
+            <div className="dash-toolbar">
+                <DashboardToolbarHeader period={period} rangeLabel={glance.rangeLabel} />
+                <div className="dt-right">
+                    <PeriodSelector />
+                    <CustomizeModal defaultVisible={blocks} onboardingComplete={allStepsDone} />
+                </div>
+            </div>
 
-                {/* Universal Page Header / Toolbar — hidden when no usable sites */}
-                {hasUsableSites && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <DashboardTabs />
-
-                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                            <PeriodSelector />
-                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
-                        </div>
-                    </div>
-                )}
-
-                {/* Render all tabs — TabPanel hides inactive via CSS for instant switching.
-                   Note: PeriodSelector still uses router.push() which re-renders all tabs.
-                   This is an accepted tradeoff — period changes are rare (1-2x/session)
-                   while tab switches are frequent and must be instant. */}
-                <TabPanel tabId="overview">
-                    <Suspense fallback={<OverviewSkeleton />}>
-                        <OverviewView searchParams={searchParams} />
-                    </Suspense>
-                </TabPanel>
-                {hasUsableSites && (
-                    <>
-                        <TabPanel tabId="analytics">
-                            <Suspense fallback={<AnalyticsSkeleton />}>
-                                <AnalyticsView searchParams={searchParams} />
-                            </Suspense>
-                        </TabPanel>
-                        <TabPanel tabId="seo">
-                            <Suspense fallback={<SEOSkeleton />}>
-                                <SEOView />
-                            </Suspense>
-                        </TabPanel>
-                    </>
-                )}
-            </DashboardTabContent>
+            <div className="stream">
+                {blocks.map(renderBlock)}
+            </div>
         </div>
     )
 }

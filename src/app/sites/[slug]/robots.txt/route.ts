@@ -40,6 +40,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
             'Allow: /',
             'Disallow: /api/',
             'Disallow: /admin/',
+            // NOTE: functional routes (checkout, orders, order confirm) are NOT
+            // Disallowed here on purpose — they carry a `noindex` robots meta, and
+            // Disallowing them would block the crawl that lets Google see that meta.
+            // (Disallow + noindex are mutually defeating.)
             '',
             'User-agent: Amazonbot',
             'Disallow: /',

@@ -10,6 +10,9 @@ import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
+import { SmartLink } from '@/blocks/_shared/smart-link'
+
+const MotionSmartLink = motion.create(SmartLink)
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -51,7 +54,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                 const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (
                 <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">
-                <motion.a
+                <MotionSmartLink
                     href={href}
                     {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     onClick={() => {
@@ -88,7 +91,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                             }}
                 >
                     <RichText text={btn.label} as="span" />
-                </motion.a>
+                </MotionSmartLink>
                 </BrokenLinkWarning>
                 )
             })}

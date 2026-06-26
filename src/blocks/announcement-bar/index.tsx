@@ -6,6 +6,7 @@ import type { AnnouncementBarConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Body } from '../shared/Typography'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel?: string } {
@@ -60,13 +61,13 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
                         {showLink !== false && linkText && linkText.trim() && linkUrl && !linkUrl.startsWith('javascript:') && (
                             <>
                                 {' '}
-                                <a
+                                <SmartLink
                                     href={resolveHref(linkUrl)}
                                     className="underline underline-offset-2 font-semibold hover:opacity-80 transition-opacity"
                                     {...getLinkAttrs(linkUrl, linkIsInternal)}
                                 >
                                     {linkText} &rarr;
-                                </a>
+                                </SmartLink>
                             </>
                         )}
                     </Body>

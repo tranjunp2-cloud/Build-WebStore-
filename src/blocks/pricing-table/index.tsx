@@ -9,6 +9,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 
 const PT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
@@ -59,13 +60,13 @@ function PlanCTA({ href: rawHref, label, highlighted = false, fullWidth = false,
     const href = resolveHref(rawHref)
     const widthCls = fullWidth ? 'block w-full' : 'inline-flex'
     return (
-        <a
+        <SmartLink
             href={href}
             className={`${widthCls} items-center justify-center px-6 py-3 rounded-xl font-semibold text-sm text-center transition-all duration-200 hover:opacity-90 whitespace-nowrap ${TOUCH_TARGET.min} ${highlighted ? 'text-white' : ''} ${extraClassName}`.trim()}
             style={highlighted ? { backgroundColor: 'var(--brand-primary)' } : { border: `2px solid var(--brand-primary)`, color: 'var(--brand-primary)' }}
         >
             {label}
-        </a>
+        </SmartLink>
     )
 }
 

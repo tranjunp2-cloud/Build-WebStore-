@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { BlockProps, ThemeConfig } from '../types'
 import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -33,7 +33,10 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
     theme: ThemeConfig
     siteBasePath: string
 }) {
-    const router = useRouter()
+    // Prefetched soft-nav to the PDP. <Link> prefetches the (force-dynamic) detail
+    // route as the card enters the viewport, so the click feels instant instead of
+    // waiting on a cold server render. Editor preview still intercepts navigation.
+    const pdpHref = product.slug ? `${siteBasePath}/products/${product.slug}` : '#'
 
     return (
         <HoverCard
@@ -64,9 +67,9 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
 
                 {/* Design decision (GH-1084): always navigate to PDP — add-to-cart is handled on
                     PDP via ProductAddToCartSection (ensures variant selection before cart). */}
-                <button
-                    type="button"
-                    className={`px-4 py-2 font-medium transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
+                <Link
+                    href={pdpHref}
+                    className={`inline-flex items-center justify-center px-4 py-2 font-medium no-underline transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
                     style={{
                         backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
                         color: 'var(--brand-primary)',
@@ -83,12 +86,14 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                         e.currentTarget.style.color = CSS_VARS.primary
                     }}
                     onClick={(e) => {
+                        // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
                         if (isInEditorPreview()) { handleCartClick(e); return }
-                        if (product.slug) router.push(`${siteBasePath}/products/${product.slug}`)
+                        // No slug → nothing to navigate to.
+                        if (!product.slug) e.preventDefault()
                     }}
                 >
                     View Detail
-                </button>
+                </Link>
             </div>
         </HoverCard>
     )
