@@ -17,6 +17,8 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ### Bug Fixes
 
+- **[#1266]** fix(ai): hero variant lock-in + video placeholder — AI-generated hero blocks showing "No video URL provided" placeholder and repeated same variant regardless of category. Root causes: (1) BROKEN_VARIANTS.hero missing video/split-video variants in template-composer.ts, (2) narrow hero pools (4 variants each for tech/fitness) biasing seed-based picker toward minimal variant, (3) batch3 preset homepage heroes over-represented minimal variant (34% of 16 presets). Fixes: expanded BROKEN_VARIANTS to include video variants, diversified tech pool → 6 variants (added split-left, slideshow), fitness pool → 6 variants (added split-left, magazine), diversified batch3 homepage presets to span 8 distinct variants across 16 presets. Files: `src/lib/ai/template-composer.ts` (BROKEN_VARIANTS, pool expansion), `src/lib/ai/openai-generator.ts` (hero pool alignment), `src/lib/ai/template-presets-batch3.ts` (preset diversification), `src/__tests__/unit/ai/gh-1266-hero-variant-rotation.test.ts` (13 tests, TC-1266-10..14), `docs/qa/F01-ai-builder-variety.md` (TC-1266-10..14 registration).
+
 - **[#1179]** fix(cart): validate quantity against variant stock not aggregate inventory — `src/components/storefront/product-add-to-cart-section.tsx` now uses `selectedVariant?.stock` as inventory source when variant is selected, preventing UX mismatch with server-side CAS. Component previously checked `product.inventory` (aggregate), causing users to be able to add quantities unavailable in the selected variant. Affected by TC-F09.237x, TC-F09.238x regression tests.
 
 ---
