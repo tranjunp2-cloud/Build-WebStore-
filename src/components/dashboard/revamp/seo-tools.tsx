@@ -100,7 +100,9 @@ export function SeoTools({ siteId, autoMetaEnabled }: { siteId: string | number 
                         role="switch"
                         aria-checked={autoMeta}
                         aria-label={toolsT.autoMeta}
+                        tabIndex={0}
                         onClick={toggleMeta}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMeta() } }}
                         style={savingMeta ? { cursor: 'wait' } : undefined}
                     />
                 </div>

@@ -18,8 +18,9 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-* { box-sizing: border-box; }
-button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; padding: 0; }
+/* Scoped reset — must NOT leak to the shell (sidebar/header) since Tailwind preflight is off */
+.dash-revamp, .dash-revamp * { box-sizing: border-box; }
+.dash-revamp button { font-family: inherit; border: none; background: none; cursor: pointer; color: inherit; padding: 0; }
 
 /* ═══════════════════════════════════════════════════════════════════
    TOKEN DEFINITIONS — mapped to system semantic tokens

@@ -149,6 +149,8 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
                                         role="switch"
                                         aria-checked={b.visible}
                                         aria-label={`${blockLabel(b.id)} visibility`}
+                                        tabIndex={0}
+                                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(b.id) } }}
                                         onClick={() => toggle(b.id)}
                                     />
                                 </div>
