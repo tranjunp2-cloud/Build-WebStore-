@@ -181,10 +181,12 @@ describe('createAddSectionBlock — MS locale injects BM defaults [TC-F26.02-05]
         expect(hasRM).toBe(true)
     })
 
-    it('cta: ctaButtons label in BM', () => {
+    it('cta: ctaLabel in BM', () => {
+        // GH-1412 — CTA inserts as a real `cta` block using the `ctaLabel` field.
         const block = createAddSectionBlock({ instruction: 'add cta', locale: 'ms' }) as Record<string, unknown>
-        const ctaButtons = block?.ctaButtons as Array<{ label: string }>
-        expect(ctaButtons?.[0]?.label).not.toBe('Get Started')
+        expect(block?.blockType).toBe('cta')
+        expect(block?.ctaLabel).toBe('Mulakan')
+        expect(block?.ctaLabel).not.toBe('Get Started')
     })
 
     it('service-cards: headline in BM (Perkhidmatan Kami)', () => {

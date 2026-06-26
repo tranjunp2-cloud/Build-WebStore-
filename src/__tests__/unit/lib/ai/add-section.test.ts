@@ -407,9 +407,13 @@ describe('createAddSectionBlock — newsletter / banner / cta [TC-F05.13]', () =
         expect(block?.blockType).toBe('hero')
     })
 
-    it('cta maps to hero blockType', () => {
-        const block = createAddSectionBlock({ instruction: 'add cta' })
-        expect(block?.blockType).toBe('hero')
+    it('cta keeps cta blockType', () => {
+        // GH-1412 — CTA is a real registered block; must NOT remap to hero.
+        const block = createAddSectionBlock({ instruction: 'add cta' }) as Record<string, unknown>
+        expect(block?.blockType).toBe('cta')
+        expect(block?.variant).toBe('banner')
+        expect(block?.ctaLabel).toBe('Get Started')
+        expect(block?.ctaUrl).toBe('#contact')
     })
 
     it('newsletter block has subscription copy', () => {
@@ -664,10 +668,11 @@ describe('normalizeAddSectionBlock — newsletter/banner/cta remapping [TC-F05.1
         expect(result?.blockType).toBe('hero')
     })
 
-    it('remaps cta blockType to "hero"', () => {
+    it('keeps cta blockType (GH-1412 — no longer remapped to hero)', () => {
         const aiBlock = { blockType: 'cta', headline: 'Get Started' }
         const result = normalizeAddSectionBlock({ instruction: 'add cta' }, aiBlock) as Record<string, unknown>
-        expect(result?.blockType).toBe('hero')
+        expect(result?.blockType).toBe('cta')
+        expect(result?.variant).toBe('banner')
     })
 })
 
