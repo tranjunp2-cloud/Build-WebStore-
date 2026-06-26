@@ -3,7 +3,7 @@
 import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Pencil, Link2, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Pencil, ArrowRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { BuilderField } from '@/components/builder/fields/BuilderField'
 import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
 import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
@@ -375,44 +375,16 @@ export default function BusinessInfoForm({
     // ── Render ───────────────────────────────────────────────────────────
 
     const toggleTabs = (
-        <div className="mb-6 flex border-b border-white/10" role="tablist" aria-label="Input method selection">
+        <div className="mb-6 flex" role="tablist" aria-label="Input method selection">
             <button
                 role="tab"
-                aria-selected={inputMode === 'manual'}
-                aria-controls="panel-manual"
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                    inputMode === 'manual'
-                        ? 'border-b-2 border-blue-500 bg-blue-500/15 text-blue-400 font-semibold'
-                        : 'border-b-2 border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-300'
-                }`}
-                disabled={urlExtracting}
-                onClick={() => handleSwitchToManual()}
+                aria-selected={true}
+                className="flex-1 px-4 py-3 text-sm font-medium transition-colors rounded-2xl bg-blue-500/15 text-blue-400 font-semibold"
                 type="button"
             >
                 <span className="inline-flex items-center justify-center gap-2">
                     <Pencil className="h-4 w-4 shrink-0" aria-hidden />
                     {t.onboarding.form.tabManual}
-                </span>
-            </button>
-            <button
-                role="tab"
-                aria-selected={inputMode === 'url'}
-                aria-controls="panel-url"
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                    inputMode === 'url'
-                        ? 'border-b-2 border-blue-500 bg-blue-500/15 text-blue-400 font-semibold'
-                        : 'border-b-2 border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-300'
-                }`}
-                disabled={urlExtracting}
-                onClick={() => {
-                    setInputMode('url')
-                    setExtractionError(null)
-                }}
-                type="button"
-            >
-                <span className="inline-flex items-center justify-center gap-2">
-                    <Link2 className="h-4 w-4 shrink-0" aria-hidden />
-                    {t.onboarding.form.tabUrl}
                 </span>
             </button>
         </div>
@@ -535,7 +507,7 @@ export default function BusinessInfoForm({
     )
 
     const formFields = (
-        <div id="panel-manual" role="tabpanel" aria-labelledby="tab-manual">
+        <div>
             <form onSubmit={handleSubmit}>
                 <div className="flex flex-col gap-6">
                     {errorMessage ? (
@@ -660,15 +632,15 @@ export default function BusinessInfoForm({
     const leftBody = (
         <>
             {toggleTabs}
-            {inputMode === 'url' ? urlInputSection : formFields}
+            {formFields}
         </>
     )
 
     const leftFooter = (
         <BuilderSubmitButton
-            disabled={inputMode === 'url' ? false : !isFormReady || isGenerating}
+            disabled={!isFormReady || isGenerating}
             loading={isGenerating}
-            onClick={inputMode === 'url' ? undefined : submitForm}
+            onClick={submitForm}
             type="button"
         >
             {t.onboarding.form.generateButton}
@@ -691,7 +663,7 @@ export default function BusinessInfoForm({
         <BuilderStepScreen
             description={t.onboarding.step1Description}
             leftBody={leftBody}
-            leftFooter={inputMode === 'manual' ? leftFooter : undefined}
+            leftFooter={leftFooter}
             right={rightPane}
             subtitle={t.onboarding.step1Subtitle}
             title={t.onboarding.step1Title}
