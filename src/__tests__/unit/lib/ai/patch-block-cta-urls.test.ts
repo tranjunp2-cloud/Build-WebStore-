@@ -266,19 +266,20 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
         expect(result.secondaryCtaLabel).toBe('Learn')
     })
 
-    it('cta secondary CTA dropped (label+url) when unresolvable', () => {
+    it('cta primary falls back to /contact while secondary still resolves (site missing /contact)', () => {
         const block = {
             blockType: 'cta',
             ctaLabel: 'Primary',
-            ctaUrl: '#contact',
+            ctaUrl: '#contact', // no /contact page in pagesNoContact → fallback
             secondaryCtaLabel: 'Learn',
-            secondaryCtaUrl: '#about', // no /about page
+            secondaryCtaUrl: '#about', // /about exists → resolves
         }
 
-        const result = patchBlockCtaUrls(block, pagesNoContact /* has /about actually */)
+        const result = patchBlockCtaUrls(block, pagesNoContact)
 
-        // pagesNoContact contains /about → secondary resolves; assert positive path
+        expect(result.ctaUrl).toBe('/contact')
         expect(result.secondaryCtaUrl).toBe('/about')
+        expect(result.secondaryCtaLabel).toBe('Learn')
     })
 
     it('cta secondary CTA dropped when no matching page', () => {
