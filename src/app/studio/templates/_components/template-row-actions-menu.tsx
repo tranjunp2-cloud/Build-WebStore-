@@ -4,6 +4,7 @@
  * Uses shadcn DropdownMenu for accessibility, styled with kebab trigger.
  */
 import { useState } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers, Wrench } from 'lucide-react'
 import {
@@ -60,9 +61,9 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                     }}
                 >
                     <DropdownMenuItem asChild>
-                        <a href={`/studio/templates/${template.id}/edit`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Link href={`/studio/templates/${template.id}/edit`} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Wrench size={13} /> Edit in builder
-                        </a>
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <a

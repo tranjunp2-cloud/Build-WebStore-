@@ -198,6 +198,107 @@ describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Action CTAs (pricing)', () => 
     })
 })
 
+// ── GH-1412: CTA block action CTAs (ctaUrl / secondaryCtaUrl) ────────
+describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — CTA block (GH-1412)', () => {
+    it('cta with #contact → resolves ctaUrl to /contact', () => {
+        const block = {
+            blockType: 'cta',
+            headline: 'Ready?',
+            ctaLabel: 'Get Started',
+            ctaUrl: '#contact',
+        }
+
+        const result = patchBlockCtaUrls(block, pagesFull)
+
+        expect(result.blockType).toBe('cta')
+        expect(result.ctaUrl).toBe('/contact')
+    })
+
+    it('cta primary CTA never lost — unresolvable URL falls back to /contact', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Go',
+            ctaUrl: '#services', // no /services page
+        }
+
+        const result = patchBlockCtaUrls(block, pagesFull)
+
+        expect(result.ctaUrl).toBe('/contact')
+    })
+
+    it('cta with pages=[] → ctaUrl falls back to /contact', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Go',
+            ctaUrl: '#contact',
+        }
+
+        const result = patchBlockCtaUrls(block, pagesEmpty)
+
+        expect(result.ctaUrl).toBe('/contact')
+    })
+
+    it('cta external ctaUrl → passthrough unchanged', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Visit',
+            ctaUrl: 'https://example.com',
+        }
+
+        const result = patchBlockCtaUrls(block, pagesFull)
+
+        expect(result.ctaUrl).toBe('https://example.com')
+    })
+
+    it('cta secondary CTA resolves when page exists', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Primary',
+            ctaUrl: '#contact',
+            secondaryCtaLabel: 'Learn',
+            secondaryCtaUrl: '#about',
+        }
+
+        const result = patchBlockCtaUrls(block, pagesFull)
+
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.secondaryCtaUrl).toBe('/about')
+        expect(result.secondaryCtaLabel).toBe('Learn')
+    })
+
+    it('cta primary falls back to /contact while secondary still resolves (site missing /contact)', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Primary',
+            ctaUrl: '#contact', // no /contact page in pagesNoContact → fallback
+            secondaryCtaLabel: 'Learn',
+            secondaryCtaUrl: '#about', // /about exists → resolves
+        }
+
+        const result = patchBlockCtaUrls(block, pagesNoContact)
+
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.secondaryCtaUrl).toBe('/about')
+        expect(result.secondaryCtaLabel).toBe('Learn')
+    })
+
+    it('cta secondary CTA dropped when no matching page', () => {
+        const block = {
+            blockType: 'cta',
+            ctaLabel: 'Primary',
+            ctaUrl: '#contact',
+            secondaryCtaLabel: 'Gallery',
+            secondaryCtaUrl: '#gallery', // no /gallery page anywhere
+        }
+
+        const result = patchBlockCtaUrls(block, pagesFull)
+
+        expect(result.ctaUrl).toBe('/contact')
+        expect(result.secondaryCtaUrl).toBeUndefined()
+        expect((result as Record<string, unknown>).secondaryCtaLabel).toBeUndefined()
+    })
+})
+
 // ── TC-F01.CTA-DRAG-05: Non-CTA blocks pass through unchanged ────────
 describe('[TC-F01.CTA-DRAG] patchBlockCtaUrls — Non-CTA blocks', () => {
     it('TC-F01.CTA-DRAG-05: block without ctaButtons or plans → return unchanged', () => {

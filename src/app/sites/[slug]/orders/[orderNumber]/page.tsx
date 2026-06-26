@@ -12,6 +12,9 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 
 const UPLOAD_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
+// Private order-tracking page — keep out of the search index.
+export const metadata = { robots: { index: false, follow: false } }
+
 export default async function OrderTrackingPage({
     params,
     searchParams,

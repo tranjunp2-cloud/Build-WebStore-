@@ -32,7 +32,9 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
     return (
         <Dialog open={isOpen} onOpenChange={(v) => { if (!v) close() }}>
             <DialogContent
-                className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden"
+                // z-[110] keeps the modal above the orders drawer (backdrop z-[100], panel z-[101]).
+                className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden z-[110]"
+                overlayClassName="z-[110]"
                 // No separate description: the labeled tracking-number input is self-describing.
                 // Tell Radix it's intentional so it doesn't log the missing-Description warning.
                 aria-describedby={undefined}

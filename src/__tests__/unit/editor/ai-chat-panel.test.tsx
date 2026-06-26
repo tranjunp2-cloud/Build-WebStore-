@@ -18,8 +18,6 @@ vi.mock('@/i18n', () => ({
                     failedToEdit: 'Failed to edit website',
                     outOfScope: 'I can only help with editing your website.',
                     undo: 'Undo',
-                    changeColorPrompt: 'Change color',
-                    addSectionPrompt: '+ Add section',
                     inputPlaceholder: 'Tell AI what to change...',
                     send: 'send',
                     newLine: 'new line',
@@ -29,14 +27,6 @@ vi.mock('@/i18n', () => ({
         locale: 'en',
     }),
     I18nProvider: ({ children }: { children: React.ReactNode }) => children,
-}))
-
-vi.mock('@/components/editor/AddSectionPromptChips', () => ({
-    AddSectionPromptChips: ({ onPromptSelect }: any) => (
-        <button data-testid="prompt-chip" onClick={() => onPromptSelect('Test Prompt')}>
-            Prompt Chip
-        </button>
-    )
 }))
 
 // jsdom does not implement scrollIntoView
@@ -247,23 +237,30 @@ describe('AIChatPanel', () => {
         localStorage.clear()
     })
 
-    it('prompts chip auto-fills input and submits', async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-            ok: true,
-            headers: new Headers({ 'content-type': 'application/json' }),
-            json: () => Promise.resolve({ action: 'test', message: 'done' })
-        })
-        global.fetch = mockFetch
+    // ── GH-1407: suggestion chips removed + textarea input ──────────────────
 
+    it('does not render the Change color / Add section suggestion chips', () => {
         render(<AIChatPanel {...defaultProps} />)
-        
-        await act(async () => {
-            fireEvent.click(screen.getByTestId('prompt-chip'))
-        })
+        expect(screen.queryByText('Change color')).not.toBeInTheDocument()
+        expect(screen.queryByText('+ Add section')).not.toBeInTheDocument()
+    })
 
-        // In AddSectionPromptChips when prompt is selected it sets the input. Wait, the chip mock only calls onPromptSelect.
-        // It should set the input, let's just make sure input receives it
+    it('renders the chat input as a textarea (auto-resize)', () => {
+        render(<AIChatPanel {...defaultProps} />)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
+        expect(input.tagName).toBe('TEXTAREA')
+    })
+
+    it('Shift+Enter inserts a new line without sending', () => {
+        const mockFetch = vi.fn()
+        global.fetch = mockFetch
+        render(<AIChatPanel {...defaultProps} />)
+
         const input = screen.getByPlaceholderText(/Tell AI what to change/i) as HTMLTextAreaElement
-        expect(input.value).toBe('Test Prompt')
+        fireEvent.change(input, { target: { value: 'line one' } })
+        fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', shiftKey: true })
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(input.value).toBe('line one')
     })
 })

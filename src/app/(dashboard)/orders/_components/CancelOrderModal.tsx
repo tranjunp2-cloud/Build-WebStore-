@@ -43,7 +43,9 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
     return (
         <Dialog open={isOpen} onOpenChange={(v) => { if (!v) close() }}>
             <DialogContent
-                className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden"
+                // z-[110] keeps the modal above the orders drawer (backdrop z-[100], panel z-[101]).
+                className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden z-[110]"
+                overlayClassName="z-[110]"
                 style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Icon Circle */}
