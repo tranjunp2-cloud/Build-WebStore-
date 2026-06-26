@@ -148,4 +148,61 @@ describe('TrackingManager', () => {
         const body = JSON.parse(mockFetch.mock.calls[0][1].body)
         expect(body.sessionId).toBe(MOCK_UUID)
     })
+
+    // ── URL normalization (GH-1386): strip /sites/{slug} prefix ──────────
+
+    // TC-F09-TRACK-09: Prefixed blog path → normalized
+    it('TC-F09-TRACK-09: strips /sites/{slug} prefix from blog path', async () => {
+        window.location = { pathname: '/sites/mystore/blog/my-post' } as Location
+        render(<TrackingManager siteId="site-1" />)
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce())
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body.pageUrl).toBe('/blog/my-post')
+    })
+
+    // TC-F09-TRACK-10: Prefixed product path → normalized
+    it('TC-F09-TRACK-10: strips /sites/{slug} prefix from product path', async () => {
+        window.location = { pathname: '/sites/mystore/products/abc' } as Location
+        render(<TrackingManager siteId="site-1" />)
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce())
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body.pageUrl).toBe('/products/abc')
+    })
+
+    // TC-F09-TRACK-11: /sites/{slug}/ (trailing slash) → /
+    it('TC-F09-TRACK-11: /sites/{slug}/ normalizes to /', async () => {
+        window.location = { pathname: '/sites/mystore/' } as Location
+        render(<TrackingManager siteId="site-1" />)
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce())
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body.pageUrl).toBe('/')
+    })
+
+    // TC-F09-TRACK-12: /sites/{slug} (no trailing slash) → /
+    it('TC-F09-TRACK-12: /sites/{slug} (no trailing slash) normalizes to /', async () => {
+        window.location = { pathname: '/sites/mystore' } as Location
+        render(<TrackingManager siteId="site-1" />)
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce())
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body.pageUrl).toBe('/')
+    })
+
+    // TC-F09-TRACK-13: Already-clean path (subdomain/custom domain) → unchanged
+    it('TC-F09-TRACK-13: already-clean path is unchanged (idempotent normalization)', async () => {
+        window.location = { pathname: '/blog/already-clean' } as Location
+        render(<TrackingManager siteId="site-1" />)
+
+        await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledOnce())
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+        expect(body.pageUrl).toBe('/blog/already-clean')
+    })
 })

@@ -6,6 +6,7 @@ import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { OwnerProvider } from './OwnerContext'
+import { TrackingManager } from './TrackingManager'
 import type { NavPage, SiteRendererProps } from './SiteRenderer'
 
 // Mirrors NavigationBlock's VARIANT_ALIASES (navigation/index.tsx) — keep in sync when adding new aliases.
@@ -22,7 +23,7 @@ const FIXED_NAV_SPACER: Record<string, string> = {
 type SiteLayoutShellProps = {
     site: SiteRendererProps['site']
     pages?: NavPage[]
-    isOwner?: boolean
+    isOwner: boolean
     children: React.ReactNode
     /** true on commerce pages: renders cart widget even when applyGlobalBlock tiers find none */
     forceCartWidget?: boolean
@@ -169,6 +170,7 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children, forceCart
 
     return (
         <OwnerProvider value={!!isOwner}>
+            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
                 ${themeCSS}
