@@ -407,12 +407,14 @@ function ImageOverlayVariant({ block, category, s3Map }: { block: AboutConfig; c
             className="relative overflow-hidden"
             style={{ color: '#ffffff', minHeight: 480 }}
         >
-            <img
-                src={imageUrl}
-                alt={block.image?.alt || `About ${headline || 'us'}`}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-            />
+            <MediaUploadOverlay field="image" altText={block.image?.alt || `About ${headline || 'us'}`} positionClass="absolute inset-0">
+                <img
+                    src={imageUrl}
+                    alt={block.image?.alt || `About ${headline || 'us'}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                />
+            </MediaUploadOverlay>
             <DuotoneOverlay color1="#0a0a0a" color2={CSS_VARS.primary} opacity={0.65} blendMode="multiply" />
             <SectionWrapper
                 as="div"

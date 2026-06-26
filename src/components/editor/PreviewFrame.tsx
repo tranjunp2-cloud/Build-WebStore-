@@ -1021,7 +1021,13 @@ function PreviewFrameInner({
             // Push updated block to iframe for in-place preview — mirrors BLOCK_FIELD_CHANGED path.
             // updateBlock calls above are synchronous so getState() reflects the latest value.
             // This lets onImageReplaced use refreshPreview:false (no full iframe reload needed).
-            const latestBlock = useEditorStore.getState().blocks[blockIndex]
+            // Send the locale-MERGED display block (not the raw flat block): on a non-primary locale
+            // the panel stores edits like `variant` in localeOverrides, so the flat block keeps the
+            // stale DB value. Sending it raw would render the wrong variant (e.g. about image-overlay
+            // flipping to split after upload). Mirrors handleBlockFieldChange in page.tsx.
+            const store = useEditorStore.getState()
+            const rawBlock = store.blocks[blockIndex]
+            const latestBlock = rawBlock ? store.getDisplayBlock(rawBlock) : rawBlock
             if (latestBlock) {
                 frameElementRef.current?.contentWindow?.postMessage(
                     { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: latestBlock },
