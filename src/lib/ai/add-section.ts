@@ -324,8 +324,8 @@ export function createAddSectionBlock({
             }
         }
 
-        case 'banner':
-        case 'cta': {
+        // 'banner' has no dedicated block — keep it mapped to a centered hero.
+        case 'banner': {
             const r = resolveBlockContent('cta', locale, brandName)
             const c = r.content as { headline: string; subheadline: string; ctaLabel: string }
             return {
@@ -334,6 +334,20 @@ export function createAddSectionBlock({
                 headline: c.headline,
                 subheadline: c.subheadline,
                 ctaButtons: [{ label: c.ctaLabel, url: '#contact', style: 'primary' }],
+            }
+        }
+
+        // GH-1412 — CTA is a real registered block; insert it as `cta`, not `hero`.
+        case 'cta': {
+            const r = resolveBlockContent('cta', locale, brandName)
+            const c = r.content as { headline: string; subheadline: string; ctaLabel: string }
+            return {
+                blockType: 'cta',
+                variant: 'banner',
+                headline: c.headline,
+                subheadline: c.subheadline,
+                ctaLabel: c.ctaLabel,
+                ctaUrl: '#contact',
             }
         }
 
@@ -1000,8 +1014,9 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         }
     }
 
-    // CTA / Banner fallbacks are intentionally mapped to Hero by createAddSectionBlock
-    if (['banner', 'cta'].includes(mergedBlock.blockType as string)) {
+    // 'banner' has no dedicated block — keep it mapped to Hero by createAddSectionBlock.
+    // GH-1412: 'cta' is a real block and must NOT be remapped to hero.
+    if (mergedBlock.blockType === 'banner') {
         mergedBlock.blockType = 'hero'
         mergedBlock.variant = 'centered'
     }
