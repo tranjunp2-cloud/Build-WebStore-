@@ -2,6 +2,9 @@
 
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
+import { SmartLink } from '@/blocks/_shared/smart-link'
+
+const MotionSmartLink = motion.create(SmartLink)
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -53,7 +56,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                         className="flex justify-center"
                     >
                         {/* Single CTA — take only the first button */}
-                        <motion.a
+                        <MotionSmartLink
                             href={resolveHref(ctaButtons[0].url)}
                             whileHover={{ scale: 1.04, y: -2 }}
                             whileTap={{ scale: 0.97 }}
@@ -65,7 +68,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                             }}
                         >
                             <RichText text={ctaButtons[0].label} as="span" />
-                        </motion.a>
+                        </MotionSmartLink>
                     </motion.div>
                 )}
             </div>

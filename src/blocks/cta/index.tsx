@@ -23,6 +23,9 @@ import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
+
+const MotionSmartLink = motion.create(SmartLink)
 
 const FLOATING_STORAGE_PREFIX = 'cta-floating-dismissed-'
 const FLOATING_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
@@ -104,18 +107,18 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
     if (shouldReduce) {
         return (
             <BrokenLinkWarning url={url} rounded="rounded-md">
-                <a href={href} {...linkAttrs} onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
+                <SmartLink href={href} {...linkAttrs} onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
                     {labelNode}
-                </a>
+                </SmartLink>
             </BrokenLinkWarning>
         )
     }
 
     return (
         <BrokenLinkWarning url={url} rounded="rounded-md">
-            <motion.a href={href} {...linkAttrs} onClick={handleClick} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className={btnCls} style={buttonStyle}>
+            <MotionSmartLink href={href} {...linkAttrs} onClick={handleClick} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className={btnCls} style={buttonStyle}>
                 {labelNode}
-            </motion.a>
+            </MotionSmartLink>
         </BrokenLinkWarning>
     )
 }
@@ -144,17 +147,17 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
     if (shouldReduce) {
         return (
             <BrokenLinkWarning url={url} rounded="rounded-md">
-                <a href={href} {...linkAttrs} onClick={handleClick} className={cls} style={style}>
+                <SmartLink href={href} {...linkAttrs} onClick={handleClick} className={cls} style={style}>
                     <RichText text={label} as="span" />
-                </a>
+                </SmartLink>
             </BrokenLinkWarning>
         )
     }
     return (
         <BrokenLinkWarning url={url} rounded="rounded-md">
-            <motion.a href={href} {...linkAttrs} onClick={handleClick} whileHover={{ x: 3 }} className={cls} style={style}>
+            <MotionSmartLink href={href} {...linkAttrs} onClick={handleClick} whileHover={{ x: 3 }} className={cls} style={style}>
                 <RichText text={label} as="span" />
-            </motion.a>
+            </MotionSmartLink>
         </BrokenLinkWarning>
     )
 }

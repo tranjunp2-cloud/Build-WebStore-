@@ -10,6 +10,9 @@ import { signOrderToken } from '@/lib/auth/order-token'
 import { orderWaitingEmail } from '@/lib/email/templates/order-waiting'
 import { sendEmail } from '@/lib/email/send'
 
+// Private order-confirmation page — keep out of the search index.
+export const metadata = { robots: { index: false, follow: false } }
+
 export default async function OrderConfirmPage({
     params,
     searchParams,

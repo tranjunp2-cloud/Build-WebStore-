@@ -9,6 +9,7 @@ import { DropdownLink, DROPDOWN_CHILD_LINK_CLASS } from './nav-dropdown-link'
 import { useI18n } from '@/i18n'
 import { NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 
 // Re-declared inline to avoid coupling to index.tsx internals
 const NAV_SURFACE_BG_SOLID = `color-mix(in srgb, var(--background, #09090b) 97%, transparent)`
@@ -26,7 +27,7 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
 
     if (!hasChildren) {
         return (
-            <a
+            <SmartLink
                 href={resolveHref(link.url)}
                 title={link.label}
                 className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg opacity-70 hover:opacity-100 hover:bg-white/[0.1] transition-all"
@@ -35,7 +36,7 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
                 {link._hiddenFromVisitor && (
                     <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />
                 )}
-            </a>
+            </SmartLink>
         )
     }
 
@@ -76,9 +77,9 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
                         style={{ left: 'calc(100% + 7px)', background: NAV_SURFACE_BG_SOLID, border: NAV_SURFACE_BORDER }}
                     >
                         {link.children!.map((child, ci) => (
-                            <a key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
+                            <SmartLink key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
                                 {child.label}
-                            </a>
+                            </SmartLink>
                         ))}
                     </motion.div>
                 )}
