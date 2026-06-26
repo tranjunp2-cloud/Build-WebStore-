@@ -5,6 +5,9 @@ import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { OT_CSS } from './[orderNumber]/order-tracking-styles'
 import OrderLookupClient from './OrderLookupClient'
 
+// Private order-lookup page — keep out of the search index.
+export const metadata = { robots: { index: false, follow: false } }
+
 export default async function OrderLookupPage({
     params,
 }: {

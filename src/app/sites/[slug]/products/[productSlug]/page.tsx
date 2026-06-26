@@ -14,6 +14,8 @@ import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
 import { getSiteBasePath } from '@/lib/site-base-path'
 import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 import { ScrollToTop } from '@/components/storefront/scroll-to-top'
+import { resolveStorefrontOrigin } from '@/lib/seo/canonical'
+import { serializeJsonLd } from '@/lib/seo/json-ld'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -90,19 +92,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // BUG-F05-020: Resolve canonical URL for product pages
     const reqHeaders = await headers()
     const tenantHostname = reqHeaders.get('x-tenant-hostname')
-    const tenantSlug = reqHeaders.get('x-tenant-slug')
-    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
-
-    let baseUrl: string
-    if (tenantHostname) {
-        baseUrl = `https://${tenantHostname}`
-    } else if (tenantSlug) {
-        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
-    } else if (slug !== 'custom') {
-        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
-    } else {
-        baseUrl = ''
-    }
+    const baseUrl = resolveStorefrontOrigin(data.tenant as any, { fallbackHostname: tenantHostname, slug })
     const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
 
     return {
@@ -115,6 +105,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             type: 'website',
             ...(canonical ? { url: canonical } : {}),
             ...(ogImage && { images: [{ url: ogImage }] }),
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title,
+            description,
+            ...(ogImage ? { images: [ogImage] } : {}),
         },
     }
 }
@@ -196,6 +192,20 @@ export default async function ProductDetailPage({ params }: Props) {
     const base = await getSiteBasePath(slug)
     const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
 
+    const origin = resolveStorefrontOrigin(tenant as any, { slug })
+    const crumbs = [
+        { name: 'Home', url: origin },
+        ...(p.category?.name ? [{ name: p.category.name, url: undefined }] : []),
+        { name: p.name, url: origin ? `${origin}/products/${p.slug}` : undefined },
+    ]
+    const breadcrumbJsonLd = origin ? {
+        '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+        itemListElement: crumbs.map((c, i) => ({
+            '@type': 'ListItem', position: i + 1, name: c.name,
+            ...(c.url ? { item: c.url } : {}),
+        })),
+    } : null
+
     return (
         <SiteLayoutShell
             site={siteWithContext as SiteRendererProps['site']}
@@ -204,7 +214,8 @@ export default async function ProductDetailPage({ params }: Props) {
             forceCartWidget
         >
             <ScrollToTop />
-            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
+            {breadcrumbJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />}
             <style>{`
                 .pd-breadcrumb { padding: 16px 32px; }
                 .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 0 32px 64px; max-width: 1200px; margin: 0 auto; }

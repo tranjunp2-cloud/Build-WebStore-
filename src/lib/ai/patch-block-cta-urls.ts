@@ -1,4 +1,5 @@
 import { resolveCtaSlugFromLinks, resolvePricingPlanCta, type NavPageLike } from '@/lib/navigation-url'
+import type { CTAConfig } from '@/blocks/cta/config'
 import type { BlockData } from '@/store/editorStore'
 
 /**
@@ -55,6 +56,24 @@ export function patchBlockCtaUrls<T extends Record<string, unknown>>(
             ...block,
             plans: (b.plans as Array<Record<string, unknown>>).map(p => resolvePricingPlanCta(p, links)),
         }
+    }
+
+    // GH-1412 — CTA block (`ctaUrl`/`secondaryCtaUrl` string fields): primary CTA
+    // is the block's whole point → keep it, default to /contact on no-match
+    // (like pricing). Optional secondary CTA → drop both label+url when unresolved.
+    if (typeof b.ctaUrl === 'string' && !Array.isArray(b.ctaButtons) && !Array.isArray(b.plans)) {
+        const next = { ...block } as Record<string, unknown>
+        next.ctaUrl = resolveCtaSlugFromLinks(b.ctaUrl, links) || '/contact'
+        if (typeof b.secondaryCtaUrl === 'string') {
+            const secondary = resolveCtaSlugFromLinks(b.secondaryCtaUrl, links)
+            if (secondary) {
+                next.secondaryCtaUrl = secondary
+            } else {
+                delete next.secondaryCtaUrl
+                delete (next as Partial<CTAConfig>).secondaryCtaLabel
+            }
+        }
+        return next as T
     }
 
     return block

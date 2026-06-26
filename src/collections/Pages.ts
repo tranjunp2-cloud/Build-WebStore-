@@ -1,5 +1,6 @@
 import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import { revalidatePageAfterChange, revalidatePageAfterDelete } from '../lib/cache/revalidate-storefront'
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -1515,7 +1516,8 @@ const GalleryMasonryBlock = {
 export const Pages: CollectionConfig = {
     slug: 'pages',
     hooks: {
-        afterChange: [afterChangeHook],
+        afterChange: [afterChangeHook, revalidatePageAfterChange],
+        afterDelete: [revalidatePageAfterDelete],
     },
     admin: {
         useAsTitle: 'title',
