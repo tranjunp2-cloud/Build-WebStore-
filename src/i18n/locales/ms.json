@@ -3005,7 +3005,7 @@
                                 "Buka tab <strong>AI CHAT</strong> di bar sisi kiri Editor.",
                                 "Taip apa yang anda mahu ubah — cth., <strong>\"Boleh tukar warna ke merah jambu?\"</strong> atau <strong>\"Tambah bahagian baru\"</strong>.",
                                 "AI akan memproses permintaan anda dan menunjukkan <strong>\"Menyediakan perubahan untuk pratonton...\"</strong> semasa mengemas kini.",
-                                "Gunakan <strong>cip cadangan pantas</strong> di bawah (cth., \"Tukar warna\", \"+ Tambah bahagian\") untuk tindakan biasa.",
+                                "Tekan <strong>Enter</strong> untuk hantar, atau <strong>Shift+Enter</strong> untuk baris baru — kotak input membesar mengikut taipan anda.",
                                 "Perubahan diterapkan secara masa nyata pada pratonton — semak dan simpan atau minta penyesuaian lanjut."
                             ]
                         },
@@ -3573,8 +3573,6 @@
             "failedToEdit": "Gagal mengedit laman web",
             "outOfScope": "Saya hanya boleh membantu mengedit laman web anda.",
             "undo": "Buat Asal",
-            "changeColorPrompt": "Tukar warna",
-            "addSectionPrompt": "+ Tambah bahagian",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
             "newLine": "baris baru"
@@ -4131,32 +4129,6 @@
             "events": "Acara",
             "blog": "Blog",
             "travel": "Pelancongan"
-        },
-        "addSection": {
-            "testimonials": "Tambah testimoni",
-            "testimonialsCompact": "💬 Tambah testimoni",
-            "testimonialsPrompt": "Tambah bahagian testimoni dengan 3 ulasan pelanggan",
-            "faq": "Tambah Soalan Lazim",
-            "faqCompact": "❓ Tambah Soalan Lazim",
-            "faqPrompt": "Tambah bahagian soalan lazim dengan 3 soalan pelanggan biasa",
-            "gallery": "Tambah galeri",
-            "galleryCompact": "🖼️ Tambah galeri",
-            "galleryPrompt": "Tambah bahagian galeri dengan 6 imej pemegang tempat",
-            "features": "Tambah ciri",
-            "featuresCompact": "✨ Tambah ciri",
-            "featuresPrompt": "Tambah bahagian ciri dengan 3 sorotan perkhidmatan utama",
-            "team": "Tambah pasukan",
-            "teamCompact": "👥 Tambah pasukan",
-            "teamPrompt": "Tambah bahagian pasukan dengan 3 ahli pasukan",
-            "newsletter": "Tambah surat berita",
-            "newsletterCompact": "✉️ Tambah surat berita",
-            "newsletterPrompt": "Tambah bahagian pendaftaran surat berita",
-            "banner": "Tambah sepanduk",
-            "bannerCompact": "📣 Tambah sepanduk",
-            "bannerPrompt": "Tambah bahagian sepanduk untuk kempen promosi",
-            "cta": "Tambah CTA",
-            "ctaCompact": "🚀 Tambah CTA",
-            "ctaPrompt": "Tambah bahagian seruan tindakan dengan tawaran yang kuat"
         },
         "inlineEditComponent": {
             "clickToEdit": "Klik untuk sunting",
