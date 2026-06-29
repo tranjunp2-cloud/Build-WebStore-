@@ -29,7 +29,9 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
             <div
                 className={cn(
                     // `dark`: segment logo = phần của sidebar → luôn dark khớp sidebar, bất kể theme.
-                    'dark sb-dark flex items-center h-full gap-2 md:gap-4 pl-4',
+                    // `dash-logo-seg`: ở mobile segment chỉ là cụm control của top-bar (không phải
+                    // cột sidebar) → globals.css neutralize sb-dark về theme (light=trắng, dark=tối).
+                    'dash-logo-seg dark sb-dark flex items-center h-full gap-2 md:gap-4 pl-4',
                     // bg + right divider (col). The header's own full-width border-bottom draws
                     // the line under the logo too — no separate bottom border here (it sat 1px off
                     // and doubled the line in the logo region).

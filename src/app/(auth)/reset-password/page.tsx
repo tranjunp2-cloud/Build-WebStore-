@@ -10,6 +10,8 @@ import { toast } from 'sonner'
 import { Lock, Eye, EyeOff, Loader2, ArrowLeft, Check, ShieldCheck } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 function createResetSchema(t: ReturnType<typeof useI18n>['t']) {
     return z
@@ -80,30 +82,11 @@ function ResetPasswordForm() {
                     {t.auth.reset.invalidLinkDesc}
                 </p>
                 <div className="mt-8 space-y-4 w-full">
-                    <Link href="/forgot-password" style={{ textDecoration: 'none' }}>
-                        <button
-                            type="button"
-                            className="relative w-full transition-all hover:brightness-110 active:scale-[0.99]"
-                            style={{
-                                display: 'flex',
-                                padding: '14px 0',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                borderRadius: 16,
-                                border: 'none',
-                                cursor: 'pointer',
-                                background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
-                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
-                                fontFamily: 'Inter, sans-serif',
-                                fontSize: 14,
-                                fontWeight: 600,
-                                lineHeight: '20px',
-                                color: '#FFFFFF',
-                            }}
-                        >
+                    <Button asChild className="h-9 w-full">
+                        <Link href="/forgot-password" style={{ textDecoration: 'none' }}>
                             {t.auth.reset.requestNewLink}
-                        </button>
-                    </Link>
+                        </Link>
+                    </Button>
 
                     <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 24 }}>
                         <Link
@@ -223,39 +206,23 @@ function ResetPasswordForm() {
                     >
                         {t.auth.reset.newPassword}
                     </label>
-                    <div
-                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
-                        style={{
-                            marginTop: 4,
-                            background: 'var(--auth-input-bg)',
-                            border: '1px solid var(--auth-input-border)',
-                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
-                        }}
-                    >
-                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
-                        <input
+                    <div className="relative mt-1">
+                        <Lock className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 pointer-events-none text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.reset.newPasswordPlaceholder}
-                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontFamily: 'Inter, sans-serif',
-                                lineHeight: '1.21em',
-                                color: 'var(--auth-text)',
-                            }}
+                            className={`pl-9 pr-9${errors.password ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('password')}
                             autoFocus
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent transition-colors"
-                            style={{ color: 'var(--auth-text)' }}
+                            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 cursor-pointer border-none bg-transparent text-[hsl(var(--muted-foreground))] transition-colors"
                             tabIndex={-1}
                         >
-                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
                     {errors.password && (
@@ -293,38 +260,22 @@ function ResetPasswordForm() {
                     >
                         {t.auth.reset.confirmPassword}
                     </label>
-                    <div
-                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.confirmPassword ? 'ring-2 ring-red-500/50' : ''}`}
-                        style={{
-                            marginTop: 4,
-                            background: 'var(--auth-input-bg)',
-                            border: '1px solid var(--auth-input-border)',
-                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
-                        }}
-                    >
-                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
-                        <input
+                    <div className="relative mt-1">
+                        <Lock className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 pointer-events-none text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontFamily: 'Inter, sans-serif',
-                                lineHeight: '1.21em',
-                                color: 'var(--auth-text)',
-                            }}
+                            className={`pl-9 pr-9${errors.confirmPassword ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('confirmPassword')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirm(!showConfirm)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent transition-colors"
-                            style={{ color: 'var(--auth-text)' }}
+                            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 cursor-pointer border-none bg-transparent text-[hsl(var(--muted-foreground))] transition-colors"
                             tabIndex={-1}
                         >
-                            {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
                     {errors.confirmPassword && (
@@ -347,28 +298,7 @@ function ResetPasswordForm() {
                 </div>
 
                 {/* Submit */}
-                <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="relative w-full transition-all disabled:opacity-50 hover:brightness-110 active:scale-[0.99]"
-                    style={{
-                        display: 'flex',
-                        padding: '14px 0',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: 16,
-                        marginTop: 20,
-                        border: 'none',
-                        cursor: 'pointer',
-                        background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        lineHeight: '20px',
-                        color: '#FFFFFF',
-                    }}
-                >
+                <Button type="submit" disabled={isSubmitting} className="mt-5 h-9 w-full">
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -377,7 +307,7 @@ function ResetPasswordForm() {
                     ) : (
                         t.auth.reset.submit
                     )}
-                </button>
+                </Button>
             </form>
 
             {/* Bottom Actions */}
