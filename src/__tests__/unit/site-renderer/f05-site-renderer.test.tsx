@@ -1664,6 +1664,62 @@ describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (f
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-04 — bottom-right group responsive layout
+// GH-1412: a bottom-right group that contains a floating-sticky CTA lays out
+// horizontally on desktop (md:flex-row) but stays a vertical stack on mobile
+// (flex-col-reverse) so the wide CTA card never overflows the viewport width.
+// Widget-only groups (no CTA) stay vertical at every breakpoint.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-04] SiteRenderer bottom-right responsive layout (CTA → md:flex-row)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-04a: CTA floating-sticky + whatsapp → container is horizontal on desktop (md:flex-row), vertical on mobile (flex-col-reverse)', () => {
+        // Arrange
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join now' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — bottom-right floating container opts into the desktop row layout
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer.className).toContain('md:flex-row')
+        // Mobile stays a vertical stack
+        expect(floatingContainer.className).toContain('flex-col-reverse')
+    })
+
+    it('TC-F04-SR-GH1412-04b: whatsapp only (no CTA) → container stays vertical, NO md:flex-row', () => {
+        // Arrange — widget-only bottom-right group must not switch to horizontal
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer.className).not.toContain('md:flex-row')
+        expect(floatingContainer.className).toContain('flex-col-reverse')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
 // Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
 //

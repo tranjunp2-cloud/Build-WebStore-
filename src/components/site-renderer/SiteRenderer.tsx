@@ -675,7 +675,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => (
                 <div
                     key={pos}
-                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
+                    // GH-1412: a bottom-right group that includes a floating-sticky CTA lays out
+                    // horizontally on desktop (CTA beside the launchers) but stays a vertical stack
+                    // on mobile so the wide CTA card never overflows the viewport width.
+                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3 ${pos !== 'bottom-left' && blockIndices.some(i => blocks[i].blockType === 'cta') ? 'md:flex-row' : ''}`}
                 >
                     {[...blockIndices]
                         // GH-1412: launcher widgets (WhatsApp/social/cart) stay closest to the
