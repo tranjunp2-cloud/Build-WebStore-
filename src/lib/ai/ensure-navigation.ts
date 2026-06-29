@@ -136,6 +136,7 @@ function buildDefaultNavigation(businessName: string, pageLinks?: readonly NavLi
         logoText: businessName,
         links,
         ctaButton: {
+            show: true,
             label: 'Get in touch',
             url: resolveCtaUrl(links),
             style: 'primary',
