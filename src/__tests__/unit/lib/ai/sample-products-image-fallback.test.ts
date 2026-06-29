@@ -17,14 +17,12 @@ const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockF
     mockGetProductImages: vi.fn(),
 }))
 
-vi.mock('@/lib/ai/unsplash-client', () => ({
+vi.mock('@/lib/ai/pixabay-client', () => ({
     searchPhotos: mockSearchPhotos,
-    buildImgixUrl: vi.fn((url: string) => url),
-    trackDownload: vi.fn(),
-    UnsplashError: class UnsplashError extends Error {
+    PixabayError: class PixabayError extends Error {
         code: string
-        constructor(message: string, code: string) {
-            super(message)
+        constructor(code: string, status: number, retryable: boolean, message?: string) {
+            super(message ?? `[Pixabay] ${code}`)
             this.code = code
         }
     },
@@ -97,7 +95,7 @@ beforeEach(() => {
     mockGetProductImages.mockReturnValue(PRODUCT_URLS)
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    delete process.env.UNSPLASH_FALLBACK_ONLY
+    delete process.env.PIXABAY_FALLBACK_ONLY
 })
 
 afterEach(() => {
@@ -105,11 +103,15 @@ afterEach(() => {
 })
 
 describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
-    it('[TC-F05-908-01] Tier A success — Unsplash hit → uploadImageUrl → product gets imageId', async () => {
+    it('[TC-F05-908-01] Tier A success — Pixabay hit → uploadImageUrl → product gets imageId', async () => {
         // Arrange
         mockSearchPhotos.mockResolvedValue([{
-            urls: { raw: 'https://unsplash.com/photo.jpg' },
-            links: { download_location: 'https://unsplash.com/dl' },
+            id: 'p1',
+            url: 'https://pixabay.com/get/p1_1280.jpg',
+            alt: 'product photo',
+            photographer: 'Photographer',
+            width: 800,
+            height: 800,
         }])
         mockUploadImageUrl.mockResolvedValue(42)
         mockFindByID.mockResolvedValue({ id: 42 })
@@ -125,8 +127,12 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
     it('[TC-F05-908-02] Tier A upload returns null → falls through to Tier C gallery URL → gets imageId', async () => {
         // Arrange — search returns photo but upload returns null (e.g. upload skipped)
         mockSearchPhotos.mockResolvedValue([{
-            urls: { raw: 'https://unsplash.com/photo.jpg' },
-            links: { download_location: 'https://unsplash.com/dl' },
+            id: 'p1',
+            url: 'https://pixabay.com/get/p1_1280.jpg',
+            alt: 'product photo',
+            photographer: 'Photographer',
+            width: 800,
+            height: 800,
         }])
         mockUploadImageUrl
             .mockResolvedValueOnce(null)   // Tier A upload → null
@@ -184,9 +190,9 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
         expect(stats.noImage).toBeGreaterThan(0)
     })
 
-    it('[TC-F05-908-06] UNSPLASH_FALLBACK_ONLY=1 skips search, goes directly to Tier C then Tier D on failure', async () => {
+    it('[TC-F05-908-06] PIXABAY_FALLBACK_ONLY=1 skips search, goes directly to Tier C then Tier D on failure', async () => {
         // Arrange
-        process.env.UNSPLASH_FALLBACK_ONLY = '1'
+        process.env.PIXABAY_FALLBACK_ONLY = '1'
         mockUploadImageUrl.mockRejectedValue(new Error('gallery down'))
         mockFindOrCreateCartonMedia.mockResolvedValue({ id: 100 })
 
@@ -202,8 +208,12 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
     it('[TC-F05-908-08] Tier A upload throws + Tier D rescues with carton → imageId set, stats.uploadFailed increments', async () => {
         // Arrange — Tier A finds photo but upload throws; Tier C also fails; Tier D carton succeeds
         mockSearchPhotos.mockResolvedValue([{
-            urls: { raw: 'https://unsplash.com/photo.jpg' },
-            links: { download_location: 'https://unsplash.com/dl' },
+            id: 'p1',
+            url: 'https://pixabay.com/get/p1_1280.jpg',
+            alt: 'product photo',
+            photographer: 'Photographer',
+            width: 800,
+            height: 800,
         }])
         mockUploadImageUrl.mockRejectedValue(new Error('S3 upload failed')) // Tier A + Tier C throw
         mockFindOrCreateCartonMedia.mockResolvedValue({ id: 99 })            // Tier D rescues
@@ -221,8 +231,12 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
         // Arrange — search returns photo but ALL uploads fail; Tier D also unavailable
         const logSpy = vi.spyOn(console, 'log')
         mockSearchPhotos.mockResolvedValue([{
-            urls: { raw: 'https://unsplash.com/photo.jpg' },
-            links: { download_location: 'https://unsplash.com/dl' },
+            id: 'p1',
+            url: 'https://pixabay.com/get/p1_1280.jpg',
+            alt: 'product photo',
+            photographer: 'Photographer',
+            width: 800,
+            height: 800,
         }])
         mockUploadImageUrl.mockRejectedValue(new Error('S3 upload failed')) // Tier A + Tier C both throw
         mockFindOrCreateCartonMedia.mockResolvedValue(null)                  // Tier D unavailable

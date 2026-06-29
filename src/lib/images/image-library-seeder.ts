@@ -9,7 +9,7 @@
  */
 
 import type { Payload } from 'payload'
-import { searchPhotos, downloadPhotoBuffer, trackDownload, buildImgixUrl } from '@/lib/ai/unsplash-client'
+import { searchPhotos, downloadPhotoBuffer } from '@/lib/ai/pixabay-client'
 import { uploadBufferToMedia } from '@/lib/ai/media-pipeline'
 import { buildSiteAltKey, siteAltKeyPrefix } from './image-library-keys'
 
@@ -180,12 +180,15 @@ export async function seedImageLibraryForSite(
             queryGroups.set(key, group)
         }
 
-        // Search Unsplash once per unique query+orientation, then distribute photos to slots
+        // Search Pixabay once per unique query+orientation, then distribute photos to slots
         const photosByKey = new Map<string, Awaited<ReturnType<typeof searchPhotos>>>()
         for (const [key, groupSlots] of queryGroups) {
             const { query, orientation } = groupSlots[0]!
+            // Pixabay ships fixed sizes — request the largest size any slot in this
+            // group needs; Payload regenerates per-variant sizes on upload anyway.
+            const groupWidth = Math.max(...groupSlots.map((s) => s.imgixW))
             try {
-                const photos = await searchPhotos(query, 10, { orientation })
+                const photos = await searchPhotos(query, 10, { orientation, width: groupWidth })
                 photosByKey.set(key, photos)
             } catch (err) {
                 console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)
@@ -195,25 +198,25 @@ export async function seedImageLibraryForSite(
 
         // Assign a unique photo to each slot (rotate through results)
         const queryIndexes = new Map<string, number>()
-        const slotPhotoAssignments: Array<{ slotDef: SlotDef; photoUrl: string | null; downloadLocation: string | null }> = []
+        const slotPhotoAssignments: Array<{ slotDef: SlotDef; photoUrl: string | null }> = []
 
         for (const slotDef of slots) {
             const key = `${slotDef.query}:${slotDef.orientation}`
             const photos = photosByKey.get(key) ?? []
             if (photos.length === 0) {
-                slotPhotoAssignments.push({ slotDef, photoUrl: null, downloadLocation: null })
+                slotPhotoAssignments.push({ slotDef, photoUrl: null })
                 continue
             }
             const idx = queryIndexes.get(key) ?? 0
             const photo = photos[idx % photos.length]!
             queryIndexes.set(key, idx + 1)
-            const url = buildImgixUrl(photo.urls.raw, { w: slotDef.imgixW, h: slotDef.imgixH, fit: 'crop' })
-            slotPhotoAssignments.push({ slotDef, photoUrl: url, downloadLocation: photo.links.download_location })
+            // photo.url is already sized by the client (Pixabay fixed sizes).
+            slotPhotoAssignments.push({ slotDef, photoUrl: photo.url })
         }
 
         // Upload all slots in parallel (bounded by semaphore)
         const results = await Promise.all(
-            slotPhotoAssignments.map(({ slotDef, photoUrl, downloadLocation }) =>
+            slotPhotoAssignments.map(({ slotDef, photoUrl }) =>
                 sem.run(async () => {
                     const altKey = buildSiteAltKey(siteId, slotDef.slot)
                     // Per-slot findOrCreate: if this slot was already uploaded by a concurrent
@@ -230,8 +233,6 @@ export async function seedImageLibraryForSite(
                     if (!photoUrl) { failed++; return { slot: slotDef.slot, id: null } }
                     try {
                         const { buffer, mimetype } = await downloadPhotoBuffer(photoUrl)
-                        // Track only after buffer is confirmed downloaded (Unsplash API terms)
-                        if (downloadLocation) trackDownload(downloadLocation)
                         const ext = mimetype.includes('png') ? 'png' : 'jpg'
                         const filename = `imglib-s${siteId}-${slotDef.slot.replace(/[[\].]/g, '-')}-${Date.now()}.${ext}`
                         const id = await uploadBufferToMedia(

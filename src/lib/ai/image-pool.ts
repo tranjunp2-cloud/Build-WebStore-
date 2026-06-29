@@ -1,11 +1,11 @@
 /**
- * Image Pool — per-site Unsplash pool for visual cohesion.
+ * Image Pool — per-site Pixabay pool for visual cohesion.
  *
  * Problem solved: today every block calls `searchPhotos(keywords)` independently,
  * so hero / gallery / team photos come from different photographers with
  * different lighting, color, and style. Users see "5 block = 5 style ảnh rời rạc".
  *
- * Solution: build ONE pool per site (1-2 Unsplash calls total), then each block
+ * Solution: build ONE pool per site (1-2 search calls total), then each block
  * picks from the pool via role-based deterministic picker. Every photo shares
  * the same query + mood filter → visual coherence by construction.
  *
@@ -13,7 +13,7 @@
  * Depends on: Phase 02 theme-moods (mood.photographyFilter + mood.imageryKeywords)
  */
 
-import { searchPhotos, type UnsplashPhoto } from './unsplash-client'
+import { searchPhotos, type PixabayPhoto } from './pixabay-client'
 import type { ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -31,7 +31,6 @@ export interface PoolPhoto {
   width: number
   height: number
   photographer: string
-  downloadLocation: string
   role: ImageRole
   aspectRatio: '16:9' | '4:3' | '1:1' | '3:4'
 }
@@ -126,11 +125,11 @@ export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): str
 }
 
 /**
- * Map a raw UnsplashPhoto into a PoolPhoto with derived aspect ratio + role.
+ * Map a raw PixabayPhoto into a PoolPhoto with derived aspect ratio + role.
  * Role is assigned defensively — "any" for landscape means the photo works
  * anywhere, the picker maps role → bucket.
  */
-function normalize(photo: UnsplashPhoto, defaultRole: ImageRole): PoolPhoto {
+function normalize(photo: PixabayPhoto, defaultRole: ImageRole): PoolPhoto {
   const ar = photo.width / Math.max(photo.height, 1)
   let aspectRatio: PoolPhoto['aspectRatio'] = '16:9'
   if (ar >= 1.6) aspectRatio = '16:9'
@@ -140,12 +139,11 @@ function normalize(photo: UnsplashPhoto, defaultRole: ImageRole): PoolPhoto {
 
   return {
     id: photo.id,
-    url: photo.urls.regular,
-    alt: photo.alt_description ?? photo.description ?? '',
+    url: photo.url,
+    alt: photo.alt ?? '',
     width: photo.width,
     height: photo.height,
-    photographer: photo.user?.name ?? photo.user?.username ?? 'Unknown',
-    downloadLocation: photo.links.download_location,
+    photographer: photo.photographer || 'Unknown',
     role: defaultRole,
     aspectRatio,
   }
@@ -170,9 +168,9 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   let underfill = false
 
   // ── Landscape bucket (hero, gallery wide) ────────────────────────
-  let landscapePhotos: UnsplashPhoto[] = []
+  let landscapePhotos: PixabayPhoto[] = []
   try {
-    landscapePhotos = (await searchPhotos(query, landscapeSize, { orientation: 'landscape' })) ?? []
+    landscapePhotos = (await searchPhotos(query, landscapeSize, { orientation: 'landscape', width: 1200 })) ?? []
   } catch (err) {
     console.warn('[image-pool] landscape search failed:', err)
   }
@@ -182,7 +180,7 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
     const relaxedQuery = buildPoolQuery(ctx, true)
     if (relaxedQuery !== query) {
       try {
-        const extra = (await searchPhotos(relaxedQuery, landscapeSize, { orientation: 'landscape' })) ?? []
+        const extra = (await searchPhotos(relaxedQuery, landscapeSize, { orientation: 'landscape', width: 1200 })) ?? []
         landscapePhotos = landscapePhotos.concat(extra)
         if (extra.length > 0) underfill = true
       } catch (err) {
@@ -193,9 +191,9 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   }
 
   // ── Square bucket (team, product flatlay) ─────────────────────────
-  let squarePhotos: UnsplashPhoto[] = []
+  let squarePhotos: PixabayPhoto[] = []
   try {
-    squarePhotos = (await searchPhotos(query, squareSize, { orientation: 'squarish' })) ?? []
+    squarePhotos = (await searchPhotos(query, squareSize, { orientation: 'squarish', width: 1000 })) ?? []
   } catch (err) {
     console.warn('[image-pool] square search failed:', err)
   }
@@ -204,7 +202,7 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
     const relaxedQuery = buildPoolQuery(ctx, true)
     if (relaxedQuery !== query) {
       try {
-        const extra = (await searchPhotos(relaxedQuery, squareSize, { orientation: 'squarish' })) ?? []
+        const extra = (await searchPhotos(relaxedQuery, squareSize, { orientation: 'squarish', width: 1000 })) ?? []
         squarePhotos = squarePhotos.concat(extra)
         if (extra.length > 0) underfill = true
       } catch (err) {
