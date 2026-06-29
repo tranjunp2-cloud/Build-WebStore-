@@ -605,7 +605,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 const spacingStyle = (isGlobalBlock || isFloatingBlock)
                     ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
-                        paddingTop: applyNavOffset && index === firstContentBlockIdx
+                        // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
+                        // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
+                        // silently overriding it with the nav height.
+                        paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
                             ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
                             : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
                         paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',

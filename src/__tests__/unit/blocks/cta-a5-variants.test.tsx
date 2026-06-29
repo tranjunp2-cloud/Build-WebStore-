@@ -116,3 +116,120 @@ describe('TC-F01D-A5.C05: mesh-gradient-hero variant', () => {
         expect(screen.getByText(baseBlock.ctaLabel)).toBeInTheDocument()
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F01D-A5.C06 — GH-1412 regression: floating-sticky shows when page not scrollable
+// Editor preview iframes (pageHeight <= 0) must show CTA immediately
+// without waiting for 30% scroll gate. Old bug: render null forever when page can't scroll.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F01D-A5.C06] floating-sticky shows when page is not scrollable (editor iframe)', () => {
+    beforeEach(() => {
+        // Clear dismiss localStorage so we start fresh
+        // Key format: 'cta-floating-dismissed-' + siteId (defaults to 'default')
+        const storageKey = 'cta-floating-dismissed-default'
+        try {
+            localStorage.removeItem(storageKey)
+        } catch {
+            // Ignore storage errors in test env
+        }
+    })
+
+    it('TC-F01D-A5.C06a: floating-sticky renders content in jsdom (pageHeight <= 0) — not null', () => {
+        // Arrange
+        // In jsdom, scrollHeight and innerHeight default to 0 → pageHeight = 0 - 0 = 0
+        // Old behavior: would never setVisible(true) → render null
+        // Fixed: when pageHeight <= 0, show immediately
+        const { container } = render(
+            <CTABlock
+                block={{ ...baseBlock, variant: 'floating-sticky' }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
+        )
+
+        // Assert — CTA should render content (headline/ctaLabel visible), not null
+        // The component renders a fixed bottom div when not dismissed/visible
+        expect(screen.getByText(baseBlock.headline)).toBeInTheDocument()
+        expect(screen.getByText(baseBlock.ctaLabel)).toBeInTheDocument()
+
+        // Assert — the fixed container exists (proof it rendered, not null)
+        const fixedContainer = container.querySelector('.fixed.bottom-4')
+        expect(fixedContainer).toBeInTheDocument()
+    })
+
+    it('TC-F01D-A5.C06b: floating-sticky does not render null even when document.documentElement.scrollHeight = 0', () => {
+        // Arrange — verify the math: pageHeight = scrollHeight - innerHeight
+        // In jsdom: both are 0 by default → pageHeight = 0 - 0 = 0 (NOT scrollable)
+        // Old code: if (pageHeight > 0 && scrollTop / pageHeight > 0.3) setVisible(true)
+        // → when pageHeight = 0, condition never true → render null
+        // Fixed: if (pageHeight <= 0 || scrollTop / pageHeight > 0.3) setVisible(true)
+        // → when pageHeight = 0, show immediately
+
+        const { container } = render(
+            <CTABlock
+                block={{ ...baseBlock, variant: 'floating-sticky' }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
+        )
+
+        // Assert — container should NOT be null/empty
+        expect(container.firstChild).not.toBeNull()
+
+        // Assert — must find content (not render null)
+        const headline = screen.queryByText(baseBlock.headline)
+        expect(headline).toBeInTheDocument()
+    })
+
+    it('TC-F01D-A5.C06c: floating-sticky respects dismiss localStorage even on non-scrollable page', () => {
+        // Arrange — set dismiss flag using the correct storage key
+        // Key format: 'cta-floating-dismissed-' + siteId (defaults to 'default')
+        const storageKey = 'cta-floating-dismissed-default'
+        localStorage.setItem(storageKey, String(Date.now()))
+
+        // Act
+        const { container } = render(
+            <CTABlock
+                block={{ ...baseBlock, variant: 'floating-sticky' }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
+        )
+
+        // Assert — when dismissed, should render null (not show fixed container)
+        expect(container.firstChild).toBeNull()
+
+        // Clean up
+        localStorage.removeItem(storageKey)
+    })
+
+    it('TC-F01D-A5.C06d: floating-sticky headline + ctaLabel are visible in fixed container', () => {
+        // Arrange
+        const { container } = render(
+            <CTABlock
+                block={{
+                    ...baseBlock,
+                    variant: 'floating-sticky',
+                    headline: 'Special offer',
+                    ctaLabel: 'Claim now',
+                }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
+        )
+
+        // Assert
+        expect(screen.getByText('Special offer')).toBeInTheDocument()
+        expect(screen.getByText('Claim now')).toBeInTheDocument()
+
+        // Assert — content is inside the fixed container
+        const fixedContainer = container.querySelector('.fixed.bottom-4')
+        expect(fixedContainer).toBeInTheDocument()
+        expect(fixedContainer).toHaveTextContent('Special offer')
+        expect(fixedContainer).toHaveTextContent('Claim now')
+    })
+})

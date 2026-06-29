@@ -1310,6 +1310,151 @@ describe('[TC-NAV-EDITOR] SiteRenderer nav offset for overlay variants (editor v
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-01 — GH-1412 regression: nav-offset respects explicit blockSpacing.paddingTop
+// When overlay nav + editor + user sets blockSpacing.paddingTop, wrapper must use user's value
+// (not nav-height override). Default behavior (no user setting) → still use nav-height.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-01] SiteRenderer nav-offset respects explicit blockSpacing.paddingTop', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'navigation') return makeTestBlock('navigation')
+            if (type === 'cta') return makeTestBlock('cta')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-01a: overlay nav + isEditor=true + user-set blockSpacing.paddingTop=120 → wrapper paddingTop = "120px" (not nav-height)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithCTASpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 120 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTASpacing} isEditor={true} />
+        )
+
+        // Assert — wrapper should respect user's 120px, not nav-height offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('120px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+
+    it('TC-F04-SR-GH1412-01b: overlay nav + isEditor=true + NO user blockSpacing.paddingTop → wrapper uses nav-height default (floating)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithCTA = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    // NO blockSpacing set — should use default nav-offset
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTA} isEditor={true} />
+        )
+
+        // Assert — with no user blockSpacing, should fall back to nav-height offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+
+    it('TC-F04-SR-GH1412-01c: transparent nav + isEditor=true + user-set blockSpacing.paddingTop=80 → uses "80px" (not nav-height)', () => {
+        // Arrange
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'transparent' } }
+        const pageWithCTASpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 80 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTASpacing} isEditor={true} />
+        )
+
+        // Assert
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('80px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('var(--nav-height, 64px)')
+    })
+
+    it('TC-F04-SR-GH1412-01d: non-overlay nav (sticky/default) does NOT apply nav-offset even in editor', () => {
+        // Arrange — sticky nav should never trigger applyNavOffset
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'default' } }
+        const pageWithCTA = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 60 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithCTA} isEditor={true} />
+        )
+
+        // Assert — should use the explicit blockSpacing value (sticky nav doesn't trigger offset)
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('60px')
+    })
+
+    it('TC-F04-SR-GH1412-01e: overlay nav + isEditor=true + user-set blockSpacing.paddingTop=0 → uses "0px" (explicit 0 wins over nav-offset)', () => {
+        // Arrange — paddingTop=0 is a deliberate user choice; `0 === undefined` is false
+        // so it must NOT fall back to the nav-height default.
+        const site = { ...defaultSite, headerBlock: { blockType: 'navigation', variant: 'floating' } }
+        const pageWithZeroSpacing = {
+            layout: [
+                {
+                    blockType: 'cta',
+                    headline: 'Join us',
+                    ctaLabel: 'Sign up',
+                    blockSpacing: { paddingTop: 0 },
+                },
+            ],
+        }
+
+        // Act
+        const { container } = render(
+            <SiteRenderer site={site} page={pageWithZeroSpacing} isEditor={true} />
+        )
+
+        // Assert — explicit 0 must be respected, not overridden by nav-offset
+        const ctaWrapper = container.querySelector('[data-block-type="cta"]') as HTMLElement
+        expect(ctaWrapper).not.toBeNull()
+        expect(ctaWrapper.style.paddingTop).toBe('0px')
+        expect(ctaWrapper.style.paddingTop).not.toBe('calc(var(--nav-height, 64px) + 1rem)')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
 // Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
 //

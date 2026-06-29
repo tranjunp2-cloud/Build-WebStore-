@@ -327,7 +327,10 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
         const handleScroll = () => {
             const scrollTop = window.scrollY
             const pageHeight = document.documentElement.scrollHeight - window.innerHeight
-            if (pageHeight > 0 && scrollTop / pageHeight > 0.3) {
+            // GH-1412: when the page can't scroll (editor preview iframe / short pages),
+            // the 30%-scroll gate never triggers and the CTA stays hidden forever.
+            // Treat a non-scrollable page as "already past the gate" and show immediately.
+            if (pageHeight <= 0 || scrollTop / pageHeight > 0.3) {
                 setVisible(true)
             }
         }
