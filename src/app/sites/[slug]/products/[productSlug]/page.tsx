@@ -7,7 +7,6 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
-import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { getServerI18n } from '@/i18n/server'
@@ -215,7 +214,6 @@ export default async function ProductDetailPage({ params }: Props) {
             forceCartWidget
         >
             <ScrollToTop />
-            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
             {breadcrumbJsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />}
             <style>{`
