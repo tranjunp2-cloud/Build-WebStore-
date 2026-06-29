@@ -1,6 +1,6 @@
 /**
  * Unit Tests — SettingsPanel nav CTA button editor
- * TC-NAV-09, TC-NAV-10
+ * TC-NAV-09, TC-NAV-10, TC-NAV-12
  * Convention: docs/TEST_CONVENTION.md | QA: docs/qa/F-navigation.md
  */
 
@@ -390,5 +390,66 @@ describe('TC-F05-15-07 — CTA secondary section shows Add button when secondary
         const addBtn = screen.getByRole('button', { name: /\+ Add Button/i })
         expect(addBtn).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /Remove secondary/i })).not.toBeInTheDocument()
+    })
+})
+
+// ── TC-NAV-12: Nav CTA section hidden on non-default variants ────────────────
+
+describe('TC-NAV-12 — Nav CTA section hidden when nav variant is not default', () => {
+    beforeEach(() => { vi.clearAllMocks() })
+
+    it.each(['transparent', 'sidebar', 'floating', 'centered', 'mega'])(
+        'hides CTA inputs when variant is %s',
+        (variant) => {
+            // Arrange
+            render(
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        {...baseProps}
+                        headerBlock={{ blockType: 'navigation', variant, links: [], ctaButton: { show: true, label: 'Reserve', url: '/contact' } }}
+                        onHeaderUpdate={vi.fn()}
+                        requestedTab={{ tab: 'menu', key: 1 }}
+                    />
+                </I18nProvider>,
+            )
+
+            // Assert — CTA inputs must not be present for non-default variants
+            expect(screen.queryByPlaceholderText('Button label (e.g. Get started)')).not.toBeInTheDocument()
+            expect(screen.queryByPlaceholderText('Button URL (e.g. /contact)')).not.toBeInTheDocument()
+        },
+    )
+
+    it('shows CTA inputs when variant is default', () => {
+        // Arrange
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...baseProps}
+                    headerBlock={{ blockType: 'navigation', variant: 'default', links: [], ctaButton: { show: true, label: 'Get started', url: '/contact' } }}
+                    onHeaderUpdate={vi.fn()}
+                    requestedTab={{ tab: 'menu', key: 1 }}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — CTA inputs visible for default variant
+        expect(screen.getByPlaceholderText('Button label (e.g. Get started)')).toBeInTheDocument()
+    })
+
+    it('shows CTA inputs when variant is unset (defaults to default behavior)', () => {
+        // Arrange
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...baseProps}
+                    headerBlock={{ blockType: 'navigation', links: [] }}
+                    onHeaderUpdate={vi.fn()}
+                    requestedTab={{ tab: 'menu', key: 1 }}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — unset variant treated as default
+        expect(screen.getByPlaceholderText('Button label (e.g. Get started)')).toBeInTheDocument()
     })
 })

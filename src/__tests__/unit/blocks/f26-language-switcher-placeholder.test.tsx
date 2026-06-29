@@ -32,7 +32,7 @@ describe('NavLangSwitcherPlaceholder', () => {
         // carries a <title> with the short code; the chevron SVG has none.
         const trigger = screen.getByRole('button')
         expect(trigger).toBeInTheDocument()
-        expect(screen.getByTitle('EN')).toBeInTheDocument()
+        expect(screen.getByLabelText('EN')).toBeInTheDocument()
         expect(trigger.textContent).toContain('EN')
 
         // ChevronDown SVG present

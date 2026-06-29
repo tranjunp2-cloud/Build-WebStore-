@@ -355,29 +355,30 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     const showOrderSearch = Boolean((block as Record<string, unknown>)._hasCart && slug)
     const trackOrderLabel = t.storefront.orderLookup.navLabel
 
+    // GH-1279: CTA button is default-variant only — suppress on all other variants.
     // ── Transparent variant ───────────────────────────────────────────────
     if (variant === 'transparent') {
-        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Sidebar variant ───────────────────────────────────────────────────
     if (variant === 'sidebar') {
-        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} trackOrderLabel={trackOrderLabel} />
+        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} trackOrderLabel={trackOrderLabel} />
     }
 
     // ── Floating (pill) variant ───────────────────────────────────────────
     if (variant === 'floating') {
-        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Centered variant ────────────────────────────────────────────────
     if (variant === 'centered') {
-        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Mega variant ─────────────────────────────────────────────────────
     if (variant === 'mega') {
-        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Default: 'default' (was 'simple') ────────────────────────────────

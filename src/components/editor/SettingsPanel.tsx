@@ -350,6 +350,10 @@ function SettingsPanelInner({
         return normalizeNavLinkItems(navLinks, pages)
     }, [headerBlock, pages, storeBlocks, getDisplayBlock, activeLocale])
 
+    // GH-1279: CTA button is only available for the default nav variant.
+    const navVariant = (headerBlock as Record<string, unknown> | null | undefined)?.variant as string | undefined
+    const isDefaultNavVariant = !navVariant || navVariant === 'default' || navVariant === 'simple'
+
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
         brand: true,
@@ -972,8 +976,8 @@ function SettingsPanelInner({
                     />
                 </div>
 
-                {/* 4. Nav CTA Button */}
-                <div className={sectionCls}>
+                {/* 4. Nav CTA Button — hidden on non-default variants (GH-1279) */}
+                {isDefaultNavVariant && <div className={sectionCls}>
                     <label className={labelCls}>{s.navCta}</label>
                     <div className="mt-2 space-y-2">
                         <label className="flex items-center gap-2 text-xs text-slate-400">
@@ -1029,7 +1033,7 @@ function SettingsPanelInner({
                             )
                         })()}
                     </div>
-                </div>
+                </div>}
 
                 {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
                 <div ref={breadcrumbSectionRef} className={sectionCls}>
