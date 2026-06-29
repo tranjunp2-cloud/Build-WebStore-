@@ -153,8 +153,72 @@ export function StaffDirectoryClient({
                         />
                     )
                 ) : (
+                    <>
+                    {/* Mobile (< md): card list — easier to read than the scrolling table */}
+                    <div className="md:hidden flex flex-col gap-3">
+                        {currentStaffPage.map((user) => {
+                            const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0];
+                            const isOwner = user.role === 'owner';
+                            const canManage = user.id !== currentUserId && currentUserRole === 'owner';
+                            return (
+                                <div key={user.id} className="rounded-[12px] border p-4 flex flex-col gap-3" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
+                                    <div className="flex items-start gap-3">
+                                        {user.avatar ? (
+                                            <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-full object-cover shrink-0" />
+                                        ) : (
+                                            <div className="h-[40px] w-[40px] rounded-full flex items-center justify-center text-white text-[14px] font-semibold shrink-0" style={{ background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)' }}>
+                                                {displayName.substring(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="text-[14px] font-medium text-[var(--dash-text)] truncate">{displayName}</span>
+                                            <span className="text-[12px] text-[var(--dash-text-muted)] truncate" title={user.email}>{user.email}</span>
+                                        </div>
+                                        {canManage && (
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <TableActionButton onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}>
+                                                    <Edit2 className="w-4 h-4" />
+                                                </TableActionButton>
+                                                <TableActionButton variant="danger" onClick={() => handleRemove(user.id)}>
+                                                    <Trash2 className="w-4 h-4" />
+                                                </TableActionButton>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        {isOwner ? (
+                                            <div className="inline-flex items-center h-[28px] px-[12px] rounded-[12px] bg-[hsl(var(--info)/0.1)] border border-[hsl(var(--info)/0.2)]"><span className="text-[12px] font-semibold text-[hsl(var(--info))]">{t?.Staff?.table?.owner || 'Owner'}</span></div>
+                                        ) : user.role === 'custom' ? (
+                                            <div className="inline-flex items-center h-[28px] px-[12px] rounded-[12px] bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.2)]"><span className="text-[12px] font-semibold text-[hsl(var(--warning))]">{t?.Staff?.table?.custom || 'Custom Features'}</span></div>
+                                        ) : (
+                                            <div className="inline-flex items-center h-[28px] px-[12px] rounded-[12px] bg-[hsl(var(--success)/0.1)] border border-[hsl(var(--success)/0.2)]"><span className="text-[12px] font-semibold text-[hsl(var(--success))]">{t?.Staff?.table?.fullAccess || 'Manager'}</span></div>
+                                        )}
+                                        <div className="flex items-center gap-[8px] shrink-0">
+                                            <div className="w-[8px] h-[8px] rounded-full" style={{ background: user.status === 'active' ? 'hsl(var(--success))' : user.status === 'suspended' ? 'hsl(var(--destructive))' : 'var(--dash-text-muted)', opacity: user.status === 'pending' ? 0.5 : 1 }} />
+                                            <span className="text-[13px] text-[var(--dash-text)]">{user.status === 'active' ? (t?.Staff?.table?.active || 'Active') : user.status === 'suspended' ? (t?.Staff?.table?.suspended || 'Suspended') : (t?.Staff?.table?.pending || 'Pending')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {filteredStaff.length > itemsPerPage && (
+                            <div className="pt-2">
+                                <TablePagination
+                                    page={currentPage}
+                                    total={filteredStaff.length}
+                                    limit={itemsPerPage}
+                                    onPageChange={setCurrentPage}
+                                    onLimitChange={handleLimitChange}
+                                    labels={{ unit: t?.Staff?.title || 'staff' }}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tablet / desktop (md+): table */}
+                    <div className="hidden md:block">
                     <Table
-                        minWidth={800}
+                        minWidth={640}
                         footer={(
                             <TablePagination
                                 page={currentPage}
@@ -204,7 +268,7 @@ export function StaffDirectoryClient({
                                                 )}
                                                 <div className="flex flex-col h-[40px] justify-center gap-[0px]">
                                                     <span className="text-[14px] font-medium text-[var(--dash-text)] leading-[1.428em] font-['Inter']">{displayName}</span>
-                                                    <span className="text-[12px] font-normal text-[var(--dash-text-muted)] leading-[1.333em] font-['Inter'] max-w-[200px] truncate block" title={user.email}>{user.email}</span>
+                                                    <span className="text-[12px] font-normal text-[var(--dash-text-muted)] leading-[1.333em] font-['Inter'] max-w-[140px] xl:max-w-[200px] truncate block" title={user.email}>{user.email}</span>
                                                 </div>
                                             </div>
                                         </TableCell>
@@ -287,6 +351,8 @@ export function StaffDirectoryClient({
                             })}
                         </TableBody>
                     </Table>
+                    </div>
+                    </>
                 )}
             </div>
 
