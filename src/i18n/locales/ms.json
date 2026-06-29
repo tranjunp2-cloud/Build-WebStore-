@@ -2359,20 +2359,16 @@
                 "duplicateCodeField": "Kod ini sudah digunakan untuk penyewa anda. Cuba kod yang berbeza atau tambah nombor.",
                 "saveFailed": "Gagal menyimpan",
                 "created": "Diskaun dicipta",
-                "saved": "Diskaun disimpan",
-                "deleted": "Diskaun dipadamkan",
-                "deleteFailed": "Gagal memadamkan"
+                "saved": "Diskaun disimpan"
             },
             "header": {
                 "createTitle": "Cipta diskaun",
                 "defaultTitle": "Diskaun",
                 "backTitle": "Kembali ke diskaun",
-                "deleteBtn": "Padam",
                 "newCode": "Kod baru · {tenantName}",
                 "createdOn": "Dicipta {date}",
                 "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan.",
-                "revert": "Kembalikan",
-                "save": "Simpan"
+                "revert": "Kembalikan"
             },
             "saveBar": {
                 "unsavedChanges": "Perubahan belum disimpan",

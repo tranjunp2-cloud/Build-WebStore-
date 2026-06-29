@@ -1,10 +1,9 @@
 'use client'
 
-import { ArrowLeft, Trash2, UndoDot, Check } from 'lucide-react'
+import { ArrowLeft, UndoDot } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
-import { Button } from '@/components/ui/button'
 
 interface DiscountFormHeaderProps {
     isNew: boolean
@@ -17,12 +16,9 @@ interface DiscountFormHeaderProps {
     id?: string
     createdAt?: string
     tenantName?: string
-    saving: boolean
     dirty: boolean
     onBack: () => void
-    onSave: () => void
     onRevert: () => void
-    onDelete?: () => void
 }
 
 export function DiscountFormHeader({
@@ -36,12 +32,9 @@ export function DiscountFormHeader({
     id,
     createdAt,
     tenantName,
-    saving,
     dirty,
     onBack,
-    onSave,
     onRevert,
-    onDelete,
 }: DiscountFormHeaderProps) {
     const { t, ti } = useI18n()
     const d = t.dashboard.discounts.header
@@ -104,22 +97,12 @@ export function DiscountFormHeader({
                         ) : null}
                     </div>
                 </div>
-
-                {!isNew && onDelete && (
-                    <button
-                        onClick={onDelete}
-                        disabled={saving}
-                        className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors disabled:opacity-50 hover:border-destructive/50 hover:text-destructive hover:bg-destructive/10"
-                        style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)', background: 'transparent' }}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {d.deleteBtn}
-                    </button>
-                )}
             </div>
 
             {/* Dirty bar */}
-            {dirty && (
+            {/* Unsaved-changes bar — Edit only. On Create there's nothing saved yet,
+                so "unsaved changes" + Revert don't apply (use footer Cancel/Save). */}
+            {dirty && !isNew && (
                 <div
                     className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
                     style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
@@ -134,15 +117,6 @@ export function DiscountFormHeader({
                             <UndoDot className="h-3 w-3" />
                             {d.revert}
                         </button>
-                        <Button
-                            onClick={onSave}
-                            disabled={saving}
-                            variant="dashPrimary"
-                            size="sm"
-                        >
-                            <Check className="h-3 w-3" />
-                            {d.save}
-                        </Button>
                     </div>
                 </div>
             )}

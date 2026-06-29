@@ -2359,20 +2359,16 @@
                 "duplicateCodeField": "This code is already in use for your tenant. Try a different code or append a number.",
                 "saveFailed": "Failed to save",
                 "created": "Discount created",
-                "saved": "Discount saved",
-                "deleted": "Discount deleted",
-                "deleteFailed": "Failed to delete"
+                "saved": "Discount saved"
             },
             "header": {
                 "createTitle": "Create discount",
                 "defaultTitle": "Discount",
                 "backTitle": "Back to discounts",
-                "deleteBtn": "Delete",
                 "newCode": "New code · {tenantName}",
                 "createdOn": "Created {date}",
                 "unsavedChanges": "You have unsaved changes.",
-                "revert": "Revert",
-                "save": "Save"
+                "revert": "Revert"
             },
             "saveBar": {
                 "unsavedChanges": "Unsaved changes",
