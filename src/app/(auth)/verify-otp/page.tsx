@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useI18n } from '@/i18n'
+import { Button } from '@/components/ui/button'
 
 const OTP_LENGTH = 6
 const RESEND_COOLDOWN_S = 60
@@ -394,29 +395,12 @@ function VerifyOTPContent() {
                     ))}
                 </div>
 
-                {/* Confirm OTP Button — Figma: height:48, fill-width, radius:16px, gradient, opacity:0.5 disabled */}
-                <button
+                {/* Confirm OTP Button — shared DS Button (default), full-width */}
+                <Button
                     type="button"
                     onClick={() => handleVerify(otp.join(''))}
                     disabled={isVerifying || !isOtpComplete}
-                    className="relative w-full transition-all hover:brightness-110 active:scale-[0.99]"
-                    style={{
-                        display: 'flex',
-                        height: '48px',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: '16px',
-                        border: 'none',
-                        cursor: isVerifying || !isOtpComplete ? 'not-allowed' : 'pointer',
-                        opacity: isVerifying || !isOtpComplete ? 0.5 : 1,
-                        background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)',
-                        boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        lineHeight: '1.4286em',
-                        color: '#FFFFFF',
-                    }}
+                    className="h-9 w-full"
                 >
                     {isVerifying ? (
                         <>
@@ -426,7 +410,7 @@ function VerifyOTPContent() {
                     ) : (
                         t.auth.otp.confirmButton
                     )}
-                </button>
+                </Button>
             </div>
 
             {/* Bottom: Resend text + Language Switcher */}

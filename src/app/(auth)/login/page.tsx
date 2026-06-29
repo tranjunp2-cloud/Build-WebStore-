@@ -10,6 +10,8 @@ import { toast } from 'sonner'
 import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Globe } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 function createLoginSchema() {
     return z.object({
@@ -57,14 +59,6 @@ function getRedirectByRole(
     // Owner with tenant → returnUrl or dashboard
     return returnUrl
 }
-
-/* ─── Figma Design Token Constants ─── */
-// Background on wrapper, not input — prevents native input rendering layer from covering icons
-const INPUT_WRAPPER_STYLE = {
-    background: 'var(--auth-input-bg)',
-    border: '1px solid var(--auth-input-border)',
-    boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
-} as const
 
 function LoginFormContent() {
     const router = useRouter()
@@ -338,23 +332,13 @@ function LoginFormContent() {
                     >
                         {t.auth.email}
                     </label>
-                    <div
-                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
-                        style={INPUT_WRAPPER_STYLE}
-                    >
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
-                        <input
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 pointer-events-none text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontFamily: 'Inter, sans-serif',
-                                lineHeight: '1.21',
-                                color: 'var(--auth-text)',
-                            }}
+                            className={`pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('email')}
                         />
                     </div>
@@ -372,30 +356,19 @@ function LoginFormContent() {
                     >
                         {t.auth.password}
                     </label>
-                    <div
-                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-ring/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
-                        style={INPUT_WRAPPER_STYLE}
-                    >
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
-                        <input
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 pointer-events-none text-[hsl(var(--muted-foreground))]" />
+                        <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className="w-full h-11 rounded-2xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                fontFamily: 'Inter, sans-serif',
-                                lineHeight: '1.21',
-                                color: 'var(--auth-text)',
-                            }}
+                            className={`pl-9 pr-9${errors.password ? ' border-red-500 focus-visible:border-red-500' : ''}`}
                             {...register('password')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors bg-transparent border-none p-0 cursor-pointer"
-                            style={{ color: 'var(--auth-text)' }}
+                            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 transition-colors bg-transparent border-none p-0 cursor-pointer text-[hsl(var(--muted-foreground))]"
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -421,29 +394,8 @@ function LoginFormContent() {
 
                 {/* ─── Bottom Actions (Button & Lang) ─── */}
                 <div className="flex flex-col w-full" style={{ gap: 16, marginTop: 40 }}>
-                    {/* ─── Sign In Button — Figma devmode CSS exact ─── */}
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="relative w-full transition-all disabled:opacity-50 hover:brightness-110 active:scale-[0.99]"
-                        style={{
-                            display: 'flex',
-                            padding: '14px 0',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            gap: 16.313,
-                            borderRadius: 16,
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
-                            fontFamily: 'Inter, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            lineHeight: '20px',
-                            color: '#FFFFFF',
-                        }}
-                    >
+                    {/* ─── Sign In Button — shared DS Button (default gradient) ─── */}
+                    <Button type="submit" disabled={isSubmitting} className="h-9 w-full">
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -455,7 +407,7 @@ function LoginFormContent() {
                                 <ArrowRight className="h-4 w-4" />
                             </>
                         )}
-                    </button>
+                    </Button>
 
                     {/* ─── Language Switcher — Figma: globe + segmented pill ─── */}
                     <LanguageSwitcher variant="segmented" />
