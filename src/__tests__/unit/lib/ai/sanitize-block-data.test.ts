@@ -309,6 +309,57 @@ describe('sanitizeBlockData — team members extended [TC-F01.08]', () => {
         expect(members[0].name).toBe('Jane')
         expect(members[0].role).toBe('Designer')
     })
+
+    // GH: team Zod schema expects members[].image as object {url,alt?}. AI often
+    // emits a string URL → "Expected object, received string". Sanitizer wraps it.
+    it('wraps a string member image into { url, alt } [TC-F01.08]', () => {
+        // Arrange — AI returned image as a bare URL string
+        const input = {
+            blockType: 'team',
+            members: [{ name: 'Ali', role: 'CEO', image: 'https://img.test/ali.jpg' }],
+        }
+
+        // Act
+        const output = sanitizeBlockData(input)
+
+        // Assert — string wrapped to object, satisfies Zod object schema
+        const members = output.members as Array<{ image: { url: string; alt: string } }>
+        expect(members[0].image).toEqual({ url: 'https://img.test/ali.jpg', alt: 'Ali' })
+    })
+
+    it('preserves an object member image and fills alt from name [TC-F01.08]', () => {
+        // Arrange — AI returned a partial object image (url only)
+        const input = {
+            blockType: 'team',
+            members: [{ name: 'Bo', role: 'CTO', image: { url: 'https://img.test/bo.jpg' } }],
+        }
+
+        // Act
+        const output = sanitizeBlockData(input)
+
+        // Assert
+        const members = output.members as Array<{ image: { url: string; alt: string } }>
+        expect(members[0].image).toEqual({ url: 'https://img.test/bo.jpg', alt: 'Bo' })
+    })
+
+    it('strips an empty/invalid member image to undefined [TC-F01.08]', () => {
+        // Arrange — empty string + missing image
+        const input = {
+            blockType: 'team',
+            members: [
+                { name: 'A', role: 'Dev', image: '' },
+                { name: 'B', role: 'Dev' },
+            ],
+        }
+
+        // Act
+        const output = sanitizeBlockData(input)
+
+        // Assert — no string leaks through; field is undefined
+        const members = output.members as Array<{ image?: unknown }>
+        expect(members[0].image).toBeUndefined()
+        expect(members[1].image).toBeUndefined()
+    })
 })
 
 // ─── FAQ items (lines 436-447) ────────────────────────────────────────────────
