@@ -27,13 +27,18 @@ function LogoFrame({ size, children }: { size: 'grid' | 'row'; children: ReactNo
     const box = size === 'grid' ? 'w-24 h-24 md:w-28 md:h-28' : 'w-20 h-20 md:w-24 md:h-24'
     return (
         <div
-            className={`flex items-center justify-center ${box} rounded-xl p-3 transition-all duration-200 hover:shadow-md`}
+            className={`${box} rounded-xl p-3 transition-all duration-200 hover:shadow-md`}
             style={{
                 border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                 background: `rgba(var(--brand-primary-rgb), 0.04)`,
             }}
         >
-            {children}
+            {/* Relative inner box gives the fixed-size area that a `fill` <Image> needs.
+             *  Fill reserves the full padded box up-front → no layout shift on image load,
+             *  and makes the whole padded area the click target for editor image-replace. */}
+            <div className="relative flex h-full w-full items-center justify-center">
+                {children}
+            </div>
         </div>
     )
 }
@@ -58,17 +63,16 @@ function LogoPlaceholder({ name, imageIndex }: { name?: string; imageIndex?: num
     )
 }
 
-/** Real logo fitted into the square frame via object-contain — keeps aspect ratio,
- *  no crop, letterboxed within the box so wide and tall logos stay uniform. */
+/** Real logo fitted into the square frame via fill + object-contain — keeps aspect
+ *  ratio, no crop, letterboxed within the box so wide and tall logos stay uniform. */
 function LogoImage({ item, index }: { item: LogoCloudConfig['logos'][number]; index: number }) {
     return (
         <Image
             src={item.logo!.url}
             alt={item.logo?.alt || item.name}
-            width={0}
-            height={0}
+            fill
             sizes="128px"
-            className="max-h-full max-w-full h-auto w-auto object-contain opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
+            className="object-contain opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
             data-image-index={index}
         />
     )
