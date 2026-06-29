@@ -651,9 +651,11 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table (GH-1222 DS migration) --- */}
+                        {/* --- Desktop Table (GH-1222 DS migration) — xl+ only; ≤1279 use cards
+                            (table minWidth 860 scrolls inside the ~710px iPad-Pro pane with sidebar open;
+                            xl matches blog/orders so iPad Pro 1024 shows cards). --- */}
                         {filteredAndSortedProducts.length > 0 && (
-                            <div className="hidden md:block">
+                            <div className="hidden xl:block">
                                 <Table
                                     className="table-fixed w-full"
                                     minWidth={860}
@@ -782,8 +784,9 @@ export default function ProductsPage() {
                             </div>
                         )}
 
-                        {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
-                        <div className="md:hidden flex flex-col gap-3">
+                        {/* --- Card View (mobile + tablet + iPad Pro, < xl) (Figma Node 30945:1017).
+                            1 col on mobile, 2 cols from md so wide tablet isn't a single sparse column. --- */}
+                        <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
@@ -824,21 +827,20 @@ export default function ProductsPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Price column (right) — level with the name; keeps name/category tight in the middle column */}
+                                            <div className="flex flex-col items-end shrink-0 pt-[2px]">
+                                                <span className="text-[11px] font-medium text-foreground/50 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
+                                                <span className="text-[16px] font-bold text-foreground leading-[20px] whitespace-nowrap">{priceDisplay}</span>
+                                            </div>
                                         </div>
 
-                                        {/* Section 2: Price + Stock/Status */}
-                                        <div className="flex items-end justify-between">
-                                            {/* Price (Left Aligned) */}
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
-                                                <span className="text-[18px] font-bold text-foreground leading-[22px]">{priceDisplay}</span>
-                                            </div>
-
-                                            {/* Stock + Status Toggle (Right Aligned) */}
-                                            <div className="flex items-end gap-3">
-                                                <div className="flex flex-col items-end gap-0.5">
-                                                    <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                    {inv === 0 ? (
+                                        {/* Section 2: Stock (left) + Status toggle (right) — price moved up next to name */}
+                                        <div className="flex items-center justify-between gap-3">
+                                            {/* Stock (Left) */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
+                                                {inv === 0 ? (
                                                         <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
                                                             <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
                                                         </div>
@@ -857,7 +859,7 @@ export default function ProductsPage() {
                                                 {/* Status Toggle - Compacted */}
                                                 <div
                                                     onClick={(e) => handleUpdateStatus(product, e)}
-                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
+                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden"
                                                     style={{
                                                         border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)" : "var(--dash-secondary-bg)",
@@ -869,7 +871,6 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "translate-x-[20px]" : "translate-x-0"
                                                     )} />
                                                 </div>
-                                            </div>
                                         </div>
 
                                         {/* Section 3: Action Row */}
@@ -884,14 +885,15 @@ export default function ProductsPage() {
                                                 {t.dashboard.products.list.edit}
                                             </Link>
 
-                                            {/* Delete Button */}
-                                            <Button
-                                                variant="ghost"
+                                            {/* Delete Button — plain <button> mirroring the Edit <Link> classes so both are exactly equal size */}
+                                            <button
+                                                type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))] p-0"
+                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
-                                            </Button>
+                                                {t.dashboard.products.list.delete}
+                                            </button>
                                         </div>
                                     </div>
                                 )
@@ -906,9 +908,9 @@ export default function ProductsPage() {
                             />
                         )}
 
-                        {/* Mobile Pagination */}
+                        {/* Card-view Pagination (< xl) — was md:hidden which left tablet cards with no pager */}
                         {totalPages > 1 && (
-                            <div className="md:hidden py-4">
+                            <div className="xl:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
@@ -936,21 +938,25 @@ export default function ProductsPage() {
 
             {quickViewProduct && (
                 <>
-                    <div className="hidden md:block">
+                    {/* Desktop 2-col QuickView only from xl (needs ~1024px; overflows on iPad).
+                        Tablet + iPad Pro (≤1279) use the fullscreen mobile detail → fits, no overflow. */}
+                    <div className="hidden xl:block">
                         <ProductQuickViewModal
                             isOpen={!!quickViewProduct}
                             onClose={() => setQuickViewProduct(null)}
                             product={quickViewProduct}
-                            onDelete={handleDelete}
+                            // Close this z-[9999] modal first, then open the confirm popup — otherwise
+                            // the ConfirmModal (z-50) renders BEHIND this overlay and is invisible.
+                            onDelete={(prod) => { setQuickViewProduct(null); handleDelete(prod) }}
                         />
                     </div>
                     {mounted && typeof document !== 'undefined' && createPortal(
-                        <div className="block md:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
+                        <div className="block xl:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
                             <ProductDetailsMobile
                                 product={quickViewProduct}
                                 onClose={() => setQuickViewProduct(null)}
                                 onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
-                                onDelete={() => handleDelete(quickViewProduct)}
+                                onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
                             />
                         </div>,
                         document.body
