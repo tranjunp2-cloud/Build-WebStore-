@@ -499,7 +499,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Group floating widgets by their corner position so they stack vertically
     // instead of overlapping when multiple are placed on the same corner.
-    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+    // GH-1412: 'cta' joins the floating stack ONLY in its floating-sticky variant, so a
+    // floating CTA no longer overlaps the WhatsApp/social/cart launchers (same bottom-right corner).
+    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'cta'])
     const getFloatingBlockPos = (b: PreviewBlock) => {
         if (b.blockType === 'cartWidget') return 'bottom-left'
         if (b.blockType === 'whatsapp-button' && (b.position as string) === 'bottom-left') return 'bottom-left'
@@ -508,7 +510,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const floatingBlockSet = new Set<number>()
     const floatingByPos = new Map<string, number[]>()
     blocks.forEach((b, i) => {
-        if (!FLOATING_WIDGET_TYPES.has(b.blockType) || (b.variant as string) === 'inline') return
+        if (!FLOATING_WIDGET_TYPES.has(b.blockType)) return
+        // CTA only floats in the floating-sticky variant; every other variant stays in normal flow.
+        if (b.blockType === 'cta' && (b.variant as string) !== 'floating-sticky') return
+        // Other widgets keep their existing behavior: skip the inline (in-flow) variant.
+        if (b.blockType !== 'cta' && (b.variant as string) === 'inline') return
         floatingBlockSet.add(i)
         const pos = getFloatingBlockPos(b)
         const arr = floatingByPos.get(pos) ?? []
@@ -605,7 +611,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 const spacingStyle = (isGlobalBlock || isFloatingBlock)
                     ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
-                        paddingTop: applyNavOffset && index === firstContentBlockIdx
+                        // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
+                        // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
+                        // silently overriding it with the nav height.
+                        paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
                             ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
                             : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
                         paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
@@ -663,49 +672,82 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             })}
 
             {/* Floating widgets — grouped by corner so they stack vertically instead of overlapping */}
-            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => (
-                <div
-                    key={pos}
-                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
-                >
-                    {blockIndices.map(blockIndex => {
-                        const floatingBlock = blocks[blockIndex]
-                        const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
-                        if (!FloatingComponent) return null
-                        const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
-                            ? floatingBlock.__editorBlockIndex : blockIndex
-                        const floatingCallback = onBlockFieldChange
-                            ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
-                            : null
-                        const floatingContent = (
-                            <FloatingContainerProvider value={true}>
-                                <BlockEditCallbackProvider value={floatingCallback}>
-                                    <BlockErrorBoundary blockType={floatingBlock.blockType}>
-                                        <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
-                                    </BlockErrorBoundary>
-                                </BlockEditCallbackProvider>
-                            </FloatingContainerProvider>
+            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => {
+                const renderFloating = (blockIndex: number) => {
+                    const floatingBlock = blocks[blockIndex]
+                    const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
+                    if (!FloatingComponent) return null
+                    const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
+                        ? floatingBlock.__editorBlockIndex : blockIndex
+                    const floatingCallback = onBlockFieldChange
+                        ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
+                        : null
+                    const floatingContent = (
+                        <FloatingContainerProvider value={true}>
+                            <BlockEditCallbackProvider value={floatingCallback}>
+                                <BlockErrorBoundary blockType={floatingBlock.blockType}>
+                                    <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
+                                </BlockErrorBoundary>
+                            </BlockEditCallbackProvider>
+                        </FloatingContainerProvider>
+                    )
+                    if (isEditor) {
+                        // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
+                        const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
+                            ? floatingBlock.__editorBlockIndex
+                            : editorIdx
+                        return (
+                            <div
+                                key={blockIndex}
+                                data-block-index={dataBlockIndex}
+                                data-block-type={floatingBlock.blockType}
+                                className="group/block relative"
+                            >
+                                {floatingContent}
+                            </div>
                         )
-                        if (isEditor) {
-                            // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
-                            const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
-                                ? floatingBlock.__editorBlockIndex
-                                : editorIdx
-                            return (
-                                <div
-                                    key={blockIndex}
-                                    data-block-index={dataBlockIndex}
-                                    data-block-type={floatingBlock.blockType}
-                                    className="group/block relative"
-                                >
-                                    {floatingContent}
-                                </div>
-                            )
-                        }
-                        return <div key={blockIndex}>{floatingContent}</div>
-                    })}
-                </div>
-            ))}
+                    }
+                    // GH-1412: `empty:hidden` so a floating-sticky CTA that renders null (before
+                    // the storefront scroll-gate fires) doesn't occupy a flex slot / leave a gap.
+                    return <div key={blockIndex} className="empty:hidden">{floatingContent}</div>
+                }
+
+                // GH-1412: keep the launcher column (WhatsApp/social/cart) exactly as before and
+                // place a floating-sticky CTA as a SEPARATE block beside it — to the left on desktop
+                // (md:flex-row), above it on mobile (flex-col) so the wide CTA card never overflows.
+                const ctaIndices = blockIndices.filter(i => blocks[i].blockType === 'cta')
+                const widgetIndices = blockIndices.filter(i => blocks[i].blockType !== 'cta')
+
+                if (ctaIndices.length === 0) {
+                    // Widget-only group — unchanged original layout.
+                    return (
+                        <div
+                            key={pos}
+                            className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
+                        >
+                            {widgetIndices.map(renderFloating)}
+                        </div>
+                    )
+                }
+
+                return (
+                    <div
+                        key={pos}
+                        className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col md:flex-row items-end gap-3`}
+                    >
+                        {/* CTA column — multiple floating-sticky CTAs stack vertically here instead
+                            of overflowing the row horizontally on desktop. */}
+                        <div className="flex flex-col items-end gap-3">
+                            {ctaIndices.map(renderFloating)}
+                        </div>
+                        {widgetIndices.length > 0 && (
+                            <div className="flex flex-col-reverse items-end gap-3">
+                                {widgetIndices.map(renderFloating)}
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
         </OwnerProvider>
         </HiddenSlugsProvider>
     )
