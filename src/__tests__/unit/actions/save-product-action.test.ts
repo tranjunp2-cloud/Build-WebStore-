@@ -21,6 +21,7 @@ vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ id: 'u1', email: 'test@example.com' }),
     extractTenantId: vi.fn().mockReturnValue(null),
+    tenantIdForQuery: vi.fn().mockReturnValue(null),
 }))
 vi.mock('@/lib/subscriptions/plan-subscription', () => ({
     getActivePlanSubscription: vi.fn().mockResolvedValue({
@@ -36,7 +37,7 @@ vi.mock('@/app/(dashboard)/actions/media', () => ({
 }))
 
 import { saveProductAction, updateProductFieldAction } from '@/app/(dashboard)/products/actions'
-import { getCurrentUser, extractTenantId } from '@/lib/auth'
+import { getCurrentUser, extractTenantId, tenantIdForQuery } from '@/lib/auth'
 
 const VALID_PRODUCT = { name: 'Test Product', price: 100 }
 const PRODUCT_WITH_IMAGES = {
@@ -49,9 +50,11 @@ describe('saveProductAction', () => {
         vi.clearAllMocks()
         vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
         vi.mocked(extractTenantId).mockReturnValue(null)
+        vi.mocked(tenantIdForQuery).mockReturnValue(null)
         mockFind.mockResolvedValue({ docs: [] })
         mockCreate.mockResolvedValue({ id: 42, name: 'Test Product' })
         mockUpdate.mockResolvedValue({ id: 42, name: 'Test Product' })
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product' })
         mockGetOrCreateCrateCartonId.mockResolvedValue(99)
     })
 
@@ -141,6 +144,36 @@ describe('saveProductAction', () => {
             data: expect.objectContaining({
                 images: PRODUCT_WITH_IMAGES.images,
             }),
+        }))
+    })
+
+    // ── Tenant injection (Fix A) ──────────────────────────────────────────────
+
+    it('[TC-F08-04-32] tenantIdForQuery returns 83 → payload.create called with tenant: 83', async () => {
+        // Arrange
+        vi.mocked(tenantIdForQuery).mockReturnValue(83)
+        mockGetOrCreateCrateCartonId.mockResolvedValue(null)
+
+        // Act
+        await saveProductAction(PRODUCT_WITH_IMAGES)
+
+        // Assert — Fix A: explicit tenant injection prevents tenant_id NOT NULL constraint failure
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({ tenant: 83 }),
+        }))
+    })
+
+    it('[TC-F08-04-32b] tenantIdForQuery returns null → payload.create NOT given a tenant field', async () => {
+        // Arrange
+        vi.mocked(tenantIdForQuery).mockReturnValue(null)
+        mockGetOrCreateCrateCartonId.mockResolvedValue(null)
+
+        // Act
+        await saveProductAction(PRODUCT_WITH_IMAGES)
+
+        // Assert — no tenant injected when user has no tenant (null guard)
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.not.objectContaining({ tenant: expect.anything() }),
         }))
     })
 

@@ -5,7 +5,7 @@
  */
 
 import type { BasePayload } from 'payload'
-import { downloadPhotoBuffer } from './unsplash-client'
+import { downloadPhotoBuffer } from './pixabay-client'
 
 export async function uploadImageUrl(
     imageUrl: string,

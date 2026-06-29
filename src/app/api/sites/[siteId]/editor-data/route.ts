@@ -40,6 +40,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             collection: 'sites',
             id: siteId,
             depth: 1,
+            disableErrors: true,
         })
 
         if (!site) {

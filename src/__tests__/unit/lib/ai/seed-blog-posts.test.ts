@@ -8,7 +8,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import type { BasePayload } from 'payload'
-import type { UnsplashPhoto } from '@/lib/ai/unsplash-client'
+import type { PixabayPhoto } from '@/lib/ai/pixabay-client'
 
 vi.mock('@/lib/ai/generate-blog-seeds', () => ({
     generateBlogSeedsAI: vi.fn().mockResolvedValue([
@@ -40,28 +40,30 @@ vi.mock('@/lib/images/blog-thumbnail-images', () => ({
     ] as [string, string, string]),
 }))
 
-vi.mock('@/lib/ai/unsplash-client', () => {
-    class UnsplashError extends Error {
+vi.mock('@/lib/ai/pixabay-client', () => {
+    class PixabayError extends Error {
         constructor(
             public readonly code: string,
             public readonly status: number,
             public readonly retryable: boolean,
             message?: string,
         ) {
-            super(message ?? `[Unsplash] ${code}`)
-            this.name = 'UnsplashError'
+            super(message ?? `[Pixabay] ${code}`)
+            this.name = 'PixabayError'
         }
     }
     return {
         searchPhotos: vi.fn().mockResolvedValue([
             {
-                urls: { raw: 'https://images.unsplash.com/photo-raw' },
-                links: { download_location: 'https://api.unsplash.com/photos/abc/download' },
-            } satisfies Partial<UnsplashPhoto>,
+                id: 'p1',
+                url: 'https://pixabay.com/get/photo_1280.jpg',
+                alt: 'photo tags',
+                photographer: 'Photographer',
+                width: 1280,
+                height: 720,
+            } satisfies Partial<PixabayPhoto>,
         ]),
-        buildImgixUrl: vi.fn((_url: string) => 'https://images.unsplash.com/photo-raw?w=1200&h=630'),
-        trackDownload: vi.fn(),
-        UnsplashError,
+        PixabayError,
     }
 })
 
@@ -74,8 +76,7 @@ const getGenerateBlogSeedsAI = async () => (await import('@/lib/ai/generate-blog
 const getGenerateBlogPostContent = async () => (await import('@/lib/ai/generate-blog-seeds')).generateBlogPostContent
 const getIsQuotaExhausted = async () => (await import('@/lib/ai/generate-blog-seeds')).isQuotaExhausted
 const getUploadImageUrl = async () => (await import('@/lib/ai/upload-media')).uploadImageUrl
-const getSearchPhotos = async () => (await import('@/lib/ai/unsplash-client')).searchPhotos
-const getBuildImgixUrl = async () => (await import('@/lib/ai/unsplash-client')).buildImgixUrl
+const getSearchPhotos = async () => (await import('@/lib/ai/pixabay-client')).searchPhotos
 const getGalleryImagesMock = async () => (await import('@/lib/images/industry-images')).getGalleryImages
 const getBlogThumbnailsMock = async () => (await import('@/lib/images/blog-thumbnail-images')).getBlogThumbnails
 const getFindOrCreateCartonMedia = async () => (await import('@/lib/media/carton-placeholder')).findOrCreateCartonMedia
@@ -212,16 +213,18 @@ describe('TC-F08-BS.07 — Tier A upload failure falls through to Tier B', () =>
 describe('TC-F08-BS.08 — Tier A: searchPhotos called with AI imageKeyword; gallery not used', () => {
     it('uses AI imageKeyword for searchPhotos and does not fall back to gallery', async () => {
         const searchPhotos = await getSearchPhotos()
-        const buildImgixUrl = await getBuildImgixUrl()
         const getGalleryImages = await getGalleryImagesMock()
         const uploadImageUrl = await getUploadImageUrl()
 
-        const mockPhoto = {
-            urls: { raw: 'https://images.unsplash.com/tier-a-raw' },
-            links: { download_location: 'https://api.unsplash.com/photos/tier-a/download' },
+        const mockPhoto: PixabayPhoto = {
+            id: 'tier-a',
+            url: 'https://pixabay.com/get/tier-a_1280.jpg',
+            alt: 'tier a tags',
+            photographer: 'Photographer',
+            width: 1280,
+            height: 720,
         }
-        vi.mocked(searchPhotos).mockResolvedValue([mockPhoto as UnsplashPhoto])
-        vi.mocked(buildImgixUrl).mockReturnValue('https://images.unsplash.com/tier-a-raw?w=1200&h=630')
+        vi.mocked(searchPhotos).mockResolvedValue([mockPhoto])
         vi.mocked(uploadImageUrl).mockResolvedValue(300)
 
         const payload = makePayload(0)
@@ -229,13 +232,13 @@ describe('TC-F08-BS.08 — Tier A: searchPhotos called with AI imageKeyword; gal
 
         // searchPhotos called once per post (3 posts) with AI imageKeyword
         expect(searchPhotos).toHaveBeenCalledTimes(3)
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape' })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape' })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape' })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
 
-        // uploadImageUrl called with the buildImgixUrl output
+        // uploadImageUrl called with photo.url directly (no Imgix transformation on Pixabay)
         expect(uploadImageUrl).toHaveBeenCalledWith(
-            'https://images.unsplash.com/tier-a-raw?w=1200&h=630',
+            'https://pixabay.com/get/tier-a_1280.jpg',
             expect.stringMatching(/^blog-9-/),
             expect.any(String),
             9,
@@ -405,9 +408,9 @@ describe('TC-F08-BS.16 — AI imageKeyword passed to searchPhotos (not category)
         const payload = makePayload(0)
         await seedBlogPosts(payload, 1, 2, 'restaurant', 'BakeryBiz', 3)
 
-        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape' })
-        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape' })
-        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape' })
+        expect(searchPhotos).toHaveBeenNthCalledWith(1, 'baking pastry', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(2, 'cafe interior', 1, { orientation: 'landscape', width: 1200 })
+        expect(searchPhotos).toHaveBeenNthCalledWith(3, 'fresh bread', 1, { orientation: 'landscape', width: 1200 })
     })
 })
 
@@ -499,9 +502,13 @@ describe('TC-F08-BS.22 — orphan media: Tier A+B upload IDs invalid (filesize=0
         // (prior tests may have set it to []  — clearAllMocks resets call counts but not implementations)
         const searchPhotos = await getSearchPhotos()
         vi.mocked(searchPhotos).mockResolvedValue([{
-            urls: { raw: 'https://images.unsplash.com/photo-raw' },
-            links: { download_location: 'https://api.unsplash.com/photos/abc/download' },
-        } as UnsplashPhoto])
+            id: 'photo-abc',
+            url: 'https://pixabay.com/get/photo-abc_1280.jpg',
+            alt: 'photo tags',
+            photographer: 'Photographer',
+            width: 1280,
+            height: 800,
+        } as PixabayPhoto])
 
         const findOrCreateCartonMedia = await getFindOrCreateCartonMedia()
         vi.mocked(findOrCreateCartonMedia).mockResolvedValue({ id: 888 } as never)
@@ -520,13 +527,13 @@ describe('TC-F08-BS.22 — orphan media: Tier A+B upload IDs invalid (filesize=0
     })
 })
 
-describe('TC-F08-BS.23 — Unsplash 429 on seed 1 → searchRateLimited set, seeds 2+3 skip Tier A', () => {
+describe('TC-F08-BS.23 — Pixabay 429 on seed 1 → searchRateLimited set, seeds 2+3 skip Tier A', () => {
     it('calls searchPhotos once when first seed hits RATE_LIMITED; remaining seeds use Tier B directly', async () => {
-        const UnsplashErrorClass = (await import('@/lib/ai/unsplash-client')).UnsplashError
+        const { PixabayError: PixabayErrorClass } = await import('@/lib/ai/pixabay-client')
         const searchPhotos = await getSearchPhotos()
         const uploadImageUrl = await getUploadImageUrl()
 
-        vi.mocked(searchPhotos).mockRejectedValue(new UnsplashErrorClass('RATE_LIMITED', 429, false))
+        vi.mocked(searchPhotos).mockRejectedValue(new PixabayErrorClass('RATE_LIMITED', 429, true))
         vi.mocked(uploadImageUrl).mockResolvedValue(555)
 
         const payload = makePayload(0)

@@ -1,31 +1,36 @@
 /**
- * Media pipeline — orchestrates Unsplash search → download → Payload Media upload.
+ * Media pipeline — orchestrates Pixabay search → download → Payload Media upload.
  *
  * Callers pass (blockType, keywords, count, ctx, payload) and receive Media IDs
  * ready to inject into block fields (hero.backgroundImage, gallery.images[].image, etc).
  *
  * Concurrency: pool-based downloads use POOL_CONCURRENCY (6) so a full gallery block
  * (6-8 photos) downloads in 1 batch. Legacy search path keeps SEARCH_CONCURRENCY (3)
- * to avoid Unsplash search 429s. Payload OOM: 6 × ~2MB = 12MB/block, well within limits.
+ * to avoid search 429s. Payload OOM: 6 × ~2MB = 12MB/block, well within limits.
  * Partial failure returns what succeeded; never throws.
  *
- * Alt-text attribution: per validation 2026-04-14 Q1, alt text format is
- * `${alt_description} — Photo by ${photographer} on Unsplash` to satisfy
- * Unsplash ToS without user-visible footer caption.
+ * Alt-text: Pixabay license requires no attribution; alt text is built from the
+ * photo tags + uploader as `${description} — Photo by ${photographer}`.
+ *
+ * Hero / blog / product last-resort fallbacks still hotlink curated static
+ * images.unsplash.com URLs (no API key) — the SSRF allowlist in pixabay-client
+ * permits those hosts.
  *
  * Server-only. Do NOT import from client components.
  */
 
 import {
     searchPhotos,
-    trackDownload,
     downloadPhotoBuffer,
-    buildImgixUrl,
-    UNSPLASH_ORIENTATION_BY_BLOCK,
-    UnsplashError,
-    type UnsplashPhoto,
-    type ImgixParams,
-} from './unsplash-client'
+    PIXABAY_ORIENTATION_BY_BLOCK,
+    PixabayError,
+    type PixabayPhoto,
+} from './pixabay-client'
+
+/** Render-box width per block — drives Pixabay size pick (largeImageURL vs webformatURL). */
+interface SizePreset {
+    w: number
+}
 
 import { resolveComposerCategory } from './composer-category-resolver'
 import type { ThemeMood } from './theme-moods'
@@ -53,22 +58,22 @@ export interface MediaPipelineContext {
 
 export interface BatchFetchResult {
     mediaIds: number[]
-    photos: UnsplashPhoto[]
+    photos: PixabayPhoto[]
     failures: Array<{ photoId: string; error: string }>
 }
 
 /** Size presets per block type — Payload auto-generates thumbnail/card/hero/square on upload. */
-const SIZE_PRESET_BY_BLOCK: Record<string, ImgixParams> = {
-    hero: { w: 1920, h: 1080, fit: 'crop' },
-    gallery: { w: 1200, h: 800, fit: 'crop' },
-    about: { w: 1200, h: 800, fit: 'crop' },
-    'portfolio-grid': { w: 800, h: 1000, fit: 'crop' },
-    team: { w: 400, h: 400, fit: 'crop', crop: 'faces' },
-    testimonials: { w: 200, h: 200, fit: 'crop', crop: 'faces' },
-    'logo-cloud': { w: 400, h: 200, fit: 'clip' },
+const SIZE_PRESET_BY_BLOCK: Record<string, SizePreset> = {
+    hero: { w: 1920 },
+    gallery: { w: 1200 },
+    about: { w: 1200 },
+    'portfolio-grid': { w: 800 },
+    team: { w: 400 },
+    testimonials: { w: 200 },
+    'logo-cloud': { w: 400 },
 }
 
-const DEFAULT_PRESET: ImgixParams = { w: 1200, h: 800, fit: 'crop' }
+const DEFAULT_PRESET: SizePreset = { w: 1200 }
 // Pool downloads: CDN has no rate limit — 6 concurrent covers a full gallery block (6-8 photos)
 // in 1 batch while staying conservative enough to avoid CDN 404 bursts on demo keys.
 const POOL_CONCURRENCY = 6
@@ -107,13 +112,14 @@ function sanitizeAlt(raw: string | null | undefined): string {
 }
 
 /**
- * Build the attribution-compliant alt text.
- * Format: `${description} — Photo by ${photographer} on Unsplash`
+ * Build descriptive alt text from the photo tags + uploader.
+ * Pixabay license requires no attribution, but a photographer credit keeps the
+ * alt informative. Format: `${description} — Photo by ${photographer}`
  */
-function buildAttributedAlt(photo: UnsplashPhoto, fallbackContext: string): string {
-    const desc = sanitizeAlt(photo.alt_description ?? photo.description) || fallbackContext
-    const photographer = sanitizeAlt(photo.user.name) || photo.user.username
-    return `${desc} — Photo by ${photographer} on Unsplash`
+function buildAttributedAlt(photo: PixabayPhoto, fallbackContext: string): string {
+    const desc = sanitizeAlt(photo.alt) || fallbackContext
+    const photographer = sanitizeAlt(photo.photographer)
+    return photographer ? `${desc} — Photo by ${photographer}` : desc
 }
 
 /** Pick up to `n` random photos from an array without replacement. */
@@ -165,18 +171,15 @@ export async function uploadBufferToMedia(
     return doc.id
 }
 
-/** Download + upload a single Unsplash photo; returns Media ID. */
+/** Download + upload a single Pixabay photo; returns Media ID. */
 async function fetchAndStorePhoto(
-    photo: UnsplashPhoto,
+    photo: PixabayPhoto,
     blockType: string,
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
 ): Promise<number> {
-    const preset = SIZE_PRESET_BY_BLOCK[blockType] ?? DEFAULT_PRESET
-    const url = buildImgixUrl(photo.urls.raw, preset)
-    const { buffer, mimetype } = await downloadPhotoBuffer(url)
-    // Fire-and-forget download tracking — license-mandatory
-    trackDownload(photo.links.download_location)
+    // photo.url is already sized by the client (Pixabay ships fixed sizes).
+    const { buffer, mimetype } = await downloadPhotoBuffer(photo.url)
     const alt = buildAttributedAlt(photo, `${ctx.businessName} ${blockType}`)
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
@@ -190,20 +193,18 @@ async function fetchAndStorePhoto(
 }
 
 /**
- * Download + upload a PoolPhoto (normalized Unsplash photo from image-pool).
+ * Download + upload a PoolPhoto (normalized Pixabay photo from image-pool).
  * Bridges the pool abstraction to the existing upload pipeline.
  *
  * Plan 260414-2249 phase-03.
  */
 async function fetchAndStorePoolPhoto(
-    photo: { id: string; url: string; alt: string; downloadLocation: string },
+    photo: { id: string; url: string; alt: string },
     blockType: string,
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
 ): Promise<number> {
     const { buffer, mimetype } = await downloadPhotoBuffer(photo.url)
-    // Fire-and-forget license-mandatory download tracking
-    if (photo.downloadLocation) trackDownload(photo.downloadLocation)
     const extension = mimetype.includes('png') ? 'png' : 'jpg'
     const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
     const alt = photo.alt || `${ctx.businessName} ${blockType}`
@@ -224,7 +225,7 @@ async function fetchAndStorePoolPhoto(
  * ctx.pool is present. Preserves partial-failure tolerance of batchFetch.
  */
 export async function batchFetchFromPool(
-    poolPhotos: Array<{ id: string; url: string; alt: string; downloadLocation: string }>,
+    poolPhotos: Array<{ id: string; url: string; alt: string }>,
     blockType: string,
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
@@ -251,7 +252,7 @@ export async function batchFetchFromPool(
 
 /** Concurrent batch fetch with partial-failure tolerance. */
 async function batchFetch(
-    photos: UnsplashPhoto[],
+    photos: PixabayPhoto[],
     blockType: string,
     ctx: MediaPipelineContext,
     payload: Parameters<typeof uploadBufferToMedia>[0],
@@ -353,19 +354,20 @@ export async function getMediaForBlock(
         if (blockType === 'hero') return heroFallbackChain(ctx, payload)
         return { mediaIds: [], photos: [], failures: [] }
     }
-    const orientation = UNSPLASH_ORIENTATION_BY_BLOCK[blockType] ?? 'landscape'
+    const orientation = PIXABAY_ORIENTATION_BY_BLOCK[blockType] ?? 'landscape'
+    const targetWidth = (SIZE_PRESET_BY_BLOCK[blockType] ?? DEFAULT_PRESET).w
     try {
         // Request 2x count to have random pool, then pickRandomN
         const photos = await searchPhotos(query, Math.max(count * 2, 10), {
             orientation,
-            contentFilter: 'high',
+            width: targetWidth,
         })
         if (photos.length === 0) {
             // Broaden: try first keyword only
             if (keywords[0]) {
                 const broader = await searchPhotos(keywords[0], Math.max(count * 2, 10), {
                     orientation,
-                    contentFilter: 'high',
+                    width: targetWidth,
                 })
                 if (broader.length === 0) {
                     return blockType === 'hero'
@@ -386,7 +388,7 @@ export async function getMediaForBlock(
         )
         return result
     } catch (err) {
-        const msg = err instanceof UnsplashError ? err.code : (err as Error).message
+        const msg = err instanceof PixabayError ? err.code : (err as Error).message
         console.warn(`[Media Pipeline] ${blockType} search failed: ${msg}`)
         if (blockType === 'hero') return heroFallbackChain(ctx, payload)
         return { mediaIds: [], photos: [], failures: [{ photoId: 'search', error: msg }] }

@@ -80,21 +80,21 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
 }
 
 /**
- * Which block types should fetch images from Unsplash during gen.
- * Env var `UNSPLASH_BLOCKS` overrides (comma-separated list).
- * Default: hero-only to stay within Demo rate limit (50 req/hr).
- * Set to `all` to enable all block types (for Production 5000/hr).
+ * Which block types should fetch stock images during gen.
+ * Env var `PIXABAY_BLOCKS` overrides (comma-separated list).
+ * Default: hero-only. Set to `all` to enable all block types — safe given
+ * Pixabay's generous limit (~100 req/min ≈ 6000/hr).
  *
  * BLOCK_IMAGE_SPEC above is still used by cleanupNonNumericImageFields
  * and stripOrphanMediaRefs regardless — those only clean refs, not fetch.
  */
-function getUnsplashEnabledBlocks(): ReadonlySet<string> {
-    const env = process.env.UNSPLASH_BLOCKS?.trim()
-    if (!env) return UNSPLASH_BLOCKS_DEFAULT
+function getImageEnabledBlocks(): ReadonlySet<string> {
+    const env = process.env.PIXABAY_BLOCKS?.trim()
+    if (!env) return IMAGE_BLOCKS_DEFAULT
     if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
     return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
 }
-const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
 
 
 export interface ImageNeed {
@@ -157,7 +157,7 @@ function hashBlockSeed(blockType: string, businessName: string): number {
  */
 export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
     const needs: ImageNeed[] = []
-    const enabledBlocks = getUnsplashEnabledBlocks()
+    const enabledBlocks = getImageEnabledBlocks()
 
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''

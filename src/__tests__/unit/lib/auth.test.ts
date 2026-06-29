@@ -30,7 +30,7 @@ vi.mock('next/server', () => ({
     },
 }))
 
-import { getCurrentUser, withAuth, getCurrentTenantId, extractTenantId } from '@/lib/auth'
+import { getCurrentUser, withAuth, getCurrentTenantId, extractTenantId, tenantIdForQuery } from '@/lib/auth'
 
 // ─── TC-F02.33: Auth middleware & role checks ─────────────────────────
 
@@ -316,11 +316,36 @@ describe('getCurrentTenantId [TC-F02.33]', () => {
         expect(tenantId).toBeNull()
     })
 
-    it('returns null when tenants field is undefined', async () => {
+    it('returns null when tenants field is undefined [TC-F02.33]', async () => {
         mockGet.mockReturnValue({ value: 'valid-token' })
         mockAuth.mockResolvedValue({ user: { id: 1 } })
 
         const tenantId = await getCurrentTenantId()
         expect(tenantId).toBeNull()
+    })
+})
+
+// ─── tenantIdForQuery — pure sync, root-cause guard for GH-1410 ──────────────
+// TC-F08-04-26: Coerces numeric-string tenant ids to numbers so Neon integer FK matches.
+describe('tenantIdForQuery [TC-F08-04-26]', () => {
+    it('coerces all-digit string id to number', () => {
+        expect(tenantIdForQuery({ tenants: [{ tenant: '1' }] })).toBe(1)
+    })
+
+    it('coerces numeric id (via extractTenantId string path) to number', () => {
+        // extractTenantId returns String(42) = "42"; tenantIdForQuery re-coerces to 42
+        expect(tenantIdForQuery({ tenants: [{ tenant: { id: 42 } }] })).toBe(42)
+    })
+
+    it('preserves non-numeric string ids unchanged', () => {
+        expect(tenantIdForQuery({ tenants: [{ tenant: 'abc-tenant' }] })).toBe('abc-tenant')
+    })
+
+    it('returns null when tenants array is empty', () => {
+        expect(tenantIdForQuery({ tenants: [] })).toBeNull()
+    })
+
+    it('returns null when user has no tenants field', () => {
+        expect(tenantIdForQuery({ id: 1 })).toBeNull()
     })
 })

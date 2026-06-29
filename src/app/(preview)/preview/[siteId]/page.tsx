@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
+import { PreviewSiteMissingNotice } from './PreviewSiteMissingNotice'
 import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 import { isNavBlock, isFooterBlock } from '@/lib/ai/ensure-navigation'
 
@@ -58,9 +59,19 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         collection: 'sites',
         id: siteId,
         depth: 2,
+        // findByID THROWS NotFound by default — disableErrors makes it return null
+        // so the guard below handles a missing site as a 404 instead of crashing the RSC render.
+        disableErrors: true,
     }) as any
 
-    if (!site) return notFound()
+    if (!site) {
+        // Stale/deleted siteId — e.g. the builder's persisted localStorage id points
+        // at a row that was removed or reseeded. Inside the editor/builder iframe,
+        // notify the parent so it can clear the stale id and recover; a standalone
+        // visit still gets a real 404.
+        if (isEditorIframe) return <PreviewSiteMissingNotice siteId={siteId} />
+        return notFound()
+    }
 
     // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
     // Ensure user has access to this site's tenant
@@ -80,6 +91,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             id: pageId,
             draft: true,
             depth: 3,
+            // Same as the site lookup: return null on missing id instead of throwing NotFound.
+            disableErrors: true,
         })
         if (!page) {
             return notFound()

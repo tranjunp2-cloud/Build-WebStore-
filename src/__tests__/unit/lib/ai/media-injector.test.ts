@@ -4,11 +4,11 @@ import { planImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } fr
 beforeEach(() => {
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    process.env.UNSPLASH_BLOCKS = 'all'
+    process.env.PIXABAY_BLOCKS = 'all'
 })
 
 afterEach(() => {
-    delete process.env.UNSPLASH_BLOCKS
+    delete process.env.PIXABAY_BLOCKS
 })
 
 describe('media-injector [plan-260414-unsplash]', () => {
@@ -107,8 +107,8 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(needs.length).toBe(3)
         })
 
-        it('hero-only default: skips non-hero blocks when UNSPLASH_BLOCKS unset', () => {
-            delete process.env.UNSPLASH_BLOCKS
+        it('hero-only default: skips non-hero blocks when PIXABAY_BLOCKS unset', () => {
+            delete process.env.PIXABAY_BLOCKS
             const blocks = [
                 { blockType: 'hero', headline: 'H' },
                 { blockType: 'about', headline: 'A' },

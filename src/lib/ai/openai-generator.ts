@@ -1668,6 +1668,20 @@ export function sanitizeBlockData(
             safeMember.name = String(mObj.name || mObj.fullName || 'Member')
             safeMember.role = String(mObj.role || mObj.position || 'Role')
 
+            // Normalize image: AI may emit a string URL or {url,alt}; Zod schema
+            // (team config) expects {url, alt?}. Mirror the gallery wrapping below.
+            // media-injector replaces this with a real Media ID afterward.
+            const img = mObj.image
+            if (typeof img === 'string') {
+                safeMember.image = img ? { url: img, alt: safeMember.name } : undefined
+            } else if (img && typeof img === 'object') {
+                const iObj = img as Record<string, unknown>
+                const url = String(iObj.url || iObj.src || '')
+                safeMember.image = url ? { url, alt: String(iObj.alt || safeMember.name) } : undefined
+            } else {
+                safeMember.image = undefined
+            }
+
             if (Array.isArray(safeMember.socials)) {
                 safeMember.socials = safeMember.socials.map((social: unknown) => {
                     if (typeof social === 'string') return { platform: social.toLowerCase(), url: '#' }
