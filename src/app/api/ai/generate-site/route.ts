@@ -555,8 +555,8 @@ export async function POST(req: NextRequest) {
         // survive into payload.create and crash with:
         //   "The following field is invalid: Page Blocks > Block N (…) > Image"
         // Staging log 2026-04-14 21:06:15 confirmed this path after the
-        // Unsplash fallback chain failed to upgrade the object to a numeric
-        // Media ID (UNSPLASH_ACCESS_KEY missing on staging env + mkdir
+        // stock-image fallback chain failed to upgrade the object to a numeric
+        // Media ID (image API key missing on staging env + mkdir
         // 'public' ENOENT on Vercel read-only fs).
         const collectAllBlockBuckets = (): Record<string, unknown>[][] => {
             const buckets: Record<string, unknown>[][] = []

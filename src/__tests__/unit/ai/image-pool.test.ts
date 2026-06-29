@@ -22,15 +22,15 @@ import {
   type BuildPoolCtx,
 } from '@/lib/ai/image-pool'
 import { THEME_MOODS } from '@/lib/ai/theme-moods'
-import type { UnsplashPhoto } from '@/lib/ai/unsplash-client'
+import type { PixabayPhoto } from '@/lib/ai/pixabay-client'
 
-// ── Mock Unsplash client ────────────────────────────────────────────────────
+// ── Mock Pixabay client ─────────────────────────────────────────────────────
 
-const mockSearchPhotos = vi.fn<(...args: unknown[]) => Promise<UnsplashPhoto[]>>()
+const mockSearchPhotos = vi.fn<(...args: unknown[]) => Promise<PixabayPhoto[]>>()
 
-vi.mock('@/lib/ai/unsplash-client', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/ai/unsplash-client')>(
-    '@/lib/ai/unsplash-client',
+vi.mock('@/lib/ai/pixabay-client', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/ai/pixabay-client')>(
+    '@/lib/ai/pixabay-client',
   )
   return {
     ...actual,
@@ -38,28 +38,14 @@ vi.mock('@/lib/ai/unsplash-client', async () => {
   }
 })
 
-function fakePhoto(id: string, w: number, h: number): UnsplashPhoto {
+function fakePhoto(id: string, w: number, h: number): PixabayPhoto {
   return {
     id,
-    alt_description: `alt ${id}`,
-    description: null,
-    urls: {
-      raw: `https://unsplash.com/${id}/raw`,
-      full: `https://unsplash.com/${id}/full`,
-      regular: `https://unsplash.com/${id}/regular`,
-      small: `https://unsplash.com/${id}/small`,
-      thumb: `https://unsplash.com/${id}/thumb`,
-    },
-    links: {
-      self: '',
-      html: '',
-      download: '',
-      download_location: `https://unsplash.com/track/${id}`,
-    },
-    user: { id: 'u1', username: 'photographer', name: 'Alice Photographer' },
+    url: `https://pixabay.com/get/${id}_1280.jpg`,
+    alt: `alt ${id}`,
+    photographer: 'Alice Photographer',
     width: w,
     height: h,
-    color: null,
   }
 }
 
@@ -117,7 +103,6 @@ describe('TC-F01-W.13 — image pool shape', () => {
     expect(photo.width).toBeGreaterThan(0)
     expect(photo.height).toBeGreaterThan(0)
     expect(photo.photographer).toBeDefined()
-    expect(photo.downloadLocation).toContain('https://')
     expect(photo.role).toBe('gallery')
     expect(['16:9', '4:3', '1:1', '3:4']).toContain(photo.aspectRatio)
   })
@@ -365,8 +350,8 @@ describe('TC-F01-W.16 — underfill backoff', () => {
 describe('image-pool helpers', () => {
   const basePool: ImagePool = {
     landscape: [
-      { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' },
-      { id: 'b', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' },
+      { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' },
+      { id: 'b', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' },
     ],
     square: [],
     portrait: [],
@@ -377,8 +362,8 @@ describe('image-pool helpers', () => {
   it('mergePool dedupes by id', () => {
     const merged = mergePool(basePool, {
       landscape: [
-        { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' }, // duplicate
-        { id: 'c', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' }, // new
+        { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' }, // duplicate
+        { id: 'c', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' }, // new
       ],
     })
     expect(merged.landscape.map((p) => p.id)).toEqual(['a', 'b', 'c'])
@@ -394,7 +379,7 @@ describe('image-pool helpers', () => {
     const withSquare: ImagePool = {
       ...basePool,
       square: [
-        { id: 's1', url: '', alt: '', width: 1000, height: 1000, photographer: '', downloadLocation: '', role: 'team', aspectRatio: '1:1' },
+        { id: 's1', url: '', alt: '', width: 1000, height: 1000, photographer: '', role: 'team', aspectRatio: '1:1' },
       ],
     }
     expect(poolSize(withSquare)).toBe(3)
