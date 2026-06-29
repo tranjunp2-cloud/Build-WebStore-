@@ -499,7 +499,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Group floating widgets by their corner position so they stack vertically
     // instead of overlapping when multiple are placed on the same corner.
-    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+    // GH-1412: 'cta' joins the floating stack ONLY in its floating-sticky variant, so a
+    // floating CTA no longer overlaps the WhatsApp/social/cart launchers (same bottom-right corner).
+    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'cta'])
     const getFloatingBlockPos = (b: PreviewBlock) => {
         if (b.blockType === 'cartWidget') return 'bottom-left'
         if (b.blockType === 'whatsapp-button' && (b.position as string) === 'bottom-left') return 'bottom-left'
@@ -508,7 +510,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const floatingBlockSet = new Set<number>()
     const floatingByPos = new Map<string, number[]>()
     blocks.forEach((b, i) => {
-        if (!FLOATING_WIDGET_TYPES.has(b.blockType) || (b.variant as string) === 'inline') return
+        if (!FLOATING_WIDGET_TYPES.has(b.blockType)) return
+        // CTA only floats in the floating-sticky variant; every other variant stays in normal flow.
+        if (b.blockType === 'cta' && (b.variant as string) !== 'floating-sticky') return
+        // Other widgets keep their existing behavior: skip the inline (in-flow) variant.
+        if (b.blockType !== 'cta' && (b.variant as string) === 'inline') return
         floatingBlockSet.add(i)
         const pos = getFloatingBlockPos(b)
         const arr = floatingByPos.get(pos) ?? []
@@ -671,7 +677,12 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     key={pos}
                     className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
                 >
-                    {blockIndices.map(blockIndex => {
+                    {[...blockIndices]
+                        // GH-1412: launcher widgets (WhatsApp/social/cart) stay closest to the
+                        // corner; a floating-sticky CTA stacks ABOVE them. flex-col-reverse puts
+                        // the first DOM child at the bottom (corner), so CTA must render last.
+                        .sort((a, b) => (blocks[a].blockType === 'cta' ? 1 : 0) - (blocks[b].blockType === 'cta' ? 1 : 0))
+                        .map(blockIndex => {
                         const floatingBlock = blocks[blockIndex]
                         const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
                         if (!FloatingComponent) return null

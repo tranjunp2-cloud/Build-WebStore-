@@ -1463,6 +1463,215 @@ describe('[TC-F04-SR-GH1412-01] SiteRenderer nav-offset respects explicit blockS
 // concern. Tests live here (f05-site-renderer.test.tsx) because the subject
 // under test is SiteRenderer — there is no separate F04 test file for it.
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-02 — GH-1412 regression: CTA floating-sticky joins floating widget stack
+// CTA floats (joins floating container) only in floating-sticky variant.
+// Other CTA variants (banner/card/etc) render in normal flow, not floating.
+// CTA + whatsapp-button (both floating-sticky / bottom-right) → grouped in same floating container,
+// NOT overlapping. Tests verify floatingBlockSet excludes other-variant CTA + renders correctly.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-02] SiteRenderer floating-sticky CTA joins widget stack', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-02a: CTA floating-sticky + whatsapp-button bottom-right → both in same floating container z-[51]', () => {
+        // Arrange — both blocks should join floatingBlockSet and render in grouped bottom-right container
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join us' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — both blocks should NOT appear in main flow (no [data-block-type="cta"] wrapper in main content)
+        const mainFlowCTA = container.querySelector('[data-block-type="cta"]')
+        expect(mainFlowCTA).toBeNull()
+
+        // Assert — both blocks should be inside the floating container (z-[51] div with bottom-6 right-6)
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+
+        // Assert — floating container should have flex layout and contain both blocks
+        expect(floatingContainer?.classList.contains('flex')).toBe(true)
+        expect(floatingContainer?.classList.contains('flex-col-reverse')).toBe(true)
+        expect(floatingContainer?.classList.contains('gap-3')).toBe(true)
+
+        // Assert — both test blocks should render inside the floating container
+        expect(screen.getByTestId('block-cta')).toBeInTheDocument()
+        expect(screen.getByTestId('block-whatsapp-button')).toBeInTheDocument()
+    })
+
+    it('TC-F04-SR-GH1412-02b: CTA variant="card" (non-floating) renders in main flow, NOT in floating container', () => {
+        // Arrange — CTA variant != 'floating-sticky' should NOT join floating stack
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'card', headline: 'Special offer' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — card CTA test block should render somewhere in the document (not null)
+        const ctaTestBlock = screen.getByTestId('block-cta')
+        expect(ctaTestBlock).toBeInTheDocument()
+
+        // Assert — card CTA should NOT be inside the floating container
+        // Verify: look for block-type=cta inside floating container → should not find
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        if (floatingContainer) {
+            const ctaInFloating = floatingContainer.querySelector('[data-testid="block-cta"]')
+            expect(ctaInFloating).toBeNull() // CTA should not be in floating container
+
+            // Only whatsapp should be in floating container
+            const whatsappInFloating = floatingContainer.querySelector('[data-testid="block-whatsapp-button"]')
+            expect(whatsappInFloating).toBeInTheDocument()
+        }
+    })
+
+    it('TC-F04-SR-GH1412-02c: whatsapp-button alone in bottom-right renders in floating container (regression test)', () => {
+        // Arrange — verify whatsapp floating behavior unchanged when no CTA present
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — whatsapp should be in floating container
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+        expect(screen.getByTestId('block-whatsapp-button')).toBeInTheDocument()
+
+        // Assert — container has correct styling
+        expect(floatingContainer?.classList.contains('flex')).toBe(true)
+        expect(floatingContainer?.classList.contains('flex-col-reverse')).toBe(true)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-GH1412-03 — CTA floating-sticky stack order in bottom-right container
+// GH-1412: blockIndices sorted so CTA pushed to END → in flex-col-reverse layout
+// → CTA rendered LAST in DOM but appears FIRST visually (top of stack).
+// Widget (whatsapp) rendered FIRST in DOM but appears LAST visually (bottom).
+// Test verifies DOM order: whatsapp testid appears before cta testid in container.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (flex-col-reverse)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'cta') return makeTestBlock('cta')
+            if (type === 'whatsapp-button') return makeTestBlock('whatsapp-button')
+            return null
+        })
+    })
+
+    it('TC-F04-SR-GH1412-03a: CTA + whatsapp in floating container → DOM order is whatsapp BEFORE cta (flex-col-reverse)', () => {
+        // Arrange — blocks array: CTA first (index 0), whatsapp second (index 1)
+        // SiteRenderer sorts so CTA pushed to END (last child in DOM)
+        // Container is flex-col-reverse → last DOM child (CTA) appears FIRST visually (top)
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Join now' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — find floating container
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        expect(floatingContainer).toBeInTheDocument()
+
+        // Assert — query ALL [data-testid] children inside floating container
+        const children = floatingContainer?.querySelectorAll('[data-testid]')
+        expect(children?.length).toBe(2)
+
+        // Assert — DOM order: whatsapp [data-testid="block-whatsapp-button"] BEFORE cta [data-testid="block-cta"]
+        // Because flex-col-reverse reverses visual order, the first DOM child (whatsapp) appears last visually
+        const whatsappIdx = Array.from(children || []).findIndex((el) => el.getAttribute('data-testid') === 'block-whatsapp-button')
+        const ctaIdx = Array.from(children || []).findIndex((el) => el.getAttribute('data-testid') === 'block-cta')
+
+        expect(whatsappIdx).toBe(0)
+        expect(ctaIdx).toBe(1)
+        // Verify: whatsapp DOM index < cta DOM index (whatsapp comes first in DOM)
+        expect(whatsappIdx).toBeLessThan(ctaIdx)
+    })
+
+    it('TC-F04-SR-GH1412-03b: whatsapp rendered first in DOM, CTA rendered last (stable sort preservation)', () => {
+        // Arrange — 2 floating blocks: whatsapp (index 0), CTA (index 1)
+        // SiteRenderer sorts: CTA pushed to end → CTA becomes last in DOM
+        // With flex-col-reverse: last DOM child (CTA) appears FIRST visually (top of stack)
+        const page = {
+            layout: [
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Contact us' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — floating container contains both blocks
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        const children = floatingContainer?.querySelectorAll('[data-testid]')
+        expect(children?.length).toBe(2)
+
+        // Assert — DOM order: whatsapp first, cta last (after sort)
+        const order = Array.from(children || []).map((el) => el.getAttribute('data-testid'))
+        expect(order[0]).toBe('block-whatsapp-button')
+        expect(order[1]).toBe('block-cta')
+    })
+
+    it('TC-F04-SR-GH1412-03c: CTA non-floating variant stays in main flow, not in floating container', () => {
+        // Arrange — CTA variant='card' (not floating-sticky) should NOT join floating stack
+        // Only whatsapp should be in the bottom-right floating container
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'card', headline: 'Special offer' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — floating container should only have whatsapp (1 child)
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
+        const floatingChildren = floatingContainer?.querySelectorAll('[data-testid]')
+        expect(floatingChildren?.length).toBe(1)
+        expect(floatingChildren?.[0]?.getAttribute('data-testid')).toBe('block-whatsapp-button')
+
+        // Assert — card CTA renders in main flow (somewhere else in document)
+        const ctaInMain = screen.getByTestId('block-cta')
+        expect(ctaInMain).toBeInTheDocument()
+        // Verify it's NOT inside the floating container
+        expect(floatingContainer?.contains(ctaInMain)).toBe(false)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F04-SR-07 — SiteRenderer injects _logoHref into navigation blocks
+// Logo redirect fix (GH-1278): ensures logo link is rewritten for local dev
+//
+// Note: TC-IDs are prefixed F04 (Block Renderer QA doc) because this tests
+// SiteRenderer's _logoHref injection behaviour which is a block-renderer
+// concern. Tests live here (f05-site-renderer.test.tsx) because the subject
+// under test is SiteRenderer — there is no separate F04 test file for it.
+// ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks', () => {
     beforeEach(() => {
         vi.clearAllMocks()

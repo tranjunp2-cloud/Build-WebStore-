@@ -12,6 +12,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { CTABlock } from '@/blocks/cta'
 import { CTAConfigSchema, ctaMeta, CTA_VARIANTS } from '@/blocks/cta/config'
+import { FloatingContainerProvider } from '@/components/site-renderer/FloatingContainerContext'
+import { BlockEditCallbackProvider } from '@/components/site-renderer/BlockEditCallbackContext'
 
 // framer-motion stub — same shape as team test.
 vi.mock('framer-motion', () => {
@@ -231,5 +233,148 @@ describe('[TC-F01D-A5.C06] floating-sticky shows when page is not scrollable (ed
         expect(fixedContainer).toBeInTheDocument()
         expect(fixedContainer).toHaveTextContent('Special offer')
         expect(fixedContainer).toHaveTextContent('Claim now')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F01D-A5.C08 — GH-1412 regression: editor hiện CTA floating-sticky NGAY
+// Khi edit block, useBlockEditCallback() !== null → isEditing=true
+// → visible khởi tạo=true → render content ngay, không cần scroll metrics
+// Trong editor: dismiss memory bỏ qua, scroll-gate bỏ qua
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F01D-A5.C08] floating-sticky shows immediately in editor (GH-1412)', () => {
+    beforeEach(() => {
+        localStorage.removeItem('cta-floating-dismissed-default')
+    })
+
+    it('TC-F01D-A5.C08a: with BlockEditCallbackProvider → headline/ctaLabel visible immediately (no scroll gate)', () => {
+        // Arrange — BlockEditCallbackProvider signals we're in editor mode
+        // When useBlockEditCallback() !== null → isEditing=true → visible init=true
+        // Content renders immediately without waiting for scroll metrics
+        const { container } = render(
+            <BlockEditCallbackProvider value={{ blockIndex: 0, onFieldChange: vi.fn() }}>
+                <CTABlock
+                    block={{ ...baseBlock, variant: 'floating-sticky', headline: 'Editor preview', ctaLabel: 'Test now' }}
+                    theme={{}}
+                    site={{}}
+                    page={{}}
+                />
+            </BlockEditCallbackProvider>
+        )
+
+        // Assert — content should render immediately (not null, not hidden by scroll gate)
+        expect(screen.getByText('Editor preview')).toBeInTheDocument()
+        expect(screen.getByText('Test now')).toBeInTheDocument()
+
+        // Assert — card div should exist (proof it rendered, not null)
+        const card = container.querySelector('.rounded-2xl')
+        expect(card).toBeInTheDocument()
+    })
+
+    it('TC-F01D-A5.C08b: editor with localStorage dismiss key set → CTA still shows (editor ignores dismiss)', () => {
+        // Arrange — set dismiss flag in localStorage before render
+        const dismissKey = 'cta-floating-dismissed-default'
+        localStorage.setItem(dismissKey, String(Date.now()))
+
+        // Act
+        render(
+            <BlockEditCallbackProvider value={{ blockIndex: 0, onFieldChange: vi.fn() }}>
+                <CTABlock
+                    block={{ ...baseBlock, variant: 'floating-sticky', headline: 'Persist test', ctaLabel: 'Click' }}
+                    theme={{}}
+                    site={{}}
+                    page={{}}
+                />
+            </BlockEditCallbackProvider>
+        )
+
+        // Assert — in editor, dismiss is ignored, so CTA must still render
+        expect(screen.getByText('Persist test')).toBeInTheDocument()
+        expect(screen.getByText('Click')).toBeInTheDocument()
+
+        // Clean up
+        localStorage.removeItem(dismissKey)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F01D-A5.C07 — GH-1412 regression: floating-sticky in-container responsive sizing
+// When CTA floats in SiteRenderer's floating widget stack, it's wrapped in
+// FloatingContainerProvider (value=true). Container owns fixed positioning,
+// so CTA must remove its own `fixed` class and use responsive sizing instead.
+// Standalone (value=false): CTA keeps original fixed positioning (backward compat).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F01D-A5.C07] floating-sticky in-container responsive sizing (GH-1412)', () => {
+    beforeEach(() => {
+        localStorage.removeItem('cta-floating-dismissed-default')
+    })
+
+    it('TC-F01D-A5.C07a: inside FloatingContainerProvider → div.card has responsive sizing, NO "fixed" class', () => {
+        // Arrange — wrap CTA in FloatingContainerProvider with value=true
+        // When CTA is inside the floating widget stack, SiteRenderer sets inContainer=true
+        // via context. This makes CTA use responsive sizing instead of fixed positioning.
+
+        // Act
+        const { container } = render(
+            <FloatingContainerProvider value={true}>
+                <CTABlock
+                    block={{
+                        ...baseBlock,
+                        variant: 'floating-sticky',
+                        headline: 'Floating in container',
+                        ctaLabel: 'Join',
+                    }}
+                    theme={{}}
+                    site={{}}
+                    page={{}}
+                />
+            </FloatingContainerProvider>
+        )
+
+        // Assert — main card div should NOT have "fixed" class
+        const card = container.querySelector('.rounded-2xl')
+        expect(card).toBeInTheDocument()
+        const cardClasses = card?.className || ''
+        expect(cardClasses).not.toContain('fixed')
+
+        // Assert — card should have responsive sizing classes (md:w-auto, md:max-w-sm)
+        // In mobile: w-[calc(100vw-3rem)] | In desktop: md:w-auto md:max-w-sm
+        expect(cardClasses).toContain('md:max-w-sm')
+        // Assert — headline and button are inside the responsive card
+        expect(screen.getByText('Floating in container')).toBeInTheDocument()
+        expect(screen.getByText('Join')).toBeInTheDocument()
+    })
+
+    it('TC-F01D-A5.C07b: standalone (FloatingContainerProvider value=false) → div.card has "fixed" class', () => {
+        // Arrange — render CTA with FloatingContainerProvider(value=false)
+        // Simulates standalone (non-floating-container) usage where CTA manages its own positioning
+
+        // Act
+        const { container } = render(
+            <FloatingContainerProvider value={false}>
+                <CTABlock
+                    block={{
+                        ...baseBlock,
+                        variant: 'floating-sticky',
+                        headline: 'Standalone floating',
+                        ctaLabel: 'Click',
+                    }}
+                    theme={{}}
+                    site={{}}
+                    page={{}}
+                />
+            </FloatingContainerProvider>
+        )
+
+        // Assert — card should have "fixed" class (original behavior)
+        const card = container.querySelector('.rounded-2xl')
+        expect(card).toBeInTheDocument()
+        const cardClasses = card?.className || ''
+        expect(cardClasses).toContain('fixed')
+
+        // Assert — fixed positioning classes should be present
+        expect(cardClasses).toContain('bottom-4')
+        expect(cardClasses).toContain('md:right-6')
+        expect(cardClasses).toContain('z-50')
     })
 })

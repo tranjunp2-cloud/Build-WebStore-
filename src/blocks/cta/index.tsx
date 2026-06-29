@@ -20,6 +20,8 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
@@ -298,14 +300,21 @@ function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
 
 function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
-    const [visible, setVisible] = useState(false)
+    // GH-1412: in the editor (non-null edit callback) skip the scroll-gate + dismiss memory
+    // and show the CTA immediately so it's visible/editable the moment the variant is picked.
+    // On the live storefront the gate stays intact.
+    const isEditing = useBlockEditCallback() !== null
+    const [visible, setVisible] = useState(isEditing)
     const [dismissed, setDismissed] = useState(false)
     const shouldReduce = useReducedMotion()
     const storageKey = FLOATING_STORAGE_PREFIX + (siteId || 'default')
+    // GH-1412: inside the SiteRenderer floating stack the container owns positioning,
+    // so drop our own `fixed`/inset to avoid overlapping the WhatsApp/social launchers.
+    const inContainer = useInFloatingContainer()
 
-    // Check localStorage dismiss memory on mount
+    // Check localStorage dismiss memory on mount (storefront only — editor always shows it)
     useEffect(() => {
-        if (typeof window === 'undefined') return
+        if (isEditing || typeof window === 'undefined') return
         try {
             const dismissedAt = localStorage.getItem(storageKey)
             if (dismissedAt) {
@@ -318,11 +327,11 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
         } catch {
             // Ignore storage errors
         }
-    }, [storageKey])
+    }, [storageKey, isEditing])
 
-    // Scroll trigger — show after user scrolls 30% of page
+    // Scroll trigger — show after user scrolls 30% of page (storefront only; editor shows instantly)
     useEffect(() => {
-        if (dismissed || typeof window === 'undefined') return
+        if (isEditing || dismissed || typeof window === 'undefined') return
 
         const handleScroll = () => {
             const scrollTop = window.scrollY
@@ -338,23 +347,32 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
         handleScroll()
         window.addEventListener('scroll', handleScroll, { passive: true })
         return () => window.removeEventListener('scroll', handleScroll)
-    }, [dismissed])
+    }, [dismissed, isEditing])
 
     const handleDismiss = useCallback(() => {
         setDismissed(true)
         setVisible(false)
+        // GH-1412: in the editor, hide visually but DON'T persist the dismissal — the key is
+        // shared by origin+siteId, so writing it would suppress the CTA on the live storefront too.
+        if (isEditing) return
         try {
             localStorage.setItem(storageKey, String(Date.now()))
         } catch {
             // Ignore
         }
-    }, [storageKey])
+    }, [storageKey, isEditing])
 
     if (dismissed || !visible) return null
 
+    // In-container: container handles fixed positioning → keep only sizing.
+    // Standalone: original self-positioned fixed corner toast (backward compatible).
+    const posClasses = inContainer
+        ? 'w-[calc(100vw-3rem)] md:w-auto md:max-w-sm'
+        : 'fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50'
+
     const content = (
         <div
-            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50 rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden"
+            className={`${posClasses} rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden`}
             style={{
                 background: CSS_VARS.surface,
                 border: '1px solid rgba(var(--brand-primary-rgb), 0.15)',
