@@ -271,6 +271,7 @@ export async function POST(request: NextRequest) {
                 senderState: warehouseState,
                 subtotalSen: subtotalSen - discountSen,
                 codAmountSen: undefined,  // Stripe = no COD
+                selectedCourier: epIntegration.selectedCourier || undefined,
             },
             epToken,
             (site as any)?.shippingConfig ?? {},

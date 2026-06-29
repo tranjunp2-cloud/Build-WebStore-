@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,9 @@ import { Label } from '@/components/ui/label'
 // Matches TableSearch input style (Orders page standard)
 const EP_INPUT = "w-full h-9 rounded-md px-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)] placeholder:text-[var(--dash-text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
 const EP_INPUT_STYLE = { background: 'transparent', color: 'var(--dash-text)' } as const
+
+// Warn the merchant when the EP wallet can't comfortably cover a label purchase (RM).
+const LOW_WALLET_THRESHOLD = 10
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
@@ -31,6 +34,8 @@ export interface EasyParcelIntegrationConfig {
     warehouse?: WarehouseData | null
     selectedCourier?: string
     testedAt?: string
+    accountName?: string | null
+    accountEmail?: string | null
 }
 
 type TestStatus = 'idle' | 'testing' | 'connected' | 'invalid'
@@ -40,12 +45,16 @@ interface Props {
     initialEpConfig: EasyParcelIntegrationConfig | null
 }
 
-const COURIERS = [
-    { id: 'flash', name: 'Flash Express', description: 'Fast nationwide delivery' },
-    { id: 'jnt', name: 'J&T Express', description: 'Reliable door-to-door' },
-    { id: 'poslaju', name: 'Pos Laju', description: 'Malaysia postal express' },
-    { id: 'dhl', name: 'DHL eCommerce', description: 'Trusted global courier' },
-] as const
+type CourierOption = { id: string; name: string; fullName?: string }
+
+// Static fallback shown only if the live /courier/list call fails. Real options come from EP and
+// use EP courier_id (e.g. "EP-CR0AP") so the saved value can filter quotations at checkout.
+const FALLBACK_COURIERS: CourierOption[] = [
+    { id: 'flash', name: 'Flash Express' },
+    { id: 'jnt', name: 'J&T Express' },
+    { id: 'poslaju', name: 'Pos Laju' },
+    { id: 'dhl', name: 'DHL eCommerce' },
+]
 
 const BENEFIT_TILES = [
     { icon: Timer, title: 'Live courier rates', desc: 'Quote J&T, Pos Laju, Ninja Van and more in real time at checkout.' },
@@ -60,18 +69,22 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         initialEpConfig?.testedAt ? 'connected' : 'idle',
     )
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
+    const [walletLow, setWalletLow] = useState(false)
+    const [isSyncing, setIsSyncing] = useState(false)
 
     // Warehouse fields
     const wh = initialEpConfig?.warehouse ?? {}
     const [whName, setWhName] = useState(wh.name ?? '')
+    const [whPhone, setWhPhone] = useState(wh.phone ?? '')
     const [whAddr1, setWhAddr1] = useState(wh.address1 ?? '')
     const [whCity, setWhCity] = useState(wh.city ?? '')
     const [whState, setWhState] = useState(wh.state ?? '')
     const [whPostcode, setWhPostcode] = useState(wh.postcode ?? '')
 
     const [selectedCourier, setSelectedCourier] = useState(
-        initialEpConfig?.selectedCourier ?? 'flash',
+        initialEpConfig?.selectedCourier ?? '',
     )
+    const [couriers, setCouriers] = useState<CourierOption[]>(FALLBACK_COURIERS)
 
     // Geo cascading: state → district → postcode (mirrors checkout logic)
     const [states, setStates] = useState<GeoState[]>([])
@@ -118,6 +131,21 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             .catch(() => {})
             .finally(() => setStatesLoading(false))
     }, [])
+
+    // Load live courier list from EP once connected; keep static fallback on failure.
+    useEffect(() => {
+        if (testStatus !== 'connected') return
+        let cancelled = false
+        fetch(`/api/tenant/${tenantId}/easyparcel-couriers`, { credentials: 'include' })
+            .then(r => r.json())
+            .then(j => {
+                if (!cancelled && j?.success && Array.isArray(j.data?.couriers) && j.data.couriers.length > 0) {
+                    setCouriers(j.data.couriers)
+                }
+            })
+            .catch(() => {})
+        return () => { cancelled = true }
+    }, [testStatus, tenantId])
 
     // Pre-populate state from existing warehouse data
     useEffect(() => {
@@ -184,7 +212,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             .finally(() => setPostcodesLoading(false))
     }
 
-    const canSave = testStatus === 'connected' && !isSaving
+    // Warehouse (sender) must be complete + valid before EP can be used — submit_orders requires
+    // name, phone, address, postcode (all mandatory on EP side). Block Save until satisfied so the
+    // merchant can't enable a config that would fail at label creation.
+    const phoneDigits = whPhone.replace(/\D/g, '')
+    const warehouseErrors: string[] = []
+    if (!whName.trim()) warehouseErrors.push('Pickup label/name')
+    if (!phoneDigits || phoneDigits.length < 8) warehouseErrors.push('Valid sender phone')
+    if (!whAddr1.trim()) warehouseErrors.push('Address line 1')
+    if (!whState.trim()) warehouseErrors.push('State')
+    if (!whPostcode.trim()) warehouseErrors.push('Postcode')
+    const warehouseComplete = warehouseErrors.length === 0
+
+    const canSave = testStatus === 'connected' && !isSaving && warehouseComplete
 
     async function handleTestConnection() {
         setTestStatus('testing')
@@ -208,12 +248,43 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             }
             const { balance, currency } = json.data ?? {}
             setWalletBalance(balance ? `${currency ?? 'MYR'} ${balance}` : null)
+            setWalletLow(balance != null && Number(balance) < LOW_WALLET_THRESHOLD)
             setCouriersCount(0)
             setTestStatus('connected')
             toast.success('EasyParcel connection verified!')
         } catch {
             setTestStatus('idle')
             toast.error('Network error. Please try again.')
+        }
+    }
+
+    // Pull EP's default pickup address into the local warehouse (server writes it, then we reload so
+    // the geo-cascade selects reconcile via the same path as connect-time seeding).
+    async function handleSyncFromEp() {
+        if (hasWarehouse && !window.confirm('Replace your saved pickup address with the one configured in EasyParcel?')) return
+        setIsSyncing(true)
+        try {
+            const res = await fetch(`/api/tenant/${tenantId}/easyparcel-test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ syncWarehouse: true }),
+            })
+            const json = await res.json()
+            if (!res.ok || !json.success) {
+                toast.error(json?.error?.message ?? 'Sync failed')
+                return
+            }
+            if (!json.data?.warehouseApplied) {
+                toast.info('No pickup address is configured in EasyParcel yet — set one in your EasyParcel account first.')
+                return
+            }
+            toast.success('Synced pickup address from EasyParcel')
+            window.location.reload()
+        } catch {
+            toast.error('Network error. Please try again.')
+        } finally {
+            setIsSyncing(false)
         }
     }
 
@@ -226,6 +297,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                     enabled,
                     warehouse: {
                         name: whName,
+                        phone: whPhone,
                         address1: whAddr1,
                         city: whCity,
                         state: whState,
@@ -365,20 +437,46 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             <CheckCircle2 className="h-4 w-4 shrink-0" />
                             {couriersCount > 0 ? `Connected — ${couriersCount} couriers available` : walletBalance ? `Connected — Wallet: ${walletBalance}` : 'Connected to EasyParcel'}
                         </div>
-                        <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-                            <div className="flex items-center gap-3">
-                                <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
-                                <p className="text-[13px] font-medium text-[var(--dash-text)]">OAuth session active</p>
+                        {walletLow && (
+                            <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--warning))]">
+                                <Wallet className="h-4 w-4 shrink-0" />
+                                Low EasyParcel wallet balance — top up to avoid label-purchase failures at fulfillment.
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
-                                className="flex items-center gap-1.5 shrink-0"
-                            >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Reconnect
-                            </Button>
+                        )}
+                        <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-[13px] font-medium text-[var(--dash-text)] truncate">
+                                        {initialEpConfig?.accountName || 'OAuth session active'}
+                                    </p>
+                                    {initialEpConfig?.accountEmail && (
+                                        <p className="text-[12px] text-[var(--dash-text-muted)] truncate">{initialEpConfig.accountEmail}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleSyncFromEp}
+                                    disabled={isSyncing}
+                                    className="flex items-center gap-1.5"
+                                    title="Pull the default pickup address configured in your EasyParcel account"
+                                >
+                                    {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                    Sync from EasyParcel
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
+                                    className="flex items-center gap-1.5"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Reconnect
+                                </Button>
+                            </div>
                         </div>
                     </>
                 ) : (
@@ -459,10 +557,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </div>
 
                         <div className="flex flex-col gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
-                                <input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
-                                    placeholder="e.g. HQ Warehouse" className={EP_INPUT} style={EP_INPUT_STYLE} />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
+                                    <input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
+                                        placeholder="e.g. HQ Warehouse" className={EP_INPUT} style={EP_INPUT_STYLE} />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="wh-phone" className="text-[12px] text-[var(--dash-text)]">
+                                        Sender phone <span className="text-[hsl(var(--destructive))]">*</span>
+                                    </Label>
+                                    <input id="wh-phone" value={whPhone} onChange={e => setWhPhone(e.target.value)}
+                                        inputMode="tel" placeholder="e.g. 0123456789" className={EP_INPUT} style={EP_INPUT_STYLE} />
+                                </div>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="wh-addr1" className="text-[12px] text-[var(--dash-text)]">Address line 1</Label>
@@ -530,14 +637,14 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
                         </p>
                         <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                            Buyers are quoted this courier's live rate. All listed couriers support COD.
+                            Buyers are quoted only this courier's live rate. Choose “All couriers” to offer the cheapest available.
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        {COURIERS.map(courier => {
+                        {[{ id: '', name: 'All couriers', fullName: 'Show cheapest available' } as CourierOption, ...couriers].map(courier => {
                             const isSelected = selectedCourier === courier.id
                             return (
-                                <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
+                                <button key={courier.id || 'all'} type="button" role="radio" aria-checked={isSelected}
                                     onClick={() => setSelectedCourier(courier.id)}
                                     className={[
                                         'relative flex flex-col gap-1 rounded-[12px] border py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
@@ -552,7 +659,9 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                         isSelected ? 'text-[rgb(16,185,129)]' : 'text-[var(--dash-text)]'].join(' ')}>
                                         {courier.name}
                                     </p>
-                                    <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.description}</p>
+                                    {courier.fullName && courier.fullName !== courier.name && (
+                                        <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.fullName}</p>
+                                    )}
                                 </button>
                             )
                         })}
@@ -578,9 +687,16 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         )}
                     </Button>
                 ) : (
-                    <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={!canSave} className="flex items-center gap-2 shrink-0">
-                        {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
-                    </Button>
+                    <>
+                        <Button variant="dashPrimary" size="dash" onClick={handleSave} disabled={!canSave} className="flex items-center gap-2 shrink-0">
+                            {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : 'Save Settings'}
+                        </Button>
+                        {!warehouseComplete && (
+                            <p className="text-[12px] text-[hsl(var(--destructive))]">
+                                Complete the pickup address first — missing: {warehouseErrors.join(', ')}.
+                            </p>
+                        )}
+                    </>
                 )}
             </div>
         </div>

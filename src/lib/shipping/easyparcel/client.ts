@@ -8,6 +8,8 @@ import type {
     EpTrackingResponse,
     EpCancelParams,
     EpWalletResponse,
+    EpAccountInfoResponse,
+    EpCourierListResponse,
 } from './types'
 
 const TIMEOUT_MS = 10_000
@@ -97,5 +99,20 @@ export async function cancelShipment(
 
 /** Get EP wallet balance for the authenticated account. */
 export async function walletBalance(token: string): Promise<EpWalletResponse> {
-    return epFetch('GET', '/open_api/2026-03/account/wallet', token)
+    // Live path is /wallet (NOT /account/wallet — that 404s). Verified against the API.
+    return epFetch('GET', '/open_api/2026-03/wallet', token)
+}
+
+/**
+ * Get the connected EP account info — name, account type, and per-address details.
+ * Verified live: GET (NOT POST as the public spec states) at /account/get_account_information.
+ * The sender email lives at data.address.pickup_address.email (empty until merchant configures it).
+ */
+export async function getAccountInfo(token: string): Promise<EpAccountInfoResponse> {
+    return epFetch('GET', '/open_api/2026-03/account/get_account_information', token)
+}
+
+/** List available couriers for a country. courier_id here matches quotation courier.courier_id. */
+export async function courierList(token: string, countryCode = 'MY'): Promise<EpCourierListResponse> {
+    return epFetch('GET', `/open_api/2026-03/courier/list?country_code=${encodeURIComponent(countryCode)}`, token)
 }

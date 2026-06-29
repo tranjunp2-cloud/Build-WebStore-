@@ -176,14 +176,65 @@ export interface EpCancelParams {
 }
 
 // --- Wallet ---
+// Live shape (verified): data.wallet[] holds one entry per currency. There is NO flat
+// current_balance/currency_code at data root — that was an incorrect earlier assumption.
+export interface EpWalletEntry {
+    balance: number | string
+    currency: string
+}
+
 export interface EpWalletResponse {
     status_code: number
     data: {
-        account_id: number
-        currency_code: string
-        current_balance: string    // RM string
-        total_credit: string
-        total_spent: string
-        last_transaction?: string
+        wallet?: EpWalletEntry[]
+        free_credit_wallet?: EpWalletEntry[]
+    }
+}
+
+// --- Account info (GET /open_api/2026-03/account/get_account_information) ---
+// Email lives per-address (pickup/billing/delivery), NOT on the account object. The address
+// objects are empty {} until the merchant configures them in EasyParcel.
+export interface EpAccountAddress {
+    name?: string | null
+    phone_number?: string | null
+    email?: string | null
+    company_name?: string | null
+    address1?: string | null
+    address2?: string | null
+    postcode?: string | null
+    city?: string | null
+    province_code?: string | null
+    country_code?: string | null
+}
+
+// --- Courier list (GET /open_api/2026-03/courier/list?country_code=MY) ---
+export interface EpCourier {
+    courier_id: string      // e.g. "EP-CR0AP" — same namespace as quotation courier.courier_id
+    uuid?: string
+    courier_name: string
+    short_name?: string
+    courier_logo?: string
+    country?: string
+}
+
+export interface EpCourierListResponse {
+    status_code: number
+    message?: string
+    data?: EpCourier[]
+}
+
+export interface EpAccountInfoResponse {
+    status_code: number
+    message?: string
+    data: {
+        account?: {
+            name?: string | null
+            account_type?: string | null
+        }
+        address?: {
+            pickup_address?: EpAccountAddress
+            billing_address?: EpAccountAddress
+            delivery_address?: EpAccountAddress
+        }
     }
 }

@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { exchangeCodeForToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getAccountInfo } from '@/lib/shipping/easyparcel/client'
+import { mapSubdivisionName } from '@/lib/shipping/easyparcel/normalize'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +47,36 @@ export async function GET(request: NextRequest) {
         const tokens = await exchangeCodeForToken(code)
         const now = Date.now()
 
+        // Best-effort: fetch the connected account's identity + default pickup address. Non-critical —
+        // never block the connection if this call fails or returns empty.
+        let accountName: string | undefined
+        let accountEmail: string | undefined
+        let seededWarehouse: Record<string, string> | undefined
+        try {
+            const info = await getAccountInfo(tokens.access_token)
+            accountName = info.data?.account?.name?.trim() || undefined
+            accountEmail = info.data?.address?.pickup_address?.email?.trim() || undefined
+
+            // Seed warehouse (sender) from EP's default pickup address — ONLY if the tenant has no
+            // warehouse yet, so we never clobber a merchant's local edits. EP address is read-only on
+            // their side, so this is a one-time prefill the merchant can then override locally.
+            const existingWh = (tenant as any)?.easyParcelIntegration?.warehouse ?? {}
+            const hasLocalWarehouse = !!(existingWh.name || existingWh.address1 || existingWh.postcode)
+            const pa = info.data?.address?.pickup_address
+            if (!hasLocalWarehouse && pa && (pa.name || pa.address1 || pa.postcode)) {
+                seededWarehouse = {
+                    name: pa.name?.trim() || '',
+                    phone: pa.phone_number?.trim() || '',
+                    address1: pa.address1?.trim() || '',
+                    address2: pa.address2?.trim() || '',
+                    city: pa.city?.trim() || '',
+                    state: pa.province_code ? mapSubdivisionName(pa.province_code.trim()) : '',
+                    postcode: pa.postcode?.trim() || '',
+                    country: 'MY',
+                }
+            }
+        } catch { /* non-critical — proceed without account identity / warehouse seed */ }
+
         await payload.update({
             collection: 'tenants',
             id: tenantId,
@@ -56,6 +88,9 @@ export async function GET(request: NextRequest) {
                     tokenRefreshExpiresAt: new Date(now + tokens.refresh_token_expires_in * 1000).toISOString(),
                     enabled: true,
                     testedAt: new Date().toISOString(),
+                    accountName: accountName ?? null,
+                    accountEmail: accountEmail ?? null,
+                    ...(seededWarehouse ? { warehouse: seededWarehouse } : {}),
                 },
             } as any,
             overrideAccess: true,

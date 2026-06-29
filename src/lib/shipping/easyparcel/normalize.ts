@@ -66,6 +66,16 @@ export function mapSubdivisionCode(stateName: string): string {
     return SUBDIVISION_CODE_MAP[stateName] ?? stateName
 }
 
+// Reverse of SUBDIVISION_CODE_MAP — built once for seeding warehouse.state from EP province_code.
+const SUBDIVISION_NAME_MAP: Record<string, string> = Object.fromEntries(
+    Object.entries(SUBDIVISION_CODE_MAP).map(([name, code]) => [code, name]),
+)
+
+/** Map an ISO 3166-2 subdivision code back to MY state name (e.g. "MY-10" → "Selangor"). Returns input unchanged if not found. */
+export function mapSubdivisionName(code: string): string {
+    return SUBDIVISION_NAME_MAP[code] ?? code
+}
+
 /**
  * Split a raw MY phone number into country code + local number for New EP API.
  * Strips non-digit chars, removes leading "60" or "0" prefix.

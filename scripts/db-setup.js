@@ -4847,6 +4847,8 @@ const MIGRATIONS = [
   { name: 'tenants.easy_parcel_integration_refresh_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_refresh_token varchar;` },
   { name: 'tenants.easy_parcel_integration_token_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_expires_at timestamp with time zone;` },
   { name: 'tenants.easy_parcel_integration_token_refresh_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_refresh_expires_at timestamp with time zone;` },
+  { name: 'tenants.easy_parcel_integration_account_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_name varchar;` },
+  { name: 'tenants.easy_parcel_integration_account_email', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_email varchar;` },
   {
     name: 'media.thumbnail',
     sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS thumbnail varchar;`,

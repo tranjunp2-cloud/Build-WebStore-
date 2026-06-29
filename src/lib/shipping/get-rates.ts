@@ -14,6 +14,7 @@ interface GetRatesParams {
     senderPostcode: string
     subtotalSen: number      // for flat-rate free-shipping threshold check
     codAmountSen?: number    // 0 or undefined = non-COD; >0 = COD order (sen)
+    selectedCourier?: string // EP courier_id the merchant restricts checkout to (optional)
 }
 
 interface GetRatesResult {
@@ -85,7 +86,17 @@ export async function getRates(
             }
         })
 
-        if (rates.length > 0) return { rates, degraded: false }
+        if (rates.length > 0) {
+            // Restrict to the merchant's chosen courier when set (real EP courier, not flat). If that
+            // courier has no service for this route, keep all rates so checkout is never blocked.
+            const chosen = params.selectedCourier
+            if (chosen && chosen !== 'flat') {
+                const filtered = rates.filter((r) => r.courier === chosen)
+                if (filtered.length > 0) return { rates: filtered, degraded: false }
+                console.warn(`[get-rates] selected courier ${chosen} unavailable for route — using all couriers`)
+            }
+            return { rates, degraded: false }
+        }
 
         console.warn('[get-rates] EP returned 0 quotations, falling back to flat rate')
     } catch (err) {

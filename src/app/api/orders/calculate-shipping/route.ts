@@ -62,6 +62,7 @@ export async function POST(request: Request) {
         let epToken: string | null = null
         let warehousePostcode = '47500'
         let warehouseState = ''
+        let epIntegrationCourier: string | undefined
 
         if (tenantId) {
             const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
             }
             warehousePostcode = epIntegration.warehouse?.postcode ?? '47500'
             warehouseState = epIntegration.warehouse?.state ?? ''
+            epIntegrationCourier = epIntegration.selectedCourier || undefined
         }
 
         // Compute total weight from items (optional); default 500g per item when not provided
@@ -96,6 +98,7 @@ export async function POST(request: Request) {
                     destState: state,
                     senderPostcode: warehousePostcode,
                     senderState: warehouseState,
+                    selectedCourier: epIntegrationCourier,
                     subtotalSen,
                     codAmountSen: typeof codAmountSen === 'number' && codAmountSen > 0 ? codAmountSen : undefined,
                 },

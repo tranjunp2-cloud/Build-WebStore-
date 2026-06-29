@@ -299,6 +299,7 @@ export async function POST(request: Request) {
                 destState: customer.address?.state ?? '',
                 senderPostcode: epIntegration.warehouse?.postcode ?? '47500',
                 senderState: warehouseState,
+                selectedCourier: epIntegration.selectedCourier || undefined,
                 subtotalSen: effSubtotalSen,
                 codAmountSen: paymentMethod === 'cod' ? effSubtotalSen : undefined,
             },

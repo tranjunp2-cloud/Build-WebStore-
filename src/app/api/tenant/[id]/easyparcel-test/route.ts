@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
-import { walletBalance } from '@/lib/shipping/easyparcel/client'
+import { walletBalance, getAccountInfo } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { mapSubdivisionName } from '@/lib/shipping/easyparcel/normalize'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -30,9 +31,17 @@ function checkRateLimit(tenantId: string): boolean {
  * Tests EP OAuth connection by fetching wallet balance.
  * On success, updates tenant.easyParcelIntegration.testedAt.
  */
-export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
+export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const { id: tenantId } = await ctx.params
+
+        // Optional: when the merchant clicks "Sync from EasyParcel", persist the pulled pickup
+        // address into the local warehouse (overwriting local edits — that is the merchant's intent).
+        let syncWarehouse = false
+        try {
+            const body = await request.json()
+            syncWarehouse = body?.syncWarehouse === true
+        } catch { /* no body — plain test connection */ }
 
         // Verify user owns this tenant
         const isSuperAdmin = (user as any).roles?.includes('super-admin')
@@ -89,17 +98,53 @@ export const POST = withAuth<RouteContext>(async (user, _request, ctx) => {
         }
 
         const walletRes = await walletBalance(token)
-        const balance = walletRes.data?.current_balance ?? '0'
-        const currency = walletRes.data?.currency_code ?? 'MYR'
+        const mainWallet = walletRes.data?.wallet?.[0]
+        const balance = mainWallet?.balance != null ? String(mainWallet.balance) : '0'
+        const currency = mainWallet?.currency ?? 'MYR'
 
+        // Best-effort: pull live identity + default pickup address for the "Sync from EasyParcel"
+        // flow. Non-critical — wallet success alone already proves the connection.
+        let accountName: string | undefined
+        let accountEmail: string | undefined
+        let pickupAddress: Record<string, string> | undefined
+        try {
+            const info = await getAccountInfo(token)
+            accountName = info.data?.account?.name?.trim() || undefined
+            accountEmail = info.data?.address?.pickup_address?.email?.trim() || undefined
+            const pa = info.data?.address?.pickup_address
+            if (pa && (pa.name || pa.address1 || pa.postcode)) {
+                pickupAddress = {
+                    name: pa.name?.trim() || '',
+                    phone: pa.phone_number?.trim() || '',
+                    address1: pa.address1?.trim() || '',
+                    address2: pa.address2?.trim() || '',
+                    city: pa.city?.trim() || '',
+                    state: pa.province_code ? mapSubdivisionName(pa.province_code.trim()) : '',
+                    postcode: pa.postcode?.trim() || '',
+                    country: 'MY',
+                }
+            }
+        } catch { /* non-critical — proceed without identity / pickup */ }
+
+        const warehouseApplied = syncWarehouse && !!pickupAddress
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: { easyParcelIntegration: { testedAt: new Date().toISOString() } } as any,
+            data: {
+                easyParcelIntegration: {
+                    testedAt: new Date().toISOString(),
+                    ...(accountName !== undefined ? { accountName } : {}),
+                    ...(accountEmail !== undefined ? { accountEmail } : {}),
+                    ...(warehouseApplied ? { warehouse: pickupAddress } : {}),
+                },
+            } as any,
             overrideAccess: true,
         })
 
-        return NextResponse.json({ success: true, data: { balance, currency } })
+        return NextResponse.json({
+            success: true,
+            data: { balance, currency, accountName, accountEmail, pickupAddress, warehouseApplied },
+        })
     } catch (error: unknown) {
         console.error('[EasyParcel Test Error]', error instanceof Error ? error.message : 'unknown')
         return NextResponse.json(
