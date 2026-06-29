@@ -47,12 +47,14 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
     ], [c])
 
     return (
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
             <TableSearch
                 value={search}
                 onSearch={(q) => { setSearch(q); onSearch(q) }}
                 placeholder={c.searchPlaceholder}
-                className="w-full sm:flex-1 sm:max-w-[360px]"
+                // Full-width own row below lg so the placeholder isn't clipped on iPad (override the
+                // component's built-in max-w-[360px]); filters wrap below. Back to capped flex at lg+.
+                className="w-full max-w-none lg:flex-1 lg:max-w-[360px]"
             />
 
             <FilterChip
@@ -69,10 +71,10 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
             />
 
             {/* Spacer pushes the export CTA to the right edge on desktop */}
-            <div className="hidden sm:block sm:flex-1" />
+            <div className="hidden lg:block lg:flex-1" />
 
             {/* Export CSV — standard F33 secondary action (matches Discounts/Customers) */}
-            <div className="flex justify-end sm:contents">
+            <div className="flex justify-end ml-auto lg:ml-0 lg:contents">
                 <Button variant="dashSecondary" size="dash" onClick={onExport} disabled={exporting} className="shrink-0">
                     <Download className="w-4 h-4" />
                     {exporting ? c.exporting : c.exportCsv}
