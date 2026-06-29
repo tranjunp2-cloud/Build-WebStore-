@@ -6,6 +6,7 @@ import { ProductFormValues } from './schema'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
 
 type VariantLive = {
     skuCode?: string
@@ -57,13 +58,10 @@ export function SkuMatrixMobile({ variants, variantsLive }: SkuMatrixMobileProps
                                 <label className="text-[12px] font-medium text-foreground/60 uppercase tracking-wide">
                                     {s?.colSku || 'SKU Code'}
                                 </label>
-                                <input
+                                <Input
                                     value={live?.skuCode ?? ''}
                                     onChange={e => set(`variants.${i}.skuCode`, e.target.value)}
-                                    className={cn(
-                                        'w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground outline-none focus:ring-1 focus:ring-white transition-colors',
-                                        errors.variants?.[i]?.skuCode ? 'border-destructive focus:border-destructive' : 'border-white/[0.08] focus:border-white'
-                                    )}
+                                    className={cn("h-9", errors.variants?.[i]?.skuCode && "border-destructive focus-visible:border-destructive")}
                                 />
                                 {errors.variants?.[i]?.skuCode && (
                                     <span className="text-[10px] text-destructive">{errors.variants[i]?.skuCode?.message}</span>
@@ -74,14 +72,11 @@ export function SkuMatrixMobile({ variants, variantsLive }: SkuMatrixMobileProps
                                 <label className="text-[12px] font-medium text-foreground/60 uppercase tracking-wide">
                                     {s?.colPrice || 'Price'}
                                 </label>
-                                <input
+                                <Input
                                     type="number"
                                     value={live?.price ?? ''}
                                     onChange={e => set(`variants.${i}.price`, e.target.value)}
-                                    className={cn(
-                                        'w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground outline-none focus:ring-1 focus:ring-white transition-colors',
-                                        errors.variants?.[i]?.price ? 'border-destructive focus:border-destructive' : 'border-white/[0.08] focus:border-white'
-                                    )}
+                                    className={cn("h-9", errors.variants?.[i]?.price && "border-destructive focus-visible:border-destructive")}
                                 />
                                 {errors.variants?.[i]?.price && (
                                     <span className="text-[10px] text-destructive">{errors.variants[i]?.price?.message}</span>
@@ -92,14 +87,11 @@ export function SkuMatrixMobile({ variants, variantsLive }: SkuMatrixMobileProps
                                 <label className="text-[12px] font-medium text-foreground/60 uppercase tracking-wide">
                                     {s?.colComparePrice || 'Compare Price'}
                                 </label>
-                                <input
+                                <Input
                                     type="number"
                                     value={live?.compareAtPrice ?? ''}
                                     onChange={e => set(`variants.${i}.compareAtPrice`, e.target.value)}
-                                    className={cn(
-                                        'w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground outline-none focus:ring-1 focus:ring-white transition-colors',
-                                        errors.variants?.[i]?.compareAtPrice ? 'border-destructive focus:border-destructive' : 'border-white/[0.08] focus:border-white'
-                                    )}
+                                    className={cn("h-9", errors.variants?.[i]?.compareAtPrice && "border-destructive focus-visible:border-destructive")}
                                 />
                                 {errors.variants?.[i]?.compareAtPrice && (
                                     <span className="text-[10px] text-destructive">{errors.variants[i]?.compareAtPrice?.message}</span>
@@ -110,14 +102,11 @@ export function SkuMatrixMobile({ variants, variantsLive }: SkuMatrixMobileProps
                                 <label className="text-[12px] font-medium text-foreground/60 uppercase tracking-wide">
                                     {s?.colStock || 'Stock'}
                                 </label>
-                                <input
+                                <Input
                                     type="number"
                                     value={live?.stock ?? ''}
                                     onChange={e => set(`variants.${i}.stock`, e.target.value)}
-                                    className={cn(
-                                        'w-full rounded-xl border bg-background px-3 py-2 text-[14px] text-foreground outline-none focus:ring-1 focus:ring-white transition-colors',
-                                        errors.variants?.[i]?.stock ? 'border-destructive focus:border-destructive' : 'border-white/[0.08] focus:border-white'
-                                    )}
+                                    className={cn("h-9", errors.variants?.[i]?.stock && "border-destructive focus-visible:border-destructive")}
                                 />
                                 {errors.variants?.[i]?.stock && (
                                     <span className="text-[10px] text-destructive">{errors.variants[i]?.stock?.message}</span>

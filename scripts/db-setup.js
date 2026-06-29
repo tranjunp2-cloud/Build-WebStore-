@@ -4847,6 +4847,27 @@ const MIGRATIONS = [
   { name: 'tenants.easy_parcel_integration_refresh_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_refresh_token varchar;` },
   { name: 'tenants.easy_parcel_integration_token_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_expires_at timestamp with time zone;` },
   { name: 'tenants.easy_parcel_integration_token_refresh_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_refresh_expires_at timestamp with time zone;` },
+  {
+    name: 'media.thumbnail',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS thumbnail varchar;`,
+  },
+  {
+    name: 'media.card',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS card varchar;`,
+  },
+  {
+    name: 'media.hero',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS hero varchar;`,
+  },
+  {
+    name: 'media.square',
+    sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS square varchar;`,
+  },
+  // ── GH-1350: orders locale snapshot ──
+  {
+    name: 'orders.locale',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {

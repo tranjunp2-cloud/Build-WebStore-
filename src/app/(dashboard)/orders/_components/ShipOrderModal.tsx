@@ -1,9 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useState } from 'react'
 import { Package, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface ShipOrderModalProps {
     orderNumber: string
@@ -17,64 +20,48 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
     const { t } = useI18n()
     const s = t.dashboard.orders.ship
     const [trackingNumber, setTrackingNumber] = useState('')
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => { setMounted(true) }, [])
-
-    useEffect(() => {
-        if (!isOpen) return
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isLoading) { setTrackingNumber(''); onBack() } }
-        document.addEventListener('keydown', onKey)
-        return () => document.removeEventListener('keydown', onKey)
-    }, [isOpen, isLoading, onBack])
-
-    if (!isOpen || !mounted) return null
 
     const isDisabled = trackingNumber.trim() === '' || isLoading
 
-    return createPortal(
-        <div
-            className="fixed inset-0 z-[102] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={(e) => { if (e.target === e.currentTarget && !isLoading) { setTrackingNumber(''); onBack() } }}
-        >
-            <div
-                className="flex flex-col items-center"
-                style={{
-                    width: 448,
-                    background: 'var(--dash-surface)',
-                    border: '1px solid var(--dash-border)',
-                    borderRadius: 16,
-                    padding: 25,
-                    boxShadow: '0px 8px 24px 0px rgba(25, 32, 56, 0.1)',
-                }}
+    function close() {
+        if (isLoading) return
+        setTrackingNumber('')
+        onBack()
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={(v) => { if (!v) close() }}>
+            <DialogContent
+                // z-[110] keeps the modal above the orders drawer (backdrop z-[100], panel z-[101]).
+                className="max-w-md rounded-xl flex flex-col items-center [&>button]:hidden z-[110]"
+                overlayClassName="z-[110]"
+                // No separate description: the labeled tracking-number input is self-describing.
+                // Tell Radix it's intentional so it doesn't log the missing-Description warning.
+                aria-describedby={undefined}
+                style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
             >
                 {/* Icon */}
                 <div
-                    className="flex items-center justify-center"
-                    style={{
-                        width: 64, height: 64,
-                        background: 'hsl(var(--primary)/0.1)',
-                        borderRadius: 9999,
-                        marginBottom: 16,
-                    }}
+                    className="flex items-center justify-center h-16 w-16 rounded-full mb-2"
+                    style={{ background: 'hsl(var(--primary)/0.1)' }}
                 >
                     <Package size={26} strokeWidth={2.67} color="hsl(var(--primary))" />
                 </div>
 
                 {/* Heading */}
-                <h2
-                    className="w-full text-center truncate"
-                    style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 20, lineHeight: '1.4em', color: 'var(--dash-text)', marginBottom: 8 }}
+                <DialogTitle
+                    className="w-full text-center truncate text-[20px] font-bold"
+                    style={{ color: 'var(--dash-text)' }}
                 >
                     {s.title} — {orderNumber}
-                </h2>
+                </DialogTitle>
 
                 {/* Tracking input */}
-                <div className="flex flex-col w-full" style={{ gap: 8, marginBottom: 24 }}>
-                    <label htmlFor="ship-tracking-input" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '1.43em', color: 'var(--dash-text)' }}>
+                <div className="flex flex-col w-full gap-2 mt-2 mb-2">
+                    <Label htmlFor="ship-tracking-input" style={{ color: 'var(--dash-text)' }}>
                         {s.trackingLabel} *
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                         id="ship-tracking-input"
                         type="text"
                         value={trackingNumber}
@@ -82,60 +69,31 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
                         placeholder={s.trackingPlaceholder}
                         disabled={isLoading}
                         autoFocus
-                        style={{
-                            height: 48,
-                            padding: '12px 16px',
-                            background: 'var(--dash-secondary-bg)',
-                            border: '1px solid var(--dash-border)',
-                            borderRadius: 12,
-                            fontFamily: 'Inter, sans-serif',
-                            fontSize: 16,
-                            color: 'var(--dash-text)',
-                            outline: 'none',
-                            width: '100%',
-                        }}
                     />
                 </div>
 
                 {/* Buttons */}
-                <div className="flex w-full" style={{ gap: 12, height: 50 }}>
-                    <button
-                        onClick={() => { if (!isLoading) { setTrackingNumber(''); onBack() } }}
+                <div className="flex w-full gap-3">
+                    <Button
+                        type="button"
+                        variant="dashSecondary"
+                        onClick={close}
                         disabled={isLoading}
-                        className="flex items-center justify-center flex-1 transition-opacity hover:opacity-80"
-                        style={{
-                            border: '1px solid var(--dash-border)',
-                            borderRadius: 16,
-                            fontFamily: 'Inter, sans-serif',
-                            fontWeight: 600,
-                            fontSize: 16,
-                            color: 'var(--dash-text)',
-                            opacity: isLoading ? 0.5 : 1,
-                        }}
+                        className="flex-1 h-[50px] rounded-lg text-[16px]"
                     >
                         {s.back}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        type="button"
                         onClick={() => onConfirm(trackingNumber.trim())}
                         disabled={isDisabled}
-                        className="flex items-center justify-center flex-1 gap-2 transition-opacity"
-                        style={{
-                            background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)',
-                            borderRadius: 16,
-                            fontFamily: 'Inter, sans-serif',
-                            fontWeight: 600,
-                            fontSize: 16,
-                            color: '#fff',
-                            opacity: isDisabled ? 0.5 : 1,
-                            cursor: isDisabled ? 'not-allowed' : 'pointer',
-                        }}
+                        className="flex-1 h-[50px] rounded-lg text-[16px]"
                     >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                         {isLoading ? s.confirming : s.confirm}
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>,
-        document.body
+            </DialogContent>
+        </Dialog>
     )
 }

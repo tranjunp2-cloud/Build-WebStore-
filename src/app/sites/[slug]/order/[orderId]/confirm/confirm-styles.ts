@@ -123,9 +123,9 @@ export const TY_CSS = `
 .ty-cod-card{display:flex;align-items:center;gap:16px;padding:20px;background:#f5f8ff;border:1px solid #d6e2fb;border-radius:14px;}
 .ty-cod-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 6px 18px -6px rgba(37,99,235,.45);}
 .ty-cod-body{flex:1;min-width:0;}
-.ty-cod-title{font-size:15px;font-weight:700;color:var(--f1);line-height:1.45;margin:0 0 4px;}
+.ty-cod-title{font-size:15px;font-weight:700;color:#0f172a;line-height:1.45;margin:0 0 4px;}
 .ty-cod-title strong{font-weight:800;color:#1e3a8a;background:rgba(59,130,246,.10);padding:1px 7px;border-radius:6px;font-family:monospace;}
-.ty-cod-sub{font-size:12.5px;color:var(--f3);margin:0;line-height:1.55;}
+.ty-cod-sub{font-size:12.5px;color:#475569;margin:0;line-height:1.55;}
 .ty-cod-tips{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
 .ty-cod-tips li{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;background:var(--inp);border:1px solid var(--bd2);border-radius:10px;font-size:12.5px;color:var(--f2);line-height:1.5;}
 .ty-cod-tips svg{color:var(--tl7);margin-top:2px;flex-shrink:0;}
@@ -194,7 +194,7 @@ export const TY_CSS = `
 .ty-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px;padding:0 16px;border-radius:10px;font-size:13px;font-weight:700;letter-spacing:.01em;transition:all 160ms ease;white-space:nowrap;cursor:pointer;border:none;text-decoration:none;}
 .ty-btn.primary{background:var(--tl);color:#fff;box-shadow:0 4px 12px -4px rgba(var(--accent-rgb,14,117,86),.40);}
 .ty-btn.primary:hover{background:var(--tl7);}
-.ty-btn.outline{background:#fff;border:1px solid var(--bd3);color:var(--f1);}
+.ty-btn.outline{background:var(--card,#fff);border:1px solid var(--bd3);color:var(--f1);}
 .ty-btn.outline:hover{background:var(--inp);border-color:var(--f4);}
 .ty-btn.ghost{background:transparent;color:var(--f2);border:1px solid var(--bd);}
 .ty-btn.ghost:hover{background:var(--inp);color:var(--f1);}

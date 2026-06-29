@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
+import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
@@ -150,6 +151,21 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
+
+    // Auto-open the publish modal when arriving from an external "Publish" CTA
+    // (e.g. the dashboard onboarding "Publish your website" step → /editor/:id?publish=1).
+    // Waits for editor data to finish loading, then strips the param so a refresh won't reopen.
+    const publishAutoOpenedRef = useRef(false)
+    useEffect(() => {
+        if (publishAutoOpenedRef.current || isLoading) return
+        if (searchParams.get('publish') !== '1') return
+        publishAutoOpenedRef.current = true
+        setIsPublishModalOpen(true)
+        const next = new URLSearchParams(searchParams.toString())
+        next.delete('publish')
+        const qs = next.toString()
+        router.replace(`/editor/${siteId}${qs ? `?${qs}` : ''}`)
+    }, [isLoading, searchParams, router, siteId])
 
     // Workspace layout (left/right sidebar visibility, persisted in localStorage)
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
@@ -1442,16 +1458,22 @@ export default function EditorPage() {
             ;(safeBlock as Record<string, unknown>).id = crypto.randomUUID()
         }
 
+        // GH-1359: resolve hardcoded CTA placeholders (#contact/#about/#) to
+        // canonical page slugs at insert time, for both the base block and the
+        // locale-variant slots (which override the base on render).
+        const pagesNow = useEditorStore.getState().pages
+
         // F-26: Consume __localeInit injected by Phase 01 normalizeAddSectionBlock
         const localeInit = (safeBlock as Record<string, unknown>).__localeInit as { en: Record<string, unknown>; ms: Record<string, unknown> } | undefined
         if (localeInit && safeBlock.id) {
-            initLocaleFromBlock(safeBlock.id as string, localeInit)
+            initLocaleFromBlock(safeBlock.id as string, patchLocaleInitCtaUrls(localeInit, pagesNow))
         }
         // Strip __localeInit before persisting the block
         if ((safeBlock as Record<string, unknown>).__localeInit) {
             const { __localeInit: _, ...rest } = safeBlock as Record<string, unknown>
             safeBlock = rest as BlockData
         }
+        safeBlock = patchBlockCtaUrls(safeBlock, pagesNow)
 
         // F-26-04: Auto-translate when site is ms + block type has no authored BM content
         const blockTypeStr = String(safeBlock.blockType || '')
@@ -1521,15 +1543,18 @@ export default function EditorPage() {
                 )
 
                 if (nextBlock) {
+                    // GH-1359: resolve CTA placeholders to canonical slugs (base + locale slots).
+                    const pagesNowAI = useEditorStore.getState().pages
                     // F-26: Consume __localeInit from Phase 01 normalizeAddSectionBlock
                     const localeInitAI = (nextBlock as Record<string, unknown>).__localeInit as { en: Record<string, unknown>; ms: Record<string, unknown> } | undefined
                     if (localeInitAI && nextBlock.id) {
-                        initLocaleFromBlock(nextBlock.id as string, localeInitAI)
+                        initLocaleFromBlock(nextBlock.id as string, patchLocaleInitCtaUrls(localeInitAI, pagesNowAI))
                     }
                     if ((nextBlock as Record<string, unknown>).__localeInit) {
                         const { __localeInit: _li, ...rest } = nextBlock as Record<string, unknown>
                         nextBlock = rest as BlockData
                     }
+                    nextBlock = patchBlockCtaUrls(nextBlock, pagesNowAI)
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
                     if (nextBlock.blockType === 'gallery') void triggerImageSeed()

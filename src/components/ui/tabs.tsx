@@ -2,38 +2,55 @@
 
 import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
 const Tabs = TabsPrimitive.Root
 
+// Two shared looks for every tab bar in the CMS:
+// - pill: segmented control (the shadcn default).
+// - underline: the dashboard nav style (Discounts / Team & Account / Products status…),
+//   driven by the global `.dash-tab-trigger` class so the 2px teal underline + active/inactive
+//   text colors are identical everywhere. Radix sets data-state on the trigger automatically.
+const tabsListVariants = cva("", {
+  variants: {
+    variant: {
+      pill: "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      underline:
+        "flex w-full items-center justify-start gap-0 h-auto rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar [border-bottom:1px_solid_var(--dash-divider)]",
+    },
+  },
+  defaultVariants: { variant: "pill" },
+})
+
+const tabsTriggerVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        pill: "rounded-lg px-3 py-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow",
+        underline:
+          "dash-tab-trigger gap-2 px-4 pb-2.5 -mb-px rounded-none cursor-pointer bg-transparent shadow-none text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[hsl(var(--primary))] data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+      },
+    },
+    defaultVariants: { variant: "pill" },
+  },
+)
+
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & VariantProps<typeof tabsListVariants>
+>(({ className, variant, ...props }, ref) => (
+  <TabsPrimitive.List ref={ref} className={cn(tabsListVariants({ variant }), className)} {...props} />
 ))
 TabsList.displayName = TabsPrimitive.List.displayName
 
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow",
-      className
-    )}
-    {...props}
-  />
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> & VariantProps<typeof tabsTriggerVariants>
+>(({ className, variant, ...props }, ref) => (
+  <TabsPrimitive.Trigger ref={ref} className={cn(tabsTriggerVariants({ variant }), className)} {...props} />
 ))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 

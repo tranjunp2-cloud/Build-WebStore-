@@ -1,6 +1,13 @@
 'use client'
 
-import { ChevronDown } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from '@/components/ui/select'
 
 type CountryCode = { code: string; flag: string; label: string }
 
@@ -28,41 +35,38 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
     const { code, rest } = parsePhone(value)
     const selected = COUNTRY_CODES.find(c => c.code === code) ?? COUNTRY_CODES[0]
 
-    function handleCodeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-        onChange(`${e.target.value}${rest}`)
+    function handleCodeChange(newCode: string) {
+        onChange(`${newCode}${rest}`)
     }
 
     function handleRestChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const rest = e.target.value.replace(/\D/g, '')
+        const digits = e.target.value.replace(/\D/g, '')
         // Keep country code when user clears the number — schema allows code-only
-        onChange(rest ? `${code}${rest}` : code)
+        onChange(digits ? `${code}${digits}` : code)
     }
-
-    const inputBase = 'bg-[hsl(var(--card))] border border-[hsl(var(--input-border))] rounded-[8px] h-[48px] text-[14px] text-white outline-none focus:border-[hsl(var(--primary))] focus:ring-1 focus:ring-[hsl(var(--ring))] transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
 
     return (
         <div className="flex gap-2 w-full">
             {/* Country code selector */}
-            <div className={`${inputBase} relative flex items-center gap-1.5 px-1 flex-shrink-0`}>
-                <span className="text-xl leading-none pointer-events-none select-none pl-1">{selected.flag}</span>
-                <ChevronDown className="h-4 w-4 text-[hsl(var(--muted-foreground)/0.5)] pointer-events-none flex-shrink-0" />
-                <select
-                    value={code}
-                    onChange={handleCodeChange}
-                    disabled={disabled}
+            <Select value={code} onValueChange={handleCodeChange} disabled={disabled}>
+                <SelectTrigger
                     aria-label="Country code"
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full disabled:cursor-not-allowed"
+                    className="h-[48px] w-auto flex-shrink-0 rounded-[8px] gap-1.5 px-2 shadow-[0px_1px_1px_rgba(0,0,0,0.1)]"
                 >
+                    <span className="text-xl leading-none select-none">{selected.flag}</span>
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                     {COUNTRY_CODES.map(c => (
-                        <option key={c.code} value={c.code} className="bg-[hsl(var(--secondary))]">
+                        <SelectItem key={c.code} value={c.code}>
                             {c.flag} {c.code} {c.label}
-                        </option>
+                        </SelectItem>
                     ))}
-                </select>
-            </div>
+                </SelectContent>
+            </Select>
 
             {/* Phone number input */}
-            <input
+            <Input
                 type="tel"
                 inputMode="numeric"
                 value={rest}
@@ -70,7 +74,7 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
                 disabled={disabled}
                 placeholder="123456789"
                 aria-label="Phone number"
-                className={`${inputBase} flex-1 px-3 placeholder-[hsl(var(--muted-foreground))] disabled:cursor-not-allowed disabled:opacity-60`}
+                className="h-[48px] rounded-[8px] text-[14px] flex-1 px-3 shadow-[0px_1px_1px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
             />
         </div>
     )

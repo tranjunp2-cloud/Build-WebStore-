@@ -87,6 +87,32 @@ describe('checkRateLimit (TC-F02.42: rate limiting)', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TC-SSO.RL-01 (integration): SSO shared-WiFi event scenario
+// Validates the 300/min IP limit allows real event load — no mocks.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('SSO shared-WiFi event scenario (TC-SSO.RL-01 integration)', () => {
+    it('200 concurrent logins from same WiFi NAT IP all pass (limit=300)', async () => {
+        const results = await Promise.all(
+            Array.from({ length: 200 }, () =>
+                checkRateLimit('sso-session:event-nat-ip', 300, 60_000)
+            )
+        )
+        const blocked = results.filter(r => !r.allowed)
+        expect(blocked).toHaveLength(0)
+    })
+
+    it('user #301+ is blocked — IP flood guard still effective at 300 limit', async () => {
+        const key = 'sso-session:overflow-test'
+        // Fill the bucket to exactly the limit
+        await Promise.all(Array.from({ length: 300 }, () => checkRateLimit(key, 300, 60_000)))
+        // One more should be blocked
+        const blocked = await checkRateLimit(key, 300, 60_000)
+        expect(blocked.allowed).toBe(false)
+        expect(blocked.remaining).toBe(0)
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TC-F02.26: Resend OTP Cooldown (60s anti-spam)
 // ═══════════════════════════════════════════════════════════════════════════
 describe('checkRateLimit for OTP resend (TC-F02.26: 60s cooldown)', () => {

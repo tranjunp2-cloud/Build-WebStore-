@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
+import { revalidateTenantAfterChange, revalidateTenantAfterDelete } from '@/lib/cache/revalidate-storefront'
 
 export const Tenants: CollectionConfig = {
     slug: 'tenants',
@@ -27,6 +28,11 @@ export const Tenants: CollectionConfig = {
                 return data
             },
         ],
+        // Bust the storefront tenant-identity cache on slug/customDomain edits
+        // made directly in the Payload admin (dashboard domain action handles its
+        // own path revalidation).
+        afterChange: [revalidateTenantAfterChange],
+        afterDelete: [revalidateTenantAfterDelete],
     },
     access: {
         read: ({ req }) => {

@@ -1,15 +1,16 @@
 /**
  * Unit Tests: HeroMediaOverlay — inline image/video edit overlay
- * TC-IDs: TC-F30-HMO-001 u2192 TC-F30-HMO-009
+ * TC-IDs: TC-F30-HMO-001 → TC-F30-HMO-009
  * Convention: docs/TEST_CONVENTION.md
  * QA doc: docs/qa/F30-hero-media-overlay.md
+ * GH-1284: Updated mocks — component now uses useUploadProgress (XHR) instead of uploadMediaAction
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 
-// u2500u2500 Mocks (top-level, before imports) u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
+// ── Mocks (top-level, before imports) ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 vi.mock('@/components/site-renderer/OwnerContext', () => ({
     useIsOwner: vi.fn(() => false),
 }))
@@ -18,8 +19,8 @@ vi.mock('@/components/site-renderer/BlockEditCallbackContext', () => ({
     useBlockEditCallback: vi.fn(() => null),
 }))
 
-vi.mock('@/app/(dashboard)/actions/media', () => ({
-    uploadMediaAction: vi.fn(),
+vi.mock('@/hooks/use-upload-progress', () => ({
+    useUploadProgress: vi.fn(),
 }))
 
 vi.mock('@/lib/media/compress-image', () => ({
@@ -31,13 +32,13 @@ vi.mock('@/lib/media/compress-image', () => ({
 const postMessageSpy = vi.fn()
 Object.defineProperty(window, 'parent', { value: { postMessage: postMessageSpy }, writable: true })
 
-// u2500u2500 Imports (after mocks) u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
+// ── Imports (after mocks) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { HeroMediaOverlay } from '@/blocks/hero/hero-media-overlay'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
 
-// u2500u2500 Helpers u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
+// ── Helpers ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const mockOnFieldChange = vi.fn()
 const mockCallback = { blockIndex: 0, onFieldChange: mockOnFieldChange }
 
@@ -45,11 +46,20 @@ function makeFile(type: string, name = 'photo.jpg'): File {
     return new File(['bytes'], name, { type })
 }
 
+let mockUpload: Mock
+
 beforeEach(() => {
     vi.clearAllMocks()
+    mockUpload = vi.fn()
+    vi.mocked(useUploadProgress).mockReturnValue({
+        upload: mockUpload,
+        progress: 0,
+        isUploading: false,
+        reset: vi.fn(),
+    })
 })
 
-// u2500u2500 Tests u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
+// ── Tests ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 describe('TC-F30-HMO-001: non-owner passthrough', () => {
     it('renders children without overlay wrapper when isOwner=false', () => {
@@ -147,7 +157,7 @@ describe('TC-F30-HMO-007: valid image upload triggers onFieldChange', () => {
     it('strips .url suffix, calls onFieldChange with hydrated object {id,url}, shows success toast', async () => {
         vi.mocked(useIsOwner).mockReturnValue(true)
         vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
-        vi.mocked(uploadMediaAction).mockResolvedValue({ id: 101, url: 'https://cdn/img.jpg' } as never)
+        mockUpload.mockResolvedValue({ id: 101, url: 'https://cdn/img.jpg' })
         const { container } = render(
             <HeroMediaOverlay field="image.url" altText="Hero image">
                 <div />

@@ -78,6 +78,7 @@ export const BLOCK_CONTENT_MS = {
         formFields: [
             { fieldName: 'name', label: 'Nama Anda', fieldType: 'text', required: true },
             { fieldName: 'email', label: 'Alamat E-mel', fieldType: 'email', required: true },
+            { fieldName: 'phone', label: 'Nombor Telefon', fieldType: 'phone', required: false },
             { fieldName: 'message', label: 'Mesej', fieldType: 'textarea', required: true },
         ],
     },

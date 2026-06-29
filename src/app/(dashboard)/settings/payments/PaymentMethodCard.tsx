@@ -3,6 +3,7 @@
 import React from 'react';
 import { Lock, Check, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { useI18n } from '@/i18n';
 
 type IconTone = 'brand' | 'purple' | 'amber' | 'teal' | '';
@@ -40,10 +41,12 @@ export function PaymentMethodCard({
 
     return (
         <div className={cn(
-            'rounded-[16px] p-[20px_22px] border transition-all duration-200',
+            // preflight OFF → class `border` thiếu border-style; phải có `border-solid` mới hiện viền.
+            'rounded-[16px] p-[20px_22px] border border-solid transition-all duration-200',
             'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
             locked ? 'bg-[hsl(var(--background))] border-dash-border' : 'bg-[hsl(var(--card))] border-dash-border',
-            highlight && !locked && 'border-[hsl(var(--info)/0.3)] shadow-[0_0_0_1px_hsl(var(--info)/0.18),0_8px_24px_-8px_hsl(var(--info)/0.18)]',
+            // Viền đồng nhất xám (dash-border) cho mọi card bất kể bật/tắt — trạng thái active
+            // đã thể hiện qua toggle + pill "Active". (Trước đây bật thì viền xanh info → lệch nhau.)
         )}>
             <div className="flex items-start gap-4">
                 {/* Icon */}
@@ -66,37 +69,15 @@ export function PaymentMethodCard({
                             <p className="text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]">{desc}</p>
                         </div>
 
-                        {/* Toggle switch */}
+                        {/* Toggle switch — shared <Switch> (GH-1222) for consistency with Shipping
+                            and other settings toggles. */}
                         <div className="relative shrink-0 group/sw">
-                            <input
-                                type="checkbox"
-                                className="absolute opacity-0 w-0 h-0"
+                            <Switch
                                 checked={isActive}
                                 disabled={locked}
-                                onChange={() => !locked && onChange(!on)}
-                                tabIndex={-1}
-                                aria-hidden="true"
+                                onCheckedChange={() => !locked && onChange(!on)}
+                                aria-label={title}
                             />
-                            <button
-                                className={cn(
-                                    'w-[44px] h-[24px] rounded-full border relative transition-all duration-200',
-                                    !isActive && 'bg-white/10 border-white/[0.08]',
-                                    locked && 'opacity-45 cursor-not-allowed',
-                                )}
-                                style={isActive ? {
-                                    background: 'linear-gradient(135deg, hsl(var(--info)) 0%, hsl(var(--primary)) 100%)',
-                                    boxShadow: '0 0 12px hsl(var(--info)/0.40)',
-                                    borderColor: 'transparent',
-                                } : undefined}
-                                onClick={() => !locked && onChange(!on)}
-                                aria-pressed={isActive}
-                                disabled={locked}
-                            >
-                                <span className={cn(
-                                    'absolute top-1/2 -translate-y-1/2 left-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-all duration-200',
-                                    isActive && 'translate-x-[20px]',
-                                )} />
-                            </button>
 
                             {locked && (
                                 <div className="absolute -top-[7px] -right-[7px] w-[18px] h-[18px] rounded-full bg-[hsl(var(--card))] border border-white/[0.08] grid place-items-center text-warning">

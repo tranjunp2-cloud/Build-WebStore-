@@ -7,6 +7,7 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 
 interface DiscountDeleteDialogProps {
@@ -60,20 +61,13 @@ export function DiscountDeleteDialog({
 
                 {/* Buttons */}
                 <div className="flex items-center justify-center gap-3 mt-4">
-                    <button
-                        className="rounded-md px-4 py-2 text-sm font-medium transition-colors"
-                        style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)' }}
-                        onClick={onCancel}
-                    >
+                    <Button variant="dashSecondary" onClick={onCancel}>
                         {d.deleteDialog.cancel}
-                    </button>
-                    <button
-                        className="flex items-center gap-1.5 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-destructive"
-                        onClick={onConfirm}
-                    >
+                    </Button>
+                    <Button variant="destructive" onClick={onConfirm}>
                         <Trash2 className="h-3.5 w-3.5" />
                         {d.deleteDialog.confirm}
-                    </button>
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>

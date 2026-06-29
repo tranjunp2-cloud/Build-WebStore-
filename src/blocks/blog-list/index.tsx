@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import type { BlockProps } from '../types'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 import type { BlogListConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
@@ -138,7 +139,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                 {variant === 'list' ? (
                     <div className="max-w-4xl mx-auto flex flex-col gap-10">
                         {posts.map((post) => (
-                            <a href={`${blogBasePath}/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
+                            <SmartLink href={`${blogBasePath}/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
                                 <div className="relative overflow-hidden rounded-xl aspect-[4/3] md:aspect-video bg-black/5 dark:bg-white/5">
                                     <div className="absolute inset-0 bg-black/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                                     {post.image ? (
@@ -161,14 +162,14 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                     </Heading>
                                     <Body className="opacity-60 leading-relaxed">{post.excerpt}</Body>
                                 </div>
-                            </a>
+                            </SmartLink>
                         ))}
                     </div>
                 ) : (
                     <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {posts.map((post) => (
                             <StaggerItem key={post.id}>
-                                <a href={`${blogBasePath}/${post.slug}`} className="block h-full">
+                                <SmartLink href={`${blogBasePath}/${post.slug}`} className="block h-full">
                                     <HoverCard className="group flex flex-col h-full rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500"
                                         style={{
                                             border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
@@ -198,7 +199,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                                 style={{ background: 'var(--brand-primary)' }} />
                                         </div>
                                     </HoverCard>
-                                </a>
+                                </SmartLink>
                             </StaggerItem>
                         ))}
                     </StaggerGrid>

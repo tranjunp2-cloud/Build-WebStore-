@@ -1,26 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT, decodeJwt } from 'jose'
-import { getPayload } from 'payload'
+import { getPayload, type BasePayload } from 'payload'
 import config from '@payload-config'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkRateLimit, RateLimitResult } from '@/lib/rateLimit'
+
+function rateLimited(r: RateLimitResult) {
+    const retryAfter = Math.max(0, Math.ceil((r.resetAt - Date.now()) / 1000))
+    return NextResponse.json(
+        {
+            error: 'rate_limited',
+            message: `Too many sign-in attempts. Please wait ${retryAfter}s and try again.`,
+            retryAfter,
+        },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+    )
+}
+
+// Queries sso_step_events to find first incomplete Web Store step.
+// Step 1 = Pick Template, Step 2 = Setup Shipping, Step 3 = Add Product.
+// Returns /onboarding if 0 steps done, /dashboard if all done.
+// Fail-open: returns /dashboard on any DB error to avoid blocking SSO.
+async function getWebStoreRedirect(payload: BasePayload, userId: number | string): Promise<string> {
+    try {
+        const db = (payload.db as any)?.drizzle
+        if (!db) return '/dashboard'
+        const { sql } = await import('drizzle-orm')
+        // Any row for a step means the user took that action (notification may still be pending/retrying)
+        const result = await db.execute(
+            sql`SELECT DISTINCT step FROM sso_step_events WHERE user_id = ${Number(userId)}`,
+        )
+        const completed = new Set<number>((result.rows ?? [] as { step: number }[]).map((r: { step: number }) => r.step))
+        if (!completed.has(1)) return '/onboarding'
+        if (!completed.has(2)) return '/settings/shipping'
+        if (!completed.has(3)) return '/products/new'
+        return '/dashboard'
+    } catch (err) {
+        console.error('[SSO] getWebStoreRedirect failed for user', userId, err)
+        return '/dashboard'
+    }
+}
 
 export async function POST(req: NextRequest) {
-    // Rate limiting: 10 attempts per minute per IP (mirrors other auth endpoints)
     // x-real-ip is set by Vercel infrastructure (not client-spoofable).
     // XFF rightmost entry is the Vercel-appended real IP; leftmost is client-controlled.
     const ip =
         req.headers.get('x-real-ip')?.trim() ||
         req.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() ||
         'unknown'
-    const rateLimit = await checkRateLimit(`sso-session:${ip}`, 10, 60_000)
-    if (!rateLimit.allowed) {
-        return NextResponse.json(
-            { error: 'rate_limited' },
-            {
-                status: 429,
-                headers: { 'Retry-After': String(Math.max(0, Math.ceil((rateLimit.resetAt - Date.now()) / 1000))) },
-            },
-        )
+
+    // IP-level flood guard. Raised from 10 → SSO_RATE_LIMIT_PER_MIN (default 300) to
+    // support shared-IP scenarios: at events 200 users share one WiFi NAT outbound IP.
+    // Read inside POST (not module scope) so env override takes effect per-request.
+    // parseInt avoids the || 300 falsy trap (Number('0') is falsy → would ignore explicit 0).
+    const _parsed = parseInt(process.env.SSO_RATE_LIMIT_PER_MIN ?? '', 10)
+    const SSO_IP_LIMIT = Number.isFinite(_parsed) && _parsed > 0 ? _parsed : 300
+    const ipRateLimit = await checkRateLimit(`sso-session:${ip}`, SSO_IP_LIMIT, 60_000)
+    if (!ipRateLimit.allowed) {
+        return rateLimited(ipRateLimit)
     }
 
     try {
@@ -38,14 +74,28 @@ export async function POST(req: NextRequest) {
         // Fast-fail: verify JWT collection claim before hitting the DB.
         // Prevents tokens from other auth-enabled collections (e.g. api-clients) from
         // being accepted even if payload.auth() would validate their signature.
-        let jwtClaims: { collection?: unknown }
+        let jwtClaims: { collection?: unknown; id?: unknown }
         try {
-            jwtClaims = decodeJwt(v2Token) as { collection?: unknown }
+            jwtClaims = decodeJwt(v2Token) as { collection?: unknown; id?: unknown }
         } catch {
             return NextResponse.json({ error: 'invalid_token' }, { status: 401 })
         }
         if (jwtClaims.collection !== 'users') {
             return NextResponse.json({ error: 'invalid_token' }, { status: 401 })
+        }
+
+        // Per-user bucket: isolates each user's login rate regardless of shared IP.
+        // Uses unverified id claim — safe as a partition key only; payload.auth() below
+        // is the real validator. claimedId null (missing claim) → skip user bucket silently.
+        const claimedId =
+            typeof jwtClaims.id === 'string' || typeof jwtClaims.id === 'number'
+                ? String(jwtClaims.id)
+                : null
+        if (claimedId) {
+            const userRateLimit = await checkRateLimit(`sso-session:user:${claimedId}`, 10, 60_000)
+            if (!userRateLimit.allowed) {
+                return rateLimited(userRateLimit)
+            }
         }
 
         const secret = process.env.PAYLOAD_SECRET
@@ -109,15 +159,23 @@ export async function POST(req: NextRequest) {
         const tenants = user.tenants as { tenant: { onboardingCompleted?: boolean } | string }[] | undefined
         const hasSeenAiWizard = user.has_seen_ai_wizard as boolean | undefined
         let redirectTo = '/dashboard'
-        if (roles.includes('tenant-owner') && !hasSeenAiWizard) {
-            if (!tenants || tenants.length === 0) {
-                redirectTo = '/onboarding'
-            } else {
-                const firstTenant = tenants[0]?.tenant
-                // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
-                if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+        if (roles.includes('tenant-owner')) {
+            if (!hasSeenAiWizard) {
+                if (!tenants || tenants.length === 0) {
                     redirectTo = '/onboarding'
+                } else {
+                    const firstTenant = tenants[0]?.tenant
+                    // Strict === false: undefined (pre-migration rows, field not yet set) treated as "done"
+                    if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+                        redirectTo = '/onboarding'
+                    } else {
+                        // Onboarding complete — route to first incomplete Web Store step
+                        redirectTo = await getWebStoreRedirect(payload, id)
+                    }
                 }
+            } else {
+                // hasSeenAiWizard=true: wizard bypassed — route to first incomplete Web Store step
+                redirectTo = await getWebStoreRedirect(payload, id)
             }
         }
 

@@ -131,6 +131,8 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
             '@payload-config': path.resolve(__dirname, './src/payload.config.ts'),
             'server-only': path.resolve(__dirname, './src/__tests__/mocks/server-only.ts'),
+            // Stub missing package in test env — LocaleFlag falls back to Globe icon when undefined
+            'country-flag-icons/react/3x2': path.resolve(__dirname, './src/__tests__/helpers/mocks/country-flag-icons-react-3x2.ts'),
         },
     },
 })

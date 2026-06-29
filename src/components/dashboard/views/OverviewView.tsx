@@ -19,6 +19,7 @@ import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+import { isUsableSite } from '@/lib/dashboard/get-tenant-site-state'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -73,10 +74,7 @@ export async function OverviewView({ searchParams }: Props) {
             limit: 5, // 1 site/tenant expected, extra for safety
         })
 
-        const usable = allSites.docs.filter((s) => {
-            const gs = (s as Record<string, unknown>).generationStatus
-            return !gs || gs === 'none' || gs === 'completed'
-        })
+        const usable = allSites.docs.filter(isUsableSite)
 
         if (usable.length === 0) {
             const hasFailed = allSites.docs.some(

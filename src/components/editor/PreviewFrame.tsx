@@ -284,6 +284,9 @@ function PreviewFrameInner({
     }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
+    // GH-1367 Bug 3: keeps the iframe frozen while the inline-edit save flushes in the
+    // background, even though the text toolbar (gated by textEditingData) is already hidden.
+    const [isFlushingEdit, setIsFlushingEdit] = useState(false)
     const [iframeScrollY, setIframeScrollY] = useState(0)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
@@ -361,6 +364,11 @@ function PreviewFrameInner({
     const textEditStopTimerRef = useRef<number | null>(null)
     const currentLiveTextRef = useRef<string | null>(null)
     const pendingInlineEditRef = useRef<InlineEditPayload | null>(null)
+    // GH-1367 Bug 3 (M1): monotonic token per inline-edit session. A background save's
+    // .finally() must only clear shared state if it still owns the current session —
+    // otherwise a save that resolves after the user re-targets another text would clobber
+    // the new session's pending payload / re-enable autosave mid-edit.
+    const editSessionSeqRef = useRef(0)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -587,6 +595,9 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
+                // New session — invalidate any in-flight save's .finally() so it won't clobber
+                // this session's pending payload / autosave suspension (GH-1367 Bug 3 M1).
+                editSessionSeqRef.current += 1
                 // Suspend all auto-saves while inline editing is active.
                 // Also clear any pending timer that carries stale blocks from before this session.
                 setIsInlineEditing(true)
@@ -608,14 +619,25 @@ function PreviewFrameInner({
                     }
                     currentLiveTextRef.current = null
                     applyInlineEditPayload(pendingInlineEditRef.current)
-                    // Save FIRST (blocks already updated by TEXT_EDITED), then resume
-                    // auto-saves and unfreeze iframe so it reloads with the just-saved data.
-                    // Prefer onInlineEditSave (component's handleSave) — it bypasses the
-                    // isSaving guard that can block performSave when a concurrent save is in flight.
+                    // GH-1367 Bug 3: hide the text toolbar IMMEDIATELY (decoupled from save).
+                    // Previously setTextEditingData(null) ran inside .finally(), so the toolbar
+                    // lingered for the full save+reload round-trip (~3s). Now it clears at once
+                    // and the block action toolbar can take over instantly.
+                    setTextEditingData(null)
+                    // Keep the iframe frozen via isFlushingEdit until the save resolves so it
+                    // reloads with the just-saved data (no stale reload / black gap).
+                    setIsFlushingEdit(true)
+                    // Save in the background. Prefer onInlineEditSave (component's handleSave) —
+                    // it bypasses the isSaving guard that can block performSave when a concurrent
+                    // save is in flight.
+                    const flushSession = editSessionSeqRef.current
                     void (onInlineEditSaveRef.current?.() ?? performSave(true)).finally(() => {
+                        // A newer edit session started while this save was in flight — skip cleanup
+                        // so we don't clobber the new session's pending payload / autosave state.
+                        if (editSessionSeqRef.current !== flushSession) return
                         pendingInlineEditRef.current = null
                         setIsInlineEditing(false)
-                        setTextEditingData(null)
+                        setIsFlushingEdit(false)
                     })
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
@@ -647,7 +669,8 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
-                if (['navigation', 'footer', 'breadcrumb'].includes(e.data.blockType)) return
+                // logo-cloud uses LogoImageOverlay for image replacement — suppress generic ImageToolbar
+                if (['navigation', 'footer', 'breadcrumb', 'logo-cloud'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -763,6 +786,10 @@ function PreviewFrameInner({
         setIsEditing(false)
         setIsSubmitting(false)
         setTextEditingData(null)
+        // GH-1367 Bug 3: also release the inline-edit save freeze. A token-guarded save .finally()
+        // may skip clearing it (stale session); reset it here so navigation/key changes can't leave
+        // the preview iframe permanently frozen. Self-heals on the next save's iframeKey bump.
+        setIsFlushingEdit(false)
         setImageClickData(null)
         setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
@@ -934,8 +961,10 @@ function PreviewFrameInner({
                 // Non-destructive: reads current images from Zustand store, only updates the clicked slot.
                 // Pre-fills null slots up to totalImagesInBlock so existing stock placeholders are preserved
                 // as null entries (gallery will show real images where set, otherwise falls back per-slot).
-                // Must use newMediaId (numeric Payload media ID) — normalizeUploadField strips objects
-                // without .id to null before persistence.
+                // Store the populated object { id, url, alt } (mirrors Strategy 7): the gallery render gate
+                // (gallery/index.tsx) only shows a real image when `typeof image === 'object' && image.url`,
+                // so a bare integer would fall back to the stock image until reload. normalizeUploadField
+                // extracts the numeric .id before persistence, so the DB write is unaffected.
                 if (!matched && imageClickData.imageIndex !== undefined && imageClickData.blockType === 'gallery') {
                     const idx = imageClickData.imageIndex
                     const currentBlock = blocks[blockIndex] as Record<string, unknown>
@@ -950,7 +979,12 @@ function PreviewFrameInner({
                     while (currentImages.length < totalSlots) {
                         currentImages.push({ image: null, caption: '' })
                     }
-                    currentImages[idx] = { ...currentImages[idx], image: newMediaId }
+                    // Preserve existing alt text if the slot already held a populated image object
+                    const existingImg = currentImages[idx]?.image
+                    const existingAlt = existingImg && typeof existingImg === 'object'
+                        ? String((existingImg as Record<string, unknown>).alt ?? '')
+                        : ''
+                    currentImages[idx] = { ...currentImages[idx], image: { id: newMediaId, url: newUrl, alt: existingAlt } }
                     updateBlock(blockIndex, { images: currentImages })
                     matched = true
                 }
@@ -1012,7 +1046,10 @@ function PreviewFrameInner({
             onImageReplaced?.()
         } catch (error) {
             console.error('Image replace error:', error)
-            toast.error(t.editor.preview.imageReplaceFailed)
+            // GH-1381 Case 2: surface the specific reason (e.g. "Invalid image file…", "Unauthorized")
+            // instead of a bare generic toast, so the user knows whether it's format/auth/server.
+            const reason = error instanceof Error && error.message ? error.message : ''
+            toast.error(t.editor.preview.imageReplaceFailed, reason ? { description: reason } : undefined)
         } finally {
             setIsImageProcessing(false)
         }
@@ -1204,12 +1241,14 @@ function PreviewFrameInner({
     // If the user is actively editing text, freeze the iframeKey so it doesn't navigate.
     // Once they blur/stop editing, it safely syncs up and reloads the preview.
     const previousIframeKey = useRef(iframeKey)
-    const effectiveIframeKey = (textEditingData || isEditing) ? previousIframeKey.current : iframeKey
+    // isFlushingEdit keeps the freeze alive while the inline-edit save flushes (GH-1367 Bug 3),
+    // even though textEditingData was already cleared to hide the toolbar.
+    const effectiveIframeKey = (textEditingData || isEditing || isFlushingEdit) ? previousIframeKey.current : iframeKey
     useEffect(() => {
-        if (!textEditingData && !isEditing) {
+        if (!textEditingData && !isEditing && !isFlushingEdit) {
             previousIframeKey.current = iframeKey
         }
-    }, [iframeKey, textEditingData, isEditing])
+    }, [iframeKey, textEditingData, isEditing, isFlushingEdit])
 
     const iframeSrc = useMemo(() => {
         const url = new URL(`/preview/${siteId}`, 'http://localhost')

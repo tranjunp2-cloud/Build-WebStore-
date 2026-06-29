@@ -22,7 +22,7 @@ export function SsoAuthorizationClient({ v2Token }: { v2Token?: string }) {
             .then((data) => {
                 if (data?.ok) {
                     // Whitelist-guard: only allow known relative paths to prevent open redirect
-                    const ALLOWED = new Set(['/dashboard', '/onboarding'])
+                    const ALLOWED = new Set(['/dashboard', '/onboarding', '/settings/shipping', '/products/new'])
                     const dest = ALLOWED.has(data.redirectTo) ? data.redirectTo : '/dashboard'
                     window.location.href = dest
                 } else {

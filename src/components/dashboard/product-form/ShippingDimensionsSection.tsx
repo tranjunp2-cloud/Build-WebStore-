@@ -3,8 +3,8 @@
 import { useFormContext } from 'react-hook-form'
 import { ProductFormValues } from './schema'
 import { cn } from '@/lib/utils'
-
 import { useI18n } from '@/i18n'
+import { Input } from '@/components/ui/input'
 
 export function ShippingDimensionsSection() {
     const { register, formState: { errors } } = useFormContext<ProductFormValues>()
@@ -21,14 +21,11 @@ export function ShippingDimensionsSection() {
                         {t.dashboard.products.form.sections?.weight || 'Weight (kg)'}
                     </label>
                     <div className="relative flex items-center">
-                        <input
+                        <Input
                             type="number"
                             step="0.01"
                             {...register('shippingWeight')}
-                            className={cn(
-                                "w-full rounded-2xl border bg-background pl-4 pr-12 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                errors.shippingWeight ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn("pr-12", errors.shippingWeight && "border-destructive focus-visible:border-destructive")}
                         />
                         <span className="absolute right-4 text-[16px] text-foreground/40 pointer-events-none">
                             kg
@@ -43,14 +40,11 @@ export function ShippingDimensionsSection() {
                         {t.dashboard.products.form.sections?.length || 'Length (cm)'}
                     </label>
                     <div className="relative flex items-center">
-                        <input
+                        <Input
                             type="number"
                             step="0.01"
                             {...register('shippingLength')}
-                            className={cn(
-                                "w-full rounded-2xl border bg-background pl-4 pr-12 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                errors.shippingLength ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn("pr-12", errors.shippingLength && "border-destructive focus-visible:border-destructive")}
                         />
                         <span className="absolute right-4 text-[16px] text-foreground/40 pointer-events-none">
                             cm
@@ -65,14 +59,11 @@ export function ShippingDimensionsSection() {
                         {t.dashboard.products.form.sections?.height || 'Height (cm)'}
                     </label>
                     <div className="relative flex items-center">
-                        <input
+                        <Input
                             type="number"
                             step="0.01"
                             {...register('shippingHeight')}
-                            className={cn(
-                                "w-full rounded-2xl border bg-background pl-4 pr-12 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                errors.shippingHeight ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn("pr-12", errors.shippingHeight && "border-destructive focus-visible:border-destructive")}
                         />
                         <span className="absolute right-4 text-[16px] text-foreground/40 pointer-events-none">
                             cm
@@ -87,14 +78,11 @@ export function ShippingDimensionsSection() {
                         {t.dashboard.products.form.sections?.width || 'Width (cm)'}
                     </label>
                     <div className="relative flex items-center">
-                        <input
+                        <Input
                             type="number"
                             step="0.01"
                             {...register('shippingWidth')}
-                            className={cn(
-                                "w-full rounded-2xl border bg-background pl-4 pr-12 py-3 text-[16px] text-foreground focus:ring-1 focus:ring-white outline-none transition-colors",
-                                errors.shippingWidth ? "border-destructive focus:border-destructive" : "border-white/[0.08] focus:border-white"
-                            )}
+                            className={cn("pr-12", errors.shippingWidth && "border-destructive focus-visible:border-destructive")}
                         />
                         <span className="absolute right-4 text-[16px] text-foreground/40 pointer-events-none">
                             cm

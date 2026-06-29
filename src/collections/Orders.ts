@@ -187,6 +187,19 @@ export const Orders: CollectionConfig = {
             ],
         },
         {
+            name: 'locale',
+            type: 'select',
+            options: [
+                { label: 'Bahasa Melayu', value: 'ms' },
+                { label: 'English', value: 'en' },
+            ],
+            defaultValue: 'en',
+            admin: {
+                description: 'Locale snapshot at order creation — used for buyer emails. Do not edit.',
+                readOnly: true,
+            },
+        },
+        {
             name: 'status',
             type: 'select',
             required: true,

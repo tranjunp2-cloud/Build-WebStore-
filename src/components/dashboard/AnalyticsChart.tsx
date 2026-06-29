@@ -70,7 +70,7 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
                 {/* Custom absolute HTML tooltip using DOM manipulation for performance */}
                 <div 
                     ref={tooltipRef}
-                    className="bg-white text-[#0B1120] px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shadow-xl border border-gray-100 absolute z-50 pointer-events-none transition-all duration-75"
+                    className="bg-[hsl(var(--popover))] text-[hsl(var(--popover-foreground))] px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shadow-xl border border-solid border-[hsl(var(--border))] absolute z-50 pointer-events-none transition-all duration-75"
                     style={{
                         display: 'none',
                         transform: 'translate(-50%, calc(-100% - 8px))', // Move up above the bar

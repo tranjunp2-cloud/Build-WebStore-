@@ -9,6 +9,7 @@ import { DropdownLink, DROPDOWN_CHILD_LINK_CLASS } from './nav-dropdown-link'
 import { useI18n } from '@/i18n'
 import { NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 
 // Re-declared inline to avoid coupling to index.tsx internals
 const NAV_SURFACE_BG_SOLID = `color-mix(in srgb, var(--background, #09090b) 97%, transparent)`
@@ -26,7 +27,7 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
 
     if (!hasChildren) {
         return (
-            <a
+            <SmartLink
                 href={resolveHref(link.url)}
                 title={link.label}
                 className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg opacity-70 hover:opacity-100 hover:bg-white/[0.1] transition-all"
@@ -35,7 +36,7 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
                 {link._hiddenFromVisitor && (
                     <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />
                 )}
-            </a>
+            </SmartLink>
         )
     }
 
@@ -48,13 +49,21 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
             {/* button (not div) for keyboard focusability; hover is handled by parent div */}
             <button type="button" title={link.label} className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg opacity-70 hover:opacity-100 hover:bg-white/[0.1] transition-all">
                 <span className="truncate">{link.label}</span>
-                <svg className="h-3 w-3 shrink-0 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3 w-3 shrink-0 -rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
                 {link._hiddenFromVisitor && (
                     <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />
                 )}
             </button>
+            {/* Bridge: fills the 7px gap (panel p-1.5=6px + border 1px) between this row's
+                right edge and the sub-flyout entry. Keeps mouse within a descendant so
+                onMouseLeave on the outer div doesn't fire while crossing the gap. */}
+            <div
+                aria-hidden="true"
+                className="absolute top-0 h-full"
+                style={{ left: '100%', width: 7, pointerEvents: 'auto' }}
+            />
             <AnimatePresence>
                 {subOpen && (
                     <motion.div
@@ -62,15 +71,15 @@ function MoreDropdownItem({ link }: { link: NavLink }) {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 8 }}
                         transition={{ duration: 0.12 }}
-                        // left-full: opens RIGHT of the More dropdown per issue #1237.
-                        // No margin gap — gap creates a dead zone where mouseleave fires prematurely.
-                        className={`absolute left-full top-0 ${NAV_Z_CLASS.dropdown} min-w-[160px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg`}
-                        style={{ background: NAV_SURFACE_BG_SOLID, border: NAV_SURFACE_BORDER }}
+                        // Offset by panel p-1.5 (6px) + border (1px) = 7px so the sub-flyout
+                        // opens flush with the panel's outer right edge — arrow no longer overlaps.
+                        className={`absolute top-0 ${NAV_Z_CLASS.dropdown} min-w-[160px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg`}
+                        style={{ left: 'calc(100% + 7px)', background: NAV_SURFACE_BG_SOLID, border: NAV_SURFACE_BORDER }}
                     >
                         {link.children!.map((child, ci) => (
-                            <a key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
+                            <SmartLink key={ci} href={resolveHref(child.url)} className={DROPDOWN_CHILD_LINK_CLASS}>
                                 {child.label}
-                            </a>
+                            </SmartLink>
                         ))}
                     </motion.div>
                 )}

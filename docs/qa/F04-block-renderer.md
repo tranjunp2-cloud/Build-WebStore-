@@ -145,3 +145,30 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 | **7. E2E UAT Approval** | [ ] Not Run | Full AI-gen → render → preview → publish flow hoạt động end-to-end. |
 
 > **Khuyến Nghị Release:** Block Renderer Engine là hệ thống lõi — mọi trang web đều phụ thuộc vào nó. Yêu cầu **100% Blocker TCs pass** + **Lighthouse > 90** + **Zero XSS** trước khi release. Khuyến nghị chạy automated regression suite (12 TCs đánh dấu AUTO) mỗi PR merge.
+
+---
+
+## 6. GH-1367 Editor Toolbar & Text Selection (TC-EDIT-01..09)
+
+**Scope:** Editor UI regression tests for Bug 1 (text-hit detection guard) + Bug 2 (light/dark theme toolbar). Mapped to Block Renderer feature family (F04 blocks are edited via this toolbar).
+
+| TC-ID | Bug | Layer | Test File | Assertion |
+|:---|:---|:---|:---|:---|
+| **TC-EDIT-01** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Background/padding click → NO `TEXT_EDITING_STARTED` message |
+| **TC-EDIT-02** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Heading text click → `TEXT_EDITING_STARTED` posted |
+| **TC-EDIT-03** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Padding wrapper around heading → NO text-edit toolbar |
+| **TC-EDIT-04** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Empty Logo Cloud block click → NO `TEXT_EDITING_STARTED` |
+| **TC-EDIT-05** | Bug 1 | Unit (jsdom) | `src/__tests__/unit/editor/preview-scripts.test.tsx` | Newsletter: bg click (no edit) vs headline click (edit started) |
+| **TC-EDIT-06** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Toolbar uses a consistent dark pill `bg-[#334155]/98` (both themes) + `.block-action-toolbar` opt-out marker |
+| **TC-EDIT-07** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Single dark-pill surface drives both modes; icon base classes preserved (amber-300 AI, red-400 delete) |
+| **TC-EDIT-08** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Action buttons include `hover:bg-white/10` class (hover state) |
+| **TC-EDIT-09** | Bug 2 | Unit (RTL) | `src/__tests__/unit/editor/block-action-bar.test.tsx` | Drag grip button present & `onDragStart` fires on pointerDown |
+
+**Root Causes & Fixes:**
+- **Bug 1 (GH-1367)**: `PreviewScripts.tsx` added `clickLandedOnTextNode(x,y)` guard (lines 315–331) — uses `document.caretRangeFromPoint` (Chrome) or `caretPositionFromPoint` (Firefox) to detect text node vs element node. Background/padding clicks return false; text hits return true.
+- **Bug 2 (GH-1367)**: `BlockActionBar.tsx` uses a single dark pill (`bg-[#334155]/98` + `border-white/30` + light 1px ring + drop shadow) in BOTH editor themes so it stays identifiable floating over any website content (white or dark). Icons stay light (`text-slate-300/400`, `amber-300`, `red-400`). In light mode the editor-shell remap would darken those, so scoped `.block-action-toolbar` rules in `globals.css` re-assert the dark-theme values (slate `#94a3b8`, AI `#fcd34d`, delete `#f87171`, white-tint dividers/hover) so light renders identically to dark.
+
+**Test Coverage Strategy:**
+- TC-EDIT-01..05: Mock `caretRangeFromPoint` per test case to simulate text vs background hits. Assert postMessage type.
+- TC-EDIT-06..09: Render real `BlockActionBar` component; query className strings + simulate pointerDown on grip button.
+- All tests: No fake data, import real components, follow AAA pattern.

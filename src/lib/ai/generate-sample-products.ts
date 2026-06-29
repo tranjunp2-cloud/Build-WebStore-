@@ -24,6 +24,8 @@ export interface SampleProduct {
     description: string
     descriptionBM?: string
     price: number
+    sku: string
+    inventory: number
     imageId?: number // Payload Media ID — undefined if image fetch failed
     galleryUrl?: string // Tier-C CDN URL used; carried to route.ts for FK-violation re-upload
     status: 'active'
@@ -112,6 +114,8 @@ Use MYR pricing. No markdown. JSON only.`
         price: typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0,
         imageId: undefined,
         status: 'active' as const,
+        sku: '',       // overridden in withImages.push
+        inventory: 0,  // overridden in withImages.push
         _imageKeyword: String(p.imageKeyword ?? ''),
     }))
 }
@@ -133,6 +137,8 @@ function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProdu
         price: t.price,
         imageId: undefined,
         status: 'active' as const,
+        sku: '',       // overridden in withImages.push
+        inventory: 0,  // overridden in withImages.push
         _imageKeyword: t.imageKeyword,
     }))
 }
@@ -330,6 +336,10 @@ export async function generateSampleProducts(
     // Seed-shuffle the fixed industry pool (6 items) so each product gets a distinct URL
     const productImagePool = getProductImages(category)
     const productUrls = seededShuffle(productImagePool, hashString(siteKey))
+
+    // Derive SKU prefix from composer category (first 3 chars, uppercase)
+    const skuPrefix = category.substring(0, 3).toUpperCase()
+
     const withImages: SampleProduct[] = []
     const stats: ProductImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
     // Set to true after first 429 — no point searching for remaining products this gen
@@ -356,7 +366,13 @@ export async function generateSampleProducts(
         const reasonStr = reason ? ` reason=${reason}` : ''
         console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
         const { _imageKeyword: _, ...product } = p
-        withImages.push({ ...product, imageId, galleryUrl: productUrls[i % productUrls.length] })
+        withImages.push({
+            ...product,
+            imageId,
+            galleryUrl: productUrls[i % productUrls.length],
+            sku: `${skuPrefix}-${String(i + 1).padStart(3, '0')}`,
+            inventory: 0,
+        })
     }
 
     return { products: withImages, stats }

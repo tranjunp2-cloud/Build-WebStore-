@@ -30,9 +30,6 @@ type Props = {
     staffProps?: StaffTabProps
 }
 
-const TRIGGER_CLASS =
-    'dash-tab-trigger flex items-center gap-2 px-4 pb-2.5 rounded-none text-sm font-medium transition-colors -mb-px cursor-pointer ' +
-    'text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] data-[state=active]:text-[var(--dash-text)]'
 
 export function TeamAccountTabs({ initialUser, staffProps }: Props) {
     const { t } = useI18n()
@@ -49,13 +46,13 @@ export function TeamAccountTabs({ initialUser, staffProps }: Props) {
                 <h1 className="text-[24px] font-bold text-[var(--dash-text)] mb-1">{t.profile.teamTabs.pageTitle}</h1>
                 <p className="text-sm text-[var(--dash-text-muted)]">{t.profile.teamTabs.pageSubtitle}</p>
             </div>
-            <TabsList className="flex w-full justify-start h-auto gap-0 rounded-none border-0 bg-transparent p-0" style={{ borderBottom: '1px solid var(--dash-divider)' }}>
-                <TabsTrigger value="profile" className={TRIGGER_CLASS}>
+            <TabsList variant="underline">
+                <TabsTrigger value="profile" variant="underline">
                     <User className="h-4 w-4" />
                     {t.profile.teamTabs.profile}
                 </TabsTrigger>
                 {/* e2e TC-F19.29 locates this tab by its EN name "Staff" — keep the en.json value stable */}
-                <TabsTrigger value="staff" className={TRIGGER_CLASS}>
+                <TabsTrigger value="staff" variant="underline">
                     <Users className="h-4 w-4" />
                     {t.profile.teamTabs.staff}
                 </TabsTrigger>

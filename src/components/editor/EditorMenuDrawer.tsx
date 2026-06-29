@@ -145,7 +145,7 @@ export function EditorMenuDrawer({
                     // Identical sizing to the dashboard sidebar renderLeaf (1:1 parity)
                     'no-underline flex items-center gap-3 px-4 rounded-[12px] h-[32px] 2xl:h-[34px] text-[13px] font-medium leading-[1.43] transition-colors',
                     isActive
-                        ? 'bg-[hsl(var(--info)/0.12)] text-[hsl(var(--info))] shadow-[0_0_16px_hsl(var(--info)/0.25)]'
+                        ? 'bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))] shadow-[0_0_16px_hsl(var(--primary)/0.25)]'
                         : 'text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text',
                 )}
                 aria-current={isActive ? 'page' : undefined}
@@ -156,7 +156,7 @@ export function EditorMenuDrawer({
                     <span className={cn(
                         'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none',
                         isActive
-                            ? 'bg-[hsl(var(--info)/0.15)] text-[hsl(var(--info))]'
+                            ? 'bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]'
                             : 'bg-dash-surface-hover text-dash-text-muted'
                     )}>
                         {formatBadgeCount(count)}
@@ -172,8 +172,9 @@ export function EditorMenuDrawer({
         <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
-            <aside className="absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
-                <div className="flex h-[65px] items-center justify-between border-b border-dash-border px-4">
+            {/* `dark`: sidebar editor luôn dark bất kể theme app (light/dark) — yêu cầu cố định. */}
+            <aside className="dark sb-dark absolute left-0 top-0 flex h-full w-[250px] flex-col border-r border-dash-border bg-[var(--dash-sidebar-bg)] shadow-2xl">
+                <div className="flex h-[65px] items-center justify-between px-4">
                     {/* Logo — matches the dashboard header (TopHeader): real logo image + Prime/Web split */}
                     <div className="flex items-center gap-2">
                         <Image
@@ -181,11 +182,11 @@ export function EditorMenuDrawer({
                             alt="PrimeWeb Logo"
                             width={28}
                             height={28}
-                            className="object-contain drop-shadow-[0px_0px_12px_hsl(var(--info)/0.6)]"
+                            className="object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                         />
                         <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
                             <span className="text-dash-text">Prime</span>
-                            <span className="text-[hsl(var(--info))]">Web</span>
+                            <span className="text-[#06B6D4]">Web</span>
                         </div>
                     </div>
                     <button
@@ -219,7 +220,7 @@ export function EditorMenuDrawer({
                             onClick={guardedNavigate('/settings/profile')}
                             className="flex h-[42px] min-w-0 flex-1 items-center gap-3 rounded-[16px] border border-dash-border pl-4 pr-px py-px transition-colors hover:bg-dash-surface-hover"
                         >
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_hsl(var(--info)/0.3)]">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-dash-surface-hover shadow-[0_0_0_2px_hsl(var(--primary)/0.3)]">
                                 {userAvatarUrl
                                     ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="h-full w-full object-cover" />
                                     : <span className="text-[12px] font-bold text-dash-text">{userInitial || '?'}</span>

@@ -94,3 +94,110 @@ export function getCachedPage(siteId: string, slug: string) {
         { revalidate: CACHE_TTL, tags: [`site-${siteId}`] }
     )()
 }
+
+// ── Visitor-path storefront cache (anonymous, published-only) ────────────────
+// These mirror the EXACT filters the storefront page applies for non-owner
+// visitors. They MUST NOT be used for the owner preview path (owners see drafts
+// + hidden pages). Invalidated by `site-${siteId}` — fired on publish/unpublish
+// (publish API) and on any site/page write (collection afterChange hooks).
+
+/**
+ * Cached site lookup by tenant id (visitor render entry point).
+ * Default depth mirrors the original `payload.find({ collection:'sites' })`
+ * call (no explicit depth) so SiteRenderer receives the same shape.
+ * Tag: `tenants` — site afterChange revalidates both `site-${id}` and `tenants`.
+ */
+export function getCachedSiteByTenant(tenantId: string) {
+    return unstable_cache(
+        async () => {
+            const payload = await getPayload({ config })
+            const result = await payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: tenantId } },
+                limit: 1,
+            })
+            return result.docs[0] ?? null
+        },
+        [`site-by-tenant-${tenantId}`],
+        { revalidate: CACHE_TTL, tags: ['tenants', `site-by-tenant-${tenantId}`] }
+    )()
+}
+
+/**
+ * Cached current page for a visitor (published + visible + not soft-deleted).
+ * Mirrors page.tsx visitor branch: isVisible≠false, deletedAt absent, depth 3,
+ * published (no draft). `pageSlug` is the leading-slash form ('/', '/about').
+ */
+export function getCachedVisitorPage(siteId: string, pageSlug: string) {
+    return unstable_cache(
+        async () => {
+            const payload = await getPayload({ config })
+            const result = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: siteId } },
+                        { slug: { equals: pageSlug } },
+                        { isVisible: { not_equals: false } },
+                        { deletedAt: { exists: false } },
+                    ],
+                },
+                limit: 1,
+                depth: 3,
+            })
+            return result.docs[0] ?? null
+        },
+        [`visitor-page-${siteId}-${pageSlug}`],
+        { revalidate: CACHE_TTL, tags: [`site-${siteId}`] }
+    )()
+}
+
+/**
+ * Cached homepage fallback for a visitor (legacy sites whose home slug isn't '/').
+ * Mirrors page.tsx isHomepage fallback for the non-owner branch.
+ */
+export function getCachedVisitorHomepage(siteId: string) {
+    return unstable_cache(
+        async () => {
+            const payload = await getPayload({ config })
+            const result = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: siteId } },
+                        { isHomepage: { equals: true } },
+                        { isVisible: { not_equals: false } },
+                        { deletedAt: { exists: false } },
+                    ],
+                },
+                limit: 1,
+                depth: 3,
+            })
+            return result.docs[0] ?? null
+        },
+        [`visitor-homepage-${siteId}`],
+        { revalidate: CACHE_TTL, tags: [`site-${siteId}`] }
+    )()
+}
+
+/**
+ * Cached full page list for nav building (ALL pages incl. hidden/deleted — the
+ * SiteRenderer derives hiddenSlugs client-side and filters nav there, so this
+ * intentionally passes everything, mirroring page.tsx `navigationPages`).
+ */
+export function getCachedNavigationPages(siteId: string) {
+    return unstable_cache(
+        async () => {
+            const payload = await getPayload({ config })
+            const result = await payload.find({
+                collection: 'pages',
+                where: { and: [{ site: { equals: siteId } }] },
+                limit: 100,
+                sort: 'createdAt',
+            })
+            return result.docs
+        },
+        [`nav-pages-${siteId}`],
+        { revalidate: CACHE_TTL, tags: [`site-${siteId}`] }
+    )()
+}

@@ -4,7 +4,27 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useUploadProgress } from '@/hooks/use-upload-progress'
+
+function checkFaviconDimensions(file: File): Promise<'ok' | 'tooSmall' | 'tooBig' | 'notSquare'> {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file)
+        const img = new Image()
+        img.onload = () => {
+            URL.revokeObjectURL(url)
+            const { width, height } = img
+            if (width < 16 || height < 16) return resolve('tooSmall')
+            if (width > 512 || height > 512) return resolve('tooBig')
+            if (width !== height) return resolve('notSquare')
+            resolve('ok')
+        }
+        img.onerror = () => {
+            URL.revokeObjectURL(url)
+            resolve('ok') // Cannot determine — let server handle
+        }
+        img.src = url
+    })
+}
 
 interface FaviconEditorProps {
     currentFavicon?: string | null
@@ -16,7 +36,7 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
     const fe = t.editor.faviconEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
-    const [isUploading, setIsUploading] = useState(false)
+    const { upload, progress, isUploading } = useUploadProgress()
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
     useEffect(() => {
@@ -26,32 +46,54 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
     }, [])
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isUploading) return
         const file = e.target.files?.[0]
         if (!file) return
 
-        // Validate format — SVG excluded: no magic bytes → server rejects it.
+        // Format validation — SVG excluded (XSS risk without server-side sanitize).
         // image/vnd.microsoft.icon is the IANA standard; image/x-icon is legacy — both used across browsers/OS.
-        const allowed = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png']
+        const allowed = ['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/jpeg', 'image/webp']
         if (!allowed.includes(file.type)) {
             toast.error(fe.invalidFormat)
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
         }
 
-        // Validate size ≤ 100KB
-        if (file.size > 100 * 1024) {
+        // Size validation — hard 500KB, soft 100KB warning
+        if (file.size > 500 * 1024) {
             toast.error(fe.tooLarge)
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
         }
+        if (file.size > 100 * 1024) {
+            toast.warning(fe.tooLargeWarning)
+        }
 
-        setIsUploading(true)
+        // Dimension validation — skip ICO (multi-resolution by nature, Image API unreliable)
+        const isIco = file.type === 'image/x-icon' || file.type === 'image/vnd.microsoft.icon'
+        if (!isIco) {
+            const dimResult = await checkFaviconDimensions(file)
+            if (dimResult === 'tooSmall') {
+                toast.error(fe.tooSmall)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                return
+            }
+            if (dimResult === 'tooBig') {
+                toast.error(fe.tooBig)
+                if (fileInputRef.current) fileInputRef.current.value = ''
+                return
+            }
+            if (dimResult === 'notSquare') {
+                toast.warning(fe.notSquare)
+            }
+        }
+
         try {
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', fe.altFavicon)
 
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await upload(formData)
             const faviconUrl = uploaded?.url
             if (!faviconUrl) throw new Error('Upload succeeded but returned no URL')
 
@@ -67,7 +109,6 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
             console.error('Favicon upload error:', error)
             toast.error(fe.error)
         } finally {
-            setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
@@ -89,7 +130,8 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
                 type="file"
                 className="hidden"
                 ref={fileInputRef}
-                accept=".ico,.png"
+                disabled={isUploading}
+                accept=".ico,.png,.jpg,.jpeg,.webp"
                 onChange={handleFileSelect}
             />
 
@@ -135,8 +177,16 @@ export function FaviconEditor({ currentFavicon, onFaviconChange }: FaviconEditor
                         )}
                     </div>
                     <span className="text-xs font-medium leading-4 text-[var(--editor-text-muted)]">
-                        {isUploading ? fe.uploading : fe.clickToUpload}
+                        {isUploading ? `${fe.uploading} ${progress}%` : fe.clickToUpload}
                     </span>
+                    {isUploading && (
+                        <div className="w-full h-0.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-blue-500/70 transition-all duration-150"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    )}
                 </button>
             )}
         </div>

@@ -2,9 +2,26 @@
  * JSON-LD Structured Data generators for SEO.
  * Auto-detected and injected by SiteRenderer based on blocks present.
  *
- * SECURITY: All output uses JSON.stringify() — safe against XSS.
- * Never use dangerouslySetInnerHTML with raw template literals for schema content.
+ * SECURITY: when embedding schema in a <script type="application/ld+json">, you
+ * MUST serialize with `serializeJsonLd()` (below) — plain JSON.stringify does
+ * NOT escape `</script>`, so tenant-controlled strings could break out and run
+ * arbitrary JS (stored XSS). Never inject raw template literals either.
  */
+
+/**
+ * Serialize a JSON-LD object for safe embedding inside a
+ * `<script type="application/ld+json">` via dangerouslySetInnerHTML.
+ * Escapes `<` `>` `&` and U+2028/U+2029 so a `</script>` (or line separator) in
+ * any tenant string can't terminate the script element early.
+ */
+export function serializeJsonLd(data: unknown): string {
+    return JSON.stringify(data)
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029')
+}
 
 type BlockData = { blockType: string; [key: string]: unknown }
 

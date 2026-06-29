@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -16,11 +15,14 @@ import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/desig
 import { useScrollShrink } from './use-scroll-shrink'
 import { useLocalHref } from '@/lib/hooks/use-local-href'
 import { useNavOverflow } from './use-nav-overflow'
+import { SmartLink } from '@/blocks/_shared/smart-link'
 import { NavDesktopLinks, MoreDropdown } from './nav-desktop-links'
 import { DropdownLink } from './nav-dropdown-link'
 import { NavLangSwitcherPlaceholder } from './language-switcher-placeholder'
 import { NavOrderSearch } from './NavOrderSearch'
 import { useI18n } from '@/i18n'
+
+const MotionSmartLink = motion.create(SmartLink)
 
 // Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
 // h-16 stays because nav row height is a layout invariant, not section padding.
@@ -92,9 +94,9 @@ function NavLogoLink({
     const resolveHref = useLocalHref()
     const injectedHref = block?._logoHref as string | undefined
     return (
-        <Link href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
+        <SmartLink href={resolveHref(injectedHref || '/')} className={className} onClick={onClick}>
             {children}
-        </Link>
+        </SmartLink>
     )
 }
 
@@ -117,7 +119,7 @@ function MobileNavItem({
 
     return (
         <div>
-            <a
+            <SmartLink
                 href={resolveHref(link?.url)}
                 title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
@@ -125,7 +127,7 @@ function MobileNavItem({
             >
                 <span className="truncate">{link.label}</span>
                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-            </a>
+            </SmartLink>
             {hasChildren && (
                 <div className="ml-4 flex flex-col gap-0.5">
                     {link.children!.map((child, index) => (
@@ -156,7 +158,7 @@ function SidebarNavItem({
 
     return (
         <div>
-            <a
+            <SmartLink
                 href={resolveHref(link?.url)}
                 title={link.label}
                 className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
@@ -164,7 +166,7 @@ function SidebarNavItem({
             >
                 <span className="truncate">{link.label}</span>
                 {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
-            </a>
+            </SmartLink>
             {hasChildren && (
                 <div className="ml-4 border-l border-white/10 pl-2">
                     {link.children!.map((child, index) => (
@@ -218,7 +220,7 @@ function NavCTAButton({
     const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
         <BrokenLinkWarning url={rawHref}>
-            <motion.a
+            <MotionSmartLink
                 href={href}
                 {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 whileHover={{ scale: 1.04, y: -1 }}
@@ -228,7 +230,7 @@ function NavCTAButton({
                 onClick={onClick}
             >
                 {label}
-            </motion.a>
+            </MotionSmartLink>
         </BrokenLinkWarning>
     )
 }
@@ -241,7 +243,7 @@ function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: st
     const href = resolveHref(rawUrl)
     const isExternal = rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
     return (
-        <a
+        <SmartLink
             href={href}
             {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
@@ -249,7 +251,7 @@ function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: st
             onClick={onClick}
         >
             {label}
-        </a>
+        </SmartLink>
     )
 }
 
@@ -353,29 +355,30 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     const showOrderSearch = Boolean((block as Record<string, unknown>)._hasCart && slug)
     const trackOrderLabel = t.storefront.orderLookup.navLabel
 
+    // GH-1279: CTA button is default-variant only — suppress on all other variants.
     // ── Transparent variant ───────────────────────────────────────────────
     if (variant === 'transparent') {
-        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Sidebar variant ───────────────────────────────────────────────────
     if (variant === 'sidebar') {
-        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} trackOrderLabel={trackOrderLabel} />
+        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} trackOrderLabel={trackOrderLabel} />
     }
 
     // ── Floating (pill) variant ───────────────────────────────────────────
     if (variant === 'floating') {
-        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Centered variant ────────────────────────────────────────────────
     if (variant === 'centered') {
-        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Mega variant ─────────────────────────────────────────────────────
     if (variant === 'mega') {
-        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
+        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={undefined} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Default: 'default' (was 'simple') ────────────────────────────────
@@ -401,7 +404,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300 shrink-0`}
@@ -483,7 +486,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading shrink-0">
                         <NavLogo
                             logo={mergedBlock.logo}
@@ -494,10 +497,10 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrd
                     </motion.div>
                 </NavLogoLink>
 
-                {/* Desktop Links */}
+                {/* Desktop Links — flex-1 justify-center prevents logo overlap vs absolute approach */}
                 <NavDesktopLinks
                     links={links}
-                    className="hidden md:flex gap-1 absolute left-1/2 -translate-x-1/2 w-[60%]"
+                    className="hidden md:flex gap-1 flex-1 justify-center"
                 />
 
                 {/* CTA + Language Switcher + Mobile */}
@@ -687,7 +690,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                     </div>
                                 )}
                                 {ctaButton?.show && (
-                                    <a
+                                    <SmartLink
                                         href={resolveHref(ctaButton.url || '#')}
                                         {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
@@ -695,7 +698,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSe
                                         onClick={() => setIsOpen(false)}
                                     >
                                         {ctaButton.label}
-                                    </a>
+                                    </SmartLink>
                                 )}
                             </div>
                         </motion.div>
@@ -949,7 +952,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
-                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer">
+                <NavLogoLink block={mergedBlock as Record<string, unknown>} className="cursor-pointer shrink-0">
                     <motion.div
                         whileHover={{ scale: 1.02 }}
                         className="font-bold text-xl font-heading flex items-center gap-2 shrink-0"
@@ -1000,14 +1003,14 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                 </button>
                             </div>
                         ) : (
-                            <motion.a
+                            <MotionSmartLink
                                 key={i}
                                 href={resolveHref(link?.url)}
                                 whileHover={{ y: -1 }}
                                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] shrink-0"
                             >
                                 {link.label}
-                            </motion.a>
+                            </MotionSmartLink>
                         )
                     ))}
                     {megaOverflowLinks.length > 0 && <MoreDropdown links={megaOverflowLinks} />}
@@ -1059,13 +1062,13 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderS
                                 {getSubLinks(links[hoveredIndex]).map((col, ci) => (
                                     <div key={ci} className="flex flex-col gap-2">
                                         {col.map((subLink, si) => (
-                                            <a
+                                            <SmartLink
                                                 key={si}
                                                 href={resolveHref(subLink?.url)}
                                                 className="block px-3 py-2.5 rounded-lg text-sm opacity-60 hover:opacity-100 hover:bg-white/[0.04] transition-all duration-200"
                                             >
                                                 {subLink.label}
-                                            </a>
+                                            </SmartLink>
                                         ))}
                                     </div>
                                 ))}
@@ -1135,14 +1138,14 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                 <div className="flex items-center gap-2">
                     {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
-                        <a
+                        <SmartLink
                             href={resolveHref(ctaButton.url || '#')}
                             {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                             className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
                             {ctaButton.label}
-                        </a>
+                        </SmartLink>
                     )}
                     {mergedBlock.showLanguageSwitcher && (
                         <NavLangSwitcherPlaceholder className="hidden md:flex" />
@@ -1186,7 +1189,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                                 <NavLangSwitcherPlaceholder className="flex px-4 py-2" />
                             )}
                             {ctaButton?.show && (
-                                <a
+                                <SmartLink
                                     href={resolveHref(ctaButton.url || '#')}
                                     {...(ctaIsExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                                     className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
@@ -1194,7 +1197,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearc
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {ctaButton.label}
-                                </a>
+                                </SmartLink>
                             )}
                         </div>
                     </motion.div>

@@ -47,7 +47,7 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
     ], [c])
 
     return (
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TableSearch
                 value={search}
                 onSearch={(q) => { setSearch(q); onSearch(q) }}

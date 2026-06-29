@@ -69,9 +69,7 @@ export default function GuidelinePage() {
                 className={[
                   'group relative flex flex-row items-start gap-[12px] p-[20px]',
                   'bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] rounded-[8px]',
-                  'shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]',
-                  'transition-all duration-200',
-                  'hover:-translate-y-0.5 hover:border-slate-600 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.6)]',
+                  'transition-colors duration-200',
                 ].join(' ')}
               >
                 {/* Affordance: arrow hints the card is a link to the feature */}

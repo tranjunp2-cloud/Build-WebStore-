@@ -197,6 +197,21 @@ Vet can toan bo AC cua F17 theo 5 ky thuat Comprehensive QA: Bao mat (RBAC, XSS 
 
 ---
 
+### GH-1384: Storefront Rich-Text (Prose) Readability in Dark Mode
+
+#### Regression Test Suite — Prose Theme CSS Variables
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F17-PROSE-01** | `[Unit]` | All prose text vars bind to var(--text) | 1. Doc `proseThemeVars` constant.<br>2. Verify --tw-prose-{body,headings,lead,bold,counters,bullets,quotes,captions,code}. | - Tat ca 9 text-bearing vars ung dung `var(--text)`.<br>- NO hardcoded hex / gray values.<br>- CSS Custom Properties dung trang theo theme tokens. | High | [x] |
+| **TC-F17-PROSE-02** | `[Unit]` | Link color bound to var(--brand-primary) | 1. Doc `proseThemeVars`.<br>2. Verify --tw-prose-links. | - `--tw-prose-links === 'var(--brand-primary)'`.<br>- Links theo theme brand, khong gray. | High | [x] |
+| **TC-F17-PROSE-03** | `[Unit]` | Border/rule colors use color-mix with var(--text) | 1. Doc `proseThemeVars`.<br>2. Verify --tw-prose-{hr,quote-borders,td-borders,th-borders}. | - Tat ca 4 border vars dung `color-mix(in srgb, var(--text) NN%, transparent)`.<br>- Translucent tints co the doc tren bat ky background.<br>- NO hardcoded grays / hex. | High | [x] |
+| **TC-F17-PROSE-04** | `[Unit]` | NO hardcoded color literals (hex/rgb) | 1. Scan tat ca 14 var values trong proseThemeVars.<br>2. Grep #[0-9a-f]{3,6} va rgb() outside color-mix. | - 0 hardcoded hex codes (#...) tim thay.<br>- 0 bare rgb(...) xuat hien ngoai color-mix().<br>- EVERY value references var(--...) hoac color-mix. | Blocker | [x] |
+| **TC-F17-PROSE-05** | `[Unit]` | proseThemeVars typed as CSSProperties | 1. Import proseThemeVars.<br>2. Verify type is CSSProperties (React). | - Object typed correctly, khong loi TypeScript.<br>- Toan bo properties / values hop le cho inline style. | High | [x] |
+| **TC-F17-PROSE-06** | `[Unit]` | Border opacity values readable | 1. Doc color-mix opacity % trong border vars. | - HR: 20% opacity (subtle divider).<br>- Quote borders: 30% opacity (more visible).<br>- Table borders: 20-30% opacity range.<br>- Readable on BOTH light + dark bg via `var(--text)`. | High | [x] |
+
+---
+
 ### RBAC & Bao Mat He Thong (BR-01)
 
 | ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |

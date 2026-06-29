@@ -8,6 +8,8 @@ import { TopHeader } from '@/components/dashboard/TopHeader'
 import { Toaster } from '@/components/ui/sonner'
 import { TenantAccessWatcher } from '@/components/dashboard/TenantAccessWatcher'
 import { UserAvatarProvider } from '@/providers/UserAvatarContext'
+import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { shouldShowNoWebsiteGuard } from './dashboard-guard-paths'
 
 type CMSLayoutClientProps = {
     userName: string
@@ -21,10 +23,12 @@ type CMSLayoutClientProps = {
     isProduction?: boolean
     /** Dynamic sidebar badge counts (F18 #1138), tenant-scoped, computed in layout.tsx. */
     badgeCounts?: Partial<Record<SidebarBadgeKey, number>>
+    /** Whether current tenant has a usable website (GH-1392). Default true → fail-open. */
+    hasWebsite?: boolean
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', userPermissions = [], isSuperAdmin = false, isProduction = false, badgeCounts, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', userPermissions = [], isSuperAdmin = false, isProduction = false, badgeCounts, hasWebsite = true, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     // Collapse state lifted here so TopHeader (« button), Sidebar (mini mode) and <main>
     // (padding) react together. Init false on SSR; localStorage is read post-mount and
@@ -33,6 +37,10 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
     const [collapsed, setCollapsed] = useState(false)
     const [hydrated, setHydrated] = useState(false)
     const pathname = usePathname()
+    // GH-1392: when the tenant has no usable website, replace guarded page content
+    // with the no-website empty state (sidebar/header stay so the user can still
+    // navigate to excluded pages and the create-site CTA).
+    const showNoWebsiteGuard = shouldShowNoWebsiteGuard(pathname, hasWebsite)
 
     useEffect(() => {
         try {
@@ -95,7 +103,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                         )}
                     >
                         <div className="p-4 sm:p-6 md:p-8">
-                            {children}
+                            {showNoWebsiteGuard ? <DashboardEmptyState /> : children}
                         </div>
                     </main>
                 </div>

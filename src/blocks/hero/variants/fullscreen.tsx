@@ -2,6 +2,9 @@
 
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
+import { SmartLink } from '@/blocks/_shared/smart-link'
+
+const MotionSmartLink = motion.create(SmartLink)
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob } from '../../shared/decorative'
@@ -32,7 +35,7 @@ export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
                 {ctaButtons.length > 0 && (
                     <div className="flex flex-wrap gap-4 justify-center">
                         {ctaButtons.map((btn, i) => (
-                            <motion.a key={i} href={resolveHref(btn?.url)}
+                            <MotionSmartLink key={i} href={resolveHref(btn?.url)}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.98 }}
                                 className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
@@ -41,7 +44,7 @@ export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
                                     : { background: 'var(--brand-primary)', color: '#fff', boxShadow: `0 4px 20px rgba(var(--brand-primary-rgb), 0.188)` }}
                             >
                                 <RichText text={btn.label} as="span" />
-                            </motion.a>
+                            </MotionSmartLink>
                         ))}
                     </div>
                 )}

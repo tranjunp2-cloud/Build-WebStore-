@@ -175,11 +175,18 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Borang pendaftaran", "Jadual kelas", "Galeri kursus..."]
+                        "items": [
+                            "Borang pendaftaran",
+                            "Jadual kelas",
+                            "Galeri kursus..."
+                        ]
                     },
                     "block2": {
                         "title": "Borang Hubungi",
-                        "items": ["Tajuk, Mesej", "Hantar e-mel perundingan"]
+                        "items": [
+                            "Tajuk, Mesej",
+                            "Hantar e-mel perundingan"
+                        ]
                     }
                 },
                 "training": {
@@ -193,11 +200,18 @@
                     ],
                     "block1": {
                         "title": "Blok Kursus",
-                        "items": ["Senarai kursus", "Jadual kelas", "Pengajar..."]
+                        "items": [
+                            "Senarai kursus",
+                            "Jadual kelas",
+                            "Pengajar..."
+                        ]
                     },
                     "block2": {
                         "title": "Pendaftaran & Pembayaran",
-                        "items": ["Borang pendaftaran", "Jadual pembayaran"]
+                        "items": [
+                            "Borang pendaftaran",
+                            "Jadual pembayaran"
+                        ]
                     }
                 },
                 "retail": {
@@ -211,11 +225,18 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Produk", "Troli", "Penapis..."]
+                        "items": [
+                            "Produk",
+                            "Troli",
+                            "Penapis..."
+                        ]
                     },
                     "block2": {
                         "title": "Daftar Keluar",
-                        "items": ["Maklumat penghantaran", "Pembayaran"]
+                        "items": [
+                            "Maklumat penghantaran",
+                            "Pembayaran"
+                        ]
                     }
                 },
                 "fnb": {
@@ -229,11 +250,18 @@
                     ],
                     "block1": {
                         "title": "Blok Menu",
-                        "items": ["Kategori hidangan", "Kombo", "Tempahan meja..."]
+                        "items": [
+                            "Kategori hidangan",
+                            "Kombo",
+                            "Tempahan meja..."
+                        ]
                     },
                     "block2": {
                         "title": "Pesanan & Penghantaran",
-                        "items": ["Troli", "Alamat penghantaran"]
+                        "items": [
+                            "Troli",
+                            "Alamat penghantaran"
+                        ]
                     }
                 },
                 "events": {
@@ -247,11 +275,18 @@
                     ],
                     "block1": {
                         "title": "Blok Acara",
-                        "items": ["Pemasa undur", "Borang pendaftaran tiket", "Jadual..."]
+                        "items": [
+                            "Pemasa undur",
+                            "Borang pendaftaran tiket",
+                            "Jadual..."
+                        ]
                     },
                     "block2": {
                         "title": "Pengesahan Kehadiran",
-                        "items": ["Hantar e-mel", "Daftar masuk QR"]
+                        "items": [
+                            "Hantar e-mel",
+                            "Daftar masuk QR"
+                        ]
                     }
                 },
                 "other": {
@@ -265,11 +300,18 @@
                     ],
                     "block1": {
                         "title": "Perpustakaan Blok",
-                        "items": ["Hero, Borang", "Galeri", "Butang..."]
+                        "items": [
+                            "Hero, Borang",
+                            "Galeri",
+                            "Butang..."
+                        ]
                     },
                     "block2": {
                         "title": "Borang Hubungi",
-                        "items": ["Tajuk, Mesej", "Hantar e-mel"]
+                        "items": [
+                            "Tajuk, Mesej",
+                            "Hantar e-mel"
+                        ]
                     }
                 }
             }
@@ -278,35 +320,68 @@
             "title": "Mengapa memilih PrimeWeb?",
             "subtitle": "Platform laman web AI terkemuka — pelopor laman web bina AI dengan pemasaran & jualan serba lengkap.",
             "stats": {
-                "customers": { "value": "10,000+", "label": "Pelanggan aktif" },
-                "published": { "value": "50,000+", "label": "Laman web diterbitkan" },
-                "blocks": { "value": "900+", "label": "Templat blok sedia" },
-                "speed": { "value": "5 minit", "label": "Bina laman web dengan AI" }
+                "customers": {
+                    "value": "10,000+",
+                    "label": "Pelanggan aktif"
+                },
+                "published": {
+                    "value": "50,000+",
+                    "label": "Laman web diterbitkan"
+                },
+                "blocks": {
+                    "value": "900+",
+                    "label": "Templat blok sedia"
+                },
+                "speed": {
+                    "value": "5 minit",
+                    "label": "Bina laman web dengan AI"
+                }
             },
             "cards": {
                 "easyToUse": {
                     "title": "Mudah digunakan — pantas dilancarkan",
-                    "points": ["Reka bentuk dengan seret & lepas yang mudah", "Tiada pengetahuan pengkodan diperlukan", "Mengurangkan masa pemasangan dengan ketara"]
+                    "points": [
+                        "Reka bentuk dengan seret & lepas yang mudah",
+                        "Tiada pengetahuan pengkodan diperlukan",
+                        "Mengurangkan masa pemasangan dengan ketara"
+                    ]
                 },
                 "dataSync": {
                     "title": "Ketersambungan data yang lancar",
-                    "points": ["Pusatkan data dari pelbagai saluran", "Sambungkan borang, e-mel, dan banyak lagi"]
+                    "points": [
+                        "Pusatkan data dari pelbagai saluran",
+                        "Sambungkan borang, e-mel, dan banyak lagi"
+                    ]
                 },
                 "security": {
                     "title": "Keselamatan tinggi, operasi stabil",
-                    "points": ["Infrastruktur selamat, dioptimumkan prestasi", "Antara muka mesra di semua peranti"]
+                    "points": [
+                        "Infrastruktur selamat, dioptimumkan prestasi",
+                        "Antara muka mesra di semua peranti"
+                    ]
                 },
                 "yourContent": {
                     "title": "Kandungan anda",
-                    "points": ["Editor visual, penyuntingan pantas", "Cadangan deskripsi dan SEO oleh AI"]
+                    "points": [
+                        "Editor visual, penyuntingan pantas",
+                        "Cadangan deskripsi dan SEO oleh AI"
+                    ]
                 },
                 "automation": {
                     "title": "Penglibatan & automasi",
-                    "points": ["Penglibatan pelanggan berbilang saluran", "Asuhan sepanjang perjalanan pelanggan", "Automatikkan tugasan berulang"]
+                    "points": [
+                        "Penglibatan pelanggan berbilang saluran",
+                        "Asuhan sepanjang perjalanan pelanggan",
+                        "Automatikkan tugasan berulang"
+                    ]
                 },
                 "fullAi": {
                     "title": "Keupayaan AI penuh",
-                    "points": ["Bina laman web melalui sembang", "AI menulis deskripsi, optimumkan SEO", "Automatikkan penciptaan kandungan"]
+                    "points": [
+                        "Bina laman web melalui sembang",
+                        "AI menulis deskripsi, optimumkan SEO",
+                        "Automatikkan penciptaan kandungan"
+                    ]
                 }
             }
         },
@@ -467,7 +542,10 @@
             "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
             "cancelButton": "Batalkan penjanaan",
             "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
-            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini.",
+            "interrupted": "Penjanaan telah terganggu. Sila cuba lagi.",
+            "leaveWarning": "Laman web sedang dijana. Pergi juga?",
+            "timeoutRecover": "Masa penjanaan tamat. Kembali ke borang."
         },
         "completion": {
             "successMessage": "telah berjaya dicipta!",
@@ -1316,8 +1394,8 @@
                 "description": "Penerangan",
                 "attributes": "Atribut",
                 "deleteConfirm": "Adakah anda pasti?",
-                "deleteProduct": "PADAM PRODUK",
-                "editProduct": "SUNTING PRODUK"
+                "deleteProduct": "Padam Produk",
+                "editProduct": "Sunting Produk"
             },
             "title": "Produk",
             "addProduct": "Tambah Produk",
@@ -2575,6 +2653,159 @@
             "accountSuspendedBody": "Akaun anda telah digantung. Sila hubungi sokongan. Anda akan dilog keluar sekarang.",
             "acknowledge": "Akui",
             "loggingOut": "Melog keluar..."
+        },
+        "revamp": {
+            "title": "Papan Pemuka",
+            "periodSub": {
+                "today": "Setiap jam · {range}",
+                "daily": "Harian · {range}"
+            },
+            "glance": {
+                "title": "Sekilas pandang",
+                "views": "Paparan halaman",
+                "leads": "Prospek",
+                "engagement": "Penglibatan",
+                "revenue": "Hasil",
+                "viewsTip": "Jumlah lawatan pelanggan ke semua halaman di laman web anda.",
+                "leadsTip": "Bakal pelanggan yang meninggalkan maklumat hubungan (e-mel, telefon) melalui borang pendaftaran di laman web anda.",
+                "engagementTip": "Tindakan pelanggan bernilai tinggi — seperti klik Beli Sekarang, Tambah ke Troli, atau pautan media sosial.",
+                "revenueSoonTip": "Penjejakan hasil akan datang. Kad ini akan mengira metrik daripada pesanan yang telah dibayar dan selesai.",
+                "noteToday": "vs semalam",
+                "note7d": "vs 7h lepas",
+                "note30d": "vs 30h lepas"
+            },
+            "comingSoon": "Akan Datang",
+            "soon": "Akan datang",
+            "onboarding": {
+                "title": "Lengkapkan persediaan kedai anda",
+                "subtitle": {
+                    "one": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda.",
+                    "other": "Lengkapkan {count} langkah lagi untuk melancarkan laman web anda."
+                },
+                "steps": {
+                    "products": {
+                        "name": "Sahkan produk anda",
+                        "desc": "AI telah menambah item demo. Sila semak inventori, harga dan variasi.",
+                        "cta": "Semak"
+                    },
+                    "design": {
+                        "name": "Sesuaikan reka bentuk anda",
+                        "desc": "Kemas kini imej, teks dan warna untuk sepadan dengan jenama anda.",
+                        "cta": "Sunting"
+                    },
+                    "shipping": {
+                        "name": "Tetapkan kadar penghantaran",
+                        "desc": "Lalai semasa ialah COD & penghantaran percuma. Kemas kini kadar untuk mengelak kerugian penghantaran.",
+                        "cta": "Sediakan"
+                    },
+                    "launch": {
+                        "name": "Terbitkan laman web anda",
+                        "desc": "Sedia untuk menjual? Lancarkan kedai anda dan mula menerima pesanan hari ini.",
+                        "cta": "Terbitkan"
+                    }
+                }
+            },
+            "traffic": {
+                "title": "Trafik & prestasi",
+                "subtitle": "Paparan halaman harian dan punca yang mendorongnya",
+                "totalPageviews": "jumlah paparan halaman · {period}",
+                "topPerforming": "Prestasi terbaik",
+                "tabs": {
+                    "pages": "Halaman",
+                    "blogs": "Blog",
+                    "referrers": "Perujuk",
+                    "products": "Produk"
+                },
+                "productsSoonTip": "Analitik produk — akan datang",
+                "emptyChartTitle": "Tiada trafik dalam tempoh ini",
+                "emptyChartDesc": "Sebaik pelawat tiba di laman anda, paparan halaman harian akan dipaparkan di sini.",
+                "emptyListTitle": "Tiada apa untuk disenaraikan lagi",
+                "emptyListDesc": "Halaman, blog dan perujuk teratas akan muncul sebaik anda mempunyai trafik.",
+                "periodToday": "hari ini",
+                "period7d": "7 hari lepas",
+                "period30d": "30 hari lepas"
+            },
+            "seo": {
+                "title": "Kesihatan SEO",
+                "subtitle": "Sejauh mana kedai anda mudah ditemui di enjin carian",
+                "scoreHistory": "Sejarah skor SEO",
+                "scoreHistoryTip": "Kami akan merekod skor anda setiap minggu supaya anda boleh menjejaki trend — akan datang.",
+                "scoreHistoryMsg": "Sedang dibangunkan — kami akan mencatat skor anda setiap minggu supaya anda boleh melihatnya meningkat.",
+                "gaugeHealthy": "Sihat",
+                "gaugeNeedsImprovement": "Perlu penambahbaikan",
+                "gaugeAtRisk": "Berisiko",
+                "breakdownMeta": "Tag Meta",
+                "breakdownContent": "Kualiti Kandungan",
+                "breakdownTechnical": "SEO Teknikal",
+                "criticalIssue": "Isu paling kritikal: {count} {text}. Membaikinya akan meningkatkan skor anda.",
+                "fixAll": "AI Baiki Semua Isu",
+                "issuesTitle": "Isu SEO",
+                "open": "{count} terbuka",
+                "allClear": "Semua selesai",
+                "allResolvedTitle": "Semua isu telah diselesaikan",
+                "allResolvedDesc": "Tiada isu SEO yang tertangguh — kedai anda dioptimumkan sepenuhnya. Kami akan menandakan isu baharu di sini apabila ia muncul.",
+                "fix": "Baiki",
+                "edit": "Sunting",
+                "altEditTip": "Penyuntingan teks Alt automatik dengan AI akan datang. Buat masa ini, klik untuk mengemas kini penerangan imej terus dalam pengurus produk anda.",
+                "issueAlt": {
+                    "one": "produk tiada teks Alt imej",
+                    "other": "produk tiada teks Alt imej"
+                },
+                "issueDescription": {
+                    "one": "halaman tiada penerangan meta",
+                    "other": "halaman tiada penerangan meta"
+                },
+                "issueTitle": {
+                    "one": "item tiada tajuk meta",
+                    "other": "item tiada tajuk meta"
+                }
+            },
+            "tools": {
+                "title": "Alat tindakan SEO",
+                "subtitle": "AI bekerja secara senyap di latar belakang supaya pelanggan dapat menemui kedai anda di Google",
+                "sitemap": "Peta laman",
+                "sitemapTip": "Peta laman menyenaraikan setiap halaman dalam kedai anda. Kami menyerahkannya kepada Google supaya ia dapat mencari dan menyenaraikan semua produk anda.",
+                "sitemapDesc": "Serahkan peta laman anda supaya Google dapat menemui dan mengindeks semua halaman anda.",
+                "resubmit": "Serah semula ke Google",
+                "autoMeta": "Tulis tajuk & penerangan carian secara automatik",
+                "autoMetaTip": "Inilah tajuk yang pelanggan lihat di Google. AI menulis tajuk yang ringkas dan menarik untuk setiap halaman secara automatik.",
+                "autoMetaDesc": "AI menulis tajuk ringkas dan menarik yang memikat pelanggan apabila mereka mencari di Google.",
+                "active": "Aktif",
+                "sitemapDone": "Peta laman diserahkan — {count} URL dihantar ke Google",
+                "sitemapRegenerated": "Peta laman dijana semula",
+                "sitemapError": "Tidak dapat menjana peta laman",
+                "metaOn": "Tag meta automatik dihidupkan",
+                "metaOff": "Tag meta automatik dimatikan",
+                "metaError": "Tidak dapat mengemas kini tetapan"
+            },
+            "orders": {
+                "title": "Pesanan belum selesai",
+                "subtitle": "Pesanan menunggu pemenuhan",
+                "awaiting": "Menunggu",
+                "mockOrder": "Pesanan pelanggan · {count} item",
+                "soonTip": "Baris gilir pemenuhan pesanan sedang dibangunkan — akan datang."
+            },
+            "customize": {
+                "button": "Sesuaikan",
+                "title": "Sesuaikan papan pemuka",
+                "description": "Seret untuk susun semula, atau togol blok hidup dan mati. Disimpan untuk akaun anda.",
+                "reset": "Set semula kepada lalai",
+                "cancel": "Batal",
+                "save": "Simpan susun atur",
+                "saving": "Menyimpan…",
+                "saved": "Susun atur papan pemuka disimpan",
+                "saveError": "Gagal menyimpan susun atur",
+                "dragToReorder": "Seret untuk susun semula",
+                "moveUp": "Alih ke atas",
+                "moveDown": "Alih ke bawah",
+                "close": "Tutup",
+                "blockOnboarding": "Senarai semak permulaan",
+                "blockGlance": "Statistik sekilas pandang",
+                "blockTraffic": "Trafik & prestasi",
+                "blockSeo": "Kesihatan SEO",
+                "blockTools": "Alat tindakan SEO",
+                "blockOrders": "Pesanan belum selesai"
+            }
         }
     },
     "auth": {
@@ -2849,7 +3080,7 @@
                                 "Buka tab <strong>AI CHAT</strong> di bar sisi kiri Editor.",
                                 "Taip apa yang anda mahu ubah — cth., <strong>\"Boleh tukar warna ke merah jambu?\"</strong> atau <strong>\"Tambah bahagian baru\"</strong>.",
                                 "AI akan memproses permintaan anda dan menunjukkan <strong>\"Menyediakan perubahan untuk pratonton...\"</strong> semasa mengemas kini.",
-                                "Gunakan <strong>cip cadangan pantas</strong> di bawah (cth., \"Tukar warna\", \"+ Tambah bahagian\") untuk tindakan biasa.",
+                                "Tekan <strong>Enter</strong> untuk hantar, atau <strong>Shift+Enter</strong> untuk baris baru — kotak input membesar mengikut taipan anda.",
                                 "Perubahan diterapkan secara masa nyata pada pratonton — semak dan simpan atau minta penyesuaian lanjut."
                             ]
                         },
@@ -3417,8 +3648,6 @@
             "failedToEdit": "Gagal mengedit laman web",
             "outOfScope": "Saya hanya boleh membantu mengedit laman web anda.",
             "undo": "Buat Asal",
-            "changeColorPrompt": "Tukar warna",
-            "addSectionPrompt": "+ Tambah bahagian",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
             "newLine": "baris baru"
@@ -3605,8 +3834,12 @@
             "altFavicon": "Favicon Laman Web",
             "remove": "Buang",
             "replace": "Ganti",
-            "invalidFormat": "Hanya fail .ico dan .png diterima",
-            "tooLarge": "Fail mestilah 100KB atau lebih kecil"
+            "invalidFormat": "Hanya fail .ico, .png, .jpg, dan .webp diterima",
+            "tooLarge": "Fail mestilah 500KB atau lebih kecil",
+            "tooLargeWarning": "Favicon lebih besar daripada 100KB — ini mungkin melambatkan pemuatan tab browser",
+            "tooSmall": "Favicon mestilah sekurang-kurangnya 16×16px",
+            "tooBig": "Favicon mestilah 512×512px atau lebih kecil",
+            "notSquare": "Favicon segi empat sama (1:1) disyorkan — imej bukan segi empat sama mungkin kelihatan herot"
         },
         "ogImageEditor": {
             "invalidFormat": "Hanya imej JPG, PNG, atau WebP diterima",
@@ -3972,32 +4205,6 @@
             "blog": "Blog",
             "travel": "Pelancongan"
         },
-        "addSection": {
-            "testimonials": "Tambah testimoni",
-            "testimonialsCompact": "💬 Tambah testimoni",
-            "testimonialsPrompt": "Tambah bahagian testimoni dengan 3 ulasan pelanggan",
-            "faq": "Tambah Soalan Lazim",
-            "faqCompact": "❓ Tambah Soalan Lazim",
-            "faqPrompt": "Tambah bahagian soalan lazim dengan 3 soalan pelanggan biasa",
-            "gallery": "Tambah galeri",
-            "galleryCompact": "🖼️ Tambah galeri",
-            "galleryPrompt": "Tambah bahagian galeri dengan 6 imej pemegang tempat",
-            "features": "Tambah ciri",
-            "featuresCompact": "✨ Tambah ciri",
-            "featuresPrompt": "Tambah bahagian ciri dengan 3 sorotan perkhidmatan utama",
-            "team": "Tambah pasukan",
-            "teamCompact": "👥 Tambah pasukan",
-            "teamPrompt": "Tambah bahagian pasukan dengan 3 ahli pasukan",
-            "newsletter": "Tambah surat berita",
-            "newsletterCompact": "✉️ Tambah surat berita",
-            "newsletterPrompt": "Tambah bahagian pendaftaran surat berita",
-            "banner": "Tambah sepanduk",
-            "bannerCompact": "📣 Tambah sepanduk",
-            "bannerPrompt": "Tambah bahagian sepanduk untuk kempen promosi",
-            "cta": "Tambah CTA",
-            "ctaCompact": "🚀 Tambah CTA",
-            "ctaPrompt": "Tambah bahagian seruan tindakan dengan tawaran yang kuat"
-        },
         "inlineEditComponent": {
             "clickToEdit": "Klik untuk sunting",
             "defaultPlaceholder": "Klik untuk sunting...",
@@ -4287,10 +4494,10 @@
             "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
             "manageButton": "Urus Akaun dalam SSO",
             "urlMissing": "URL portal SSO tidak dikonfigurasi. Hubungi pentadbir.",
-            "generalTitle": "🔒 Maklumat diuruskan oleh SSO",
+            "generalTitle": " Maklumat diuruskan oleh SSO",
             "generalNotice": "Medan maklumat peribadi disegerakkan daripada sistem SSO. Anda tidak boleh mengeditnya di sini.",
             "generalLink": "Untuk membuat perubahan, sila lawati portal SSO",
-            "securityTitle": "🛡️ Akaun Dilindungi SSO",
+            "securityTitle": "Akaun Dilindungi SSO",
             "securityNotice": "Kata laluan dan tetapan keselamatan anda diuruskan oleh sistem Single Sign-On (SSO). Untuk menukar kata laluan, mendayakan pengesahan dua faktor (2FA), atau mengemas kini sebarang tetapan keselamatan, sila lawati portal pengurusan SSO.",
             "securityLink": "Urus Akaun SSO"
         },

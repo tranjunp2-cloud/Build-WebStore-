@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, saveXenditKeys, disconnectXendit } from './actions';
 import { useI18n } from '@/i18n';
@@ -89,7 +90,6 @@ export function PaymentsFormClient({
     const [detailsSubmitted, setDetailsSubmitted] = useState(false);
     // Xendit Connect states (Model C)
     const [xenditIsConnected, setXenditIsConnected] = useState(xenditConnected ?? false);
-    const [isDirty, setIsDirty] = useState(false);
     const [showAllBanks, setShowAllBanks] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +105,20 @@ export function PaymentsFormClient({
         qrImageId: string | number | null; qrPreviewUrl: string | null; qrFileName: string | null;
         accountHolderName: string; bankName: string; accountNumber: string;
     } | null>(null);
+
+    // isDirty = state hiện tại KHÁC snapshot server (giá trị đã lưu). Tự động false khi chưa đổi gì,
+    // hoặc khi user sửa rồi revert đúng về giá trị gốc → thanh unsaved chỉ hiện khi thực sự có thay đổi.
+    const isDirty = !!serverPaymentValues && (
+        paymentCod !== serverPaymentValues.paymentCod ||
+        paymentQr !== serverPaymentValues.paymentQr ||
+        cardEnabled !== serverPaymentValues.cardEnabled ||
+        fpxEnabled !== serverPaymentValues.fpxEnabled ||
+        // Chuẩn hóa nullish: null vs undefined (snapshot khi chưa có ảnh QR) không tính là thay đổi.
+        (qrImageId ?? null) !== (serverPaymentValues.qrImageId ?? null) ||
+        (accountHolderName ?? '') !== (serverPaymentValues.accountHolderName ?? '') ||
+        (bankName ?? '') !== (serverPaymentValues.bankName ?? '') ||
+        (accountNumber ?? '') !== (serverPaymentValues.accountNumber ?? '')
+    );
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const sub = t.common.subscriptionErrors;
@@ -375,7 +389,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setCardEnabled(checked);
-        setIsDirty(true);
     };
 
     const handleToggleFpx = (checked: boolean) => {
@@ -383,7 +396,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setFpxEnabled(checked);
-        setIsDirty(true);
     };
 
     const handleToggleCod = (checked: boolean) => {
@@ -391,7 +403,6 @@ export function PaymentsFormClient({
             toast.error(pt.lastMethodWarning); return;
         }
         setPaymentCod(checked);
-        setIsDirty(true);
     };
 
     const handleToggleQr = (checked: boolean) => {
@@ -406,7 +417,6 @@ export function PaymentsFormClient({
         bankFormUserTriggeredRef.current = checked;
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-        setIsDirty(true);
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,7 +437,6 @@ export function PaymentsFormClient({
             const serverUrl = getImageUrl(uploadRes.doc as Media);
             if (serverUrl) setQrPreviewUrl(serverUrl);
             setPaymentQr(true);
-            setIsDirty(true);
             toast.dismiss('upload-qr');
             toast.success(pt.uploadingQr);
         } catch (e: unknown) {
@@ -441,23 +450,19 @@ export function PaymentsFormClient({
     const handleRemoveImage = () => {
         setQrImageId(null); setQrPreviewUrl(null); setQrFileName(null); setPaymentQr(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        setIsDirty(true);
     };
 
     const handleAccountHolderNameChange = useCallback((val: string) => {
         setAccountHolderName(val);
-        setIsDirty(true);
         if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountHolderName: undefined }));
     }, []);
 
     const handleBankNameChange = useCallback((val: string) => {
         setBankName(val);
-        setIsDirty(true);
     }, []);
 
     const handleAccountNumberChange = useCallback((val: string) => {
         setAccountNumber(val);
-        setIsDirty(true);
         if (val.trim()) setBankTransferErrors(prev => ({ ...prev, accountNumber: undefined }));
     }, []);
 
@@ -490,14 +495,12 @@ export function PaymentsFormClient({
             if (!serverPaymentValues.paymentQr) setQrWidgetExpanded(false);
         }
         setBankTransferErrors({});
-        setIsDirty(false);
     };
 
     const handleXenditDisconnect = async () => {
         const res = await disconnectXendit();
         if (!res.success) { toast.error('Failed to disconnect Xendit'); return; }
         setXenditIsConnected(false);
-        setIsDirty(false);
     };
 
     const handleSaveXenditKeys = async (secretKey: string, callbackToken: string) => {
@@ -542,7 +545,6 @@ export function PaymentsFormClient({
                 account_number: accountNumber || null,
             });
             if (res.success) {
-                setIsDirty(false);
                 setBankTransferErrors({});
                 // Update server snapshot so Cancel targets the just-saved state
                 setServerPaymentValues({
@@ -602,7 +604,7 @@ export function PaymentsFormClient({
 
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
@@ -709,7 +711,7 @@ export function PaymentsFormClient({
             {/* ─── Xendit (F34) ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-cyan-400 shrink-0" style={{ boxShadow: '0 0 10px #22d3ee' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">
                         {pt.xenditSectionTitle}
                     </h2>
@@ -733,7 +735,7 @@ export function PaymentsFormClient({
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px]">
-                    <span className="w-[6px] h-[6px] rounded-full bg-purple-400 shrink-0" style={{ boxShadow: '0 0 10px #c084fc' }} />
+                    <span className="w-[6px] h-[6px] rounded-full bg-[hsl(var(--primary))] shrink-0" style={{ boxShadow: '0 0 10px hsl(var(--primary)/0.6)' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.manualSectionTitle}</h2>
                     <span className="ml-auto text-[12px] text-slate-500">{pt.manualSectionDesc}</span>
                 </div>
@@ -809,8 +811,8 @@ export function PaymentsFormClient({
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'hsl(var(--primary) / 0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--primary) / 0.04)';
                                         }}
                                         onMouseLeave={e => {
                                             (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
@@ -836,7 +838,7 @@ export function PaymentsFormClient({
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                         style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)'}` }}
-                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onFocusCapture={e => !bankTransferErrors.accountHolderName && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountHolderName ? '#ef4444' : 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -868,7 +870,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
-                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
@@ -892,7 +894,7 @@ export function PaymentsFormClient({
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
                                             style={{ background: 'var(--dash-surface)', border: `1px solid ${bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)'}` }}
-                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onFocusCapture={e => !bankTransferErrors.accountNumber && (e.currentTarget.style.boxShadow = '0 0 0 1px hsl(var(--ring)), 0 0 0 4px hsl(var(--ring) / 0.15)', e.currentTarget.style.borderColor = 'hsl(var(--primary))')}
                                             onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = bankTransferErrors.accountNumber ? '#ef4444' : 'var(--dash-border)')}
                                         >
                                             <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
@@ -922,7 +924,8 @@ export function PaymentsFormClient({
                 </div>
             </section>
 
-            {/* Save bar — sticky bottom so it sticks at viewport bottom when scrolling */}
+            {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh. */}
+            {isDirty && (
             <div
                 className="sticky bottom-4 z-40 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
                 style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
@@ -941,29 +944,28 @@ export function PaymentsFormClient({
                     )}
                 </div>
                 <div className="flex gap-2">
-                    <button
+                    <Button
                         type="button"
+                        variant="dashSecondary"
+                        size="sm"
                         onClick={handleCancel}
                         disabled={isSavingAll}
-                        className="inline-flex items-center h-[34px] px-[14px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {pt.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="button"
+                        size="sm"
                         onClick={handleSaveAll}
                         disabled={!isDirty || isSavingAll}
-                        className="inline-flex items-center gap-[6px] h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
-                        style={{
-                            background: 'linear-gradient(135deg, #2563eb 0%, #9333ea 100%)',
-                            boxShadow: isDirty ? '0 6px 18px rgba(37,99,235,0.35)' : 'none',
-                        }}
+                        className="gap-1.5"
                     >
                         <Save className="w-[13px] h-[13px]" />
                         {isSavingAll ? pt.saving : pt.saveChanges}
-                    </button>
+                    </Button>
                 </div>
             </div>
+            )}
 
         </div>
     );

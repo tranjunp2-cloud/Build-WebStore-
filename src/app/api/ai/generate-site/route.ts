@@ -45,6 +45,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
 import { coerceVideoVariants } from '@/lib/ai/coerce-video-variants'
+import { normalizeInternalUrl, resolveCtaSlugFromLinks, resolvePricingPlanCta } from '@/lib/navigation-url'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -276,17 +277,20 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
-        if (resolvedTenantId) {
+        // F23: Sync tenant slug with builder — deferred to post-generation success (GH-1371).
+        // Syncing before SSE caused "Already taken" on retry after interrupted generation
+        // because the slug was claimed even when no site was created. The sync now runs
+        // only after runGenPipeline() succeeds, so a failed/aborted gen never locks the slug.
+        const syncTenantSlug = async () => {
+            if (!resolvedTenantId) return
             try {
                 const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
                 const currentSlug = tenant?.slug as string | undefined
                 const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
                 const businessName = businessInfo?.businessName || ''
 
-                // Case 1: User explicitly chose a slug in the builder → always sync, regardless of current slug
+                // Case 1: User explicitly chose a slug in the builder → always sync
                 if (userChosenSlug && userChosenSlug !== currentSlug) {
-                    // Slug was already verified available on client-side, but double-check uniqueness
                     const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
                     await payload.update({
                         collection: 'tenants',
@@ -294,7 +298,7 @@ export async function POST(req: NextRequest) {
                         data: { slug: newSlug } as Record<string, unknown>,
                     })
                 }
-                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
+                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade
                 else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
                     const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
@@ -869,6 +873,11 @@ export async function POST(req: NextRequest) {
             return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
         })
 
+        // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
+        // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
+        // buildGeneratedPages clones all blocks so mutation here is safe.
+        patchPageCtaUrls(rawPageDefinitions as Array<{ layout?: unknown[] }>, normalizedPageLinks)
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
         // GH-817: pass page links so injected/hollow nav reflects actual generated pages
@@ -1182,6 +1191,42 @@ export async function POST(req: NextRequest) {
         try {
             const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
             productImageStats = imgStats
+            // Best-effort: resolve/create a category for sample products now that site.id is available.
+            // Generator runs pre-site (parallel pipeline), so category must be resolved here in DB phase.
+            let sampleCategoryId: number | undefined
+            try {
+                const composerCategory = resolveComposerCategory(
+                    `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
+                )
+                const { docs: catDocs } = await payload.find({
+                    collection: 'categories',
+                    where: { tenant: { equals: resolvedTenantId }, site: { equals: site.id }, deletedAt: { exists: false } },
+                    limit: 20,
+                    depth: 0,
+                })
+                if (catDocs.length === 0) {
+                    const created = await payload.create({
+                        collection: 'categories',
+                        data: {
+                            name: composerCategory.charAt(0).toUpperCase() + composerCategory.slice(1),
+                            slug: `${composerCategory}-${site.id}`,
+                            tenant: resolvedTenantId,
+                            site: site.id,
+                        },
+                    })
+                    sampleCategoryId = created.id as number
+                } else {
+                    const want = composerCategory.toLowerCase()
+                    const hit = catDocs.find(c => {
+                        const slug = String((c as any).slug ?? '').toLowerCase()
+                        const name = String((c as any).name ?? '').toLowerCase()
+                        return slug.includes(want) || name.includes(want)
+                    }) ?? catDocs[0]
+                    sampleCategoryId = hit!.id as number
+                }
+            } catch (err) {
+                console.warn('[generate-site] sample category setup failed (non-fatal):', (err as Error).message)
+            }
             for (const product of sampleProducts) {
                 // Guard: name must be at least 3 chars (Products schema minLength)
                 const name = product.name?.trim()
@@ -1208,6 +1253,9 @@ export async function POST(req: NextRequest) {
                     description: product.description,
                     ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
                     price: product.price,
+                    sku: product.sku,
+                    inventory: product.inventory,
+                    ...(sampleCategoryId ? { category: [sampleCategoryId] } : {}),
                     status: 'active' as const,
                 }
                 try {
@@ -1334,6 +1382,9 @@ export async function POST(req: NextRequest) {
                             normalizedPageLinks,
                         } = await runGenPipeline(onEvent)
 
+                        // F23: sync tenant slug now that generation succeeded (GH-1371)
+                        await syncTenantSlug()
+
                         // products_generated event
                         if (productsCreatedCount > 0) {
                             controller.enqueue(
@@ -1405,6 +1456,9 @@ export async function POST(req: NextRequest) {
             productsCreatedCount: _productsCreatedCount,
             timeMs,
         } = await runGenPipeline()
+
+        // F23: sync tenant slug now that generation succeeded (GH-1371)
+        await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
         import('@/lib/sso/sso-api-client')
@@ -1486,13 +1540,44 @@ function cloneBlockData<T>(value: T): T {
     return JSON.parse(JSON.stringify(value))
 }
 
-function normalizeInternalUrl(url: unknown): string {
-    if (typeof url !== 'string') return '#'
-    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
-    if (url === '#about' || url === 'about') return '/about'
-    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
-    if (url === '#contact' || url === 'contact') return '/contact'
-    return url
+/**
+ * Fix hero and cta block CTA URLs across all page definitions to use
+ * canonical slugs from the generated site. Runs after buildGeneratedPages
+ * so real page slugs are known. Mutates layouts in-place (pages are
+ * already cloned by buildGeneratedPages).
+ * Buttons with no matching page are removed — prevents phantom-click hrefs.
+ */
+function patchPageCtaUrls(
+    pageDefinitions: Array<{ layout?: unknown[] }>,
+    canonicalLinks: Array<{ label: string; url: string }>,
+): void {
+    for (const page of pageDefinitions) {
+        const layout = page.layout
+        if (!Array.isArray(layout)) continue
+        for (const block of layout as Array<AIBlock | null>) {
+            if (!block) continue
+            if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
+                block.ctaButtons = (block.ctaButtons as Array<Record<string, unknown> | string>)
+                    .flatMap((btn): AIBlock[] => {
+                        if (typeof btn === 'string') return []
+                        const url = resolveCtaSlugFromLinks(btn.url, canonicalLinks)
+                        return url ? [{ ...btn, url } as AIBlock] : []
+                    })
+            }
+            if (block.blockType === 'cta' && block.ctaButton && typeof block.ctaButton === 'object') {
+                const url = resolveCtaSlugFromLinks((block.ctaButton as Record<string, unknown>).url, canonicalLinks)
+                if (url) {
+                    (block.ctaButton as Record<string, unknown>).url = url
+                } else {
+                    block.ctaButton = undefined
+                }
+            }
+            if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
+                block.plans = (block.plans as Array<Record<string, unknown>>)
+                    .map(p => resolvePricingPlanCta(p, canonicalLinks))
+            }
+        }
+    }
 }
 
 function applyGeneratedSiteNavigation(
@@ -2023,11 +2108,6 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             }
         }
 
-        // ── Logo Cloud: strip logos (needs real media) ──
-        if (sanitized.blockType === 'logo-cloud') {
-            sanitized.logos = []
-        }
-
         // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
         if (sanitized.blockType === 'google-maps') {
             if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
@@ -2160,6 +2240,14 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     items,
                 }
             })
+        }
+
+        // ── Logo Cloud: normalize logos[].name from AI-gen field variants ──
+        if (sanitized.blockType === 'logo-cloud' && Array.isArray(sanitized.logos)) {
+            sanitized.logos = (sanitized.logos as AIBlock[]).map((item: AIBlock, i: number) => ({
+                ...item,
+                name: String(item.name || item.company || item.brand || item.title || `Partner ${i + 1}`),
+            }))
         }
 
         // ── Remove non-schema fields that AI might add ──

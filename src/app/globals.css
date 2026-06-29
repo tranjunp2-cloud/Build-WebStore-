@@ -83,6 +83,7 @@
   --editor-border-subtle: rgba(0, 0, 0, 0.05);
   --editor-overlay-bg: rgba(0, 0, 0, 0.04);
   --editor-overlay-hover: rgba(0, 0, 0, 0.06);
+  --editor-slider-track: #CBD5E1;              /* slate-300 — visible groove on white panel */
 }
 
 /* Dashboard + Editor semantic tokens — dark mode overrides */
@@ -110,6 +111,7 @@
   --editor-border-subtle: rgba(255, 255, 255, 0.04);
   --editor-overlay-bg: rgba(255, 255, 255, 0.04);
   --editor-overlay-hover: rgba(255, 255, 255, 0.06);
+  --editor-slider-track: #0B1120;              /* = editor-bg — darker groove on slate-800 panel */
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -631,9 +633,12 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell header {
     background-color: var(--dash-sidebar-bg) !important;
 }
-/* Light mode: bỏ viền ngang dưới header (TopHeader dùng --dash-divider trực tiếp).
-   Dark giữ nguyên đường viền header. */
-html:not(.dark) .dash-shell header { border-bottom-color: transparent; }
+/* Bỏ viền ngang dưới header ở cả light + dark (TopHeader dùng --dash-divider trực tiếp).
+   Line này cũng là đường dưới logo của sidebar → bỏ cho cả header + sidebar. */
+.dash-shell header { border-bottom-color: transparent; }
+
+/* Sidebar footer (LanguageToggle): giữ viền trên ở cả light + dark. */
+.dash-sidebar-footer { border-top: 1px solid var(--dash-divider); }
 
 /* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
 .dash-shell .text-slate-300,
@@ -876,6 +881,20 @@ html:not(.dark) .editor-shell .hover\:bg-white\/10:hover { background-color: rgb
 html:not(.dark) .editor-shell .hover\:bg-white\/15:hover { background-color: rgba(0,0,0,0.09); }
 html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-color: rgba(0,0,0,0.08); }
 
+/* ── GH-1367: Block action toolbar — consistent dark pill in both themes ───── */
+/* The toolbar is a single dark pill (#334155) in BOTH editor themes so it stays
+   identifiable floating over ANY website content (white or dark). Its icons are
+   light. In light mode the editor-shell remap would darken those light icons /
+   white-tint dividers — re-assert the dark-theme values so light mode renders
+   identically to dark. Dark mode renders these natively (no override needed).
+   The extra .block-action-toolbar class wins on specificity (no !important). */
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-400,
+html:not(.dark) .editor-shell .block-action-toolbar .text-slate-300 { color: #94a3b8; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-amber-300 { color: #fcd34d; }
+html:not(.dark) .editor-shell .block-action-toolbar .text-red-400 { color: #f87171; }
+html:not(.dark) .editor-shell .block-action-toolbar .bg-white\/10 { background-color: rgba(255,255,255,0.1); }
+html:not(.dark) .editor-shell .block-action-toolbar .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.1); }
+
 /* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
 /* bg overrides turn input bgs white (same as page bg) → need distinct bg */
 html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
@@ -1057,6 +1076,10 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
   select {
     appearance: none;
     margin: 0;
+    /* Preflight is OFF, so the `border` utility sets width+color but not style —
+       browsers then fall back to the UA default `border-style: inset` (beveled:
+       top/left darker than bottom/right). Force solid so borders render evenly. */
+    border-style: solid;
   }
 
   textarea {
@@ -1444,5 +1467,62 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
   transform: none !important;
   width: 320px !important;
   max-width: 320px !important;
+}
+
+/* ── Sidebar always-dark (.sb-dark) ──────────────────────────────────────────
+   Sidebar (dashboard + editor menu drawer + logo segment) phải trông Y HỆT dark
+   ở cả light lẫn dark. Class `dark` trên các container đó đã flip token --dash-*;
+   block này khôi phục các utility bị `html:not(.dark) .dash-shell …` remap sang
+   rgba(0,0,0,…) (chỉ chạy ở light) về lại giá trị dark — chỉ trong .sb-dark. */
+.sb-dark .bg-white\/\[0\.03\] { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .bg-white\/5 { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-white\/8 { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .bg-white\/10 { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-white\/\[0\.08\] { background-color: rgba(255,255,255,0.08) !important; }
+.sb-dark .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(255,255,255,0.03) !important; }
+.sb-dark .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(255,255,255,0.02) !important; }
+.sb-dark .hover\:bg-white\/5:hover,
+.sb-dark .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .hover\:bg-white\/10:hover { background-color: rgba(255,255,255,0.10) !important; }
+.sb-dark .bg-\[\#0B1120\]\/50 { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[\#0B1120\]\/60 { background-color: rgba(11,17,32,0.6) !important; }
+.sb-dark .bg-\[\#0B1120\]\/80 { background-color: rgba(11,17,32,0.8) !important; }
+.sb-dark .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(11,17,32,0.5) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(255,255,255,0.05) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.1\)\] { background-color: rgba(255,255,255,0.1) !important; }
+.sb-dark .bg-\[rgba\(255\,255\,255\,0\.2\)\] { background-color: rgba(255,255,255,0.2) !important; }
+.sb-dark .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(248,250,252,0.3) !important; }
+
+/* SET CỨNG màu dark trực tiếp (không qua token/cascade) — sidebar luôn dark thật.
+   Dark palette: bg #060B18, surface #161E2E, secondary/muted #1F2937, border #2A3645,
+   text #FFFFFF, text-muted #9CA3AF, teal #2DD4BF. */
+.sb-dark { --primary: var(--p-teal-400) !important; --dash-sidebar-bg: #060B18 !important; --dash-divider: #232E3D !important; }
+.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: #060B18 !important; }
+.sb-dark .text-dash-text { color: #FFFFFF !important; }
+.sb-dark .text-dash-text-muted { color: #9CA3AF !important; }
+.sb-dark .hover\:text-dash-text:hover { color: #FFFFFF !important; }
+.sb-dark .bg-dash-surface { background-color: #161E2E !important; }
+.sb-dark .bg-dash-surface-hover { background-color: #1F2937 !important; }
+.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: #1F2937 !important; }
+.sb-dark .border-dash-border { border-color: #2A3645 !important; }
+
+/* ── Logo segment: MOBILE follows theme (not sidebar-dark) ────────────────────
+   Top-bar left cluster (☰ + ⊞ + logo) dùng .sb-dark để KHỚP cột sidebar ở
+   DESKTOP. Ở mobile nó chỉ là cụm control của top-bar (sidebar = drawer) nên
+   forced-dark tạo "khoảng đen" trên header sáng. Dưới đây: chỉ ở mobile,
+   neutralize sb-dark về theme hiện hành (light = trắng, dark = giữ tối).
+   Đặt SAU block .sb-dark + selector compound (.dash-logo-seg.sb-dark) → thắng
+   cascade. Desktop giữ nguyên 100%. */
+@media (max-width: 767px) {
+  .dash-logo-seg.sb-dark { --dash-sidebar-bg: #FFFFFF !important; }
+  .dark .dash-logo-seg.sb-dark { --dash-sidebar-bg: #060B18 !important; }
+  .dash-logo-seg.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: var(--dash-sidebar-bg) !important; }
+  .dash-logo-seg.sb-dark .text-dash-text { color: hsl(var(--foreground)) !important; }
+  .dash-logo-seg.sb-dark .text-dash-text-muted { color: hsl(var(--muted-foreground)) !important; }
+  .dash-logo-seg.sb-dark .hover\:text-dash-text:hover { color: hsl(var(--foreground)) !important; }
+  .dash-logo-seg.sb-dark .bg-dash-surface { background-color: hsl(var(--card)) !important; }
+  .dash-logo-seg.sb-dark .bg-dash-surface-hover { background-color: hsl(var(--muted)) !important; }
+  .dash-logo-seg.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: hsl(var(--muted)) !important; }
+  .dash-logo-seg.sb-dark .border-dash-border { border-color: hsl(var(--border)) !important; }
 }
 }
