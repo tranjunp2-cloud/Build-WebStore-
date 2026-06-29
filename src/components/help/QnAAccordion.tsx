@@ -46,7 +46,7 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                 className="flex items-center justify-between w-full px-5 py-4 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] hover:bg-[hsl(var(--secondary))] transition-colors"
                 style={{ userSelect: 'none' }}
             >
-                <div className="text-[14px] font-semibold text-white pr-4">
+                <div className="min-w-0 break-words text-[14px] font-semibold text-white pr-4">
                     {question}
                 </div>
                 <div

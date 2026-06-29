@@ -37,7 +37,7 @@ export default function GuidelinePage() {
 
   return (
     // PANEL: OVERVIEW — bg:card, border:1px border, border-radius:12px, padding:24px
-    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-6">
+    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-4 sm:p-6">
       <div className="flex flex-col gap-[17px]">
 
         {/* Section 1: Welcome */}
