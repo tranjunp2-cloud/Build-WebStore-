@@ -242,7 +242,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 />
             </div>
 
-
             <DiscountSaveBar
                 dirty={dirty}
                 isNew={isNew}
