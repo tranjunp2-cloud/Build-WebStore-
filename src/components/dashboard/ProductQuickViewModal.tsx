@@ -104,9 +104,11 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
     if (!mounted || !isOpen || !product) return null
 
-    // Process Images
-    const images = product.images?.map(img => getImageUrl(img.image)).filter(Boolean) as string[] || []
-    const displayImages = images.length > 0 ? images : ['/images/crate-carton.png'] // Fallback if no images
+    // Process Images — carry alt alongside url so render sites can use stored alt text
+    const processedImages = (product.images ?? [])
+        .map(img => ({ url: getImageUrl(img.image), alt: img.alt }))
+        .filter(img => img.url !== null) as { url: string; alt?: string }[]
+    const displayImages = processedImages.length > 0 ? processedImages : [{ url: '/images/crate-carton.png', alt: undefined }]
 
     // Process Categories (Assuming populated)
     const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || ''
@@ -164,8 +166,8 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     {/* Main Image */}
                     <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full aspect-square shrink-0 overflow-hidden relative border border-white/5">
                         <ProductImageWithFallback
-                            imgUrl={displayImages[selectedImageIdx] ?? null}
-                            alt={product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"}
+                            imgUrl={displayImages[selectedImageIdx]?.url ?? null}
+                            alt={displayImages[selectedImageIdx]?.alt || product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"}
                             size="lg"
                             sizes="480px"
                         />
@@ -174,9 +176,9 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     {/* Thumbnails */}
                     {displayImages.length > 1 && (
                         <div className="grid grid-cols-3 gap-[16px]">
-                            {displayImages.slice(0, 3).map((imgUrl, idx) => (
+                            {displayImages.slice(0, 3).map((img, idx) => (
                                 <button key={idx} onClick={() => setSelectedImageIdx(idx)} className={`relative w-full aspect-square rounded-[4px] overflow-hidden ${selectedImageIdx === idx ? 'border-2 border-[#44DDC1]' : 'opacity-60 hover:opacity-100 transition-opacity bg-[#1D2026] border border-white/5'}`}>
-                                    <ProductImageWithFallback imgUrl={imgUrl} alt={`Thumb ${idx + 1}`} size="sm" sizes="120px" />
+                                    <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="120px" />
                                 </button>
                             ))}
                         </div>

@@ -50,7 +50,7 @@ export default function NewProductPage() {
                 width: data.shippingWidth || 0,
                 height: data.shippingHeight || 0,
             },
-            images: data.images?.map(img => ({ image: img.id, alt: data.name })) || [],
+            images: data.images?.map(img => ({ image: img.id, alt: img.alt?.trim() || data.name })) || [],
             hasVariants: data.hasVariants,
             variantConfigs: data.hasVariants ? data.tiers?.map((t) => ({
                 name: t.name,

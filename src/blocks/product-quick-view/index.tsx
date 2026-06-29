@@ -19,6 +19,15 @@ import {
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+
+export function pairImagesWithAlts(
+    images: Array<{ image?: { url?: string }; alt?: string }> | undefined
+): { imageUrls: string[]; imageAlts: string[] } {
+    const pairs = (images ?? [])
+        .map(i => ({ url: i.image?.url, alt: i.alt ?? '' }))
+        .filter((p): p is { url: string; alt: string } => typeof p.url === 'string')
+    return { imageUrls: pairs.map(p => p.url), imageAlts: pairs.map(p => p.alt) }
+}
 type QuickViewProductWithCurrency = QuickViewProduct & {
     _currency?: string
     _currencyCode?: string  // raw ISO code (MYR/USD)
@@ -116,7 +125,7 @@ function QuickViewModal({
                     {/* Images */}
                     <div className="relative aspect-square overflow-hidden">
                         {images.length > 0 ? (
-                            <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                            <img src={images[selectedImage]} alt={product.imageAlts[selectedImage] || product.name} className="w-full h-full object-cover" />
                         ) : (
                             <ImagePlaceholder size="lg" />
                         )}
@@ -265,7 +274,7 @@ function ProductCard({
         >
             <div className="relative aspect-square overflow-hidden">
                 {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={product.imageUrls[0]} alt={product.imageAlts[0] || product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                     <ImagePlaceholder size="md" />
                 )}
@@ -342,14 +351,16 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
             .then(json => {
                 const docs = (json.docs || []) as Array<Record<string, unknown>>
                 const mapped: QuickViewProductWithCurrency[] = docs.map((doc) => {
-                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
                     const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    const { imageUrls, imageAlts } = pairImagesWithAlts(images)
                     return {
                         name: String(doc.name || ''),
                         slug: String(doc.slug || ''),
                         price,
-                        imageUrls: (images ?? []).map(i => i.image?.url).filter((u): u is string => typeof u === 'string'),
+                        imageUrls,
+                        imageAlts,
                         description: typeof doc.shortDescription === 'string' ? doc.shortDescription : undefined,
                         _currency: CURRENCY_DISPLAY[currencyCode] ?? currencyCode,
                         _currencyCode: currencyCode,

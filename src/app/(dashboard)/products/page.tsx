@@ -707,7 +707,7 @@ export default function ProductsPage() {
                                                     {/* Thumbnail */}
                                                     <TableCell>
                                                         <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="40px" />
+                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="sm" sizes="40px" />
                                                         </div>
                                                     </TableCell>
 
@@ -800,7 +800,7 @@ export default function ProductsPage() {
                                         <div className="flex items-start gap-[12px]">
                                             {/* Thumbnail 64×64 */}
                                             <div className="relative h-[64px] w-[64px] shrink-0 rounded-[12px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="md" sizes="64px" />
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="md" sizes="64px" />
                                             </div>
 
                                             {/* Text Information Block */}

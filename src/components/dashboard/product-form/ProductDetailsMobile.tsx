@@ -31,8 +31,10 @@ function getImageUrl(image: any): string | null {
 export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: ProductDetailsMobileProps) {
     const { t } = useI18n();
     const [activeIdx, setActiveIdx] = useState(0)
-    // Process Images
-    const displayImages = product.images?.map(img => getImageUrl(img.image)).filter(Boolean) as string[] || [];
+    // Process Images — carry alt alongside url so render sites can use stored alt text
+    const displayImages = (product.images ?? [])
+        .map(img => ({ url: getImageUrl(img.image), alt: img.alt }))
+        .filter(img => img.url !== null) as { url: string; alt?: string }[]
 
     // Description extracting raw text from Payload RichText if available
     let descText = product.shortDescription || ''
@@ -77,8 +79,8 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 <div className="flex flex-col w-full relative mb-2">
                     <div className="relative w-full aspect-[4/5] max-h-[500px] bg-secondary">
                         <ProductImageWithFallback
-                            imgUrl={displayImages[activeIdx] ?? displayImages[0] ?? null}
-                            alt={product.name || 'Product Image'}
+                            imgUrl={displayImages[activeIdx]?.url ?? displayImages[0]?.url ?? null}
+                            alt={displayImages[activeIdx]?.alt || product.name || 'Product Image'}
                             size="lg"
                             sizes="100vw"
                         />
@@ -86,7 +88,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                     {/* Thumbnails Overlay */}
                     {displayImages.length > 1 && (
                         <div className="relative flex items-center gap-2 overflow-x-auto px-4 scrollbar-none z-10 -mt-10 pb-2">
-                            {displayImages.map((imgUrl, idx) => (
+                            {displayImages.map((img, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => setActiveIdx(idx)}
@@ -96,7 +98,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                                             : 'border-2 border-transparent'
                                     }`}
                                 >
-                                    <ProductImageWithFallback imgUrl={imgUrl} alt="Thumbnail" size="sm" sizes="64px" />
+                                    <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="64px" />
                                 </button>
                             ))}
                         </div>
