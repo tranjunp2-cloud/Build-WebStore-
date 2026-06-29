@@ -864,7 +864,7 @@ export function PaymentsFormClient({
                                 </div>
 
                                 {/* Bank name + Account number */}
-                                <div className="grid grid-cols-2 gap-[16px] mt-[16px]">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px] mt-[16px]">
                                     <div className="flex flex-col gap-[6px]">
                                         <label className="text-[13px] font-semibold text-slate-300">{pt.bankNameLabel}</label>
                                         <div
