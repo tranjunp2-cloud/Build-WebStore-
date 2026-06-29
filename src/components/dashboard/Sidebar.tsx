@@ -20,7 +20,7 @@
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe } from 'lucide-react'
+import { Globe, ChevronsRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -46,6 +46,8 @@ type SidebarProps = {
     badgeCounts?: Partial<Record<SidebarBadgeKey, number>>
     /** Desktop mini mode (64px icon-only). Mobile drawer ignores this and always renders full. */
     collapsed?: boolean
+    /** Expand the rail from mini mode — rendered as the » button at the top of the collapsed rail. */
+    onToggleCollapsed?: () => void
     /** Enable the width transition only after the persisted state has painted (anti hydration-flash). */
     animateCollapse?: boolean
     /**
@@ -57,7 +59,7 @@ type SidebarProps = {
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen, badgeCounts, collapsed = false, animateCollapse = false, isProduction = false, onToggleCollapsed }: SidebarProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
 
@@ -166,9 +168,30 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
     // ─── Sidebar Content (mini = desktop collapsed; mobile drawer always full) ─
     const renderSidebarContent = (mini: boolean) => (
         <>
+            {/* Mini rail: expand toggle » sits at the top, directly under the logo icon in the header
+                (collapsed-state brand placement). Hidden in the full/mobile drawer (« lives in the header). */}
+            {mini && onToggleCollapsed && (
+                <div className="flex justify-center pt-1 pb-0 shrink-0">
+                    <button
+                        onClick={onToggleCollapsed}
+                        aria-label="Expand sidebar"
+                        aria-expanded={false}
+                        aria-controls="dashboard-sidebar"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent border-none outline-none text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer transition-colors"
+                    >
+                        <ChevronsRight className="h-5 w-5" />
+                    </button>
+                </div>
+            )}
+
             {/* Flat nav — scrolls as one column; section headers are static labels (no accordion) */}
             <nav
-                className="sidebar-scroll flex-1 flex flex-col gap-1 px-3 pt-6 overflow-y-auto"
+                className={cn(
+                    'sidebar-scroll flex-1 flex flex-col gap-1 px-3 overflow-y-auto',
+                    // Mini rail: tighter top gap so the » toggle sits close to the first icon
+                    // (full/mobile keep the original pt-6 rhythm).
+                    mini ? 'pt-2' : 'pt-6',
+                )}
                 aria-label="Main navigation"
             >
                 {visibleSections.map((section, idx) => (
@@ -214,7 +237,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
             {/* Mobile overlay + drawer — slides in BELOW the header; every item is a leaf so any
                 click navigates and the route-change effect closes the drawer (design §1.3) */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-40 md:hidden">
+                <div className="fixed inset-0 z-40 lg:hidden">
                     <div
                         className="absolute inset-0 top-[56px] bg-black/60"
                         onClick={() => setMobileOpen(false)}
@@ -234,7 +257,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 id="dashboard-sidebar"
                 className={cn(
                     // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
-                    'dark sb-dark fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
+                    'dark sb-dark fixed left-0 top-[56px] z-40 hidden lg:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
                     animateCollapse && 'transition-[width] duration-200',
                     collapsed ? 'w-[64px]' : 'w-[250px]'
                 )}
