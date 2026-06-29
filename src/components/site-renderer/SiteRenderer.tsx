@@ -672,57 +672,76 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             })}
 
             {/* Floating widgets — grouped by corner so they stack vertically instead of overlapping */}
-            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => (
-                <div
-                    key={pos}
-                    // GH-1412: a bottom-right group that includes a floating-sticky CTA lays out
-                    // horizontally on desktop (CTA beside the launchers) but stays a vertical stack
-                    // on mobile so the wide CTA card never overflows the viewport width.
-                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3 ${pos !== 'bottom-left' && blockIndices.some(i => blocks[i].blockType === 'cta') ? 'md:flex-row' : ''}`}
-                >
-                    {[...blockIndices]
-                        // GH-1412: launcher widgets (WhatsApp/social/cart) stay closest to the
-                        // corner; a floating-sticky CTA stacks ABOVE them. flex-col-reverse puts
-                        // the first DOM child at the bottom (corner), so CTA must render last.
-                        .sort((a, b) => (blocks[a].blockType === 'cta' ? 1 : 0) - (blocks[b].blockType === 'cta' ? 1 : 0))
-                        .map(blockIndex => {
-                        const floatingBlock = blocks[blockIndex]
-                        const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
-                        if (!FloatingComponent) return null
-                        const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
-                            ? floatingBlock.__editorBlockIndex : blockIndex
-                        const floatingCallback = onBlockFieldChange
-                            ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
-                            : null
-                        const floatingContent = (
-                            <FloatingContainerProvider value={true}>
-                                <BlockEditCallbackProvider value={floatingCallback}>
-                                    <BlockErrorBoundary blockType={floatingBlock.blockType}>
-                                        <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
-                                    </BlockErrorBoundary>
-                                </BlockEditCallbackProvider>
-                            </FloatingContainerProvider>
+            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => {
+                const renderFloating = (blockIndex: number) => {
+                    const floatingBlock = blocks[blockIndex]
+                    const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
+                    if (!FloatingComponent) return null
+                    const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
+                        ? floatingBlock.__editorBlockIndex : blockIndex
+                    const floatingCallback = onBlockFieldChange
+                        ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
+                        : null
+                    const floatingContent = (
+                        <FloatingContainerProvider value={true}>
+                            <BlockEditCallbackProvider value={floatingCallback}>
+                                <BlockErrorBoundary blockType={floatingBlock.blockType}>
+                                    <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
+                                </BlockErrorBoundary>
+                            </BlockEditCallbackProvider>
+                        </FloatingContainerProvider>
+                    )
+                    if (isEditor) {
+                        // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
+                        const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
+                            ? floatingBlock.__editorBlockIndex
+                            : editorIdx
+                        return (
+                            <div
+                                key={blockIndex}
+                                data-block-index={dataBlockIndex}
+                                data-block-type={floatingBlock.blockType}
+                                className="group/block relative"
+                            >
+                                {floatingContent}
+                            </div>
                         )
-                        if (isEditor) {
-                            // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
-                            const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
-                                ? floatingBlock.__editorBlockIndex
-                                : editorIdx
-                            return (
-                                <div
-                                    key={blockIndex}
-                                    data-block-index={dataBlockIndex}
-                                    data-block-type={floatingBlock.blockType}
-                                    className="group/block relative"
-                                >
-                                    {floatingContent}
-                                </div>
-                            )
-                        }
-                        return <div key={blockIndex}>{floatingContent}</div>
-                    })}
-                </div>
-            ))}
+                    }
+                    return <div key={blockIndex}>{floatingContent}</div>
+                }
+
+                // GH-1412: keep the launcher column (WhatsApp/social/cart) exactly as before and
+                // place a floating-sticky CTA as a SEPARATE block beside it — to the left on desktop
+                // (md:flex-row), above it on mobile (flex-col) so the wide CTA card never overflows.
+                const ctaIndices = blockIndices.filter(i => blocks[i].blockType === 'cta')
+                const widgetIndices = blockIndices.filter(i => blocks[i].blockType !== 'cta')
+
+                if (ctaIndices.length === 0) {
+                    // Widget-only group — unchanged original layout.
+                    return (
+                        <div
+                            key={pos}
+                            className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
+                        >
+                            {widgetIndices.map(renderFloating)}
+                        </div>
+                    )
+                }
+
+                return (
+                    <div
+                        key={pos}
+                        className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col md:flex-row items-end gap-3`}
+                    >
+                        {ctaIndices.map(renderFloating)}
+                        {widgetIndices.length > 0 && (
+                            <div className="flex flex-col-reverse items-end gap-3">
+                                {widgetIndices.map(renderFloating)}
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
         </OwnerProvider>
         </HiddenSlugsProvider>
     )

@@ -1500,9 +1500,11 @@ describe('[TC-F04-SR-GH1412-02] SiteRenderer floating-sticky CTA joins widget st
         const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
         expect(floatingContainer).toBeInTheDocument()
 
-        // Assert — floating container should have flex layout and contain both blocks
+        // Assert — outer group lays out vertically on mobile (flex-col) and horizontally on
+        // desktop (md:flex-row); the launcher column keeps its own flex-col-reverse stack.
         expect(floatingContainer?.classList.contains('flex')).toBe(true)
-        expect(floatingContainer?.classList.contains('flex-col-reverse')).toBe(true)
+        expect(floatingContainer?.classList.contains('flex-col')).toBe(true)
+        expect(floatingContainer?.classList.contains('md:flex-row')).toBe(true)
         expect(floatingContainer?.classList.contains('gap-3')).toBe(true)
 
         // Assert — both test blocks should render inside the floating container
@@ -1562,13 +1564,12 @@ describe('[TC-F04-SR-GH1412-02] SiteRenderer floating-sticky CTA joins widget st
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TC-F04-SR-GH1412-03 — CTA floating-sticky stack order in bottom-right container
-// GH-1412: blockIndices sorted so CTA pushed to END → in flex-col-reverse layout
-// → CTA rendered LAST in DOM but appears FIRST visually (top of stack).
-// Widget (whatsapp) rendered FIRST in DOM but appears LAST visually (bottom).
-// Test verifies DOM order: whatsapp testid appears before cta testid in container.
+// TC-F04-SR-GH1412-03 — CTA floating-sticky is a SEPARATE block beside the launcher column
+// GH-1412: the launcher widgets (WhatsApp/social/cart) keep their own untouched
+// flex-col-reverse column; a floating-sticky CTA renders as a sibling next to it,
+// NOT inside the launcher column.
 // ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (flex-col-reverse)', () => {
+describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky separated from launcher column', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockGetComponent.mockImplementation((type: string) => {
@@ -1578,10 +1579,8 @@ describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (f
         })
     })
 
-    it('TC-F04-SR-GH1412-03a: CTA + whatsapp in floating container → DOM order is whatsapp BEFORE cta (flex-col-reverse)', () => {
-        // Arrange — blocks array: CTA first (index 0), whatsapp second (index 1)
-        // SiteRenderer sorts so CTA pushed to END (last child in DOM)
-        // Container is flex-col-reverse → last DOM child (CTA) appears FIRST visually (top)
+    it('TC-F04-SR-GH1412-03a: launcher column (flex-col-reverse) holds whatsapp but NOT the CTA', () => {
+        // Arrange
         const page = {
             layout: [
                 { blockType: 'cta', variant: 'floating-sticky', headline: 'Join now' },
@@ -1592,29 +1591,21 @@ describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (f
         // Act
         const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
 
-        // Assert — find floating container
+        // Assert — both blocks present in the floating group
         const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
         expect(floatingContainer).toBeInTheDocument()
+        expect(floatingContainer?.querySelectorAll('[data-testid]').length).toBe(2)
 
-        // Assert — query ALL [data-testid] children inside floating container
-        const children = floatingContainer?.querySelectorAll('[data-testid]')
-        expect(children?.length).toBe(2)
-
-        // Assert — DOM order: whatsapp [data-testid="block-whatsapp-button"] BEFORE cta [data-testid="block-cta"]
-        // Because flex-col-reverse reverses visual order, the first DOM child (whatsapp) appears last visually
-        const whatsappIdx = Array.from(children || []).findIndex((el) => el.getAttribute('data-testid') === 'block-whatsapp-button')
-        const ctaIdx = Array.from(children || []).findIndex((el) => el.getAttribute('data-testid') === 'block-cta')
-
-        expect(whatsappIdx).toBe(0)
-        expect(ctaIdx).toBe(1)
-        // Verify: whatsapp DOM index < cta DOM index (whatsapp comes first in DOM)
-        expect(whatsappIdx).toBeLessThan(ctaIdx)
+        // Assert — the nested launcher column keeps its own flex-col-reverse stack and
+        // contains the whatsapp launcher but NOT the CTA (CTA is a separate sibling).
+        const launcherColumn = floatingContainer?.querySelector('.flex.flex-col-reverse')
+        expect(launcherColumn).toBeInTheDocument()
+        expect(launcherColumn?.querySelector('[data-testid="block-whatsapp-button"]')).toBeInTheDocument()
+        expect(launcherColumn?.querySelector('[data-testid="block-cta"]')).toBeNull()
     })
 
-    it('TC-F04-SR-GH1412-03b: whatsapp rendered first in DOM, CTA rendered last (stable sort preservation)', () => {
-        // Arrange — 2 floating blocks: whatsapp (index 0), CTA (index 1)
-        // SiteRenderer sorts: CTA pushed to end → CTA becomes last in DOM
-        // With flex-col-reverse: last DOM child (CTA) appears FIRST visually (top of stack)
+    it('TC-F04-SR-GH1412-03b: CTA renders before the launcher column in DOM (CTA left on desktop, top on mobile)', () => {
+        // Arrange — author order does not matter; CTA must still precede the launcher column
         const page = {
             layout: [
                 { blockType: 'whatsapp-button', position: 'bottom-right' },
@@ -1625,15 +1616,14 @@ describe('[TC-F04-SR-GH1412-03] SiteRenderer CTA floating-sticky DOM ordering (f
         // Act
         const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
 
-        // Assert — floating container contains both blocks
-        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]')
-        const children = floatingContainer?.querySelectorAll('[data-testid]')
-        expect(children?.length).toBe(2)
-
-        // Assert — DOM order: whatsapp first, cta last (after sort)
-        const order = Array.from(children || []).map((el) => el.getAttribute('data-testid'))
-        expect(order[0]).toBe('block-whatsapp-button')
-        expect(order[1]).toBe('block-cta')
+        // Assert — direct children of the group: [CTA block, launcher column]
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        const directChildren = Array.from(floatingContainer.children) as HTMLElement[]
+        expect(directChildren.length).toBe(2)
+        // First direct child holds the CTA; second is the launcher column.
+        expect(directChildren[0].querySelector('[data-testid="block-cta"]')).toBeInTheDocument()
+        expect(directChildren[1].classList.contains('flex-col-reverse')).toBe(true)
+        expect(directChildren[1].querySelector('[data-testid="block-whatsapp-button"]')).toBeInTheDocument()
     })
 
     it('TC-F04-SR-GH1412-03c: CTA non-floating variant stays in main flow, not in floating container', () => {
@@ -1692,12 +1682,12 @@ describe('[TC-F04-SR-GH1412-04] SiteRenderer bottom-right responsive layout (CTA
         // Act
         const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
 
-        // Assert — bottom-right floating container opts into the desktop row layout
+        // Assert — bottom-right floating group opts into the desktop row layout
         const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
         expect(floatingContainer).toBeInTheDocument()
         expect(floatingContainer.className).toContain('md:flex-row')
-        // Mobile stays a vertical stack
-        expect(floatingContainer.className).toContain('flex-col-reverse')
+        // Mobile stays a vertical stack (outer column; launcher sub-column keeps flex-col-reverse)
+        expect(floatingContainer.className).toContain('flex-col')
     })
 
     it('TC-F04-SR-GH1412-04b: whatsapp only (no CTA) → container stays vertical, NO md:flex-row', () => {
