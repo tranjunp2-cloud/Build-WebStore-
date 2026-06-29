@@ -78,7 +78,7 @@ export async function PATCH(
         const { siteId } = await params
 
         // Verify site exists and check ownership (tenant isolation)
-        const existingSite = await payload.findByID({ collection: 'sites', id: siteId })
+        const existingSite = await payload.findByID({ collection: 'sites', id: siteId, disableErrors: true })
         if (!existingSite) {
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
