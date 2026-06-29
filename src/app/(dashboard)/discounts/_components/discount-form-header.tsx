@@ -1,10 +1,9 @@
 'use client'
 
-import { ArrowLeft, Trash2, UndoDot, Check } from 'lucide-react'
+import { ArrowLeft, Trash2, UndoDot } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
-import { Button } from '@/components/ui/button'
 
 interface DiscountFormHeaderProps {
     isNew: boolean
@@ -20,7 +19,6 @@ interface DiscountFormHeaderProps {
     saving: boolean
     dirty: boolean
     onBack: () => void
-    onSave: () => void
     onRevert: () => void
     onDelete?: () => void
 }
@@ -39,7 +37,6 @@ export function DiscountFormHeader({
     saving,
     dirty,
     onBack,
-    onSave,
     onRevert,
     onDelete,
 }: DiscountFormHeaderProps) {
@@ -119,7 +116,9 @@ export function DiscountFormHeader({
             </div>
 
             {/* Dirty bar */}
-            {dirty && (
+            {/* Unsaved-changes bar — Edit only. On Create there's nothing saved yet,
+                so "unsaved changes" + Revert don't apply (use footer Cancel/Save). */}
+            {dirty && !isNew && (
                 <div
                     className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
                     style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
@@ -134,15 +133,6 @@ export function DiscountFormHeader({
                             <UndoDot className="h-3 w-3" />
                             {d.revert}
                         </button>
-                        <Button
-                            onClick={onSave}
-                            disabled={saving}
-                            variant="dashPrimary"
-                            size="sm"
-                        >
-                            <Check className="h-3 w-3" />
-                            {d.save}
-                        </Button>
                     </div>
                 </div>
             )}

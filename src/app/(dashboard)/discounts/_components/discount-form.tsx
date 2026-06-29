@@ -239,7 +239,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 saving={saving}
                 dirty={dirty}
                 onBack={handleCancel}
-                onSave={handleSave}
                 onRevert={handleRevert}
                 onDelete={!isNew ? () => setDeleteOpen(true) : undefined}
             />
