@@ -155,9 +155,10 @@ describe('[TC-F01D-A5.C06] floating-sticky shows when page is not scrollable (ed
         expect(screen.getByText(baseBlock.headline)).toBeInTheDocument()
         expect(screen.getByText(baseBlock.ctaLabel)).toBeInTheDocument()
 
-        // Assert — the fixed container exists (proof it rendered, not null)
-        const fixedContainer = container.querySelector('.fixed.bottom-4')
-        expect(fixedContainer).toBeInTheDocument()
+        // Assert — the card exists (proof it rendered, not null). Positioning is owned by the
+        // SiteRenderer floating container, so the card itself only carries sizing classes.
+        const card = container.querySelector('.rounded-2xl')
+        expect(card).toBeInTheDocument()
     })
 
     it('TC-F01D-A5.C06b: floating-sticky does not render null even when document.documentElement.scrollHeight = 0', () => {
@@ -228,11 +229,11 @@ describe('[TC-F01D-A5.C06] floating-sticky shows when page is not scrollable (ed
         expect(screen.getByText('Special offer')).toBeInTheDocument()
         expect(screen.getByText('Claim now')).toBeInTheDocument()
 
-        // Assert — content is inside the fixed container
-        const fixedContainer = container.querySelector('.fixed.bottom-4')
-        expect(fixedContainer).toBeInTheDocument()
-        expect(fixedContainer).toHaveTextContent('Special offer')
-        expect(fixedContainer).toHaveTextContent('Claim now')
+        // Assert — content is inside the card (positioning owned by the floating container)
+        const card = container.querySelector('.rounded-2xl')
+        expect(card).toBeInTheDocument()
+        expect(card).toHaveTextContent('Special offer')
+        expect(card).toHaveTextContent('Claim now')
     })
 })
 
@@ -295,6 +296,33 @@ describe('[TC-F01D-A5.C08] floating-sticky shows immediately in editor (GH-1412)
         // Clean up
         localStorage.removeItem(dismissKey)
     })
+
+    it('TC-F01D-A5.C08c: editor hides the dismiss (X) button; storefront shows it (GH-1412)', () => {
+        // Editor — owner must not be able to dismiss (and lose) their own CTA from the preview.
+        const editor = render(
+            <BlockEditCallbackProvider value={{ blockIndex: 0, onFieldChange: vi.fn() }}>
+                <CTABlock
+                    block={{ ...baseBlock, variant: 'floating-sticky' }}
+                    theme={{}}
+                    site={{}}
+                    page={{}}
+                />
+            </BlockEditCallbackProvider>
+        )
+        expect(editor.queryByLabelText('Dismiss call to action')).toBeNull()
+        editor.unmount()
+
+        // Storefront — dismiss button is available (page not scrollable → CTA visible).
+        render(
+            <CTABlock
+                block={{ ...baseBlock, variant: 'floating-sticky' }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
+        )
+        expect(screen.getByLabelText('Dismiss call to action')).toBeInTheDocument()
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -345,36 +373,33 @@ describe('[TC-F01D-A5.C07] floating-sticky in-container responsive sizing (GH-14
         expect(screen.getByText('Join')).toBeInTheDocument()
     })
 
-    it('TC-F01D-A5.C07b: standalone (FloatingContainerProvider value=false) → div.card has "fixed" class', () => {
-        // Arrange — render CTA with FloatingContainerProvider(value=false)
-        // Simulates standalone (non-floating-container) usage where CTA manages its own positioning
+    it('TC-F01D-A5.C07b: card never self-positions — only sizing classes, no "fixed" (GH-1412)', () => {
+        // GH-1412: the floating-sticky CTA is always rendered inside the SiteRenderer floating
+        // container, which owns positioning. The card must NOT carry its own fixed/inset/z classes
+        // (the old standalone branch was dead code and has been removed).
 
-        // Act
+        // Act — render without any FloatingContainerProvider (worst case for self-positioning)
         const { container } = render(
-            <FloatingContainerProvider value={false}>
-                <CTABlock
-                    block={{
-                        ...baseBlock,
-                        variant: 'floating-sticky',
-                        headline: 'Standalone floating',
-                        ctaLabel: 'Click',
-                    }}
-                    theme={{}}
-                    site={{}}
-                    page={{}}
-                />
-            </FloatingContainerProvider>
+            <CTABlock
+                block={{
+                    ...baseBlock,
+                    variant: 'floating-sticky',
+                    headline: 'Standalone floating',
+                    ctaLabel: 'Click',
+                }}
+                theme={{}}
+                site={{}}
+                page={{}}
+            />
         )
 
-        // Assert — card should have "fixed" class (original behavior)
+        // Assert — card carries only sizing, never positioning
         const card = container.querySelector('.rounded-2xl')
         expect(card).toBeInTheDocument()
         const cardClasses = card?.className || ''
-        expect(cardClasses).toContain('fixed')
-
-        // Assert — fixed positioning classes should be present
-        expect(cardClasses).toContain('bottom-4')
-        expect(cardClasses).toContain('md:right-6')
-        expect(cardClasses).toContain('z-50')
+        expect(cardClasses).toContain('md:max-w-sm')
+        expect(cardClasses).not.toContain('fixed')
+        expect(cardClasses).not.toContain('inset-x-4')
+        expect(cardClasses).not.toContain('z-50')
     })
 })

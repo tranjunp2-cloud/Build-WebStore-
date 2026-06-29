@@ -1707,6 +1707,27 @@ describe('[TC-F04-SR-GH1412-04] SiteRenderer bottom-right responsive layout (CTA
         expect(floatingContainer.className).not.toContain('md:flex-row')
         expect(floatingContainer.className).toContain('flex-col-reverse')
     })
+
+    it('TC-F04-SR-GH1412-04c: multiple floating-sticky CTAs stack in a column (no horizontal overflow)', () => {
+        // Arrange — two floating-sticky CTAs must stack vertically in the CTA column, not spread
+        // across the desktop row (which would overflow the viewport width).
+        const page = {
+            layout: [
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'First CTA' },
+                { blockType: 'cta', variant: 'floating-sticky', headline: 'Second CTA' },
+                { blockType: 'whatsapp-button', position: 'bottom-right' },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — first direct child is the CTA column holding BOTH CTAs
+        const floatingContainer = container.querySelector('.fixed.bottom-6.right-6.z-\\[51\\]') as HTMLElement
+        const ctaColumn = floatingContainer.children[0] as HTMLElement
+        expect(ctaColumn.className).toContain('flex-col')
+        expect(ctaColumn.querySelectorAll('[data-testid="block-cta"]').length).toBe(2)
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

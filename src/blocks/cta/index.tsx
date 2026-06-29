@@ -20,7 +20,6 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
-import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
@@ -308,9 +307,6 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
     const [dismissed, setDismissed] = useState(false)
     const shouldReduce = useReducedMotion()
     const storageKey = FLOATING_STORAGE_PREFIX + (siteId || 'default')
-    // GH-1412: inside the SiteRenderer floating stack the container owns positioning,
-    // so drop our own `fixed`/inset to avoid overlapping the WhatsApp/social launchers.
-    const inContainer = useInFloatingContainer()
 
     // Check localStorage dismiss memory on mount (storefront only — editor always shows it)
     useEffect(() => {
@@ -349,30 +345,28 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
         return () => window.removeEventListener('scroll', handleScroll)
     }, [dismissed, isEditing])
 
+    // Storefront-only — the dismiss button is hidden in the editor (see render), so this never
+    // runs while editing and can't leak a dismissal to the live storefront via localStorage.
     const handleDismiss = useCallback(() => {
         setDismissed(true)
         setVisible(false)
-        // GH-1412: in the editor, hide visually but DON'T persist the dismissal — the key is
-        // shared by origin+siteId, so writing it would suppress the CTA on the live storefront too.
-        if (isEditing) return
         try {
             localStorage.setItem(storageKey, String(Date.now()))
         } catch {
             // Ignore
         }
-    }, [storageKey, isEditing])
+    }, [storageKey])
 
     if (dismissed || !visible) return null
 
-    // In-container: container handles fixed positioning → keep only sizing.
-    // Standalone: original self-positioned fixed corner toast (backward compatible).
-    const posClasses = inContainer
-        ? 'w-[calc(100vw-3rem)] md:w-auto md:max-w-sm'
-        : 'fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50'
+    // GH-1412: floating-sticky CTA is always rendered inside the SiteRenderer floating stack
+    // (the container owns fixed positioning), so we only size the card here — full-width on
+    // mobile, capped to max-w-sm on desktop.
+    const sizeClasses = 'w-[calc(100vw-3rem)] md:w-auto md:max-w-sm'
 
     const content = (
         <div
-            className={`${posClasses} rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden`}
+            className={`${sizeClasses} rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden`}
             style={{
                 background: CSS_VARS.surface,
                 border: '1px solid rgba(var(--brand-primary-rgb), 0.15)',
@@ -384,14 +378,18 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
         >
             {/* A4 vocab: layered shapes — organic blobs peeking inside the toast */}
             <LayeredShapes color={CSS_VARS.primary} opacity={0.08} />
-            <button
-                type="button"
-                onClick={handleDismiss}
-                className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity z-20 ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
-                aria-label="Dismiss call to action"
-            >
-                <X size={16} />
-            </button>
+            {/* GH-1412: hide the dismiss button while editing — the owner shouldn't be able to
+                dismiss (and lose) their own CTA from the editor preview. */}
+            {!isEditing && (
+                <button
+                    type="button"
+                    onClick={handleDismiss}
+                    className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity z-20 ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
+                    aria-label="Dismiss call to action"
+                >
+                    <X size={16} />
+                </button>
+            )}
             <div className="relative z-10">
                 <Heading level={4} className="mb-2 pr-2">
                     <RichText text={headline} as="span" />

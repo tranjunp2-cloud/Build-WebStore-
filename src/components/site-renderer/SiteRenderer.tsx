@@ -707,7 +707,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                             </div>
                         )
                     }
-                    return <div key={blockIndex}>{floatingContent}</div>
+                    // GH-1412: `empty:hidden` so a floating-sticky CTA that renders null (before
+                    // the storefront scroll-gate fires) doesn't occupy a flex slot / leave a gap.
+                    return <div key={blockIndex} className="empty:hidden">{floatingContent}</div>
                 }
 
                 // GH-1412: keep the launcher column (WhatsApp/social/cart) exactly as before and
@@ -733,7 +735,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         key={pos}
                         className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col md:flex-row items-end gap-3`}
                     >
-                        {ctaIndices.map(renderFloating)}
+                        {/* CTA column — multiple floating-sticky CTAs stack vertically here instead
+                            of overflowing the row horizontally on desktop. */}
+                        <div className="flex flex-col items-end gap-3">
+                            {ctaIndices.map(renderFloating)}
+                        </div>
                         {widgetIndices.length > 0 && (
                             <div className="flex flex-col-reverse items-end gap-3">
                                 {widgetIndices.map(renderFloating)}
