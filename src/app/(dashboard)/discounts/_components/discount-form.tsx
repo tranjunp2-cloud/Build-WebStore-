@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { DiscountFormHeader } from './discount-form-header'
-import { DiscountDeleteDialog } from './discount-delete-dialog'
 import { DiscountFormFields, type DiscountDraft, type DiscountFormErrors } from './discount-form-fields'
 import { computeEffectiveDiscountStatus } from '@/lib/discounts/effective-status'
 import { discountActivationBlocks } from '@/lib/discounts/activation-guard'
@@ -92,7 +91,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
     const [draft, setDraft] = useState<DiscountDraft>(init)
     const [errors, setErrors] = useState<DiscountFormErrors>({})
     const [saving, setSaving] = useState(false)
-    const [deleteOpen, setDeleteOpen] = useState(false)
 
     useEffect(() => { setDraft(init); setErrors({}) }, [init])
 
@@ -199,24 +197,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
         }
     }
 
-    const handleDelete = async () => {
-        setDeleteOpen(false)
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/v1/discounts/${discount!.id}`, { method: 'DELETE' })
-            if (!res.ok) {
-                const json = await res.json().catch(() => ({}))
-                throw new Error(json?.error?.message ?? dt.deleteFailed)
-            }
-            toast.success(dt.deleted)
-            router.push('/discounts')
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : dt.deleteFailed
-            toast.error(dt.deleteFailed, { description: message })
-            setSaving(false)
-        }
-    }
-
     const handleRevert = () => { setDraft(init); setErrors({}) }
 
     const handleCancel = () => {
@@ -236,11 +216,9 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 id={discount?.id}
                 createdAt={discount?.createdAt}
                 tenantName={tenantName}
-                saving={saving}
                 dirty={dirty}
                 onBack={handleCancel}
                 onRevert={handleRevert}
-                onDelete={!isNew ? () => setDeleteOpen(true) : undefined}
             />
 
             <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
@@ -264,15 +242,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 />
             </div>
 
-            {!isNew && (
-                <DiscountDeleteDialog
-                    code={discount!.code}
-                    usageCount={discount!.usageCount}
-                    open={deleteOpen}
-                    onConfirm={handleDelete}
-                    onCancel={() => setDeleteOpen(false)}
-                />
-            )}
 
             <DiscountSaveBar
                 dirty={dirty}

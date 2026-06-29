@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeft, Trash2, UndoDot } from 'lucide-react'
+import { ArrowLeft, UndoDot } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { fmtDate } from '@/lib/discounts/format'
 import { useI18n } from '@/i18n'
@@ -16,11 +16,9 @@ interface DiscountFormHeaderProps {
     id?: string
     createdAt?: string
     tenantName?: string
-    saving: boolean
     dirty: boolean
     onBack: () => void
     onRevert: () => void
-    onDelete?: () => void
 }
 
 export function DiscountFormHeader({
@@ -34,11 +32,9 @@ export function DiscountFormHeader({
     id,
     createdAt,
     tenantName,
-    saving,
     dirty,
     onBack,
     onRevert,
-    onDelete,
 }: DiscountFormHeaderProps) {
     const { t, ti } = useI18n()
     const d = t.dashboard.discounts.header
@@ -101,18 +97,6 @@ export function DiscountFormHeader({
                         ) : null}
                     </div>
                 </div>
-
-                {!isNew && onDelete && (
-                    <button
-                        onClick={onDelete}
-                        disabled={saving}
-                        className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium border transition-colors disabled:opacity-50 hover:border-destructive/50 hover:text-destructive hover:bg-destructive/10"
-                        style={{ color: 'var(--dash-text-muted)', borderColor: 'var(--dash-border)', background: 'transparent' }}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {d.deleteBtn}
-                    </button>
-                )}
             </div>
 
             {/* Dirty bar */}
