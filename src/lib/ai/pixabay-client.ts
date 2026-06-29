@@ -101,7 +101,7 @@ const DOWNLOAD_HOST_ALLOWLIST = [
 const DEFAULT_TIMEOUT_MS = 15_000
 const DEFAULT_MAX_BYTES = 10_000_000 // 10 MB
 const RATE_LIMIT_WARN_THRESHOLD = 20
-const LARGE_SIZE_MIN_WIDTH = 900 // ≥ this → largeImageURL (1280px), else webformatURL (640px)
+const LARGE_SIZE_MIN_WIDTH = 700 // ≥ this → largeImageURL (1280px), else webformatURL (640px)
 
 /** Recommended orientation per block type — used by media-pipeline callers. */
 export const PIXABAY_ORIENTATION_BY_BLOCK: Record<string, PixabayOrientation> = {
@@ -218,8 +218,11 @@ export async function searchPhotos(
         warnNoKeyOnce()
         return []
     }
+    // Pixabay has no 'squarish' orientation (mapped to 'all'). Over-fetch candidates
+    // so we can prefer near-square hits for avatar/team buckets — see reordering below.
+    const isSquarish = opts.orientation === 'squarish'
     // Pixabay per_page min is 3 — clamp low side, then slice to requested count.
-    const perPage = Math.min(Math.max(count, 3), 200)
+    const perPage = Math.min(Math.max(isSquarish ? count * 3 : count, 3), 200)
     const params = new URLSearchParams({
         key: getKey(),
         q: query.trim().slice(0, 100),
@@ -236,7 +239,15 @@ export async function searchPhotos(
     })
     logRateLimit(res.headers)
     const json = (await res.json()) as PixabaySearchResponse
-    const hits = Array.isArray(json.hits) ? json.hits : []
+    let hits = Array.isArray(json.hits) ? json.hits : []
+    if (isSquarish) {
+        // Stable-prefer near-square hits, fall back to the rest to still fill count.
+        const isNearSquare = (h: PixabayHit): boolean => {
+            const ar = h.imageWidth / Math.max(h.imageHeight, 1)
+            return ar >= 0.8 && ar <= 1.25
+        }
+        hits = [...hits.filter(isNearSquare), ...hits.filter((h) => !isNearSquare(h))]
+    }
     return hits.slice(0, count).map((hit) => ({
         id: String(hit.id),
         url: pickSizedUrl(hit, opts.width),

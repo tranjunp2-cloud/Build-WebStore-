@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * Unit tests for src/lib/ai/pixabay-client.ts
- * TC-F38-PIXABAY-01 through TC-F38-PIXABAY-08
+ * TC-F38-PIXABAY-01 through TC-F38-PIXABAY-11
  *
  * Tests import from source — no reimplementation of logic.
  * Global fetch is stubbed; no real network calls.
@@ -145,19 +145,36 @@ describe('searchPhotos', () => {
         expect(Number(url.searchParams.get('per_page'))).toBeGreaterThanOrEqual(3)
     })
 
-    it('[TC-F38-PIXABAY-05] size pick: width≥900 → largeImageURL; width<900 → webformatURL', async () => {
+    it('[TC-F38-PIXABAY-05] size pick: width≥700 → largeImageURL; width<700 → webformatURL', async () => {
         // Arrange
         const hit = makeHit(1)
 
-        // width >= 900 → largeImageURL (≥ LARGE_SIZE_MIN_WIDTH constant)
+        // width >= 700 → largeImageURL (≥ LARGE_SIZE_MIN_WIDTH constant)
         vi.mocked(fetch).mockResolvedValue(makeApiResponse([hit]))
-        let photos = await searchPhotos('test', 1, { width: 1200 })
+        let photos = await searchPhotos('test', 1, { width: 800 })
         expect(photos[0]!.url).toBe(`https://pixabay.com/get/photo-1_1280.jpg`)
 
-        // width < 900 → webformatURL
+        // width < 700 → webformatURL
         vi.mocked(fetch).mockResolvedValue(makeApiResponse([hit]))
         photos = await searchPhotos('test', 1, { width: 640 })
         expect(photos[0]!.url).toBe(`https://pixabay.com/get/photo-1_640.jpg`)
+    })
+
+    it('[TC-F38-PIXABAY-09] squarish over-fetches and prefers near-square hits', async () => {
+        // Arrange — 1 landscape (ar≈1.78) + 2 square hits, in landscape-first order
+        const landscape = makeHit(1, { imageWidth: 1600, imageHeight: 900 })
+        const squareA = makeHit(2, { imageWidth: 1000, imageHeight: 1000 })
+        const squareB = makeHit(3, { imageWidth: 800, imageHeight: 800 })
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([landscape, squareA, squareB]))
+
+        // Act — request 2 squarish
+        const photos = await searchPhotos('team', 2, { orientation: 'squarish' })
+
+        // Assert — square hits float to the front; landscape dropped by slice
+        expect(photos.map((p) => p.id)).toEqual(['2', '3'])
+        // over-fetch: per_page is count*3 (=6), clamped ≥3
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(Number(url.searchParams.get('per_page'))).toBe(6)
     })
 
     it('[TC-F38-PIXABAY-06] 429 response (twice) → throws PixabayError RATE_LIMITED', async () => {
@@ -182,6 +199,19 @@ describe('searchPhotos', () => {
         expect((err as PixabayError).code).toBe('RATE_LIMITED')
         // initial attempt + 1 retry = 2 total fetch calls
         expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    })
+
+    it('[TC-F38-PIXABAY-10] 401 response → throws PixabayError UNAUTHORIZED without retry', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue({
+            ok: false,
+            status: 401,
+            headers: new Headers(),
+        } as unknown as Response)
+
+        // Act + Assert — 401 is non-retryable, fails immediately
+        await expect(searchPhotos('nature', 5)).rejects.toMatchObject({ code: 'UNAUTHORIZED' })
+        expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     })
 })
 
@@ -212,5 +242,16 @@ describe('downloadPhotoBuffer', () => {
             'https://images.unsplash.com/x.jpg',
             expect.objectContaining({ headers: expect.any(Object) }),
         )
+    })
+
+    it('[TC-F38-PIXABAY-11] buffer over maxBytes → throws PixabayError TOO_LARGE', async () => {
+        // Arrange — 6-byte payload, cap at 2 bytes
+        const fakeData = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])
+        vi.mocked(fetch).mockResolvedValue(makeDownloadResponse(fakeData))
+
+        // Act + Assert
+        await expect(
+            downloadPhotoBuffer('https://pixabay.com/get/photo-1_1280.jpg', 2),
+        ).rejects.toMatchObject({ code: 'TOO_LARGE' })
     })
 })

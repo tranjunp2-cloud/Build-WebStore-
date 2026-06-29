@@ -27,12 +27,9 @@ import {
     type PixabayPhoto,
 } from './pixabay-client'
 
-/** Render-box preset per block — `w` drives Pixabay size pick (largeImageURL vs webformatURL). */
+/** Render-box width per block — drives Pixabay size pick (largeImageURL vs webformatURL). */
 interface SizePreset {
     w: number
-    h: number
-    fit?: 'crop' | 'clip'
-    crop?: 'faces' | 'edges' | 'entropy' | 'center'
 }
 
 import { resolveComposerCategory } from './composer-category-resolver'
@@ -67,16 +64,16 @@ export interface BatchFetchResult {
 
 /** Size presets per block type — Payload auto-generates thumbnail/card/hero/square on upload. */
 const SIZE_PRESET_BY_BLOCK: Record<string, SizePreset> = {
-    hero: { w: 1920, h: 1080, fit: 'crop' },
-    gallery: { w: 1200, h: 800, fit: 'crop' },
-    about: { w: 1200, h: 800, fit: 'crop' },
-    'portfolio-grid': { w: 800, h: 1000, fit: 'crop' },
-    team: { w: 400, h: 400, fit: 'crop', crop: 'faces' },
-    testimonials: { w: 200, h: 200, fit: 'crop', crop: 'faces' },
-    'logo-cloud': { w: 400, h: 200, fit: 'clip' },
+    hero: { w: 1920 },
+    gallery: { w: 1200 },
+    about: { w: 1200 },
+    'portfolio-grid': { w: 800 },
+    team: { w: 400 },
+    testimonials: { w: 200 },
+    'logo-cloud': { w: 400 },
 }
 
-const DEFAULT_PRESET: SizePreset = { w: 1200, h: 800, fit: 'crop' }
+const DEFAULT_PRESET: SizePreset = { w: 1200 }
 // Pool downloads: CDN has no rate limit — 6 concurrent covers a full gallery block (6-8 photos)
 // in 1 batch while staying conservative enough to avoid CDN 404 bursts on demo keys.
 const POOL_CONCURRENCY = 6
