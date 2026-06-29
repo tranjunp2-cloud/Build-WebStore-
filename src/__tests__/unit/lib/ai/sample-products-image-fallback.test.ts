@@ -9,12 +9,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages } = vi.hoisted(() => ({
+const { mockSearchPhotos, mockUploadImageUrl, mockFindOrCreateCartonMedia, mockFindByID, mockGetProductImages, mockResolveComposerCategory } = vi.hoisted(() => ({
     mockSearchPhotos: vi.fn(),
     mockUploadImageUrl: vi.fn(),
     mockFindOrCreateCartonMedia: vi.fn(),
     mockFindByID: vi.fn(),
     mockGetProductImages: vi.fn(),
+    mockResolveComposerCategory: vi.fn(),
 }))
 
 vi.mock('@/lib/ai/unsplash-client', () => ({
@@ -58,7 +59,7 @@ vi.mock('@/lib/images/industry-images', () => ({
 }))
 
 vi.mock('@/lib/ai/composer-category-resolver', () => ({
-    resolveComposerCategory: vi.fn().mockReturnValue('business'),
+    resolveComposerCategory: mockResolveComposerCategory,
 }))
 
 vi.mock('@/lib/ai/config', () => ({
@@ -95,6 +96,7 @@ const PRODUCT_URLS = [
 beforeEach(() => {
     vi.clearAllMocks()
     mockGetProductImages.mockReturnValue(PRODUCT_URLS)
+    mockResolveComposerCategory.mockReturnValue('business')
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
     delete process.env.UNSPLASH_FALLBACK_ONLY
@@ -237,4 +239,39 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
         // Pin the exact reason code — ensures tierAUploadFailed path, not gallery_failed
         expect(logSpy.mock.calls.some(args => String(args[0]).includes('reason=upload_failed'))).toBe(true)
     })
+})
+
+describe('[TC-F09-1383] sample product fields — sku / inventory / category', () => {
+    // Image mocks: all tiers fail non-fatally so products are still generated
+    // with imageId=undefined — sufficient since these tests assert on sku/inventory/category
+    function setupImageMocks() {
+        mockSearchPhotos.mockResolvedValue([])
+        mockUploadImageUrl.mockRejectedValue(new Error('upload not needed for this test'))
+        mockFindOrCreateCartonMedia.mockResolvedValue(null)
+    }
+
+    it('[TC-F09-1383-01] generates unique SKU for each product matching pattern', async () => {
+        // Arrange — resolveComposerCategory mocked → 'business' → prefix 'BUS'
+        setupImageMocks()
+
+        // Act
+        const { products } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload as any)
+        const skus = products.map(p => p.sku)
+
+        // Assert
+        skus.forEach(sku => expect(sku).toMatch(/^BUS-\d{3}$/))
+        expect(new Set(skus).size).toBe(products.length) // all unique
+    })
+
+    it('[TC-F09-1383-02] sets inventory to 0 for all products', async () => {
+        // Arrange
+        setupImageMocks()
+
+        // Act
+        const { products } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload as any)
+
+        // Assert
+        products.forEach(p => expect(p.inventory).toBe(0))
+    })
+
 })

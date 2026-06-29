@@ -30,13 +30,16 @@ export function TrackingManager({ siteId, isOwner }: TrackingManagerProps) {
             }
         } catch { /* private browsing */ }
 
+        // Strip /sites/{slug} prefix so direct-access and subdomain URLs normalize to the same path
+        const pageUrl = window.location.pathname.replace(/^\/sites\/[^/]+/, '') || '/'
+
         fetch('/api/analytics/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 siteId,
                 event: 'pageview',
-                pageUrl: window.location.pathname,
+                pageUrl,
                 referrer: document.referrer || '',
                 sessionId,
             }),
