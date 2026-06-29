@@ -43,7 +43,7 @@ export default function NewProductPage() {
             compareAtPrice: data.hasVariants ? undefined : data.compareAtPrice || undefined,
             category: data.categoryIds,
             inventory: data.hasVariants ? (data.variants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0) : (data.baseInventory || 0),
-            sku: data.hasVariants ? '' : data.baseSku || '',
+            sku: data.baseSku || '',
             weight: data.shippingWeight || 0,
             dimensions: {
                 length: data.shippingLength || 0,

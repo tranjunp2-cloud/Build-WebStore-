@@ -2,7 +2,7 @@
 
 import { getPayload, type Where } from 'payload'
 import configPromise from '@payload-config'
-import { getCurrentUser, extractTenantId } from '@/lib/auth'
+import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
 
@@ -66,7 +66,8 @@ export async function getProductsAction() {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
-    const tenantId = extractTenantId(user)
+    // Fix B: coerce to number so payload WHERE matches Neon integer FK (tenant_id integer)
+    const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
     const res = await payload.find({
         collection: 'products',
@@ -74,7 +75,7 @@ export async function getProductsAction() {
         where: {
             and: [
                 { deletedAt: { exists: false } },
-                ...(tenantId ? [{ tenant: { equals: tenantId } }] : []),
+                ...(tenantId != null ? [{ tenant: { equals: tenantId } }] : []),
             ],
         },
         limit: 100,
@@ -121,7 +122,8 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             .map(v => typeof v.sku === 'string' ? v.sku.trim() : '')
             .filter(Boolean),
     ]
-    const tenantId = extractTenantId(user)
+    // Fix B: coerce to number so SKU scope and tenant filter match Neon integer FK
+    const tenantId = tenantIdForQuery(user)
     const numId = id ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
     if (numId !== undefined && Number.isNaN(numId)) throw new Error('Invalid product ID')
     const conflicts = await findConflictingSkus(payload, candidateSkus, tenantId, numId)
@@ -170,13 +172,47 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
         })
         return JSON.parse(JSON.stringify(res))
     } else {
-        const res = await payload.create({
-            collection: 'products',
-            data,
-            user,
-            overrideAccess: false,
-        })
-        return JSON.parse(JSON.stringify(res))
+        // Fix A: explicitly set tenant so the product is always scoped to the user's tenant.
+        // beforeChangeHook injects it too, but only if req.user.tenants is populated — this
+        // guarantees the write even when tenants aren't deeply populated in the server action ctx.
+        if (tenantId != null) (data as Record<string, unknown>).tenant = tenantId
+
+        try {
+            const res = await payload.create({
+                collection: 'products',
+                data,
+                user,
+                overrideAccess: false,
+                // Bypass Payload/Drizzle transaction: commitTransaction silently swallows COMMIT
+                // errors (done.catch(()=>{}) in beginTransaction absorbs PostgreSQL commit failures),
+                // so products appear created but are rolled back. Without a transaction each INSERT
+                // auto-commits, avoiding the silent-commit-failure bug. Tradeoff: if variants INSERT
+                // fails after the products row commits, the product row stays with no variants;
+                // that failure still propagates to the user via handleUpsertError → throw.
+                disableTransaction: true,
+            })
+            // Verify the product actually exists in DB — detects silent Payload/Drizzle commit failures
+            // where commitTransaction swallows COMMIT errors and returns the doc as if it succeeded.
+            try {
+                const verify = await payload.findByID({ collection: 'products', id: res.id, overrideAccess: true, depth: 0 })
+                if (!verify?.id) {
+                    console.error('[products.create] VERIFY FAILED — product not in DB after create!', { id: res?.id })
+                    throw new Error('Product was not saved. Please try again.')
+                }
+            } catch (verifyErr) {
+                if ((verifyErr as Error)?.message === 'Product was not saved. Please try again.') throw verifyErr
+                console.error('[products.create] VERIFY ERROR', { id: res?.id, verifyErr })
+                throw new Error('Product was not saved. Please try again.')
+            }
+            return JSON.parse(JSON.stringify(res))
+        } catch (createErr) {
+            console.error('[products.create] failed', {
+                tenant: tenantId,
+                name: (data as Record<string, unknown>).name,
+                err: createErr,
+            })
+            throw createErr
+        }
     }
 }
 
@@ -196,8 +232,9 @@ export async function updateProductFieldAction(id: string | number, data: unknow
 
     // Subscription gate — checked here because the update below uses overrideAccess: true
     // (required to work around a Payload 3.79 bug with variant array 'id' fields).
-    const tenantId = extractTenantId(user)
-    if (tenantId) {
+    // Fix B: coerce to number so getActivePlanSubscription WHERE matches Neon integer FK
+    const tenantId = tenantIdForQuery(user)
+    if (tenantId != null) {
         const sub = await getActivePlanSubscription(payload, tenantId)
         if (!sub || !(await canUse(payload, sub.plan as PlanCode, 'product_management'))) {
             throw new Error('Product management is not available on your current plan.')

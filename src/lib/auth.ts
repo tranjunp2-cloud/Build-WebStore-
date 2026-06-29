@@ -160,6 +160,18 @@ export function extractTenantId(user: unknown): string | null {
 }
 
 /**
+ * Same as extractTenantId but coerces all-digit strings to numbers so that
+ * payload.find WHERE clauses match Neon PostgreSQL integer FK columns (products.tenant_id integer).
+ * Mirrors the coercion in Products.getTenantIds(). Use this for DB query filters and writes.
+ */
+export function tenantIdForQuery(user: unknown): string | number | null {
+    const raw = extractTenantId(user)
+    if (raw === null) return null
+    if (/^\d+$/.test(raw)) return Number(raw)
+    return raw
+}
+
+/**
  * Get the current user's primary tenant ID.
  * Most users only have 1 tenant (their store).
  */
