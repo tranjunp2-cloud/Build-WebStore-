@@ -25,6 +25,7 @@
  *   TC-F05-save-21d → normalizeBlocksForPersistence: contact block with valid email → unchanged
  *   TC-F05-save-21e → normalizeBlocksForPersistence: contact block with email whitespace → trimmed
  *   TC-F05-save-21f → normalizeBlocksForPersistence: non-contact block email → NOT sanitized (only contact applied)
+ *   TC-F05-save-21g → PAYLOAD_EMAIL_RE unit test: valid/invalid emails + Payload-subset guards (hyphen-edge, IP literal, double-dot)
  *   TC-GH1381-04a → normalizeBlocksForPersistence: gallery images[].image {id,url,alt} → id extracted (GH-1381)
  *   TC-GH1381-04b → normalizeBlocksForPersistence: gallery mixed image types (object + int + null)
  *   TC-GH1381-04c → normalizeBlocksForPersistence: gallery image {url} without id → null
