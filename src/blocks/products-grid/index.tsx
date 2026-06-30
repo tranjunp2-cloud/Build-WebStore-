@@ -88,6 +88,10 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                     }}
                     onClick={(e) => {
                         // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
+                        // Both editor and builder gate PDP nav — product preview routes are not
+                        // rewritten to /preview, so navigating would leak to a live storefront PDP
+                        // that 404s for a draft site. (Builder product nav needs a productPreviewPath
+                        // rewrite first — out of scope for the menu-tab navigation fix.)
                         if (isInEditorPreview()) { handleCartClick(e); return }
                         // No slug → nothing to navigate to.
                         if (!product.slug) e.preventDefault()

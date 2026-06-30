@@ -144,7 +144,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             {/* Self-contained scroll: the iframe auto-grows to its content height, so cap this
                 wrapper and let it scroll internally. overscroll-contain stops the scroll chain
                 from propagating to the page (which would shift the form/header). */}
-            <div className="relative flex min-h-[360px] max-h-[calc(100vh-500px)] items-start justify-center overflow-y-auto overscroll-contain bg-slate-100 dark:bg-[hsl(var(--background))] p-6">
+            <div className="relative flex min-h-[360px] max-h-[calc(100vh-500px)] items-start justify-center overflow-y-auto overscroll-contain bg-slate-100 dark:bg-[hsl(var(--background))] p-3 sm:p-6">
                 {/* Subtle loading overlay — keeps iframe visible to avoid flash */}
                 {loading && (
                     <div className="absolute inset-0 flex items-start justify-center pt-8 bg-slate-100/70 dark:bg-[hsl(var(--background)/0.7)] z-10 pointer-events-none">
@@ -171,6 +171,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                         title="Email preview"
                         style={{
                             width: previewMode === 'desktop' ? '560px' : '360px',
+                            maxWidth: '100%',
                             minHeight: '480px',
                             border: 'none',
                             borderRadius: '8px',

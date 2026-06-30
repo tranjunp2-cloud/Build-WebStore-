@@ -138,7 +138,19 @@ export function detectLocaleFromText(text: string): string {
     if (byScript) return byScript
 
     const iso = franc(trimmed, { minLength: 10 })
-    return FRANC_ISO_TO_LOCALE[iso] ?? 'en'
+    const locale = FRANC_ISO_TO_LOCALE[iso] ?? 'en'
+
+    // franc-min is unreliable on short Latin-script text (business names are noun-heavy
+    // and 2–5 words), routinely guessing random Latin languages (fr/es/it/nl/vi/...) for
+    // plain English input → false "did you mean <X>?" modal (GH-1442). Genuine non-English
+    // Latin languages carry their own diacritics (fr: é à ç, es: ñ, de: ü ß, pt: ã) — and
+    // Vietnamese diacritics are already caught above by detectByScript. So when the text is
+    // pure ASCII, trust franc only for the primary locales (en/ms, both ASCII); any other
+    // guess is noise → default to English. Malay still resolves to 'ms' (skips the modal).
+    const hasNonAscii = /[^\u0000-\u007F]/.test(trimmed)
+    if (!hasNonAscii && locale !== 'en' && locale !== 'ms') return 'en'
+
+    return locale
 }
 
 /**

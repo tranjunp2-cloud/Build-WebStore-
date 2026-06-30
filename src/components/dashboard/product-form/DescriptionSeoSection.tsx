@@ -120,7 +120,7 @@ export function DescriptionSeoSection() {
                 </div>
 
                 {/* SEO Toggle Banner -> AI Optimization Button in Design */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 rounded-2xl border border-white/5 bg-background/50 p-3 md:p-[17px]">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0 rounded-2xl border border-white/5 bg-background/50 p-3 lg:p-[17px]">
                     <div className="flex flex-col items-start gap-1 text-left">
                         <h3 className="text-[14px] md:text-[16px] font-medium text-foreground m-0">{t.dashboard.products.form.sections?.seoOpt || 'Search Optimization (SEO)'}</h3>
                         <p className="text-[12px] text-foreground/50 m-0 leading-tight pb-0.5 md:pb-0">{t.dashboard.products.form.sections?.seoOptDesc || 'Automatically generate Meta Title and Slug'}</p>

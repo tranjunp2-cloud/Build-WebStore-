@@ -152,10 +152,10 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
     }
 
     return (
-        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-end xl:items-center justify-end xl:justify-center border-0 bg-[var(--dash-overlay)] backdrop-blur-sm xl:p-4 animate-in fade-in duration-200">
-            <div className="flex flex-col p-[1px] w-full xl:w-[768px] max-h-[90vh] items-start bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-t-[16px] xl:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 duration-300">
-                {/* Mobile drag handle */}
-                <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
+        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-end md:items-center justify-end md:justify-center border-0 bg-[var(--dash-overlay)] backdrop-blur-sm md:p-4 animate-in fade-in duration-200">
+            <div className="flex flex-col p-[1px] w-full md:max-w-[768px] max-h-[90vh] items-start bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-t-[16px] md:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom md:slide-in-from-bottom-0 duration-300">
+                {/* Mobile drag handle (bottom-sheet only — centered dialog from md) */}
+                <div className="flex md:hidden items-start justify-center pt-[12px] w-full shrink-0">
                     <div className="bg-[hsl(var(--border))] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
                 </div>
                 {/* Header (31611:5304) */}

@@ -47,7 +47,9 @@ export function DiscountsToolbar({
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            <TableSearch value={search} onSearch={onSearch} placeholder={tb.searchPlaceholder} />
+            {/* Full-width own row below lg so the placeholder isn't clipped on mobile (override the
+                component's built-in max-w-[360px]); filters wrap below. Capped flex at lg+. */}
+            <TableSearch value={search} onSearch={onSearch} placeholder={tb.searchPlaceholder} className="w-full max-w-none lg:flex-1 lg:max-w-[360px]" />
 
             <FilterChip<StatusFilter>
                 icon={Clock}

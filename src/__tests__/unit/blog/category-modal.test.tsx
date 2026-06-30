@@ -87,14 +87,15 @@ describe('[TC-F17-05] CategoryModal — Bottom Sheet renders with drag handle on
         expect(screen.getByText('Manage Category')).toBeInTheDocument()
     })
 
-    it('renders the mobile drag handle (hidden on xl)', async () => {
+    it('renders the mobile drag handle (hidden on md+)', async () => {
         // Arrange + Act
         await act(async () => {
             render(<CategoryModal onClose={vi.fn()} />)
         })
 
-        // Assert — the drag handle div has class "flex xl:hidden"
-        const dragHandleContainer = document.querySelector('.flex.xl\\:hidden')
+        // Assert — the drag handle div has class "flex md:hidden"
+        // (tablet-first: bottom-sheet only on mobile, centered dialog from md+)
+        const dragHandleContainer = document.querySelector('.flex.md\\:hidden')
         expect(dragHandleContainer).not.toBeNull()
     })
 
