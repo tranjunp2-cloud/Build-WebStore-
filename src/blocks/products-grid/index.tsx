@@ -10,7 +10,7 @@ import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
-import { handleCartClick, isInEditorEditMode } from '@/lib/storefront/editor-intercept'
+import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
@@ -87,9 +87,12 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                         e.currentTarget.style.color = CSS_VARS.primary
                     }}
                     onClick={(e) => {
-                        // Editor edit canvas: block navigation + show toast (handleCartClick preventDefaults).
-                        // Builder result preview (?builder=1) is exempt so users can open the PDP.
-                        if (isInEditorEditMode()) { handleCartClick(e); return }
+                        // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
+                        // Both editor and builder gate PDP nav — product preview routes are not
+                        // rewritten to /preview, so navigating would leak to a live storefront PDP
+                        // that 404s for a draft site. (Builder product nav needs a productPreviewPath
+                        // rewrite first — out of scope for the menu-tab navigation fix.)
+                        if (isInEditorPreview()) { handleCartClick(e); return }
                         // No slug → nothing to navigate to.
                         if (!product.slug) e.preventDefault()
                     }}
