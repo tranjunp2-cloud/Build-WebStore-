@@ -20,9 +20,10 @@
 import { useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Globe, ChevronsRight } from 'lucide-react'
+import { Globe, ChevronsRight, ChevronsLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { AppSwitcher } from './AppSwitcher'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { NAV_SECTIONS, filterNavSections, type NavLeaf, type SidebarBadgeKey } from '@/config/sidebar-nav'
 import { isPathActive } from '@/lib/sidebar/is-path-active'
@@ -237,16 +238,50 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
             {/* Mobile overlay + drawer — slides in BELOW the header; every item is a leaf so any
                 click navigates and the route-change effect closes the drawer (design §1.3) */}
             {mobileOpen && (
-                <div className="fixed inset-0 z-40 lg:hidden">
+                // z above the top-bar (z-50): the drawer runs from top-0 and OVERLAYS the header's
+                // ☰ + logo so they don't show twice — it reads as one black bar from the very top.
+                <div className="fixed inset-0 z-[60] lg:hidden">
                     <div
-                        className="absolute inset-0 top-[56px] bg-black/60"
+                        className="absolute inset-0 bg-black/60"
                         onClick={() => setMobileOpen(false)}
                     />
                     <aside
                         // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
-                        className="dark sb-dark absolute left-0 top-[56px] bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
+                        className="dark sb-dark absolute left-0 top-0 bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
+                        {/* Drawer header — replaces the top-bar's ☰ + logo (same 56px band): logo,
+                            SSO app-switcher (⊞) and a close (✕). */}
+                        <div
+                            className="flex h-[56px] shrink-0 items-center justify-between pl-4 pr-2"
+                            style={{ borderBottom: '1px solid var(--dash-col-divider-color)' }}
+                        >
+                            <Link
+                                href="/dashboard"
+                                onClick={() => setMobileOpen(false)}
+                                className="flex items-center gap-2 no-underline outline-none"
+                            >
+                                <img
+                                    src="/images/logo-icon-3c4d76.png"
+                                    alt="PrimeWeb Logo"
+                                    className="h-[28px] w-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                                />
+                                <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
+                                    <span className="text-dash-text">Prime</span>
+                                    <span className="text-[#06B6D4]">Web</span>
+                                </div>
+                            </Link>
+                            <div className="flex items-center gap-1">
+                                <AppSwitcher />
+                                <button
+                                    onClick={() => setMobileOpen(false)}
+                                    aria-label="Close menu"
+                                    className="flex h-10 w-10 items-center justify-center rounded-lg border-none bg-transparent text-dash-text-muted outline-none transition-colors hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer"
+                                >
+                                    <ChevronsLeft className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
                         {renderSidebarContent(false)}
                     </aside>
                 </div>

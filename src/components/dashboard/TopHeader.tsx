@@ -66,8 +66,12 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                         </div>
                     </Link>
 
-                    {/* App Switcher ⊞ — SSO / ecosystem launcher, to the RIGHT of the logo. */}
-                    <AppSwitcher />
+                    {/* App Switcher ⊞ — SSO / ecosystem launcher, to the RIGHT of the logo.
+                        Desktop (lg) only; on mobile/tablet it moves into the drawer header so the
+                        top-bar stays trimmed to just ☰ + logo. */}
+                    <div className="hidden lg:block">
+                        <AppSwitcher />
+                    </div>
                 </div>
 
                 {/* Collapsed mini rail: logo icon centered so the brand stays visible above the
