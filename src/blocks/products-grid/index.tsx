@@ -10,7 +10,7 @@ import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
-import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { handleCartClick, isInEditorEditMode } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
@@ -87,8 +87,9 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                         e.currentTarget.style.color = CSS_VARS.primary
                     }}
                     onClick={(e) => {
-                        // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
-                        if (isInEditorPreview()) { handleCartClick(e); return }
+                        // Editor edit canvas: block navigation + show toast (handleCartClick preventDefaults).
+                        // Builder result preview (?builder=1) is exempt so users can open the PDP.
+                        if (isInEditorEditMode()) { handleCartClick(e); return }
                         // No slug → nothing to navigate to.
                         if (!product.slug) e.preventDefault()
                     }}

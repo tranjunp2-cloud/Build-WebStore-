@@ -16,7 +16,7 @@ import {
     CARD_PADDING,
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
-import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { handleCartClick, isInEditorEditMode } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -226,7 +226,8 @@ function QuickViewModal({
                                 className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
                                 onClick={(e) => {
-                                    if (isInEditorPreview()) { handleCartClick(e); return }
+                                    // Editor edit canvas blocks nav; builder result preview (?builder=1) allows it.
+                                    if (isInEditorEditMode()) { handleCartClick(e); return }
                                     if (product.slug) {
                                         router.push(`${siteBasePath}/products/${product.slug}`)
                                         onClose()
