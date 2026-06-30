@@ -179,8 +179,10 @@ export function DiscountsUsageHistoryLayout() {
             {/* Data table — only shown when rows exist */}
             {!loading && rows.length > 0 && (
                 <>
-                {/* Card list (mobile + tablet + iPad Pro, < xl) — table scrolls on narrow panes */}
-                <div className="xl:hidden flex flex-col gap-3">
+                {/* Card list (mobile + tablet + iPad Pro, < xl) — table scrolls on narrow panes.
+                    1 col on mobile, 2 cols from md (tablet) — matches the discounts card list so the
+                    wide iPad width isn't a single sparse column. */}
+                <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                     {rows.map((u) => (
                         <div key={u.id} className="rounded-[12px] border p-4 flex flex-col gap-2" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
                             <div className="flex items-center justify-between gap-2">
@@ -204,7 +206,7 @@ export function DiscountsUsageHistoryLayout() {
                             </div>
                         </div>
                     ))}
-                    <div className="pt-1">
+                    <div className="pt-1 md:col-span-2">
                         <TablePagination page={page} total={totalDocs} limit={limit} onPageChange={setPage} onLimitChange={(n) => { setLimit(n); setPage(1) }} labels={{ showing: d.showingOf, of: d.ofTotal, unit: d.ofRedemptions, rowsPerPage: d.rowsPerPage }} />
                     </div>
                 </div>
