@@ -195,6 +195,32 @@ describe('getDefaultContentFields [TC-GH-1433]', () => {
         }
     })
 
+    // ─── TC-GH-1433-16: every prefilled field's literal text appears in the preview ───
+    // Broader than TC-15 (subject round-trip): covers greeting/ctaLabel/closing too, including
+    // display-only fields (seller footer). Strips {tokens}, asserts each literal fragment (>=4
+    // chars) of the prefill is present in the rendered subject+html for both locales.
+
+    it('[TC-GH-1433-16] all 4 prefilled fields mirror the preview render (literal fragments)', () => {
+        for (const type of EMAIL_TEMPLATE_TYPES) {
+            for (const locale of ['en', 'ms'] as const) {
+                const fixture = { ...EMAIL_PREVIEW_FIXTURES[type], locale }
+                const out = (() => {
+                    const r = templateRegistry[type](fixture as never)
+                    return `${r.subject}\n${r.html}`
+                })()
+                const def = getDefaultContentFields(type, locale)
+                for (const field of ['subject', 'greeting', 'ctaLabel', 'closing'] as const) {
+                    const v = def[field]
+                    if (!v) continue
+                    const fragments = v.split(/\{[^}]+\}/).map((s) => s.trim()).filter((s) => s.length >= 4)
+                    for (const frag of fragments) {
+                        expect(out, `${type}/${locale} ${field} fragment "${frag}" not in preview`).toContain(frag)
+                    }
+                }
+            }
+        }
+    })
+
     // ─── TC-GH-1433-11: all 17 types return an object without throwing ───
 
     it('[TC-GH-1433-11] all EMAIL_TEMPLATE_TYPES resolve without errors', () => {
