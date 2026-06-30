@@ -1973,8 +1973,23 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
 
-  /* Mobile-sim intent ported to real breakpoints */
+  /* Mobile: keep 2-up but STACK each card's top row vertically. On a ~160px card the
+     justify-between row (icon+label vs delta/badge) collides — the label has min-width:0
+     so it shrinks and its text overflows under the wide Coming-Soon badge. Going column
+     puts each piece on its own line: [icon] label → delta/badge → value. No overlap. */
   .dash-revamp .stat-grid              { grid-template-columns: 1fr 1fr; }
+  .dash-revamp .stat-card              { padding: 12px 13px; min-height: 116px; }
+  .dash-revamp .stat-top               { flex-direction: column; align-items: stretch; gap: 7px; margin-bottom: 8px; }
+  .dash-revamp .stat-top-left          { gap: 7px; }
+  /* delta / coming-soon now sits on its own line under the label → left-align it */
+  .dash-revamp .stat-change            { align-items: flex-start; text-align: left; }
+  .dash-revamp .stat-ic                { width: 28px; height: 28px; border-radius: 8px; }
+  .dash-revamp .stat-ic svg            { width: 15px; height: 15px; }
+  .dash-revamp .stat-label             { font-size: 11.5px; gap: 3px; }
+  .dash-revamp .stat-val               { font-size: 22px; margin-bottom: 6px; }
+  .dash-revamp .delta                  { font-size: 11px; padding: 2px 6px; }
+  /* secondary "vs …" note — drop on mobile to keep each card short */
+  .dash-revamp .delta-note             { display: none; }
   .dash-revamp .issues-list.cols2      { grid-template-columns: 1fr; }
   .dash-revamp .tp-row                 { grid-template-columns: 26px 1fr auto; }
   .dash-revamp .tp-share               { display: none; }
