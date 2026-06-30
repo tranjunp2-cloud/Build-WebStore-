@@ -51,8 +51,15 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                     <Menu className="h-5 w-5 text-dash-text-muted" />
                 </button>
 
-                {/* Logo + App Switcher — hidden on desktop (lg) when collapsed (mini rail shows just the logo icon). */}
+                {/* App Switcher + Logo — hidden on desktop (lg) when collapsed (mini rail shows just the logo icon). */}
                 <div className={cn('flex items-center gap-2.5 lg:gap-3', collapsed && 'lg:hidden')}>
+                    {/* App Switcher ⊞ — SSO / ecosystem launcher, to the LEFT of the logo (design §3.7).
+                        Desktop (lg) only; on mobile/tablet it moves into the drawer header so the
+                        top-bar stays trimmed to just ☰ + logo. */}
+                    <div className="hidden lg:block">
+                        <AppSwitcher />
+                    </div>
+
                     {/* Logo (icon + PrimeWeb wordmark) */}
                     <Link href="/dashboard" className="flex items-center gap-2 no-underline outline-none">
                         <img
@@ -65,13 +72,6 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                             <span className="text-[#06B6D4]">Web</span>
                         </div>
                     </Link>
-
-                    {/* App Switcher ⊞ — SSO / ecosystem launcher, to the RIGHT of the logo.
-                        Desktop (lg) only; on mobile/tablet it moves into the drawer header so the
-                        top-bar stays trimmed to just ☰ + logo. */}
-                    <div className="hidden lg:block">
-                        <AppSwitcher />
-                    </div>
                 </div>
 
                 {/* Collapsed mini rail: logo icon centered so the brand stays visible above the

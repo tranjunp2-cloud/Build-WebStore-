@@ -250,37 +250,37 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         className="dark sb-dark absolute left-0 top-0 bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
-                        {/* Drawer header — replaces the top-bar's ☰ + logo (same 56px band): logo,
-                            SSO app-switcher (⊞) and a close (✕). */}
+                        {/* Drawer header — replaces the top-bar's ☰ + logo (same 56px band):
+                            SSO app-switcher (⊞) LEFT of the logo (design §3.7), close (« ) on the right. */}
                         <div
                             className="flex h-[56px] shrink-0 items-center justify-between pl-4 pr-2"
                             style={{ borderBottom: '1px solid var(--dash-col-divider-color)' }}
                         >
-                            <Link
-                                href="/dashboard"
-                                onClick={() => setMobileOpen(false)}
-                                className="flex items-center gap-2 no-underline outline-none"
-                            >
-                                <img
-                                    src="/images/logo-icon-3c4d76.png"
-                                    alt="PrimeWeb Logo"
-                                    className="h-[28px] w-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
-                                />
-                                <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
-                                    <span className="text-dash-text">Prime</span>
-                                    <span className="text-[#06B6D4]">Web</span>
-                                </div>
-                            </Link>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2.5">
                                 <AppSwitcher />
-                                <button
+                                <Link
+                                    href="/dashboard"
                                     onClick={() => setMobileOpen(false)}
-                                    aria-label="Close menu"
-                                    className="flex h-10 w-10 items-center justify-center rounded-lg border-none bg-transparent text-dash-text-muted outline-none transition-colors hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer"
+                                    className="flex items-center gap-2 no-underline outline-none"
                                 >
-                                    <ChevronsLeft className="h-5 w-5" />
-                                </button>
+                                    <img
+                                        src="/images/logo-icon-3c4d76.png"
+                                        alt="PrimeWeb Logo"
+                                        className="h-[28px] w-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
+                                    />
+                                    <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
+                                        <span className="text-dash-text">Prime</span>
+                                        <span className="text-[#06B6D4]">Web</span>
+                                    </div>
+                                </Link>
                             </div>
+                            <button
+                                onClick={() => setMobileOpen(false)}
+                                aria-label="Close menu"
+                                className="flex h-10 w-10 items-center justify-center rounded-lg border-none bg-transparent text-dash-text-muted outline-none transition-colors hover:bg-dash-surface-hover hover:text-dash-text cursor-pointer"
+                            >
+                                <ChevronsLeft className="h-5 w-5" />
+                            </button>
                         </div>
                         {renderSidebarContent(false)}
                     </aside>
