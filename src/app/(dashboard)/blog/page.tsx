@@ -28,6 +28,7 @@ import {
     TableActionButton,
 } from '@/components/ui/table'
 import { TablePagination } from '@/components/ui/table-pagination'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Badge } from '@/components/ui/badge'
 import { TableSearch } from '@/components/ui/table-search'
@@ -319,8 +320,8 @@ export default function BlogListPage() {
 
     return (
         <div className="flex flex-col w-full font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
-            {/* Header Container */}
-            <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center w-full gap-4 xl:gap-0">
+            {/* Header Container — title + actions on one row from sm (tablet inline); stacks on mobile */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center w-full gap-4 sm:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
                     <div className="w-full h-[32px]">
                         <h1 className="mt-[-1px] w-[242px] h-[32px] text-foreground text-[24px] font-[700] leading-[1.3333333333333333em]">
@@ -417,13 +418,16 @@ export default function BlogListPage() {
                 </div>
             )}
 
-            {/* Mobile Card Layout (visible only below xl) */}
-            <div className="flex flex-col w-full flex-1 overflow-y-auto xl:hidden gap-4 mt-[24px] min-h-0">
+            {/* Card Layout (visible below xl) — 1 col on mobile, 2 cols from md (tablet) so wide
+                tablet/iPad width isn't a single sparse column; xl+ uses the desktop table below. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 content-start w-full flex-1 overflow-y-auto xl:hidden gap-4 mt-[24px] min-h-0">
                 {posts.length === 0 ? (
-                    <TableEmptyState
-                        icon={<SearchX />}
-                        title={t.dashboard.blog.noMatches}
-                    />
+                    <div className="md:col-span-2">
+                        <TableEmptyState
+                            icon={<SearchX />}
+                            title={t.dashboard.blog.noMatches}
+                        />
+                    </div>
                 ) : posts.map((post) => (
                     <div
                         key={`mobile-${post.id}`}
@@ -450,9 +454,22 @@ export default function BlogListPage() {
                             <div className="flex flex-col flex-1 min-w-0 gap-[10px]">
                                 {/* Title & Checkbox */}
                                 <div className="flex flex-row justify-between items-start gap-2">
-                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground line-clamp-2 flex-1 min-w-0">
-                                        {post.title}
-                                    </span>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-foreground line-clamp-2 min-h-[40px] flex-1 min-w-0 cursor-default">
+                                                {post.title}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                            side="top"
+                                            align="start"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="max-w-[360px] max-h-[50vh] overflow-y-auto whitespace-normal break-words leading-relaxed"
+                                            style={{ backgroundColor: 'var(--dash-surface)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
+                                        >
+                                            {post.title}
+                                        </TooltipContent>
+                                    </Tooltip>
                                     <div className="shrink-0 pt-0.5">
                                         <BlogCheckbox
                                             checked={selectedIds.has(post.id)}
@@ -496,34 +513,34 @@ export default function BlogListPage() {
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
+                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
                             >
-                                <Eye className="w-4 h-4" />
-                                {t.dashboard.blog.actions.view}
+                                <Eye className="w-4 h-4 shrink-0" />
+                                <span className="truncate">{t.dashboard.blog.actions.view}</span>
                             </Button>
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
+                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
                             >
-                                <Pencil className="w-4 h-4" />
-                                {t.dashboard.blog.actions.edit}
+                                <Pencil className="w-4 h-4 shrink-0" />
+                                <span className="truncate">{t.dashboard.blog.actions.edit}</span>
                             </Button>
                             <Button
                                 onClick={() => openDeleteConfirm(post)}
                                 variant="ghost"
-                                className="flex-1 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
+                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
                             >
-                                <Trash2 className="w-4 h-4" />
-                                {t.dashboard.blog.actions.delete}
+                                <Trash2 className="w-4 h-4 shrink-0" />
+                                <span className="truncate">{t.dashboard.blog.actions.delete}</span>
                             </Button>
                         </div>
                     </div>
                 ))}
 
-                {/* Mobile pagination */}
+                {/* Pagination — spans both columns under the card grid */}
                 {meta && meta.totalDocs > meta.limit && (
-                    <div className="py-4 shrink-0">
+                    <div className="py-4 shrink-0 md:col-span-2">
                         <TablePagination
                             page={meta.page}
                             total={meta.totalDocs}
@@ -632,15 +649,27 @@ export default function BlogListPage() {
                                         </div>
                                     </TableCell>
 
-                                    {/* Title — widest column; truncates, native tooltip shows full title on hover */}
+                                    {/* Title — widest column; truncates, Radix tooltip shows full title on hover (matches Discounts) */}
                                     <TableCell>
-                                        <span
-                                            title={post.title}
-                                            className="truncate block font-[600] text-[14px] leading-[1.4285714285714286em]"
-                                            style={{ color: 'var(--dash-text)' }}
-                                        >
-                                            {post.title}
-                                        </span>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span
+                                                    className="truncate block font-[600] text-[14px] leading-[1.4285714285714286em] cursor-default"
+                                                    style={{ color: 'var(--dash-text)' }}
+                                                >
+                                                    {post.title}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent
+                                                side="top"
+                                                align="start"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="max-w-[360px] max-h-[50vh] overflow-y-auto whitespace-normal break-words leading-relaxed"
+                                                style={{ backgroundColor: 'var(--dash-surface)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
+                                            >
+                                                {post.title}
+                                            </TooltipContent>
+                                        </Tooltip>
                                     </TableCell>
 
                                     {/* Category */}

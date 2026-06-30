@@ -385,7 +385,7 @@ function LoginFormContent() {
                         type="button"
                         onClick={handleForgotPassword}
                         disabled={checkingReset}
-                        className="text-sm font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
+                        className="text-sm font-medium text-white hover:text-white/80 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
                         style={{ lineHeight: '1.43' }}
                     >
                         {checkingReset ? t.auth.checking : t.auth.forgotPassword}

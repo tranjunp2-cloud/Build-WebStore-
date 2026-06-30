@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Pencil, Trash2, Banknote, Percent } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { DiscountUsageMeter } from './discount-usage-meter'
+import { DiscountsCardList } from './discounts-card-list'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     Table,
@@ -67,8 +68,17 @@ export function DiscountsTable({
     }
 
     return (
-        /* table-fixed + colgroup by %: stable column widths, no layout shift on description (#7).
-           min-w-[920px] keeps layout intact on narrow viewports (horizontal scroll). */
+        <>
+        {/* Mobile / tablet / small-desktop (<xl): card list — matches Blog/Orders
+            breakpoint so the 920px table only appears once there's real room. */}
+        <div className="xl:hidden">
+            <DiscountsCardList discounts={discounts} onEdit={onEdit} onDelete={onDelete} footer={footer} />
+        </div>
+
+        {/* Desktop (>=xl): original table, unchanged */}
+        <div className="hidden xl:block">
+        {/* table-fixed + colgroup by %: stable column widths, no layout shift on description (#7).
+           min-w-[920px] keeps layout intact on narrow viewports (horizontal scroll). */}
         <Table className="table-fixed w-full" minWidth={920} footer={footer}>
             <colgroup>
                 <col style={{ width: '24%' }} />
@@ -210,5 +220,7 @@ export function DiscountsTable({
                 ))}
             </TableBody>
         </Table>
+        </div>
+        </>
     )
 }

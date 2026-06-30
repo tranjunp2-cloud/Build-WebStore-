@@ -186,7 +186,7 @@ export function VariantsInventorySection() {
 
                 {/* Base Information (Always Visible as Master Values) */}
                 <div className="flex flex-col gap-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-foreground">*</span>
@@ -220,7 +220,7 @@ export function VariantsInventorySection() {
                         </p>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-foreground">*</span>
@@ -458,7 +458,7 @@ export function VariantsInventorySection() {
                                 <div className="px-4 py-3 border-b border-white/[0.08] bg-secondary/50">
                                     <h3 className="text-[14px] font-medium text-foreground">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
                                 </div>
-                                <div className="hidden md:block overflow-x-auto">
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-left text-sm border-spacing-y-2 border-separate -mt-2">
                                         <thead className="text-[12px] uppercase text-foreground/60 font-medium whitespace-nowrap">
                                             <tr>
@@ -517,7 +517,7 @@ export function VariantsInventorySection() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="md:hidden">
+                                <div className="lg:hidden">
                                     <SkuMatrixMobile variants={variants} variantsLive={variantsLive} />
                                 </div>
                             </div>

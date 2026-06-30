@@ -208,8 +208,10 @@ export function CustomersDetail({ customer }: Props) {
             {/* Sticky save bar — only on Default tab */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 z-40"
-                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--dash-border)' }}
+                    // left-0 on tablet (drawer sidebar); from lg align to the live sidebar width
+                    // (--dash-content-pl = 250 / 64 collapsed) so the bar isn't left floating/misaligned.
+                    className="fixed bottom-0 left-0 right-0 lg:left-[var(--dash-content-pl)] transition-[left] duration-200 flex items-center justify-between gap-3 px-6 py-3 z-40"
+                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)' }}
                 >
                     <span style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
                         {dirty ? cd.unsaved : cd.upToDate}
