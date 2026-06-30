@@ -7,6 +7,7 @@ export type QuickViewProduct = {
     price: number
     originalPrice?: number
     imageUrls: string[]
+    imageAlts: string[]
     description?: string
     variants?: string[]
     badge?: string
@@ -36,6 +37,7 @@ export const ProductQuickViewConfigSchema = BaseBlockSchema.extend({
         price: z.number(),
         originalPrice: z.number().optional(),
         imageUrls: z.array(z.string()).default([]),
+        imageAlts: z.array(z.string()).default([]),
         description: z.string().optional(),
         variants: z.array(z.string()).optional(),
         badge: z.string().optional(),
