@@ -188,7 +188,9 @@ export function CustomersDetail({ customer }: Props) {
             {/* Sticky save bar — synced with discount-save-bar style */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
+                    // left-0 on tablet (drawer sidebar); from lg align to the live sidebar width
+                    // (--dash-content-pl = 250 / 64 collapsed) so the bar isn't left floating/misaligned.
+                    className="fixed bottom-0 left-0 right-0 lg:left-[var(--dash-content-pl)] transition-[left] duration-200 flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
                     style={{
                         background: 'var(--dash-surface)',
                         borderColor: 'var(--dash-border)',

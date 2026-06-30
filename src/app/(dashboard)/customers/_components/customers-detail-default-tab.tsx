@@ -53,10 +53,12 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
 
     return (
         <TooltipProvider delayDuration={200}>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+        {/* 2-col (form + 300px stats) only from xl — at iPad Pro (≤1279) the content with the sidebar
+            open (~710px) is too narrow for 1fr+300px, so stack to 1 col below xl. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
             {/* Left: form card */}
             <div className="rounded-[16px] p-6" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
-                <div className="grid gap-x-6 gap-y-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
 
                     {/* Email — read-only identity (col 1) */}
                     <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>

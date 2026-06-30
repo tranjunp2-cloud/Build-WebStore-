@@ -27,10 +27,11 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { EmailTemplateCardList } from './email-template-card-list'
 
-const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
+export const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
-const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
+export const TEMPLATE_ICONS: Record<EmailTemplateType, ElementType> = {
     'welcome':                    Users,
     'otp-verification':           ShieldCheck,
     'forgot-password':            Key,
@@ -60,11 +61,11 @@ const TEMPLATE_LABELS: Partial<Record<EmailTemplateType, string>> = {
     'newsletter-seller-digest':   'Newsletter (Seller Digest)',
 }
 
-function toLabel(type: EmailTemplateType): string {
+export function toLabel(type: EmailTemplateType): string {
     return TEMPLATE_LABELS[type] ?? type.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
+export function relTime(iso: string | undefined, defaultLabel: string, editedAgoTpl: string, ti: (tpl: string, vars: Record<string, string | number>) => string): string {
     if (!iso) return defaultLabel
     const diff = Date.now() - new Date(iso).getTime()
     const mins = Math.floor(diff / 60000)
@@ -122,14 +123,29 @@ export function EmailTemplateListView({ rows, audienceTab, onTabChange, onSelect
                             </span>
                         </TabsTrigger>
                     </TabsList>
-                    <span className="absolute right-0 top-2 text-xs text-[var(--dash-text-muted)] pointer-events-none">
+                    {/* On phones the absolute count overlaps the tabs — show it
+                        statically below the tab bar instead (sm+ keeps the float). */}
+                    <span className="hidden sm:block absolute right-0 top-2 text-xs text-[var(--dash-text-muted)] pointer-events-none">
                         {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
                     </span>
                 </div>
+                <p className="sm:hidden -mt-2 mb-4 text-xs text-[var(--dash-text-muted)]">
+                    {ti(et.customizedCount, { count: customizedCount, total: activeTypes.length })}
+                </p>
 
             {/* Table */}
             <TabsContent value={audienceTab} className="mt-0">
-            <div className="mb-4">
+            {/* Phones: card list (avoids fixed-column table overflow). iPad + desktop keep the table. */}
+            <div className="md:hidden mb-4">
+                <EmailTemplateCardList
+                    types={activeTypes}
+                    recipient={recipient}
+                    findRow={findRow}
+                    onSelectTemplate={onSelectTemplate}
+                    onToggleEnabled={onToggleEnabled}
+                />
+            </div>
+            <div className="hidden md:block mb-4">
                 <Table>
                     <colgroup>
                         <col />

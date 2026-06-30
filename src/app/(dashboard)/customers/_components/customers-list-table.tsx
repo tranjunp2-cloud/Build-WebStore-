@@ -4,6 +4,7 @@ import { ChevronUp, ChevronDown, Users, SearchX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { RankBadge, CustomerAvatar } from './customers-shared-ui'
+import { CustomersListCards } from './customers-list-card'
 import { Badge } from '@/components/ui/badge'
 import { TablePagination } from '@/components/ui/table-pagination'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
@@ -146,6 +147,14 @@ export function CustomersListTable({
         : undefined
 
     return (
+        <>
+        {/* Mobile + tablet + iPad Pro (<xl): card list — avoids horizontal scroll of the 760px table */}
+        <div className="xl:hidden">
+            <CustomersListCards records={records} loading={loading} onRowClick={onRowClick} footer={footer} />
+        </div>
+
+        {/* Desktop (>=xl): original table, unchanged */}
+        <div className="hidden xl:block">
         <Table minWidth={760} className="table-fixed w-full" footer={footer}>
             {/* table-fixed + % colgroup: even columns. Email is slightly wider (it carries
                 the avatar + address); the other 5 are equal width for a balanced rhythm. */}
@@ -209,5 +218,7 @@ export function CustomersListTable({
                 }
             </TableBody>
         </Table>
+        </div>
+        </>
     )
 }

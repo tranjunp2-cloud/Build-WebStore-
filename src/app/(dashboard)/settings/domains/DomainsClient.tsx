@@ -636,24 +636,26 @@ export function DomainsClient({
                                 {t?.Domains?.connected || 'Connected'}
                             </Badge>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                             {!isEditingSlug ? (
                                 <Button
                                     type="button"
                                     onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                     variant="dashSecondary"
                                     size="dash"
+                                    className="w-full sm:w-auto justify-center"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     {t?.Domains?.changeSubdomain || 'Change subdomain'}
                                 </Button>
                             ) : (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
                                     <Button
                                         type="button"
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                         variant="dashSecondary"
                                         size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.cancel || 'Cancel'}
                                     </Button>
@@ -663,6 +665,7 @@ export function DomainsClient({
                                         onClick={() => setShowSlugConfirm(true)}
                                         variant="dashPrimary"
                                         size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.save || 'Save'}
                                     </Button>
