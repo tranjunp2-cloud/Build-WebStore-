@@ -20,11 +20,10 @@ const LINK_CLASS =
     'relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1 whitespace-nowrap'
 
 /** Single item inside MoreDropdown — plain link or click-to-expand accordion when children exist. */
-function MoreDropdownItem({ link, isOpen = false, onToggle = () => {} }: { link: NavLink; isOpen?: boolean; onToggle?: () => void }) {
+function MoreDropdownItem({ link, index, isOpen = false, onToggle = () => {} }: { link: NavLink; index: number; isOpen?: boolean; onToggle?: () => void }) {
     const resolveHref = useLocalHref()
     const hasChildren = link.children && link.children.length > 0
-    // Stable panel id for aria-controls — derived from label, safe for nav labels
-    const panelId = `more-sub-${link.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+    const panelId = `more-sub-${index}`
 
     if (!hasChildren) {
         return (
@@ -122,6 +121,7 @@ export function MoreDropdown({ links }: { links: NavLink[] }) {
                             <MoreDropdownItem
                                 key={i}
                                 link={link}
+                                index={i}
                                 isOpen={openIndex === i}
                                 onToggle={() => setOpenIndex(openIndex === i ? null : i)}
                             />
