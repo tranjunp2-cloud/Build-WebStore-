@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { forwardRef, type AnchorHTMLAttributes, type MouseEvent } from 'react'
-import { isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { isInEditorEditMode } from '@/lib/storefront/editor-intercept'
 
 /**
  * True when a (already-resolved) href points at an internal Next.js route that
@@ -44,13 +44,14 @@ export const SmartLink = forwardRef<HTMLAnchorElement, SmartLinkProps>(
         // would defeat opening a fresh document).
         const forceAnchor = Boolean(target && target !== '_self')
 
-        // Inside the builder iframe, clicking a block in the canvas must select
-        // it, not navigate the preview away. Next's <Link> fires its router.push
-        // from React's delegated handler before the editor's native interceptor
-        // can absorb the click, so suppress navigation here. Checked at
-        // click-time (not render) to avoid any SSR/hydration mismatch.
+        // Inside the EDITOR edit canvas (?editor=1), clicking a block must select it,
+        // not navigate the preview away. Next's <Link> fires its router.push from
+        // React's delegated handler before the editor's native interceptor can absorb
+        // the click, so suppress navigation here. The builder RESULT preview (?builder=1)
+        // is exempt — there the user must be able to click links to explore the generated
+        // site. Checked at click-time (not render) to avoid any SSR/hydration mismatch.
         const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
-            if (isInEditorPreview()) e.preventDefault()
+            if (isInEditorEditMode()) e.preventDefault()
             onClick?.(e)
         }
 

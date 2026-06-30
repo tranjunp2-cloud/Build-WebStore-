@@ -226,6 +226,10 @@ function QuickViewModal({
                                 className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
                                 onClick={(e) => {
+                                    // Both editor and builder gate PDP nav — product preview routes
+                                    // are not rewritten to /preview, so navigating would leak to a live
+                                    // storefront PDP that 404s for a draft site. (Out of scope for the
+                                    // menu-tab navigation fix; needs a productPreviewPath rewrite first.)
                                     if (isInEditorPreview()) { handleCartClick(e); return }
                                     if (product.slug) {
                                         router.push(`${siteBasePath}/products/${product.slug}`)
