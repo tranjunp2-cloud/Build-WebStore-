@@ -12,6 +12,18 @@ import { blockRegistry } from '@/blocks/registry'
 export const UPLOAD_FIELDS = ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage'] as const
 
 /**
+ * Exact copy of Payload's built-in `email` field validation regex (payload@3.79.0,
+ * `dist/fields/validations.js` → `email`). Because it IS Payload's regex, anything that passes
+ * this also passes Payload — so a contact email we keep never triggers a
+ * "field is invalid: ... > Email" ValidationError on payload.create/update. Catches the
+ * real-world failures: missing TLD (`info@brand`), non-ASCII/Cyrillic domains, hyphen-edge
+ * labels, IP literals. Re-sync this literal if Payload is upgraded (regex is a local const,
+ * not exported, so it can't be imported directly).
+ */
+export const PAYLOAD_EMAIL_RE =
+    /^(?!.*\.\.)[\w!#$%&'*+/=?^`{|}~-](?:[\w!#$%&'*+/=?^`{|}~.-]*[\w!#$%&'*+/=?^`{|}~-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/i
+
+/**
  * Coerce an invalid block `variant` value to the block's default variant.
  *
  * Context: AI gen / preset layer sometimes emits variant strings that are
@@ -157,10 +169,21 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.headline = ''
         }
 
-        // Contact block: empty-string email fails Payload email-format validation on publish.
-        // Strip to null so Payload skips format check (field is not required).
-        if (b.blockType === 'contact' && b.email === '') {
-            b.email = null
+        // Contact block: an invalid email fails Payload's email-format validation and makes
+        // payload.create/update reject the ENTIRE page (e.g. AI gen emits "info@brand" with no
+        // TLD, or canned content with a non-ASCII domain). The field is optional, so null out
+        // anything Payload would reject — a contact block without an email beats a failed
+        // 13-block generate. Empty string is dropped silently (expected); other invalid values warn.
+        if (b.blockType === 'contact' && typeof b.email === 'string') {
+            const email = b.email.trim()
+            if (email === '' || !PAYLOAD_EMAIL_RE.test(email)) {
+                if (email !== '') {
+                    console.warn(`[Save] contact block email "${b.email}" failed email-format validation — dropping to null`)
+                }
+                b.email = null
+            } else if (email !== b.email) {
+                b.email = email
+            }
         }
 
         // CTA block: ctaStyle must be 'primary' | 'outline' (GH-1283).
