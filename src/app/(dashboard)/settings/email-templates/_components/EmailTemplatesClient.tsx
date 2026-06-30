@@ -237,6 +237,16 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
 
     const handleOpenInNewTab = useCallback(async () => {
         if (!selectedTemplateId) return
+        // Open the tab SYNCHRONOUSLY inside the click gesture so popup blockers (Safari) allow it,
+        // and WITHOUT `noopener` — `window.open(..., 'noopener')` returns null, which previously left
+        // a blank about:blank tab because the document.write block never ran.
+        const win = window.open('', '_blank')
+        if (!win) {
+            toast.error(et.toast.popupBlocked)
+            return
+        }
+        win.opener = null // sever opener access without relying on the noopener flag
+        win.document.write('<!DOCTYPE html><title>Loading…</title><body style="margin:0;font-family:sans-serif;padding:24px;color:#64748b">Loading preview…</body>')
         try {
             const draftConfig = {
                 enabled: draft.enabled,
@@ -247,19 +257,20 @@ export function EmailTemplatesClient({ initialRows, defaultsByType }: EmailTempl
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ templateType: selectedTemplateId, locale, draftConfig }),
             })
-            if (!res.ok) return
+            if (!res.ok) throw new Error(`Preview API ${res.status}`)
             const { subject, html } = await res.json()
-            const win = window.open('', '_blank', 'noopener,noreferrer')
-            if (win) {
-                const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-                win.document.open()
-                win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
-                win.document.close()
-            }
+            const safeSubject = (subject ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            win.document.open()
+            win.document.write(`<!DOCTYPE html><html><head><title>${safeSubject || 'Email Preview'}</title></head><body style="margin:0;background:#f1f5f9;font-family:sans-serif"><div style="background:#1e293b;color:#94a3b8;padding:12px 24px;font-size:12px;display:flex;align-items:center;gap:8px"><span style="color:#64748b">Subject:</span><span style="color:#f1f5f9;font-weight:600">${safeSubject}</span></div>${html}</body></html>`)
+            win.document.close()
         } catch (err) {
             console.error('[OpenInNewTab] error:', err)
+            win.document.open()
+            win.document.write('<!DOCTYPE html><title>Preview failed</title><body style="margin:0;font-family:sans-serif;padding:24px;color:#ef4444">Failed to load preview. Please close this tab and try again.</body>')
+            win.document.close()
+            toast.error(et.toast.previewFailed)
         }
-    }, [selectedTemplateId, draft, locale])
+    }, [selectedTemplateId, draft, locale, et])
 
     function handleListToggle(
         templateType: EmailTemplateType,
