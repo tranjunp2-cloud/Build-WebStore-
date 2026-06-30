@@ -8,15 +8,13 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 import { validateContentFields } from './validate-content-fields'
 
+// Canonical ContentFields lives in the email lib (single source); re-exported here
+// so existing imports from this module keep working.
+export type { ContentFields } from '@/lib/email/template-default-fields'
+import type { ContentFields } from '@/lib/email/template-default-fields'
+
 // These templates cannot be disabled — security-critical flows
 const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
-
-export interface ContentFields {
-    subject?: string
-    greeting?: string
-    ctaLabel?: string
-    closing?: string
-}
 
 export interface SaveEmailTemplateInput {
     templateType: EmailTemplateType
