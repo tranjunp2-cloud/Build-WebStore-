@@ -127,6 +127,20 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         } catch { /* non-critical — proceed without identity / pickup */ }
 
         const warehouseApplied = syncWarehouse && !!pickupAddress
+        const syncedWarehouses = warehouseApplied
+            ? [{
+                id: crypto.randomUUID(),
+                label: pickupAddress!.name || 'Pickup address',
+                phone: pickupAddress!.phone || '',
+                address1: pickupAddress!.address1 || '',
+                address2: pickupAddress!.address2 || '',
+                city: pickupAddress!.city || '',
+                state: pickupAddress!.state || '',
+                postcode: pickupAddress!.postcode || '',
+                country: 'MY',
+                isDefault: true,
+            }]
+            : undefined
         await payload.update({
             collection: 'tenants',
             id: tenantId,
@@ -135,7 +149,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     testedAt: new Date().toISOString(),
                     ...(accountName !== undefined ? { accountName } : {}),
                     ...(accountEmail !== undefined ? { accountEmail } : {}),
-                    ...(warehouseApplied ? { warehouse: pickupAddress } : {}),
+                    ...(syncedWarehouses ? { warehouses: syncedWarehouses } : {}),
                 },
             } as any,
             overrideAccess: true,

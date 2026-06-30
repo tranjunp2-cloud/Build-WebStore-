@@ -24,6 +24,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -250,7 +251,8 @@ export async function POST(request: NextRequest) {
         // tenant is already fetched above as `tenant` / `tenantTyped`.
         const epIntegration = (tenant as any)?.easyParcelIntegration ?? {}
         let epToken: string | null = null
-        const warehouseState = epIntegration.warehouse?.state ?? ''
+        const defaultWarehouse = getDefaultWarehouse(epIntegration)
+        const warehouseState = defaultWarehouse.state ?? ''
         if (epIntegration.enabled && epIntegration.accessToken) {
             try {
                 epToken = await getValidToken(epIntegration, (tenant as any).id, payload)
@@ -267,7 +269,7 @@ export async function POST(request: NextRequest) {
                 weightGrams: totalWeightGrams,
                 destPostcode: customer.address?.postcode ?? '',
                 destState: customer.address?.state ?? '',
-                senderPostcode: epIntegration.warehouse?.postcode ?? '47500',
+                senderPostcode: defaultWarehouse.postcode ?? '47500',
                 senderState: warehouseState,
                 subtotalSen: subtotalSen - discountSen,
                 codAmountSen: undefined,  // Stripe = no COD

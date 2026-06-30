@@ -7,6 +7,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -275,7 +276,8 @@ export async function POST(request: Request) {
         // Resolve EP token from tenant integration settings (tenantForSlug already fetched above)
         const epIntegration = (tenantForSlug as any)?.easyParcelIntegration ?? {}
         let epToken: string | null = null
-        const warehouseState = epIntegration.warehouse?.state ?? ''
+        const defaultWarehouse = getDefaultWarehouse(epIntegration)
+        const warehouseState = defaultWarehouse.state ?? ''
         if (epIntegration.enabled && epIntegration.accessToken) {
             try {
                 epToken = await getValidToken(epIntegration, tenantId, payload)
@@ -297,7 +299,7 @@ export async function POST(request: Request) {
                 weightGrams: totalWeightGrams,
                 destPostcode: customer.address?.postcode ?? '',
                 destState: customer.address?.state ?? '',
-                senderPostcode: epIntegration.warehouse?.postcode ?? '47500',
+                senderPostcode: defaultWarehouse.postcode ?? '47500',
                 senderState: warehouseState,
                 selectedCourier: epIntegration.selectedCourier || undefined,
                 subtotalSen: effSubtotalSen,

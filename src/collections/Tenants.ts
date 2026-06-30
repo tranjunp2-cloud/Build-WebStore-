@@ -629,7 +629,14 @@ export const Tenants: CollectionConfig = {
                     name: 'warehouse',
                     type: 'json',
                     admin: {
-                        description: 'Default pickup warehouse: {name, phone, address1, address2, city, state, postcode, country}',
+                        description: 'Legacy single pickup warehouse (kept for back-compat). New configs use `warehouses`.',
+                    },
+                },
+                {
+                    name: 'warehouses',
+                    type: 'json',
+                    admin: {
+                        description: 'Pickup addresses: [{id, label, phone, address1, address2, city, state, postcode, country, isDefault}]',
                     },
                 },
                 {

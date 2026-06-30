@@ -9,6 +9,7 @@ import {
 } from '@/lib/shipping'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
+import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
 
 export const maxDuration = 60
 
@@ -74,8 +75,9 @@ export async function POST(request: Request) {
                     // token expired or not connected — falls back to flat rate below
                 }
             }
-            warehousePostcode = epIntegration.warehouse?.postcode ?? '47500'
-            warehouseState = epIntegration.warehouse?.state ?? ''
+            const defaultWh = getDefaultWarehouse(epIntegration)
+            warehousePostcode = defaultWh.postcode ?? '47500'
+            warehouseState = defaultWh.state ?? ''
             epIntegrationCourier = epIntegration.selectedCourier || undefined
         }
 

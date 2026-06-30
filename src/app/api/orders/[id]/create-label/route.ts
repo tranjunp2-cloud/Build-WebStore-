@@ -7,6 +7,7 @@ import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { submitOrder } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
+import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
 import { buildSubmitParams } from './build-submit-params'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -94,10 +95,8 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             throw err
         }
 
-        const warehouse = tenantEp.warehouse as {
-            name?: string; phone?: string; address1?: string; address2?: string
-            city?: string; state?: string; postcode?: string; country?: string
-        } | undefined
+        // Use the default pickup address (multi-warehouse aware, legacy single fallback) as the sender.
+        const warehouse = getDefaultWarehouse(tenantEp)
 
         if (!warehouse?.address1) {
             return NextResponse.json(

@@ -4,6 +4,7 @@ import type { EpSubmitOrderParams } from '@/lib/shipping/easyparcel/types'
 
 interface Warehouse {
     name?: string
+    label?: string
     phone?: string
     address1?: string
     address2?: string
@@ -65,7 +66,7 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
             quantity: 1,
         }],
         sender: {
-            name: warehouse.name ?? 'Sender',
+            name: warehouse.name ?? warehouse.label ?? 'Sender',
             phone_number_country_code: senderPhone.countryCode,
             phone_number: senderPhone.number || '0000000',
             address_1: warehouse.address1 ?? '',
