@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, User, ShoppingBag, CircleAlert, Undo2, Check } from 'lucide-react'
+import { ArrowLeft, Loader2, User, ShoppingBag, UndoDot, Check } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { CustomerAvatar, RankBadge } from './customers-shared-ui'
@@ -67,23 +68,13 @@ export function CustomersDetail({ customer }: Props) {
         if (!validate()) return
         setSaving(true)
         try {
-            const updated = await updateShopCustomerAction(draft.id, {
+            await updateShopCustomerAction(draft.id, {
                 name: draft.name,
                 rank: draft.rank,
                 notes: draft.notes,
             })
-            const merged: ShopCustomerRecord = {
-                ...updated,
-                orderCount: original.orderCount,
-                lifetime: original.lifetime,
-                completedRate: original.completedRate,
-                failedRate: original.failedRate,
-                firstOrderAt: original.firstOrderAt,
-                latestOrderAt: original.latestOrderAt,
-            }
-            setOriginal(merged)
-            setDraft(merged)
             toast.success(cd.saved)
+            router.push('/customers')
         } catch {
             toast.error(cd.saveFailed)
         } finally {
@@ -130,34 +121,23 @@ export function CustomersDetail({ customer }: Props) {
                 </div>
             </div>
 
-            {/* Dirty bar */}
+            {/* Dirty bar — synced with discount-form-header style */}
             {dirty && (
-                <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-[8px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)]">
-                    <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: 'hsl(var(--warning))' }}>
-                        <CircleAlert className="w-3.5 h-3.5 shrink-0" />
-                        {cd.unsavedBanner}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleRevert}
-                            disabled={saving}
-                            style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-50"
-                        >
-                            <Undo2 className="w-3 h-3" /> {cd.revert}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium !text-white border-none cursor-pointer disabled:opacity-60"
-                            style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
-                        >
-                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                            {cd.saveChanges}
-                        </button>
-                    </div>
+                <div
+                    className="flex items-center justify-between gap-4 px-6 py-2 text-sm"
+                    style={{ background: 'hsl(var(--warning)/0.08)', borderBottom: '1px solid hsl(var(--warning)/0.2)', color: 'hsl(var(--warning))' }}
+                >
+                    <span>{cd.unsavedBanner}</span>
+                    <button
+                        type="button"
+                        onClick={handleRevert}
+                        disabled={saving}
+                        className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                        style={{ color: 'hsl(var(--warning))', background: 'hsl(var(--warning)/0.12)' }}
+                    >
+                        <UndoDot className="h-3 w-3" />
+                        {cd.revert}
+                    </button>
                 </div>
             )}
 
@@ -205,37 +185,42 @@ export function CustomersDetail({ customer }: Props) {
                 : <CustomersDetailOrdersTab customerId={original.id} />
             }
 
-            {/* Sticky save bar — only on Default tab */}
+            {/* Sticky save bar — synced with discount-save-bar style */}
             {activeTab === 'default' && (
                 <div
-                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 z-40"
-                    style={{ background: 'var(--cus-surface-sticky)', backdropFilter: 'blur(12px)', borderTop: '1px solid var(--dash-border)' }}
+                    className="fixed bottom-0 left-0 right-0 md:left-[250px] flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
+                    style={{
+                        background: 'var(--dash-surface)',
+                        borderColor: 'var(--dash-border)',
+                        backdropFilter: 'blur(12px)',
+                    }}
                 >
-                    <span style={{ fontSize: 12, color: 'var(--cus-text-muted)' }}>
+                    <span className="text-xs" style={{ color: 'var(--dash-text-muted)' }}>
                         {dirty ? cd.unsaved : cd.upToDate}
-                        {' · '}{cd.lastSaved}{' '}
-                        <strong style={{ color: 'var(--dash-text)' }}>{relativeTime(original.updatedAt, cd.relJustNow)}</strong>
                     </span>
                     <div className="flex items-center gap-2">
-                        <button
+                        <Button
                             type="button"
-                            onClick={handleRevert}
-                            disabled={!dirty || saving}
-                            style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-medium text-[var(--dash-text-muted)] bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors cursor-pointer disabled:opacity-40"
+                            onClick={() => { handleRevert(); router.push('/customers') }}
+                            disabled={saving}
+                            variant="dashSecondary"
+                            size="sm"
                         >
-                            <Undo2 className="w-3 h-3" /> {cd.revert}
-                        </button>
-                        <button
+                            {cd.cancel}
+                        </Button>
+                        <Button
                             type="button"
                             onClick={handleSave}
                             disabled={!dirty || saving}
-                            className="flex items-center gap-1.5 h-8 px-4 rounded-[8px] text-[12px] font-medium !text-white border-none cursor-pointer disabled:opacity-40"
-                            style={{ background: 'linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)' }}
+                            variant="dashPrimary"
+                            size="sm"
                         >
-                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            {saving
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Check className="h-3.5 w-3.5" />
+                            }
                             {cd.saveChanges}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

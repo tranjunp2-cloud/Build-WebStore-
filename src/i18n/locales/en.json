@@ -1906,6 +1906,7 @@
                 "tabOrders": "Orders",
                 "unsavedBanner": "You have unsaved changes.",
                 "revert": "Revert",
+                "cancel": "Cancel",
                 "saveChanges": "Save changes",
                 "upToDate": "Up to date",
                 "unsaved": "Unsaved changes",
