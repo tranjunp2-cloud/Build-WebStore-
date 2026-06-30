@@ -29,6 +29,41 @@ describe('TC-F26-01-01: detectLocaleFromText distinguishes CJK languages', () =>
     })
 })
 
+describe('TC-F26-01-08: plain English input is not misdetected as another language (GH-1442)', () => {
+    // franc-min misguesses short, noun-heavy English business text as random Latin
+    // languages (fr/es/it/nl/vi…), which used to pop the "did you mean <X>?" modal.
+    // Pure-ASCII Latin input must resolve to en (or ms), never a diacritic language.
+    const englishBusinessInputs = [
+        'Yoga Studio',                 // reported: was misdetected as Italian
+        'Yoga Studio classes',
+        'Bestie Nail Salon and spa',
+        'Sunny Yoga Studio wellness classes',
+        'Green Garden landscaping services',
+        'Blue Ocean Spa massage therapy',
+        'Elite Real Estate agency homes',
+        'Royal Tailor custom suits clothing',
+        'Tech Solutions software development company',
+        'Mike Auto Repair car service center',
+    ]
+    for (const input of englishBusinessInputs) {
+        it(`"${input}" → en`, () => {
+            expect(detectLocaleFromText(input)).toBe('en')
+        })
+    }
+})
+
+describe('TC-F26-01-09: genuine non-English input is still detected (no over-correction)', () => {
+    it('French with diacritics → fr (ASCII gate does not over-correct diacritic languages)', () => {
+        expect(detectLocaleFromText('Restaurant français cuisine traditionnelle plats du terroir')).toBe('fr')
+    })
+    it('Malay (ASCII) → ms (primary locale, modal skipped)', () => {
+        expect(detectLocaleFromText('Kedai runcit menjual barangan keperluan harian')).toBe('ms')
+    })
+    it('Vietnamese with diacritics → vi', () => {
+        expect(detectLocaleFromText('Nhà hàng phở bò truyền thống Hà Nội')).toBe('vi')
+    })
+})
+
 describe('TC-F26-01-02: resolveInitialActiveLocale restores persisted view locale', () => {
     it('EN-base site switched to MS → reload stays MS (the reported bug)', () => {
         // generationLocale=en (site authored in EN), user switched to ms → site.locale='ms'
