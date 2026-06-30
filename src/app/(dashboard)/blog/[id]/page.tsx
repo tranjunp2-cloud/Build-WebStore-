@@ -517,10 +517,6 @@ export default function BlogEditorPage() {
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-foreground">
-                                {isNew ? t.dashboard.blog.editor.newPost : `${t.dashboard.blog.editor.editPrefix} ${form.title || t.dashboard.blog.editor.untitled}`}
-                            </span>
                         </div>
                         <div className="h-[32px] flex items-center">
                             <h1 className="font-['Inter'] font-[700] text-[24px] leading-[32px] text-foreground">
