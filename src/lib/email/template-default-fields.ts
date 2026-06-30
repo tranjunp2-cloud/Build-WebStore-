@@ -72,9 +72,11 @@ export function getDefaultContentFields(type: EmailTemplateType, locale: Locale)
 
         case 'otp-verification':
             // base = L.otp; fieldMap: { subject:'subject', greeting:'greeting', closing:'footer' }
+            // greeting OMITTED: L.otp.greeting embeds <strong> markup. The override path HTML-escapes
+            // config.greeting, so prefilling it would (a) show raw markup in a plain-text input and
+            // (b) render escaped "&lt;strong&gt;" if saved — a non-round-trip degrade. Blank → default kept.
             return {
                 subject: L.otp.subject,
-                greeting: L.otp.greeting,
                 closing: L.otp.footer,
             }
 

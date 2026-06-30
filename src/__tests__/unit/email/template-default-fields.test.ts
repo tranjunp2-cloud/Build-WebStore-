@@ -81,13 +81,14 @@ describe('getDefaultContentFields [TC-GH-1433]', () => {
         expect(fpEn.ctaLabel).not.toBe(fpMs.ctaLabel)
     })
 
-    // ─── TC-GH-1433-06: otp-verification omits ctaLabel ─────────────────
+    // ─── TC-GH-1433-06: otp-verification omits ctaLabel + greeting ──────
 
-    it('[TC-GH-1433-06] otp-verification has no ctaLabel (not in fieldMap)', () => {
+    it('[TC-GH-1433-06] otp-verification omits ctaLabel (no button) and greeting (markup)', () => {
         const r = getDefaultContentFields('otp-verification', 'en')
         expect(r.ctaLabel).toBeUndefined()
+        // greeting omitted: L.otp.greeting has <strong> markup → escaped by override path (non-round-trip)
+        expect(r.greeting).toBeUndefined()
         expect(r.subject).toBeTruthy()
-        expect(r.greeting).toBeTruthy()
         expect(r.closing).toBeTruthy()
     })
 
@@ -177,20 +178,27 @@ describe('getDefaultContentFields [TC-GH-1433]', () => {
         expect(staff.greeting).toBe('Hello {inviteeName}')
     })
 
-    // ─── TC-GH-1433-15: prefilled subject round-trips to the default preview render ───
-    // Gold-standard invariant: feeding the prefilled subject back as a config override must
-    // reproduce the exact subject the preview renders with no override. Catches wrong copy
-    // (e.g. confirmed vs placed) AND non-substituting tokens in one shot.
+    // ─── TC-GH-1433-15: every prefilled field round-trips to the default render ───
+    // Gold-standard invariant: feeding ANY single prefilled field back as a config override must
+    // produce a BYTE-IDENTICAL render (subject + html) vs no override. Catches wrong copy
+    // (confirmed vs placed), non-substituting tokens, AND non-round-trip markup (escaped <strong>)
+    // in one shot — across all 4 fields, for every overridable template + locale.
+    // (Display-only fields where the override is ignored pass trivially; TC-16 covers those.)
 
-    it('[TC-GH-1433-15] prefilled subject reproduces the default render for every locale', () => {
+    it('[TC-GH-1433-15] prefilled fields reproduce the default render byte-for-byte', () => {
         for (const type of EMAIL_TEMPLATE_TYPES) {
             for (const locale of ['en', 'ms'] as const) {
-                const def = getDefaultContentFields(type, locale)
-                if (!def.subject) continue // blank subjects are intentionally omitted
                 const fixture = { ...EMAIL_PREVIEW_FIXTURES[type], locale }
-                const rendered = templateRegistry[type](fixture as never).subject
-                const overridden = templateRegistry[type](fixture as never, { subject: def.subject } as never).subject
-                expect(overridden, `${type}/${locale} subject prefill must round-trip`).toBe(rendered)
+                const base = templateRegistry[type](fixture as never)
+                const baseOut = `${base.subject}|${base.html}`
+                const def = getDefaultContentFields(type, locale)
+                for (const field of ['subject', 'greeting', 'ctaLabel', 'closing'] as const) {
+                    const v = def[field]
+                    if (!v) continue // blank fields are intentionally omitted
+                    const ov = templateRegistry[type](fixture as never, { [field]: v } as never)
+                    const ovOut = `${ov.subject}|${ov.html}`
+                    expect(ovOut, `${type}/${locale} ${field} prefill must round-trip`).toBe(baseOut)
+                }
             }
         }
     })
