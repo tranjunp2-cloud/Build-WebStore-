@@ -2,36 +2,21 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, Zap, Timer, Wallet, Printer, MapPin, Lock, Pencil, Search, Check, RefreshCw } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, ShieldCheck, PlugZap, BadgePercent, Wallet, Printer, Lock, Search, RefreshCw, Unlink, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-
-// Matches TableSearch input style (Orders page standard)
-const EP_INPUT = "w-full h-9 rounded-md px-3 text-[13px] outline-none transition-colors [border:1px_solid_hsl(var(--input-border))] focus:[border-color:hsl(var(--primary))] focus:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)] placeholder:text-[var(--dash-text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
-const EP_INPUT_STYLE = { background: 'transparent', color: 'var(--dash-text)' } as const
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { PickupAddresses } from './pickup-addresses'
+import type { Warehouse } from '@/lib/shipping/easyparcel/warehouse'
 
 // Warn the merchant when the EP wallet can't comfortably cover a label purchase (RM).
 const LOW_WALLET_THRESHOLD = 10
 
-type GeoState = { id: number; name: string; state_code: string; zone: string }
-type GeoDistrict = { id: number; name: string }
-
-interface WarehouseData {
-    name?: string
-    phone?: string
-    address1?: string
-    address2?: string
-    city?: string
-    state?: string
-    postcode?: string
-    country?: string
-}
-
 export interface EasyParcelIntegrationConfig {
     enabled?: boolean
     // accessToken is server-only, never returned to client
-    warehouse?: WarehouseData | null
+    warehouse?: Warehouse | null       // legacy single pickup (back-compat)
+    warehouses?: Warehouse[]           // current multi pickup addresses
     selectedCourier?: string
     testedAt?: string
     accountName?: string | null
@@ -45,19 +30,22 @@ interface Props {
     initialEpConfig: EasyParcelIntegrationConfig | null
 }
 
-type CourierOption = { id: string; name: string; fullName?: string }
+// Courier options come live from EP and use EP courier_id (e.g. "EP-CR0AP") so the saved value can
+// filter quotations at checkout. No static fallback — the picker shows loading / no-data instead.
+type CourierOption = { id: string; name: string; fullName?: string; priceFrom?: number | null }
 
-// Static fallback shown only if the live /courier/list call fails. Real options come from EP and
-// use EP courier_id (e.g. "EP-CR0AP") so the saved value can filter quotations at checkout.
-const FALLBACK_COURIERS: CourierOption[] = [
-    { id: 'flash', name: 'Flash Express' },
-    { id: 'jnt', name: 'J&T Express' },
-    { id: 'poslaju', name: 'Pos Laju' },
-    { id: 'dhl', name: 'DHL eCommerce' },
-]
+// Deterministic colored badge (initials) per courier — mirrors the hifi mock's logo chips.
+const COURIER_BADGE_COLORS = ['#eab308', '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#14b8a6', '#64748b']
+function courierBadge(name: string): { initials: string; color: string } {
+    const words = name.replace(/[^a-zA-Z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean)
+    const initials = (words.length >= 2 ? words[0][0] + words[1][0] : name.slice(0, 2)).toUpperCase()
+    let h = 0
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+    return { initials, color: COURIER_BADGE_COLORS[h % COURIER_BADGE_COLORS.length] }
+}
 
 const BENEFIT_TILES = [
-    { icon: Timer, title: 'Live courier rates', desc: 'Quote J&T, Pos Laju, Ninja Van and more in real time at checkout.' },
+    { icon: BadgePercent, title: 'Live courier rates', desc: 'Quote J&T, Pos Laju, Ninja Van and more in real time at checkout.' },
     { icon: Wallet, title: 'No platform markup', desc: 'Shipping is deducted straight from your own EasyParcel wallet.' },
     { icon: Printer, title: 'One-click AWB labels', desc: 'Generate air waybills and book pickups without leaving an order.' },
     { icon: ShieldCheck, title: 'Flat-rate safety net', desc: 'Your flat rates stay on as an automatic fallback if the API ever fails.' },
@@ -71,37 +59,28 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
     const [walletLow, setWalletLow] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
+    const [isDisconnecting, setIsDisconnecting] = useState(false)
+    const [confirm, setConfirm] = useState<null | 'disconnect' | 'sync'>(null)
 
-    // Warehouse fields
-    const wh = initialEpConfig?.warehouse ?? {}
-    const [whName, setWhName] = useState(wh.name ?? '')
-    const [whPhone, setWhPhone] = useState(wh.phone ?? '')
-    const [whAddr1, setWhAddr1] = useState(wh.address1 ?? '')
-    const [whCity, setWhCity] = useState(wh.city ?? '')
-    const [whState, setWhState] = useState(wh.state ?? '')
-    const [whPostcode, setWhPostcode] = useState(wh.postcode ?? '')
+    // Pickup addresses (multi). Seed from legacy single `warehouse` if no array exists yet.
+    const [warehouses, setWarehouses] = useState<Warehouse[]>(() => {
+        const list = initialEpConfig?.warehouses
+        if (Array.isArray(list) && list.length > 0) return list
+        const legacy = initialEpConfig?.warehouse
+        if (legacy && (legacy.address1 || legacy.postcode || legacy.name)) {
+            return [{ ...legacy, id: 'legacy', label: legacy.name || 'Pickup address', isDefault: true }]
+        }
+        return []
+    })
 
     const [selectedCourier, setSelectedCourier] = useState(
         initialEpConfig?.selectedCourier ?? '',
     )
-    const [couriers, setCouriers] = useState<CourierOption[]>(FALLBACK_COURIERS)
-
-    // Geo cascading: state → district → postcode (mirrors checkout logic)
-    const [states, setStates] = useState<GeoState[]>([])
-    const [statesLoading, setStatesLoading] = useState(true)
-    const [selectedStateId, setSelectedStateId] = useState('')
-    const [districts, setDistricts] = useState<GeoDistrict[]>([])
-    const [districtsLoading, setDistrictsLoading] = useState(false)
-    const [selectedDistrictId, setSelectedDistrictId] = useState('')
-    const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
-    const [postcodesLoading, setPostcodesLoading] = useState(false)
+    const [couriers, setCouriers] = useState<CourierOption[]>([])
+    const [couriersLoading, setCouriersLoading] = useState(false)
+    const [codOnly, setCodOnly] = useState(false)
 
     const [isSaving, setIsSaving] = useState(false)
-    const [couriersCount, setCouriersCount] = useState(0)
-    const [showAddressForm, setShowAddressForm] = useState(
-        !(initialEpConfig?.warehouse?.name || initialEpConfig?.warehouse?.address1),
-    )
-    const [whIsDefault, setWhIsDefault] = useState(true)
 
     const searchParams = useSearchParams()
 
@@ -123,108 +102,39 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // Load states on mount
-    useEffect(() => {
-        fetch('/api/geo/states')
-            .then(r => r.json())
-            .then(data => setStates(Array.isArray(data) ? data : []))
-            .catch(() => {})
-            .finally(() => setStatesLoading(false))
-    }, [])
-
-    // Load live courier list from EP once connected; keep static fallback on failure.
+    // Load live courier list from EP once connected. Show loading while fetching; on failure/empty
+    // the picker renders a "no data" state (no static fallback).
     useEffect(() => {
         if (testStatus !== 'connected') return
         let cancelled = false
+        setCouriersLoading(true)
         fetch(`/api/tenant/${tenantId}/easyparcel-couriers`, { credentials: 'include' })
             .then(r => r.json())
             .then(j => {
-                if (!cancelled && j?.success && Array.isArray(j.data?.couriers) && j.data.couriers.length > 0) {
+                if (cancelled) return
+                if (j?.success && Array.isArray(j.data?.couriers)) {
                     setCouriers(j.data.couriers)
+                    setCodOnly(j.data.codFiltered === true)
+                    const w = j.data.wallet
+                    if (w?.balance != null) {
+                        setWalletBalance(`${w.currency ?? 'MYR'} ${w.balance}`)
+                        setWalletLow(Number(w.balance) < LOW_WALLET_THRESHOLD)
+                    }
+                } else {
+                    setCouriers([])
                 }
             })
-            .catch(() => {})
+            .catch(() => { if (!cancelled) setCouriers([]) })
+            .finally(() => { if (!cancelled) setCouriersLoading(false) })
         return () => { cancelled = true }
     }, [testStatus, tenantId])
 
-    // Pre-populate state from existing warehouse data
-    useEffect(() => {
-        if (states.length > 0 && whState && !selectedStateId) {
-            const match = states.find(s => s.name === whState)
-            if (!match) return
-            setSelectedStateId(String(match.id))
-            setDistrictsLoading(true)
-            fetch(`/api/geo/districts?stateId=${match.id}`)
-                .then(r => r.json())
-                .then(data => setDistricts(Array.isArray(data) ? data : []))
-                .catch(() => {})
-                .finally(() => setDistrictsLoading(false))
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [states])
-
-    // Pre-populate district + postcode from existing warehouse data
-    useEffect(() => {
-        if (districts.length > 0 && whCity && !selectedDistrictId) {
-            const match = districts.find(d => d.name === whCity)
-            if (!match) return
-            setSelectedDistrictId(String(match.id))
-            setPostcodesLoading(true)
-            fetch(`/api/geo/postcodes?districtId=${match.id}`)
-                .then(r => r.json())
-                .then(data => setPostcodeOpts(Array.isArray(data) ? data : []))
-                .catch(() => {})
-                .finally(() => setPostcodesLoading(false))
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [districts])
-
-    const handleStateChange = (stateId: string) => {
-        setSelectedStateId(stateId)
-        const st = states.find(s => s.id === Number(stateId))
-        setWhState(st?.name || '')
-        setWhCity('')
-        setWhPostcode('')
-        setSelectedDistrictId('')
-        setDistricts([])
-        setPostcodeOpts([])
-        if (!stateId) return
-        setDistrictsLoading(true)
-        fetch(`/api/geo/districts?stateId=${stateId}`)
-            .then(r => r.json())
-            .then(data => setDistricts(Array.isArray(data) ? data : []))
-            .catch(() => {})
-            .finally(() => setDistrictsLoading(false))
-    }
-
-    const handleDistrictChange = (districtId: string) => {
-        setSelectedDistrictId(districtId)
-        const d = districts.find(dist => dist.id === Number(districtId))
-        setWhCity(d?.name || '')
-        setWhPostcode('')
-        setPostcodeOpts([])
-        if (!districtId) return
-        setPostcodesLoading(true)
-        fetch(`/api/geo/postcodes?districtId=${districtId}`)
-            .then(r => r.json())
-            .then(data => setPostcodeOpts(Array.isArray(data) ? data : []))
-            .catch(() => {})
-            .finally(() => setPostcodesLoading(false))
-    }
-
-    // Warehouse (sender) must be complete + valid before EP can be used — submit_orders requires
-    // name, phone, address, postcode (all mandatory on EP side). Block Save until satisfied so the
-    // merchant can't enable a config that would fail at label creation.
-    const phoneDigits = whPhone.replace(/\D/g, '')
-    const warehouseErrors: string[] = []
-    if (!whName.trim()) warehouseErrors.push('Pickup label/name')
-    if (!phoneDigits || phoneDigits.length < 8) warehouseErrors.push('Valid sender phone')
-    if (!whAddr1.trim()) warehouseErrors.push('Address line 1')
-    if (!whState.trim()) warehouseErrors.push('State')
-    if (!whPostcode.trim()) warehouseErrors.push('Postcode')
-    const warehouseComplete = warehouseErrors.length === 0
-
-    const canSave = testStatus === 'connected' && !isSaving && warehouseComplete
+    // At least one pickup address is required (each is validated inside the add form). A specific
+    // courier must also be chosen so checkout never offers a non-COD courier to COD buyers.
+    const warehouseComplete = warehouses.length > 0
+    const hasWarehouse = warehouses.length > 0
+    const courierMissing = !selectedCourier
+    const canSave = testStatus === 'connected' && !isSaving && warehouseComplete && !courierMissing
 
     async function handleTestConnection() {
         setTestStatus('testing')
@@ -249,7 +159,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             const { balance, currency } = json.data ?? {}
             setWalletBalance(balance ? `${currency ?? 'MYR'} ${balance}` : null)
             setWalletLow(balance != null && Number(balance) < LOW_WALLET_THRESHOLD)
-            setCouriersCount(0)
             setTestStatus('connected')
             toast.success('EasyParcel connection verified!')
         } catch {
@@ -261,7 +170,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // Pull EP's default pickup address into the local warehouse (server writes it, then we reload so
     // the geo-cascade selects reconcile via the same path as connect-time seeding).
     async function handleSyncFromEp() {
-        if (hasWarehouse && !window.confirm('Replace your saved pickup address with the one configured in EasyParcel?')) return
         setIsSyncing(true)
         try {
             const res = await fetch(`/api/tenant/${tenantId}/easyparcel-test`, {
@@ -285,6 +193,30 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             toast.error('Network error. Please try again.')
         } finally {
             setIsSyncing(false)
+            setConfirm(null)
+        }
+    }
+
+    // Clear the EP OAuth session for this tenant. Warehouse/courier config is kept server-side.
+    async function handleDisconnect() {
+        setIsDisconnecting(true)
+        try {
+            const res = await fetch(`/api/tenant/${tenantId}/easyparcel-disconnect`, {
+                method: 'DELETE',
+                credentials: 'include',
+            })
+            const json = await res.json()
+            if (!res.ok || !json.success) {
+                toast.error(json?.error?.message ?? 'Disconnect failed')
+                return
+            }
+            toast.success('EasyParcel disconnected')
+            window.location.reload()
+        } catch {
+            toast.error('Network error. Please try again.')
+        } finally {
+            setIsDisconnecting(false)
+            setConfirm(null)
         }
     }
 
@@ -295,15 +227,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             const data = {
                 easyParcelIntegration: {
                     enabled,
-                    warehouse: {
-                        name: whName,
-                        phone: whPhone,
-                        address1: whAddr1,
-                        city: whCity,
-                        state: whState,
-                        postcode: whPostcode,
-                        country: 'MY',
-                    },
+                    warehouses,
                     selectedCourier,
                 },
             }
@@ -331,8 +255,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 p-6">
                     <div className="flex items-start gap-4">
-                        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.2)] shrink-0">
-                            <Zap className="h-6 w-6 text-[rgb(16,185,129)]" />
+                        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] shrink-0" style={{ background: 'linear-gradient(135deg, rgb(16,185,129) 0%, rgb(13,148,136) 100%)' }}>
+                            <PlugZap className="h-6 w-6 text-white" />
                         </div>
                         <div>
                             <h3 className="text-[18px] font-bold text-[var(--dash-text)]">Connect EasyParcel</h3>
@@ -378,10 +302,10 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 <div className="flex items-center gap-5 p-6">
                     <Button
                         variant="dashPrimary" size="dash"
-                        onClick={() => setEnabled(true)}
+                        onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
                         className="flex items-center gap-2 shrink-0"
                     >
-                        <Zap className="h-4 w-4" />
+                        <PlugZap className="h-4 w-4" />
                         Setup Connection
                     </Button>
                     <p className="text-[13px] text-[var(--dash-text-muted)]">
@@ -393,17 +317,14 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     // --- Full settings (EP enabled) ---
-    const hasWarehouse = !!(whName || whAddr1 || whPostcode)
-    const warehouseAddress = [whAddr1, whCity, whPostcode, whState].filter(Boolean).join(', ')
-
     return (
         <div className="mt-5 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary)/0.6)] overflow-hidden">
 
             {/* ─── Header ───────────────────────────────────── */}
             <div className="flex items-center justify-between gap-4 p-6">
                 <div className="flex items-center gap-4">
-                    <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-[rgba(16,185,129,0.15)] border border-[rgba(16,185,129,0.2)] shrink-0">
-                        <Zap className="h-6 w-6 text-[rgb(16,185,129)]" />
+                    <div className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] shrink-0" style={{ background: 'linear-gradient(135deg, rgb(16,185,129) 0%, rgb(13,148,136) 100%)' }}>
+                        <PlugZap className="h-6 w-6 text-white" />
                     </div>
                     <div>
                         <h3 className="text-[18px] font-bold text-[var(--dash-text)]">Connect EasyParcel</h3>
@@ -435,14 +356,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                     <>
                         <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-3 text-[13px] text-[rgb(16,185,129)]">
                             <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            {couriersCount > 0 ? `Connected — ${couriersCount} couriers available` : walletBalance ? `Connected — Wallet: ${walletBalance}` : 'Connected to EasyParcel'}
+                            {couriers.length > 0 ? `Connected to EasyParcel — ${couriers.length} couriers available` : 'Connected to EasyParcel'}
                         </div>
-                        {walletLow && (
-                            <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--warning))]">
-                                <Wallet className="h-4 w-4 shrink-0" />
-                                Low EasyParcel wallet balance — top up to avoid label-purchase failures at fulfillment.
-                            </div>
-                        )}
                         <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                             <div className="flex items-center gap-3 min-w-0">
                                 <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
@@ -455,28 +370,17 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSyncFromEp}
-                                    disabled={isSyncing}
-                                    className="flex items-center gap-1.5"
-                                    title="Pull the default pickup address configured in your EasyParcel account"
-                                >
-                                    {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                                    Sync from EasyParcel
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
-                                    className="flex items-center gap-1.5"
-                                >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Reconnect
-                                </Button>
-                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => (hasWarehouse ? setConfirm('sync') : handleSyncFromEp())}
+                                disabled={isSyncing}
+                                className="flex items-center gap-1.5 shrink-0"
+                                title="Pull the default pickup address configured in your EasyParcel account"
+                            >
+                                {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                Sync from EasyParcel
+                            </Button>
                         </div>
                     </>
                 ) : (
@@ -490,7 +394,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                 onClick={() => { window.location.href = `/api/tenant/${tenantId}/easyparcel-oauth-start` }}
                                 className="flex items-center gap-2"
                             >
-                                <Zap className="h-4 w-4" />
+                                <PlugZap className="h-4 w-4" />
                                 Connect with EasyParcel
                             </Button>
                         </div>
@@ -508,121 +412,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
             {/* ─── Pickup Addresses ─────────────────────────── */}
-            <div className="p-6 flex flex-col gap-4" style={{ opacity: testStatus === 'testing' ? 0.5 : 1, pointerEvents: testStatus === 'testing' ? 'none' : undefined }}>
-                <div className="flex items-start justify-between gap-4">
+            <div className="p-6 flex flex-col gap-5" style={{ opacity: testStatus === 'testing' ? 0.5 : 1, pointerEvents: testStatus === 'testing' ? 'none' : undefined }}>
+                <PickupAddresses value={warehouses} onChange={setWarehouses} />
+                {testStatus === 'connected' && (
                     <div>
-                        <p className="text-[14px] font-semibold text-[var(--dash-text)]">
-                            Pickup addresses <span className="text-[var(--dash-text-muted)] font-normal">· origin</span>
-                        </p>
-                        <p className="mt-1 text-[12px] text-[var(--dash-text-muted)]">
-                            Saved warehouse / pickup locations — used for calculating charges &amp; arranging pickup. PrimeWeb keeps them for you; the postcode validates during &ldquo;Test connection&rdquo;.
-                        </p>
-                    </div>
-                    {hasWarehouse && !showAddressForm && (
-                        <Button variant="outline" size="sm" onClick={() => setShowAddressForm(true)} className="shrink-0">
-                            + Add address
+                        <Button
+                            variant="outline"
+                            onClick={() => setConfirm('disconnect')}
+                            disabled={isDisconnecting}
+                            className="flex items-center gap-2 border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive)/0.06)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.12)]"
+                        >
+                            {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+                            Disconnect Account
                         </Button>
-                    )}
-                </div>
-
-                {/* Address card */}
-                {hasWarehouse && !showAddressForm && (
-                    <div className="flex items-start gap-3 rounded-[12px] border border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.05)] p-4">
-                        <div className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 border-[hsl(var(--primary))]">
-                            <div className="h-[8px] w-[8px] rounded-full bg-[hsl(var(--primary))]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-[13px] font-semibold text-[var(--dash-text)]">{whName || 'Pickup Warehouse'}</span>
-                                <span style={{ background: 'rgba(16,185,129,0.15)', color: 'rgb(16,185,129)', borderRadius: 10, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>Active</span>
-                            </div>
-                            {warehouseAddress && (
-                                <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">{warehouseAddress}</p>
-                            )}
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => setShowAddressForm(true)} className="text-[12px] shrink-0">
-                            Edit
-                        </Button>
-                    </div>
-                )}
-
-                {/* Add / Edit inline form */}
-                {(showAddressForm || !hasWarehouse) && (
-                    <div className="rounded-[12px] border border-white/[0.08] bg-white/[0.02] p-5 flex flex-col gap-4">
-                        <div className="flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 text-[var(--dash-text-muted)]" />
-                            <span className="text-[11px] font-bold tracking-widest text-[var(--dash-text-muted)] uppercase">
-                                {hasWarehouse ? 'Edit pickup address' : 'Add pickup address'}
-                            </span>
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="wh-name" className="text-[12px] text-[var(--dash-text)]">Label</Label>
-                                    <input id="wh-name" value={whName} onChange={e => setWhName(e.target.value)}
-                                        placeholder="e.g. HQ Warehouse" className={EP_INPUT} style={EP_INPUT_STYLE} />
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="wh-phone" className="text-[12px] text-[var(--dash-text)]">
-                                        Sender phone <span className="text-[hsl(var(--destructive))]">*</span>
-                                    </Label>
-                                    <input id="wh-phone" value={whPhone} onChange={e => setWhPhone(e.target.value)}
-                                        inputMode="tel" placeholder="e.g. 0123456789" className={EP_INPUT} style={EP_INPUT_STYLE} />
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="wh-addr1" className="text-[12px] text-[var(--dash-text)]">Address line 1</Label>
-                                <input id="wh-addr1" value={whAddr1} onChange={e => setWhAddr1(e.target.value)}
-                                    placeholder="Address line 1" className={EP_INPUT} style={EP_INPUT_STYLE} />
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="wh-state" className="text-[12px] text-[var(--dash-text)]">State</Label>
-                                    <select id="wh-state" value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}
-                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
-                                        <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
-                                        {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="wh-city" className="text-[12px] text-[var(--dash-text)]">City</Label>
-                                    <select id="wh-city" value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}
-                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
-                                        <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
-                                        {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="wh-postcode" className="text-[12px] text-[var(--dash-text)]">Postcode</Label>
-                                    <select id="wh-postcode" value={whPostcode} onChange={e => setWhPostcode(e.target.value)} disabled={!selectedDistrictId || postcodesLoading}
-                                        className={EP_INPUT} style={EP_INPUT_STYLE}>
-                                        <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
-                                        {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button type="button" onClick={() => setWhIsDefault(v => !v)} className="flex items-center gap-2 cursor-pointer select-none">
-                            <span style={{
-                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                                border: whIsDefault ? '1.5px solid #3b82f6' : '1.5px solid rgba(255,255,255,0.3)',
-                                background: whIsDefault ? '#3b82f6' : 'transparent',
-                            }}>
-                                {whIsDefault && <Check className="h-3 w-3 text-white" style={{ strokeWidth: 3 }} />}
-                            </span>
-                            <span className="text-[12px] text-[var(--dash-text-muted)]">Set as default pickup address</span>
-                        </button>
-
-                        <div className="flex items-center justify-end gap-3">
-                            <Button variant="dashSecondary" size="dash" onClick={() => setShowAddressForm(false)}>Cancel</Button>
-                            <Button variant="dashPrimary" size="dash" onClick={() => setShowAddressForm(false)} className="flex items-center gap-1.5">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                {hasWarehouse ? 'Update address' : 'Add address'}
-                            </Button>
-                        </div>
                     </div>
                 )}
             </div>
@@ -637,35 +439,75 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                             Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
                         </p>
                         <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                            Buyers are quoted only this courier's live rate. Choose “All couriers” to offer the cheapest available.
+                            Buyers are quoted only this courier's live rate.
+                            {codOnly && ' Only couriers that support COD are listed.'}
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        {[{ id: '', name: 'All couriers', fullName: 'Show cheapest available' } as CourierOption, ...couriers].map(courier => {
-                            const isSelected = selectedCourier === courier.id
-                            return (
-                                <button key={courier.id || 'all'} type="button" role="radio" aria-checked={isSelected}
-                                    onClick={() => setSelectedCourier(courier.id)}
-                                    className={[
-                                        'relative flex flex-col gap-1 rounded-[12px] border py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
-                                        isSelected
-                                            ? 'border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.06)] pl-7 pr-4'
-                                            : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] px-4',
-                                    ].join(' ')}>
-                                    {isSelected && (
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 h-[8px] w-[8px] rounded-full bg-[rgb(16,185,129)]" />
-                                    )}
-                                    <p className={['text-[13px] font-semibold',
-                                        isSelected ? 'text-[rgb(16,185,129)]' : 'text-[var(--dash-text)]'].join(' ')}>
-                                        {courier.name}
-                                    </p>
-                                    {courier.fullName && courier.fullName !== courier.name && (
-                                        <p className="text-[11px] text-[var(--dash-text-muted)]">{courier.fullName}</p>
-                                    )}
-                                </button>
-                            )
-                        })}
-                    </div>
+                    {couriersLoading ? (
+                        <div className="flex items-center gap-2 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-6 text-[13px] text-[var(--dash-text-muted)]">
+                            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                            Loading couriers from EasyParcel…
+                        </div>
+                    ) : couriers.length === 0 ? (
+                        <div className="flex items-center gap-2 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-6 text-[13px] text-[var(--dash-text-muted)]">
+                            <XCircle className="h-4 w-4 shrink-0" />
+                            No courier data available. Check your EasyParcel connection and try again.
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {couriers.map(courier => {
+                                const isSelected = selectedCourier === courier.id
+                                const badge = courierBadge(courier.name)
+                                return (
+                                    <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
+                                        onClick={() => setSelectedCourier(courier.id)}
+                                        className={[
+                                            'flex items-center gap-3 rounded-[12px] border px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+                                            isSelected
+                                                ? 'border-[hsl(var(--primary)/0.5)] bg-[hsl(var(--primary)/0.06)]'
+                                                : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15]',
+                                        ].join(' ')}>
+                                        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2"
+                                            style={{ borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--input-border))' }}>
+                                            {isSelected && <span className="h-[8px] w-[8px] rounded-full bg-[hsl(var(--primary))]" />}
+                                        </span>
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-[12px] font-bold text-white"
+                                            style={{ background: badge.color }}>{badge.initials}</span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-[13px] font-semibold text-[var(--dash-text)] truncate">{courier.name}</span>
+                                            {courier.priceFrom != null ? (
+                                                <span className="block text-[12px] text-[var(--dash-text-muted)]">from RM {courier.priceFrom.toFixed(2)}</span>
+                                            ) : courier.fullName && courier.fullName !== courier.name ? (
+                                                <span className="block text-[12px] text-[var(--dash-text-muted)] truncate">{courier.fullName}</span>
+                                            ) : null}
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {walletBalance && (() => {
+                        const walletNum = parseFloat(walletBalance.replace(/[^0-9.]/g, ''))
+                        const cheapest = couriers.reduce<number | null>((m, c) => (c.priceFrom != null && (m == null || c.priceFrom < m) ? c.priceFrom : m), null)
+                        const ordersLeft = Number.isFinite(walletNum) && cheapest && cheapest > 0 ? Math.floor(walletNum / cheapest) : null
+                        return (
+                            <div className="flex items-center justify-between gap-3 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] px-4 py-3">
+                                <div className="flex items-center gap-2 text-[13px] text-[hsl(var(--warning))]">
+                                    <Wallet className="h-4 w-4 shrink-0" />
+                                    <span>
+                                        <strong>Wallet balance: {walletBalance}</strong>
+                                        {ordersLeft != null && ` — enough for about ${ordersLeft} order${ordersLeft === 1 ? '' : 's'}.`}
+                                        {walletLow && ' Top up to avoid interruptions.'}
+                                    </span>
+                                </div>
+                                <a href="https://app.easyparcel.com" target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[13px] font-medium text-[hsl(var(--warning))] hover:opacity-80 shrink-0">
+                                    Top up <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                            </div>
+                        )
+                    })()}
                 </div>
             )}
 
@@ -693,12 +535,34 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </Button>
                         {!warehouseComplete && (
                             <p className="text-[12px] text-[hsl(var(--destructive))]">
-                                Complete the pickup address first — missing: {warehouseErrors.join(', ')}.
+                                Add at least one pickup address first.
+                            </p>
+                        )}
+                        {warehouseComplete && courierMissing && (
+                            <p className="text-[12px] text-[hsl(var(--destructive))]">
+                                Select a courier for checkout first.
                             </p>
                         )}
                     </>
                 )}
             </div>
+
+            <ConfirmModal
+                open={confirm !== null}
+                variant={confirm === 'disconnect' ? 'danger' : 'default'}
+                loading={confirm === 'disconnect' ? isDisconnecting : isSyncing}
+                icon={confirm === 'disconnect'
+                    ? <Unlink className="h-7 w-7 text-[hsl(var(--destructive))]" />
+                    : <RefreshCw className="h-7 w-7 text-[hsl(var(--primary))]" />}
+                title={confirm === 'disconnect' ? 'Disconnect EasyParcel?' : 'Sync from EasyParcel?'}
+                description={confirm === 'disconnect'
+                    ? 'You will need to reconnect to quote live rates and buy labels. Your pickup address and courier settings are kept.'
+                    : 'Replace your saved pickup address with the one configured in EasyParcel?'}
+                confirmLabel={confirm === 'disconnect' ? 'Disconnect' : 'Sync'}
+                cancelLabel="Cancel"
+                onCancel={() => setConfirm(null)}
+                onConfirm={() => { if (confirm === 'disconnect') handleDisconnect(); else handleSyncFromEp() }}
+            />
         </div>
     )
 }
