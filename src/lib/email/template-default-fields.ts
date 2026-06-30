@@ -99,13 +99,13 @@ export function getDefaultContentFields(type: EmailTemplateType, locale: Locale)
 
         case 'order-confirmation':
             // base = L.order; fieldMap: { greeting:'greeting', ctaLabel:'cta', closing:'farewell' }
-            // subject is overridable via manual config?.subject (not fieldMap); defaultSubject is an
-            // inline literal: `${shopName} - Your order has been confirmed - ${orderNumber}`.
-            // shopName is exposed to applyVariables as {brandName}; orderNumber as {orderNumber}.
+            // subject is overridable via manual config?.subject (not fieldMap); defaultSubject branches
+            // on data.event. The preview fixture sets NO event → falls to the "placed" default, so the
+            // form must mirror that. {brandName} = shopName, {orderNumber} round-trip via vars.
             return {
                 subject: locale === 'ms'
-                    ? '{brandName} - Pesanan anda telah disahkan - {orderNumber}'
-                    : '{brandName} - Your order has been confirmed - {orderNumber}',
+                    ? '{brandName} - Anda telah berjaya membuat pesanan - {orderNumber}'
+                    : '{brandName} - Your order has been placed - {orderNumber}',
                 greeting: order.greeting,
                 ctaLabel: order.cta,
                 closing: order.farewell,
@@ -198,10 +198,10 @@ export function getDefaultContentFields(type: EmailTemplateType, locale: Locale)
             }
 
         case 'order-waiting':
-            // No config param accepted; surfaces inline strings + L.order for greeting/closing
-            // subject and ctaLabel from inline strings (locale-aware)
+            // No config param accepted (display-only). Rendered subject is
+            // `${shopName} - ${inlineSubject} ${orderNumber}` → mirror that structure.
             return {
-                subject: orderWaitingStrings[locale].subject,
+                subject: `{brandName} - ${orderWaitingStrings[locale].subject} {orderNumber}`,
                 greeting: order.greeting,
                 ctaLabel: orderWaitingStrings[locale].ctaLabel,
                 closing: order.farewell,

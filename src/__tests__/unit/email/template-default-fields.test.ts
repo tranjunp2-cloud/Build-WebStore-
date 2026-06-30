@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { getDefaultContentFields } from '@/lib/email/template-default-fields'
 import { EMAIL_TEMPLATE_TYPES } from '@/lib/email/types'
+import { templateRegistry } from '@/lib/email/template-registry'
+import { EMAIL_PREVIEW_FIXTURES } from '@/lib/email/preview-fixtures'
 
 /**
  * TC-GH-1433: email template editor form prefill defaults.
@@ -29,9 +31,9 @@ describe('getDefaultContentFields [TC-GH-1433]', () => {
         // Arrange / Act
         const r = getDefaultContentFields('order-confirmation', 'en')
 
-        // Assert — subject is overridable via manual config?.subject, so it is prefilled
+        // Assert — subject mirrors the preview fixture (no event → "placed" default branch)
         expect(r.subject).toBeTruthy()
-        expect(r.subject).toContain('confirmed')
+        expect(r.subject).toContain('placed')
         expect(r.greeting).toBeTruthy()
         expect(r.ctaLabel).toBeTruthy()
         expect(r.closing).toBeTruthy()
@@ -173,6 +175,24 @@ describe('getDefaultContentFields [TC-GH-1433]', () => {
         const staff = getDefaultContentFields('staff-invitation', 'en')
         expect(staff.subject).toBeUndefined()
         expect(staff.greeting).toBe('Hello {inviteeName}')
+    })
+
+    // ─── TC-GH-1433-15: prefilled subject round-trips to the default preview render ───
+    // Gold-standard invariant: feeding the prefilled subject back as a config override must
+    // reproduce the exact subject the preview renders with no override. Catches wrong copy
+    // (e.g. confirmed vs placed) AND non-substituting tokens in one shot.
+
+    it('[TC-GH-1433-15] prefilled subject reproduces the default render for every locale', () => {
+        for (const type of EMAIL_TEMPLATE_TYPES) {
+            for (const locale of ['en', 'ms'] as const) {
+                const def = getDefaultContentFields(type, locale)
+                if (!def.subject) continue // blank subjects are intentionally omitted
+                const fixture = { ...EMAIL_PREVIEW_FIXTURES[type], locale }
+                const rendered = templateRegistry[type](fixture as never).subject
+                const overridden = templateRegistry[type](fixture as never, { subject: def.subject } as never).subject
+                expect(overridden, `${type}/${locale} subject prefill must round-trip`).toBe(rendered)
+            }
+        }
     })
 
     // ─── TC-GH-1433-11: all 17 types return an object without throwing ───
