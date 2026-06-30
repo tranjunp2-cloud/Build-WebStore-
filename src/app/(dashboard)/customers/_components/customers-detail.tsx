@@ -203,7 +203,7 @@ export function CustomersDetail({ customer }: Props) {
                     <div className="flex items-center gap-2">
                         <Button
                             type="button"
-                            onClick={() => { handleRevert(); router.push('/customers') }}
+                            onClick={() => router.push('/customers')}
                             disabled={saving}
                             variant="dashSecondary"
                             size="sm"

@@ -1910,7 +1910,6 @@
                 "saveChanges": "Save changes",
                 "upToDate": "Up to date",
                 "unsaved": "Unsaved changes",
-                "lastSaved": "Last saved",
                 "saved": "Customer saved",
                 "saveFailed": "Failed to save customer",
                 "fieldEmail": "Email",
