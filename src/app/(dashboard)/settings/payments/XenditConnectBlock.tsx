@@ -19,9 +19,8 @@ export function XenditConnectBlock({ tenantId, onSaveKeys }: XenditConnectBlockP
     return (
         <>
             <div
-                className="anim-pay-hero relative grid items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] overflow-hidden"
+                className="anim-pay-hero relative flex flex-col sm:grid sm:grid-cols-[56px_1fr_auto] items-start sm:items-center gap-[22px] p-[22px_26px] mb-[18px] rounded-[18px] overflow-hidden"
                 style={{
-                    gridTemplateColumns: '56px 1fr auto',
                     background: 'var(--dash-surface)',
                     border: '1px solid var(--dash-border)',
                 }}

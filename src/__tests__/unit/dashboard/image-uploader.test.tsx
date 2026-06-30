@@ -42,12 +42,12 @@ describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
     })
 
     it('shows image count indicator', () => {
-        render(<ImageUploader {...defaultProps} value={[{ url: '/img1.jpg' }]} />)
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} />)
         expect(screen.getByText('1 / 5')).toBeDefined()
     })
 
     it('hides upload zone when max images reached [TC-F08-01-14]', () => {
-        const images = Array.from({ length: 5 }, (_, i) => ({ url: `/img${i}.jpg` }))
+        const images = Array.from({ length: 5 }, (_, i) => ({ id: `img${i}`, url: `/img${i}.jpg` }))
         render(<ImageUploader {...defaultProps} value={images} />)
         // Upload zone should not be visible
         const uploadZones = screen.queryAllByText(/upload/i)
@@ -56,13 +56,13 @@ describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
     })
 
     it('renders remove buttons for each image', () => {
-        render(<ImageUploader {...defaultProps} value={[{ url: '/img1.jpg' }, { url: '/img2.jpg' }]} />)
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }, { id: 'img2', url: '/img2.jpg' }]} />)
         const removeButtons = screen.getAllByTestId('x-icon')
         expect(removeButtons.length).toBeGreaterThanOrEqual(2)
     })
 
     it('calls onChange with removed image when X clicked', () => {
-        const images = [{ url: '/img1.jpg' }, { url: '/img2.jpg' }]
+        const images = [{ id: 'img1', url: '/img1.jpg' }, { id: 'img2', url: '/img2.jpg' }]
         render(<ImageUploader {...defaultProps} value={images} />)
 
         const removeButtons = screen.getAllByTestId('x-icon')
@@ -79,5 +79,23 @@ describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
     it('renders description when provided', () => {
         render(<ImageUploader {...defaultProps} description="Max 5 images, 5MB each" />)
         expect(screen.getByText('Max 5 images, 5MB each')).toBeDefined()
+    })
+
+    // ─── TC-F08-01-15: Alt text input ──────────────────────────────────────
+
+    it('shows alt input when showAltInput is true [TC-F08-01-15]', () => {
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} showAltInput={true} />)
+        expect(screen.getByPlaceholderText('Alt text...')).toBeDefined()
+    })
+
+    it('hides alt input when showAltInput is false (default) [TC-F08-01-15]', () => {
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} />)
+        expect(screen.queryByPlaceholderText('Alt text...')).toBeNull()
+    })
+
+    it('shows amber counter when alt text exceeds 125 chars [TC-F08-01-15]', () => {
+        const longAlt = 'a'.repeat(126)
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg', alt: longAlt }]} showAltInput={true} />)
+        expect(screen.getByText('126/125')).toBeDefined()
     })
 })

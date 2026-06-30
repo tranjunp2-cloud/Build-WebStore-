@@ -19,6 +19,18 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
     const [siteState, setSiteState] = useState(site)
     const [pages, setPages] = useState(initialPages)
 
+    // Soft-navigation sync: clicking a nav link inside the preview iframe changes the
+    // ?pageId query and re-runs the server component, but this client component stays
+    // mounted (same /preview/[siteId] route) so useState(initialPage) keeps the OLD page
+    // → content stays stuck on the previous page. Re-seed `page` when the server delivers
+    // a different page id. Keyed on id (not the prop object) so postMessage editor edits
+    // within the SAME page aren't clobbered by parent re-renders.
+    const initialPageId = (initialPage as { id?: unknown } | null)?.id
+    useEffect(() => {
+        setPage(initialPage)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialPageId])
+
     // F26 FIX: seed the iframe's locale state from SSR site data on mount so the header
     // language switcher flag matches the saved locale on first paint. Previously it relied
     // solely on the parent's UPDATE_LOCALE postMessage, which races the iframe load — when

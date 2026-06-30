@@ -72,11 +72,12 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                 <label className="text-[14px] font-medium text-foreground leading-[1.43]">
                     {t.dashboard.products.form.sections?.images || 'Images (Up to 5 images, each < 5MB)'}
                 </label>
-                <ImageUploader 
+                <ImageUploader
                     value={images || []}
                     onChange={(newImages) => setValue('images', newImages, { shouldDirty: true, shouldValidate: true })}
                     maxImages={5}
                     maxSizeMB={5}
+                    showAltInput={true}
                 />
                 {errors.images && (
                     <p className="text-xs text-destructive mt-1">{errors.images.message}</p>

@@ -49,16 +49,18 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                 style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
             >
                 {/* Connected header row */}
-                <div className="flex items-center gap-[14px] px-[16px] py-[12px]">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-[14px] px-[16px] py-[12px]">
+                    {/* Left group (dot + icon + text) — whole group sits above the buttons on mobile */}
+                    <div className="flex items-center gap-[14px] min-w-0 w-full sm:flex-1">
                     <span className="anim-scb-pulse w-2 h-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
                     <div className="w-8 h-8 rounded-[9px] bg-emerald-500/[0.12] border border-emerald-500/[0.28] text-emerald-400 grid place-items-center shrink-0">
                         <Check className="w-[15px] h-[15px]" />
                     </div>
                     <div className="flex flex-col gap-[2px] min-w-0 flex-1">
-                        <div className="flex items-center gap-2 text-[13px] font-semibold text-slate-50">
+                        <div className="flex items-center gap-2 flex-wrap text-[13px] font-semibold text-slate-50">
                             {pt.xenditConnectedBar}
                             {accountId && (
-                                <span className="font-mono text-[12.5px] font-medium text-slate-300 px-2 py-[2px] bg-white/[0.04] rounded-[6px] tracking-tight" style={{ border: '1px solid var(--dash-border)' }}>
+                                <span className="font-mono text-[12.5px] font-medium text-slate-300 px-2 py-[2px] bg-white/[0.04] rounded-[6px] tracking-tight max-w-full truncate" style={{ border: '1px solid var(--dash-border)' }}>
                                     {accountId}
                                 </span>
                             )}
@@ -68,7 +70,8 @@ export function XenditConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                             {businessName || pt.xenditKybVerified}
                         </div>
                     </div>
-                    <div className="flex gap-[6px] shrink-0 ml-auto">
+                    </div>
+                    <div className="flex gap-[6px] shrink-0 sm:ml-auto">
                         <a
                             href="https://dashboard.xendit.co"
                             target="_blank"

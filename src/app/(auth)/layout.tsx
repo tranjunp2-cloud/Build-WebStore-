@@ -15,12 +15,16 @@ export default async function AuthLayout({
     const cookieValue = cookieStore.get('prefer_lang')?.value
     const localeCookie = (cookieValue === 'en' || cookieValue === 'ms') ? (cookieValue as Locale) : 'en'
 
-    const themeCookie = cookieStore.get('theme')?.value
-    const initialTheme = themeCookie === 'light' ? 'light' : 'dark'
-
     return (
         <AppShell>
-            <ThemeProvider initialTheme={initialTheme}>
+            {/* Auth is always dark — force the html class before paint so a
+                user who left the CMS in light mode sees no flash of light here. */}
+            <script
+                dangerouslySetInnerHTML={{
+                    __html: `document.documentElement.classList.add('dark')`,
+                }}
+            />
+            <ThemeProvider forcedTheme="dark">
                 <I18nProvider defaultLocale={localeCookie}>
                     <div
                         className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8"

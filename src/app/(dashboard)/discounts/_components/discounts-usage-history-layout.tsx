@@ -178,6 +178,41 @@ export function DiscountsUsageHistoryLayout() {
 
             {/* Data table — only shown when rows exist */}
             {!loading && rows.length > 0 && (
+                <>
+                {/* Card list (mobile + tablet + iPad Pro, < xl) — table scrolls on narrow panes.
+                    1 col on mobile, 2 cols from md (tablet) — matches the discounts card list so the
+                    wide iPad width isn't a single sparse column. */}
+                <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+                    {rows.map((u) => (
+                        <div key={u.id} className="rounded-[12px] border p-4 flex flex-col gap-2" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="inline-flex w-fit items-center rounded-[4px] border px-2.5 py-[3px] font-mono text-[12px] font-semibold tracking-wide" style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}>
+                                    {u.discountCode ?? u.discount?.code ?? '—'}
+                                </span>
+                                <span className="font-mono text-[14px] font-semibold text-[hsl(var(--success))] shrink-0">−{fmtRM(u.amountApplied)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap text-[13px]" style={textMuted}>
+                                <span>{u.discountType != null && u.discountValue != null ? fmtValue(u.discountType, u.discountValue) : u.discount ? fmtValue(u.discount.type, u.discount.value) : '—'}</span>
+                                {u.order && (
+                                    <a href={`/orders?order=${u.order.id}`} className="inline-flex items-center gap-1 text-[hsl(var(--info))] hover:opacity-80">
+                                        <span className="rounded-[3px] border px-[5px] py-px font-mono text-[11px]" style={{ background: 'var(--dash-surface-hover)', borderColor: 'var(--dash-border)', color: 'var(--dash-text-muted)' }}>{u.order.orderNumber ?? u.order.id}</span>
+                                        <ArrowUpRight className="h-3 w-3" />
+                                    </a>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-xs" style={textMuted}>
+                                <span className="font-mono truncate" title={u.customerEmail ?? ''}>{u.customerEmail ?? '—'}</span>
+                                <span className="shrink-0" title={u.usedAt ?? ''}>{fmtDate(u.usedAt)}</span>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="pt-1 md:col-span-2">
+                        <TablePagination page={page} total={totalDocs} limit={limit} onPageChange={setPage} onLimitChange={(n) => { setLimit(n); setPage(1) }} labels={{ showing: d.showingOf, of: d.ofTotal, unit: d.ofRedemptions, rowsPerPage: d.rowsPerPage }} />
+                    </div>
+                </div>
+
+                {/* Table (xl+) */}
+                <div className="hidden xl:block">
                 <Table footer={(
                     <TablePagination
                         page={page}
@@ -243,6 +278,8 @@ export function DiscountsUsageHistoryLayout() {
                         ))}
                     </TableBody>
                 </Table>
+                </div>
+                </>
             )}
         </div>
     )

@@ -119,10 +119,11 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
 
     return (
         <div className="w-full">
-            {/* Mobile View: Stacked Cards */}
-            <div className="flex flex-col md:hidden w-full gap-4">
+            {/* Card View (mobile + tablet + iPad Pro, < xl — table minWidth 1100 overflows ≤1279).
+                1 col on mobile, 2 cols from md. Desktop table only from xl (matches blog). */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:hidden w-full gap-4 content-start">
                 {loading ? (
-                    <div className="p-8 text-center text-slate-400">{o.tableHeaders.loading}</div>
+                    <div className="p-8 text-center text-slate-400 md:col-span-2">{o.tableHeaders.loading}</div>
                 ) : (
                     orders.map((order) => {
                         const isSelected = selectedRows.has(order.id)
@@ -157,9 +158,9 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                                             {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-[12px]">
-                                        <span className="text-[12px] text-slate-400">{order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}</span>
-                                        <span className="text-[12px] text-slate-500">{formatOrderDate(order.createdAt)}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[12px] text-slate-400 truncate">{order.paymentMethod === 'ewallet' ? xenditChannelLabel(order.xenditChannelCode) : (methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—')}</span>
+                                        <span className="text-[12px] text-slate-500 shrink-0">{formatOrderDate(order.createdAt)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -168,11 +169,12 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                 )}
             </div>
 
-            {/* Mobile pager (the desktop pager lives in the Table card footer slot) */}
-            {footer && <div className="md:hidden">{footer}</div>}
+            {/* Card pager (the desktop pager lives in the Table card footer slot).
+                mt separates it from the card grid (grid gap-4 only applies between cards). */}
+            {footer && <div className="xl:hidden mt-4">{footer}</div>}
 
-            {/* Desktop View: Table — base primitives; pager sits in the card footer slot */}
-            <div className="hidden md:block w-full">
+            {/* Desktop View: Table (xl+) — base primitives; pager sits in the card footer slot */}
+            <div className="hidden xl:block w-full">
                 <Table minWidth={1100} className="table-fixed w-full" footer={footer}>
                     {/* table-fixed + % colgroup: 4 middle columns (customer, total, payment,
                         date) equal width (17%); edge columns (order #, status) 16%. All columns

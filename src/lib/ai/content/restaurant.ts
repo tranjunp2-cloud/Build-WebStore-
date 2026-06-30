@@ -35,7 +35,7 @@ export const restaurantContent: CategoryContent = {
         'Bringing the legendary flavours of Penang nasi kandar to Kuala Lumpur. Our nasi kandar set starts from RM 10 with a choice of curry chicken (RM 6), fried fish (RM 8), and our famous dalca (RM 4). Open 24 hours to satisfy your cravings anytime.',
       address: 'No. 45, Jalan Masjid India, 50100 Kuala Lumpur',
       phone: '+60 3-2693 5521',
-      email: 'hello@sitinasiканdar.my',
+      email: 'hello@sitinasikandar.my',
       heroHeadline: 'Penang Nasi Kandar, Straight to Your Plate',
       heroSubheadline:
         'Flood your rice with our legendary curries — open 24 hours, 7 days a week.',

@@ -84,25 +84,25 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
     ]
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-4 lg:gap-[22px] w-full">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3 xl:gap-[22px] w-full">
             {metrics.map((item, index) => (
                 <div
                     key={index}
-                    className="min-h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-[17px] flex items-center gap-[12px]"
+                    className="xl:h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-2 xl:p-[17px] flex items-center gap-1.5 xl:gap-[12px]"
                 >
                     {/* Icon Container */}
                     <div
-                        className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${item.iconBg}`}
+                        className={`w-8 h-8 xl:w-10 xl:h-10 rounded-xl xl:rounded-2xl flex items-center justify-center shrink-0 ${item.iconBg}`}
                     >
                         {item.icon}
                     </div>
 
                     {/* Text Container */}
-                    <div className="flex flex-col justify-center">
-                        <span className="text-2xl font-bold text-slate-50 leading-8">
+                    <div className="flex flex-col justify-center min-w-0">
+                        <span className="text-lg xl:text-2xl font-bold text-slate-50 leading-6 xl:leading-8">
                             {item.value}
                         </span>
-                        <span className="text-xs font-normal text-slate-400 leading-[16px] line-clamp-2">
+                        <span className="text-[11px] xl:text-xs font-normal text-slate-400 leading-[14px] xl:leading-[16px] line-clamp-2">
                             {item.label}
                         </span>
                     </div>

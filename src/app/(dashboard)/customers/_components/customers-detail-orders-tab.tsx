@@ -143,7 +143,7 @@ export function CustomersDetailOrdersTab({ customerId }: { customerId: number })
     ) : undefined
 
     return (
-        <Table minWidth={540} className="table-fixed w-full" footer={footer}>
+        <Table minWidth={480} className="table-fixed w-full" footer={footer}>
             {/* table-fixed + % colgroup: even columns. Last col is just the row-chevron, so
                 it's kept narrow. NB: no inter-tag whitespace — colgroup rejects text nodes. */}
             <colgroup>
