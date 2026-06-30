@@ -125,7 +125,7 @@ function QuickViewModal({
                     {/* Images */}
                     <div className="relative aspect-square overflow-hidden">
                         {images.length > 0 ? (
-                            <img src={images[selectedImage]} alt={product.imageAlts[selectedImage] || product.name} className="w-full h-full object-cover" />
+                            <img src={images[selectedImage]} alt={product.imageAlts?.[selectedImage] || product.name} className="w-full h-full object-cover" />
                         ) : (
                             <ImagePlaceholder size="lg" />
                         )}
@@ -274,7 +274,7 @@ function ProductCard({
         >
             <div className="relative aspect-square overflow-hidden">
                 {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.imageAlts[0] || product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={product.imageUrls[0]} alt={product.imageAlts?.[0] || product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                     <ImagePlaceholder size="md" />
                 )}
