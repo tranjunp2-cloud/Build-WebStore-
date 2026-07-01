@@ -4873,6 +4873,7 @@ const COLLECTION_SLUGS = [
   'plan-features',
   'discounts',
   'discount_usage_history',
+  'sso-step-events',
 
 ];
 

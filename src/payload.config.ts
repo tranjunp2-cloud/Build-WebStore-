@@ -41,6 +41,7 @@ import { PlanSubscriptionUsages } from './collections/PlanSubscriptionUsages'
 import { PlanFeatures } from './collections/PlanFeatures'
 import { Discounts } from './collections/Discounts'
 import { DiscountUsageHistory } from './collections/DiscountUsageHistory'
+import { SsoStepEvents } from './collections/SsoStepEvents'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -154,6 +155,7 @@ export default buildConfig({
     PlanFeatures,
     Discounts,
     DiscountUsageHistory,
+    SsoStepEvents,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
