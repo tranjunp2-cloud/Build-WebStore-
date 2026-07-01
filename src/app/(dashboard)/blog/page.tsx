@@ -362,7 +362,7 @@ export default function BlogListPage() {
                 <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center
                                 [&_button]:w-full sm:[&_button]:w-auto [&_button]:px-2.5 sm:[&_button]:px-3
                                 [&_button>span]:min-w-0 [&_button>span]:flex-1 sm:[&_button>span]:flex-none
-                                [&_button>span>span]:hidden sm:[&_button>span>span]:inline">
+                                [&_[data-chip-label]]:hidden [&_[data-chip-sep]]:hidden sm:[&_[data-chip-label]]:inline sm:[&_[data-chip-sep]]:inline">
                     <FilterChip<'' | 'draft' | 'published'>
                         icon={Clock}
                         label={t.dashboard.blog.filters.statusLabel}
