@@ -40,13 +40,6 @@
   --border-semantic: var(--border-legacy);
   --divider: var(--border-legacy);
 
-  /* Typography fallbacks — ensure `font-sans` / body rule resolves even
-     OUTSIDE the AppShell wrapper (portals, toasts, modals mounted directly
-     on document.body). next/font's `.inter_xxx__variable` class on the
-     AppShell div overrides these with the real self-hosted font names. */
-  --font-inter: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-outfit: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-
   /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
   --nav-height: 64px;
 

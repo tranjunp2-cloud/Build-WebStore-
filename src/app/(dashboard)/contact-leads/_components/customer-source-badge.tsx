@@ -1,21 +1,8 @@
 'use client'
 
-import { useI18n } from '@/i18n'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import type { CustomerSource } from '../_lib/customer-record'
-
-const SOURCE_VARIANT: Record<CustomerSource, 'default' | 'secondary'> = {
-    'contact-form': 'default',
-    'newsletter':   'secondary',
-}
-
-// GH-1337: tinted pill badges per Figma spec. !rounded-full overrides Badge default rounded-md.
-// Whitespace is responsive (set on the Badge below), not baked in here.
-const SOURCE_SOLID: Record<CustomerSource, string> = {
-    'contact-form': '!bg-blue-500/10 !border-blue-500/30 !text-blue-500 !rounded-full',
-    'newsletter':   '!bg-[rgba(167,139,250,0.1)] !border-[rgba(138,129,245,0.3)] !text-[#8a81f5] !rounded-full',
-}
+import { SOURCE_COLORS } from '../_lib/badge-tokens'
+import { useI18n } from '@/i18n'
 
 export function CustomerSourceBadge({ source }: { source: CustomerSource }) {
     const { t } = useI18n()
@@ -24,14 +11,13 @@ export function CustomerSourceBadge({ source }: { source: CustomerSource }) {
         'contact-form': c.sourceBadgeContact,
         'newsletter':   c.sourceBadgeNewsletter,
     }
+    const colors = SOURCE_COLORS[source]
     return (
-        <Badge
-            variant={SOURCE_VARIANT[source]}
-            // Desktop (>=1280): single line, unchanged. iPad table band: allow the long
-            // "Newsletter Subscriptions" label to wrap so it fits a compact column → no overflow/scroll.
-            className={cn(SOURCE_SOLID[source], 'whitespace-normal min-[1280px]:whitespace-nowrap')}
+        <span
+            className="inline-flex items-center rounded-[12px] text-xs font-medium border whitespace-nowrap"
+            style={{ background: colors.bg, borderColor: colors.border, color: colors.text, paddingTop: '5px', paddingBottom: '5px', paddingLeft: '13px', paddingRight: '13px' }}
         >
             {labelMap[source]}
-        </Badge>
+        </span>
     )
 }

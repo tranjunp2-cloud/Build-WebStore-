@@ -249,9 +249,6 @@ export function detectLanguage(text: string): DetectedLanguage {
 
     // franc-min for all other languages
     const iso = franc(text, { minLength: 3 })
-    if (iso === 'und') {
-        return { contentLang: 'en', gpLang: 'English', blockLang: 'en' }
-    }
 
     const contentLang = ISO_TO_CONTENT_LANG[iso]
     const blockLang = ISO_TO_BLOCK_LANG[iso] ?? 'en'
@@ -262,6 +259,15 @@ export function detectLanguage(text: string): DetectedLanguage {
                 ? 'Malay (Bahasa Melayu)'
                 : 'English'
         return { contentLang, gpLang, blockLang }
+    }
+
+    // franc-min misguesses short, noun-heavy Latin input (e.g. "Yoga Studio") as a random
+    // Latin language (Italian/French/Dutch/...) → GPT then generates the whole site in that
+    // wrong language (GH-1442). Genuine non-English Latin languages carry their own diacritics
+    // (it: è é, fr: à ç, es: ñ, pt: ã) and non-Latin scripts are already handled above. So when
+    // the input is pure ASCII, distrust the exotic guess and generate in English.
+    if (!/[^\u0000-\u007F]/.test(text)) {
+        return { contentLang: 'en', gpLang: 'English', blockLang: 'en' }
     }
 
     const gpLang = ISO_TO_LANG_NAME[iso] ?? 'English'

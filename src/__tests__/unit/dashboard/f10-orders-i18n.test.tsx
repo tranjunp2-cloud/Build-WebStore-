@@ -50,6 +50,7 @@ vi.mock('lucide-react', () => ({
     CheckCircle: () => <span data-testid="icon-checkcircle" />,
     CheckCircle2: () => <span data-testid="icon-checkcircle2" />,
     XCircle: () => <span data-testid="icon-xcircle" />,
+    RotateCcw: () => <span data-testid="icon-rotateccw" />,
     X: () => <span data-testid="icon-x" />,
     Calendar: () => <span data-testid="icon-calendar" />,
     CreditCard: () => <span data-testid="icon-creditcard" />,
@@ -229,19 +230,27 @@ describe('TC-F10.i18n.04 — OrdersMetrics renders i18n labels (EN)', () => {
             ok: true,
             json: async () => ({
                 success: true,
-                data: { pending: 5, readyToShip: 3, confirmed: 2, shipped: 1, cancelled: 0 }
+                data: { pending: 5, confirmed: 2, readyToShip: 3, shipped: 1, completed: 4, cancelled: 0, refunded: 1 }
             }),
         } as Response)
     })
 
-    it('renders all four metric labels from EN locale', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('renders all seven metric labels from EN locale', () => {
         render(<OrdersMetrics />)
 
-        // The 4 metrics are: Pending, Ready to Ship, Confirmed (uses status.confirmed), Shipped
+        // 7 boxes in lifecycle order: pending, confirmed, readyToShip, shipped, completed, cancelled, refunded
+        // confirmed uses o.status.confirmed; refunded uses o.status.refunded (no metrics key for these)
         expect(screen.getByText(enOrders.metrics.pending)).toBeInTheDocument()
-        expect(screen.getByText(enOrders.metrics.readyToShip)).toBeInTheDocument()
         expect(screen.getByText(enOrders.status.confirmed)).toBeInTheDocument()
+        expect(screen.getByText(enOrders.metrics.readyToShip)).toBeInTheDocument()
         expect(screen.getByText(enOrders.metrics.shipped)).toBeInTheDocument()
+        expect(screen.getByText(enOrders.metrics.completed)).toBeInTheDocument()
+        expect(screen.getByText(enOrders.metrics.cancelled)).toBeInTheDocument()
+        expect(screen.getByText(enOrders.status.refunded)).toBeInTheDocument()
     })
 })
 

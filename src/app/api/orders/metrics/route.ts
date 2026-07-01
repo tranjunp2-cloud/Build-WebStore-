@@ -20,17 +20,19 @@ export const GET = withAuth(async (user) => {
             return res.totalDocs
         }
 
-        const [pending, readyToShip, confirmed, shipped, cancelled] = await Promise.all([
+        const [pending, confirmed, readyToShip, shipped, completed, cancelled, refunded] = await Promise.all([
             countGroup(ORDER_STATUS_GROUPS.pending),
-            countGroup(ORDER_STATUS_GROUPS.ready_to_ship),
             countGroup(ORDER_STATUS_GROUPS.confirmed),
+            countGroup(ORDER_STATUS_GROUPS.ready_to_ship),
             countGroup(ORDER_STATUS_GROUPS.shipped),
+            countGroup(ORDER_STATUS_GROUPS.completed),
             countGroup(ORDER_STATUS_GROUPS.cancelled),
+            countGroup(ORDER_STATUS_GROUPS.refunded),
         ])
 
         return NextResponse.json({
             success: true,
-            data: { pending, readyToShip, confirmed, shipped, cancelled },
+            data: { pending, confirmed, readyToShip, shipped, completed, cancelled, refunded },
         })
     } catch (error: any) {
         console.error('[Orders Metrics Error]', error)

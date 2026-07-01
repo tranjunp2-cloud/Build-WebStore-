@@ -2232,7 +2232,9 @@
                     "disabled": "Template disabled",
                     "updateFailed": "Failed to update template",
                     "testSent": "Test email sent to {email}",
-                    "testFailed": "Failed to send test email"
+                    "testFailed": "Failed to send test email",
+                    "popupBlocked": "Popup blocked — allow popups to open the preview",
+                    "previewFailed": "Failed to open preview"
                 },
                 "descriptions": {
                     "welcome": "First-touch hello when a buyer signs up or places their first order.",

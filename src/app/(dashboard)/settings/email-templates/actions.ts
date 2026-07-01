@@ -8,15 +8,18 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import type { EmailTemplateType, EmailRecipient } from '@/lib/email/types'
 import { validateContentFields } from './validate-content-fields'
 
-// These templates cannot be disabled — security-critical flows
-const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
-
+// NOTE: declared locally (not re-exported from the lib) — a `'use server'` file may only
+// export async functions; `export type { … } from '…'` re-exports are rejected by the
+// Turbopack build. Structurally identical to ContentFields in lib/email/template-default-fields.
 export interface ContentFields {
     subject?: string
     greeting?: string
     ctaLabel?: string
     closing?: string
 }
+
+// These templates cannot be disabled — security-critical flows
+const CRITICAL_TYPES: EmailTemplateType[] = ['otp-verification', 'forgot-password', 'password-changed']
 
 export interface SaveEmailTemplateInput {
     templateType: EmailTemplateType

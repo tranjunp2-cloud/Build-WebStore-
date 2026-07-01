@@ -2232,7 +2232,9 @@
                     "disabled": "Templat dilumpuhkan",
                     "updateFailed": "Gagal mengemas kini templat",
                     "testSent": "E-mel ujian dihantar ke {email}",
-                    "testFailed": "Gagal menghantar e-mel ujian"
+                    "testFailed": "Gagal menghantar e-mel ujian",
+                    "popupBlocked": "Pop timbul disekat — benarkan pop timbul untuk membuka pratonton",
+                    "previewFailed": "Gagal membuka pratonton"
                 },
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",

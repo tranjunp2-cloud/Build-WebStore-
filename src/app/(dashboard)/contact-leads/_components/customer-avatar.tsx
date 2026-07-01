@@ -29,7 +29,7 @@ export function CustomerAvatar({ name, email, source, size = 40 }: Props) {
             ) : (
                 <span
                     className="font-extrabold select-none"
-                    style={{ fontSize: 16, color: 'var(--dash-accent)', fontFamily: 'Manrope, sans-serif' }}
+                    style={{ fontSize: Math.round(size * 0.4), color: 'var(--dash-accent)', fontFamily: 'Manrope, sans-serif' }}
                 >
                     {getInitials(name, email)}
                 </span>
