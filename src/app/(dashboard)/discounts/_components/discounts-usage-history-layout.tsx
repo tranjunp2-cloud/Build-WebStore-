@@ -179,10 +179,9 @@ export function DiscountsUsageHistoryLayout() {
             {/* Data table — only shown when rows exist */}
             {!loading && rows.length > 0 && (
                 <>
-                {/* Card list (mobile + tablet + iPad Pro, < xl) — table scrolls on narrow panes.
-                    1 col on mobile, 2 cols from md (tablet) — matches the discounts card list so the
-                    wide iPad width isn't a single sparse column. */}
-                <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+                {/* Card list (mobile + iPad mini, < 820px). 1 col on mobile, 2 cols from md —
+                    matches the discounts card list; the table takes over from iPad Air (>=820). */}
+                <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                     {rows.map((u) => (
                         <div key={u.id} className="rounded-[12px] border p-4 flex flex-col gap-2" style={{ borderColor: 'var(--dash-border)', background: 'var(--dash-surface)' }}>
                             <div className="flex items-center justify-between gap-2">
@@ -211,9 +210,11 @@ export function DiscountsUsageHistoryLayout() {
                     </div>
                 </div>
 
-                {/* Table (xl+) */}
-                <div className="hidden xl:block">
-                <Table footer={(
+                {/* Table (iPad Air >=820 and up). `.dash-table-compact` shrinks font + padding
+                    below xl (auto-layout kept so wide cells wrap instead of forcing scroll);
+                    >=1280 = no-op → desktop byte-identical. */}
+                <div className="hidden min-[820px]:block">
+                <Table className="dash-table-compact" footer={(
                     <TablePagination
                         page={page}
                         total={totalDocs}
