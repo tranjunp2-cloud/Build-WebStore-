@@ -1969,6 +1969,14 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .tools-grid  { grid-template-columns: 1fr; }
 }
 
+/* iPad Pro / small laptops (981–1279px): the sidebar leaves the content pane ~784px,
+   so 4 stat cards across collide (label overlaps the delta/Coming-Soon badge). Keep the
+   clean 2×2 used at iPad Air until xl, where the pane is wide enough for 4. Desktop
+   (≥1280) keeps the original 4-col → byte-identical. */
+@media (min-width: 981px) and (max-width: 1279px) {
+  .dash-revamp .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+
 @media (max-width: 560px) {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
