@@ -26,6 +26,7 @@ interface EpIntegrationLike {
     warehouse?: unknown
     accessToken?: unknown
     selectedCourier?: unknown
+    selectedCouriers?: unknown
 }
 
 /** Normalise the stored warehouses array (guards against bad/missing data). */
@@ -63,13 +64,43 @@ export function isWarehouseComplete(w: Warehouse | null | undefined): boolean {
 }
 
 /**
+ * Resolve the allowlisted courier IDs for a tenant. Coalesce strategy (backwards-compatible):
+ * 1. If `selectedCouriers` is a non-empty array → use it (trimmed, non-empty strings, deduped).
+ * 2. Else if `selectedCourier` is a non-empty string → `[selectedCourier]`.
+ * 3. Else → `[]`.
+ *
+ * Legacy tenants have `selectedCourier='flash'` (defaultValue), so they always get `['flash']`
+ * after migration — zero behaviour change.
+ */
+export function getAllowedCouriers(ep: EpIntegrationLike | null | undefined): string[] {
+    if (Array.isArray(ep?.selectedCouriers)) {
+        const filtered = (ep!.selectedCouriers as unknown[])
+            .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+            .map((x) => x.trim())
+        // dedupe while preserving order
+        const seen = new Set<string>()
+        const deduped = filtered.filter((x) => {
+            if (seen.has(x)) return false
+            seen.add(x)
+            return true
+        })
+        if (deduped.length > 0) return deduped
+    }
+    if (typeof ep?.selectedCourier === 'string' && ep.selectedCourier.trim()) {
+        return [ep.selectedCourier.trim()]
+    }
+    return []
+}
+
+/**
  * Whether EasyParcel is READY to quote/ship for a tenant — the single source of truth used by the
- * order flow. "Connected" (has token) is NOT enough: a valid default pickup and a selected courier
- * are required, otherwise checkout must fall back to flat rate instead of quoting a wrong origin or
- * failing at label creation. Does not check token expiry — the caller's getValidToken handles that.
+ * order flow. "Connected" (has token) is NOT enough: a valid default pickup and at least one
+ * allowlisted courier are required, otherwise checkout must fall back to flat rate instead of
+ * quoting a wrong origin or failing at label creation. Does not check token expiry — the caller's
+ * getValidToken handles that.
  */
 export function isEpReady(ep: EpIntegrationLike | null | undefined): boolean {
     if (!ep?.accessToken) return false
-    if (typeof ep.selectedCourier !== 'string' || !ep.selectedCourier.trim()) return false
+    if (getAllowedCouriers(ep).length < 1) return false
     return isWarehouseComplete(getDefaultWarehouse(ep))
 }

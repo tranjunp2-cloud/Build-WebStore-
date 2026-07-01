@@ -646,6 +646,14 @@ export const Tenants: CollectionConfig = {
                     admin: { description: 'Default selected courier ID (e.g. flash, jnt, poslaju)' },
                 },
                 {
+                    name: 'selectedCouriers',
+                    type: 'json',
+                    admin: {
+                        description:
+                            'Allowlist of courier IDs; checkout quotes the cheapest that serves the route. Supersedes selectedCourier.',
+                    },
+                },
+                {
                     name: 'testedAt',
                     type: 'date',
                     admin: { readOnly: true, description: 'Timestamp of last successful EP connection test' },

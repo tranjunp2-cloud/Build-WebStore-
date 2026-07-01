@@ -8,7 +8,7 @@ import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getShippingRate } from '@/lib/shipping'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady, getAllowedCouriers } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -302,7 +302,7 @@ export async function POST(request: Request) {
                 destState: customer.address?.state ?? '',
                 senderPostcode: defaultWarehouse.postcode ?? '47500',
                 senderState: warehouseState,
-                selectedCourier: epIntegration.selectedCourier || undefined,
+                allowedCouriers: getAllowedCouriers(epIntegration),
                 subtotalSen: effSubtotalSen,
                 codAmountSen: paymentMethod === 'cod' ? effSubtotalSen : undefined,
             },

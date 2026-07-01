@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PickupAddresses } from './pickup-addresses'
 import { CourierPicker } from './courier-picker'
-import { getDefaultWarehouse, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getAllowedCouriers, getDefaultWarehouse, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
 import type { EasyParcelIntegrationConfig } from './easyparcel-settings-tab'
 
 interface Props {
@@ -26,12 +26,18 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
     // the merchant can Back to Connect to switch account / disconnect.
     const [step, setStep] = useState(1)
     const [warehouses, setWarehouses] = useState<Warehouse[]>(initialEpConfig?.warehouses ?? [])
-    const [selectedCourier, setSelectedCourier] = useState(initialEpConfig?.selectedCourier ?? '')
+    const [selectedCouriers, setSelectedCouriers] = useState<string[]>(() =>
+        getAllowedCouriers(initialEpConfig),
+    )
     const [isSaving, setIsSaving] = useState(false)
     const [isDisconnecting, setIsDisconnecting] = useState(false)
 
+    function onToggle(id: string) {
+        setSelectedCouriers(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+    }
+
     const pickupDone = warehouses.length > 0
-    const courierDone = !!selectedCourier
+    const courierDone = selectedCouriers.length > 0
     const canNext = step === 0 || (step === 1 && pickupDone) || (step === 2 && courierDone)
     const canActivate = pickupDone && courierDone
 
@@ -58,7 +64,7 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled: true, warehouses, selectedCourier }),
+                body: JSON.stringify({ enabled: true, warehouses, selectedCouriers }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to activate')
@@ -129,7 +135,7 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
                     </div>
                 )}
                 {step === 1 && <PickupAddresses value={warehouses} onChange={setWarehouses} />}
-                {step === 2 && <CourierPicker tenantId={tenantId} active selectedCourier={selectedCourier} onSelect={setSelectedCourier} />}
+                {step === 2 && <CourierPicker tenantId={tenantId} active selected={selectedCouriers} onToggle={onToggle} />}
                 {step === 3 && (
                     <div className="flex flex-col gap-4">
                         <p className="text-[14px] font-semibold text-[var(--dash-text)]">Review &amp; activate</p>
@@ -144,7 +150,13 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
                                 </div>
                             </div>
                             <div className="text-[13px] text-[var(--dash-text-muted)]">
-                                Checkout courier: <span className="text-[var(--dash-text)] font-medium">{selectedCourier || '—'}</span>
+                                Checkout couriers: <span className="text-[var(--dash-text)] font-medium">
+                                    {selectedCouriers.length === 0
+                                        ? '—'
+                                        : selectedCouriers.length <= 3
+                                            ? selectedCouriers.join(', ')
+                                            : `${selectedCouriers.length} couriers selected`}
+                                </span>
                             </div>
                         </div>
                         <p className="text-[12px] text-[var(--dash-text-muted)]">

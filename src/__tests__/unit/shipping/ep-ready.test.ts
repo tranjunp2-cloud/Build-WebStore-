@@ -9,6 +9,7 @@ import {
     isWarehouseComplete,
     isEpReady,
     getDefaultWarehouse,
+    getAllowedCouriers,
 } from '@/lib/shipping/easyparcel/warehouse'
 
 const completeWh = {
@@ -59,6 +60,58 @@ describe('getDefaultWarehouse', () => {
     })
 })
 
+describe('getAllowedCouriers', () => {
+    // TC-F14.124 — `selectedCouriers:['jnt','flash']` → `['jnt','flash']`
+    it('[TC-F14.124] selectedCouriers array present → return as-is', () => {
+        const ep = { selectedCouriers: ['jnt', 'flash'] }
+        expect(getAllowedCouriers(ep)).toEqual(['jnt', 'flash'])
+    })
+
+    // TC-F14.125 — legacy only `selectedCourier:'flash'` → `['flash']`
+    it('[TC-F14.125] legacy selectedCourier only → wrap in array', () => {
+        const ep = { selectedCourier: 'flash' }
+        expect(getAllowedCouriers(ep)).toEqual(['flash'])
+    })
+
+    // TC-F14.126 — neither set → `[]`
+    it('[TC-F14.126] neither array nor legacy → empty array', () => {
+        const ep = { accessToken: 'tok' }
+        expect(getAllowedCouriers(ep)).toEqual([])
+    })
+
+    // TC-F14.127 — array wins when both present
+    it('[TC-F14.127] array takes precedence over legacy scalar', () => {
+        const ep = { selectedCouriers: ['jnt'], selectedCourier: 'flash' }
+        expect(getAllowedCouriers(ep)).toEqual(['jnt'])
+    })
+
+    // TC-F14.128 — trim + filter empty + dedupe
+    it('[TC-F14.128] array with whitespace/empty entries → trimmed + deduped', () => {
+        const ep = { selectedCouriers: ['  jnt  ', '', 'jnt', 'flash', '   '] }
+        expect(getAllowedCouriers(ep)).toEqual(['jnt', 'flash'])
+    })
+
+    it('returns empty when selectedCouriers is empty array', () => {
+        const ep = { selectedCouriers: [] }
+        expect(getAllowedCouriers(ep)).toEqual([])
+    })
+
+    it('returns empty when selectedCourier is empty string', () => {
+        const ep = { selectedCourier: '' }
+        expect(getAllowedCouriers(ep)).toEqual([])
+    })
+
+    it('handles null/undefined ep gracefully', () => {
+        expect(getAllowedCouriers(null)).toEqual([])
+        expect(getAllowedCouriers(undefined)).toEqual([])
+    })
+
+    it('filters out non-string entries in array', () => {
+        const ep = { selectedCouriers: ['jnt', 123, null, 'flash', undefined] }
+        expect(getAllowedCouriers(ep as any)).toEqual(['jnt', 'flash'])
+    })
+})
+
 describe('isEpReady', () => {
     const ready = { accessToken: 'tok', selectedCourier: 'EP-CR0AP', warehouses: [completeWh] }
 
@@ -80,5 +133,15 @@ describe('isEpReady', () => {
     it('works via legacy single warehouse', () => {
         const { id, isDefault, ...legacy } = completeWh
         expect(isEpReady({ accessToken: 'tok', selectedCourier: 'EP-CR0AP', warehouse: legacy })).toBe(true)
+    })
+
+    // TC-F14.129 — true with array courier allowlist
+    it('[TC-F14.129] true when token + warehouse + ≥1 courier (array)', () => {
+        expect(isEpReady({ accessToken: 'tok', warehouses: [completeWh], selectedCouriers: ['jnt', 'flash'] })).toBe(true)
+    })
+
+    // TC-F14.130 — false when allowlist empty
+    it('[TC-F14.130] false when allowlist length=0 (empty array)', () => {
+        expect(isEpReady({ accessToken: 'tok', warehouses: [completeWh], selectedCouriers: [] })).toBe(false)
     })
 })

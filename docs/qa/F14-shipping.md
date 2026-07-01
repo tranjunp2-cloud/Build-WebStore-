@@ -346,6 +346,63 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 
 ---
 
+### 3.16 EasyParcel Allowlist + Auto-Cheapest (F36, GH-1333 Phase 06)
+
+Merchant picks a SET of couriers via allowlist (`selectedCouriers[]`). At checkout, quotes cheapest allowlisted courier serving the route. COD orders restrict to COD-capable couriers. Flat fallback if none serve. Legacy tenants coalesce `selectedCourier` scalar → `[selectedCourier]` for backward compatibility.
+
+#### Coalesce Helper Tests (getAllowedCouriers)
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.124** | Unit | High | `selectedCouriers:['jnt','flash']` array present → `['jnt','flash']` | Import `getAllowedCouriers(ep)`, ep={selectedCouriers:['jnt','flash']} | Return `['jnt','flash']` | F36, GH-1333 |
+| **TC-F14.125** | Unit | High | Legacy only `selectedCourier:'flash'`, no array → `['flash']` | ep={selectedCourier:'flash', warehouses:[]} (no selectedCouriers) | Return `['flash']` | F36, GH-1333 |
+| **TC-F14.126** | Unit | High | Neither array nor legacy set → `[]` | ep={warehouses:[], accessToken:'tok'} (no courier fields) | Return `[]` | F36, GH-1333 |
+| **TC-F14.127** | Unit | High | Array wins when BOTH present | ep={selectedCouriers:['jnt'], selectedCourier:'flash'} | Return `['jnt']` (array priority) | F36, GH-1333 |
+| **TC-F14.128** | Unit | Medium | Array with whitespace/empty entries → trimmed + deduped | ep={selectedCouriers:['  jnt  ', '', 'jnt', 'flash']} | Return `['jnt','flash']` (trim, filter empty, dedupe) | F36, GH-1333 |
+
+#### Readiness Gate (isEpReady)
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.129** | Unit | High | isEpReady true when token + warehouse + ≥1 courier (array) | isEpReady({accessToken:'tok', warehouses:[completeWh], selectedCouriers:['jnt','flash']}) | true | F36, GH-1333 |
+| **TC-F14.130** | Unit | High | isEpReady false when allowlist length=0 (empty array) | isEpReady({accessToken:'tok', warehouses:[completeWh], selectedCouriers:[]}) | false (no courier allowed) | F36, GH-1333 |
+
+#### getRates Cheapest + COD Logic
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.131** | Unit | High | Allowlist `['jnt','flash']`, route offers both → pick cheaper only, `degraded:false`, `rates.length===1` | Mock quotations→{jnt:RM50, flash:RM40}, allowedCouriers=['jnt','flash'], codAmountSen=0 | rates=[{courier:'flash', priceSen:4000}], degraded:false | F36, GH-1333 |
+| **TC-F14.132** | Unit | High | Allowlist `['dhl']`, route offers only `['jnt','flash']` → flat fallback, `degraded:true` | allowedCouriers=['dhl'], quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flat', degraded:true}], degraded:true | F36, GH-1333 |
+| **TC-F14.133** | Unit | High | Empty/absent allowlist → cheapest of ALL (not rates[0]), `degraded:false` | allowedCouriers=undefined, quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flash', priceSen:4000}], degraded:false (cheapest regardless order) | F36, GH-1333 |
+| **TC-F14.134** | Unit | High | COD order (`codAmountSen>0`), both allowed, only `flash.codAvailable` → returns `flash` even if `jnt` cheaper | codAmountSen=1000, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'flash', codAvailable:true}], degraded:false | F36, GH-1333 |
+| **TC-F14.135** | Unit | High | COD order, NO courier is COD-capable → flat, `degraded:true` | codAmountSen=1000, allowedCouriers=['jnt','flash'], both codAvailable:false | rates=[{courier:'flat', degraded:true}], degraded:true | F36, GH-1333 |
+| **TC-F14.136** | Unit | High | Non-COD order (`codAmountSen=0`) ignores `codAvailable` flag (cheapest regardless) | codAmountSen=0, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'jnt', codAvailable:false}] (jnt cheaper) | F36, GH-1333 |
+| **TC-F14.137** | Unit | Medium | Allowlist `['flat']` (sentinel) filtered out → treated as no allowlist → cheapest of all | allowedCouriers=['flat'], quotations→{jnt:RM40, flash:RM50} | rates=[{courier:'jnt', degraded:false}] (after filtering 'flat', no restriction, pick cheapest) | F36, GH-1333 |
+
+#### Server Route Threading
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.138** | Func | High | POST /api/orders/calculate-shipping passes `getAllowedCouriers(ep)` to getRates | Call POST with epIntegration={selectedCouriers:['jnt'], ...}, quotations→jnt/flash available | Response includes chosen rate's codAvailable | F36, GH-1333 |
+| **TC-F14.139** | Func | High | Legacy single-courier tenant → identical output to pre-change (regression) | ep={selectedCourier:'flash'}, quotations→flash/jnt both available, jnt cheaper | rates=[{courier:'flash'}] because legacy coalesced to ['flash'] | F36, GH-1333 |
+
+#### Save Route Guard
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.140** | Sec | High | POST /api/tenant/[id]/easyparcel-save: `enabled:true` + empty `selectedCouriers` → 400 `EP_NOT_READY` | POST {enabled:true, warehouses:[completeWh], selectedCouriers:[]} | HTTP 400, error.code='EP_NOT_READY' | F36, GH-1333 |
+| **TC-F14.141** | Func | High | POST with `selectedCouriers:['jnt','flash']` + complete warehouse → 200, persists array + legacy scalar | POST {enabled:true, warehouses:[completeWh], selectedCouriers:['jnt','flash']} | HTTP 200, DB easyParcelIntegration.selectedCouriers=['jnt','flash'], selectedCourier='jnt' | F36, GH-1333 |
+
+#### UI Multi-Select
+
+| ID | Type | Pri | Title | Steps | Expected | Refs |
+|---|---|---|---|---|---|---|
+| **TC-F14.142** | UI | High | CourierPicker toggles membership (check adds, re-check removes), aria-checked reflects state | Render CourierPicker with ['jnt']. Click 'flash' checkbox (add). Click 'jnt' checkbox (remove). | After add: ['jnt','flash'], aria-checked='true' on flash. After remove: ['flash'], aria-checked='false' on jnt | F36, GH-1333 |
+| **TC-F14.143** | UI | High | Settings-tab seeds `selectedCouriers` from legacy config via coalesce, Activate disabled at 0 | Render SettingsTab for ep={selectedCourier:'flash'}. Check initial state. Try Activate with 0 selected. | Initial picked=['flash']. Activate button disabled when selected.length=0 | F36, GH-1333 |
+| **TC-F14.144** | UI | High | Stepper `courierDone` true only when ≥1 selected; activate body carries array | Render Stepper. Step 2 (courier) with 0 selected. Add 1. Click Next. | courierDone=false at 0 selected; activate POST includes selectedCouriers:['jnt'] | F36, GH-1333 |
+
+---
+
 ## 4. End-to-End UAT Flows
 
 ### E2E #1: Seller setup → Buyer mua West MY (happy path)

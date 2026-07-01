@@ -14,7 +14,7 @@ interface GetRatesParams {
     senderPostcode: string
     subtotalSen: number      // for flat-rate free-shipping threshold check
     codAmountSen?: number    // 0 or undefined = non-COD; >0 = COD order (sen)
-    selectedCourier?: string // EP courier_id the merchant restricts checkout to (optional)
+    allowedCouriers?: string[] // EP courier_ids merchant allows; checkout quotes cheapest that serves route
 }
 
 interface GetRatesResult {
@@ -87,17 +87,26 @@ export async function getRates(
         })
 
         if (rates.length > 0) {
-            // The merchant restricts checkout to ONE courier. If it serves this route, quote it; if it
-            // does not, fall back to FLAT rate — never silently quote a different courier they didn't
-            // choose. (Empty selectedCourier = no restriction → cheapest of all.)
-            const chosen = params.selectedCourier
-            if (chosen && chosen !== 'flat') {
-                const filtered = rates.filter((r) => r.courier === chosen)
-                if (filtered.length > 0) return { rates: filtered, degraded: false }
-                console.warn(`[get-rates] chosen courier "${chosen}" not offered for this route; available=[${rates.map(r => r.courier).join(', ')}] → flat fallback`)
-                return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
+            // Allowlist: merchant may restrict to a set of EP courier_ids.
+            // 'flat' sentinel is excluded — it is never a real EP courier_id.
+            const allow = params.allowedCouriers?.filter((c) => c && c !== 'flat')
+
+            let candidates = allow?.length ? rates.filter((r) => allow.includes(r.courier)) : rates
+
+            // COD filter: if this is a COD order, keep only COD-capable couriers.
+            if (params.codAmountSen != null && params.codAmountSen > 0) {
+                candidates = candidates.filter((r) => r.codAvailable === true)
             }
-            return { rates, degraded: false }
+
+            const best = pickCheapest(candidates)
+            if (best) return { rates: [best], degraded: false }
+
+            // No candidate survived (allowlist ∩ route empty, or no COD-capable courier).
+            const reason = params.codAmountSen != null && params.codAmountSen > 0
+                ? 'no COD-capable courier in allowlist serves this route'
+                : 'none of the allowed couriers serve this route'
+            console.warn(`[get-rates] ${reason}; available=[${rates.map((r) => r.courier).join(', ')}] → flat fallback`)
+            return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
         }
 
         console.warn('[get-rates] EP returned 0 quotations, falling back to flat rate')
@@ -110,6 +119,14 @@ export async function getRates(
         rates: [buildFlatRateOption(params, flatConfig, destState)],
         degraded: true,
     }
+}
+
+/** Returns the rate with the lowest priceSen, or undefined if the list is empty. */
+function pickCheapest(rates: RateOption[]): RateOption | undefined {
+    return rates.reduce<RateOption | undefined>(
+        (best, r) => (best == null || r.priceSen < best.priceSen ? r : best),
+        undefined,
+    )
 }
 
 function buildFlatRateOption(

@@ -24,7 +24,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady, getAllowedCouriers } from '@/lib/shipping/easyparcel/warehouse'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
                 senderState: warehouseState,
                 subtotalSen: subtotalSen - discountSen,
                 codAmountSen: undefined,  // Stripe = no COD
-                selectedCourier: epIntegration.selectedCourier || undefined,
+                allowedCouriers: getAllowedCouriers(epIntegration),
             },
             epToken,
             (site as any)?.shippingConfig ?? {},

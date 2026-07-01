@@ -4842,6 +4842,7 @@ const MIGRATIONS = [
   { name: 'tenants.easy_parcel_integration_detected_env', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_detected_env varchar;` },
   { name: 'tenants.easy_parcel_integration_warehouse', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_warehouse jsonb;` },
   { name: 'tenants.easy_parcel_integration_selected_courier', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_selected_courier varchar DEFAULT 'flash';` },
+  { name: 'tenants.easy_parcel_integration_selected_couriers', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_selected_couriers jsonb;` },
   { name: 'tenants.easy_parcel_integration_tested_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_tested_at timestamp with time zone;` },
   { name: 'tenants.easy_parcel_integration_access_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_access_token varchar;` },
   { name: 'tenants.easy_parcel_integration_refresh_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_refresh_token varchar;` },

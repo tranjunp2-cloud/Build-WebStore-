@@ -8,7 +8,7 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 /**
  * POST /api/tenant/[id]/easyparcel-save
- * Persist the merchant-editable EasyParcel settings (enabled / warehouses / selectedCourier).
+ * Persist the merchant-editable EasyParcel settings (enabled / warehouses / selectedCouriers).
  * Uses overrideAccess after an explicit ownership check — the client can't PATCH /api/tenants
  * directly because the group holds server-only token fields guarded by field access.
  */
@@ -35,12 +35,15 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const body = await request.json().catch(() => ({}))
         const enabled = body?.enabled === true
         const warehouses: Warehouse[] = Array.isArray(body?.warehouses) ? body.warehouses : []
-        const selectedCourier = typeof body?.selectedCourier === 'string' ? body.selectedCourier : ''
+        // Parse and sanitize allowlist; filter to non-empty strings only.
+        const selectedCouriers: string[] = Array.isArray(body?.selectedCouriers)
+            ? body.selectedCouriers.filter((c: unknown) => typeof c === 'string' && c.trim().length > 0)
+            : []
 
-        // Guard: can only activate (enabled=true) when the default pickup is complete + a courier is set.
-        if (enabled && (!isWarehouseComplete(getDefaultWarehouse({ warehouses })) || !selectedCourier)) {
+        // Guard: can only activate (enabled=true) when the default pickup is complete + at least one courier is allowed.
+        if (enabled && (!isWarehouseComplete(getDefaultWarehouse({ warehouses })) || selectedCouriers.length < 1)) {
             return NextResponse.json(
-                { success: false, error: { code: 'EP_NOT_READY', message: 'A complete default pickup address and a courier are required to activate.' } },
+                { success: false, error: { code: 'EP_NOT_READY', message: 'A complete default pickup address and at least one courier are required to activate.' } },
                 { status: 400 },
             )
         }
@@ -49,7 +52,16 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: { easyParcelIntegration: { enabled, warehouses, selectedCourier } } as any,
+            data: {
+                easyParcelIntegration: {
+                    enabled,
+                    warehouses,
+                    selectedCouriers,
+                    // Legacy scalar kept for one release so any un-migrated read path stays valid.
+                    // Removable after all consumers are updated to read selectedCouriers[].
+                    selectedCourier: selectedCouriers[0] ?? '',
+                },
+            } as any,
             overrideAccess: true,
         })
 

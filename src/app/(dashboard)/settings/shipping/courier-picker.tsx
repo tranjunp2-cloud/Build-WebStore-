@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, XCircle, Wallet, ExternalLink } from 'lucide-react'
+import { Loader2, XCircle, Wallet, ExternalLink, Check } from 'lucide-react'
 
 type CourierOption = { id: string; name: string; fullName?: string; priceFrom?: number | null; logo?: string | null }
 
@@ -22,16 +22,17 @@ interface CourierPickerProps {
     tenantId: string
     /** Fetch couriers only once the connection is usable. */
     active: boolean
-    selectedCourier: string
-    onSelect: (id: string) => void
+    selected: string[]
+    onToggle: (id: string) => void
 }
 
 /**
- * "Courier for checkout" picker — lists every courier the EP account offers for MY; the seller picks
- * one. COD is route-dependent (validated at checkout, not here). Also shows the wallet balance banner.
+ * "Couriers for checkout" picker — lists every courier the EP account offers for MY; the seller
+ * picks one or more. Buyers are quoted the cheapest of the selected couriers. COD availability
+ * depends on the route. Also shows the wallet balance banner.
  * Used by both the setup stepper and the management view.
  */
-export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: CourierPickerProps) {
+export function CourierPicker({ tenantId, active, selected, onToggle }: CourierPickerProps) {
     const [couriers, setCouriers] = useState<CourierOption[]>([])
     const [loading, setLoading] = useState(false)
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
@@ -65,10 +66,10 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
         <div className="flex flex-col gap-4">
             <div>
                 <p className="text-[14px] font-semibold text-[var(--dash-text)]">
-                    Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
+                    Couriers for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one or more</span>
                 </p>
                 <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                    Buyers are quoted only this courier's live rate. COD availability depends on the delivery route.
+                    Buyers are quoted the cheapest of the couriers you select. COD availability depends on the delivery route.
                 </p>
             </div>
 
@@ -85,20 +86,24 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {couriers.map(courier => {
-                        const isSelected = selectedCourier === courier.id
+                        const isSelected = selected.includes(courier.id)
                         const badge = courierBadge(courier.name)
                         return (
-                            <button key={courier.id} type="button" role="radio" aria-checked={isSelected}
-                                onClick={() => onSelect(courier.id)}
+                            <button key={courier.id} type="button" role="checkbox" aria-checked={isSelected}
+                                onClick={() => onToggle(courier.id)}
                                 className={[
                                     'flex items-center gap-3 rounded-[12px] border px-4 py-3 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
                                     isSelected
                                         ? 'border-[hsl(var(--primary)/0.5)] bg-[hsl(var(--primary)/0.06)]'
                                         : 'border-white/[0.08] bg-white/[0.02] hover:border-white/[0.15]',
                                 ].join(' ')}>
-                                <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2"
-                                    style={{ borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--input-border))' }}>
-                                    {isSelected && <span className="h-[8px] w-[8px] rounded-full bg-[hsl(var(--primary))]" />}
+                                {/* Checkbox indicator */}
+                                <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 transition-colors"
+                                    style={{
+                                        borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--input-border))',
+                                        background: isSelected ? 'hsl(var(--primary))' : 'transparent',
+                                    }}>
+                                    {isSelected && <Check className="h-[10px] w-[10px] text-white" strokeWidth={3} />}
                                 </span>
                                 {courier.logo ? (
                                     // eslint-disable-next-line @next/next/no-img-element

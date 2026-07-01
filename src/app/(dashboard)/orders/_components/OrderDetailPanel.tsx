@@ -66,7 +66,8 @@ export interface OrderDetail {
     tenant?: {
         easyParcelIntegration?: {
             enabled?: boolean
-            selectedCourier?: string
+            selectedCourier?: string      // legacy scalar; populated as selectedCouriers[0]
+            selectedCouriers?: string[]   // allowlist (phase 05)
             detectedEnv?: string
         }
     } | string | number | null

@@ -9,7 +9,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PickupAddresses } from './pickup-addresses'
 import { CourierPicker } from './courier-picker'
 import { EpSetupStepper } from './ep-setup-stepper'
-import { getDefaultWarehouse, isWarehouseComplete, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getAllowedCouriers, getDefaultWarehouse, isWarehouseComplete, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
 
 export interface EasyParcelIntegrationConfig {
     enabled?: boolean
@@ -57,9 +57,13 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         return []
     })
 
-    const [selectedCourier, setSelectedCourier] = useState(
-        initialEpConfig?.selectedCourier ?? '',
+    const [selectedCouriers, setSelectedCouriers] = useState<string[]>(() =>
+        getAllowedCouriers(initialEpConfig),
     )
+
+    function onToggle(id: string) {
+        setSelectedCouriers(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+    }
 
     const [isSaving, setIsSaving] = useState(false)
 
@@ -87,12 +91,12 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // courier must also be chosen so checkout never offers a non-COD courier to COD buyers.
     const warehouseComplete = warehouses.length > 0
     const hasWarehouse = warehouses.length > 0
-    const courierMissing = !selectedCourier
+    const courierMissing = selectedCouriers.length === 0
     const canSave = testStatus === 'connected' && !isSaving && warehouseComplete && !courierMissing
 
-    // Ready = default pickup complete (incl. phone) + a courier chosen. Mirrors server isEpReady
+    // Ready = default pickup complete (incl. phone) + at least one courier chosen. Mirrors server isEpReady
     // (minus token, which the client can't see). Drives the toggle guard + not-ready badge.
-    const localReady = isWarehouseComplete(getDefaultWarehouse({ warehouses })) && !!selectedCourier
+    const localReady = isWarehouseComplete(getDefaultWarehouse({ warehouses })) && selectedCouriers.length > 0
 
     // Master toggle: activate/deactivate EP for checkout. Persists immediately; can only turn ON when
     // ready. Sends the full group so Payload doesn't drop warehouses/courier.
@@ -109,7 +113,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled: next, warehouses, selectedCourier }),
+                body: JSON.stringify({ enabled: next, warehouses, selectedCouriers }),
             })
             if (!res.ok) throw new Error()
             toast.success(next ? 'EasyParcel activated' : 'EasyParcel deactivated — checkout uses flat rate')
@@ -212,7 +216,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled, warehouses: next, selectedCourier }),
+                body: JSON.stringify({ enabled, warehouses: next, selectedCouriers }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to save')
@@ -230,7 +234,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled, warehouses, selectedCourier }),
+                body: JSON.stringify({ enabled, warehouses, selectedCouriers }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to save')
@@ -248,7 +252,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     const connected = !!initialEpConfig?.testedAt
     const persistedSetup =
         ((initialEpConfig?.warehouses?.length ?? 0) > 0 || !!initialEpConfig?.warehouse?.address1) &&
-        !!initialEpConfig?.selectedCourier
+        getAllowedCouriers(initialEpConfig).length > 0
 
     // --- Not connected → intro card ---
     if (!connected) {
@@ -462,7 +466,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             {/* ─── Courier picker — only after connection verified ── */}
             {testStatus === 'connected' && (
                 <div className="p-6">
-                    <CourierPicker tenantId={tenantId} active selectedCourier={selectedCourier} onSelect={setSelectedCourier} />
+                    <CourierPicker tenantId={tenantId} active selected={selectedCouriers} onToggle={onToggle} />
                 </div>
             )}
 
