@@ -74,7 +74,7 @@ export async function submitOrder(
     token: string,
     params: EpSubmitOrderParams,
 ): Promise<EpSubmitOrderResponse> {
-    return epFetch('POST', '/shipment/submit_orders', token, { shipment: [params] })
+    return epFetch('POST', '/open_api/2026-03/shipment/submit_orders', token, { shipment: [params] })
 }
 
 /** Fetch tracking events by tracking number. */

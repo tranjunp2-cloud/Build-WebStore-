@@ -7,7 +7,7 @@ import { withFeatureGuard } from '@/lib/subscriptions/feature-guard'
 import { submitOrder } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
-import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
 import { buildSubmitParams } from './build-submit-params'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -51,10 +51,13 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // Idempotency guard: already labelled — return existing without re-submitting
+        // Idempotency guard: key on shipment_number (easyParcelOrderNo), which is ALWAYS present on a
+        // successful submit — awb_number may be null (async AWB), so keying on it would let a pending
+        // shipment be re-submitted and double-charge the wallet.
+        const existingShipmentNo = (order as any).easyParcelOrderNo as string | null | undefined
         const existingAwbNo = (order as any).awbNo as string | null | undefined
         const existingLabelUrl = (order as any).labelUrl as string | null | undefined
-        if (existingAwbNo) {
+        if (existingShipmentNo) {
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }
 
@@ -96,11 +99,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         }
 
         // Use the default pickup address (multi-warehouse aware, legacy single fallback) as the sender.
+        // Must be complete (incl. phone) — EP submit_orders rejects an incomplete sender.
         const warehouse = getDefaultWarehouse(tenantEp)
 
-        if (!warehouse?.address1) {
+        if (!isWarehouseComplete(warehouse)) {
             return NextResponse.json(
-                { success: false, error: { code: 'EP_NO_WAREHOUSE', message: 'Warehouse address not configured in EasyParcel settings' } },
+                { success: false, error: { code: 'EP_NOT_READY', message: 'Pickup address is incomplete in EasyParcel settings (name, phone, address, state, postcode required)' } },
                 { status: 422 },
             )
         }
@@ -146,9 +150,12 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         })
 
         const submitRes = await submitOrder(token, submitParams)
-        const firstShipment = submitRes.data?.shipment?.[0]
+        // Envelope: data[] (orders) → shipments[] (per order). We submit one parcel → one shipment.
+        const firstShipment = submitRes.data?.[0]?.shipments?.[0]
 
-        if (!firstShipment || firstShipment.status === 'error' || !firstShipment.awb) {
+        // status:'success' = shipment created + wallet charged. awb_number/label may still be null
+        // (courier generates the AWB asynchronously) — that is NOT a failure.
+        if (!firstShipment || firstShipment.status !== 'success' || !firstShipment.shipment_number) {
             const errMsg = firstShipment?.errors?.[0] ?? 'EasyParcel failed to create shipment'
             return NextResponse.json(
                 { success: false, error: { code: 'EASYPARCEL_ERROR', message: errMsg } },
@@ -156,15 +163,18 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             )
         }
 
-        // Persist AWB + tracking_number + shipment_id (reuses easyParcelOrderNo col)
+        const awbNo = firstShipment.awb_number ?? null
+        const labelUrl = firstShipment.awb_url || firstShipment.awb_urls_by_format?.A6 || firstShipment.awb_urls_by_format?.A4 || null
+
+        // Persist shipment_number (idempotency key), AWB (nullable), label + tracking urls.
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
-                awbNo: firstShipment.awb,
-                trackingNumber: firstShipment.tracking_number ?? firstShipment.awb,
-                easyParcelOrderNo: firstShipment.shipment_id ?? null,
-                labelUrl: null,  // New API does not return label_url in submit response
+                easyParcelOrderNo: firstShipment.shipment_number,
+                awbNo,
+                trackingNumber: awbNo,
+                labelUrl,
                 shippingTrackingStatus: 'pending_pickup',
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
             } as any,
@@ -179,7 +189,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
         return NextResponse.json({
             success: true,
-            data: { awbNo: firstShipment.awb, trackingNumber: firstShipment.tracking_number ?? firstShipment.awb },
+            data: { awbNo, trackingNumber: awbNo, labelUrl },
         })
     } catch (error: unknown) {
         if (error instanceof EasyParcelError) {

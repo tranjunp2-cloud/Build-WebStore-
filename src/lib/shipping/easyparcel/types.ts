@@ -135,18 +135,27 @@ export interface EpSubmitOrderParams {
     cod_amount?: number   // RM float, omit for non-COD
 }
 
+// Live shape (verified against 2026-03 doc): data is an array of orders, each with a shipments[].
+// awb_number can be null when the courier generates the AWB asynchronously — status:'success' still
+// means the shipment was created (and the wallet charged), so idempotency must key on shipment_number.
+export interface EpSubmitShipment {
+    status: 'success' | 'error'
+    shipment_number?: string
+    courier?: string | null
+    awb_number?: string | null
+    awb_url?: string | null
+    awb_urls_by_format?: { A4?: string; A5?: string; A6?: string }
+    tracking_url?: string | null
+    reference?: string
+    errors?: string[]
+}
+
 export interface EpSubmitOrderResponse {
     status_code: number
-    data: {
-        shipment: Array<{
-            status: 'success' | 'error'
-            shipment_id?: string
-            reference?: string
-            tracking_number?: string
-            awb?: string
-            errors?: string[]
-        }>
-    }
+    data: Array<{
+        order_details?: { order_number?: string; account_id?: number }
+        shipments: EpSubmitShipment[]
+    }>
 }
 
 // --- Tracking ---
