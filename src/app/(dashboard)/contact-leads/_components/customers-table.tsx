@@ -85,14 +85,14 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
                 Sums to 100% → table-fixed w-full fits the viewport, no horizontal scroll. At >=1280px
                 the desktop ratios are restored (6+12=18 / 18 / 12 / 21 / 12 / 13 / 6). */}
             <colgroup>
-                <col className="w-[9%]  min-[1280px]:w-[7%]" /> {/* Customer (avatar) */}
-                <col className="w-[16%] min-[1280px]:w-[12%]" /> {/* Profile (name)    */}
-                <col className="w-[12%] min-[1280px]:w-[18%]" /> {/* Email   */}
-                <col className="w-[16%] min-[1280px]:w-[12%]" /> {/* Source  */}
-                <col className="w-[12%] min-[1280px]:w-[21%]" /> {/* Message */}
-                <col className="w-[13%] min-[1280px]:w-[12%]" /> {/* Date    */}
-                <col className="w-[14%] min-[1280px]:w-[13%]" /> {/* Status  */}
-                <col className="w-[8%]  min-[1280px]:w-[5%]" /> {/* Actions */}
+                <col className="w-[9%]  min-[1280px]:w-[7%]" />{/* Customer (avatar) */}
+                <col className="w-[16%] min-[1280px]:w-[12%]" />{/* Profile (name)    */}
+                <col className="w-[12%] min-[1280px]:w-[18%]" />{/* Email   */}
+                <col className="w-[16%] min-[1280px]:w-[12%]" />{/* Source  */}
+                <col className="w-[12%] min-[1280px]:w-[21%]" />{/* Message */}
+                <col className="w-[13%] min-[1280px]:w-[12%]" />{/* Date    */}
+                <col className="w-[14%] min-[1280px]:w-[13%]" />{/* Status  */}
+                <col className="w-[8%]  min-[1280px]:w-[5%]" />{/* Actions */}
             </colgroup>
             <TableHeader>
                 <TableRow>
