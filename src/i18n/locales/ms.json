@@ -1203,12 +1203,12 @@
             "status": {
                 "pending": "Menunggu",
                 "confirmed": "Disahkan",
-                "readyToShip": "Sedia untuk Dihantar",
-                "shipped": "Sedang Dihantar",
+                "readyToShip": "Sedia Dihantar",
+                "shipped": "Dihantar",
                 "completed": "Selesai",
                 "cancelled": "Dibatalkan",
                 "refunded": "Dikembalikan",
-                "processing": "Sedang Diproses",
+                "processing": "Diproses",
                 "paid": "Telah Dibayar"
             },
             "toast": {
@@ -1838,7 +1838,8 @@
             "deleteConfirmPost": "dan tidak boleh dibatalkan.",
             "cancel": "Batal",
             "deleteButton": "Padam",
-            "colProfile": "Profil Pelanggan",
+            "colCustomer": "Pelanggan",
+            "colProfile": "Profil",
             "colEmail": "E-mel",
             "colSource": "Sumber & Laman",
             "colMessage": "Mesej",

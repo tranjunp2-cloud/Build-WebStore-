@@ -112,8 +112,9 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 key={leaf.href}
                 href={leaf.href}
                 className={cn(
-                    // Responsive height: 34px on large screens (≥1536px / 1920), tighter on smaller laptops
-                    'no-underline flex items-center rounded-[12px] h-[32px] 2xl:h-[34px] text-[13px] font-medium leading-[1.43] transition-colors',
+                    // Responsive height: 34px on large screens (≥1536px / 1920), tighter on smaller laptops.
+                    // Label is 12px on the mobile/tablet drawer (< lg) and 13px on the desktop sidebar (lg+).
+                    'no-underline flex items-center rounded-[12px] h-[32px] 2xl:h-[34px] text-[12px] lg:text-[13px] font-medium leading-[1.43] transition-colors',
                     mini ? 'justify-center px-0' : 'gap-3 px-4',
                     isActive
                         ? 'bg-[hsl(var(--primary)/0.12)] text-[hsl(var(--primary))] shadow-[0_0_16px_hsl(var(--primary)/0.25)]'
@@ -247,7 +248,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     />
                     <aside
                         // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
-                        className="dark sb-dark absolute left-0 top-0 bottom-0 z-10 flex w-[250px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
+                        className="dark sb-dark absolute left-0 top-0 bottom-0 z-10 flex w-[246px] flex-col bg-[var(--dash-sidebar-bg)] shadow-2xl animate-in slide-in-from-left duration-200"
                         style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
                     >
                         {/* Drawer header — replaces the top-bar's ☰ + logo (same 56px band):
@@ -294,7 +295,8 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     // `dark`: sidebar luôn dark bất kể theme app (light/dark) — yêu cầu cố định.
                     'dark sb-dark fixed left-0 top-[56px] z-40 hidden lg:flex h-[calc(100vh-56px)] flex-col bg-[var(--dash-sidebar-bg)]',
                     animateCollapse && 'transition-[width] duration-200',
-                    collapsed ? 'w-[64px]' : 'w-[250px]'
+                    // 246px on iPad Pro / smaller laptops (< 2xl), 250px on true desktop (>= 1536px).
+                    collapsed ? 'w-[64px]' : 'w-[246px] 2xl:w-[250px]'
                 )}
                 style={{ borderRight: '1px solid var(--dash-col-divider-color)' }}
             >

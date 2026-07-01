@@ -209,6 +209,22 @@
 .dash-table tbody tr { border-bottom: 1px solid var(--dash-border); }
 .dash-table tbody tr:last-child { border-bottom: none; }
 
+/* ── Shared compact table sizing (CMS dashboard) ─────────────────────────────
+   Opt-in: <Table className="dash-table-compact">. Unifies header/body font across
+   EVERY dashboard table at all widths so sizes stay consistent:
+     • desktop (>= xl / 1280px): header 10px / body 12px
+     • tablet band (< xl):       header 8px  / body 10px  (+ 8px cell padding so a
+                                  wide table fits without horizontal scroll)
+   Column ratios stay per-page via each table's <colgroup>; element sizes that aren't
+   text (thumbnails, action buttons) are tuned per-page. Higher specificity (class +
+   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px]. */
+.dash-table-compact th { font-size: 10px; }
+.dash-table-compact td, .dash-table-compact td span { font-size: 12px; }
+@media (max-width: 1279.98px) {
+  .dash-table-compact th { font-size: 8px; padding-left: 8px; padding-right: 8px; }
+  .dash-table-compact td, .dash-table-compact td span { font-size: 10px; padding-left: 8px; padding-right: 8px; }
+}
+
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
 /* Dark mode (default — matches current hardcoded values) */
 :root {

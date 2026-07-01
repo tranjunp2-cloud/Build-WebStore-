@@ -95,8 +95,8 @@ const TableHead = React.forwardRef<
     <th
         ref={ref}
         className={cn(
-            // F33 design: 11px bold uppercase, 0.88px tracking.
-            'px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] whitespace-nowrap',
+            // F33 design: 10px bold uppercase, 0.88px tracking.
+            'px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.08em] whitespace-nowrap',
             className,
         )}
         // Header text = F33 `--ink-3` (the muted label tone) → `--dash-text-muted`
@@ -137,7 +137,7 @@ function SortableHead<K extends string>({
     return (
         <th
             className={cn(
-                'px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] cursor-pointer select-none whitespace-nowrap',
+                'px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.08em] cursor-pointer select-none whitespace-nowrap',
                 className,
             )}
             // Header text = F33 `--ink-3` (--dash-text-muted); the active sort column reads

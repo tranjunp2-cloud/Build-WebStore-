@@ -44,17 +44,24 @@ export function FilterChip<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
+                // `chip-trigger` is a marker hook (no styles) so a caller can target just
+                // this pill (not the dropdown option buttons) for responsive tweaks.
+                className="chip-trigger flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
                 style={{
                     background: active ? 'hsl(var(--primary) / 0.12)' : 'hsl(var(--card))',
                     border: active ? '1px solid hsl(var(--primary) / 0.4)' : '1px solid hsl(var(--input-border))',
                     color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                 }}
             >
-                {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
+                {Icon && <Icon className="chip-icon w-3.5 h-3.5 shrink-0" />}
+                {/* Label / separator / value are three marked spans so a caller can hide
+                    whichever it wants on narrow screens (each also hides the ` : ` sep):
+                    orders hides sep+value (label-only chip), blog hides label+sep
+                    (value-only chip). With none hidden it renders "Label : value". */}
                 <span className="truncate max-w-[160px]">
-                    <span style={{ color: 'var(--dash-text-muted)' }}>{label} : </span>
-                    {selected?.label}
+                    <span data-chip-label style={{ color: 'var(--dash-text-muted)' }}>{label}</span>
+                    <span data-chip-sep style={{ color: 'var(--dash-text-muted)' }}> : </span>
+                    <span data-chip-value>{selected?.label}</span>
                 </span>
                 <ChevronDown
                     className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
