@@ -39,7 +39,7 @@ export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSi
                     animateCollapse && 'lg:transition-[width] lg:duration-200',
                     // Sidebar column only from lg (desktop / iPad landscape). Tablet portrait + mobile
                     // are a plain top-bar cluster + overlay drawer (no fixed push-sidebar).
-                    collapsed ? 'lg:w-[64px] lg:pl-0 lg:gap-0 lg:justify-center' : 'lg:w-[250px] lg:pr-3',
+                    collapsed ? 'lg:w-[64px] lg:pl-0 lg:gap-0 lg:justify-center' : 'lg:w-[246px] 2xl:w-[250px] lg:pr-3',
                 )}
             >
                 {/* Hamburger — mobile + tablet (< lg). Opens the overlay drawer. */}

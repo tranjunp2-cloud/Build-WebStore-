@@ -107,7 +107,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                             hydrated && 'transition-[padding] duration-200',
                             // Fixed push-sidebar only from lg (desktop / iPad landscape). Tablet
                             // portrait + mobile use the overlay drawer → content stays full-width.
-                            collapsed ? 'lg:pl-[64px]' : 'lg:pl-[250px]'
+                            collapsed ? 'lg:pl-[64px]' : 'lg:pl-[246px] 2xl:pl-[250px]'
                         )}
                     >
                         <div className="p-4 sm:p-6 md:p-8">
