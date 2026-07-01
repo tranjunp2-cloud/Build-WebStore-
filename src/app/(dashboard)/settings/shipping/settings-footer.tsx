@@ -14,7 +14,7 @@ type Props = {
 }
 
 const CARD_CLS =
-    "flex items-center justify-between gap-4 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--card)/0.95)] backdrop-blur-md px-6 py-4"
+    "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 rounded-[16px] border border-white/[0.08] bg-[hsl(var(--card)/0.95)] backdrop-blur-md px-6 py-4"
 
 export function SettingsFooter({ isDirty, isSaving, lastSaveSucceeded, onReset, onSave }: Props) {
     const { t } = useI18n()
@@ -44,12 +44,13 @@ export function SettingsFooter({ isDirty, isSaving, lastSaveSucceeded, onReset, 
                     </span>
                 )}
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 w-full sm:w-auto">
                 <Button
                     type="button"
                     onClick={onReset}
                     variant="dashSecondary"
                     size="dash"
+                    className="w-full sm:w-auto justify-center"
                 >
                     <RotateCcw className="h-4 w-4" />
                     {s.resetToDefaults}
@@ -60,6 +61,7 @@ export function SettingsFooter({ isDirty, isSaving, lastSaveSucceeded, onReset, 
                     disabled={!isDirty || isSaving}
                     variant="dashPrimary"
                     size="dash"
+                    className="w-full sm:w-auto justify-center"
                 >
                     <Save className="h-4 w-4" />
                     {isSaving ? s.saving : s.saveChanges}

@@ -87,17 +87,19 @@ export function OrdersActionBar({
     const [paymentVal, setPaymentVal] = useState('all')
     const [sortVal, setSortVal] = useState('-createdAt')
 
+    // Always 2 rows: search (row 1) + filters (row 2) — stays clean even at 1280 with the
+    // sidebar open (inline 1-row gets cramped there). Search caps width on desktop.
     return (
-        <div className="flex flex-col md:flex-row md:items-center gap-3 w-full">
+        <div className="flex flex-col gap-3 w-full">
             <TableSearch
                 value={search}
                 onSearch={(q) => onSearch?.(q)}
                 placeholder={o.search}
                 debounceMs={0}
-                className="w-full md:flex-1 md:max-w-[400px]"
+                className="w-full xl:max-w-[480px]"
             />
 
-            <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+            <div className="flex items-center gap-2 w-full flex-wrap">
                 <FilterChip<string>
                     icon={Calendar}
                     label={o.filterLabels.date}

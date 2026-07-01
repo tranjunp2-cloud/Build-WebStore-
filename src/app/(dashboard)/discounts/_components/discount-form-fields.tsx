@@ -64,7 +64,8 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
     }
 
     return (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        // Tablet (768–1023): single column; 2-col only from lg (1024) so iPad portrait isn't cramped.
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             {/* Code */}
             <div className="flex flex-col gap-1.5">
                 <Label>{d.codeLabel} <span className="text-destructive">*</span></Label>
@@ -101,7 +102,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             </div>
 
             {/* Description */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
                 <Label>
                     {d.descriptionLabel}{' '}
                     <span style={{ color: 'var(--dash-text-muted)', fontWeight: 400, fontSize: 11 }}>{d.descriptionOptional}</span>
@@ -116,7 +117,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
             {/* Type — bespoke segmented toggle (kept per design): two labeled options with icons, not a
                 boolean switch. Only the container radius is token-synced to rounded-lg. */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
                 <Label>{d.typeLabel} <span className="text-destructive">*</span></Label>
                 <div className="flex rounded-lg border border-solid overflow-hidden w-fit" style={{ borderColor: 'hsl(var(--input-border))' }}>
                     {(['percentage', 'fixed'] as const).map((tp) => (
@@ -145,7 +146,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
 
             {/* Value — bespoke affix group (kept per F33): RM/% unit panel shares the border box, so the
                 inner number input stays bare. Container token-synced to card bg + rounded-lg. */}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <div className="flex flex-col gap-1.5 lg:col-span-2">
                 <Label>{d.valueLabel} <span className="text-destructive">*</span></Label>
                 <div className="flex items-center gap-3">
                     <div
@@ -261,7 +262,7 @@ export function DiscountFormFields({ draft, errors, isNew, usageCount, set }: Di
             )}
 
             {/* Date window — Starts at + Expires at always share one row */}
-            <div className="grid grid-cols-1 gap-5 sm:col-span-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 lg:col-span-2 lg:grid-cols-2">
                 {/* Starts At */}
                 <div className="flex flex-col gap-1.5">
                     <Label>{d.startsAtLabel}</Label>

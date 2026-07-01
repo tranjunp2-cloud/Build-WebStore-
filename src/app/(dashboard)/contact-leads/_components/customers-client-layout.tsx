@@ -124,8 +124,8 @@ export function CustomersClientLayout() {
                 onExport={handleExport}
             />
 
-            {/* Mobile: card list — still gates on loading to avoid flash */}
-            <div className="md:hidden">
+            {/* Card list (mobile + tablet + iPad Pro, < xl) — still gates on loading to avoid flash */}
+            <div className="xl:hidden">
                 {loading ? (
                     <div className="py-16 text-center text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{c.loading}</div>
                 ) : (
@@ -142,8 +142,8 @@ export function CustomersClientLayout() {
                 )}
             </div>
 
-            {/* Desktop: table with inline skeleton rows */}
-            <div className="hidden md:block">
+            {/* Desktop table (xl+) with inline skeleton rows */}
+            <div className="hidden xl:block">
                 <CustomersTable
                     records={records}
                     loading={loading}

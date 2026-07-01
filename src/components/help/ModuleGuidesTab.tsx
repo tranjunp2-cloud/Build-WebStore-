@@ -207,7 +207,7 @@ export function ModuleGuidesTab() {
           {module.steps.map((step) => (
             <div
               key={`${module.id}-step-${step.num}`}
-              className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-6 mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
+              className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl p-4 sm:p-6 mb-4 sm:mb-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.5)]"
             >
               <h3 className="text-[16px] font-bold text-white flex items-center mb-3">
                 <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] !text-white text-[13px] font-bold mr-2.5 shrink-0">

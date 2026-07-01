@@ -15,6 +15,17 @@ export function isInEditorPreview(): boolean {
     return window.parent !== window && (params.has('editor') || params.has('builder'))
 }
 
+// True ONLY in the editor edit canvas (?editor=1), NOT the builder result preview
+// (?builder=1). Use this to gate NAVIGATION: in the editor a link click must select
+// the block instead of navigating away, but in the builder preview (shown right after
+// AI generation) the user must be able to click links to explore the generated site.
+// Cart/checkout actions stay gated by isInEditorPreview() in both modes.
+export function isInEditorEditMode(): boolean {
+    if (typeof window === 'undefined') return false
+    const params = new URLSearchParams(window.location.search)
+    return window.parent !== window && params.has('editor')
+}
+
 // Derive parent frame origin from document.referrer (same pattern as PreviewScripts.tsx).
 // Fallback to window.location.origin when referrer is absent or unparseable.
 export function getParentOrigin(): string {

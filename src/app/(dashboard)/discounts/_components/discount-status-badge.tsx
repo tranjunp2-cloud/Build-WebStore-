@@ -34,8 +34,8 @@ export function DiscountStatusBadge({ status, startsAt, expiresAt, usageLimit, u
         <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-full text-[11px] font-semibold ${
                 isActive
-                    ? 'bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]'
-                    : 'bg-slate-400/[0.14] text-slate-600 dark:text-slate-400'
+                    ? 'border border-solid border-[hsl(var(--success)/0.5)] bg-[hsl(var(--success)/0.12)] text-[hsl(var(--success))]'
+                    : 'border border-solid border-slate-400/50 bg-slate-400/[0.14] text-slate-600 dark:text-slate-400'
             }`}
         >
             <span

@@ -27,13 +27,23 @@ function applyTheme(t: Theme) {
 export function ThemeProvider({
     children,
     initialTheme = 'dark',
+    forcedTheme,
 }: {
     children: React.ReactNode
     initialTheme?: Theme
+    /** Lock the subtree to one theme (e.g. auth). Toggle/setTheme become no-ops. */
+    forcedTheme?: Theme
 }) {
-    const [theme, setThemeState] = useState<Theme>(initialTheme)
+    const [theme, setThemeState] = useState<Theme>(forcedTheme ?? initialTheme)
 
     useEffect(() => {
+        if (forcedTheme) {
+            // Forced mode: only flip the html class, never persist — keeps the
+            // user's dashboard theme (same `theme` key) untouched after they leave.
+            document.documentElement.classList.toggle('dark', forcedTheme === 'dark')
+            setThemeState(forcedTheme)
+            return
+        }
         // localStorage takes priority over SSR cookie on first mount
         const stored = localStorage.getItem('theme') as Theme | null
         const resolved = stored === 'light' || stored === 'dark' ? stored : initialTheme
@@ -42,13 +52,15 @@ export function ThemeProvider({
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const setTheme = useCallback((t: Theme) => {
+        if (forcedTheme) return
         setThemeState(t)
         applyTheme(t)
-    }, [])
+    }, [forcedTheme])
 
     const toggle = useCallback(() => {
+        if (forcedTheme) return
         setTheme(theme === 'dark' ? 'light' : 'dark')
-    }, [theme, setTheme])
+    }, [theme, setTheme, forcedTheme])
 
     return (
         <ThemeContext.Provider value={{ theme, toggle, setTheme }}>

@@ -37,7 +37,7 @@ export default function GuidelinePage() {
 
   return (
     // PANEL: OVERVIEW — bg:card, border:1px border, border-radius:12px, padding:24px
-    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-6">
+    <div className="w-full bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-4 sm:p-6">
       <div className="flex flex-col gap-[17px]">
 
         {/* Section 1: Welcome */}
@@ -59,9 +59,10 @@ export default function GuidelinePage() {
             </h3>
           </div>
 
-          {/* Single row of 4 cards on desktop (lg). Tablet 2-up, mobile stacked.
-              Vertical layout + larger padding gives each card more breathing room. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px]">
+          {/* 4 cards in one row only from xl. At iPad Pro (1024) with the sidebar open the content is
+              ~710px, so 4 cols squish each card to ~165px (text wraps one word per line) — use 2 cols
+              below xl. Mobile stacked. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-[16px]">
             {features.map((item) => (
               <Link
                 key={item.title}

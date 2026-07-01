@@ -69,7 +69,12 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col">
+            {/* --dash-content-pl: live sidebar width (250 / 64 collapsed) so fixed bottom save-bars
+                can align with the content area at lg+ (tablet uses left-0). */}
+            <div
+                className="dash-shell min-h-screen bg-dash-bg flex flex-col"
+                style={{ '--dash-content-pl': collapsed ? '64px' : '250px' } as React.CSSProperties}
+            >
                 <TenantAccessWatcher />
                 <TopHeader
                     userName={userName}
@@ -92,6 +97,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                         mobileOpen={sidebarOpen}
                         setMobileOpen={setSidebarOpen}
                         collapsed={collapsed}
+                        onToggleCollapsed={toggleCollapsed}
                         animateCollapse={hydrated}
                         badgeCounts={badgeCounts}
                     />
@@ -99,7 +105,9 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                         className={cn(
                             'flex-1 min-w-0 [overflow-x:clip]',
                             hydrated && 'transition-[padding] duration-200',
-                            collapsed ? 'md:pl-[64px]' : 'md:pl-[250px]'
+                            // Fixed push-sidebar only from lg (desktop / iPad landscape). Tablet
+                            // portrait + mobile use the overlay drawer → content stays full-width.
+                            collapsed ? 'lg:pl-[64px]' : 'lg:pl-[250px]'
                         )}
                     >
                         <div className="p-4 sm:p-6 md:p-8">

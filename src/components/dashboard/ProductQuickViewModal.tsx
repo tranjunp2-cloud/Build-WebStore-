@@ -145,7 +145,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     if (!descText) descText = product.shortDescription || ''
 
     return createPortal(
-        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        <div className="hidden xl:flex fixed inset-0 z-[9999] justify-end items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={onClose}
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
             <div

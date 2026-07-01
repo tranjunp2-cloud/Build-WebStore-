@@ -1906,10 +1906,10 @@
                 "tabOrders": "Orders",
                 "unsavedBanner": "You have unsaved changes.",
                 "revert": "Revert",
+                "cancel": "Cancel",
                 "saveChanges": "Save changes",
                 "upToDate": "Up to date",
                 "unsaved": "Unsaved changes",
-                "lastSaved": "Last saved",
                 "saved": "Customer saved",
                 "saveFailed": "Failed to save customer",
                 "fieldEmail": "Email",
@@ -2231,7 +2231,9 @@
                     "disabled": "Template disabled",
                     "updateFailed": "Failed to update template",
                     "testSent": "Test email sent to {email}",
-                    "testFailed": "Failed to send test email"
+                    "testFailed": "Failed to send test email",
+                    "popupBlocked": "Popup blocked — allow popups to open the preview",
+                    "previewFailed": "Failed to open preview"
                 },
                 "descriptions": {
                     "welcome": "First-touch hello when a buyer signs up or places their first order.",
