@@ -651,14 +651,15 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table (GH-1222 DS migration) — xl+ only; ≤1279 use cards
-                            (table minWidth 860 scrolls inside the ~710px iPad-Pro pane with sidebar open;
-                            xl matches blog/orders so iPad Pro 1024 shows cards). --- */}
+                        {/* --- Table (iPad Air >=820 and up) — matches orders/blog dash-table-compact
+                            convention: below xl the shared `.dash-table-compact` (globals.css) shrinks
+                            font + padding so the columns fit; no minWidth floor → table-fixed w-full
+                            always fits the pane (no horizontal scroll on iPad Pro with sidebar open).
+                            At >=1280 the compact class is a no-op → desktop byte-identical. --- */}
                         {filteredAndSortedProducts.length > 0 && (
-                            <div className="hidden xl:block">
+                            <div className="hidden min-[820px]:block">
                                 <Table
-                                    className="table-fixed w-full"
-                                    minWidth={860}
+                                    className="table-fixed w-full dash-table-compact"
                                     footer={
                                         <TablePagination
                                             page={currentPage}
@@ -784,9 +785,9 @@ export default function ProductsPage() {
                             </div>
                         )}
 
-                        {/* --- Card View (mobile + tablet + iPad Pro, < xl) (Figma Node 30945:1017).
-                            1 col on mobile, 2 cols from md so wide tablet isn't a single sparse column. --- */}
-                        <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+                        {/* --- Card View (mobile + iPad mini, < 820px) (Figma Node 30945:1017).
+                            1 col on mobile, 2 cols from md; the table takes over from iPad Air (>=820). --- */}
+                        <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
@@ -908,9 +909,10 @@ export default function ProductsPage() {
                             />
                         )}
 
-                        {/* Card-view Pagination (< xl) — was md:hidden which left tablet cards with no pager */}
+                        {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
+                            pager lives in its footer slot from iPad Air up. */}
                         {totalPages > 1 && (
-                            <div className="xl:hidden py-4">
+                            <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
@@ -951,14 +953,27 @@ export default function ProductsPage() {
                         />
                     </div>
                     {mounted && typeof document !== 'undefined' && createPortal(
-                        <div className="block xl:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
-                            <ProductDetailsMobile
-                                product={quickViewProduct}
-                                onClose={() => setQuickViewProduct(null)}
-                                onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
-                                onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
+                        <>
+                            {/* Backdrop — dim + blur, tap to close. Mirrors the order detail panel. */}
+                            <div
+                                className="xl:hidden fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+                                onClick={() => setQuickViewProduct(null)}
                             />
-                        </div>,
+                            {/* Product detail panel (< xl / iPad + mobile) — slides in from the right
+                                exactly like the order panel: full-width on phones, 488px side panel from
+                                md up so the list stays visible (dimmed) behind it. */}
+                            <div
+                                className="xl:hidden fixed right-0 top-0 z-[9999] h-[100dvh] w-full md:w-[488px] overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
+                                style={{ background: 'hsl(var(--background))', borderLeft: '1px solid var(--dash-border)' }}
+                            >
+                                <ProductDetailsMobile
+                                    product={quickViewProduct}
+                                    onClose={() => setQuickViewProduct(null)}
+                                    onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
+                                    onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
+                                />
+                            </div>
+                        </>,
                         document.body
                     )}
                 </>
