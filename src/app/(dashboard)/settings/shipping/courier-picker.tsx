@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, XCircle, Wallet, ExternalLink } from 'lucide-react'
 
-type CourierOption = { id: string; name: string; fullName?: string; priceFrom?: number | null }
+type CourierOption = { id: string; name: string; fullName?: string; priceFrom?: number | null; logo?: string | null }
 
 // Warn the merchant when the EP wallet can't comfortably cover a label purchase (RM).
 const LOW_WALLET_THRESHOLD = 10
@@ -27,13 +27,13 @@ interface CourierPickerProps {
 }
 
 /**
- * "Courier for checkout" picker — fetches the tenant's live COD-capable couriers (with 'from' prices)
- * and shows the wallet balance banner. Used by both the setup stepper and the management view.
+ * "Courier for checkout" picker — lists every courier the EP account offers for MY; the seller picks
+ * one. COD is route-dependent (validated at checkout, not here). Also shows the wallet balance banner.
+ * Used by both the setup stepper and the management view.
  */
 export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: CourierPickerProps) {
     const [couriers, setCouriers] = useState<CourierOption[]>([])
     const [loading, setLoading] = useState(false)
-    const [codOnly, setCodOnly] = useState(false)
     const [walletBalance, setWalletBalance] = useState<string | null>(null)
     const [walletLow, setWalletLow] = useState(false)
 
@@ -47,7 +47,6 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
                 if (cancelled) return
                 if (j?.success && Array.isArray(j.data?.couriers)) {
                     setCouriers(j.data.couriers)
-                    setCodOnly(j.data.codFiltered === true)
                     const w = j.data.wallet
                     if (w?.balance != null) {
                         setWalletBalance(`${w.currency ?? 'MYR'} ${w.balance}`)
@@ -69,8 +68,7 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
                     Courier for checkout <span className="text-[var(--dash-text-muted)] font-normal">· Pick one</span>
                 </p>
                 <p className="mt-0.5 text-[12px] text-[var(--dash-text-muted)]">
-                    Buyers are quoted only this courier's live rate.
-                    {codOnly && ' Only couriers that support COD are listed.'}
+                    Buyers are quoted only this courier's live rate. COD availability depends on the delivery route.
                 </p>
             </div>
 
@@ -82,7 +80,7 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
             ) : couriers.length === 0 ? (
                 <div className="flex items-center gap-2 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-6 text-[13px] text-[var(--dash-text-muted)]">
                     <XCircle className="h-4 w-4 shrink-0" />
-                    No courier data available. Add a pickup address and check your EasyParcel connection.
+                    No courier data available. Check your EasyParcel connection and try again.
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -102,8 +100,14 @@ export function CourierPicker({ tenantId, active, selectedCourier, onSelect }: C
                                     style={{ borderColor: isSelected ? 'hsl(var(--primary))' : 'hsl(var(--input-border))' }}>
                                     {isSelected && <span className="h-[8px] w-[8px] rounded-full bg-[hsl(var(--primary))]" />}
                                 </span>
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-[12px] font-bold text-white"
-                                    style={{ background: badge.color }}>{badge.initials}</span>
+                                {courier.logo ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={courier.logo} alt=""
+                                        className="h-9 w-9 shrink-0 rounded-[8px] object-contain bg-white p-0.5" />
+                                ) : (
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-[12px] font-bold text-white"
+                                        style={{ background: badge.color }}>{badge.initials}</span>
+                                )}
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-[13px] font-semibold text-[var(--dash-text)] truncate">{courier.name}</span>
                                     {courier.priceFrom != null ? (

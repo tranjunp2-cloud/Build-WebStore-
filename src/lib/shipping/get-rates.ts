@@ -87,13 +87,15 @@ export async function getRates(
         })
 
         if (rates.length > 0) {
-            // Restrict to the merchant's chosen courier when set (real EP courier, not flat). If that
-            // courier has no service for this route, keep all rates so checkout is never blocked.
+            // The merchant restricts checkout to ONE courier. If it serves this route, quote it; if it
+            // does not, fall back to FLAT rate — never silently quote a different courier they didn't
+            // choose. (Empty selectedCourier = no restriction → cheapest of all.)
             const chosen = params.selectedCourier
             if (chosen && chosen !== 'flat') {
                 const filtered = rates.filter((r) => r.courier === chosen)
                 if (filtered.length > 0) return { rates: filtered, degraded: false }
-                console.warn(`[get-rates] selected courier ${chosen} unavailable for route — using all couriers`)
+                console.warn(`[get-rates] chosen courier "${chosen}" not offered for this route; available=[${rates.map(r => r.courier).join(', ')}] → flat fallback`)
+                return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
             }
             return { rates, degraded: false }
         }

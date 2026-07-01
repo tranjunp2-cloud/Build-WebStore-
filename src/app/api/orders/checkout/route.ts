@@ -6,6 +6,7 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
+import { getShippingRate } from '@/lib/shipping'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
@@ -309,7 +310,19 @@ export async function POST(request: Request) {
             (site as any).shippingConfig ?? {},
             customer.address?.state,
         )
-        const bestRate = rateResult.rates[0]
+        let bestRate = rateResult.rates[0]
+
+        // COD to a route the EP courier can't collect (COD is West-MY domestic only): don't use EP for
+        // this order — fall back to flat rate + manual COD (seller arranges delivery & collects cash),
+        // so a COD-only store still works from an East-Malaysia origin. Mirrors the storefront UI.
+        if (paymentMethod === 'cod' && bestRate.courier !== 'flat' && bestRate.codAvailable !== true) {
+            const flatSen = getShippingRate(customer.address?.state ?? '', (site as any).shippingConfig ?? {}, effSubtotalSen)
+            bestRate = {
+                courier: 'flat', serviceId: 'flat', courierName: 'Standard Delivery', serviceName: 'Standard Delivery',
+                priceSen: flatSen, codAvailable: false, estDelivery: '3–5 business days', degraded: false,
+            }
+        }
+
         const shippingFeeSen = bestRate.priceSen
         const shippingFee = shippingFeeSen / 100
 

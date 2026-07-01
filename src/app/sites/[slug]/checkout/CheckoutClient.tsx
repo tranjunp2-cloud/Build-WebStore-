@@ -118,7 +118,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; type: 'percentage' | 'fixed'; value: number } | null>(null)
     const [discountSen, setDiscountSen] = useState(0)
     // EasyParcel live shipping (resolved server-side; courier is not buyer-selected)
-    const [shipCalc, setShipCalc] = useState<{ feeRM: number; courierName: string; isFree: boolean; degraded: boolean } | null>(null)
+    const [shipCalc, setShipCalc] = useState<{ feeRM: number; courierName: string; isFree: boolean; degraded: boolean; codAvailable?: boolean } | null>(null)
     const [shipLoading, setShipLoading] = useState(false)
     const [showOverlay, setShowOverlay] = useState(false)
     const [overlayTakingLong, setOverlayTakingLong] = useState(false)
@@ -264,9 +264,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // Free-ship gates on the POST-discount subtotal (F33 phase-07) — mirrors the server so UI total matches.
     const effectiveSub = Math.max(0, sub - discountRM)
 
-    // EasyParcel live rate: resolve server-side once a destination state is chosen. Mirrors the
-    // backend getRates (EP courier when ready, flat fallback) so the shown total matches what's charged.
-    const addressReady = !!selectedState && sub > 0
+    // EasyParcel live rate: resolve server-side once the destination (state + postcode) is chosen —
+    // wait for the full address so we don't quote on a half-filled form. Mirrors the backend getRates
+    // (EP courier when ready, flat fallback) so the shown total matches what's charged.
+    const addressReady = !!selectedState && !!form.postcode && sub > 0
     useEffect(() => {
         if (!addressReady || !siteId || items.length === 0) { setShipCalc(null); return }
         let cancelled = false
@@ -277,6 +278,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             body: JSON.stringify({
                 siteId,
                 state: selectedState!.name,
+                destPostcode: form.postcode,
                 subtotalSen: Math.round(effectiveSub * 100),
                 items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
                 ...(paymentMethod === 'cod' ? { codAmountSen: Math.round(effectiveSub * 100) } : {}),
@@ -287,7 +289,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (cancelled) return
                 if (j?.success && j.data) {
                     const r0 = j.data.rates?.[0]
-                    setShipCalc({ feeRM: j.data.fee ?? 0, courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded })
+                    setShipCalc({ feeRM: j.data.fee ?? 0, courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded, codAvailable: j.data.codAvailable })
                 } else {
                     // API error → never leave checkout stuck; use flat fallback (matches server getRates)
                     setShipCalc({ feeRM: baseShipping, courierName: 'Standard', isFree: false, degraded: true })
@@ -297,18 +299,25 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             .finally(() => { if (!cancelled) setShipLoading(false) })
         return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedStateId, siteId, items.length, paymentMethod, effectiveSub])
+    }, [selectedStateId, form.postcode, siteId, items.length, paymentMethod, effectiveSub])
 
+    const shippingSettled = addressReady && !shipLoading && shipCalc != null
+    // COD to a route the EP courier can't collect (COD = West-MY domestic only). Don't block — fall
+    // back to flat rate + manual COD (seller arranges delivery & collects cash) so a COD-only store
+    // still works even from an East-Malaysia origin.
+    const codUsesFlat = paymentMethod === 'cod' && shippingSettled && !!shipCalc && !shipCalc.degraded && shipCalc.codAvailable === false
     const shipStatus: 'empty' | 'loading' | 'rates' | 'free' | 'fallback' =
         !addressReady ? 'empty'
             : (shipLoading || !shipCalc) ? 'loading'
-                : shipCalc.isFree ? 'free'
-                    : shipCalc.degraded ? 'fallback'
-                        : 'rates'
-    const shippingSettled = addressReady && !shipLoading && shipCalc != null
-    const courierName = shipCalc?.courierName ?? 'Standard'
-    const shippingFee = shipStatus === 'free' ? 0 : (shipCalc ? shipCalc.feeRM : baseShipping)
-    const total = Math.round((Math.max(0, sub - discountRM) + shippingFee) * 100) / 100
+                : codUsesFlat ? 'fallback'
+                    : shipCalc.isFree ? 'free'
+                        : shipCalc.degraded ? 'fallback'
+                            : 'rates'
+    const courierName = codUsesFlat ? 'Standard' : (shipCalc?.courierName ?? 'Standard')
+    const shippingFee = shipStatus === 'free' ? 0 : (codUsesFlat ? baseShipping : (shipCalc ? shipCalc.feeRM : baseShipping))
+    // Shipping only counts toward the total once resolved — before the address is entered the total
+    // is just subtotal − discount (matches the "Enter address" shipping line + disabled Place Order).
+    const total = Math.round((Math.max(0, sub - discountRM) + (shippingSettled ? shippingFee : 0)) * 100) / 100
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
@@ -873,6 +882,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                     <span className="pm-pill"><MapPin size={11} /> {ck.westMalaysiaOnly}</span>
                                                     <span className="pm-pill">{ck.noExtraFee}</span>
                                                 </div>
+                                                {codUsesFlat && (
+                                                    <p style={{ marginTop: 8, fontSize: 12, color: 'var(--f3)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                                        <Info size={12} /> Courier COD isn’t available to this address — the seller will arrange delivery and collect cash. Standard shipping applies.
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

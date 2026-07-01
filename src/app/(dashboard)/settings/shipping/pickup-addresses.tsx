@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapPin, Check, Star, Pencil, Trash2, Plus } from 'lucide-react'
+import { MapPin, Check, Star, Pencil, Trash2, Plus, AlertTriangle } from 'lucide-react'
+
+// EasyParcel COD is West-Malaysia domestic only — an East-MY origin can't collect COD via courier.
+const EAST_MY_STATES = new Set(['Sabah', 'Sarawak', 'Labuan'])
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { Warehouse } from '@/lib/shipping/easyparcel/warehouse'
@@ -210,6 +213,18 @@ export function PickupAddresses({ value, onChange }: PickupAddressesProps) {
                     </Button>
                 )}
             </div>
+
+            {/* East-Malaysia origin warning: EasyParcel COD is West-MY domestic only. */}
+            {(() => {
+                const dw = warehouses.find(w => w.isDefault) ?? warehouses[0]
+                if (!dw || !EAST_MY_STATES.has((dw.state ?? '').trim())) return null
+                return (
+                    <div className="flex items-start gap-2 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.08)] px-4 py-3 text-[12px] text-[hsl(var(--warning))]">
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-px" />
+                        <span>Cash on Delivery via EasyParcel isn’t available from East Malaysia (Sabah / Sarawak / Labuan). COD orders will fall back to standard delivery — you arrange delivery and collect cash yourself.</span>
+                    </div>
+                )
+            })()}
 
             {/* Saved address cards */}
             {warehouses.map(w => {

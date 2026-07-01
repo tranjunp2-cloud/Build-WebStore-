@@ -38,11 +38,13 @@ export async function POST(request: Request) {
             return badRequest('VALIDATION_ERROR', 'Request body must be a JSON object')
         }
 
-        const { siteId, state, subtotalSen, items, codAmountSen } = body
+        const { siteId, state, subtotalSen, items, codAmountSen, destPostcode } = body
 
         if (typeof siteId !== 'string' || siteId.length === 0 || siteId.length > 100) {
             return badRequest('VALIDATION_ERROR', 'siteId required')
         }
+        // Destination postcode — required for an accurate EP quotation. Optional/ignored for flat rate.
+        const receiverPostcode = typeof destPostcode === 'string' && /^\d{4,6}$/.test(destPostcode) ? destPostcode : ''
         if (typeof state !== 'string' || !(MY_STATES as readonly string[]).includes(state)) {
             return badRequest('INVALID_STATE', 'Invalid Malaysia state')
         }
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
             const rateResult = await getRates(
                 {
                     weightGrams: totalWeightGrams,
-                    destPostcode: '',  // not available at calculate-shipping stage
+                    destPostcode: receiverPostcode,
                     destState: state,
                     senderPostcode: warehousePostcode,
                     senderState: warehouseState,
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
 
             return NextResponse.json({
                 success: true,
-                data: { fee, isFree, region, rates: rateResult.rates, degraded: rateResult.degraded },
+                data: { fee, isFree, region, rates: rateResult.rates, degraded: rateResult.degraded, codAvailable: bestRate.codAvailable === true },
             })
         }
 
