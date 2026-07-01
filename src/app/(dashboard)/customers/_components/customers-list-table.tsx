@@ -148,14 +148,17 @@ export function CustomersListTable({
 
     return (
         <>
-        {/* Mobile + tablet + iPad Pro (<xl): card list — avoids horizontal scroll of the 760px table */}
-        <div className="xl:hidden">
+        {/* Mobile + iPad mini (<820px): card list — avoids horizontal scroll of the table */}
+        <div className="min-[820px]:hidden">
             <CustomersListCards records={records} loading={loading} onRowClick={onRowClick} footer={footer} />
         </div>
 
-        {/* Desktop (>=xl): original table, unchanged */}
-        <div className="hidden xl:block">
-        <Table minWidth={760} className="table-fixed w-full" footer={footer}>
+        {/* iPad Air and up (>=820px): table. Matches /blog convention: `dash-table-compact`
+            (globals.css) shrinks font+padding below xl and NO min-w floor → table-fixed w-full
+            shrinks to fit any iPad width (no horizontal scroll). min-w only at desktop (>=1280)
+            restores the original 760px floor → desktop byte-identical. */}
+        <div className="hidden min-[820px]:block">
+        <Table className="table-fixed w-full dash-table-compact min-[1280px]:min-w-[760px]" footer={footer}>
             {/* table-fixed + % colgroup: even columns. Email is slightly wider (it carries
                 the avatar + address); the other 5 are equal width for a balanced rhythm. */}
             <colgroup>
