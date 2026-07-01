@@ -117,6 +117,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // ── Discount state ───────────────────────────────────────────────
     const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; type: 'percentage' | 'fixed'; value: number } | null>(null)
     const [discountSen, setDiscountSen] = useState(0)
+    // EasyParcel live shipping (resolved server-side; courier is not buyer-selected)
+    const [shipCalc, setShipCalc] = useState<{ feeRM: number; courierName: string; isFree: boolean; degraded: boolean } | null>(null)
+    const [shipLoading, setShipLoading] = useState(false)
     const [showOverlay, setShowOverlay] = useState(false)
     const [overlayTakingLong, setOverlayTakingLong] = useState(false)
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -260,7 +263,51 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const discountRM = discountSen / 100
     // Free-ship gates on the POST-discount subtotal (F33 phase-07) — mirrors the server so UI total matches.
     const effectiveSub = Math.max(0, sub - discountRM)
-    const shippingFee = freeAboveRM !== null && effectiveSub >= freeAboveRM ? 0 : baseShipping
+
+    // EasyParcel live rate: resolve server-side once a destination state is chosen. Mirrors the
+    // backend getRates (EP courier when ready, flat fallback) so the shown total matches what's charged.
+    const addressReady = !!selectedState && sub > 0
+    useEffect(() => {
+        if (!addressReady || !siteId || items.length === 0) { setShipCalc(null); return }
+        let cancelled = false
+        setShipLoading(true)
+        fetch('/api/orders/calculate-shipping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                siteId,
+                state: selectedState!.name,
+                subtotalSen: Math.round(effectiveSub * 100),
+                items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                ...(paymentMethod === 'cod' ? { codAmountSen: Math.round(effectiveSub * 100) } : {}),
+            }),
+        })
+            .then(r => r.json())
+            .then(j => {
+                if (cancelled) return
+                if (j?.success && j.data) {
+                    const r0 = j.data.rates?.[0]
+                    setShipCalc({ feeRM: j.data.fee ?? 0, courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded })
+                } else {
+                    // API error → never leave checkout stuck; use flat fallback (matches server getRates)
+                    setShipCalc({ feeRM: baseShipping, courierName: 'Standard', isFree: false, degraded: true })
+                }
+            })
+            .catch(() => { if (!cancelled) setShipCalc({ feeRM: baseShipping, courierName: 'Standard', isFree: false, degraded: true }) })
+            .finally(() => { if (!cancelled) setShipLoading(false) })
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStateId, siteId, items.length, paymentMethod, effectiveSub])
+
+    const shipStatus: 'empty' | 'loading' | 'rates' | 'free' | 'fallback' =
+        !addressReady ? 'empty'
+            : (shipLoading || !shipCalc) ? 'loading'
+                : shipCalc.isFree ? 'free'
+                    : shipCalc.degraded ? 'fallback'
+                        : 'rates'
+    const shippingSettled = addressReady && !shipLoading && shipCalc != null
+    const courierName = shipCalc?.courierName ?? 'Standard'
+    const shippingFee = shipStatus === 'free' ? 0 : (shipCalc ? shipCalc.feeRM : baseShipping)
     const total = Math.round((Math.max(0, sub - discountRM) + shippingFee) * 100) / 100
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
@@ -363,6 +410,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.line1.trim() && form.city && form.postcode && items.length > 0 &&
+        shippingSettled &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit')
     )
 
@@ -547,7 +595,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         >
             {isPlacing
                 ? <><Loader2 size={16} className="spin" /> {ck.placingOrder}</>
-                : <><Rocket size={16} /> {ck.placeOrder}</>}
+                : shipStatus === 'empty'
+                    ? <><MapPin size={16} /> Enter address to continue</>
+                    : shipStatus === 'loading'
+                        ? <><Loader2 size={16} className="spin" /> Calculating shipping…</>
+                        : <><Rocket size={16} /> {ck.placeOrder}</>}
         </button>
     )
 
@@ -640,11 +692,17 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-ch">
                                 <span className="ck-num">02</span>
                                 <h2 className="ck-ct">{ck.shippingAddress}</h2>
-                                <span className="ck-aux">
-                                    <Truck size={12} />
-                                    {selectedState?.zone === 'east' ? 'East Malaysia' : 'West Malaysia'}
-                                    {' · '}{shippingFee === 0 ? 'Free' : formatPrice(shippingFee, currency)}
-                                </span>
+                                {(form.city || selectedState) ? (
+                                    <span className="ck-aux" style={{ color: 'var(--tl)' }}>
+                                        <MapPin size={12} />
+                                        {form.city || selectedState?.name}
+                                    </span>
+                                ) : (
+                                    <span className="ck-aux">
+                                        <AlertCircle size={12} />
+                                        Required
+                                    </span>
+                                )}
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
@@ -885,8 +943,24 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 </div>
                             )}
                             <div className="sum-row">
-                                <span className="sr-l">{ck.shipping} ({selectedState?.zone === 'east' ? 'East MY' : 'West MY'})</span>
-                                <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
+                                {shipStatus === 'empty' ? (
+                                    <>
+                                        <span className="sr-l">{ck.shipping}</span>
+                                        <span className="sr-v" style={{ color: 'var(--f4)', fontFamily: 'inherit', fontWeight: 500 }}>Enter address</span>
+                                    </>
+                                ) : shipStatus === 'loading' ? (
+                                    <>
+                                        <span className="sr-l">{ck.shipping}</span>
+                                        <span className="sr-v" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--f3)', fontFamily: 'inherit', fontWeight: 500 }}>
+                                            <Loader2 size={12} className="spin" /> Calculating…
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="sr-l">{ck.shipping} <span style={{ color: 'var(--f4)' }}>(via {courierName})</span></span>
+                                        <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
+                                    </>
+                                )}
                             </div>
                             {sub > 0 && freeAboveRM !== null && (
                                 <>
