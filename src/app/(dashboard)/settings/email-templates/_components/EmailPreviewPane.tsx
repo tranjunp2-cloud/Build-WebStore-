@@ -141,10 +141,12 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
             </div>
 
             {/* Preview canvas */}
-            {/* Self-contained scroll: the iframe auto-grows to its content height, so cap this
-                wrapper and let it scroll internally. overscroll-contain stops the scroll chain
-                from propagating to the page (which would shift the form/header). */}
-            <div className="relative flex min-h-[360px] max-h-[calc(100vh-500px)] items-start justify-center overflow-y-auto overscroll-contain bg-slate-100 dark:bg-[hsl(var(--background))] p-3 sm:p-6">
+            {/* Self-contained scroll — DESKTOP split-view only (md+). The iframe auto-grows to its
+                content height; on desktop we cap this wrapper so it scrolls internally and
+                overscroll-contain keeps the scroll from shifting the form/header next to it.
+                On mobile the layout is stacked (grid-cols-1), so let the preview grow naturally
+                and the page scroll — no cramped inner box. */}
+            <div className="relative flex min-h-[360px] items-start justify-center bg-slate-100 dark:bg-[hsl(var(--background))] p-3 sm:p-6 md:max-h-[calc(100vh-500px)] md:overflow-y-auto md:overscroll-contain">
                 {/* Subtle loading overlay — keeps iframe visible to avoid flash */}
                 {loading && (
                     <div className="absolute inset-0 flex items-start justify-center pt-8 bg-slate-100/70 dark:bg-[hsl(var(--background)/0.7)] z-10 pointer-events-none">
