@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import ProductDetailPage, { generateMetadata } from '../../../app/sites/[slug]/products/[productSlug]/page'
+import { ProductImageGallery } from '../../../components/storefront/ProductImageGallery'
 import { getPayload } from 'payload'
 
 // Mock getPayload
@@ -166,5 +167,72 @@ describe('Storefront Product Detail Page (US-F08-06)', () => {
         const { queryByTestId } = render(jsx)
 
         expect(queryByTestId('variant-selector')).not.toBeInTheDocument()
+    })
+})
+
+// TC-F09-1451 — ProductImageGallery client component
+describe('ProductImageGallery (TC-F09-1451)', () => {
+    const mockImages = [
+        { image: { url: 'https://cdn.example.com/img1.jpg' }, alt: 'Ảnh 1' },
+        { image: { url: 'https://cdn.example.com/img2.jpg' }, alt: 'Ảnh 2' },
+        { image: { url: 'https://cdn.example.com/img3.jpg' }, alt: 'Ảnh 3' },
+    ]
+
+    it('TC-F09-1451-01 — first thumbnail is selected (aria-selected=true) by default', () => {
+        const { getByLabelText } = render(
+            <ProductImageGallery images={mockImages} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        expect(getByLabelText('View image 1')).toHaveAttribute('aria-selected', 'true')
+        expect(getByLabelText('View image 2')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('TC-F09-1451-02 — does not render thumbnail strip when only 1 image', () => {
+        const { queryByLabelText } = render(
+            <ProductImageGallery images={[mockImages[0]]} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        expect(queryByLabelText('View image 2')).not.toBeInTheDocument()
+    })
+
+    it('TC-F09-1451-03 — renders thumbnail buttons for all images when multiple', () => {
+        const { getByLabelText } = render(
+            <ProductImageGallery images={mockImages} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        expect(getByLabelText('View image 1')).toBeInTheDocument()
+        expect(getByLabelText('View image 2')).toBeInTheDocument()
+        expect(getByLabelText('View image 3')).toBeInTheDocument()
+    })
+
+    it('TC-F09-1451-04 — clicking thumbnail marks it as selected (aria-selected=true)', () => {
+        const { getByLabelText } = render(
+            <ProductImageGallery images={mockImages} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        const btn2 = getByLabelText('View image 2')
+        expect(btn2).toHaveAttribute('aria-selected', 'false')
+        fireEvent.click(btn2)
+        expect(btn2).toHaveAttribute('aria-selected', 'true')
+        // first thumbnail deselected
+        expect(getByLabelText('View image 1')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('TC-F09-1451-05 — renders placeholder icon when images array is empty', () => {
+        const { container } = render(
+            <ProductImageGallery images={[]} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        // Package icon rendered as svg aria-hidden
+        const svg = container.querySelector('svg[aria-hidden]')
+        expect(svg).toBeInTheDocument()
+    })
+
+    it('TC-F09-1451-06 — renders all 5 thumbnails when product has 5 images', () => {
+        const fiveImages = Array.from({ length: 5 }, (_, i) => ({
+            image: { url: `https://cdn.example.com/img${i + 1}.jpg` },
+            alt: `Photo ${i + 1}`,
+        }))
+        const { getByLabelText } = render(
+            <ProductImageGallery images={fiveImages} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        for (let i = 1; i <= 5; i++) {
+            expect(getByLabelText(`View image ${i}`)).toBeInTheDocument()
+        }
     })
 })
