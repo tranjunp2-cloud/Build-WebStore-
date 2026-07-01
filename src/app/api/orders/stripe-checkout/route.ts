@@ -24,7 +24,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
         let epToken: string | null = null
         const defaultWarehouse = getDefaultWarehouse(epIntegration)
         const warehouseState = defaultWarehouse.state ?? ''
-        if (epIntegration.enabled && epIntegration.accessToken) {
+        if (epIntegration.enabled && isEpReady(epIntegration)) {
             try {
                 epToken = await getValidToken(epIntegration, (tenant as any).id, payload)
             } catch {

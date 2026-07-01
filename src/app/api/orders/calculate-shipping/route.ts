@@ -9,7 +9,7 @@ import {
 } from '@/lib/shipping'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 
 export const maxDuration = 60
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         if (tenantId) {
             const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
             const epIntegration = (tenantDoc as any)?.easyParcelIntegration ?? {}
-            if (epIntegration.enabled && epIntegration.accessToken) {
+            if (epIntegration.enabled && isEpReady(epIntegration)) {
                 try {
                     epToken = await getValidToken(epIntegration, tenantId, payload)
                 } catch {

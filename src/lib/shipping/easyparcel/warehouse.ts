@@ -24,6 +24,8 @@ export interface Warehouse {
 interface EpIntegrationLike {
     warehouses?: unknown
     warehouse?: unknown
+    accessToken?: unknown
+    selectedCourier?: unknown
 }
 
 /** Normalise the stored warehouses array (guards against bad/missing data). */
@@ -45,4 +47,29 @@ export function getDefaultWarehouse(ep: EpIntegrationLike | null | undefined): W
     if (def) return def
     const legacy = ep?.warehouse
     return legacy && typeof legacy === 'object' ? (legacy as Warehouse) : {}
+}
+
+/** A pickup address is usable as an EP shipment sender only when EP's mandatory fields are present. */
+export function isWarehouseComplete(w: Warehouse | null | undefined): boolean {
+    if (!w) return false
+    const phoneDigits = (w.phone ?? '').replace(/\D/g, '')
+    return (
+        !!(w.label || w.name)?.trim() &&
+        phoneDigits.length >= 8 &&
+        !!w.address1?.trim() &&
+        !!w.state?.trim() &&
+        !!w.postcode?.trim()
+    )
+}
+
+/**
+ * Whether EasyParcel is READY to quote/ship for a tenant — the single source of truth used by the
+ * order flow. "Connected" (has token) is NOT enough: a valid default pickup and a selected courier
+ * are required, otherwise checkout must fall back to flat rate instead of quoting a wrong origin or
+ * failing at label creation. Does not check token expiry — the caller's getValidToken handles that.
+ */
+export function isEpReady(ep: EpIntegrationLike | null | undefined): boolean {
+    if (!ep?.accessToken) return false
+    if (typeof ep.selectedCourier !== 'string' || !ep.selectedCourier.trim()) return false
+    return isWarehouseComplete(getDefaultWarehouse(ep))
 }

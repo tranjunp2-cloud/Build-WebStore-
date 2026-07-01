@@ -90,7 +90,8 @@ export async function GET(request: NextRequest) {
                     refreshToken: tokens.refresh_token,
                     tokenExpiresAt: new Date(now + tokens.expires_in * 1000).toISOString(),
                     tokenRefreshExpiresAt: new Date(now + tokens.refresh_token_expires_in * 1000).toISOString(),
-                    enabled: true,
+                    // NOTE: enabled is NOT set here — connecting only stores the token. The merchant
+                    // completes the setup stepper and clicks "Save & Activate" to set enabled=true.
                     testedAt: new Date().toISOString(),
                     accountName: accountName ?? null,
                     accountEmail: accountEmail ?? null,
