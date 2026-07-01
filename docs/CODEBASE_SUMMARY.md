@@ -56,12 +56,12 @@ src/
 
 ## Collections (`src/collections/`)
 
-23 Payload collections — schema source of truth:
+24 Payload collections — schema source of truth:
 
 - **Identity:** `Users`, `Tenants`, `Subscribers`, `Subscriptions`
 - **CMS:** `Pages`, `Sites`, `Templates`, `Media`, `Blogs`, `BlogCategories`
 - **Commerce:** `Products`, `Categories`, `Orders`, `Customers`, `Discounts`, `DiscountUsageHistory`, `ContactSubmissions`
-- **Infra:** `AiUsageLogs`, `Analytics`, `Notifications`, `PushSubscriptions`, `SEOMetaJobs`, `EmailTemplateSettings`
+- **Infra:** `AiUsageLogs`, `Analytics`, `Notifications`, `PushSubscriptions`, `SEOMetaJobs`, `EmailTemplateSettings`, `SsoStepEvents`
 
 Adding a new collection requires: Payload config + migration in `scripts/db-setup.js` + slug in `COLLECTION_SLUGS[]`. See `.claude/rules/database-schema.md`.
 
