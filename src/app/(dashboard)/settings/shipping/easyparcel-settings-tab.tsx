@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle, ShieldCheck, PlugZap, BadgePercent, Wallet, Printer, Lock, Search, RefreshCw, Unlink } from 'lucide-react'
+import { Loader2, XCircle, ShieldCheck, PlugZap, BadgePercent, Wallet, Printer, Lock, Search, RefreshCw, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -201,6 +201,27 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         }
     }
 
+    // Persist pickup-address mutations immediately. The inline "Add/Update/Delete/Set default"
+    // actions only change local state; without this they'd need a separate "Save Settings" click
+    // to reach the DB, which reads as "editing the address does nothing".
+    async function handleWarehousesChange(next: Warehouse[]) {
+        setWarehouses(next)
+        if (testStatus !== 'connected') return
+        try {
+            const res = await fetch(`/api/tenant/${tenantId}/easyparcel-save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ enabled, warehouses: next, selectedCourier }),
+            })
+            const json = await res.json()
+            if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to save')
+            toast.success('Pickup address saved')
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to save pickup address')
+        }
+    }
+
     async function handleSave() {
         if (!canSave) return
         setIsSaving(true)
@@ -340,10 +361,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             <div className="p-6 flex flex-col gap-4">
                 {testStatus === 'connected' ? (
                     <>
-                        <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-3 text-[13px] text-[rgb(16,185,129)]">
-                            <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            Connected to EasyParcel
-                        </div>
                         {enabled && !localReady && (
                             <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--warning))]">
                                 <XCircle className="h-4 w-4 shrink-0" />
@@ -424,7 +441,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
 
             {/* ─── Pickup Addresses ─────────────────────────── */}
             <div className="p-6 flex flex-col gap-5" style={{ opacity: testStatus === 'testing' ? 0.5 : 1, pointerEvents: testStatus === 'testing' ? 'none' : undefined }}>
-                <PickupAddresses value={warehouses} onChange={setWarehouses} />
+                <PickupAddresses value={warehouses} onChange={handleWarehousesChange} />
                 {testStatus === 'connected' && (
                     <div>
                         <Button

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, Unlink } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Loader2, Lock, MapPin, PlugZap, Unlink } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { PickupAddresses } from './pickup-addresses'
@@ -105,10 +105,6 @@ export function EpSetupStepper({ tenantId, initialEpConfig }: Props) {
             <div className="p-6">
                 {step === 0 && (
                     <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-2 rounded-[10px] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-3 text-[13px] text-[rgb(16,185,129)]">
-                            <CheckCircle2 className="h-4 w-4 shrink-0" />
-                            Connected to EasyParcel
-                        </div>
                         <div className="flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-5 py-4">
                             <div className="flex items-center gap-3 min-w-0">
                                 <Lock className="h-4 w-4 text-[var(--dash-text-muted)] shrink-0" />
