@@ -193,8 +193,10 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 </div>
             </div>
 
-            {/* Sticky Footer — DS buttons (match the desktop QuickView modal: dashSecondary destructive + dashPrimary) */}
-            <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-white/10 p-4 pb-8 z-50">
+            {/* Sticky Footer — DS buttons (match the desktop QuickView modal: dashSecondary destructive + dashPrimary).
+                Confined to the 488px detail panel from md up (mobile stays full-width) so the bar sits under
+                the panel, not centered across the whole viewport. */}
+            <div className="fixed bottom-0 left-0 right-0 md:left-auto md:w-[488px] bg-background/90 backdrop-blur-md border-t border-white/10 p-4 pb-8 z-50">
                 <div className="flex gap-3 sm:max-w-[560px] sm:mx-auto">
                     <Button
                         variant="dashSecondary"
