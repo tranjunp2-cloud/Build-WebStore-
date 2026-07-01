@@ -375,8 +375,11 @@ describe('TC-F10.i18n.08 — Specific Key Value Correctness', () => {
     it('MS status labels match expected values', () => {
         expect(msOrders.status.pending).toBe('Menunggu')
         expect(msOrders.status.confirmed).toBe('Disahkan')
-        expect(msOrders.status.readyToShip).toBe('Sedia untuk Dihantar')
-        expect(msOrders.status.shipped).toBe('Sedang Dihantar') // renamed from 'Telah Dihantar' (bug #22)
+        // Shortened for the tablet/mobile status badge so the pill fits the column
+        // without overflow (MS runs longer than EN): 'Sedia untuk Dihantar' → 'Sedia
+        // Dihantar', 'Sedang Dihantar' → 'Dihantar'.
+        expect(msOrders.status.readyToShip).toBe('Sedia Dihantar')
+        expect(msOrders.status.shipped).toBe('Dihantar')
         expect(msOrders.status.completed).toBe('Selesai')
         expect(msOrders.status.cancelled).toBe('Dibatalkan')
         expect(msOrders.status.refunded).toBe('Dikembalikan')
