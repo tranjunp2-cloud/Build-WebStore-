@@ -13,22 +13,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 
-// ── Mock i18n ─────────────────────────────────────────────────────────────────
-vi.mock('@/i18n', () => ({
-    useI18n: () => ({
-        t: {
-            dashboard: {
-                products: {
-                    list: {
-                        missingInfoTitle: 'Missing information',
-                        missingAlt: 'Image alt text',
-                        missingCategory: 'Category',
-                    },
-                },
-            },
-        },
-    }),
-}))
+beforeEach(() => {
+    vi.clearAllMocks()
+})
 
 // ── Mock Tooltip components ────────────────────────────────────────────────────
 vi.mock('@/components/ui/tooltip', () => {
@@ -303,11 +290,4 @@ describe('MissingInfoIndicator — Button properties', () => {
         const button = screen.getByRole('button')
         expect(button).toHaveClass('shrink-0')
     })
-})
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Cleanup
-// ──────────────────────────────────────────────────────────────────────────────
-beforeEach(() => {
-    vi.clearAllMocks()
 })
