@@ -27,7 +27,7 @@ So that shop của tôi có quyền tính cước và mua nhãn vận đơn qua 
 
 > **OAuth 2.0 Authorization-Code flow (not API keys):** Merchant never shares secrets. Workflow: merchant redirects to EasyParcel → logs in + grants scope → callback returns authorization code → backend exchanges code for access token (10h) + refresh token (1yr). Tokens stored securely per tenant, auto-refreshed on expiry.
 >
-> **Warehouse = Prime source of truth (KHÔNG sync từ EP):** EasyParcel OAuth doesn't return stored addresses → merchant enters 1 warehouse address in Prime, reused for all rate-check + label/pickup operations. Force-validate via rate-check call.
+> **Warehouses = Prime source of truth (KHÔNG sync từ EP):** EasyParcel OAuth doesn't return stored addresses → merchant enters multiple warehouse addresses (pickup points) in Prime, one marked as default (isDefault). Reused for rate-check + label/pickup operations. Force-validate via rate-check call.
 
 ### Acceptance Criteria
 
@@ -36,14 +36,16 @@ So that shop của tôi có quyền tính cước và mua nhãn vận đơn qua 
 ```gherkin
 GIVEN tenant chưa kết nối, mở settings/shipping > tab "EasyParcel"
   AND bấm "Connect with EasyParcel ↗"
-WHEN  OAuth popup opens (https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...)
+WHEN  GET /api/tenant/[id]/easyparcel-oauth-start (sets HttpOnly cookie ep_state_{tenantId})
+  AND OAuth popup opens (https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...)
   AND merchant logs in + grants scope
-THEN  EasyParcel redirects callback with authorization code
-  AND backend POSTs to https://api.easyparcel.com/oauth/token
-        (grant_type=authorization_code, code, redirect_uri, Basic auth client_id:client_secret)
+THEN  EasyParcel redirects callback to GET /api/easyparcel/oauth-callback with authorization code
+  AND backend verifies nonce, then POSTs to https://api.easyparcel.com/oauth/token
+        (grant_type=authorization_code, code, redirect_uri, Basic auth EASYPARCEL_CLIENT_ID:EASYPARCEL_CLIENT_SECRET)
   AND receives access_token (10h) + refresh_token (1yr) + expires_at
-  AND stores securely in tenant.easyParcelIntegration.oauthTokens
-  AND popup closes
+  AND stores securely in tenant.easyParcelIntegration (accessToken, refreshToken, tokenExpiresAt)
+  AND calls GET /account/get_account_information to sync account name + email
+  AND redirects to /settings/shipping?ep=connected
   AND settings page shows green "Connected — Account: [Name] (Live)" + wallet balance
   AND warehouse/courier selection sections unlock for input
 ```
@@ -55,11 +57,11 @@ THEN  EasyParcel redirects callback with authorization code
 ```gherkin
 GIVEN tenant connected via OAuth, now filling warehouse address
   AND entered address with city, state, postcode, country=MY
-WHEN  bấm "Save"
-THEN  backend calls POST /shipment/quotations with warehouse (sender) details as test
-  AND quotation call succeeds → postcode valid, warehouse accepted
-  AND quotation call fails (invalid postcode/state combo) → reject save with error "Postcode invalid"
-  AND config KHÔNG được lưu (force validate once; can edit later without re-test)
+WHEN  bấm "Validate" hoặc "Save"
+THEN  backend calls POST /api/tenant/[id]/easyparcel-test { syncWarehouse? } (rate-limited 3/60s/tenant)
+  AND test call returns balance, accountName, accountEmail, pickupAddress → postcode valid, warehouse accepted
+  AND test call fails → reject save with error "Postcode invalid or account not ready"
+  AND config KHÔNG được lưu trước khi validate thành công
 ```
 
 > 📌 Source: PRD FR A-2 (force validate warehouse)
@@ -78,24 +80,28 @@ THEN  trả 403 Forbidden (mirror hasSiteAccess)
 #### AC-4: Token auto-refresh on 401
 
 ```gherkin
-GIVEN access token đã hết hạn (> 10h)
-WHEN  backend makes rate/order call lấy 401 Unauthorized
-THEN  backend POSTs to oauth/token với refresh_token (grant_type=refresh_token)
+GIVEN access token sắp hết hạn (< 60s to expiry)
+WHEN  backend makes rate/order call
+THEN  backend auto-refreshes: POSTs to https://api.easyparcel.com/oauth/token với refresh_token (grant_type=refresh_token)
   AND gets new access_token
-  AND retries original request
+  AND uses new token for the call
   AND succeeds (idempotent)
+
+AND GIVEN access token đã hết hạn hoàn toàn
+WHEN  backend makes call lấy 401 Unauthorized
+THEN  throws AUTH_EXPIRED error (needs reconnect)
 ```
 
 > 📌 Source: spec v2026-03 _authentication.md (Refresh Token Flow)
 
 ### Additional Criteria
 
-- [ ] Warehouse = Prime SoT: 1 block (line1/2/city/state/postcode/country) dùng cho **cả** rate-check **lẫn** label/pickup. KHÔNG sync từ EasyParcel.
-- [ ] Warehouse form dùng **geo cascade có sẵn**: State → City → Postcode = 3 dropdown qua `/api/geo/{states,districts,postcodes}` (dataset `malaysia_*` đã seed); chỉ `line1/2` free text. **Recommend:** reuse checkout `AddressCascadeFields` component (DRY).
-- [ ] Cpon fields: line1 required, line2 optional, city required, state required (cascade), postcode required (5 digits), country hardcoded MY.
-- [ ] Force validate: first-time save (or Validate button if UX prefers) → rate-check call. Sai → error. Đúng → lưu. Edit sau không cần re-validate.
-- [ ] OAuth tokens stored in `tenant.easyParcelIntegration.oauthTokens` (access + refresh + expires_at). Encrypt at-rest if possible; decrypt on use.
-- [ ] Disconnect button: clears tokens. Merchant can re-authorize anytime.
+- [ ] Warehouses = Prime SoT: array of pickup addresses (id?, label?, phone, address1, address2?, city, state, postcode, country, isDefault?). One marked isDefault. Reused for all rate-check + label/pickup operations. KHÔNG sync từ EasyParcel.
+- [ ] Warehouse array form: add/edit/delete UI with one default selector. Reuse `AddressCascadeFields` component for geo cascade (DRY). Line1 required, line2 optional, city required, state required (cascade), postcode required (5 digits), country hardcoded MY.
+- [ ] Phone normalized to 60-prefix (e.g. "0122134567" → "60122134567").
+- [ ] Force validate first-time save (or Validate button) → POST /api/tenant/[id]/easyparcel-test. Sai → error. Đúng → lưu. Edit sau không cần re-validate.
+- [ ] OAuth tokens stored in `tenant.easyParcelIntegration`: accessToken*, refreshToken*, tokenExpiresAt*, tokenRefreshExpiresAt* (all server-only, access.read=false). Encrypt at-rest if possible; decrypt on use.
+- [ ] Disconnect button: DELETE /api/tenant/[id]/easyparcel-disconnect — clears tokens, disables integration, keeps warehouse/courier config. Merchant can re-authorize anytime.
 - [ ] Errors: OAuth flow errors (invalid state, user denied, invalid redirect_uri) → red Alert with retry. Network errors → generic "Failed to connect, retry" + details in logs only.
 
 ### Market Notes
@@ -137,28 +143,27 @@ THEN  lưu selectedCourier (single courier_id) vào tenant.easyParcelIntegration
 
 > 📌 Source: PRD FR A-3 + §10 RESOLVED (map theo `courier_id`, hiển thị `courier_name`+logo, mua label bằng `service_id`)
 
-#### AC-2: Chỉ list 4 courier hỗ trợ COD (COD mặc định toàn platform)
+#### AC-2: List ALL live couriers từ EasyParcel (single-select)
 
 ```gherkin
-GIVEN merchant vừa connect xong (list courier trả về từ EasyParcel)
-  AND COD bật mặc định toàn platform (đã deploy production, non-negotiable)
-WHEN  render section Courier
-THEN  CHỈ list 4 courier có cod_service_available=true (Flash, DHL eCommerce, J&T, Aramex — đọc live từ response)
-  AND courier non-COD (Pos Laju, Ninja Van, City-Link, SPX...) KHÔNG hiển thị
-  AND default chọn J&T Express
-  AND mỗi courier gắn badge "COD" + settlement ETA per-courier (xem [F10-orders-management.md § 20.2](../prd/F10-orders-management.md#easyparcel--cod-order-runtime))
-  AND KHÔNG có collapse "＋ Xem thêm courier" (chỉ 4 courier)
-  AND merchant chọn lại tự do trong 4 courier (vẫn single-select)
-  AND chỉ default mã courier mà account merchant thực sự có
+GIVEN merchant vừa connect xong
+WHEN  render section Courier Selection
+THEN  GET /api/tenant/[id]/easyparcel-couriers → fetch full live courier list (country=MY) + wallet
+  AND list ALL returned couriers (no 4-courier restriction)
+  AND each courier shows: courier name + logo + selection as radio (single-select)
+  AND default chọn J&T Express (nếu có, otherwise first available)
+  AND merchant chọn 1 courier để dùng cho all orders (vẫn single-select)
+  AND warn if wallet < RM10 (LOW_WALLET_THRESHOLD)
 ```
 
-> 📌 Source: PRD FR A-3 (decision: COD non-negotiable platform default → courier picker giới hạn 4 courier COD) + `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`
+> 📌 Source: PRD FR A-3 (courier picker fetches full live list) + brief as-built facts
 
 ### Additional Criteria
 
-- [ ] `selectedCourier` = single field (courier_id), KHÔNG hasMany. Chưa chọn → default J&T.
+- [ ] `selectedCourier` = single field (courier_id text), KHÔNG hasMany. Chưa chọn → default J&T.
+- [ ] GET /api/tenant/[id]/easyparcel-couriers → live courier list, wallet balance per currency.
 - [ ] KHÔNG show giá ở settings; KHÔNG còn section "Default parcel" (đã bỏ — weight lấy từ Products.weight/dimensions, fallback hằng số hệ thống).
-- [ ] KHÔNG có setting label mode (tạo label luôn manual ở Phase C); KHÔNG show số dư ví EP.
+- [ ] KHÔNG có setting label mode (tạo label luôn manual ở Phase C); KHÔNG show số dư ví EP chi tiết (chỉ cảnh báo RM10 threshold).
 
 ### Definition of Done
 
@@ -226,29 +231,37 @@ So that tôi thấy đúng giá ship trước khi trả tiền
 
 ### Acceptance Criteria
 
-#### AC-1: EasyParcel ON → trả phí ship 1 courier (shop chọn)
+#### AC-1: EasyParcel ON → trả phí ship của 1 courier (shop chọn)
 
 ```gherkin
 GIVEN tenant EasyParcel ON + đã chọn selectedCourier
-  AND POST /api/orders/calculate-shipping { siteId, dest postcode/state, items }
+  AND POST /api/orders/calculate-shipping { siteId, destPostcode/destState, items, codAmountSen? }
 WHEN  getRates() chạy
 THEN  tính tổng weight = sum(Products.weight × qty); product = 0/thiếu → hằng số DEFAULT_PARCEL
-  AND gọi POST /shipment/quotations (OAuth Bearer token) với origin warehouse, dest, weight, dims cho selectedCourier
-  AND trả { courier, serviceId, fee(sen), eta } của đúng courier shop chọn (KHÔNG mảng nhiều courier)
+  AND aggregate weight: min floor 0.1 kg, round UP to 1 decimal
+  AND normalize phone to 60-prefix (e.g. "0122134567" → "60122134567")
+  AND gọi POST /open_api/2026-03/shipment/quotations (OAuth Bearer token) với:
+        { shipment: [{ sender (warehouse), receiver (dest address), parcel_value(RM float), weight(kg), width?/length?/height?(cm) }] }
+  AND trả rates[] array với { courier, serviceId, courierName, serviceName, priceSen, codAvailable, codMaxSen, estDelivery }
+  AND filter để return chỉ rate của selectedCourier (KHÔNG mảng nhiều courier)
+  AND backward-compat field fee (single price)
 ```
 
-> 📌 Source: PRD FR B-1, B-2
+> 📌 Source: PRD FR B-1, B-2 + brief as-built facts
 
 #### AC-2: Currency RM→sen đúng, KHÔNG markup
 
 ```gherkin
-GIVEN EasyParcel trả price = RM 8.00 cho 1 service
+GIVEN EasyParcel trả price = RM 8.00 cho 1 service trong rates[]
 WHEN  normalize giá
-THEN  compute nội bộ = 800 sen (×100 chính xác); order.shippingFee lưu = 8.00 RM-float (đồng nhất `total`), KHÔNG lưu 800 vào cột (lệch 100×)
+THEN  compute nội bộ = 800 sen (×100 chính xác) để compare/discount logic
+  AND order.shippingFee lưu = 8.00 RM-float (đồng nhất field `total`)
+  AND codMaxSen = max COD (sen) × 1 to apply caps
   AND giá = raw EasyParcel (KHÔNG cộng markup)
+  AND NFR-1: tất cả tiền dụng sen internally; RM khi gửi EP, sen khi nhận
 ```
 
-> 📌 Source: PRD FR B-6, NFR-1, §8 Phase B AC#5
+> 📌 Source: PRD FR B-6, NFR-1, §8 Phase B AC#5 + brief
 
 #### AC-3: Lưu courier vào order ở mọi nhánh checkout
 
@@ -311,18 +324,18 @@ THEN  dùng lại cascade State → City → Postcode của F14 (/api/geo/* + Ch
 
 > 📌 Source: PRD FR B-0
 
-#### AC-1: phí ship → 1 dòng "Shipping" trong Order Summary
+#### AC-1: phí ship + courier branding → 1 dòng "Shipping" trong Order Summary
 
 ```gherkin
-GIVEN calculate-shipping trả phí của courier shop chọn (selectedCourier)
+GIVEN calculate-shipping trả rates[] với courier name + logo của selectedCourier
 WHEN  checkout render
-THEN  Order Summary hiển thị 1 dòng "Shipping: giá thật"
-  AND KHÔNG có section vận chuyển (buyer không thấy/không chọn courier)
+THEN  Order Summary hiển thị 1 dòng "Shipping: [Courier Logo] Courier Name — RM X.XX"
+  AND KHÔNG có section vận chuyển picker (buyer không chọn courier — fixed by selectedCourier)
   AND KHÔNG có dòng SST (gỡ ở checkout từ F33 phase-06)
   AND phí + total đúng (total = subtotal − discount + shipping); lưu vào order khi đặt
 ```
 
-> 📌 Source: PRD FR B-3
+> 📌 Source: PRD FR B-3 + brief as-built facts (courier branding)
 
 #### AC-2: Rate API lỗi/timeout → fallback flat, KHÔNG chặn checkout
 
@@ -379,6 +392,8 @@ As a   SME Owner
 I want bấm "Ready to Ship" (nút có sẵn) để mua nhãn (AWB) ngay trong order detail
 So that tôi không cần màn tạo vận đơn riêng, cước trừ thẳng ví EasyParcel của tôi
 ```
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Acceptance criteria are forward-looking; no code yet.**
 
 ### Acceptance Criteria
 
@@ -459,6 +474,8 @@ I want chọn pickup (courier tới lấy) hoặc dropoff khi tạo label
 So that hàng được lấy theo lịch phù hợp với shop
 ```
 
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Acceptance criteria are forward-looking; no code yet.**
+
 ### Acceptance Criteria
 
 #### AC-1: Pickup/dropoff — collection_date với date-picker rule đúng
@@ -523,38 +540,43 @@ THEN  fallback conservative (vd 12:00 hoặc chỉ cho ngày làm việc kế)
 
 ---
 
-## US-F36-08: COD via EasyParcel — Eligibility, Checkout & Label Creation
+## US-F36-08: COD via EasyParcel — Eligibility & Checkout
 
-**Wave 7** | **P1** | **L** | **Status:** Deferred — blocked on sandbox/support verify of COD submit field (see PRD §8/§9)
+**Wave 7** | **P1** | **L** | **Status:** Draft (Phase B: Checkout portion built; Phase C: Label creation deferred)
 
 ### Story
 
 ```
 As a   buyer ở West Malaysia
 I want chọn COD (trả tiền mặt khi nhận) tại checkout khi courier shop hỗ trợ và đơn trong giới hạn
-So that tôi mua hàng không cần thanh toán trước, và merchant tạo label COD qua EasyParcel để courier thu hộ
+So that tôi mua hàng không cần thanh toán trước
 ```
 
-> **Couriers hỗ trợ COD (West MY only):** J&T Express, DHL eCommerce, Flash Express, Aramex. Pos Laju, SPX Express, City-Link KHÔNG hỗ trợ.
+> **COD eligibility (West MY only):** COD-capable couriers determined live from quotation `cod.available`. No hardcoded courier list. Picker filters to COD-capable couriers; backend enforces all three eligibility rules.
 > **"Confirmed but unpaid" model:** COD order tạo với `paymentStatus='unpaid'` — tiền chưa thu tại checkout. Merchant nhận tiền sau khi courier settle qua EasyParcel dashboard.
 > **Platform RM0:** platform không đụng tiền COD; không build reconciliation; merchant tự withdraw trên EasyParcel.
+>
+> **References:**
+> - Decision & validation: [decision-260702-1503-GH-1333-cod-handoff.md](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md)
+> - COD matrix evidence: [ep-cod-matrix-260702.md](../../plans/reports/ep-cod-matrix-260702.md)
+> - Issue: [GH-1333](https://github.com/primeproduction/ech-prime-web-v2/issues/1333)
 
-### Acceptance Criteria
+### Acceptance Criteria (Phase B — Checkout)
 
 #### AC-1: COD eligibility gating — hiện tùy chọn đúng điều kiện
 
 ```gherkin
-GIVEN buyer đã nhập địa chỉ + rate đã tính xong
+GIVEN buyer đã nhập địa chỉ + calculate-shipping trả rates[]
+  AND rate response chứa codAvailable (boolean) + codMaxSen (cap per courier)
 WHEN  render payment options tại checkout
 THEN  COD option ENABLED chỉ khi ĐỒNG THỜI:
         (1) zone của địa chỉ buyer = 'west' (từ /api/geo/lookup/[postcode])
-        (2) selectedCourier có cod_service_available = true trong rate response (J&T, DHL, Flash, Aramex)
-        (3) order grand total >= RM5.01 (min COD)
-        (4) order grand total <= RM7,000 (max COD)
+        (2) selectedCourier có codAvailable=true (live from quotation)
+        (3) order grand total ∈ [codMinAmount, codMaxAmount] của courier đó (per-courier, live)
   AND thiếu bất kỳ điều kiện nào → COD option disabled với helper text lý do cụ thể
 ```
 
-> 📌 Source: PRD FR C-6a
+> 📌 Source: PRD FR C-6a + brief as-built facts
 
 #### AC-2: COD disabled — helper text đúng theo từng lý do
 
@@ -567,13 +589,13 @@ GIVEN buyer West MY + selectedCourier không hỗ trợ COD (defensive — với
 WHEN  render payment options
 THEN  COD disabled (buyer KHÔNG thấy tên courier — helper chung chung)
 
-GIVEN buyer West MY + total > cod_service_max_cod_amount của courier đang dùng (per-courier: J&T RM1,000, Flash RM7,000...)
+GIVEN buyer West MY + total > max_cod_amount của courier đang dùng (per-courier, live từ quotation)
 WHEN  render payment options
 THEN  COD disabled + helper chung chung "COD chỉ áp dụng cho đơn dưới RM X" (KHÔNG lộ tên courier)
 
-GIVEN buyer West MY + courier hỗ trợ nhưng total < RM5.01
+GIVEN buyer West MY + total < min_cod_amount của courier đang dùng (per-courier, live từ quotation)
 WHEN  render payment options
-THEN  COD disabled + helper "Giá trị đơn tối thiểu để dùng COD là RM5.01"
+THEN  COD disabled + helper chung chung "Đơn dưới mức tối thiểu để dùng COD" (KHÔNG lộ tên courier)
 ```
 
 > 📌 Source: PRD FR C-6a, design §2.2 COD disabled states
@@ -582,17 +604,17 @@ THEN  COD disabled + helper "Giá trị đơn tối thiểu để dùng COD là 
 
 ```gherkin
 GIVEN buyer đủ điều kiện + chọn COD tại checkout
-WHEN  bấm Place Order
+WHEN  bấm Place Order → POST /api/orders/checkout { paymentMethod: 'cod', codAmountSen }
 THEN  order tạo với:
         paymentMethod = 'cod'
         codAmount     = snapshot grand total (sen, KHÔNG recalculate sau)
         codStatus     = 'pending' (default)
         paymentStatus = 'unpaid'
-  AND codAmount (RM) = codAmount (sen) / 100 (khi hiển thị)
+  AND codAmount (RM float) = codAmount (sen) / 100 (khi hiển thị / gửi EasyParcel)
   AND "confirmed but unpaid" — tiền không thu tại đây
 ```
 
-> 📌 Source: PRD FR C-6b, C-6c, NFR-1
+> 📌 Source: PRD FR C-6b, C-6c, NFR-1 + brief as-built facts
 
 #### AC-4: COD fee disclosure (informational)
 
@@ -607,20 +629,41 @@ THEN  hiển thị <Alert> thông tin phí COD max(flat, 4%) theo courier đã c
 
 > 📌 Source: PRD FR C-6d
 
+#### AC-4b: Server hard-rejects ineligible COD
+
+```gherkin
+GIVEN buyer submit checkout với cod_amount pero isCodEligible=false (East MY hoặc courier không hỗ trợ hoặc amount out-of-range)
+WHEN  POST /api/orders/checkout executes
+THEN  server hard-rejects: KHÔNG tạo order
+  AND trả 400 Bad Request hoặc 422 Unprocessable Entity: "COD not eligible for this order"
+  AND ordinal cause: East Malaysia, courier không hỗ trợ COD, hoặc total ngoài giới hạn courier
+  AND UI-only disable là không đủ — EP không validate; code PHẢI enforce
+
+AND GIVEN cod_amount không submitted (buyer chọn bank/Stripe)
+WHEN  checkout submit
+THEN  ignore cod_amount (KHÔNG parse)
+```
+
+> 📌 Source: PA2 validation decision (GH-1333) — backend is gate, not UI
+
+---
+
+### Acceptance Criteria (Phase C — Label Creation — NOT BUILT)
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. AC-5 onwards are forward-looking; no code yet.**
+
 #### AC-5: Create label COD — gửi flag COD + codAmount
 
 ```gherkin
 GIVEN order paymentMethod='cod' + buyer West MY + codAmount trong giới hạn courier
 WHEN  merchant tạo label qua modal Ready to Ship → POST /api/orders/[id]/create-label
-THEN  POST /shipment/submit_orders gửi feature.cod_enabled=true + cod_amount (RM = codAmount/100)
+THEN  POST /open_api/2026-03/shipment/submit_orders gửi { cod_amount (RM float = codAmount/100) }
   AND modal hiện COD badge + "Thu hộ: RM X" + fee note trước khi confirm
   AND codStatus = 'pending' (unchanged — tiền chưa thu)
   AND cước ship vẫn trừ ví merchant (tách biệt khỏi COD amount)
-
-NOTE: tên param cod_enabled + cod_amount CHƯA confirmed — verify sandbox trước go-live (§11 item #1)
 ```
 
-> 📌 Source: PRD FR C-6e, §11 item #1
+> 📌 Source: PRD FR C-6e + brief as-built facts (cod_amount is the verified param name)
 
 #### AC-6: COD East MY tại create-label → block
 
@@ -664,11 +707,12 @@ THEN  codStatus giữ nguyên 'pending' (không thu được tiền)
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test AC-1: COD enabled đúng khi West MY + courier COD + total trong range
-- [ ] Test AC-2: 4 disabled states — đúng helper text từng lý do
+- [ ] Test AC-1: COD enabled đúng khi West MY + courier COD + total trong range (3 conditions)
+- [ ] Test AC-2: disabled states — đúng helper text từng lý do (East MY, non-COD courier, out-of-range amount, under minimum)
 - [ ] Test AC-3: order fields codAmount (sen), codStatus='pending', paymentStatus='unpaid'
-- [ ] Test AC-5: label payload gửi cod_enabled + cod_amount đúng; param name verify sandbox
-- [ ] Test AC-6: East MY COD order → modal block + disable nút
+- [ ] Test AC-4b: server rejects ineligible COD (returns 400/422); UI disable alone insufficient
+- [ ] Test AC-5: label payload gửi cod_enabled + cod_amount đúng; param name verify sandbox (Phase C)
+- [ ] Test AC-6: East MY COD order → modal block + disable nút (Phase C)
 - [ ] `cod_amount` (number, sen) + `cod_status` varchar → 2 cột mới trên `orders` → MIGRATIONS entries (NFR-9)
 
 ---
@@ -686,6 +730,8 @@ So that tôi biết tiền COD đang ở bước nào mà không cần rời kh�
 ```
 
 > Đây là display-only story — KHÔNG có reconciliation API. Merchant update thủ công dựa trên EasyParcel dashboard. Giữ tối thiểu (KISS).
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Acceptance criteria are forward-looking; no code yet.**
 
 ### Acceptance Criteria
 
@@ -751,70 +797,73 @@ I want theo dõi trạng thái giao hàng (courier + AWB + status) trên trang �
 So that tôi biết hàng đang ở đâu mà không cần hỏi shop
 ```
 
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Acceptance criteria are forward-looking; no code yet.**
+
 ### Acceptance Criteria
 
 #### AC-1: Cron poll tracking theo batch tenant
 
 ```gherkin
-GIVEN có orders shipped/chưa completed có awbNo
+GIVEN có orders shipped/chưa completed có trackingNumber (awbNo)
 WHEN  GET /api/cron/sync-tracking chạy (cron-secret auth, mỗi 30-60 phút)
 THEN  gom orders group theo tenant (đúng OAuth token)
-  AND gọi POST /shipment/tracking_status + POST /shipment/details theo batch (fallback polling)
-  AND cập nhật shippingTrackingStatus = 1 trong 13 status chuẩn EasyParcel (đã normalize mọi courier)
+  AND gọi GET /open_api/2026-03/shipment/tracking?tracking_number=awbNo theo batch
+  AND receive EP string status → map via mapTrackingStatus() → 1 trong 13 status chuẩn (order_created, pending_pickup, picked_up, in_transit, out_for_delivery, delivered, failed_delivery, returned_to_sender, lost, cancelled, exception, processing, unknown)
+  AND cập nhật order.shippingTrackingStatus + shippingTrackingLastUpdated
   AND idempotent + backoff (không spam API)
 ```
 
-> 📌 Source: PRD FR C-7, NFR-5
+> 📌 Source: PRD FR C-7, NFR-5 + brief as-built facts (GET /shipment/tracking, string status mapping)
 
 #### AC-2: Tracking nhúng order detail (KHÔNG màn riêng) + dual-field
 
 ```gherkin
-GIVEN order có awbNo + shippingTrackingStatus (numeric code from webhook/polling)
+GIVEN order có trackingNumber + shippingTrackingStatus (string enum from polling GET /shipment/tracking)
 WHEN  buyer mở sites/[slug]/orders/[orderNumber]
 THEN  làm giàu component có sẵn OtShippingCard + OtTimeline (KHÔNG dựng trang/scene mới)
-  AND hiển thị courier + AWB + trạng thái tracking mới nhất (numeric → display label mapping)
+  AND hiển thị courier + AWB + trạng thái tracking mới nhất (13 string enums, display labels per mapping)
   AND order.status (lifecycle) tách khỏi shippingTrackingStatus (display) — dual-field
   AND merchant order detail (OrderDetailPanel) có badge tracking tương ứng
 ```
 
-> 📌 Source: PRD §8 (status codes 0-11), design §2.4 dual-field table
+> 📌 Source: PRD FR C-7, design §2.4 dual-field table + brief as-built facts (string status enums, no numeric codes)
 
-#### AC-2b: 11 numeric status codes → chỉ 4 gợi ý lifecycle (manual)
+#### AC-2b: 13 string status enums → gợi ý lifecycle (manual)
 
 ```gherkin
-GIVEN shippingTrackingStatus ∈ {0,2,3,4,5,6,7,8,11} (numeric codes from webhook/polling)
+GIVEN shippingTrackingStatus ∈ {in_transit, out_for_delivery, delivered, returned_to_sender, ...} (13 string enums from polling)
 WHEN  render tracking
-THEN  4 Delivery In Transit / Out for Delivery / On Hold / Exception → CHỈ hiển thị, KHÔNG đổi order.status
-  AND 3 Collected → gợi ý merchant bấm shipped; 6 Returned → refunded; 0 Cancelled → cancelled
+THEN  in_transit / out_for_delivery / exception → CHỈ hiển thị, KHÔNG đổi order.status
+  AND picked_up → gợi ý merchant bấm shipped; returned_to_sender → refunded; cancelled → cancelled
   AND mọi transition vẫn do merchant bấm tay (KHÔNG auto)
 ```
 
-> 📌 Source: PRD §8 numeric status code table (0/2/3/4/5/6/7/8/11)
+> 📌 Source: PRD FR C-7, design §2.4 status mapping + brief as-built facts (13 string enums)
 
-#### AC-3: Delivered (code 5) → KHÔNG auto-complete (manual)
+#### AC-3: Delivered → KHÔNG auto-complete (manual)
 
 ```gherkin
-GIVEN webhook/polling nhận shipment_status_code = 5 (Delivered)
+GIVEN polling nhận EP status = 'delivered' (mapped to shippingTrackingStatus='delivered')
 WHEN  cập nhật order
-THEN  CHỈ update shippingTrackingStatus = 5 (field hiển thị)
+THEN  CHỈ update shippingTrackingStatus = 'delivered' (field hiển thị)
   AND KHÔNG tự chuyển order sang completed
   AND merchant tự bấm "Completed" (giữ manual order lifecycle hiện tại)
 ```
 
-> 📌 Source: PRD FR C-9
+> 📌 Source: PRD FR C-9 + brief as-built facts (string status enums, no auto-complete)
 
 ### Additional Criteria
 
-- [ ] **Webhook listeners (primary):** Subscribe topics 1 (status), 2 (awb), 3 (tracking) → async updates. **Polling fallback:** cron /api/cron/sync-tracking → POST /shipment/tracking_status + /shipment/details (every 30-60 min).
+- [ ] **Polling (current impl):** cron /api/cron/sync-tracking → GET /open_api/2026-03/shipment/tracking (every 30-60 min). No webhooks in MVP (forward-looking).
 - [ ] Cron auth bằng cron-secret; reject nếu thiếu/sai secret.
-- [ ] Numeric status codes (0-11) → display labels per dual-field mapping table (PRD §8, design §2.4).
-- [ ] KHÔNG show số dư ví EP / KHÔNG cron cảnh báo ví (đã bỏ); ví thiếu chỉ lộ khi tạo label fail (US-F36-06 AC-3).
+- [ ] String status enums (13 values) → display labels per mapping table (PRD §8 updated, design §2.4).
+- [ ] KHÔNG show số dư ví EP / KHÔNG cron cảnh báo ví (đã bỏ); ví thiếu chỉ lộ khi tạo label fail.
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test: webhook listener receives topic 1/2/3 → order updates; polling cron batches correctly; numeric codes map to display labels
-- [ ] Cột order mới (shippingTrackingStatus) → MIGRATIONS (NFR-9)
+- [ ] Test: polling cron batches correctly; 13 string status enums map to display labels correctly
+- [ ] Cột order mới (shippingTrackingStatus, shippingTrackingLastUpdated) → MIGRATIONS (NFR-9)
 
 ---
 
@@ -833,6 +882,8 @@ So that I can process refunds through the existing Refund button without needing
 ```
 
 > **No EasyParcel reverse label:** F36 does NOT use EP reverse label. Case A = courier auto-returns the parcel to sender (no new label, no EP API call). Case B = merchant records a free-text tracking code from any courier the buyer uses — not EP-generated.
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase D only. Acceptance criteria are forward-looking; no code yet.**
 
 ### Acceptance Criteria
 
@@ -893,6 +944,8 @@ As a   SME Owner
 I want hủy đơn và refund đúng theo trạng thái nhãn vận đơn (chưa mua / đã mua / đã pickup)
 So that tiền hàng và cước được xử lý công bằng, không thất thoát sai
 ```
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase D only. Acceptance criteria are forward-looking; no code yet.**
 
 ### Acceptance Criteria
 
@@ -963,6 +1016,8 @@ So that I have a complete record of the return, can track the parcel back to my 
 ```
 
 > **No EasyParcel reverse label:** the buyer ships back via any courier of their choice (J&T, Pos Laju, Lalamove, etc.). The system records a free-text tracking code — not an EP reverse AWB.
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase D only. Acceptance criteria are forward-looking; no code yet.**
 
 ### Acceptance Criteria
 

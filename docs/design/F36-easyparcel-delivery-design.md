@@ -4,7 +4,7 @@
 > **Feature Code:** F36
 > **Links:**
 > - PRD: [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md)
-> - Stories: `docs/stories/F36-easyparcel-delivery-stories.md` _(planned — chưa tạo)_
+> - Stories: [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md)
 > - Architecture: `docs/architecture/F36-easyparcel-delivery.md` _(planned — chưa tạo)_
 > - Research: [`easyparcel-api-deep-dive`](../../plans/reports/researcher-260611-1614-easyparcel-api-deep-dive.md), [`my-shipping-aggregators`](../../plans/reports/researcher-260611-1614-my-shipping-aggregators.md)
 > - **🎨 Hi-fi design:** _TBD — chưa generate; ASCII low-fi bên dưới là source-of-truth tạm thời._
@@ -81,10 +81,12 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │ │ ✅ Connected — Live (account + ví)   │ │ ◄── green Alert
 │ │                                      │ │
 │ │ 🚚 Courier (chọn 1 cho shop)         │ │
-│ │  (•) J&T Express    [Phổ biến SME]   │ │
-│ │  ( ) DHL eCommerce  [Phổ biến SME]   │ │
-│ │  ( ) Flash Express  [Phổ biến SME]   │ │
-│ │  ＋ Xem thêm courier (3)             │ │
+│ │  (•) J&T Express                     │ │
+│ │  ( ) DHL eCommerce                   │ │
+│ │  ( ) Flash Express                   │ │
+│ │  ( ) Pos Laju                        │ │
+│ │  ( ) [+3 more...]                    │ │
+│ │  ⚠️ Ví dưới RM10 → cảnh báo          │ │
 │ │  (không show giá — giá thật ở        │ │
 │ │   checkout · vận đơn tạo manual)     │ │
 │ └──────────────────────────────────────┘ │
@@ -97,7 +99,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - OAuth callback (backend): POST `/oauth/token` exchanges `code` + Basic auth → `access_token` (10h) + `refresh_token` (1yr), stores securely per tenant.oauthTokens
 - Connected state: Green `<Alert>` showing account name + wallet balance + Disconnect button
 - Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → dùng cho COD West-MY. Force-validate postcode via rate-check call.
-- Courier: `<RadioGroup>` **single-select** từ response tại OAuth connect (`courier_id`, `courier_name`, logo). Chỉ **4 couriers** (COD-supporting: J&T, DHL eCommerce, Flash, Aramex) — no "See more" collapse.
+- Courier: `<RadioGroup>` **single-select** từ live `/courier/list?country_code=MY` response (tất cả couriers available, không giới hạn 4 loại). Hiện wallet threshold warning nếu balance < RM10.
 - Parcel weight/dims: KHÔNG có form — lấy từ `Products.weight` + `Products.dimensions`; product=0 → const `DEFAULT_PARCEL`
 
 **States:**
@@ -128,11 +130,13 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │ │ (reuse F14 cascade)          │ • Áo Khoác Bò    RM 50 x1 ││
 │ │ State:    [ Selangor     ▼ ] │ ───────────────────────── ││
 │ │ City:     [ Shah Alam    ▼ ] │ Subtotal:         RM 50   ││
-│ │ Postcode: [ 40000        ▼ ] │ Shipping:         RM 5.42 ││
-│ │                              │ ───────────────────────── ││
-│ │ (KHÔNG có section vận        │ Total:         RM 55.42   ││
-│ │  chuyển — shop chốt 1        │                           ││
-│ │  courier; buyer không chọn)  │ [ Place Order ]           ││
+│ │ Postcode: [ 40000        ▼ ] │ Shipping:                 ││
+│ │                              │ 🚚 J&T Express  RM 5.42   ││
+│ │ (KHÔNG có section vận        │    2–3 ngày               ││
+│ │  chuyển — shop chốt 1        │ ───────────────────────── ││
+│ │  courier; buyer không chọn)  │ Total:         RM 55.42   ││
+│ │                              │                           ││
+│ │                              │ [ Place Order ]           ││
 │ │                              │ (KHÔNG có dòng SST)       ││
 │ └──────────────────────────────┴───────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
@@ -166,9 +170,9 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Điều kiện chặn | Helper Text (hiện dưới COD option) |
 |----------------|-------------------------------------|
 | Địa chỉ East MY (Sabah/Sarawak) | "COD chỉ khả dụng cho địa chỉ West Malaysia" |
-| total > RM7,000 | "Đơn vượt hạn mức COD (RM7,000)" |
+| Đơn vượt hạn mức COD của courier | "Đơn vượt hạn mức COD của courier (tối đa theo courier, từ quotation)" |
 | selectedCourier không hỗ trợ COD | "Courier đang chọn không hỗ trợ COD" |
-| total < RM5.01 | "Giá trị đơn tối thiểu để dùng COD là RM5.01" |
+| Đơn dưới mức tối thiểu COD của courier | "Đơn dưới mức tối thiểu COD của courier (tối thiểu theo courier, từ quotation)" |
 
 **COD selected — fee disclosure (informational):**
 
@@ -180,9 +184,12 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 **Components:**
 - Shipping address: **reuse F14 geo cascade** State → City → Postcode (`<Select>` × 3, `/api/geo/*` + `CheckoutForm`) — KHÔNG dựng form mới
-- Phí ship: 1 dòng trong Order Summary — `formatPrice(fee,'MYR')` (KHÔNG có section vận chuyển riêng, KHÔNG picker, KHÔNG courier branding; shop đã chốt 1 courier)
+- Phí ship: 1 dòng trong Order Summary — `formatPrice(fee,'MYR')` + **courier name + logo + ETA** (từ calculate-shipping response `rates[]` array — selected/cheapest rate). KHÔNG section vận chuyển riêng, KHÔNG picker (shop đã chốt 1 courier).
 - **KHÔNG có dòng SST** ở Order Summary (SST gỡ ở checkout từ F33 phase-06 — `total = subtotal − discount + shipping`)
-- COD option: `<RadioGroup>` trong payment methods; eligibility check từ zone (geo lookup `/api/geo/lookup/[postcode]` → `zone='west'`) + `cod_service_available` từ rate response + total vs min/max. Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
+- COD option: `<RadioGroup>` trong payment methods; eligibility check từ 3 điều kiện: (1) zone = West Malaysia (geo lookup `/api/geo/lookup/[postcode]` → `zone='west'`), (2) `cod.available=true` từ rate response của selected courier, (3) total ∈ [`min_cod_amount`, `max_cod_amount`] của courier đó (read live từ quotation, per-courier). Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
+  
+  > **COD Validation (PA2 decision):** Code enforces ALL COD rules; EasyParcel does NOT validate ineligible orders. UI gating chặn checkout, server route cũng hard-rejects COD param nếu không đủ điều kiện. Courier picker chỉ show COD-capable couriers (from live rate response). Ref: [`decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) · [`ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) · GH-1333
+
 - COD fee disclosure: `<Alert variant="default" className="text-xs">` hiện khi buyer chọn COD — informational only, không block.
 - Loading: `<Skeleton>` 1 row khi gọi `/api/orders/calculate-shipping` (debounce 300ms sau khi đủ địa chỉ)
 - Fallback: render block fee đơn F14 (zero thay đổi)
@@ -197,13 +204,16 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Free triggered | Badge "FREE" trên dòng phí ship |
 | COD available | COD option enabled trong payment methods |
 | COD East MY | COD `<RadioGroupItem disabled>` + helper "COD chỉ khả dụng cho địa chỉ West Malaysia" |
-| COD over limit | COD disabled + helper "Đơn vượt hạn mức COD (RM7,000)" |
+| COD over limit | COD disabled + helper "Đơn vượt hạn mức COD của courier (tối đa theo courier)" |
 | COD courier không hỗ trợ | COD disabled + helper "Courier đang chọn không hỗ trợ COD" |
+| COD under limit | COD disabled + helper "Đơn dưới mức tối thiểu COD của courier" |
 | COD selected | `<Alert>` fee disclosure hiện (informational) |
 
 ---
 
 ### 2.3. "Ready to Ship" modal — Create Label (KHÔNG phải màn riêng) <a id="screen-c-create-label"></a>
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase A+B only. Forward-looking design; no code yet.**
 
 > **Đây là 1 `<Dialog>` confirm bật từ nút "Ready to Ship" có sẵn — KHÔNG phải scene/route riêng.** Lý do giữ modal: bấm = **trừ tiền thật từ ví EasyParcel** → cần confirm cân nặng/dims (cước phụ thuộc cân) + chọn pickup trước khi trừ ví. Bỏ modal = trừ ví mù.
 
@@ -306,6 +316,8 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 ### 2.4. Screen D — Order Tracking (nhúng order detail) <a id="screen-d-tracking"></a>
 
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Forward-looking design; no code yet.**
+
 **Path:** `/sites/[slug]/orders/[orderNumber]` (buyer) + `OrderDetailPanel` (merchant) — **KHÔNG màn riêng**, làm giàu component có sẵn.
 **Trạng thái:** Đơn shipped, có AWB, cron đã sync 1 mốc.
 
@@ -389,6 +401,8 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 ---
 
 ### 2.5. Screen E — Returns (merchant) <a id="screen-e-returns"></a>
+
+> **⚠️ NOT BUILT (as of 2026-07-01) — Phase D only. Forward-looking design; no code yet.**
 
 **Path:** `Dashboard > Orders > [order]` — dùng nút **Refund / Cancel có sẵn** trong `OrderDetailPanel`. **KHÔNG có màn RMA, KHÔNG buyer return-request.** 1 màn, **2 context phân biệt bằng banner đầu đơn**, cùng hội tụ về nút Refund.
 
@@ -581,12 +595,12 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 | Prime Field | v2026-03 Param | Transform | Notes |
 |---|---|---|---|
 | Warehouse postcode | `sender.postcode` | copy as-is (5 digits) | sender = warehouse (origin) |
-| Warehouse state | `sender.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | e.g., "MY-07" = Penang |
+| Warehouse state | `sender.subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | e.g., "MY-07" = Penang |
 | Warehouse country | `sender.country` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
 | Buyer postcode | `receiver.postcode` | copy as-is (5 digits) | — |
-| Buyer state | `receiver.subdivision_code` | `mapToISO3166_2()` → "MY-XX" | same mapping |
+| Buyer state | `receiver.subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | same mapping |
 | Buyer country | `receiver.country` | hardcode `"MY"` | — |
-| Package weight | `weight` | `aggregateWeightKg()` → double, 2 decimals | kg, NOT grams |
+| Package weight | `weight` | `aggregateWeightKg()` → double, 1 decimal, min floor 0.1kg | kg, NOT grams |
 | Package width | `width` | parse to integer | cm |
 | Package length | `length` | parse to integer | cm |
 | Package height | `height` | parse to integer | cm |
@@ -612,14 +626,14 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 |---|---|---|---|
 | Name | `name` | copy as-is | required |
 | Company | `company` | copy as-is | optional |
-| Phone country code | `phone_number_country_code` | hardcode `"MY"` | ISO country code |
-| Phone number | `phone_number` | `normalizePhone()` → digits only | e.g., "0122134567" (no +60) |
+| Phone country code | `phone_number_country_code` | hardcode `"60"` | Malaysia country code (digits, not ISO alpha) |
+| Phone number | `phone_number` | `splitPhone()` → number only | e.g., "122134567" (from "60122134567") |
 | Email | `email` | copy as-is | optional |
 | Address line 1 | `address_1` | `addressLine(order)[0]` | primary address |
 | Address line 2 | `address_2` | `addressLine(order)[1]` | optional, secondary |
 | City | `city` | copy as-is | **required** (separate from postcode) |
 | Postcode | `postcode` | copy as-is (5 digits) | — |
-| Subdivision code | `subdivision_code` | `mapToISO3166_2()` → "MY-XX" | ISO 3166-2 |
+| Subdivision code | `subdivision_code` | `mapSubdivisionCode()` → "MY-XX" | ISO 3166-2 |
 | Country code | `country_code` | hardcode `"MY"` | ISO 3166-1 alpha-2 |
 
 ### 9.3 State → ISO 3166-2 MY Mapping (All 16 states)
@@ -647,7 +661,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 
 ### 9.4 Transform Functions (Pseudo-code, v2026-03)
 
-#### mapToISO3166_2(primeStateName) — MY states only
+#### mapSubdivisionCode(primeStateName) — MY states only
 
 ```
 INPUT:  "Selangor" OR "Pulau Pinang"
@@ -662,22 +676,32 @@ const subdivisionMap = {
 return subdivisionMap[primeStateName] || null;  // FAIL if unmapped
 ```
 
-#### normalizePhone(phone) — v2026-03 uses digits-only format
+#### normalizePhone(phone) — v2026-03 uses 60-prefix format
 
 ```
-INPUT:  "+60-12-2134567"  OR  "0122134567"  OR  "122134567"
-OUTPUT: "0122134567" (leading 0, no +60 prefix, no dashes)
+INPUT:  "+60-12-2134567"  OR  "0122134567"  OR  "122134567"  OR  "60122134567"
+OUTPUT: "60122134567" (60-prefix, digits only, no leading 0)
 
 1. Strip all non-digits: phone.replace(/\D/g, "")
-2. If starts with "60": remove "60", prepend "0"
-3. If doesn't start with "0": prepend "0"
-4. Validate 10 ≤ length ≤ 11; else FAIL
-5. Return result
+2. If starts with "0": remove leading "0", prepend "60"
+3. If starts with "60": keep as-is
+4. If doesn't start with "60": prepend "60"
+5. Validate length = 11 (60 + 9 digits); else FAIL
+6. Return result
 
-"+60122134567" → "0122134567" ✓
-"0122134567"   → "0122134567" ✓
-"122134567"    → "0122134567" ✓
-"6012"         → FAIL (length < 10)
+"+60122134567" → "60122134567" ✓
+"0122134567"   → "60122134567" ✓
+"122134567"    → "60122134567" ✓
+"60122134567"  → "60122134567" ✓
+"6012"         → FAIL (invalid length)
+```
+
+**splitPhone(phone) helper:**
+```
+INPUT:  "60122134567"  OR  "0122134567"
+OUTPUT: { countryCode: "60", number: "122134567" }
+
+Split normalizePhone result at position 2 (first 2 chars = "60").
 ```
 
 #### addressLine(order) — split address into line1 + line2
@@ -700,24 +724,31 @@ LOGIC:
 - Else: address_1 = address, address_2 = ""
 ```
 
-#### aggregateWeightKg(items) — DB stores grams, API needs kg
+#### aggregateWeightKg(weightGrams) — DB stores grams, API needs kg
 
 ```
-CRITICAL: DB stores weight in GRAMS. EasyParcel expects KILOGRAMS as decimal.
+CRITICAL: Takes already-summed grams. DB stores weight in GRAMS. EasyParcel expects KILOGRAMS as decimal.
 Divide by 1000 ONCE. Do NOT divide a value that is already in kg.
+Enforce minimum 0.1 kg floor. Round UP to 1 decimal (not 2).
 
-INPUT:  items = [{ weight_g: 250 }, { weight_g: 750 }, { weight_g: 500 }]
-OUTPUT: weight = 1.5  (kg, decimal)
+INPUT:  weightGrams = 1500  (grams — already summed from order line items)
+OUTPUT: weight = 1.5  (kg, decimal, 1 place)
 
-total_grams = SUM(item.weight_g for each item)
-weight_kg   = total_grams / 1000      // divide ONCE — double-division bug = weight off by 1000x
-weight_kg   = ROUND(weight_kg, 2)
-return weight_kg
+1. weight_kg = weightGrams / 1000
+2. weight_kg = MAX(0.1, weight_kg)  // min floor 0.1 kg
+3. weight_kg = CEIL(weight_kg * 10) / 10  // round UP to 1 decimal
+4. return weight_kg
+
+Examples:
+- 1500g → 1.5 kg ✓
+- 50g → 0.1 kg (floor applied) ✓
+- 1234g → 1.3 kg (rounded UP) ✓
+- 999g → 1.0 kg (rounded UP) ✓
 ```
 
 ### 9.5 Key Gotchas
 
-- **Phone is split into 2 fields:** `phone_number_country_code` (e.g. `"MY"`) + `phone_number` (digits-only, no +60 prefix). Don't send a single combined phone string.
+- **Phone is split into 2 fields:** `phone_number_country_code` (hardcode `"60"` — country code digits, not ISO alpha) + `phone_number` (digits-only from `splitPhone()`, e.g., `"122134567"`). Don't send a single combined phone string.
 - **Postcode param is `postcode`** (same field name on `POST /shipment/quotations` and `POST /shipment/submit_orders`).
 - **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
 - **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.

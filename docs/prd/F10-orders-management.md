@@ -586,19 +586,23 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 
 **COD per-courier reference (source of truth for UI/UX gating + settlement expectation):**
 
-> Read LIVE from `EPRateCheckingBulk` (`cod_service_available`, `cod_service_min/max_cod_amount`, fee) — do NOT hardcode courier list. Table below = design baseline; min/max + settlement must be sandbox-verified (per F36 overview §9 item #1).
+> Read LIVE from `POST /shipment/quotations` endpoint: COD fields = `features[].cod.available`, `min_cod_amount`, `max_cod_amount`, fee (internal response = `codAvailable` + `codMaxSen`). **Do NOT hardcode courier list.** Table below = indicative design baseline; actual COD couriers + min/max limits are live per account and must be read from API (sandbox returned 7 COD-capable; Flash may vary by account). Sandbox-verify per F36 overview §9 item #1. **Decision & handoff:** [decision-260702-1503-GH-1333-cod-handoff.md](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) (GH-1333).
 
 | Courier | COD? | COD fee | COD min–max (collected) | Settlement → merchant | UI/UX note |
 |---|---|---|---|---|---|
-| **Flash Express** | ✅ | RM5 / 4% (higher) | ~RM5.01 – **RM7,000** | **T+1–3 days** | ⭐ Recommended default for COD shops: fastest payout, highest cap |
-| **DHL eCommerce** | ✅ | RM6 / 4% | unknown → read from API | T+1–3 days | Fast payout; cap not public → use `cod_service_max` |
-| **J&T Express** | ✅ | RM7 / 4% | ~RM7.01 – **RM1,000** | T+7–12 days | ⚠️ COD cap only RM1,000 (differs from Flash); slower payout; low-value orders |
-| **Aramex** | ✅ | RM10 / 4% | unknown → read from API | **~T+30 days** | ⚠️ Holds cash ~1 month → warn seller; do NOT default |
+| **Flash Express** | ✅ | RM5 / 4% (higher) | ~RM5.01 – RM7,000¹ | **T+1–3 days** | ⭐ Recommended default for COD shops: fastest payout, highest cap |
+| **DHL eCommerce** | ✅ | RM6 / 4% | read from API | T+1–3 days | Fast payout; cap not public → use `min_cod_amount` + `max_cod_amount` |
+| **J&T Express** | ✅ | RM7 / 4% | ~RM7.01 – RM1,000¹ | T+7–12 days | ⚠️ COD cap only RM1,000 (differs from Flash); slower payout; low-value orders |
+| **Aramex** | ✅ | RM10 / 4% | read from API | **~T+30 days** | ⚠️ Holds cash ~1 month → warn seller; do NOT default |
 | Pos Laju · Ninja Van · City-Link · SkyNet · SPX · Best · Redbox · Teleport · Lalamove | ❌ | — | — | — | No COD path via EasyParcel API |
+
+¹ **Indicative baseline only.** Live limits vary by merchant account; read from `min_cod_amount` + `max_cod_amount` per courier in API response. Sandbox set = 7 COD-capable couriers (Aramex, DHL eCommerce, J&T, Lazada, Pos Malaysia/Melplus, Poslaju, SPX); Flash was NOT returned on the sandbox account — courier availability varies per account.
 
 **Shared COD constraints (all couriers):** West Malaysia only (`zone='east'` has no COD; couriers still deliver East for prepaid). COD payout prerequisite (seller): eKYC + bank account verification before first withdrawal; manual withdraw on EP dashboard (Pending → To Release → Released); no API/webhook settlement → Prime stores `codStatus` display-only. COD fee deducted from collected cash (merchant nets remainder); failed delivery → sender (merchant) bears return cost.
 
-**Consequence:** COD max differs per courier (J&T RM1,000 vs Flash RM7,000) → gating (F19 C-6a) must use per-courier `cod_service_max_cod_amount` from API, NOT a shared RM7,000 constant. Source: `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`.
+**Critical Validation Note:** EasyParcel `submit_orders` endpoint does **NOT validate** COD eligibility (accepts under-min, over-max, non-COD couriers, East MY addresses). **Prime enforces all COD validation server-side** + picker filters non-COD couriers client-side to prevent invalid orders.
+
+**Consequence:** COD max differs per courier → gating (F19 C-6a) must use per-courier `max_cod_amount` from the `quotations` API response, NOT a shared constant. Source: `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`.
 
 **Runtime Flow (shortened):**
 ```
@@ -624,7 +628,7 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 3. GIVEN order COD shipped, buyer refused WHEN cron Returned THEN shipping_tracking_status='Returned'; cod_status='pending' (chưa thu).
 4. GIVEN courierStatus='Returned' WHEN merchant Refund THEN F10 /refund reused; goods refunded, inventory restocked; COD không thu.
 
-**Cross-ref:** COD eligibility gating (West MY, per-courier min/max validation) + fee disclosure (informational, merchant-borne) → see **F19-store-configuration**.
+**Cross-ref:** COD eligibility gating (West MY, per-courier min/max validation) + fee disclosure (informational, merchant-borne) → **F19-store-configuration (Phase F).** Prime hard-gates all COD validation (server) + picker filters non-COD couriers (UI) to compensate for EP's lack of validation.
 
 **Order Schema (new columns):**
 
