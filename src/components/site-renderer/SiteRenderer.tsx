@@ -5,11 +5,10 @@ import type { ThemeConfig } from '@/blocks/types'
 import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import {
     BROKEN_URL_PREFIX,
-    HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
+    createPreviewUrlRewriter,
     resolveInternalUrlPath,
     rewriteLiveUrl,
-    splitPathAndTail,
 } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
@@ -200,60 +199,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)
     // - Unmatched internal paths → '#' (prevent 404)
     // - External URLs (http*) → preserved as-is
-    const previewSiteId = String(
-        (site as { id?: string | number })?.id ?? '',
-    )
+    // Extracted to createPreviewUrlRewriter so preview routes that render blocks WITHOUT
+    // SiteRenderer (blog detail) reuse the exact same slug→pageId resolution.
+    const rewritePreviewUrl = createPreviewUrlRewriter({
+        pages,
+        siteId: (site as { id?: string | number })?.id,
+        isBuilderPreview,
+    })
 
-    // Use the real pages list as the source of truth for URL resolution:
-    //
-    // - slugToPageId: any-form slug → pageId. Editor preview routes nav
-    //   links to `/preview/{siteId}?pageId=...` so the iframe stays in
-    //   preview scope.
-    // - slugCanonical: any-form slug → canonical `/slug`. Live mode
-    //   rewrites nav/footer/cta URLs to the real slug, fixing cases like
-    //   AI-seeded `/Services` → stored `/services`. Built once via
-    //   buildSlugCanonicalMap; both helpers index three forms (exact,
-    //   lowercased, bare) so case and leading-slash drift both resolve.
-    const slugToPageId = new Map<string, string>()
-    for (const p of pages) {
-        const pid = String(p.id)
-        const rawSlug = (p.slug ?? '').trim()
-        if (!rawSlug) continue
-        const withSlash = rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`
-        slugToPageId.set(withSlash, pid)
-        slugToPageId.set(withSlash.toLowerCase(), pid)
-        if (rawSlug !== '/') {
-            slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
-        }
-    }
-    const homepage = pages.find((p) => p.isHomepage) ?? pages[0]
-    if (homepage) {
-        const homepageId = String(homepage.id)
-        slugToPageId.set('/', homepageId)
-        // Mirror buildSlugCanonicalMap's HOMEPAGE_ALIASES so preview clicks on
-        // `/Home`, `/Index`, etc. resolve the iframe to the homepage pageId
-        // instead of dead-ending at `#`. Sharing the const prevents drift.
-        for (const alias of HOMEPAGE_ALIASES) {
-            if (!slugToPageId.has(alias)) slugToPageId.set(alias, homepageId)
-        }
-    }
-
+    // slugCanonical: any-form slug → canonical `/slug`. Live mode rewrites nav/footer/cta
+    // URLs to the real slug, fixing cases like AI-seeded `/Services` → stored `/services`.
+    // Indexes three forms (exact, lowercased, bare) so case + leading-slash drift resolve.
     const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
-
-    const rewritePreviewUrl = (url: string | undefined): string => {
-        if (!url) return '#'
-        if (/^https?:\/\//i.test(url)) return url
-        if (url.startsWith('#')) return url
-        if (url.includes('#') && !url.startsWith('/')) return url
-        if (!previewSiteId) return '#'
-        const [path] = splitPathAndTail(url)
-        const hit =
-            slugToPageId.get(path) ??
-            slugToPageId.get(path.toLowerCase()) ??
-            slugToPageId.get(path.replace(/^\//, ''))
-        if (hit) return `/preview/${previewSiteId}?pageId=${hit}${isBuilderPreview ? '&builder=1' : ''}`
-        return '#'
-    }
 
     const rewriteUrl = isEditor
         ? rewritePreviewUrl
