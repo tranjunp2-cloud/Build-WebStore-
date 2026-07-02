@@ -16,7 +16,7 @@ export type TrackingStatus =
     | 'processing'
     | 'unknown'
 
-interface StatusEntry {
+export interface StatusEntry {
     internal: TrackingStatus
     buyerLabel: string
 }
@@ -41,4 +41,27 @@ const STATUS_MAP: Record<string, StatusEntry> = {
 /** Map an EP raw status string to internal enum + buyer label. Defaults to 'unknown'. */
 export function mapTrackingStatus(epRaw: string): StatusEntry {
     return STATUS_MAP[epRaw] ?? { internal: 'unknown', buyerLabel: 'Processing' }
+}
+
+// Canonical numeric shipment_status_code → internal enum + buyer label.
+// Source of truth: EP OpenAPI docs (github.com/easyparcel/OpenAPI, 2026-03 + 2026-06).
+// 0=Cancel, 2=To Be Collected, 3=Collected, 4=Delivery In Transit, 5=Delivered,
+// 6=Returned, 7=Schedule In Arrangement, 8=On Hold, 11=Drop Off.
+// NOTE: ondemand.* webhook topics use a CONFLICTING code table (e.g. ondemand 5 =
+// "Cancelled by Driver") — callers must never feed ondemand codes into this map.
+const SHIPMENT_STATUS_CODE_MAP: Record<number, StatusEntry> = {
+    0: { internal: 'cancelled', buyerLabel: 'Shipment Cancelled' },
+    2: { internal: 'pending_pickup', buyerLabel: 'Waiting for Pickup' },
+    3: { internal: 'picked_up', buyerLabel: 'Parcel Picked Up' },
+    4: { internal: 'in_transit', buyerLabel: 'In Transit' },
+    5: { internal: 'delivered', buyerLabel: 'Delivered' },
+    6: { internal: 'returned_to_sender', buyerLabel: 'Returned to Sender' },
+    7: { internal: 'pending_pickup', buyerLabel: 'Waiting for Pickup' },
+    8: { internal: 'exception', buyerLabel: 'Delivery Exception' },
+    11: { internal: 'picked_up', buyerLabel: 'Parcel Picked Up' },
+}
+
+/** Map an EP numeric shipment_status_code to internal enum + buyer label. Defaults to 'unknown'. */
+export function mapShipmentStatusCode(code: number): StatusEntry {
+    return SHIPMENT_STATUS_CODE_MAP[code] ?? { internal: 'unknown', buyerLabel: 'Processing' }
 }

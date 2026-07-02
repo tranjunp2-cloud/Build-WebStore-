@@ -2,7 +2,7 @@ import 'server-only'
 import type { BasePayload } from 'payload'
 import { tracking } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { mapTrackingStatus } from '@/lib/shipping/easyparcel/status-map'
+import { applyTrackingUpdate } from '@/lib/shipping/easyparcel/apply-tracking-update'
 
 const TERMINAL = new Set(['delivered', 'returned_to_sender', 'lost', 'cancelled'])
 
@@ -81,35 +81,29 @@ export async function syncTrackingJob(payload: BasePayload) {
                 const trackingRef: string = order.trackingNumber || awbNo
                 if (!trackingRef) continue
 
+                // Documented tracking_status endpoint returns { data: { results: [...] } } —
+                // one result per requested AWB (single-AWB call here, so index 0).
                 const statusResp = await tracking(token, trackingRef)
-                if (!statusResp.data) continue
-
-                // Map via status_code if available, else fall back to status string
-                const mapped = mapTrackingStatus(statusResp.data.status_code ?? statusResp.data.status)
-                const currentStatus: string | undefined = order.shippingTrackingStatus
-
-                // Only update if status changed
-                if (currentStatus === mapped.internal) continue
-
-                const currentHistory: Array<{ status: string; description: string; eventTime: string }> =
-                    (order.shippingTrackingHistory ?? [])
-
-                const newEntry = {
-                    status: mapped.internal,
-                    description: mapped.buyerLabel,
-                    eventTime: new Date().toISOString(),
+                const apiResult = statusResp.data?.results?.[0]
+                if (!apiResult || apiResult.status !== 'success' || apiResult.latest_shipment_status_code == null) {
+                    payload.logger.warn(
+                        { orderId: order.id, trackingRef, epStatus: apiResult?.status },
+                        '[sync-tracking] tracking_status returned no usable result, skipping',
+                    )
+                    errors++
+                    continue
                 }
 
-                await payload.update({
-                    collection: 'orders',
-                    id: order.id,
-                    data: {
-                        shippingTrackingStatus: mapped.internal,
-                        shippingTrackingLastUpdated: new Date().toISOString(),
-                        shippingTrackingHistory: [...currentHistory, newEntry],
-                    } as any,
-                    overrideAccess: true,
-                })
+                // Shared writer: maps the numeric shipment_status_code, skips unchanged,
+                // appends history (using courier free-text as description), and
+                // auto-completes on delivered (same code path as the EP webhook receiver).
+                const result = await applyTrackingUpdate(
+                    payload,
+                    order,
+                    apiResult.latest_shipment_status_code,
+                    apiResult.latest_tracking_status,
+                )
+                if (result === 'unchanged') continue
 
                 updated++
             } catch (err: unknown) {

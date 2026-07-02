@@ -23,6 +23,17 @@ interface ShippingAddress {
     country?: string
 }
 
+interface ParcelDimensionsCm {
+    width: number
+    length: number
+    height: number
+}
+
+// EasyParcel requires parcel dimensions (height is mandatory on submit). We have no
+// per-product dimension data, so fall back to a small sensible default parcel size (cm)
+// unless the caller overrides it. Prevents "The item 0 height field is required" errors.
+const DEFAULT_PARCEL_DIM_CM: ParcelDimensionsCm = { width: 10, length: 10, height: 10 }
+
 interface BuildSubmitParamsInput {
     warehouse: Warehouse
     shippingAddress: ShippingAddress
@@ -34,6 +45,7 @@ interface BuildSubmitParamsInput {
     weightGrams: number
     collectionDate?: string
     codAmountRm?: number    // RM float; omit for non-COD
+    dimensionsCm?: Partial<ParcelDimensionsCm>  // optional override; defaults to 10×10×10 cm
 }
 
 export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderParams {
@@ -48,19 +60,33 @@ export function buildSubmitParams(input: BuildSubmitParamsInput): EpSubmitOrderP
         weightGrams,
         collectionDate,
         codAmountRm,
+        dimensionsCm,
     } = input
 
     const senderPhone = splitPhone(warehouse.phone ?? '')
     const receiverPhone = splitPhone(customerPhone || '600000000')
     const weightKg = aggregateWeightKg(weightGrams)
 
+    // Merge any caller override onto the default parcel size; EP requires height/width/length.
+    const dim: ParcelDimensionsCm = {
+        width: dimensionsCm?.width ?? DEFAULT_PARCEL_DIM_CM.width,
+        length: dimensionsCm?.length ?? DEFAULT_PARCEL_DIM_CM.length,
+        height: dimensionsCm?.height ?? DEFAULT_PARCEL_DIM_CM.height,
+    }
+
     const params: EpSubmitOrderParams = {
         service_id: shippingServiceId,
         collection_date: collectionDate ?? earliestPickupDate(shippingCourier ?? ''),
         weight: weightKg,
+        width: dim.width,
+        length: dim.length,
+        height: dim.height,
         item: [{
             content: 'Parcel',
             weight: weightKg,
+            width: dim.width,
+            length: dim.length,
+            height: dim.height,
             currency_code: 'MYR',
             value: total,
             quantity: 1,

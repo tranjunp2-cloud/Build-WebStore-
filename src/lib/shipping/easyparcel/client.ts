@@ -5,7 +5,7 @@ import type {
     EpQuotationResponse,
     EpSubmitOrderParams,
     EpSubmitOrderResponse,
-    EpTrackingResponse,
+    EpTrackingStatusResponse,
     EpCancelParams,
     EpWalletResponse,
     EpAccountInfoResponse,
@@ -77,16 +77,29 @@ export async function submitOrder(
     return epFetch('POST', '/open_api/2026-03/shipment/submit_orders', token, { shipment: [params] })
 }
 
-/** Fetch tracking events by tracking number. */
+/**
+ * Fetch tracking status for one or more AWB numbers (max 100 per call).
+ * Documented endpoint (EP OpenAPI docs, 2026-03 + 2026-06):
+ * POST /open_api/2026-03/shipment/tracking_status body { awb_numbers: string[] }.
+ */
+export async function trackingStatus(
+    token: string,
+    awbNumbers: string[],
+): Promise<EpTrackingStatusResponse> {
+    return epFetch(
+        'POST',
+        '/open_api/2026-03/shipment/tracking_status',
+        token,
+        { awb_numbers: awbNumbers },
+    )
+}
+
+/** Convenience wrapper: fetch tracking status for a single AWB number. */
 export async function tracking(
     token: string,
-    trackingNumber: string,
-): Promise<EpTrackingResponse> {
-    return epFetch(
-        'GET',
-        `/open_api/2026-03/shipment/tracking?tracking_number=${encodeURIComponent(trackingNumber)}`,
-        token,
-    )
+    awbNumber: string,
+): Promise<EpTrackingStatusResponse> {
+    return trackingStatus(token, [awbNumber])
 }
 
 /** Cancel a shipment by tracking number. */

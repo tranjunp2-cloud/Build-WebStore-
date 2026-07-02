@@ -158,23 +158,35 @@ export interface EpSubmitOrderResponse {
     }>
 }
 
-// --- Tracking ---
-export interface EpTrackingEvent {
-    status: string
-    status_code?: string
-    timestamp: string
-    location?: string
-    remark?: string
+// --- Tracking status (POST /open_api/2026-03/shipment/tracking_status) ---
+// Verified against EP OpenAPI docs source (github.com/easyparcel/OpenAPI, 2026-03 + 2026-06):
+// request body is { awb_numbers: string[] } (max 100), NOT a GET with ?tracking_number=.
+// status_log entries carry the numeric shipment_status_code; latest_tracking_status is
+// courier FREE TEXT — display-only, never used for status mapping.
+export interface EpTrackingStatusLogEntry {
+    event_date: string
+    shipment_status_code: number
+    tracking_status: string
+    location?: string | null
 }
 
-export interface EpTrackingResponse {
+export interface EpTrackingStatusResult {
+    status: 'success' | 'error'
+    awb_number: string
+    shipment_number?: string
+    order_number?: string
+    latest_shipment_status_code?: number
+    latest_tracking_status?: string
+    latest_event_date?: string
+    status_log?: EpTrackingStatusLogEntry[]
+    errors?: string[]
+}
+
+export interface EpTrackingStatusResponse {
     status_code: number
+    message?: string
     data: {
-        tracking_number: string
-        reference?: string
-        status: string
-        status_code?: string
-        events?: EpTrackingEvent[]
+        results: EpTrackingStatusResult[]
     }
 }
 
