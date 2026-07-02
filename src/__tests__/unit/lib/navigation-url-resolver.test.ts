@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+    buildPreviewSlugToPageId,
     buildSlugCanonicalMap,
+    createPreviewUrlRewriter,
     resolveInternalUrlPath,
     rewriteLiveUrl,
+    rewriteNavLinkUrls,
     splitPathAndTail,
 } from '@/lib/navigation-url'
 
@@ -348,5 +351,84 @@ describe('[TC-F01.CTA-DRAG] resolvePricingPlanCta — pricing CTA + actionType s
         const result = resolvePricingPlanCta({ name: 'Pro', ctaUrl: 'https://buy.stripe.com/x', ctaActionType: 'external' }, links)
         expect(result.ctaUrl).toBe('https://buy.stripe.com/x')
         expect(result.ctaActionType).toBe('external')
+    })
+})
+
+// GH-1443: nav/footer links on the blog detail preview route (rendered WITHOUT SiteRenderer)
+// kept raw `/` hrefs and navigated the iframe out to the platform root. These cover the
+// shared rewriter that now scopes those links back into /preview/{siteId}.
+describe('[TC-F01-GH1443] buildPreviewSlugToPageId', () => {
+    it('TC-F01-GH1443-01: maps exact + lowercased + bare slug forms to pageId', () => {
+        const map = buildPreviewSlugToPageId(samplePages)
+        expect(map.get('/about')).toBe('2')
+        expect(map.get('/About'.toLowerCase())).toBe('2')
+        expect(map.get('about')).toBe('2')
+    })
+
+    it('TC-F01-GH1443-02: homepage `/` and aliases resolve to the homepage pageId', () => {
+        const map = buildPreviewSlugToPageId(samplePages)
+        expect(map.get('/')).toBe('1')
+        expect(map.get('/home')).toBe('1')
+        expect(map.get('index')).toBe('1')
+    })
+
+    it('TC-F01-GH1443-03: empty / null pages yield an empty map', () => {
+        expect(buildPreviewSlugToPageId(null).size).toBe(0)
+        expect(buildPreviewSlugToPageId([]).size).toBe(0)
+    })
+})
+
+describe('[TC-F01-GH1443] createPreviewUrlRewriter', () => {
+    it('TC-F01-GH1443-04: rewrites homepage `/` to preview pageId (no escape to platform root)', () => {
+        const rewrite = createPreviewUrlRewriter({ pages: samplePages, siteId: 42 })
+        expect(rewrite('/')).toBe('/preview/42?pageId=1')
+    })
+
+    it('TC-F01-GH1443-05: appends &builder=1 only in builder preview', () => {
+        const builder = createPreviewUrlRewriter({ pages: samplePages, siteId: 42, isBuilderPreview: true })
+        expect(builder('/about')).toBe('/preview/42?pageId=2&builder=1')
+        const plain = createPreviewUrlRewriter({ pages: samplePages, siteId: 42, isBuilderPreview: false })
+        expect(plain('/about')).toBe('/preview/42?pageId=2')
+    })
+
+    it('TC-F01-GH1443-06: preserves external http URLs and #-anchors unchanged', () => {
+        const rewrite = createPreviewUrlRewriter({ pages: samplePages, siteId: 42 })
+        expect(rewrite('https://x.com')).toBe('https://x.com')
+        expect(rewrite('#section')).toBe('#section')
+        // mailto/tel are NOT preserved here (→ '#'), mirroring SiteRenderer's preview
+        // rewriter exactly. Parity is intentional: nav/footer on blog detail now behaves
+        // identically to the main preview page for these edge links.
+        expect(rewrite('mailto:a@b.com')).toBe('#')
+    })
+
+    it('TC-F01-GH1443-07: unmatched internal path → # (prevent leaking a raw slug)', () => {
+        const rewrite = createPreviewUrlRewriter({ pages: samplePages, siteId: 42 })
+        expect(rewrite('/nonexistent')).toBe('#')
+    })
+
+    it('TC-F01-GH1443-08: missing siteId → # (never emits a bare /preview/ path)', () => {
+        const rewrite = createPreviewUrlRewriter({ pages: samplePages, siteId: undefined })
+        expect(rewrite('/about')).toBe('#')
+    })
+})
+
+describe('[TC-F01-GH1443] rewriteNavLinkUrls', () => {
+    const rewrite = createPreviewUrlRewriter({ pages: samplePages, siteId: 42, isBuilderPreview: true })
+
+    it('TC-F01-GH1443-09: rewrites top-level nav link urls into preview scope', () => {
+        const links = [{ label: 'Home', url: '/' }, { label: 'About', url: '/about' }]
+        const out = rewriteNavLinkUrls(links, rewrite) as Array<{ url: string }>
+        expect(out[0].url).toBe('/preview/42?pageId=1&builder=1')
+        expect(out[1].url).toBe('/preview/42?pageId=2&builder=1')
+    })
+
+    it('TC-F01-GH1443-10: recurses into nested children links', () => {
+        const links = [{ label: 'More', url: '#', children: [{ label: 'Contact', url: '/contact' }] }]
+        const out = rewriteNavLinkUrls(links, rewrite) as Array<{ url: string; children: Array<{ url: string }> }>
+        expect(out[0].children[0].url).toBe('/preview/42?pageId=4&builder=1')
+    })
+
+    it('TC-F01-GH1443-11: non-array input passes through untouched', () => {
+        expect(rewriteNavLinkUrls(undefined, rewrite)).toBeUndefined()
     })
 })
