@@ -1,0 +1,46 @@
+'use client'
+
+import { AlertTriangle } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import type { MissingField } from '@/lib/products/missing-fields'
+import type { useI18n } from '@/i18n'
+
+type MissingInfoIndicatorProps = {
+    missing: MissingField[]
+    t: ReturnType<typeof useI18n>['t']
+}
+
+/**
+ * Soft, read-only warning icon + tooltip for products missing ALT text and/or
+ * category (GH-1457). Renders nothing when `missing` is empty. Trigger is a
+ * focusable button (not a hover-only span) so it's reachable via keyboard.
+ */
+export function MissingInfoIndicator({ missing, t }: MissingInfoIndicatorProps) {
+    if (!missing.length) return null
+
+    const label = (field: MissingField) =>
+        field === 'alt' ? t.dashboard.products.list.missingAlt : t.dashboard.products.list.missingCategory
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={t.dashboard.products.list.missingInfoTitle}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex shrink-0 cursor-help items-center justify-center"
+                >
+                    <AlertTriangle className="w-4 h-4 text-warning" aria-hidden="true" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p className="font-medium mb-1">{t.dashboard.products.list.missingInfoTitle}</p>
+                <ul className="list-disc pl-4">
+                    {missing.map((field) => (
+                        <li key={field}>{label(field)}</li>
+                    ))}
+                </ul>
+            </TooltipContent>
+        </Tooltip>
+    )
+}

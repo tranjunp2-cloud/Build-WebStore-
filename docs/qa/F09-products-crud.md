@@ -46,12 +46,35 @@
 
 ---
 
-## 4. Quality 10-Point Checklist Summary
+## 4. Missing Info Soft Warning (GH-1457)
+
+| ID | Title | Pre-condition | Steps | Test Data | Expected Result | Priority |
+|:---|:---|:---|:---|:---|:---|:---|
+| TC-09.21 | Verify cảnh báo ALT khi SP không có ảnh nào | `getMissingFields()` pure fn | 1. Gọi fn với product không có field `images`. | `images`: undefined | Trả về mảng chứa `'alt'`. | High |
+| TC-09.22 | Verify cảnh báo ALT khi ảnh đầu tiên không có alt text | `getMissingFields()` pure fn | 1. Gọi fn với `images[0].alt` rỗng/undefined. | `images[0].alt`: undefined hoặc `""` | Trả về mảng chứa `'alt'`. | High |
+| TC-09.23 | Verify không cảnh báo ALT khi ảnh đầu tiên có alt text | `getMissingFields()` pure fn | 1. Gọi fn với `images[0].alt` có giá trị. | `images[0].alt`: "Áo thun trắng" | Không có `'alt'` trong kết quả trả về. | High |
+| TC-09.24 | Verify cảnh báo Category khi SP không có field category | `getMissingFields()` pure fn | 1. Gọi fn với product không có field `category`. | `category`: undefined | Trả về mảng chứa `'category'`. | High |
+| TC-09.25 | Verify cảnh báo Category khi mảng category rỗng | `getMissingFields()` pure fn | 1. Gọi fn với `category: []`. | `category`: `[]` | Trả về mảng chứa `'category'`. | High |
+| TC-09.26 | Verify không cảnh báo Category khi có ít nhất 1 category | `getMissingFields()` pure fn | 1. Gọi fn với `category` có ≥1 phần tử. | `category`: `['cat-1']` | Không có `'category'` trong kết quả trả về. | High |
+| TC-09.27 | Verify cảnh báo cả 2 field khi thiếu cả ALT và Category | `getMissingFields()` pure fn | 1. Gọi fn với cả `images` và `category` đều thiếu. | `images`: undefined, `category`: `[]` | Trả về `['alt', 'category']`. | High |
+| TC-09.28 | Verify chỉ cảnh báo ALT khi Category đã có | `getMissingFields()` pure fn | 1. Gọi fn với `images[0].alt` thiếu, `category` có giá trị. | `alt`: undefined, `category`: `['cat-1']` | Trả về `['alt']` (không có `'category'`). | Medium |
+| TC-09.29 | Verify chỉ cảnh báo Category khi ALT đã có | `getMissingFields()` pure fn | 1. Gọi fn với `alt` có giá trị, `category` thiếu. | `alt`: "Alt text", `category`: `[]` | Trả về `['category']` (không có `'alt'`). | Medium |
+| TC-09.30 | Verify không cảnh báo gì khi cả 2 field đều đầy đủ | `getMissingFields()` pure fn | 1. Gọi fn với `alt` và `category` đều có giá trị. | `alt`: "Alt text", `category`: `['cat-1']` | Trả về mảng rỗng `[]`. | High |
+| TC-09.31 | Verify `MissingInfoIndicator` không render gì khi SP đầy đủ thông tin | Component render, `missing: []` | 1. Render component với `missing=[]`. | `missing`: `[]` | Component trả về `null`, không có DOM output. | High |
+| TC-09.32 | Verify hiển thị nút icon cảnh báo khi SP thiếu thông tin | Component render, `missing` non-empty | 1. Render component với `missing=['alt']`. | `missing`: `['alt']` | Render `<button>` chứa icon AlertTriangle màu warning. | High |
+| TC-09.33 | Verify nút cảnh báo có `aria-label` đúng | Component render | 1. Render component, inspect button attributes. | `missing`: `['alt']` | Button có `aria-label` khớp với `t.dashboard.products.list.missingInfoTitle`. | Medium |
+| TC-09.34 | Verify tooltip liệt kê đúng field đang thiếu (dynamic) | Component render + hover/focus | 1. Render với các tổ hợp `missing` khác nhau.<br>2. Kiểm tra nội dung `TooltipContent`. | `missing`: `['alt']`, `['category']`, `['alt','category']` | Tooltip hiển thị đúng danh sách nhãn tương ứng, không thừa/thiếu. | High |
+| TC-09.35 | Verify click vào icon KHÔNG mở QuickView (stopPropagation) **[Regression guard]** | Component lồng trong parent có `onClick` | 1. Gắn `onClick` giả lập trên parent (mô phỏng row/card click-to-quickview).<br>2. Click vào button cảnh báo. | Simulated parent `onClick` handler | Parent `onClick` KHÔNG được gọi — event dừng lại ở button (`stopPropagation`). | Khẩn |
+| TC-09.36 | Verify icon ẩn khỏi screen reader (`aria-hidden`) | Component render | 1. Render component, inspect icon SVG attributes. | `missing`: `['alt']` | Icon `AlertTriangle` có `aria-hidden="true"` (label đã có ở button cha). | Low |
+
+---
+
+## 5. Quality 10-Point Checklist Summary
 
 | Hạng mục (10-Point) | Trạng thái | Ghi chú / Test Case Bao Phủ |
 |---|---|---|
 | 1. Happy Path | [ ] Untested | TC-09.01 |
-| 2. UI/UX (UX Empathy) | [ ] Untested | TC-09.09, TC-09.12, TC-09.10, TC-09.14 |
+| 2. UI/UX (UX Empathy) | [ ] Untested | TC-09.09, TC-09.12, TC-09.10, TC-09.14, TC-09.21–36 (GH-1457, unit-tested) |
 | 3. Validation | [ ] Untested | TC-09.06, TC-09.07 |
 | 4. Boundary | [ ] Untested | TC-09.05, TC-09.07 |
 | 5. Data | [ ] Untested | TC-09.02, TC-09.03, TC-09.04, TC-09.08 |
