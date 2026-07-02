@@ -155,6 +155,10 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
     }
     footerBlock = {
         ...footerBlock,
+        // The `minimal` footer variant mirrors the nav via `_filteredNavLinks`; without it
+        // it falls back to RAW site.headerBlock.links and escapes the iframe (#1443). Reuse
+        // the already-rewritten nav links. Mirrors SiteRenderer's footer injection.
+        _filteredNavLinks: navBlock.links,
         columns: Array.isArray(footerBlock.columns)
             ? (footerBlock.columns as Array<Record<string, unknown>>).map((col) =>
                 col && typeof col === 'object'
