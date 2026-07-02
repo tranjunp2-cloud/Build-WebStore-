@@ -30,6 +30,20 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
     const { id } = await ctx.params
     const payload = await getPayload({ config })
 
+    // Parse optional reason from body (guard non-JSON or missing body gracefully)
+    let refundReason = 'REQUESTED_BY_CUSTOMER'
+    try {
+        const ct = request.headers.get('content-type') ?? ''
+        if (ct.includes('application/json')) {
+            const body = await request.json()
+            if (body?.reason && typeof body.reason === 'string' && body.reason.trim()) {
+                refundReason = body.reason.trim()
+            }
+        }
+    } catch {
+        // Non-JSON or empty body — keep default reason
+    }
+
     // Fetch order with tenant expanded (depth: 1)
     let order: any
     try {
@@ -237,7 +251,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 invoiceId: order.xenditPaymentRequestId,
                 // Xendit MYR = major unit (RM). order.total already RM. NO *100.
                 amount: order.total,
-                reason: 'REQUESTED_BY_CUSTOMER',
+                reason: refundReason,
             })
         } catch (err) {
             // CAS already committed — log clearly. Ops must handle via Xendit dashboard.
