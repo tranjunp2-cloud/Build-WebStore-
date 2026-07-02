@@ -10,7 +10,7 @@
 |--------|-------------|
 | **Dev mới** | [README.md](../README.md) (setup) → [CONTRIBUTING.md](../.github/CONTRIBUTING.md) (rules) |
 | **Designer** | [Design Guide](design/DESIGN_WORKFLOW.md) (rules + screens + tokens + Figma links) |
-| **QC** | [Features](#features) bên dưới → xem stories |
+| **QC** | [Features](#features) bên dưới → xem stories · [JMeter QC env](qa/jmeter-qc-env.md) · [QC runbook](qa/qc-test-runbook.md) |
 | **DevOps** | [DEPLOY.md](../.github/DEPLOY.md) → [GIT_AND_CI_RULES.md](../.github/GIT_AND_CI_RULES.md) |
 | **Tất cả** | [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority) |
 | **AI agents (Claude/Cursor)** | [CLAUDE.md](../CLAUDE.md) → [.claude/rules/](../.claude/rules/) (path-scoped rules) |
