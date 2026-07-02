@@ -8,6 +8,7 @@ export const maxDuration = 300
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
@@ -1408,9 +1409,16 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(_encoder.encode(doneData))
 
                         // Notify SSO Hub: user created their first site (step 1)
-                        import('@/lib/sso/sso-api-client')
-                            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-                            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+                        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+                        const _notifyStep1Stream = () =>
+                            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+                            )
+                        try {
+                            after(_notifyStep1Stream)
+                        } catch {
+                            void _notifyStep1Stream()
+                        }
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
@@ -1461,9 +1469,16 @@ export async function POST(req: NextRequest) {
         await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
-        import('@/lib/sso/sso-api-client')
-            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _notifyStep1 = () =>
+            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+            )
+        try {
+            after(_notifyStep1)
+        } catch {
+            void _notifyStep1()
+        }
 
         return NextResponse.json({
             success: true,
