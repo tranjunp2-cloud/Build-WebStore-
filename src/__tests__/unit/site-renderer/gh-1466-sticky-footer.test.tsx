@@ -210,4 +210,108 @@ describe('GH-1466: SiteRenderer sticky footer', () => {
         expect(cartWidget).toBeInTheDocument()
         expect(wrapper).not.toContainElement(cartWidget)
     })
+
+    it('TC-GH1466-07: editor mode preserves data-block-index/data-block-type on bucketed nav/footer (PreviewScripts contract)', () => {
+        // Arrange — PreviewScripts (editor iframe) selects blocks via `[data-block-index]` /
+        // `[data-block-type]` using closest(); this contract must survive header/footer bucketing.
+        const page = {
+            layout: [
+                { blockType: 'navigation', links: [] },
+                { blockType: 'hero', title: 'Welcome' },
+                { blockType: 'footer', columns: [] },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} isEditor />)
+
+        // Assert — bucketed header/footer wrapper divs still carry the editor data attributes
+        const wrapper = container.querySelector('.min-h-screen.flex.flex-col')
+        const navEl = wrapper?.querySelector('[data-block-type="navigation"]')
+        const footerEl = wrapper?.querySelector('[data-block-type="footer"]')
+        const heroEl = wrapper?.querySelector('main.flex-1 [data-block-type="hero"]')
+        expect(navEl).toBeInTheDocument()
+        expect(navEl?.getAttribute('data-block-index')).toBe('0')
+        expect(footerEl).toBeInTheDocument()
+        expect(footerEl?.getAttribute('data-block-index')).toBe('2')
+        expect(heroEl).toBeInTheDocument()
+        expect(heroEl?.getAttribute('data-block-index')).toBe('1')
+    })
+
+    it('TC-GH1466-08: isHomepage JSON-LD (Organization/WebSite) gates on page.isHomepage, not block order — survives malformed layout', () => {
+        // Arrange — same malformed layout as TC-GH1466-05 (nav authored mid-array, not blocks[0]).
+        // Pre-fix, isHomepage used `blocks[0]?.blockType === 'navigation'` (authored order), which
+        // is false here even though page.isHomepage=true — wrong schema would render.
+        const page = {
+            isHomepage: true,
+            layout: [
+                { blockType: 'hero', title: 'Content before nav (malformed)' },
+                { blockType: 'navigation', links: [] },
+                { blockType: 'footer', columns: [] },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — Organization/WebSite schema present (homepage-only), WebPage schema absent
+        const jsonLd = Array.from(container.querySelectorAll('script[type="application/ld+json"]'))
+            .map((el) => el.textContent)
+            .join('\n')
+        expect(jsonLd).toContain('"@type":"Organization"')
+        expect(jsonLd).toContain('"@type":"WebSite"')
+        expect(jsonLd).not.toContain('"@type":"WebPage"')
+    })
+
+    it('TC-GH1466-09: isHomepage JSON-LD renders WebPage (not Organization/WebSite) when page.isHomepage is not true, even with hero+nav-first blocks', () => {
+        // Arrange — blocks look exactly like a homepage (hero present, nav authored first), but
+        // page.isHomepage is false. Old heuristic would have wrongly emitted Organization/WebSite.
+        const page = {
+            isHomepage: false,
+            layout: [
+                { blockType: 'navigation', links: [] },
+                { blockType: 'hero', title: 'Not actually the homepage' },
+                { blockType: 'footer', columns: [] },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — WebPage schema present, standalone Organization/WebSite schemas absent.
+        // (WebPage legitimately nests a `isPartOf: {"@type":"WebSite", ...}` sub-object — only
+        // the standalone top-level schema, prefixed by its own @context, must be absent.)
+        const jsonLd = Array.from(container.querySelectorAll('script[type="application/ld+json"]'))
+            .map((el) => el.textContent)
+            .join('\n')
+        expect(jsonLd).toContain('"@type":"WebPage"')
+        expect(jsonLd).not.toContain('"@context":"https://schema.org","@type":"Organization"')
+        expect(jsonLd).not.toContain('"@context":"https://schema.org","@type":"WebSite"')
+    })
+
+    it('TC-GH1466-10: isHomepage JSON-LD renders WebPage when page.isHomepage is omitted entirely (not just explicit false)', () => {
+        // Arrange — page.isHomepage is undefined (the realistic shape for most non-homepage
+        // pages, which never had the field set at all). Guards the `=== true` strict-equality
+        // check: a regression to `!== false` would treat omitted isHomepage as truthy and
+        // wrongly emit Organization/WebSite here — adversarial review caught this gap via
+        // mutation testing (TC-08/09 only covered explicit true/false, not omitted).
+        const page = {
+            layout: [
+                { blockType: 'navigation', links: [] },
+                { blockType: 'hero', title: 'Some page, isHomepage never set' },
+                { blockType: 'footer', columns: [] },
+            ],
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={defaultSite} page={page} />)
+
+        // Assert — WebPage schema present, standalone Organization/WebSite schemas absent.
+        const jsonLd = Array.from(container.querySelectorAll('script[type="application/ld+json"]'))
+            .map((el) => el.textContent)
+            .join('\n')
+        expect(jsonLd).toContain('"@type":"WebPage"')
+        expect(jsonLd).not.toContain('"@context":"https://schema.org","@type":"Organization"')
+        expect(jsonLd).not.toContain('"@context":"https://schema.org","@type":"WebSite"')
+    })
 })

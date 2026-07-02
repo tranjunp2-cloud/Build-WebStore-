@@ -70,6 +70,7 @@ export type SiteRendererProps = {
     }
     page: {
         layout?: unknown[]
+        isHomepage?: boolean
         [key: string]: unknown
     }
     pages?: NavPage[]
@@ -460,7 +461,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     }) as PreviewBlock[]
 
     // JSON-LD schemas — auto-detect from blocks present
-    const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
+    // Organization/WebSite (vs. WebPage) schema gates on `page.isHomepage`, the Payload `pages`
+    // collection's own ground-truth flag — every SiteRenderer call site's `page` originates from
+    // a `payload.find`/`findByID` on that collection (or a spread thereof), so the field is
+    // reliably present. Previously this used a block-order heuristic
+    // (`blocks[0]?.blockType === 'navigation'`), which broke once bucketing (below) started
+    // rendering nav visually first regardless of its authored position in page.layout — the
+    // heuristic no longer reflected what actually renders on screen.
+    const isHomepage = page?.isHomepage === true
     const jsonLdSchemas = generatePageSchemas({ blocks, site, page, isHomepage })
 
     // Heading hierarchy — compute levels for all blocks
@@ -531,6 +539,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // possible via ensureNavigationBlocks (src/lib/ai/ensure-navigation.ts), which patches an
     // existing nav/footer's content but never repositions it. Snapping to top/bottom is the
     // correct fix for that latent display bug, not a regression.
+    // Note: 'announcement-bar' is the one block type conventionally authored ABOVE the nav
+    // (root element is `sticky top-0 z-50`). It is NOT in the header/footer bucket check below,
+    // so it falls into mainEls and renders BELOW nav — banner + nav sticky collision on scroll
+    // if a layout ever has announcement-bar before nav. Low reach today: structure-enforcer.ts
+    // forces nav to index 0 on the AI-gen path, and the editor blocks dropping around nav.
     const headerEls: React.ReactNode[] = []
     const mainEls: React.ReactNode[] = []
     const footerEls: React.ReactNode[] = []
