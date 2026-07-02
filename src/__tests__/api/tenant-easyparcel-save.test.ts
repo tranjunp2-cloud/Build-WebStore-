@@ -1,8 +1,9 @@
 /**
  * POST /api/tenant/[id]/easyparcel-save route tests — F36 Phase 05 (GH-1333)
- * Tests: save guard (enabled=true requires warehouse + ≥1 courier), array persistence, legacy scalar.
+ * Tests: save guard (enabled=true requires warehouse complete), warehouse persistence.
+ * NO courier selection — auto-cheapest at checkout.
  *
- * TC-F14.140, TC-F14.141 from docs/qa/F14-shipping.md
+ * TC-F14.140 from docs/qa/F14-shipping.md
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -55,40 +56,12 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         mockUser = { id: 1, roles: ['super-admin'], tenants: [] }
     })
 
-    // TC-F14.140: enabled=true + empty selectedCouriers → 400 EP_NOT_READY
-    it('[TC-F14.140] enabled=true + empty selectedCouriers → 400 EP_NOT_READY', async () => {
-        const res = await callPost('tenant-1', {
-            enabled: true,
-            warehouses: [completeWarehouse],
-            selectedCouriers: [],
-        })
-        const body = await res.json()
-
-        expect(res.status).toBe(400)
-        expect(body.error?.code).toBe('EP_NOT_READY')
-        expect(mockUpdate).not.toHaveBeenCalled()
-    })
-
-    // TC-F14.140 variant: enabled=true + missing selectedCouriers → 400 EP_NOT_READY
-    it('[TC-F14.140] enabled=true + missing selectedCouriers → 400 EP_NOT_READY', async () => {
-        const res = await callPost('tenant-1', {
-            enabled: true,
-            warehouses: [completeWarehouse],
-        })
-        const body = await res.json()
-
-        expect(res.status).toBe(400)
-        expect(body.error?.code).toBe('EP_NOT_READY')
-        expect(mockUpdate).not.toHaveBeenCalled()
-    })
-
-    // TC-F14.140 variant: enabled=true + incomplete warehouse → 400 EP_NOT_READY
+    // TC-F14.140: enabled=true + incomplete warehouse → 400 EP_NOT_READY
     it('[TC-F14.140] enabled=true + incomplete warehouse (missing phone) → 400 EP_NOT_READY', async () => {
         const incompleteWh = { ...completeWarehouse, phone: '' }
         const res = await callPost('tenant-1', {
             enabled: true,
             warehouses: [incompleteWh],
-            selectedCouriers: ['jnt', 'flash'],
         })
         const body = await res.json()
 
@@ -97,14 +70,38 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
-    // TC-F14.141: valid array + complete warehouse → 200 OK, persist array + legacy scalar
-    it('[TC-F14.141] valid selectedCouriers + complete warehouse → 200 OK, persist array + legacy scalar', async () => {
+    // TC-F14.140 variant: enabled=true + empty warehouses → 400 EP_NOT_READY
+    it('[TC-F14.140] enabled=true + empty warehouses → 400 EP_NOT_READY', async () => {
+        const res = await callPost('tenant-1', {
+            enabled: true,
+            warehouses: [],
+        })
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error?.code).toBe('EP_NOT_READY')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // TC-F14.140 variant: enabled=true + missing warehouses → 400 EP_NOT_READY
+    it('[TC-F14.140] enabled=true + missing warehouses → 400 EP_NOT_READY', async () => {
+        const res = await callPost('tenant-1', {
+            enabled: true,
+        })
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error?.code).toBe('EP_NOT_READY')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // TC-F14.141: enabled=true + complete warehouse → 200 OK, persist warehouse + enabled
+    it('[TC-F14.141] enabled=true + complete warehouse → 200 OK, persist warehouse', async () => {
         mockUpdate.mockResolvedValue({ id: 'tenant-1' })
 
         const res = await callPost('tenant-1', {
             enabled: true,
             warehouses: [completeWarehouse],
-            selectedCouriers: ['jnt', 'flash'],
         })
 
         expect(res.status).toBe(200)
@@ -114,34 +111,35 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         const updateCall = mockUpdate.mock.calls[0][0]
         expect(updateCall.collection).toBe('tenants')
         expect(updateCall.id).toBe('tenant-1')
-        expect(updateCall.data.easyParcelIntegration.selectedCouriers).toEqual(['jnt', 'flash'])
-        expect(updateCall.data.easyParcelIntegration.selectedCourier).toBe('jnt') // legacy scalar = first element
+        expect(updateCall.data.easyParcelIntegration.warehouses).toEqual([completeWarehouse])
+        expect(updateCall.data.easyParcelIntegration.enabled).toBe(true)
+        // NO selectedCouriers or selectedCourier in new spec
     })
 
-    // TC-F14.141 variant: single courier → legacy scalar = that courier
-    it('[TC-F14.141] single selectedCourier → legacy scalar mirrors it', async () => {
+    // TC-F14.141 variant: multiple warehouses
+    it('[TC-F14.141] enabled=true + multiple complete warehouses → 200 OK, persist all', async () => {
         mockUpdate.mockResolvedValue({ id: 'tenant-1' })
+
+        const wh2 = { ...completeWarehouse, id: 'w-2', label: 'Branch', isDefault: false }
 
         const res = await callPost('tenant-1', {
             enabled: true,
-            warehouses: [completeWarehouse],
-            selectedCouriers: ['flash'],
+            warehouses: [completeWarehouse, wh2],
         })
 
         expect(res.status).toBe(200)
         const updateCall = mockUpdate.mock.calls[0][0]
-        expect(updateCall.data.easyParcelIntegration.selectedCouriers).toEqual(['flash'])
-        expect(updateCall.data.easyParcelIntegration.selectedCourier).toBe('flash')
+        expect(updateCall.data.easyParcelIntegration.warehouses).toEqual([completeWarehouse, wh2])
+        expect(updateCall.data.easyParcelIntegration.enabled).toBe(true)
     })
 
     // enabled=false is always OK (no guard)
-    it('enabled=false is always OK, even with empty couriers', async () => {
+    it('enabled=false is always OK (no warehouse check)', async () => {
         mockUpdate.mockResolvedValue({ id: 'tenant-1' })
 
         const res = await callPost('tenant-1', {
             enabled: false,
-            warehouses: [completeWarehouse],
-            selectedCouriers: [],
+            warehouses: [],
         })
 
         expect(res.status).toBe(200)
@@ -160,20 +158,21 @@ describe('POST /api/tenant/[id]/easyparcel-save — F36', () => {
         expect(mockUpdate).not.toHaveBeenCalled()
     })
 
-    // Sanitize: non-string couriers in array filtered
-    it('sanitizes non-string couriers from array', async () => {
+    // Ignore selectedCouriers in request (not part of new spec)
+    it('ignores selectedCouriers param (not accepted in new spec)', async () => {
         mockUpdate.mockResolvedValue({ id: 'tenant-1' })
 
         const res = await callPost('tenant-1', {
             enabled: true,
             warehouses: [completeWarehouse],
-            selectedCouriers: ['jnt', 123, null, 'flash', undefined, '   '],
+            selectedCouriers: ['jnt', 'flash'], // Ignored
         })
 
         expect(res.status).toBe(200)
         const updateCall = mockUpdate.mock.calls[0][0]
-        // Non-strings and empty strings filtered out
-        expect(updateCall.data.easyParcelIntegration.selectedCouriers).toEqual(['jnt', 'flash'])
+        // Route should only persist enabled + warehouses, not couriers
+        expect(updateCall.data.easyParcelIntegration.enabled).toBe(true)
+        expect(updateCall.data.easyParcelIntegration.warehouses).toEqual([completeWarehouse])
     })
 
     // Error handling: update fails → 500 INTERNAL_ERROR

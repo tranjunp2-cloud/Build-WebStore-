@@ -1,7 +1,8 @@
 /**
  * EasyParcel Ready-Gate Tests — F36 Phase 04 [GH-1333]
- * Regression tests for order-flow ready-gate: when EP is enabled and ready (token + default warehouse + courier),
- * checkout uses EP rates. Otherwise falls back to flat rate.
+ * Regression tests for order-flow ready-gate: when EP is enabled and ready (token + default warehouse complete),
+ * checkout uses EP rates with auto-cheapest courier selection. Otherwise falls back to flat rate.
+ * Courier selection is NO LONGER user-configurable; checkout always picks the cheapest EP option.
  *
  * TC-F36.xx references from docs/qa/F36-easyparcel.md (if exists) or relative to F14 shipping baseline.
  * This test file extends orders-calculate-shipping.test.ts with EP-specific ready-gate scenarios.
@@ -77,11 +78,11 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
     })
 
     // ──────────────────────────────────────────────────────────────────
-    // TC-F36.01: EP Ready: accessToken + complete default warehouse + selectedCourier
-    // → uses EP (calls getRates)
+    // TC-F36.01: EP Ready: accessToken + complete default warehouse
+    // → uses EP (calls getRates with auto-cheapest)
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.01] EP enabled=true + isEpReady=true (token + warehouse + courier) → uses EP rates, not flat', async () => {
+    it('[TC-F36.01] EP enabled=true + isEpReady=true (token + warehouse) → uses EP rates, not flat', async () => {
         // Arrange: Complete EP config
         const completeWarehouse = {
             id: 'w1',
@@ -142,12 +143,12 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
     })
 
     // ──────────────────────────────────────────────────────────────────
-    // TC-F36.02: EP enabled=true, but NO selectedCourier
-    // → flat rate fallback (NOT EP path)
+    // TC-F36.02: EP enabled=true + warehouse complete (courier NOT required)
+    // → uses EP rates (auto-cheapest, no user courier selection needed)
     // ──────────────────────────────────────────────────────────────────
 
-    it('[TC-F36.02] EP enabled=true but selectedCourier="" → flat rate, NOT EP path', async () => {
-        // Arrange: EP config without courier selection
+    it('[TC-F36.02] EP enabled=true + warehouse complete (no courier selection) → uses EP rates', async () => {
+        // Arrange: EP config with warehouse only (courier not selected, not required)
         const completeWarehouse = {
             id: 'w1',
             label: 'HQ',
@@ -165,22 +166,37 @@ describe('POST /api/orders/calculate-shipping — EP ready-gate [TC-F36.xx]', ()
             refreshToken: 'refresh-xyz',
             tokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
             warehouses: [completeWarehouse],
-            selectedCourier: '', // MISSING
+            // NO selectedCourier field (courier auto-picked at checkout)
         }
 
         mockSiteWithTenant(null, tenantId, epConfig)
         vi.mocked(getValidToken).mockResolvedValue('token-xyz')
 
+        // Mock getRates to return cheapest EP option
+        const mockEpRate = {
+            courier: 'easyparcel',
+            serviceId: 'ep-standard',
+            courierName: 'EasyParcel',
+            serviceName: 'Standard',
+            priceSen: 1000,
+            codAvailable: false,
+            estDelivery: '2-3 days',
+        }
+        vi.mocked(getRates).mockResolvedValue({
+            rates: [mockEpRate],
+            degraded: false,
+        })
+
         // Act
         const res = await callPost({ ...validBase, items: [{ productId: 'p1', quantity: 1 }] })
         const body = await res.json()
 
-        // Assert: Should get flat rate, NOT EP
+        // Assert: Should use EP rates (auto-cheapest), NOT flat rate
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
         expect(body.data.rates).toHaveLength(1)
-        expect(body.data.rates[0].courier).toBe('flat') // Flat rate fallback
-        expect(vi.mocked(getRates)).not.toHaveBeenCalled() // EP path NOT taken
+        expect(body.data.rates[0].courier).toBe('easyparcel') // EP auto-cheapest
+        expect(vi.mocked(getRates)).toHaveBeenCalled() // EP path taken
     })
 
     // ──────────────────────────────────────────────────────────────────

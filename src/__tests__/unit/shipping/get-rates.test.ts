@@ -80,19 +80,15 @@ describe('getRates', () => {
         })
     })
 
-    // Happy path: allowlist intersection + cheapest
-    describe('[TC-F14.131] allowlist intersection + pick cheapest', () => {
-        it('returns cheaper only when allowlist matches route', async () => {
+    // Happy path: pick cheapest of all (no allowlist filtering)
+    describe('[TC-F14.131] pick cheapest of all available', () => {
+        it('returns cheapest EP option regardless of courier', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: ['jnt', 'flash'] },
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
             expect(result.rates[0].courier).toBe('flash')
@@ -101,19 +97,14 @@ describe('getRates', () => {
         })
     })
 
-    // Allowlist ∩ route = empty → flat fallback
-    describe('[TC-F14.132] allowlist ∩ route empty → flat fallback', () => {
-        it('returns flat when allowlist contains no route couriers', async () => {
-            mockQuotationsSuccess([
-                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
-                { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
-            ])
+    // EP returns no quotations → flat fallback
+    describe('[TC-F14.132] EP empty quotations → flat fallback', () => {
+        it('returns flat when EP returns 0 quotations', async () => {
+            ;(quotations as any).mockResolvedValue({
+                data: [{ status: 'success', quotations: [] }],
+            })
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: ['dhl', 'pos'] }, // not in quotations
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
             expect(result.rates[0].courier).toBe('flat')
@@ -121,19 +112,16 @@ describe('getRates', () => {
         })
     })
 
-    // Empty/absent allowlist → cheapest of ALL
-    describe('[TC-F14.133] empty/absent allowlist → cheapest of ALL', () => {
-        it('returns cheapest when allowlist is undefined', async () => {
+    // Auto-cheapest: always pick the lowest price from EP
+    describe('[TC-F14.133] pick cheapest from all EP quotations', () => {
+        it('returns cheapest across multiple EP options', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
+                { courier: 'pos', serviceId: 'std', courierName: 'POS', serviceName: 'Standard', priceSen: 6000, codAvailable: false, estDelivery: '5–7 days' },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: undefined },
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
             expect(result.rates[0].courier).toBe('flash')
@@ -141,40 +129,37 @@ describe('getRates', () => {
             expect(result.degraded).toBe(false)
         })
 
-        it('returns cheapest when allowlist is empty array', async () => {
+        it('returns cheapest even with single option', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
-                { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: [] },
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('flash')
+            expect(result.rates[0].courier).toBe('jnt')
+            expect(result.rates[0].priceSen).toBe(5000)
             expect(result.degraded).toBe(false)
         })
     })
 
     // COD: restrict to cod-capable, pick cheapest
-    describe('[TC-F14.134] COD order restricts to COD-capable', () => {
-        it('returns COD-capable courier even if more expensive', async () => {
+    describe('[TC-F14.134] COD order restricts to COD-capable couriers', () => {
+        it('returns cheapest COD-capable courier even if more expensive than non-COD', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 5000, codAvailable: true, codMaxSen: 100000, estDelivery: '3–5 days' },
+                { courier: 'pos', serviceId: 'std', courierName: 'POS', serviceName: 'Standard', priceSen: 4500, codAvailable: true, codMaxSen: 50000, estDelivery: '5–7 days' },
             ])
 
             const result = await getRates(
-                { ...baseParams, allowedCouriers: ['jnt', 'flash'], codAmountSen: 1000 },
+                { ...baseParams, codAmountSen: 1000 },
                 'token123',
                 flatConfig,
             )
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('flash') // only COD option
+            expect(result.rates[0].courier).toBe('pos') // cheapest COD-capable
             expect(result.rates[0].codAvailable).toBe(true)
             expect(result.degraded).toBe(false)
         })
@@ -189,7 +174,7 @@ describe('getRates', () => {
             ])
 
             const result = await getRates(
-                { ...baseParams, allowedCouriers: ['jnt', 'flash'], codAmountSen: 1000 },
+                { ...baseParams, codAmountSen: 1000 },
                 'token123',
                 flatConfig,
             )
@@ -200,42 +185,71 @@ describe('getRates', () => {
         })
     })
 
-    // Non-COD: ignores codAvailable
-    describe('[TC-F14.136] non-COD order ignores codAvailable flag', () => {
-        it('picks cheapest regardless of COD flag', async () => {
+    // BYOC couriers are excluded from auto-selection (opt-in only, not linked here)
+    describe('[TC-F14.145] excludes BYOC couriers from auto-pick', () => {
+        it('skips a cheaper BYOC courier and picks the cheapest non-BYOC', async () => {
+            mockQuotationsSuccess([
+                { courier: 'byoc_fedex', serviceId: 'std', courierName: 'BYOC FedEx', serviceName: 'Standard', priceSen: 3000, codAvailable: false, estDelivery: '2–4 days' },
+                { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates).toHaveLength(1)
+            expect(result.rates[0].courier).toBe('flash') // cheapest non-BYOC, BYOC 3000 skipped
+            expect(result.degraded).toBe(false)
+        })
+
+        it('falls back to flat when every quotation is BYOC', async () => {
+            mockQuotationsSuccess([
+                { courier: 'byoc_fedex', serviceId: 'std', courierName: 'BYOC FedEx', serviceName: 'Standard', priceSen: 3000, codAvailable: false, estDelivery: '2–4 days' },
+                { courier: 'byoc_gdex', serviceId: 'std', courierName: 'BYOC GDEX', serviceName: 'Standard', priceSen: 3500, codAvailable: false, estDelivery: '2–4 days' },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates).toHaveLength(1)
+            expect(result.rates[0].courier).toBe('flat')
+            expect(result.degraded).toBe(true)
+        })
+    })
+
+    // Non-COD: ignores codAvailable flag
+    describe('[TC-F14.136] non-COD order picks cheapest (ignores codAvailable)', () => {
+        it('picks cheapest regardless of COD availability', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 5000, codAvailable: true, codMaxSen: 100000, estDelivery: '3–5 days' },
             ])
 
             const result = await getRates(
-                { ...baseParams, allowedCouriers: ['jnt', 'flash'], codAmountSen: 0 },
+                { ...baseParams, codAmountSen: undefined },
                 'token123',
                 flatConfig,
             )
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('jnt') // cheaper, COD not checked
+            expect(result.rates[0].courier).toBe('jnt') // cheaper, COD availability not checked
             expect(result.degraded).toBe(false)
         })
     })
 
-    // 'flat' sentinel filter
-    describe('[TC-F14.137] flat sentinel excluded from EP candidates', () => {
-        it('filters flat from allowlist, treats as no allowlist → picks cheapest of all', async () => {
+    // No allowlist param — new spec removes courier selection
+    describe('[TC-F14.137] (deprecated allowlist logic replaced by auto-cheapest)', () => {
+        it('no courier filtering — always picks cheapest EP option', async () => {
+            // Old spec had allowlist filtering (e.g. allowlist=['flat']).
+            // New spec: no allowlist param. Always pick cheapest EP.
+            // This test is deprecated but kept for traceability: old TC-F14.137 logic is replaced by auto-cheapest.
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: ['flat'] }, // only flat allowed (filtered out → empty)
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('jnt') // after filtering 'flat', no allowlist restriction, pick cheapest
+            expect(result.rates[0].courier).toBe('jnt') // cheapest, no allowlist filtering
             expect(result.degraded).toBe(false)
         })
     })
@@ -277,22 +291,18 @@ describe('getRates', () => {
         })
     })
 
-    // Edge: single option
+    // Edge cases
     describe('edge cases', () => {
-        it('works correctly with single allowlisted courier', async () => {
+        it('picks cheapest when EP returns multiple options', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: ['jnt'] },
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('jnt')
+            expect(result.rates[0].courier).toBe('flash') // cheapest
             expect(result.degraded).toBe(false)
         })
 
@@ -310,11 +320,7 @@ describe('getRates', () => {
                 },
             ])
 
-            const result = await getRates(
-                { ...baseParams, allowedCouriers: ['flash'] },
-                'token123',
-                flatConfig,
-            )
+            const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates[0].codMaxSen).toBe(50000)
         })
