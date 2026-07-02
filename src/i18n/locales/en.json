@@ -3494,6 +3494,18 @@
         "imageTooLarge": "Image must be smaller than 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "AI Chat",
+            "components": "Components",
+            "pages": "Pages",
+            "settings": "Settings"
+        },
+        "advisoryBanner": {
+            "title": "Better experience on Desktop",
+            "description": "Advanced editing tools work best on a larger screen. Some tools may be limited on mobile devices.",
+            "copyLink": "Copy Link",
+            "dismiss": "Dismiss"
+        },
         "toolbar": {
             "publish": "Publish",
             "publishing": "Publishing",

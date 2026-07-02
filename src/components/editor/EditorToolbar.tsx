@@ -186,6 +186,9 @@ interface EditorToolbarProps {
     canRedo: boolean
     viewport: 'desktop' | 'mobile'
     compact?: boolean
+    /** Phase 04: shared with the compact Tools-sheet AI-chat panel (Phase 03) — drives the
+     * "Processing…" save-status label and disables Publish/Update while an AI edit is in flight. */
+    aiRunning?: boolean
     onOpenMenu: () => void
     onOpenTemplates?: () => void
     onPageSelected: (pageId: string) => void
@@ -223,6 +226,7 @@ export function EditorToolbar({
     canRedo,
     viewport,
     compact = false,
+    aiRunning = false,
     onOpenMenu,
     onOpenTemplates,
     onPageSelected,
@@ -267,36 +271,49 @@ export function EditorToolbar({
     const CurrentPageIcon = getPageIcon(currentPage ?? { isHomepage: false, slug: '' })
 
     if (compact) {
+        // Phase 04: reuses `t.editor.unpublishModal.processing` ("Processing…") rather than
+        // adding a new toolbar.* i18n key — same string already covers this exact meaning.
+        const processingLabel = t.editor.unpublishModal.processing
+
         return (
-            <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-3">
+            <>
+            <header className="flex h-12 shrink-0 items-center justify-between overflow-hidden border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-3">
                 <div className="flex min-w-0 items-center gap-0.5">
                     <button
                         type="button"
                         onClick={onOpenMenu}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
                         title={et.menu}
                     >
                         <Menu className="h-4 w-4" />
                     </button>
 
+                    {/* Phase 04 (audit #2): page-selector chip removed from the header (2026-07-02,
+                        user: not in F05's header design) — page-switching stays reachable via the
+                        Phase 03 Tools sheet Pages tab (PageManagerPanel), no functionality lost. */}
+
                     <button
                         type="button"
                         onClick={onOpenTemplates}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-amber-300/80 transition-colors hover:bg-white/[0.06]"
+                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-1.5 text-amber-300/80 transition-colors hover:bg-white/[0.06]"
                         title={et.templates}
                     >
-                        <Palette className="h-4 w-4" />
+                        <Palette className="h-4 w-4 shrink-0" />
+                        <span className="text-[11px] font-medium">{et.templates}</span>
                     </button>
 
-                    <div className="mx-1 h-4 w-px bg-white/[0.06]" />
+                    <div className="mx-1 h-4 w-px shrink-0 bg-white/[0.06]" />
 
-                    <div className="flex items-center gap-1">
-                        <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="text-[11px] text-slate-400">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
+                    <div className="flex min-w-0 items-center gap-1">
+                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', aiRunning ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                        <span className="truncate text-[11px] text-slate-400">{aiRunning ? processingLabel : isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1.5">
+                    {/* Phase 04 (audit #12): publish-state badge removed (2026-07-02, user: redundant
+                        with the saved-status dot + the Live/Publish button's own color — not in F05). */}
+
                     {previewDisabled ? (
                         <Button
                             variant="ghost"
@@ -327,28 +344,64 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing || isSaving}
+                                disabled={isPublishing || isSaving || aiRunning}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
                             >
                                 {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
                             </Button>
                         )}
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={onViewLive}
-                            className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
-                        >
-                            <Globe className="h-3.5 w-3.5" />
-                            {et.live}
-                        </Button>
+                        {/* Phase 04 (audit #15-18): View-Live dropdown ported from the desktop
+                            branch — Open Website / Copy Link / Unpublish (→ UnpublishModal). */}
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                                >
+                                    <Globe className="h-3.5 w-3.5" />
+                                    {et.live}
+                                    <ChevronDown className="ml-1 h-3 w-3" />
+                                </Button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                                <DropdownMenu.Content
+                                    className="editor-portal z-50 min-w-[180px] rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-elevated)] p-1.5 shadow-2xl"
+                                    sideOffset={8}
+                                    align="end"
+                                >
+                                    <DropdownMenu.Item
+                                        onSelect={onViewLive}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                                        {vm.openWebsite}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                        onSelect={onCopyLink}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-[var(--editor-text)] outline-none hover:bg-[var(--editor-overlay-hover)] focus:bg-[var(--editor-overlay-hover)]"
+                                    >
+                                        <Copy className="h-3.5 w-3.5 text-slate-400" />
+                                        {vm.copyLink}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--editor-border)]" />
+                                    <DropdownMenu.Item
+                                        onSelect={onUnpublish}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-400 outline-none hover:bg-red-500/10 focus:bg-red-500/10"
+                                    >
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                        {vm.unpublish}
+                                    </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
                         </>
                     ) : (
                         <Button
                             type="button"
                             size="sm"
                             onClick={onPublish}
-                            disabled={isPublishing || publishSuccess}
+                            disabled={isPublishing || publishSuccess || aiRunning}
                             className={cn(
                                 'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
                                 publishSuccess && 'from-emerald-500 to-emerald-400',
@@ -366,6 +419,18 @@ export function EditorToolbar({
 
                 </div>
             </header>
+            {/* Phase 04 (audit #20): maintenance banner — duplicated from the desktop fragment
+                below (same condition/content/handler) so it also renders on compact. */}
+            {wasPublished && !isPublished && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{mt.banner}</span>
+                    <Button size="sm" variant="ghost" onClick={onPublish} className="ml-auto h-6 px-2 text-[10px] text-amber-400 hover:bg-amber-500/10 hover:text-amber-300">
+                        {mt.republish}
+                    </Button>
+                </div>
+            )}
+            </>
         )
     }
 

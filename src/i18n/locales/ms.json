@@ -3494,6 +3494,18 @@
         "imageTooLarge": "Imej mestilah lebih kecil daripada 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "Chat AI",
+            "components": "Komponen",
+            "pages": "Halaman",
+            "settings": "Tetapan"
+        },
+        "advisoryBanner": {
+            "title": "Pengalaman lebih baik di Desktop",
+            "description": "Alat penyuntingan lanjutan berfungsi paling baik pada skrin yang lebih besar. Sesetengah alat mungkin terhad pada peranti mudah alih.",
+            "copyLink": "Salin Pautan",
+            "dismiss": "Tutup"
+        },
         "toolbar": {
             "publish": "Terbitkan",
             "publishing": "Menerbitkan",

@@ -284,6 +284,20 @@ interface SettingsPanelProps {
     onAddLanguage?: (locale: string) => void
     onRemoveLanguage?: () => void
     onMakePrimary?: (locale: string) => void
+    /**
+     * F05 compact Tools sheet: stretch to the host's full width instead of the
+     * fixed `SETTINGS_PANEL_WIDTH` (320px) desktop right-panel width. Optional,
+     * additive — desktop callers omit this and keep the exact 320px panel.
+     */
+    fullWidth?: boolean
+    /**
+     * F05 compact block-tap sheet (`CompactEditorLayout`'s bsBlock): hides this
+     * panel's own Global/SEO/Menu/Block tab strip + title/description header —
+     * F05's bsBlock shows block fields directly, no tab bar (that lives only in
+     * the Tools sheet's Settings tab). Optional, additive — every other caller
+     * (desktop, Tools sheet Settings tab) omits this and is unaffected.
+     */
+    hideChrome?: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -296,6 +310,8 @@ function SettingsPanelInner({
     generationLocale, primaryLocale, secondaryLocale, pendingLocale,
     navShowLanguageSwitcher = false, navMultilingualEnabled = false,
     onNavLanguageSwitcherChange, onAddLanguage, onRemoveLanguage, onMakePrimary,
+    fullWidth = false,
+    hideChrome = false,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -1359,20 +1375,32 @@ function SettingsPanelInner({
         handleBlockUpdate({ [field]: cats })
     }
 
-    const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
+    const allTabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
         { id: 'global', label: s.tabGlobal, icon: <Settings className="h-4 w-4" aria-hidden /> },
         { id: 'seo', label: s.tabSeo, icon: <Search className="h-4 w-4" aria-hidden /> },
         { id: 'menu', label: s.tabMenu, icon: <Compass className="h-4 w-4" aria-hidden /> },
         { id: 'block', label: s.tabBlock, icon: <Palette className="h-4 w-4" aria-hidden />, disabled: !block },
     ]
+    // F05 compact Tools sheet Settings tab never hosts block editing (own bsBlock sheet
+    // handles that) — hide the Block pill and lay the remaining 3 out in a single row.
+    const tabs = fullWidth ? allTabs.filter(tab => tab.id !== 'block') : allTabs
 
     return (
         <div
-            className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[var(--editor-surface)]"
-            style={{ width: SETTINGS_PANEL_WIDTH }}
+            className={cn(
+                'flex h-full flex-col bg-[var(--editor-surface)]',
+                fullWidth ? 'w-full flex-1' : 'shrink-0 border-l border-white/5',
+            )}
+            style={fullWidth ? undefined : { width: SETTINGS_PANEL_WIDTH }}
         >
-            <div className="border-b border-white/5 px-4 py-4">
-                <div className="grid grid-cols-2 gap-2">
+            {!hideChrome && (
+            <div className={cn(
+                // Preflight is off — bare `border-*` utilities emit no border-style and render
+                // invisible, so `border-solid` must be declared explicitly (see globals.css note).
+                'border-solid px-4 py-4',
+                fullWidth ? 'border-y border-[var(--editor-border)]' : 'border-b border-white/5',
+            )}>
+                <div className={cn('grid gap-2', fullWidth ? 'grid-cols-3' : 'grid-cols-2')}>
                     {tabs.map(tab => (
                         <Tooltip.Provider key={tab.id} delayDuration={150}>
                             <Tooltip.Root>
@@ -1413,8 +1441,10 @@ function SettingsPanelInner({
                     ))}
                 </div>
             </div>
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+                {!hideChrome && (
                 <div className="mb-6">
                     <div className="flex items-start gap-4">
                         <div>
@@ -1437,6 +1467,7 @@ function SettingsPanelInner({
                         </div>
                     </div>
                 </div>
+                )}
 
                 <div className="space-y-5">
                     {activeTab === 'global' ? renderGlobalContent() : null}

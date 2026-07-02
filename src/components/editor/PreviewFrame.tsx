@@ -43,6 +43,14 @@ interface PreviewFrameProps {
     onPageNavigate?: (pageId: string) => void
     onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
+    /**
+     * F05 compact canvas (mobile + iPad): hide the floating `BlockActionBar`
+     * overlay (duplicate/AI-edit/delete icons above the selected block) — the
+     * compact block-settings sheet already covers move/delete. Optional,
+     * additive; desktop (incl. its own "preview as mobile" viewport toggle)
+     * omits this and is unaffected.
+     */
+    hideBlockActionBar?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
@@ -239,6 +247,7 @@ function PreviewFrameInner({
     onPageNavigate,
     onBlockAIEdit,
     disableDragDrop = false,
+    hideBlockActionBar = false,
     onInlineEditSave,
     onHandleReady,
     onFooterUpdate,
@@ -1396,7 +1405,7 @@ function PreviewFrameInner({
                             const selectedLayout = selectedBlock !== null
                                 ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                                 : null
-                            if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
+                            if (!selectedLayout || !overlayOffset || dragState || textEditingData || hideBlockActionBar) return null
 
                             return (
                                 <>

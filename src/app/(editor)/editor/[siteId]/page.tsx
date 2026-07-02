@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { FileText, MessageCircle, Zap } from 'lucide-react'
@@ -34,8 +34,11 @@ import { useTabAuthority } from '@/hooks/useTabAuthority'
 import { OfflineBanner } from '@/components/editor/OfflineBanner'
 import { TabSuspendedOverlay } from '@/components/editor/TabSuspendedOverlay'
 import { resolveApiError } from '@/lib/ui/resolve-api-error'
+import { CompactEditorLayout, type PreviewFrameSharedProps } from '@/components/editor/CompactEditorLayout'
+import type { ToolsSheetPanelProps, ToolsSheetTab } from '@/components/editor/EditorToolsSheet'
+import { useEditorLayoutMode } from '@/hooks/useEditorLayoutMode'
 
-type SiteData = {
+export type SiteData = {
     id: string
     name: string
     domain?: string | null
@@ -146,11 +149,16 @@ export default function EditorPage() {
     } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
-    const [isCompactLayout, setIsCompactLayout] = useState(false)
+    const { isCompact: isCompactLayout } = useEditorLayoutMode()
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
+    // Phase 03: F05 Tools sheet (bottom bar → 4-tab sheet) + AI-processing (Stop AI) state.
+    const [toolsSheetOpen, setToolsSheetOpen] = useState(false)
+    const [toolsSheetTab, setToolsSheetTab] = useState<ToolsSheetTab>('chat')
+    const [aiRunning, setAiRunning] = useState(false)
+    const stopAIRef = useRef<(() => void) | null>(null)
 
     // Auto-open the publish modal when arriving from an external "Publish" CTA
     // (e.g. the dashboard onboarding "Publish your website" step → /editor/:id?publish=1).
@@ -276,18 +284,6 @@ export default function EditorPage() {
         if (currentPage) return getDisplayPageTitle(currentPage, activeLocale)
         return page?.title || 'Homepage'
     }, [currentPageId, page?.title, pages, activeLocale])
-
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(max-width: 767px)')
-        const applyLayoutMode = (matches: boolean) => setIsCompactLayout(matches)
-
-        applyLayoutMode(mediaQuery.matches)
-
-        const handleChange = (event: MediaQueryListEvent) => applyLayoutMode(event.matches)
-        mediaQuery.addEventListener('change', handleChange)
-
-        return () => mediaQuery.removeEventListener('change', handleChange)
-    }, [])
 
     // Phase 1: Reset store when siteId changes to prevent stale data flash
     const storeSiteId = useEditorStore(state => state.siteId)
@@ -2044,13 +2040,83 @@ export default function EditorPage() {
         if (blockIndex === null || blockIndex >= 0) setSelectedGlobalBlockType(null)
         if (isCompactLayout && blockIndex !== null) {
             setIsMobileSettingsOpen(true)
+            setToolsSheetOpen(false) // Phase 03: XOR — block sheet takes over from the Tools sheet
         }
     }, [isCompactLayout])
 
+    // Phase 02: ✕/backdrop dismiss of the compact block-settings sheet — closes the sheet
+    // AND clears the selection (so the canvas highlight/BlockActionBar also clear, and
+    // re-tapping the same block still triggers a fresh open).
+    const handleCloseMobileSettings = useCallback(() => {
+        setIsMobileSettingsOpen(false)
+        setSelectedBlock(null)
+        setSelectedGlobalBlockType(null)
+    }, [])
+
+    // Phase 03: F05 bottom bar → 4-tab Tools sheet. XOR with the block-settings sheet —
+    // opening the Tools sheet always closes it (mirrors F05's `openSheet()` clearing block
+    // selection). `tab` is optional so the swipe-up/tap-anywhere entry points can reopen
+    // on the last-viewed tab (defaults to whatever `toolsSheetTab` already is).
+    const openTools = useCallback((tab?: ToolsSheetTab) => {
+        if (tab) setToolsSheetTab(tab)
+        setToolsSheetOpen(true)
+        setIsMobileSettingsOpen(false)
+    }, [])
+
+    const closeTools = useCallback(() => setToolsSheetOpen(false), [])
+
+    // Phase 03: "■ Stop AI" — aborts the in-flight AIChatPanel request via the abort
+    // function it registers through `onStopHandlerChange` (see toolsPanelProps.chat below).
+    const handleStopAI = useCallback(() => {
+        stopAIRef.current?.()
+    }, [])
+
+    // Lifted from the inline onHeaderUpdate/onFooterUpdate closures previously in the
+    // compact branch's SettingsPanel mount (bodies copied verbatim) so CompactEditorLayout
+    // can receive them as named props. Desktop's own SettingsPanel mount keeps its
+    // separate inline closures untouched (out of scope for this extraction).
+    const handleMobileHeaderUpdate = useCallback((changes: Record<string, unknown>) => {
+        updateHeaderBlock(changes)
+        const s = useEditorStore.getState()
+        const h = s.headerBlock
+        // F26-04: send display-merged so iframe sees current locale's _localeContent overrides.
+        if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
+        void saveWithRetry({ showToast: false, refreshPreview: false })
+    }, [updateHeaderBlock, saveWithRetry])
+
+    const handleMobileFooterUpdate = useCallback((changes: Record<string, unknown>) => {
+        updateFooterBlock(changes)
+        const s = useEditorStore.getState()
+        const f = s.footerBlock
+        if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
+        if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+        footerUpdateSaveTimerRef.current = setTimeout(() => {
+            footerUpdateSaveTimerRef.current = null
+            void saveWithRetry({ showToast: false, refreshPreview: false })
+        }, 600)
+    }, [updateFooterBlock, saveWithRetry])
+
+    // Shared by the desktop PageManagerPanel mount (sidebarContent below) AND the
+    // Phase 03 compact Tools-sheet Pages tab (toolsPanelProps.pages) — one handler,
+    // two hosts, no forked business logic.
+    const handlePagesChanged = useCallback(async () => {
+        setIframeKey(key => key + 1)
+        // Re-sync the page list from the server after create/delete so the
+        // panel reflects the change immediately (no manual reload). no-store
+        // guarantees a fresh read; setPages is the single source of truth.
+        try {
+            const r = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include', cache: 'no-store' })
+            if (r.ok) {
+                const d = await r.json()
+                if (Array.isArray(d?.pages)) setPages(d.pages)
+            }
+        } catch { /* non-fatal — optimistic addPageToState already applied */ }
+    }, [siteId, setPages])
+
     const sidebarTabs = [
-        { id: 'chat' as const, label: 'AI Chat', icon: <MessageCircle className="h-4 w-4" aria-hidden /> },
-        { id: 'components' as const, label: 'Components', icon: <Zap className="h-4 w-4" aria-hidden /> },
-        { id: 'pages' as const, label: 'Pages', icon: <FileText className="h-4 w-4" aria-hidden /> },
+        { id: 'chat' as const, label: t.editor.sidebar.aiChat, icon: <MessageCircle className="h-4 w-4" aria-hidden /> },
+        { id: 'components' as const, label: t.editor.sidebar.components, icon: <Zap className="h-4 w-4" aria-hidden /> },
+        { id: 'pages' as const, label: t.editor.sidebar.pages, icon: <FileText className="h-4 w-4" aria-hidden /> },
     ]
 
     const sidebarContent = (
@@ -2093,24 +2159,202 @@ export default function EditorPage() {
                     currentPageId={currentPageId}
                     siteStatus={site?.status}
                     onPageSelected={handlePageSelected}
-                    onPagesChanged={async () => {
-                        setIframeKey(key => key + 1)
-                        // Re-sync the page list from the server after create/delete so the
-                        // panel reflects the change immediately (no manual reload). no-store
-                        // guarantees a fresh read; setPages is the single source of truth.
-                        try {
-                            const r = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include', cache: 'no-store' })
-                            if (r.ok) {
-                                const d = await r.json()
-                                if (Array.isArray(d?.pages)) setPages(d.pages)
-                            }
-                        } catch { /* non-fatal — optimistic addPageToState already applied */ }
-                    }}
+                    onPagesChanged={handlePagesChanged}
                     onEditPage={() => setActiveSidebarTab('chat')}
                 />
             ) : null}
         </>
     )
+
+    // Phase 03: compact Tools-sheet panel prop bundles (EditorToolsSheet host, mounted from
+    // CompactEditorLayout). Second set of instances for the SAME components/handlers the
+    // desktop sidebarContent/right-panel SettingsPanel above already use — no forked
+    // business logic, mirrors the Phase 02 precedent where CompactEditorLayout's
+    // block-settings sheet already duplicates the desktop SettingsPanel mount this way.
+    const toolsPanelProps: ToolsSheetPanelProps = {
+        chat: {
+            siteId,
+            blocks,
+            selectedBlock,
+            onAIAction: handleAIAction,
+            onUndoLastAction: handleUndo,
+            siteName: siteName || site?.name || '',
+            theme,
+            currentPageSlug: page?.slug || 'home',
+            currentPageTitle,
+            externalActivity: chatActivity,
+            blockContext: chatBlockContext,
+            onBlockContextDismiss: () => setChatBlockContext(null),
+            compact: true,
+            onProcessingChange: setAiRunning,
+            onStopHandlerChange: (stop) => { stopAIRef.current = stop },
+        },
+        components: {
+            blocks,
+            selectedBlock,
+            onBlockSelect: handleMobileBlockSelect,
+            onAIAction: handleAIAction,
+            onEditGlobalBlock: (blockType: string) => {
+                handleBlockSelectWithContext(-1, blockType)
+                openTools('settings') // F05 screen 9: edit nav/footer → Settings→Menu tab
+            },
+            onAutoTranslate: handleAutoTranslate,
+        },
+        pages: {
+            siteId,
+            currentPageId,
+            siteStatus: site?.status,
+            onPageSelected: handlePageSelected,
+            onPagesChanged: handlePagesChanged,
+            onEditPage: () => openTools('chat'),
+        },
+        settings: {
+            block: null,
+            blockIndex: null,
+            theme,
+            site,
+            siteName: siteName || site?.name || '',
+            siteStatus: site?.status || 'draft',
+            headerBlock,
+            footerBlock,
+            pages,
+            currentPageId,
+            siteLocale,
+            generationLocale: site?.generationLocale ?? siteLocale,
+            primaryLocale,
+            secondaryLocale,
+            pendingLocale,
+            navShowLanguageSwitcher: Boolean((headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher),
+            navMultilingualEnabled: Boolean((headerBlock as { multilingualEnabled?: boolean; showLanguageSwitcher?: boolean } | null)?.multilingualEnabled ?? (headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher),
+            onNavLanguageSwitcherChange: handleMultilingualToggle,
+            onAddLanguage: handleAddLanguage,
+            onRemoveLanguage: handleRemoveLanguage,
+            onMakePrimary: handleMakePrimary,
+            onThemeChange: handleThemeChange,
+            onBlockFieldChange: handleBlockFieldChange,
+            onBlockUpdate: handleBlockUpdate,
+            onHeaderUpdate: handleMobileHeaderUpdate,
+            onFooterUpdate: handleMobileFooterUpdate,
+            onSiteSettingsChange: handleSiteSettingsChange,
+            onPageUpdate: handlePageUpdate,
+            requestedTab: settingsRequestedTab,
+        },
+    }
+
+    // Phase 02: PreviewFrame prop bundle shared verbatim between the desktop mount (below)
+    // and the compact CompactEditorLayout mount — every value here is IDENTICAL to what was
+    // previously inlined on the desktop <PreviewFrame> (extraction only, no behavior change).
+    // `onBlockSelect` and `disableDragDrop` are intentionally excluded — desktop passes
+    // `handleBlockSelectWithContext` with no `disableDragDrop`; compact passes
+    // `handleMobileBlockSelect` with `disableDragDrop` (touch), see CompactEditorLayout.tsx.
+    const previewFrameSharedProps: PreviewFrameSharedProps = {
+        siteId,
+        pageId: currentPageId,
+        iframeKey,
+        isLoading,
+        viewport,
+        selectedBlock,
+        onBlockAIEdit: (blockIndex, blockType) => {
+            setActiveSidebarTab('chat')
+            setChatBlockContext({ blockIndex, blockType })
+        },
+        onDeleteBlock: handleDeleteBlock,
+        onDuplicateBlock: handleDuplicateBlock,
+        onInlineEditApplied: async (content, blockIndex, detail) => {
+            setSelectedBlock(blockIndex)
+            setActiveSidebarTab('chat')
+            // BUG-F05-13: Show instruction + result separately in chat
+            if (detail) {
+                setChatActivity({
+                    id: `inline-req-${Date.now()}`,
+                    content: `✏️ **${detail.blockType}**: ${detail.instruction}`,
+                })
+                setTimeout(() => {
+                    setChatActivity({
+                        id: `inline-res-${Date.now()}`,
+                        content: `✅ "${detail.originalText}" → "${detail.rewrittenText}"`,
+                    })
+                }, 100)
+            } else {
+                setChatActivity({
+                    id: `inline-${Date.now()}`,
+                    content,
+                })
+            }
+            // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
+            // — no iframe reload needed, just persist to DB.
+            await handleSave({ showToast: false, refreshPreview: false })
+        },
+        onReorderBlocks: handleReorderBlocks,
+        onBlockDrop: handleBlockDrop,
+        onImageReplaced: async () => {
+            // UPDATE_BLOCK_DATA (sent by PreviewFrame after updateBlock) already
+            // updates the iframe preview in-place — no full reload needed.
+            // refreshPreview: false prevents setIframeKey from firing and avoids
+            // the stale-DB-data race when a prior save is still in-flight.
+            await handleSave({ showToast: false, refreshPreview: false })
+        },
+        onPageNavigate: handlePageSelected,
+        onInlineEditSave: async () => {
+            // Inline edit already updated text in iframe — no reload needed.
+            // Reloading here causes visible jank while user is still editing.
+            await handleSave({ showToast: false, refreshPreview: false })
+        },
+        onFooterUpdate: (changes) => {
+            updateFooterBlock(changes)
+            const s = useEditorStore.getState()
+            const f = s.footerBlock
+            if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
+            if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+            footerUpdateSaveTimerRef.current = setTimeout(() => {
+                footerUpdateSaveTimerRef.current = null
+                void saveWithRetry({ showToast: false, refreshPreview: false })
+            }, 600)
+        },
+        onFooterInlineEdit: (changes) => {
+            // Update store only — no iframe push so contentEditable cursor stays intact
+            updateFooterBlock(changes)
+            if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+            footerUpdateSaveTimerRef.current = setTimeout(() => {
+                footerUpdateSaveTimerRef.current = null
+                void saveWithRetry({ showToast: false, refreshPreview: false })
+            }, 600)
+        },
+        onFooterEditStop: () => {
+            // Only save if a debounce is pending — if it already fired, the save is done
+            const hadPending = !!footerUpdateSaveTimerRef.current
+            if (footerUpdateSaveTimerRef.current) {
+                clearTimeout(footerUpdateSaveTimerRef.current)
+                footerUpdateSaveTimerRef.current = null
+            }
+            if (hadPending) void saveWithRetry({ showToast: false, refreshPreview: false })
+        },
+        onHandleReady: (handle) => {
+            previewFrameSendRef.current = handle
+            // F26-04: sync locale on iframe ready so header switcher matches site language immediately
+            if (handle) {
+                const s = useEditorStore.getState()
+                handle.sendToIframe({
+                    type: 'UPDATE_LOCALE',
+                    activeLocale: s.activeLocale,
+                    generationLocale: s.generationLocale,
+                    siteLocale: s.siteLocale,
+                    primaryLocale: s.primaryLocale,
+                    secondaryLocale: s.secondaryLocale,
+                })
+            }
+        },
+        onLocaleSwitch: (locale) => { void handleLocaleSwitch(locale as SiteLocale) },
+    }
+
+    // Shared by the desktop `EditorToolbar` "Copy Link" action and the compact
+    // #1472 advisory banner's CTA — single clipboard implementation, no fork.
+    const handleCopyLink = () => {
+        if (siteUrl) {
+            navigator.clipboard.writeText(siteUrl)
+            toast.success(t.editor.toast.linkCopied, { description: siteUrl })
+        }
+    }
 
     return (
         <>
@@ -2147,6 +2391,7 @@ export default function EditorPage() {
                 canRedo={canRedo()}
                 viewport={viewport}
                 compact={isCompactLayout}
+                aiRunning={aiRunning}
                 onOpenMenu={() => setIsMenuOpen(true)}
                 onOpenTemplates={() => setIsTemplateModalOpen(true)}
                 onPageSelected={handlePageSelected}
@@ -2164,12 +2409,7 @@ export default function EditorPage() {
                 onUnpublish={() => setIsUnpublishModalOpen(true)}
                 pendingLocale={pendingLocale}
                 onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
-                onCopyLink={() => {
-                    if (siteUrl) {
-                        navigator.clipboard.writeText(siteUrl)
-                        toast.success(t.editor.toast.linkCopied, { description: siteUrl })
-                    }
-                }}
+                onCopyLink={handleCopyLink}
                 siteUrl={siteUrl}
                 wasPublished={wasPublished}
                 onViewportChange={setViewport}
@@ -2178,102 +2418,49 @@ export default function EditorPage() {
             <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} />
 
             {isCompactLayout ? (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <EditorSidebar
-                        tabs={sidebarTabs}
-                        activeTab={activeSidebarTab}
-                        onTabChange={setActiveSidebarTab}
-                        compact
-                    >
-                        {sidebarContent}
-                    </EditorSidebar>
-
-                    {/* F05 FR-29: FAB chat button on mobile */}
-                    {activeSidebarTab !== 'chat' && (
-                        <button
-                            type="button"
-                            onClick={() => setActiveSidebarTab('chat')}
-                            className="fixed right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
-                            style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-                            aria-label="Open AI Chat"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        </button>
-                    )}
-
-                    {/* F05 FR-31: Bottom sheet for block settings on mobile */}
-                    {isMobileSettingsOpen && currentBlock && (
-                        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-                            <div
-                                className="absolute inset-0 bg-black/60"
-                                onClick={() => setIsMobileSettingsOpen(false)}
-                                onKeyDown={(e) => e.key === 'Escape' && setIsMobileSettingsOpen(false)}
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Close settings"
-                            />
-                            <div className="relative max-h-[70vh] landscape:max-h-[90vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
-                                <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-[#0F172A] px-4 py-3">
-                                    <span className="text-sm font-medium text-white">Block Settings</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsMobileSettingsOpen(false)}
-                                        className="rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                    </button>
-                                </div>
-                                <SettingsPanel
-                                    block={currentBlock}
-                                    blockIndex={selectedBlock}
-                                    theme={theme}
-                                    site={site}
-                                    siteName={siteName || site?.name || ''}
-                                    siteStatus={site?.status || 'draft'}
-                                    headerBlock={headerBlock}
-                                    footerBlock={footerBlock}
-                                    pages={pages}
-                                    currentPageId={currentPageId}
-                                    siteLocale={siteLocale}
-                                    generationLocale={site?.generationLocale ?? siteLocale}
-                                    primaryLocale={primaryLocale} secondaryLocale={secondaryLocale}
-                            pendingLocale={pendingLocale}
-                                    navShowLanguageSwitcher={Boolean((headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher)}
-                                    navMultilingualEnabled={Boolean((headerBlock as { multilingualEnabled?: boolean; showLanguageSwitcher?: boolean } | null)?.multilingualEnabled ?? (headerBlock as { showLanguageSwitcher?: boolean } | null)?.showLanguageSwitcher)}
-                                    onNavLanguageSwitcherChange={handleMultilingualToggle}
-                                    onAddLanguage={handleAddLanguage}
-                                    onRemoveLanguage={handleRemoveLanguage}
-                                    onMakePrimary={handleMakePrimary}
-                                    onThemeChange={handleThemeChange}
-                                    onBlockFieldChange={handleBlockFieldChange}
-                                    onBlockUpdate={handleBlockUpdate}
-                                    onHeaderUpdate={(changes) => {
-                                        updateHeaderBlock(changes)
-                                        const s = useEditorStore.getState()
-                                        const h = s.headerBlock
-                                        // F26-04: send display-merged so iframe sees current locale's _localeContent overrides.
-                                        if (h) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: s.getDisplayBlock(h) })
-                                        void saveWithRetry({ showToast: false, refreshPreview: false })
-                                    }}
-                                    onFooterUpdate={(changes) => {
-                                        updateFooterBlock(changes)
-                                        const s = useEditorStore.getState()
-                                        const f = s.footerBlock
-                                        if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
-                                        if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
-                                        footerUpdateSaveTimerRef.current = setTimeout(() => {
-                                            footerUpdateSaveTimerRef.current = null
-                                            void saveWithRetry({ showToast: false, refreshPreview: false })
-                                        }, 600)
-                                    }}
-                                    onSiteSettingsChange={handleSiteSettingsChange}
-                                    onPageUpdate={handlePageUpdate}
-                                    requestedTab={settingsRequestedTab}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <CompactEditorLayout
+                    previewFrameProps={previewFrameSharedProps}
+                    onBlockSelect={handleMobileBlockSelect}
+                    totalBlocks={blocks.length}
+                    onReorderBlock={handleReorderBlocks}
+                    onDeleteBlockConfirmed={handleDeleteBlock}
+                    isMobileSettingsOpen={isMobileSettingsOpen}
+                    onCloseMobileSettings={handleCloseMobileSettings}
+                    currentBlock={currentBlock}
+                    selectedBlock={selectedBlock}
+                    theme={theme}
+                    site={site}
+                    siteName={siteName}
+                    headerBlock={headerBlock}
+                    footerBlock={footerBlock}
+                    pages={pages}
+                    currentPageId={currentPageId}
+                    siteLocale={siteLocale}
+                    primaryLocale={primaryLocale}
+                    secondaryLocale={secondaryLocale}
+                    pendingLocale={pendingLocale}
+                    settingsRequestedTab={settingsRequestedTab}
+                    onNavLanguageSwitcherChange={handleMultilingualToggle}
+                    onAddLanguage={handleAddLanguage}
+                    onRemoveLanguage={handleRemoveLanguage}
+                    onMakePrimary={handleMakePrimary}
+                    onThemeChange={handleThemeChange}
+                    onBlockFieldChange={handleBlockFieldChange}
+                    onBlockUpdate={handleBlockUpdate}
+                    onHeaderUpdate={handleMobileHeaderUpdate}
+                    onFooterUpdate={handleMobileFooterUpdate}
+                    onSiteSettingsChange={handleSiteSettingsChange}
+                    onPageUpdate={handlePageUpdate}
+                    toolsSheetOpen={toolsSheetOpen}
+                    toolsSheetTab={toolsSheetTab}
+                    onOpenTools={openTools}
+                    onCloseTools={closeTools}
+                    onToolsTabChange={setToolsSheetTab}
+                    toolsPanelProps={toolsPanelProps}
+                    aiRunning={aiRunning}
+                    onStopAI={handleStopAI}
+                    onCopyLink={handleCopyLink}
+                />
             ) : (
                 <div className="flex flex-1 min-h-0 overflow-hidden">
                     <div
@@ -2294,104 +2481,8 @@ export default function EditorPage() {
 
                     <div className={cn("flex flex-1 flex-col transition-opacity duration-300", isTransitioning && "opacity-0")}>
                         <PreviewFrame
-                            siteId={siteId}
-                            pageId={currentPageId}
-                            iframeKey={iframeKey}
-                            isLoading={isLoading}
-                            viewport={viewport}
-                            selectedBlock={selectedBlock}
+                            {...previewFrameSharedProps}
                             onBlockSelect={handleBlockSelectWithContext}
-                            onBlockAIEdit={(blockIndex, blockType) => {
-                                setActiveSidebarTab('chat')
-                                setChatBlockContext({ blockIndex, blockType })
-                            }}
-                            onDeleteBlock={handleDeleteBlock}
-                            onDuplicateBlock={handleDuplicateBlock}
-                            onInlineEditApplied={async (content, blockIndex, detail) => {
-                                setSelectedBlock(blockIndex)
-                                setActiveSidebarTab('chat')
-                                // BUG-F05-13: Show instruction + result separately in chat
-                                if (detail) {
-                                    setChatActivity({
-                                        id: `inline-req-${Date.now()}`,
-                                        content: `✏️ **${detail.blockType}**: ${detail.instruction}`,
-                                    })
-                                    setTimeout(() => {
-                                        setChatActivity({
-                                            id: `inline-res-${Date.now()}`,
-                                            content: `✅ "${detail.originalText}" → "${detail.rewrittenText}"`,
-                                        })
-                                    }, 100)
-                                } else {
-                                    setChatActivity({
-                                        id: `inline-${Date.now()}`,
-                                        content,
-                                    })
-                                }
-                                // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
-                                // — no iframe reload needed, just persist to DB.
-                                await handleSave({ showToast: false, refreshPreview: false })
-                            }}
-                            onReorderBlocks={handleReorderBlocks}
-                            onBlockDrop={handleBlockDrop}
-                            onImageReplaced={async () => {
-                                // UPDATE_BLOCK_DATA (sent by PreviewFrame after updateBlock) already
-                                // updates the iframe preview in-place — no full reload needed.
-                                // refreshPreview: false prevents setIframeKey from firing and avoids
-                                // the stale-DB-data race when a prior save is still in-flight.
-                                await handleSave({ showToast: false, refreshPreview: false })
-                            }}
-                            onPageNavigate={handlePageSelected}
-                            onInlineEditSave={async () => {
-                                // Inline edit already updated text in iframe — no reload needed.
-                                // Reloading here causes visible jank while user is still editing.
-                                await handleSave({ showToast: false, refreshPreview: false })
-                            }}
-                            onFooterUpdate={(changes) => {
-                                updateFooterBlock(changes)
-                                const s = useEditorStore.getState()
-                                const f = s.footerBlock
-                                if (f) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: s.getDisplayBlock(f) })
-                                if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
-                                footerUpdateSaveTimerRef.current = setTimeout(() => {
-                                    footerUpdateSaveTimerRef.current = null
-                                    void saveWithRetry({ showToast: false, refreshPreview: false })
-                                }, 600)
-                            }}
-                            onFooterInlineEdit={(changes) => {
-                                // Update store only — no iframe push so contentEditable cursor stays intact
-                                updateFooterBlock(changes)
-                                if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
-                                footerUpdateSaveTimerRef.current = setTimeout(() => {
-                                    footerUpdateSaveTimerRef.current = null
-                                    void saveWithRetry({ showToast: false, refreshPreview: false })
-                                }, 600)
-                            }}
-                            onFooterEditStop={() => {
-                                // Only save if a debounce is pending — if it already fired, the save is done
-                                const hadPending = !!footerUpdateSaveTimerRef.current
-                                if (footerUpdateSaveTimerRef.current) {
-                                    clearTimeout(footerUpdateSaveTimerRef.current)
-                                    footerUpdateSaveTimerRef.current = null
-                                }
-                                if (hadPending) void saveWithRetry({ showToast: false, refreshPreview: false })
-                            }}
-                            onHandleReady={(handle) => {
-                                previewFrameSendRef.current = handle
-                                // F26-04: sync locale on iframe ready so header switcher matches site language immediately
-                                if (handle) {
-                                    const s = useEditorStore.getState()
-                                    handle.sendToIframe({
-                                        type: 'UPDATE_LOCALE',
-                                        activeLocale: s.activeLocale,
-                                        generationLocale: s.generationLocale,
-                                        siteLocale: s.siteLocale,
-                                        primaryLocale: s.primaryLocale,
-                                        secondaryLocale: s.secondaryLocale,
-                                    })
-                                }
-                            }}
-                            onLocaleSwitch={(locale) => { void handleLocaleSwitch(locale as SiteLocale) }}
                         />
                     </div>
 

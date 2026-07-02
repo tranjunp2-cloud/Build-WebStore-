@@ -39,6 +39,17 @@ interface AIChatPanelProps {
     blockContext?: { blockIndex: number; blockType: string } | null
     onBlockContextDismiss?: () => void
     compact?: boolean
+    /**
+     * Phase 03 (F05 compact Tools sheet): reports request-in-flight state so a host
+     * (e.g. `EditorToolsSheet`/`CompactEditorLayout`) can show a canvas "AI is editing…"
+     * overlay + "Stop AI" affordance. Optional, additive — no-op for existing callers.
+     */
+    onProcessingChange?: (isProcessing: boolean) => void
+    /**
+     * Phase 03: receives an abort function while a request is in flight (null when idle)
+     * so the host's "Stop AI" control can cancel the current AI edit request.
+     */
+    onStopHandlerChange?: (stop: (() => void) | null) => void
 }
 
 // Auto-grow textarea cap: ~6 lines of 13px/leading-5 (20px) text + py-1.5 before scrolling.
@@ -65,6 +76,8 @@ function AIChatPanelInner({
     blockContext,
     onBlockContextDismiss,
     compact = false,
+    onProcessingChange,
+    onStopHandlerChange,
 }: AIChatPanelProps) {
 
     const { t } = useI18n()
@@ -287,6 +300,11 @@ function AIChatPanelInner({
             },
         ])
         setIsProcessing(true)
+        onProcessingChange?.(true)
+        // Phase 03: lets a host (compact Tools sheet) offer a "Stop AI" control that
+        // cancels this in-flight request via the shared fetch/stream AbortController.
+        const abortController = new AbortController()
+        onStopHandlerChange?.(() => abortController.abort())
 
         try {
             const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
@@ -301,6 +319,7 @@ function AIChatPanelInner({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
+                signal: abortController.signal,
                 body: JSON.stringify({
                     instruction: userMsg,
                     block: currentBlock,
@@ -345,10 +364,20 @@ function AIChatPanelInner({
                 })
             }
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Unknown error'
-            handleAIError(assistantMessageId, message)
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                updateAssistantMessage(assistantMessageId, {
+                    content: '⏹️ Stopped',
+                    isStreaming: false,
+                    undoable: false,
+                })
+            } else {
+                const message = err instanceof Error ? err.message : 'Unknown error'
+                handleAIError(assistantMessageId, message)
+            }
         } finally {
             setIsProcessing(false)
+            onProcessingChange?.(false)
+            onStopHandlerChange?.(null)
         }
     }
 
