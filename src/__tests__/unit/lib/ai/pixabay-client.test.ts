@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, PixabayError } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, PixabayError } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -117,6 +117,44 @@ describe('searchPhotos', () => {
         await searchPhotos('test', 1, { orientation: 'squarish' })
         url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
         expect(url.searchParams.get('orientation')).toBe('all')
+    })
+
+    it('[TC-F38-RAW-06] raw VN q URL-encoded verbatim + lang=vi auto-detected', async () => {
+        // Arrange — GH-1185: keywords sent RAW (user language). Vietnamese
+        // queries get lang=vi so Pixabay matches VN tags instead of
+        // diacritic-stripped partials ("cơm" → "myfirstpug.com").
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([]))
+
+        // Act
+        await searchPhotos('phở bò', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('q')).toBe('phở bò')
+        expect(url.searchParams.get('lang')).toBe('vi')
+    })
+
+    it('[TC-F38-RAW-07] English/Malay q keeps Pixabay default lang (no lang param)', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([]))
+
+        // Act — plain English and a French/Malay loanword with é (ambiguous
+        // diacritic) must NOT be misrouted to lang=vi.
+        await searchPhotos('café latte barista', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.has('lang')).toBe(false)
+    })
+
+    it('[TC-F38-RAW-08] detectQueryLang: unambiguous VN chars → vi, others → undefined', () => {
+        // Arrange + Act + Assert — pure function
+        expect(detectQueryLang('cơm bò')).toBe('vi')
+        expect(detectQueryLang('gỏi cuốn tôm')).toBe('vi')
+        expect(detectQueryLang('nhà hàng hải sản')).toBe('vi')
+        expect(detectQueryLang('nasi lemak ayam')).toBeUndefined()
+        expect(detectQueryLang('modern office')).toBeUndefined()
+        expect(detectQueryLang('café résumé')).toBeUndefined()
     })
 
     it('[TC-F38-PIXABAY-03] missing PIXABAY_API_KEY → returns [] without fetching', async () => {

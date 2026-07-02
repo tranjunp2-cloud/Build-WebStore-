@@ -44,6 +44,21 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | `image-library-seeder.test.ts` | 17-slot upload, idempotency, alt key |
 | `media-injector.test.ts` | `PIXABAY_BLOCKS` gating (hero-only default vs all) |
 
+## 4b. Regression — raw keyword (GH-1185, plan `plans/260702-1607-GH-1185-pixabay-raw-keyword/`)
+
+> Keyword gửi lên Pixabay GIỮ NGUYÊN ngôn ngữ user nhập (không dịch EN); `q` không trộn EN scaffolding (mood/category/modifier) khi có raw keyword. Query tiếng Việt → auto-detect ký tự VN → set `lang=vi` (nếu không Pixabay strip dấu và partial-match rác: "cơm"→"myfirstpug.com", "bò"→bò Scotland); query EN/MS giữ default `lang=en`.
+
+| TC-ID | Loại | Mô tả | Kỳ vọng | Status |
+|---|---|---|---|---|
+| **TC-F38-RAW-01** | `[Positive]` | `buildPoolQuery` với products VN + mood | `q` = `"phở bò gỏi cuốn"` — không adjective EN, không category | [x] |
+| **TC-F38-RAW-02** | `[Positive]` | `buildPoolQuery` không products | scaffolding: chứa category (`restaurant`) | [x] |
+| **TC-F38-RAW-03** | `[Positive]` | `buildPoolQuery(relaxed=true)` với 2 products | broaden về `"phở bò"` (≠ query chính) | [x] |
+| **TC-F38-RAW-04** | `[Positive]` | `deriveKeywords` có englishKeywords (raw) | trả `["phở bò"]` verbatim — không modifier/mood | [x] |
+| **TC-F38-RAW-05** | `[Positive]` | `deriveKeywords` không raw keyword | scaffolding: category base + modifier | [x] |
+| **TC-F38-RAW-06** | `[Positive]` | Raw VN q verbatim + `lang=vi` auto-detect | pool-level: `q="phở bò"`; client-level: URL có `lang=vi` | [x] |
+| **TC-F38-RAW-07** | `[Negative]` | Query EN / loanword é ("café latte") | URL KHÔNG có `lang` param (default en, không misroute) | [x] |
+| **TC-F38-RAW-08** | `[Positive]` | `detectQueryLang` pure function | VN chars đặc trưng (ơ/ư/ă/đ/hook-above/dot-below) → 'vi'; EN/MS/café → undefined | [x] |
+
 ## 5. Kiểm thử thủ công (staging)
 
 1. Thêm `PIXABAY_API_KEY` vào Vercel staging. Gen 1 site.

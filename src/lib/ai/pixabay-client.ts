@@ -201,6 +201,41 @@ function pickSizedUrl(hit: PixabayHit, targetWidth?: number): string {
 }
 
 /**
+ * GH-1185: detect Vietnamese queries so the search runs with `lang=vi`.
+ * Without it, Pixabay's default lang=en strips diacritics and partial-matches
+ * per word across multilingual tags — "cơm bò" ("com" + "bò") returned pug
+ * dogs (tag "myfirstpug.com") and Scottish cattle (tag "bò ghàidhealach").
+ *
+ * Only unambiguous Vietnamese characters are matched (horn letters ơ/ư, breve
+ * ă, đ, and the hook-above/tilde/dot-below vowel series). Plain à/á/é/ô etc.
+ * are excluded — they appear in French/Malay loanwords ("café") and would
+ * misroute English queries to lang=vi.
+ * Exported for testing only.
+ */
+const VIETNAMESE_CHAR_RE = /[ăâđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệịỉĩọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i
+export function detectQueryLang(query: string): 'vi' | undefined {
+    return VIETNAMESE_CHAR_RE.test(query) ? 'vi' : undefined
+}
+
+/**
+ * GH-1185: client-side relevance gate for Vietnamese queries.
+ *
+ * Even with lang=vi, Pixabay ranks by popularity and matches loosely — a
+ * query "cơm cá kho tộ" returns "cá cơm" (anchovy) photos because their tags
+ * contain the words "cá" and "cơm". This helper re-checks that EVERY word of
+ * the query appears in the photo's tags, so callers can treat weak matches
+ * as a miss and fall back to a broader query instead of filling the pool
+ * with popular-but-wrong photos.
+ */
+export function photoMatchesQuery(photoTags: string | null | undefined, query: string): boolean {
+    if (!photoTags) return false
+    const tags = photoTags.toLowerCase()
+    const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1)
+    if (words.length === 0) return true
+    return words.every((w) => tags.includes(w))
+}
+
+/**
  * Search Pixabay photos. Returns up to `count` normalized photos.
  * Empty array if no results — not thrown.
  *
@@ -232,6 +267,11 @@ export async function searchPhotos(
         safesearch: 'true',
         page: String(opts.page ?? 1),
     })
+    // GH-1185: Vietnamese query → lang=vi so Pixabay matches VN-language tags
+    // instead of diacritic-stripped partial matches. English/Malay queries
+    // keep Pixabay's default lang=en (ms is not a supported Pixabay lang).
+    const lang = detectQueryLang(query)
+    if (lang) params.set('lang', lang)
 
     const url = `${BASE}?${params.toString()}`
     const res = await fetchWithRetry(url, {

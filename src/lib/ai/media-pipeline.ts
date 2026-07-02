@@ -155,7 +155,7 @@ export async function uploadBufferToMedia(
         tenantId: string
     },
 ): Promise<number> {
-    const doc = await payload.create({
+    const createArgs = {
         collection: 'media',
         data: {
             alt: args.alt,
@@ -167,8 +167,23 @@ export async function uploadBufferToMedia(
             name: args.filename,
             size: args.buffer.length,
         },
-    })
-    return doc.id
+    }
+    try {
+        const doc = await payload.create(createArgs)
+        return doc.id
+    } catch (err) {
+        // GH-1185 follow-up: media create fails transiently under parallel
+        // batch uploads (transaction rollback / sharp race — dev log shows
+        // "Failed to persist upload data ... NotFound"). One retry after a
+        // short backoff recovers most cases; blocks otherwise lose their
+        // image ref and render the generic template fallback.
+        console.warn(
+            `[Media Pipeline] media create failed for ${args.filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
+        )
+        await new Promise((r) => setTimeout(r, 300))
+        const doc = await payload.create(createArgs)
+        return doc.id
+    }
 }
 
 /** Download + upload a single Pixabay photo; returns Media ID. */
@@ -363,8 +378,10 @@ export async function getMediaForBlock(
             width: targetWidth,
         })
         if (photos.length === 0) {
-            // Broaden: try first keyword only
-            if (keywords[0]) {
+            // Broaden: try first keyword only. Skip when the query was already
+            // a single term — the retry would re-issue the identical Pixabay
+            // call (raw 1-term keywords are common after GH-1185).
+            if (keywords[0] && keywords[0].trim() !== query) {
                 const broader = await searchPhotos(keywords[0], Math.max(count * 2, 10), {
                     orientation,
                     width: targetWidth,
