@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- saved from url=(0097)file:///Users/tranthibichdung/Desktop/ech-prime-web-v2/docs/design/F05-mobile-editor-ui-demo.html -->
-<html lang="en" data-theme="dark"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html lang="vi" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>F05 Mobile AI Editor — Full Flow Interactive Demo (v2)</title>
@@ -12,7 +12,7 @@
     :root {
       --bg: #0B1120;
       --surface: #161E2E;
-      --primary-blue: #2DD4BF;
+      --primary-blue: #3B82F6;
       --primary-teal: #2DD4BF;
       --fg: #FFFFFF;
       --muted: #9CA3AF;
@@ -29,8 +29,8 @@
       --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.5);
       --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.6);
       --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.8);
-      --gradient-primary: linear-gradient(135deg, var(--info) 0%, var(--primary-teal) 100%);
-      --active-bg: rgba(45, 212, 191, .12);
+      --gradient-primary: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-teal) 100%);
+      --active-bg: rgba(59, 130, 246, .12);
       --hover-bg: rgba(255, 255, 255, .05);
       --header-h: 48px;
       --bottom-bar-h: 56px;
@@ -39,7 +39,7 @@
     [data-theme="light"] {
       --bg: #F8FAFC;
       --surface: #FFFFFF;
-      --primary-blue: #0D9488;
+      --primary-blue: #2563EB;
       --primary-teal: #0D9488;
       --fg: #0F172A;
       --muted: #64748B;
@@ -52,7 +52,7 @@
       --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1);
       --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.1), 0 2px 4px -2px rgb(0 0 0/0.1);
       --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.1), 0 8px 10px -6px rgb(0 0 0/0.1);
-      --active-bg: rgba(13, 148, 136, .1);
+      --active-bg: rgba(37, 99, 235, .08);
       --hover-bg: rgba(0, 0, 0, .04);
     }
 
@@ -193,6 +193,32 @@
       background: var(--hover-bg);
     }
 
+    .page-sel {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: var(--radius-md);
+      background: var(--secondary-bg);
+      font-size: 12px;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .page-sel span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .page-sel .chevron {
+      font-size: 8px;
+      opacity: .5;
+      flex-shrink: 0;
+      margin-left: 2px;
+    }
+
     .h-actions {
       display: flex;
       gap: 4px;
@@ -230,7 +256,7 @@
       flex: 1;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      background: #0B1120;
+      background: #f8fafc;
       position: relative;
     }
 
@@ -241,49 +267,26 @@
     .m-nav {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       padding: 10px 16px;
-      background: #161E2E;
-      border-bottom: 1px solid #1F2937;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
     }
 
     .m-logo {
       font-weight: 700;
       font-size: 14px;
-      color: #F1F5F9;
-    }
-
-    .m-menu-btn {
-      width: 36px;
-      height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 12px;
-      background: #1F2937;
-      color: #E5E7EB;
-      border: 1px solid #1F2937;
-      flex-shrink: 0;
-    }
-
-    .m-menu-btn svg {
-      width: 18px;
-      height: 18px;
+      color: #1f2937;
     }
 
     .m-links {
-      display: none;
-    }
-
-    .m-right {
+      margin-left: auto;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      gap: 12px;
     }
 
     .m-links span {
       font-size: 11px;
-      color: #9CA3AF;
+      color: #6b7280;
     }
 
     .m-hero {
@@ -319,13 +322,13 @@
 
     .m-products {
       padding: 16px;
-      background: #161E2E;
+      background: #fff;
     }
 
     .m-products h2 {
       font-size: 15px;
       font-weight: 700;
-      color: #F1F5F9;
+      color: #1f2937;
       margin-bottom: 10px;
     }
 
@@ -338,13 +341,12 @@
     .p-card {
       border-radius: 10px;
       overflow: hidden;
-      border: 1px solid #1F2937;
-      background: #0F172A;
+      border: 1px solid #e5e7eb;
     }
 
     .p-card .p-img {
       height: 80px;
-      background: #0F172A;
+      background: #f3f4f6;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -357,13 +359,13 @@
 
     .p-card .p-info h3 {
       font-size: 12px;
-      color: #E5E7EB;
+      color: #1f2937;
       font-weight: 600;
     }
 
     .p-card .p-info .price {
       font-size: 11px;
-      color: #2DD4BF;
+      color: #7c3aed;
       font-weight: 700;
       margin-top: 2px;
     }
@@ -391,7 +393,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: rgba(45, 212, 191,.06);
+      background: rgba(59, 130, 246, .06);
       pointer-events: none;
     }
 
@@ -408,7 +410,7 @@
       display: flex;
       align-items: center;
       gap: 3px;
-      box-shadow: 0 4px 12px rgba(45, 212, 191,.4);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, .4);
       opacity: 0;
       pointer-events: none;
       transition: opacity .2s;
@@ -453,7 +455,7 @@
 
     .il-toolbar button.on {
       color: var(--primary-blue);
-      background: rgba(45, 212, 191,.15);
+      background: rgba(59, 130, 246, .15);
     }
 
     .il-toolbar .sep {
@@ -512,7 +514,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 8px 24px rgba(45, 212, 191,.4);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, .4);
       z-index: 55;
       font-size: 20px;
       color: #fff;
@@ -552,12 +554,6 @@
       box-shadow: var(--shadow-card);
       transition: all .15s;
       position: relative;
-    }
-
-    .ur-float button svg {
-      width: 18px;
-      height: 18px;
-      stroke: currentColor;
     }
 
     .ur-float button:active {
@@ -750,7 +746,7 @@
       border-radius: 6px;
       font-size: 10px;
       font-weight: 600;
-      background: rgba(45, 212, 191,.15);
+      background: rgba(59, 130, 246, .15);
       color: var(--primary-blue);
     }
 
@@ -838,13 +834,6 @@
       color: #fff;
       font-size: 14px;
       flex-shrink: 0;
-    }
-
-    .chat-send svg {
-      width: 17px;
-      height: 17px;
-      stroke: currentColor;
-      transform: translateX(-1px);
     }
 
     .chat-send:active {
@@ -1046,624 +1035,6 @@
     }
 
     /* ═══════════════════════════════════════════
-   SETTINGS TAB (Global / Menu / SEO sub-tabs)
-   ═══════════════════════════════════════════ */
-    .stg-subtabs {
-      display: flex;
-      gap: 4px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .stg-subtab {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      height: 32px;
-      border-radius: var(--radius-md);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      background: transparent;
-      border: none;
-      transition: all .15s;
-    }
-
-    .stg-subtab svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    .stg-subtab.on {
-      background: rgba(45, 212, 191, .12);
-      color: var(--primary-teal);
-    }
-
-    .stg-subpanel {
-      display: none;
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-    }
-
-    .stg-subpanel.on {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .stg-upload {
-      font-size: 11px;
-      color: var(--primary-blue);
-      font-weight: 600;
-    }
-
-    /* Segmented toggle (Dark/Light, On/Off) */
-    .seg-toggle {
-      display: inline-flex;
-      gap: 3px;
-      padding: 2px;
-      background: var(--secondary-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-    }
-
-    .seg-toggle button {
-      padding: 4px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      background: transparent;
-      border: none;
-    }
-
-    .seg-toggle button.on {
-      background: var(--primary-teal);
-      color: #0B1120;
-    }
-
-    /* Navigation style variant grid */
-    .nav-variants {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-
-    .nv-variant {
-      padding: 9px;
-      border-radius: var(--radius-md);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      background: var(--secondary-bg);
-      border: 1px solid var(--border);
-      transition: all .15s;
-    }
-
-    .nv-variant.on {
-      background: rgba(45, 212, 191, .12);
-      color: var(--primary-teal);
-      border-color: rgba(45, 212, 191, .3);
-    }
-
-    /* Add link/menu button */
-    .nav-add {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      margin-top: 8px;
-      padding: 9px;
-      border-radius: var(--radius-md);
-      border: 1px dashed var(--border);
-      background: transparent;
-      color: var(--primary-blue);
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    /* SEO Google preview box */
-    .seo-preview {
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      background: var(--secondary-bg);
-    }
-
-    .seo-preview .seo-url {
-      font-size: 11px;
-      color: var(--success);
-      margin-bottom: 2px;
-    }
-
-    .seo-preview .seo-title {
-      font-size: 13px;
-      color: #60A5FA;
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-
-    .seo-preview .seo-desc {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    /* SEO AI optimize button */
-    .seo-ai-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: 100%;
-      margin-top: 4px;
-      padding: 10px;
-      border-radius: var(--radius-md);
-      border: none;
-      background: var(--gradient-primary);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    /* ═══════════════════════════════════════════
-   TEMPLATE PICKER MODAL
-   ═══════════════════════════════════════════ */
-    .tmpl-modal {
-      position: absolute;
-      inset: 0;
-      z-index: 130;
-      display: none;
-    }
-
-    .tmpl-modal.on {
-      display: block;
-    }
-
-    .tmpl-backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, .7);
-      backdrop-filter: blur(2px);
-    }
-
-    .tmpl-dialog {
-      position: absolute;
-      inset: 10px;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-    }
-
-    .tmpl-hd {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .tmpl-hd h2 {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--fg);
-    }
-
-    .tmpl-close {
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-md);
-      color: var(--muted);
-    }
-
-    .tmpl-close svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .tmpl-close:active {
-      background: var(--hover-bg);
-    }
-
-    .tmpl-filters {
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .tmpl-search {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      height: 36px;
-      padding: 0 12px;
-      background: var(--secondary-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      margin-bottom: 10px;
-    }
-
-    .tmpl-search svg {
-      width: 15px;
-      height: 15px;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
-
-    .tmpl-search input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--fg);
-      font-size: 12px;
-    }
-
-    .tmpl-cats {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 2px;
-      scrollbar-width: none;
-    }
-
-    .tmpl-cats::-webkit-scrollbar {
-      display: none;
-    }
-
-    .tmpl-cat {
-      flex-shrink: 0;
-      padding: 5px 12px;
-      border-radius: var(--radius-md);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      background: var(--secondary-bg);
-      border: 1px solid var(--border);
-    }
-
-    .tmpl-cat.on {
-      background: var(--primary-teal);
-      color: #0B1120;
-      border-color: var(--primary-teal);
-    }
-
-    .tmpl-count {
-      padding: 8px 16px 0;
-      font-size: 11px;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
-
-    .tmpl-grid {
-      flex: 1;
-      overflow-y: auto;
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      padding: 12px 16px 16px;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(30, 41, 59, .9) transparent;
-    }
-
-    .tmpl-grid::-webkit-scrollbar {
-      width: 4px;
-      background: transparent;
-    }
-
-    .tmpl-grid::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .tmpl-grid::-webkit-scrollbar-thumb {
-      background: rgba(30, 41, 59, .9);
-      border-radius: 999px;
-    }
-
-    .tmpl-grid::-webkit-scrollbar-thumb:hover {
-      background: rgba(51, 65, 85, .95);
-    }
-
-    [data-theme="light"] .tmpl-grid {
-      scrollbar-color: rgba(15, 23, 42, .18) transparent;
-    }
-
-    [data-theme="light"] .tmpl-grid::-webkit-scrollbar-thumb {
-      background: rgba(15, 23, 42, .18);
-    }
-
-    [data-theme="light"] .tmpl-grid::-webkit-scrollbar-thumb:hover {
-      background: rgba(15, 23, 42, .3);
-    }
-
-    /* Template card */
-    .tc {
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-      background: var(--surface);
-      transition: border-color .2s, transform .2s;
-    }
-
-    .tc.current {
-      border-color: var(--primary-teal);
-      box-shadow: 0 0 16px rgba(45, 212, 191, .2);
-    }
-
-    .tc-thumb {
-      position: relative;
-      height: 140px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .tc-emoji {
-      font-size: 44px;
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, .3));
-    }
-
-    .tc-badges {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      display: flex;
-      gap: 4px;
-    }
-
-    .tc-badge {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: var(--radius-md);
-      backdrop-filter: blur(6px);
-    }
-
-    .tc-badge svg {
-      width: 11px;
-      height: 11px;
-    }
-
-    .tc-badge.feat {
-      background: rgba(245, 158, 11, .18);
-      color: #FBBF24;
-      border: 1px solid rgba(245, 158, 11, .3);
-    }
-
-    .tc-badge.pro {
-      background: rgba(139, 92, 246, .18);
-      color: #A78BFA;
-      border: 1px solid rgba(139, 92, 246, .3);
-    }
-
-    .tc-cur-badge {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: var(--radius-md);
-      background: var(--primary-teal);
-      color: #0B1120;
-    }
-
-    .tc-hover {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: rgba(0, 0, 0, .5);
-      backdrop-filter: blur(2px);
-      opacity: 0;
-      transition: opacity .25s;
-    }
-
-    .tc-thumb:hover .tc-hover,
-    .tc-thumb:active .tc-hover {
-      opacity: 1;
-    }
-
-    .tc-hover button {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 8px 12px;
-      border-radius: var(--radius-lg);
-      font-size: 11px;
-      font-weight: 600;
-      color: #fff;
-    }
-
-    .tc-hover button svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    .tc-prev {
-      background: rgba(255, 255, 255, .15);
-      border: 1px solid rgba(255, 255, 255, .2);
-    }
-
-    .tc-use {
-      background: linear-gradient(90deg, #2563EB 0%, #7C3AED 100%);
-      box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
-    }
-
-    .tc-info {
-      padding: 12px 14px;
-    }
-
-    .tc-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .tc-txt h3 {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--fg);
-      transition: color .3s;
-    }
-
-    .tc:hover .tc-txt h3 {
-      color: #93C5FD;
-    }
-
-    .tc-thumb::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 40px;
-      background: linear-gradient(to top, rgba(10, 10, 18, .85), transparent);
-      pointer-events: none;
-    }
-
-    .tc-txt p {
-      margin-top: 3px;
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    .tc-swatches {
-      display: flex;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
-    .tc-swatches i {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, .1);
-    }
-
-    .tc-tags {
-      margin-top: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-
-    .tc-tags span {
-      font-size: 10px;
-      font-weight: 500;
-      color: var(--muted);
-      background: var(--secondary-bg);
-      padding: 2px 8px;
-      border-radius: var(--radius-sm);
-    }
-
-    /* Apply confirmation dialog */
-    .tmpl-confirm {
-      position: absolute;
-      inset: 0;
-      z-index: 140;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .tmpl-confirm.on {
-      display: flex;
-    }
-
-    .tmpl-confirm::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, .6);
-      backdrop-filter: blur(2px);
-    }
-
-    .tmpl-confirm-box {
-      position: relative;
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      padding: 18px;
-    }
-
-    .tcf-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .tcf-ico {
-      width: 38px;
-      height: 38px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: rgba(245, 158, 11, .12);
-      font-size: 18px;
-    }
-
-    .tcf-row h3 {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--fg);
-    }
-
-    .tcf-row p {
-      margin-top: 4px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
-    .tcf-acts {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-
-    .tcf-cancel {
-      padding: 8px 16px;
-      border-radius: var(--radius-md);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      background: var(--secondary-bg);
-    }
-
-    .tcf-apply {
-      padding: 8px 16px;
-      border-radius: var(--radius-md);
-      font-size: 12px;
-      font-weight: 700;
-      color: #0B1120;
-      background: var(--primary-teal);
-    }
-
-    /* ═══════════════════════════════════════════
    CMS MENU DRAWER
    ═══════════════════════════════════════════ */
     .drawer-overlay {
@@ -1710,151 +1081,67 @@
     }
 
     .drawer-logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex: 1;
-      text-decoration: none;
-    }
-
-    .drawer-logo-img {
-      width: 28px;
-      height: 28px;
-      object-fit: contain;
-      filter: drop-shadow(0 0 12px rgba(6, 182, 212, .6));
-    }
-
-    .drawer-logo-text {
       font-size: 16px;
-      font-weight: 700;
-      letter-spacing: -.3px;
-      line-height: 1;
-    }
-
-    .drawer-logo-text .lg-prime {
-      color: var(--fg);
-    }
-
-    .drawer-logo-text .lg-web {
-      color: #06B6D4;
+      font-weight: 800;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      flex: 1;
     }
 
     .drawer-close {
       width: 32px;
       height: 32px;
-      border-radius: var(--radius-lg);
-      background: transparent;
-      color: var(--muted);
+      border-radius: 50%;
+      background: var(--secondary-bg);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background .12s, color .12s;
+      font-size: 14px;
     }
 
-    .drawer-close svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    .drawer-close:hover {
-      background: rgba(255, 255, 255, .06);
-      color: var(--fg);
-    }
-
-    /* Nav: grouped sections, no separators (matches real Sidebar) */
     .drawer-nav {
       flex: 1;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 24px 12px 8px;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(15, 23, 42, .16) rgba(255, 255, 255, .04);
-    }
-
-    .drawer-nav::-webkit-scrollbar {
-      width: 6px;
-      background: transparent;
-    }
-
-    .drawer-nav::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, .04);
-      border-radius: 999px;
-    }
-
-    .drawer-nav::-webkit-scrollbar-thumb {
-      background: rgba(15, 23, 42, .16);
-      border-radius: 999px;
-    }
-
-    [data-theme="light"] .drawer-nav {
-      scrollbar-color: rgba(15, 23, 42, .12) rgba(15, 23, 42, .04);
-    }
-
-    [data-theme="light"] .drawer-nav::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, .04);
-    }
-
-    [data-theme="light"] .drawer-nav::-webkit-scrollbar-thumb {
-      background: rgba(15, 23, 42, .12);
-    }
-
-    .drawer-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .drawer-section {
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--muted);
-      opacity: .5;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      padding: 6px 16px;
-      user-select: none;
+      padding: 8px 0;
     }
 
     .drawer-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 0 16px;
-      height: 34px;
-      border-radius: var(--radius-lg);
+      gap: 10px;
+      padding: 11px 16px;
       font-size: 13px;
       font-weight: 500;
-      color: var(--muted);
-      text-decoration: none;
-      transition: background .12s, color .12s;
+      transition: background .12s;
+      min-height: 44px;
+      position: relative;
     }
 
-    .drawer-item:hover {
-      background: rgba(255, 255, 255, .06);
-      color: var(--fg);
+    .drawer-item:active {
+      background: var(--hover-bg);
     }
 
     .drawer-item.current {
-      background: rgba(45, 212, 191, .12);
-      color: var(--primary-teal);
-      box-shadow: 0 0 16px rgba(45, 212, 191, .25);
+      color: var(--primary-blue);
+      background: var(--active-bg);
+    }
+
+    .drawer-item.current::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      background: var(--primary-blue);
+      border-radius: 0 2px 2px 0;
     }
 
     .drawer-item .di-icon {
-      width: 18px;
-      height: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .drawer-item .di-icon svg {
-      width: 18px;
-      height: 18px;
-      stroke: currentColor;
+      width: 20px;
+      text-align: center;
+      font-size: 15px;
     }
 
     .drawer-item .di-label {
@@ -1862,198 +1149,64 @@
     }
 
     .drawer-item .di-badge {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 20px;
-      min-width: 20px;
-      padding: 0 6px;
-      border-radius: 999px;
-      font-size: 11px;
+      background: var(--error);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
+    .drawer-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 6px 16px;
+    }
+
+    .drawer-section {
+      font-size: 10px;
       font-weight: 600;
-      line-height: 1;
-      background: rgba(255, 255, 255, .06);
       color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding: 12px 16px 4px;
     }
 
     .drawer-footer {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 17px 12px 14px;
+      padding: 12px 16px;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
 
-    /* Footer row 1: profile + theme + bell */
-    .drawer-userrow {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .drawer-profile {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex: 1;
-      min-width: 0;
-      height: 42px;
-      padding-left: 16px;
-      padding-right: 1px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      text-decoration: none;
-      transition: background .12s;
-    }
-
-    .drawer-profile:hover {
-      background: rgba(255, 255, 255, .06);
-    }
-
-    .drawer-profile .dp-avatar {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      flex-shrink: 0;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, .06);
-      box-shadow: 0 0 0 2px rgba(45, 212, 191, .3);
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--fg);
-    }
-
-    .drawer-profile .dp-name {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--fg);
-    }
-
-    .drawer-icobtn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 42px;
-      height: 42px;
-      flex-shrink: 0;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      background: transparent;
-      color: var(--muted);
-      transition: background .12s, color .12s;
-    }
-
-    .drawer-icobtn:hover {
-      background: rgba(255, 255, 255, .06);
-      color: var(--fg);
-    }
-
-    .drawer-icobtn svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    .drawer-icobtn .ic-sun {
-      color: var(--warning);
-    }
-
-    .drawer-bell {
-      position: relative;
-    }
-
-    .drawer-bell .bell-badge {
-      position: absolute;
-      top: -2px;
-      right: -2px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 20px;
-      height: 18px;
-      padding: 0 4px;
-      border-radius: 999px;
-      background: var(--error);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    /* Footer row 2: language toggle */
     .drawer-lang {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      height: 42px;
-      padding: 0 4px 0 16px;
-      border: 1px solid var(--border);
-      background: var(--secondary-bg);
-      border-radius: var(--radius-xl);
-    }
-
-    .drawer-lang .lang-globe {
-      width: 16px;
-      height: 16px;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
-
-    .drawer-lang .lang-seg {
-      display: flex;
-      flex: 1;
-      gap: 4px;
+      gap: 6px;
+      margin-bottom: 10px;
     }
 
     .drawer-lang button {
-      flex: 1;
-      height: 30px;
-      border-radius: var(--radius-lg);
-      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
       font-weight: 600;
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      transition: all .15s;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
     }
 
     .drawer-lang button.on {
-      background: var(--primary-teal);
-      color: #0B1120;
-      box-shadow: 0 0 12px rgba(45, 212, 191, .4);
+      background: rgba(45, 212, 191, .15);
+      color: var(--primary-teal);
+      border-color: rgba(45, 212, 191, .3);
     }
 
-    /* Footer row 3: logout (bordered pill, matches real) */
     .drawer-logout {
       display: flex;
       align-items: center;
-      gap: 12px;
-      height: 42px;
-      padding-left: 16px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      background: transparent;
-      font-size: 14px;
-      color: var(--fg);
-      font-weight: 500;
-      transition: background .12s;
-    }
-
-    .drawer-logout:hover {
-      background: rgba(255, 255, 255, .06);
-    }
-
-    .drawer-logout svg {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--error);
+      font-weight: 600;
+      padding: 8px 0;
     }
 
     /* ═══════════════════════════════════════════
@@ -2219,7 +1372,7 @@
       border: 1px solid var(--primary-blue);
       border-radius: var(--radius-md);
       margin: 4px 6px;
-      background: rgba(45, 212, 191,.05);
+      background: rgba(59, 130, 246, .05);
       display: none;
     }
 
@@ -2357,7 +1510,7 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      border: 3px solid rgba(45, 212, 191,.2);
+      border: 3px solid rgba(59, 130, 246, .2);
       border-top-color: var(--primary-blue);
       animation: spin .8s linear infinite;
       margin-bottom: 10px;
@@ -2604,7 +1757,7 @@
       font-weight: 600;
       padding: 2px 7px;
       border-radius: var(--radius-sm);
-      background: rgba(45, 212, 191,.1);
+      background: rgba(59, 130, 246, .1);
       color: var(--primary-blue);
     }
 
@@ -2695,26 +1848,14 @@
     }
 
     .nv-acts button {
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 12px;
       color: var(--muted);
-      flex-shrink: 0;
-    }
-
-    .nv-acts button svg {
-      width: 15px;
-      height: 15px;
-      stroke: currentColor;
-    }
-
-    .nv-acts button:hover {
-      background: var(--hover-bg);
-      color: var(--fg);
     }
 
     .nv-acts button:active {
@@ -2773,7 +1914,7 @@
     }
 
     .img-toolbar .btn-aig {
-      background: rgba(45, 212, 191,.2);
+      background: rgba(59, 130, 246, .2);
       color: rgba(255, 255, 255, .35);
       pointer-events: none;
     }
@@ -2839,6 +1980,22 @@
       to {
         transform: translateY(0)
       }
+    }
+
+    .theme-btn {
+      position: absolute;
+      top: 56px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 95;
+      font-size: 12px;
     }
 
     /* Undo toast (with action) */
@@ -2918,222 +2075,159 @@
       font-weight: 600;
       min-height: 32px;
     }
-
-    /* ═══════════════════════════════════════════
-   TOOLBAR ADDITIONS (Task B)
-   ═══════════════════════════════════════════ */
-    .hbtn svg { width: 18px; height: 18px; }
-    .hbtn-tmpl {
-      color: var(--warning);
-      width: auto !important;
-      padding: 0 12px !important;
-      gap: 6px;
-      font-size: 12px !important;
-    }
-    .h-saved {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      color: var(--success);
-      font-weight: 600;
-      flex-shrink: 0;
-      padding: 0 4px;
-    }
-    .saved-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--success);
-      flex-shrink: 0;
-    }
-
-    /* FAB with icon */
-    .fab { width: 56px; height: 56px; }
-    .fab svg { width: 22px; height: 22px; }
-
-    /* Bottom sheet header (block/site settings) */
-    .bs-sheet-hdr {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      min-height: 44px;
-    }
-    .bs-sheet-hdr .btype {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: var(--radius-sm);
-      background: rgba(45, 212, 191,.1);
-      color: var(--primary-blue);
-    }
-    .bs-sheet-hdr .bname {
-      font-size: 13px;
-      font-weight: 600;
-      flex: 1;
-    }
-    .bs-sheet-close {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: var(--secondary-bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      color: var(--fg);
-    }
-    .bs-sheet-close svg { width: 14px; height: 14px; }
-
-    /* Chat helper row */
-    .chat-helper {
-      padding: 3px 14px 8px;
-      font-size: 10px;
-      color: var(--muted);
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    /* Pages panel */
-    .pg-panel { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-
-    /* Tab icons */
-    .bs-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
-    .bs-tab { gap: 4px; padding-left: 4px; padding-right: 4px; }
-
-    /* Page action SVG icons */
-    .pg-item .pg-acts button svg { width: 13px; height: 13px; }
-
-    /* Block settings delete bar */
-    .bs-del-bar {
-      padding: 10px 14px;
-      border-top: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .btn-del-blk {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      width: 100%;
-      padding: 9px;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--error);
-      color: var(--error);
-      font-size: 12px;
-      font-weight: 600;
-      min-height: 40px;
-    }
-    .btn-del-blk svg { width: 14px; height: 14px; }
   </style>
 </head>
 
 <body>
 
   <div class="phone-frame" id="phone">
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+
     <!-- ══════════════════════════════════════════════════════════════
      SCREEN 1: DEFAULT PREVIEW — Main editor screen
-     Features: Preview, FAB, Undo/Redo, Bottom Sheet (AI Chat / Components / Pages),
-               Block Settings bottom sheet, Site Settings bottom sheet, CMS Menu Drawer
+     Features: Preview, FAB, Undo/Redo, Bottom Sheet (Chat/Blocks/Settings),
+               CMS Menu Drawer, Page Manager Dropdown (reorder, add, delete, visibility)
      ══════════════════════════════════════════════════════════════ -->
     <div class="screen active" id="s1">
-      <!-- TOP TOOLBAR (matches real EditorToolbar compact mobile) -->
+      <!-- Header -->
       <div class="ed-header">
-        <!-- LEFT: Menu + Templates -->
-        <button class="hbtn" onclick="openDrawer()" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
-        <button class="hbtn hbtn-tmpl" onclick="openTemplates()" title="Templates"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></svg>Templates</button>
-        <!-- STATUS -->
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <!-- RIGHT: Preview + Publish -->
+        <button class="hbtn" onclick="openDrawer()">☰</button>
+        <button class="page-sel" onclick="togglePages()">
+          <span id="currentPageName">🏠 Trang chủ</span>
+          <span class="chevron">▼</span>
+        </button>
         <div class="h-actions">
-          <button class="hbtn hbtn-preview" onclick="showToast('Preview mode','')" title="Preview"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/><path d="m21 3-9 9"/><path d="M15 3h6v6"/></svg></button>
-          <button class="btn-pub" onclick="showS(7)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button>
+          <span class="h-status">Đã lưu ✓</span>
+          <button class="btn-pub" onclick="showS(7)">🚀</button>
         </div>
       </div>
 
-      <!-- CMS MENU DRAWER (mirrors real dashboard Sidebar 1:1) -->
+      <!-- CMS MENU DRAWER -->
       <div class="drawer-overlay" id="drawerOv" onclick="closeDrawer()"></div>
       <div class="drawer" id="drawer">
-        <!-- Header: logo + close (X) -->
         <div class="drawer-header">
-          <a class="drawer-logo" href="#" onclick="return false">
-            <img class="drawer-logo-img" src="../../public/images/logo-icon-3c4d76.png" alt="WebStore Logo">
-            <span class="drawer-logo-text"><span class="lg-prime">Web</span><span class="lg-web">Store</span></span>
-          </a>
-          <button class="drawer-close" onclick="closeDrawer()" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+          <span class="drawer-logo">⚡ Prime AI</span>
+          <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-nav">
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">📊</span><span class="di-label">Dashboard</span></div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-section">Cửa hàng của tôi</div>
+          <div class="drawer-item current"><span class="di-icon">🎨</span><span class="di-label">Editor</span></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">📝</span><span class="di-label">Blog</span></div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">🛍️</span><span class="di-label">Sản
+              phẩm</span></div>
+          <div class="drawer-item" onclick="closeDrawer()">
+            <span class="di-icon">📦</span><span class="di-label">Đơn hàng</span>
+            <span class="di-badge">5</span>
+          </div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">⚙️</span><span class="di-label">Cấu
+              hình Store</span></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">❓</span><span class="di-label">Trung
+              tâm hỗ trợ</span></div>
+        </div>
+        <div class="drawer-footer">
+          <div class="drawer-lang">
+            <button class="on">VN</button>
+            <button>EN</button>
+          </div>
+          <button class="drawer-logout">🚪 Đăng xuất</button>
+        </div>
+      </div>
+
+      <!-- PAGE MANAGER DROPDOWN -->
+      <div class="pg-drop" id="pgDrop">
+        <div class="pg-drop-header">
+          <span>📄 Quản lý trang</span>
+          <button onclick="togglePages()">Đóng</button>
         </div>
 
-        <nav class="drawer-nav" aria-label="Editor menu">
-          <!-- Dashboard (standalone) -->
-          <div class="drawer-group">
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span><span class="di-label">Dashboard</span></a>
-          </div>
-
-          <!-- Online Store -->
-          <div class="drawer-group">
-            <div class="drawer-section">Online Store</div>
-            <a class="drawer-item current" href="#" aria-current="page" onclick="return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/></svg></span><span class="di-label">Editor</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg></span><span class="di-label">Blog</span></a>
-          </div>
-
-          <!-- Core Operations -->
-          <div class="drawer-group">
-            <div class="drawer-section">Core Operations</div>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></span><span class="di-label">Orders</span><span class="di-badge">6</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg></span><span class="di-label">Products</span><span class="di-badge">6</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span><span class="di-label">Discounts</span><span class="di-badge">9</span></a>
-          </div>
-
-          <!-- CRM -->
-          <div class="drawer-group">
-            <div class="drawer-section">CRM</div>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="di-label">All Customers</span><span class="di-badge">13</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span><span class="di-label">Contact Leads</span><span class="di-badge">7</span></a>
-          </div>
-
-          <!-- Settings -->
-          <div class="drawer-group">
-            <div class="drawer-section">Settings</div>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg></span><span class="di-label">Payments</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></span><span class="di-label">Shipping</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span><span class="di-label">Domains</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span><span class="di-label">Email Templates</span></a>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg></span><span class="di-label">Team &amp; Account</span></a>
-          </div>
-
-          <!-- Support -->
-          <div class="drawer-group">
-            <div class="drawer-section">Support</div>
-            <a class="drawer-item" href="#" onclick="closeDrawer();return false"><span class="di-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg></span><span class="di-label">Help Center</span></a>
-          </div>
-        </nav>
-
-        <div class="drawer-footer">
-          <!-- Row 1: profile + theme toggle + notifications -->
-          <div class="drawer-userrow">
-            <a class="drawer-profile" href="#" onclick="return false">
-              <span class="dp-avatar">J</span>
-              <span class="dp-name">Jun</span>
-            </a>
-            <button class="drawer-icobtn" onclick="toggleTheme()" aria-label="Switch theme"><svg class="ic-sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
-            <button class="drawer-icobtn drawer-bell" aria-label="15 unread notifications"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bell-badge">15</span></button>
-          </div>
-
-          <!-- Row 2: language toggle (Globe + MY/EN) -->
-          <div class="drawer-lang">
-            <svg class="lang-globe" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-            <div class="lang-seg">
-              <button>MY</button>
-              <button class="on">EN</button>
+        <!-- Page list -->
+        <div id="pageList">
+          <div class="pg-item cur" data-page="home">
+            <span class="pg-ico">🏠</span>
+            <span class="pg-name">Trang chủ</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button class="disabled" title="Không thể ẩn trang chủ">👁️</button>
+              <button onclick="pageAction(&#39;home&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button class="disabled" title="Không thể ẩn trang chủ">↑</button>
+              <button onclick="pageAction(&#39;home&#39;,&#39;down&#39;)" title="Di chuyển xuống">↓</button>
             </div>
           </div>
+          <div class="pg-item" data-page="products">
+            <span class="pg-ico">🛍️</span>
+            <span class="pg-name">Sản phẩm</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;products&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div>
+          
+          <div class="pg-item" data-page="about">
+            <span class="pg-ico">📄</span>
+            <span class="pg-name">Giới thiệu</span>
+            <span class="pg-tag draft">Draft</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;about&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div><div class="pg-item" data-page="contact">
+            <span class="pg-ico">📞</span>
+            <span class="pg-name">Liên hệ</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;contact&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div>
+        </div>
 
-          <!-- Row 3: logout -->
-          <button class="drawer-logout"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg><span>Logout</span></button>
+        <!-- Delete confirmation (hidden by default) -->
+        <div class="pg-confirm" id="pgConfirm">
+          <p>⚠️ Bạn chắc chắn muốn xoá trang "<span id="pgConfirmName">Liên hệ</span>"? Dữ liệu sẽ được giữ lại 5 giây
+            để hoàn tác.</p>
+          <div class="pg-confirm-acts">
+            <button class="btn-cancel" onclick="hidePgConfirm()">Huỷ</button>
+            <button class="btn-danger" onclick="confirmDeletePage()">Xoá</button>
+          </div>
+        </div>
+
+        <div class="pg-div"></div>
+
+        <!-- 404 system page -->
+        <div class="pg-item" data-page="404">
+          <span class="pg-ico">🚫</span>
+          <span class="pg-name">Trang 404</span>
+          <span class="pg-tag" style="background:rgba(156,163,175,.1);color:var(--muted);font-size:9px">System</span>
+          <div class="pg-acts">
+            <button onclick="pageAction(&#39;404&#39;,&#39;edit&#39;)" title="Chỉnh sửa nội dung 404">✏️</button>
+          </div>
+        </div>
+
+        <div class="pg-div"></div>
+
+        <!-- Add new page -->
+        <button class="pg-add" id="pgAddBtn" onclick="showAddPageForm()" style="">➕ Thêm trang mới</button>
+
+        <!-- Add page form (hidden by default) -->
+        <div class="pg-form" id="pgForm">
+          <label>Tên trang</label>
+          <input id="pgNameIn" placeholder="VD: Khuyến mãi" oninput="updateSlugPreview()">
+          <div class="slug-preview">Slug: <span id="slugPreview">/cs</span></div>
+          <div class="pg-form-actions">
+            <button class="btn-cancel" onclick="hideAddPageForm()">Huỷ</button>
+            <button class="btn-create" onclick="createNewPage()">Tạo trang</button>
+          </div>
         </div>
       </div>
 
@@ -3141,38 +2235,40 @@
       <div class="preview" id="prevArea">
         <div class="preview-inner">
           <div class="m-nav blk" data-b="header" onclick="selBlock(this,&#39;header&#39;)">
-            <button type="button" class="m-menu-btn" onclick="event.stopPropagation(); showToast('Menu','')" aria-label="Open menu"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
             <span class="m-logo">🌸 FloraShop</span>
-            <div class="m-right"><div class="ai-badge">✨ AI</div></div>
+            <div class="m-links"><span>Home</span><span>SP</span><span>Liên hệ</span></div>
+            <div class="ai-badge">✨ AI</div>
           </div>
           <div class="m-hero blk" data-b="hero" onclick="selBlock(this,&#39;hero&#39;)">
-            <h1>Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours — Fresh from garden to your door</p>
-            <span class="m-hero-btn">Shop Now →</span>
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ — Tươi từ vườn đến tay bạn</p>
+            <span class="m-hero-btn">Mua ngay →</span>
             <div class="ai-badge">✨ AI</div>
           </div>
 
           <!-- RICH TEXT BLOCK -->
-          <div class="blk" onclick="selBlock(this,&#39;text&#39;)" style="padding:30px 20px; text-align:center; background:#161E2E; border-bottom:1px solid #1F2937">
-            <h2 style="color:#F1F5F9; margin-bottom:10px; font-size:18px">Our Story</h2>
-            <p style="color:#9CA3AF; font-size:13px; line-height:1.5">We believe AI can help turn every idea into reality quickly and effectively.</p>
+          <div class="blk" onclick="selBlock(this, &#39;text&#39;)" style="padding:30px 20px; text-align:center; background:#fff; border-bottom:1px solid #eee">
+            <div class="blk-overlay"></div>
+            <h2 style="color:#1f2937; margin-bottom:10px; font-size:18px">Câu chuyện của chúng tôi</h2>
+            <p style="color:#4b5563; font-size:13px; line-height:1.5">Chúng tôi tin rằng AI có thể giúp biến mọi ý tưởng
+              thành hiện thực một cách nhanh chóng và hiệu quả nhất.</p>
             <div class="ai-badge">✨ AI</div>
           </div>
 
           <div class="m-products blk" data-b="products" onclick="selBlock(this,&#39;products&#39;)">
-            <h2>Featured Products</h2>
+            <h2>Sản phẩm nổi bật</h2>
             <div class="p-grid">
               <div class="p-card">
                 <div class="p-img">🌹</div>
                 <div class="p-info">
-                  <h3>Red Roses</h3>
+                  <h3>Hoa Hồng Đỏ</h3>
                   <div class="price">299.000₫</div>
                 </div>
               </div>
               <div class="p-card">
                 <div class="p-img">🌻</div>
                 <div class="p-info">
-                  <h3>Sunflowers</h3>
+                  <h3>Hoa Hướng Dương</h3>
                   <div class="price">199.000₫</div>
                 </div>
               </div>
@@ -3181,681 +2277,190 @@
           </div>
 
           <!-- CTA BLOCK -->
-          <div class="blk" onclick="selBlock(this,&#39;cta&#39;)" style="padding:30px 20px; background:#3b82f6; color:#fff; text-align:center">
-            <h3 style="margin-bottom:8px; font-size:18px">Ready to grow?</h3>
-            <p style="margin-bottom:15px; font-size:12px; opacity:0.9">Sign up now and get 20% off.</p>
-            <button style="padding:10px 20px; border:none; border-radius:8px; background:#fff; color:#3b82f6; font-weight:700; font-size:13px">Shop Now</button>
+          <div class="blk" onclick="selBlock(this, &#39;cta&#39;)" style="padding:30px 20px; background:#3b82f6; color:#fff; text-align:center">
+            <div class="blk-overlay"></div>
+            <h3 style="margin-bottom:8px; font-size:18px">Sẵn sàng để bứt phá?</h3>
+            <p style="margin-bottom:15px; font-size:12px; opacity:0.9">Đăng ký ngay để nhận ưu đãi 20%.</p>
+            <button style="padding:10px 20px; border:none; border-radius:8px; background:#fff; color:#3b82f6; font-weight:700; font-size:13px">Mua
+              ngay</button>
             <div class="ai-badge">✨ AI</div>
           </div>
 
           <div class="m-footer blk" data-b="footer" onclick="selBlock(this,&#39;footer&#39;)">
-            <p>© 2026 FloraShop — Fresh flowers, same-day delivery nationwide</p>
+            <p>© 2026 FloraShop — Hoa tươi giao nhanh toàn quốc</p>
             <p style="margin-top:3px">📞 0909 123 456 · 📧 hello@florashop.vn</p>
             <div class="ai-badge">✨ AI</div>
           </div>
         </div>
-        <div class="toast" id="toast1"><span class="t-ico">✅</span><span class="t-txt" id="toast1Txt">Page order updated</span><span class="t-act" id="toast1Act"></span></div>
+        <div class="toast" id="toast1"><span class="t-ico">✅</span><span class="t-txt" id="toast1Txt">Đã đổi vị trí trang</span><span class="t-act" id="toast1Act"></span></div>
       </div>
 
-      <!-- Undo/Redo (temporarily hidden)
+      <!-- Undo/Redo -->
       <div class="ur-float" id="urFloat">
-        <button class="has" onclick="showToast(&#39;Undone&#39;,&#39;&#39;)" title="Undo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></svg><span class="cnt">3</span></button>
-        <button onclick="showToast(&#39;Redone&#39;,&#39;&#39;)" title="Redo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13"/></svg></button>
+        <button class="has" onclick="showToast(&#39;Đã hoàn tác&#39;,&#39;&#39;)">↩️<span class="cnt">3</span></button>
+        <button onclick="showToast(&#39;Đã làm lại&#39;,&#39;&#39;)">↪️</button>
       </div>
-      -->
 
-      <!-- FAB — fixed bottom-right, 56px, MessageCircle icon, opens chat tab -->
+      <!-- FAB -->
+      <button class="fab" id="fab" onclick="openSheet(&#39;chat&#39;)">🪄</button>
 
-      <!-- Bottom Bar (swipe up to open chat) -->
+      <!-- Bottom Bar -->
       <div class="bot-bar" onclick="openSheet(&#39;chat&#39;)">
         <div class="swipe-h"></div>
-        <div class="bot-bar-text"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Open AI Chat &amp; Tools <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--primary-teal)"><path d="m18 15-6-6-6 6"/></svg></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ <span style="font-size:10px;color:var(--muted)">▲</span></div>
       </div>
 
       <!-- Delete undo toast (floating) -->
       <div class="undo-toast" id="undoToast">
         <span class="t-ico">🗑️</span>
-        <span class="ut-txt">Page deleted</span>
-        <button class="ut-btn" onclick="undoDeletePage()">Undo</button>
+        <span class="ut-txt">Đã xoá trang</span>
+        <button class="ut-btn" onclick="undoDeletePage()">Hoàn tác</button>
         <span class="ut-timer" id="undoTimer">5s</span>
       </div>
 
-      <!-- ═══ MAIN BOTTOM SHEET — 3 tabs: AI Chat / Components / Pages ═══ -->
+      <!-- ═══ BOTTOM SHEET ═══ -->
       <div class="bs-overlay" id="shOv" onclick="closeSheet()"></div>
       <div class="bs h75" id="sheet">
         <div class="bs-handle"></div>
         <div class="bs-tabs" id="shTabs">
-          <button class="bs-tab on" data-t="chat" onclick="swTab(&#39;chat&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> AI Chat</button>
-          <button class="bs-tab" data-t="components" onclick="swTab(&#39;components&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Components</button>
-          <button class="bs-tab" data-t="pages" onclick="swTab(&#39;pages&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Pages</button>
-          <button class="bs-tab" data-t="settings" onclick="swTab(&#39;settings&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg> Settings</button>
+          <button class="bs-tab on" data-t="chat" onclick="swTab(&#39;chat&#39;)">🤖 Chat</button>
+          <button class="bs-tab" data-t="blocks" onclick="swTab(&#39;blocks&#39;)">🧩 Components</button>
+          <button class="bs-tab" data-t="settings" onclick="swTab(&#39;settings&#39;)">⚙️ Settings</button>
         </div>
 
-        <!-- CHAT PANEL -->
+        <!-- CHAT -->
         <div class="bs-panel on" data-p="chat">
           <div class="chat-msgs" id="chatMsgs">
-            <div class="bubble ai fade">Hello! What would you like to edit?</div>
-            <div class="bubble ai fade" style="animation-delay:.1s">Try: "Change hero background to pink", "Add reviews", "Rewrite the headline"</div>
+            <div class="bubble ai fade">👋 Xin chào! Mình là AI Editor. Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble ai fade" style="animation-delay:.1s">💡 Gợi ý: "Đổi nền hero sang hồng", "Thêm đánh giá",
+              "Viết lại tiêu đề"</div>
           </div>
           <div class="chat-bar">
-            <input class="chat-in" id="chatIn" placeholder="Tell AI what to change...">
-            <button class="chat-send" onclick="sendChat()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></button>
+            <input class="chat-in" id="chatIn" placeholder="Nhập lệnh cho AI...">
+            <button class="chat-send" onclick="sendChat()">▶</button>
           </div>
-          <div class="chat-helper">Enter = send · Shift+Enter = new line</div>
         </div>
 
-        <!-- COMPONENTS PANEL (real BlockLibraryPanel — emojis kept for categories & items) -->
-        <div class="bs-panel" data-p="components">
-          <div class="blk-search"><span class="si">🔍</span><input placeholder="Search blocks..."></div>
+        <!-- BLOCKS -->
+        <div class="bs-panel" data-p="blocks">
+          <div class="blk-search"><span class="si">🔍</span><input placeholder="Tìm block..."></div>
           <div class="blk-list">
             <div class="blk-cat">
-              <div class="blk-cat-t">📐 Basics</div>
-              <div class="blk-row"><div class="ico">📝</div><span class="lbl">Rich Text</span><button class="add" onclick="addBlk(&#39;Rich Text&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">🖼️</div><span class="lbl">Hero Banner</span><button class="add" onclick="addBlk(&#39;Hero Banner&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">📊</div><span class="lbl">3-Column Grid</span><button class="add" onclick="addBlk(&#39;3-Column Grid&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">🎞️</div><span class="lbl">Photo Gallery</span><button class="add" onclick="addBlk(&#39;Photo Gallery&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">📢</div><span class="lbl">CTA Banner</span><button class="add" onclick="addBlk(&#39;CTA Banner&#39;)">+</button></div>
+              <div class="blk-cat-t">📐 Cơ bản</div>
+              <div class="blk-row">
+                <div class="ico">📝</div><span class="lbl">Rich Text</span><button class="add" onclick="addBlk(&#39;Rich Text&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🖼️</div><span class="lbl">Hero Banner</span><button class="add" onclick="addBlk(&#39;Hero Banner&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📊</div><span class="lbl">3 Cột Grid</span><button class="add" onclick="addBlk(&#39;3 Cột Grid&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🎞️</div><span class="lbl">Gallery Ảnh</span><button class="add" onclick="addBlk(&#39;Gallery Ảnh&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📢</div><span class="lbl">CTA Banner</span><button class="add" onclick="addBlk(&#39;CTA Banner&#39;)">+</button>
+              </div>
             </div>
             <div class="blk-cat">
-              <div class="blk-cat-t">🛒 Commerce</div>
-              <div class="blk-row"><div class="ico">🛍️</div><span class="lbl">Product List</span><button class="add" onclick="addBlk(&#39;Product List&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">🛒</div><span class="lbl">Shopping Cart</span><button class="add" onclick="addBlk(&#39;Shopping Cart&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">⭐</div><span class="lbl">Customer Reviews</span><button class="add" onclick="addBlk(&#39;Customer Reviews&#39;)">+</button></div>
+              <div class="blk-cat-t">🛒 Cửa hàng</div>
+              <div class="blk-row">
+                <div class="ico">🛍️</div><span class="lbl">Danh sách SP</span><button class="add" onclick="addBlk(&#39;Danh sách SP&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🛒</div><span class="lbl">Giỏ hàng</span><button class="add" onclick="addBlk(&#39;Giỏ hàng&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">⭐</div><span class="lbl">Đánh giá KH</span><button class="add" onclick="addBlk(&#39;Đánh giá KH&#39;)">+</button>
+              </div>
             </div>
             <div class="blk-cat">
-              <div class="blk-cat-t">🧩 Widget</div>
-              <div class="blk-row"><div class="ico">💬</div><span class="lbl">Social Feed</span><button class="add" onclick="addBlk(&#39;Social Feed&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">📋</div><span class="lbl">Contact Form</span><button class="add" onclick="addBlk(&#39;Contact Form&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">🗺️</div><span class="lbl">Google Maps</span><button class="add" onclick="addBlk(&#39;Google Maps&#39;)">+</button></div>
-              <div class="blk-row"><div class="ico">📰</div><span class="lbl">Latest Blog</span><button class="add" onclick="addBlk(&#39;Latest Blog&#39;)">+</button></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- PAGES PANEL (replaces old Settings tab; page manager content moved here) -->
-        <div class="bs-panel" data-p="pages">
-          <div class="pg-panel">
-            <div class="pg-drop-header">
-              <span>📄 Pages</span>
-              <button onclick="closeSheet()">Close</button>
-            </div>
-
-            <div id="pageList">
-              <div class="pg-item cur" data-page="home">
-                <span class="pg-ico">🏠</span>
-                <span class="pg-name">Home</span>
-                <span class="pg-tag live">Live</span>
-                <div class="pg-acts">
-                  <button class="disabled" title="Cannot hide home page"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-                  <button onclick="pageAction(&#39;home&#39;,&#39;edit&#39;)" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
-                  <button class="disabled" title="Cannot move home page up"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
-                  <button onclick="pageAction(&#39;home&#39;,&#39;down&#39;)" title="Move down"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-                </div>
+              <div class="blk-cat-t">🧩 Widgets</div>
+              <div class="blk-row">
+                <div class="ico">💬</div><span class="lbl">Social Feed</span><button class="add" onclick="addBlk(&#39;Social Feed&#39;)">+</button>
               </div>
-              <div class="pg-item" data-page="products">
-                <span class="pg-ico">🛍️</span>
-                <span class="pg-name">Products</span>
-                <span class="pg-tag live">Live</span>
-                <div class="pg-acts">
-                  <button onclick="pageAction(&#39;products&#39;,&#39;toggleVis&#39;)" title="Toggle visibility"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-                  <button onclick="pageAction(&#39;products&#39;,&#39;edit&#39;)" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
-                  <button onclick="pageAction(&#39;products&#39;,&#39;up&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
-                  <button onclick="pageAction(&#39;products&#39;,&#39;down&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-                </div>
+              <div class="blk-row">
+                <div class="ico">📋</div><span class="lbl">Form Liên hệ</span><button class="add" onclick="addBlk(&#39;Form Liên hệ&#39;)">+</button>
               </div>
-              <div class="pg-item" data-page="about">
-                <span class="pg-ico">📄</span>
-                <span class="pg-name">About</span>
-                <span class="pg-tag draft">Draft</span>
-                <div class="pg-acts">
-                  <button onclick="pageAction(&#39;about&#39;,&#39;toggleVis&#39;)" title="Toggle visibility"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-                  <button onclick="pageAction(&#39;about&#39;,&#39;edit&#39;)" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
-                  <button onclick="pageAction(&#39;about&#39;,&#39;up&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
-                  <button onclick="pageAction(&#39;about&#39;,&#39;down&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-                </div>
+              <div class="blk-row">
+                <div class="ico">🗺️</div><span class="lbl">Google Maps</span><button class="add" onclick="addBlk(&#39;Google Maps&#39;)">+</button>
               </div>
-              <div class="pg-item" data-page="contact">
-                <span class="pg-ico">📞</span>
-                <span class="pg-name">Contact</span>
-                <span class="pg-tag live">Live</span>
-                <div class="pg-acts">
-                  <button onclick="pageAction(&#39;contact&#39;,&#39;toggleVis&#39;)" title="Toggle visibility"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
-                  <button onclick="pageAction(&#39;contact&#39;,&#39;edit&#39;)" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
-                  <button onclick="pageAction(&#39;contact&#39;,&#39;up&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button>
-                  <button onclick="pageAction(&#39;contact&#39;,&#39;down&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Delete confirmation (hidden by default) -->
-            <div class="pg-confirm" id="pgConfirm">
-              <p>⚠️ Delete "<span id="pgConfirmName">Contact</span>"? Content will be kept for 5 seconds to undo.</p>
-              <div class="pg-confirm-acts">
-                <button class="btn-cancel" onclick="hidePgConfirm()">Cancel</button>
-                <button class="btn-danger" onclick="confirmDeletePage()">Delete</button>
-              </div>
-            </div>
-
-            <div class="pg-div"></div>
-
-            <!-- 404 system page -->
-            <div class="pg-item" data-page="404">
-              <span class="pg-ico">🚫</span>
-              <span class="pg-name">404 Page</span>
-              <span class="pg-tag" style="background:rgba(156,163,175,.1);color:var(--muted);font-size:9px">System</span>
-              <div class="pg-acts">
-                <button onclick="pageAction(&#39;404&#39;,&#39;edit&#39;)" title="Edit content"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
-              </div>
-            </div>
-
-            <div class="pg-div"></div>
-
-            <!-- Add new page -->
-            <button class="pg-add" id="pgAddBtn" onclick="showAddPageForm()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add New Page</button>
-
-            <!-- Add page form (hidden by default) -->
-            <div class="pg-form" id="pgForm">
-              <label>Page Name</label>
-              <input id="pgNameIn" placeholder="e.g. Promotions" oninput="updateSlugPreview()">
-              <div class="slug-preview">Slug: <span id="slugPreview">/page-name</span></div>
-              <div class="pg-form-actions">
-                <button class="btn-cancel" onclick="hideAddPageForm()">Cancel</button>
-                <button class="btn-create" onclick="createNewPage()">Create Page</button>
+              <div class="blk-row">
+                <div class="ico">📰</div><span class="lbl">Blog Mới nhất</span><button class="add" onclick="addBlk(&#39;Blog Mới nhất&#39;)">+</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SETTINGS PANEL (4th tab — Global / Menu / SEO, mirrors desktop SettingsPanel) -->
+        <!-- SETTINGS -->
         <div class="bs-panel" data-p="settings">
-          <div class="stg-subtabs">
-            <button class="stg-subtab on" data-st="global" onclick="swStgTab('global')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg> Global</button>
-            <button class="stg-subtab" data-st="menu" onclick="swStgTab('menu')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/></svg> Menu</button>
-            <button class="stg-subtab" data-st="seo" onclick="swStgTab('seo')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg> SEO</button>
-          </div>
-
-          <!-- ═══ GLOBAL ═══ -->
-          <div class="stg-subpanel on" data-sp="global">
-            <div class="stg-list">
+          <div class="stg-list" id="stgList">
+            <!-- GLOBAL SETTINGS -->
+            <div id="gStg" style="">
               <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand Identity</button>
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand
+                  Identity</button>
                 <div class="stg-body open">
-                  <div class="stg-row"><span class="stg-lbl">Business Name</span><input class="stg-in" value="FloraShop" placeholder="Your Company"></div>
-                  <div class="stg-row"><span class="stg-lbl">Logo</span><button class="stg-upload">📤 Upload Logo</button></div>
-                  <div class="stg-row"><span class="stg-lbl">Favicon</span><button class="stg-upload">📤 Upload Favicon</button></div>
+                  <div class="stg-row"><span class="stg-lbl">Logo</span><button style="font-size:11px;color:var(--primary-blue);font-weight:600">📤 Tải lên</button></div>
+                  <div class="stg-row"><span class="stg-lbl">Tên thương hiệu</span><input class="stg-in" value="FloraShop"></div>
+                  <div class="stg-row"><span class="stg-lbl">Màu chính</span>
+                    <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px">
+                      <div class="swatch" style="background:#764ba2"></div>
+                    </div>
+                  </div>
+                  <div class="stg-row"><span class="stg-lbl">Màu phụ</span>
+                    <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px">
+                      <div class="swatch" style="background:#667eea"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📞 Contact Info</button>
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📞 Liên hệ</button>
                 <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Phone</span><input class="stg-in" value="+60 12-345-6789" style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">Email</span><input class="stg-in" value="hello@flora.com" style="width:130px"></div>
-                  <div style="padding:6px 0">
-                    <div class="stg-lbl" style="margin-bottom:4px">Address</div>
-                    <textarea class="stg-in" style="width:100%;height:44px;resize:none">12 Jalan Ampang, Kuala Lumpur</textarea>
+                  <div class="stg-row"><span class="stg-lbl">SĐT</span><input class="stg-in" value="0909 123 456">
                   </div>
+                  <div class="stg-row"><span class="stg-lbl">Email</span><input class="stg-in" value="hello@flora.vn" style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">Địa chỉ</span><input class="stg-in" value="123 Nguyễn Huệ, Q1" style="width:130px"></div>
                 </div>
               </div>
               <div class="stg-grp">
                 <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔗 Social Links</button>
                 <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Facebook</span><input class="stg-in" placeholder="facebook.com/yourbrand" style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">Instagram</span><input class="stg-in" placeholder="instagram.com/yourbrand" style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">Twitter</span><input class="stg-in" placeholder="twitter.com/yourbrand" style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">LinkedIn</span><input class="stg-in" placeholder="linkedin.com/company/..." style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">YouTube</span><input class="stg-in" placeholder="youtube.com/@yourbrand" style="width:130px"></div>
-                  <div class="stg-row"><span class="stg-lbl">TikTok</span><input class="stg-in" placeholder="tiktok.com/@yourbrand" style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">Facebook</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">Instagram</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">TikTok</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
                 </div>
               </div>
               <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🌈 Theme &amp; Colors</button>
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔍 SEO Settings</button>
                 <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Primary color</span>
-                    <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#2DD4BF" style="width:72px"><div class="swatch" style="background:#2DD4BF"></div></div>
-                  </div>
-                  <div class="stg-row"><span class="stg-lbl">Heading font</span><select class="stg-sel"><option>Outfit</option><option>Poppins</option><option>Montserrat</option></select></div>
-                  <div class="stg-row"><span class="stg-lbl">Body font</span><select class="stg-sel"><option>Inter</option><option>Roboto</option><option>Open Sans</option></select></div>
-                  <div class="stg-row"><span class="stg-lbl">Color mode</span>
-                    <div class="seg-toggle"><button class="on">Dark</button><button>Light</button></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ═══ MENU ═══ -->
-          <div class="stg-subpanel" data-sp="menu">
-            <div class="stg-list">
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🧭 Navigation Style</button>
-                <div class="stg-body open">
-                  <div class="nav-variants">
-                    <button class="nv-variant on">Default</button>
-                    <button class="nv-variant">Centered</button>
-                    <button class="nv-variant">Transparent</button>
-                    <button class="nv-variant">Sidebar</button>
-                    <button class="nv-variant">Floating</button>
-                  </div>
-                </div>
-              </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🔗 Navigation Links</button>
-                <div class="stg-body open" style="padding:4px 8px">
-                  <div class="nav-list">
-                    <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🏠 Home</span>
-                      <div class="nv-acts"><button title="Move up"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button><button title="Move down"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button><button title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button></div>
-                    </div>
-                    <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🛍️ Products</span>
-                      <div class="nv-acts"><button title="Move up"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button><button title="Move down"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button><button title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button></div>
-                    </div>
-                    <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Fresh Flowers</span>
-                      <div class="nv-acts"><button title="Promote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button><button title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button><button title="Delete" style="color:var(--error)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
-                    </div>
-                    <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📄 About</span>
-                      <div class="nv-acts"><button title="Move up"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button><button title="Move down"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button><button title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button></div>
-                    </div>
-                    <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📞 Contact</span>
-                      <div class="nv-acts"><button title="Move up"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></button><button title="Move down"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button><button title="Edit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button></div>
-                    </div>
-                  </div>
-                  <button class="nav-add"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M5 12h14"/><path d="M12 5v14"/></svg> Add Link</button>
-                </div>
-              </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🌐 Quick Language</button>
-                <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Enable multi-language</span><div class="seg-toggle"><button>On</button><button class="on">Off</button></div></div>
-                  <div class="stg-row"><span class="stg-lbl">Primary</span><select class="stg-sel"><option>English (EN)</option><option>Malay (MY)</option></select></div>
-                </div>
-              </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔘 Navigation CTA Button</button>
-                <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Show CTA button</span><div class="seg-toggle"><button class="on">On</button><button>Off</button></div></div>
-                  <div class="stg-row"><span class="stg-lbl">Button label</span><input class="stg-in" value="Get started" style="width:120px"></div>
-                  <div class="stg-row"><span class="stg-lbl">Button URL</span><input class="stg-in" value="/contact" style="width:120px"></div>
-                </div>
-              </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🗂️ Breadcrumb Settings</button>
-                <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">Home label</span><input class="stg-in" value="Home" style="width:120px"></div>
-                  <div class="stg-row"><span class="stg-lbl">Separator</span><input class="stg-in" value="/" style="width:60px;text-align:center"></div>
-                  <div class="stg-row"><span class="stg-lbl">Show on all pages</span><div class="seg-toggle"><button class="on">On</button><button>Off</button></div></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- ═══ SEO ═══ -->
-          <div class="stg-subpanel" data-sp="seo">
-            <div class="stg-list">
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🔍 SEO &amp; Social</button>
-                <div class="stg-body open">
                   <div style="padding:6px 0">
-                    <div class="stg-lbl" style="margin-bottom:4px">URL Slug</div>
-                    <input class="stg-in" value="/home" style="width:100%">
+                    <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 ký
+                        tự)</span></div><input class="stg-in" value="Cửa hàng Hoa Tươi - Giao Trong Ngày" style="width:100%">
                   </div>
                   <div style="padding:6px 0">
-                    <div class="stg-lbl" style="margin-bottom:4px;display:flex;justify-content:space-between">Meta Title <span style="color:var(--muted)">31/60</span></div>
-                    <input class="stg-in" value="FloraShop — Fresh Flower Store" style="width:100%">
+                    <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160 ký tự)</span></div><textarea class="stg-in" style="width:100%;height:50px;resize:none">Mua hoa tươi giao ngay trong 2h!</textarea>
                   </div>
-                  <div style="padding:6px 0">
-                    <div class="stg-lbl" style="margin-bottom:4px;display:flex;justify-content:space-between">Meta Description <span style="color:var(--muted)">44/160</span></div>
-                    <textarea class="stg-in" style="width:100%;height:54px;resize:none" placeholder="Tell search engines what this page is about.">Buy fresh flowers, same-day delivery in 2h!</textarea>
-                  </div>
+                  <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--gradient-primary);color:#fff;font-size:11px;font-weight:600;margin-top:4px">✨
+                    Tối ưu SEO bằng AI</button>
                 </div>
               </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🔎 Google Preview</button>
-                <div class="stg-body open">
-                  <div class="seo-preview">
-                    <div class="seo-url">flora.com › home</div>
-                    <div class="seo-title">FloraShop — Fresh Flower Store</div>
-                    <div class="seo-desc">Buy fresh flowers, same-day delivery in 2h!</div>
-                  </div>
-                </div>
-              </div>
-              <div class="stg-grp">
-                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🖼️ Social Share Image</button>
-                <div class="stg-body">
-                  <div class="stg-row"><span class="stg-lbl">OG Image <span style="color:var(--muted)">(1200×630)</span></span><button class="stg-upload">📤 Upload</button></div>
-                </div>
-              </div>
-              <button class="seo-ai-btn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Automatic SEO Optimization</button>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- BLOCK SETTINGS BOTTOM SHEET (opens when a canvas block is selected) -->
-      <div class="bs-overlay" id="bsBlockOv" onclick="closeBsBlock()"></div>
-      <div class="bs h60" id="bsBlock">
-        <div class="bs-handle"></div>
-        <div class="bs-sheet-hdr">
-          <span class="btype" id="bTypeL">BLOCK</span>
-          <span class="bname" id="bNameL">Block Settings</span>
-          <button class="bs-sheet-close" onclick="closeBsBlock()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-        </div>
-        <div class="mv-bar">
-          <button class="mv-btn" onclick="showToast(&#39;Moved up&#39;,&#39;&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg> Move Up</button>
-          <button class="mv-btn" onclick="showToast(&#39;Moved down&#39;,&#39;&#39;)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg> Move Down</button>
-        </div>
-        <div id="bStgFields" style="padding:4px 14px;overflow-y:auto;flex:1"></div>
-        <div class="bs-del-bar">
-          <button class="btn-del-blk" onclick="showS(8)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete Block</button>
-        </div>
-      </div>
-
-      <!-- SITE SETTINGS BOTTOM SHEET (FR-31 global settings) -->
-      <div class="bs-overlay" id="bsSiteOv" onclick="closeBsSite()"></div>
-      <div class="bs h85" id="bsSite">
-        <div class="bs-handle"></div>
-        <div class="bs-sheet-hdr">
-          <span class="bname">Site Settings</span>
-          <button class="bs-sheet-close" onclick="closeBsSite()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-        </div>
-        <div class="stg-list">
-          <div class="stg-grp">
-            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand Identity</button>
-            <div class="stg-body open">
-              <div class="stg-row"><span class="stg-lbl">Logo</span><button style="font-size:11px;color:var(--primary-blue);font-weight:600">📤 Upload</button></div>
-              <div class="stg-row"><span class="stg-lbl">Brand name</span><input class="stg-in" value="FloraShop"></div>
-              <div class="stg-row"><span class="stg-lbl">Primary color</span>
-                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px"><div class="swatch" style="background:#764ba2"></div></div>
+            <!-- BLOCK SETTINGS (shown when block selected) -->
+            <div id="bStg" style="display: none;">
+              <div class="bs-blk-hdr">
+                <span class="btype" id="bTypeL">PRODUCTS</span>
+                <span class="bname" id="bNameL">Sản phẩm</span>
+                <button class="bdel" onclick="showS(8)">🗑️</button>
               </div>
-              <div class="stg-row"><span class="stg-lbl">Secondary color</span>
-                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px"><div class="swatch" style="background:#667eea"></div></div>
+              <div class="mv-bar">
+                <button class="mv-btn" onclick="showToast(&#39;Đã di chuyển lên&#39;,&#39;&#39;)">↑ Lên</button>
+                <button class="mv-btn" onclick="showToast(&#39;Đã di chuyển xuống&#39;,&#39;&#39;)">↓ Xuống</button>
               </div>
-            </div>
-          </div>
-          <div class="stg-grp">
-            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📞 Contact</button>
-            <div class="stg-body">
-              <div class="stg-row"><span class="stg-lbl">Phone</span><input class="stg-in" value="0909 123 456"></div>
-              <div class="stg-row"><span class="stg-lbl">Email</span><input class="stg-in" value="hello@flora.vn" style="width:130px"></div>
-              <div class="stg-row"><span class="stg-lbl">Address</span><input class="stg-in" value="123 Nguyen Hue, D1" style="width:130px"></div>
-            </div>
-          </div>
-          <div class="stg-grp">
-            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔗 Social Links</button>
-            <div class="stg-body">
-              <div class="stg-row"><span class="stg-lbl">Facebook</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
-              <div class="stg-row"><span class="stg-lbl">Instagram</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
-              <div class="stg-row"><span class="stg-lbl">TikTok</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
-            </div>
-          </div>
-          <div class="stg-grp">
-            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔍 SEO Settings</button>
-            <div class="stg-body">
-              <div style="padding:6px 0">
-                <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 chars)</span></div>
-                <input class="stg-in" value="FloraShop — Fresh Flower Store" style="width:100%">
-              </div>
-              <div style="padding:6px 0">
-                <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160 chars)</span></div>
-                <textarea class="stg-in" style="width:100%;height:50px;resize:none">Buy fresh flowers, same-day delivery in 2h!</textarea>
-              </div>
-              <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--gradient-primary);color:#fff;font-size:11px;font-weight:600;margin-top:4px">✨ Optimize SEO with AI</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ TEMPLATE PICKER MODAL (mirrors EditorTemplateModal) ═══ -->
-      <div class="tmpl-modal" id="tmplModal">
-        <div class="tmpl-backdrop" onclick="closeTemplates()"></div>
-        <div class="tmpl-dialog">
-          <!-- Header -->
-          <div class="tmpl-hd">
-            <h2>Choose a Template</h2>
-            <button class="tmpl-close" onclick="closeTemplates()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-          </div>
-          <!-- Filters -->
-          <div class="tmpl-filters">
-            <div class="tmpl-search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><input placeholder="Search templates..."></div>
-            <div class="tmpl-cats">
-              <button class="tmpl-cat on">All</button>
-              <button class="tmpl-cat">Restaurant</button>
-              <button class="tmpl-cat">E-Commerce</button>
-              <button class="tmpl-cat">Beauty</button>
-              <button class="tmpl-cat">Tech</button>
-              <button class="tmpl-cat">Health</button>
-              <button class="tmpl-cat">Education</button>
-              <button class="tmpl-cat">Real Estate</button>
-              <button class="tmpl-cat">Fitness</button>
-              <button class="tmpl-cat">Creative</button>
-              <button class="tmpl-cat">Business</button>
-              <button class="tmpl-cat">Cafe &amp; Bakery</button>
-              <button class="tmpl-cat">Events</button>
-              <button class="tmpl-cat">Blog</button>
-              <button class="tmpl-cat">Travel</button>
-            </div>
-          </div>
-          <div class="tmpl-count">Showing 56 of 56 templates</div>
-          <!-- Grid -->
-          <div class="tmpl-grid">
-            <!-- Current template -->
-            <div class="tc current">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#db2777,#ec4899)">
-                <span class="tc-cur-badge">Current</span>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Rose Petal')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Rose Petal</h3><p>A soft feminine beauty template with rose tones and elegant booking experience.</p></div>
-                  <div class="tc-swatches"><i style="background:#db2777"></i><i style="background:#ec4899"></i></div>
-                </div>
-                <div class="tc-tags"><span>beauty</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#7c3aed,#a78bfa)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Midnight Luxe')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Midnight Luxe</h3><p>A dark luxury e-commerce template for high-end fashion and premium product showcases.</p></div>
-                  <div class="tc-swatches"><i style="background:#7c3aed"></i><i style="background:#a78bfa"></i></div>
-                </div>
-                <div class="tc-tags"><span>ecommerce</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#c2410c,#ea580c)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Warung Kampung')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Warung Kampung</h3><p>A warm traditional restaurant template with earthy tones and inviting family-style dining feel.</p></div>
-                  <div class="tc-swatches"><i style="background:#c2410c"></i><i style="background:#ea580c"></i></div>
-                </div>
-                <div class="tc-tags"><span>restaurant</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#dc2626,#f97316)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Noir Steakhouse')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Noir Steakhouse</h3><p>A bold dark-themed restaurant template for upscale dining and night-market vibes.</p></div>
-                  <div class="tc-swatches"><i style="background:#dc2626"></i><i style="background:#f97316"></i></div>
-                </div>
-                <div class="tc-tags"><span>restaurant</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#2563eb,#3b82f6)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Shopfront Clean')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Shopfront Clean</h3><p>A clean modern e-commerce template optimized for product browsing and fast conversions.</p></div>
-                  <div class="tc-swatches"><i style="background:#2563eb"></i><i style="background:#3b82f6"></i></div>
-                </div>
-                <div class="tc-tags"><span>ecommerce</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#2563eb,#06b6d4)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Cyber SaaS')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Cyber SaaS</h3><p>A modern vibrant SaaS template with bold CTAs and feature-rich comparison layouts.</p></div>
-                  <div class="tc-swatches"><i style="background:#2563eb"></i><i style="background:#06b6d4"></i></div>
-                </div>
-                <div class="tc-tags"><span>tech</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#22c55e,#4ade80)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Dark Console')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Dark Console</h3><p>A dark hacker-themed template with terminal aesthetics for developer tools and APIs.</p></div>
-                  <div class="tc-swatches"><i style="background:#22c55e"></i><i style="background:#4ade80"></i></div>
-                </div>
-                <div class="tc-tags"><span>tech</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#d97706,#b45309)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Natural Glow')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Natural Glow</h3><p>A minimal organic beauty template with warm earth tones and zen-inspired layouts.</p></div>
-                  <div class="tc-swatches"><i style="background:#d97706"></i><i style="background:#b45309"></i></div>
-                </div>
-                <div class="tc-tags"><span>beauty</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#0d9488,#14b8a6)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('ZenFlow Yoga')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>ZenFlow Yoga</h3><p>Calm, soothing yoga studio design — soft tones, ample whitespace, mindful imagery.</p></div>
-                  <div class="tc-swatches"><i style="background:#0d9488"></i><i style="background:#14b8a6"></i></div>
-                </div>
-                <div class="tc-tags"><span>fitness</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#3e5fad,#1e293b)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Executive Dark')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Executive Dark</h3><p>Sleek dark-mode business site with authority stats and executive team profiles.</p></div>
-                  <div class="tc-swatches"><i style="background:#3e5fad"></i><i style="background:#1e293b"></i></div>
-                </div>
-                <div class="tc-tags"><span>business</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#3363a3,#2563eb)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Explorer Dark')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Explorer Dark</h3><p>Dark adventure travel site for expeditions with dramatic imagery and bold stats.</p></div>
-                  <div class="tc-swatches"><i style="background:#3363a3"></i><i style="background:#2563eb"></i></div>
-                </div>
-                <div class="tc-tags"><span>travel</span></div>
-              </div>
-            </div>
-            <!-- Pro card -->
-            <div class="tc">
-              <div class="tc-thumb" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)">
-                <div class="tc-badges"><span class="tc-badge pro"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> Pro</span></div>
-                <div class="tc-hover">
-                  <button class="tc-prev"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                  <button class="tc-use" onclick="pickTemplate('Prestige Academy')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg> Use this template</button>
-                </div>
-              </div>
-              <div class="tc-info">
-                <div class="tc-top">
-                  <div class="tc-txt"><h3>Prestige Academy</h3><p>Traditional academic layout with strong hierarchy — perfect for schools and training centers.</p></div>
-                  <div class="tc-swatches"><i style="background:#1d4ed8"></i><i style="background:#3b82f6"></i></div>
-                </div>
-                <div class="tc-tags"><span>education</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Apply confirmation -->
-        <div class="tmpl-confirm" id="tmplConfirm">
-          <div class="tmpl-confirm-box">
-            <div class="tcf-row">
-              <span class="tcf-ico">⚠️</span>
-              <div>
-                <h3 id="tcfTitle">Apply "Rose Petal"?</h3>
-                <p>This will apply the new template layout and theme. Your existing content (text, images) will be preserved where possible.</p>
-              </div>
-            </div>
-            <div class="tcf-acts">
-              <button class="tcf-cancel" onclick="cancelTemplate()">Cancel</button>
-              <button class="tcf-apply" onclick="applyTemplate()">Apply Template</button>
+              <div id="bStgFields" style="padding:4px 14px"><div class="stg-grp"><button class="stg-hdr"><span class="arr open">▶</span> 📦 Hiển thị</button><div class="stg-body open"><div class="stg-row"><span class="stg-lbl">Số cột (Mobile)</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><select class="stg-sel"><option>1 Cột</option><option>2 Cột</option></select></div></div><div class="stg-row"><span class="stg-lbl">Số lượng SP</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><input class="stg-in" style="width: 60px; text-align: center;"></div></div><div class="stg-row"><span class="stg-lbl">Hiện giá</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><select class="stg-sel"><option>Có</option><option>Không</option></select></div></div></div></div></div>
             </div>
           </div>
         </div>
@@ -3867,31 +2472,30 @@
      ══════════════════════════════════════════════════════════════ -->
     <div class="screen" id="s2">
       <div class="ed-header">
-        <button class="hbtn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
-        <div class="h-saved"><span class="saved-dot" style="background:var(--primary-blue)"></span><span class="pulse" style="color:var(--primary-blue)">Processing...</span></div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub" style="opacity:.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="hbtn">☰</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><span class="h-status pulse" style="color:var(--primary-blue)">Đang xử lý...</span></div>
       </div>
       <div class="preview" style="position:relative">
         <div class="preview-inner" style="filter:blur(1px);opacity:.5">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
           <div class="m-hero">
-            <h1>Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours</p><span class="m-hero-btn">Shop Now →</span>
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p><span class="m-hero-btn">Mua ngay →</span>
           </div>
           <div class="m-products">
-            <h2>Featured Products</h2>
+            <h2>Sản phẩm nổi bật</h2>
           </div>
         </div>
         <div class="proc-ov">
           <div class="spinner"></div>
-          <div style="font-size:12px;color:#fff;font-weight:500;text-align:center">AI is editing your design...</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:3px">Changing hero background to pink</div>
+          <div style="font-size:12px;color:#fff;font-weight:500;text-align:center">AI đang chỉnh sửa giao diện...</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">Đổi màu nền hero sang hồng</div>
         </div>
       </div>
       <div class="bot-bar" style="flex-direction:column;gap:0;padding:6px 16px">
         <div class="swipe-h" style="margin-bottom:4px"></div>
-        <button class="stop-btn" onclick="showS(1)">■ Stop AI</button>
+        <button class="stop-btn" onclick="showS(1)">■ Dừng tạo AI</button>
       </div>
     </div>
 
@@ -3901,44 +2505,39 @@
     <div class="screen" id="s3">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
           <div class="m-hero" style="background:linear-gradient(135deg,#f472b6,#ec4899)">
-            <h1>Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours</p>
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p>
           </div>
         </div>
       </div>
       <div class="bs-overlay on" onclick="showS(1)"></div>
       <div class="bs open h60">
         <div class="bs-handle"></div>
-        <div class="bs-tabs">
-          <button class="bs-tab on"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> AI Chat</button>
-          <button class="bs-tab"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Components</button>
-          <button class="bs-tab"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/></svg> Pages</button>
-        </div>
+        <div class="bs-tabs"><button class="bs-tab on">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab">⚙️ Cài đặt</button></div>
         <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
           <div class="chat-msgs" style="flex:1">
-            <div class="bubble ai">Hello! What would you like to edit?</div>
-            <div class="bubble user">Change hero background to pink</div>
-            <div class="bubble ai">Hero background changed to pink! 🌸</div>
-            <div class="bubble user">Add customer reviews section</div>
-            <div class="bubble sys">⚠️ You've used all your AI credits this month!</div>
+            <div class="bubble ai">Xin chào! Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble user">Đổi nền hero sang hồng</div>
+            <div class="bubble ai">Đã đổi nền hero sang hồng rồi nhé! 🌸</div>
+            <div class="bubble user">Thêm section đánh giá KH</div>
+            <div class="bubble sys">⚠️ Bạn đã hết lượt dùng AI tháng này!</div>
             <div class="tok-banner">
               <div class="ico">💎</div>
-              <div class="title">AI Credits Exhausted</div>
-              <div class="desc">You can still add blocks and edit manually. Upgrade to continue using AI.</div>
-              <button class="up-btn">💎 Upgrade Now</button>
+              <div class="title">Hết AI Token</div>
+              <div class="desc">Bạn vẫn có thể thêm block và chỉnh sửa thủ công. Nâng cấp để tiếp tục dùng AI.</div>
+              <button class="up-btn">💎 Nâng cấp gói ngay</button>
             </div>
           </div>
           <div class="chat-bar">
-            <input class="chat-in off" placeholder="🚫 Credits used up" disabled="">
-            <button class="chat-send off"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></button>
+            <input class="chat-in off" placeholder="🚫 Đã hết Token" disabled="">
+            <button class="chat-send off">▶</button>
           </div>
         </div>
       </div>
@@ -3950,9 +2549,8 @@
     <div class="screen" id="s4">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><span class="h-status" style="color:var(--success)">✓ Lưu</span><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
         <div class="preview-inner">
@@ -3966,15 +2564,27 @@
               <div class="sep"></div>
               <button>≡</button>
             </div>
-            <h1 style="margin-top:36px">Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours</p>
-            <span class="m-hero-btn">Shop Now →</span>
+            <h1 style="margin-top:36px">Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p>
+            <span class="m-hero-btn">Mua ngay →</span>
           </div>
           <div class="m-products">
-            <h2>Featured Products</h2>
+            <h2>Sản phẩm nổi bật</h2>
             <div class="p-grid">
-              <div class="p-card"><div class="p-img">🌹</div><div class="p-info"><h3>Red Roses</h3><div class="price">299.000₫</div></div></div>
-              <div class="p-card"><div class="p-img">🌻</div><div class="p-info"><h3>Sunflowers</h3><div class="price">199.000₫</div></div></div>
+              <div class="p-card">
+                <div class="p-img">🌹</div>
+                <div class="p-info">
+                  <h3>Hoa Hồng</h3>
+                  <div class="price">299.000₫</div>
+                </div>
+              </div>
+              <div class="p-card">
+                <div class="p-img">🌻</div>
+                <div class="p-info">
+                  <h3>Hướng Dương</h3>
+                  <div class="price">199.000₫</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3983,31 +2593,45 @@
       <div class="bs-overlay on" style="background:transparent" onclick="showS(1)"></div>
       <div class="bs open h50">
         <div class="bs-handle"></div>
-        <div class="bs-sheet-hdr"><span class="btype">BLOCK</span><span class="bname">Hero Section</span><button class="bs-sheet-close" onclick="showS(1)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+        <div class="bs-blk-hdr"><span class="btype">BLOCK</span><span class="bname">Hero Section</span><button class="bdel">🗑️</button></div>
         <div class="mv-bar">
-          <button class="mv-btn">↑ Move Up</button>
-          <button class="mv-btn">↓ Move Down</button>
+          <button class="mv-btn">↑ Di chuyển lên</button>
+          <button class="mv-btn">↓ Di chuyển xuống</button>
         </div>
         <div style="padding:6px 14px;overflow-y:auto;flex:1">
           <div class="stg-grp">
             <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Background</button>
             <div class="stg-body open">
-              <div class="stg-row"><span class="stg-lbl">Type</span><select class="stg-sel"><option>Gradient</option><option>Image</option></select></div>
-              <div class="stg-row"><span class="stg-lbl">Color 1</span><div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px"><div class="swatch" style="background:#667eea"></div></div></div>
-              <div class="stg-row"><span class="stg-lbl">Color 2</span><div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px"><div class="swatch" style="background:#764ba2"></div></div></div>
+              <div class="stg-row"><span class="stg-lbl">Kiểu</span><select class="stg-sel">
+                  <option>Gradient</option>
+                  <option>Ảnh</option>
+                </select></div>
+              <div class="stg-row"><span class="stg-lbl">Màu 1</span>
+                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px">
+                  <div class="swatch" style="background:#667eea"></div>
+                </div>
+              </div>
+              <div class="stg-row"><span class="stg-lbl">Màu 2</span>
+                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px">
+                  <div class="swatch" style="background:#764ba2"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="stg-grp">
             <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📐 Padding</button>
             <div class="stg-body">
-              <div class="stg-row"><span class="stg-lbl">Top</span><input class="stg-in" value="40px" style="width:60px"></div>
-              <div class="stg-row"><span class="stg-lbl">Bottom</span><input class="stg-in" value="40px" style="width:60px"></div>
+              <div class="stg-row"><span class="stg-lbl">Trên</span><input class="stg-in" value="40px" style="width:60px"></div>
+              <div class="stg-row"><span class="stg-lbl">Dưới</span><input class="stg-in" value="40px" style="width:60px"></div>
             </div>
           </div>
           <div class="stg-grp">
             <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> ✨ Animation</button>
             <div class="stg-body">
-              <div class="stg-row"><span class="stg-lbl">Effect</span><select class="stg-sel"><option>Fade In</option><option>Slide Up</option></select></div>
+              <div class="stg-row"><span class="stg-lbl">Hiệu ứng</span><select class="stg-sel">
+                  <option>Fade In</option>
+                  <option>Slide Up</option>
+                </select></div>
             </div>
           </div>
         </div>
@@ -4020,33 +2644,38 @@
     <div class="screen" id="s5">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
           <div class="m-hero">
-            <h1>Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours</p>
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p>
           </div>
           <div class="m-products">
-            <h2>Featured Products</h2>
+            <h2>Sản phẩm nổi bật</h2>
             <div class="p-grid">
               <div class="p-card">
                 <div class="p-img blk sel" style="position:relative;outline-offset:-2px">
                   🌹
                   <div class="img-toolbar">
-                    <button class="btn-up">📤 Change Image</button>
-                    <button class="btn-aig">✨ AI Image 🚫</button>
+                    <button class="btn-up">📤 Đổi ảnh</button>
+                    <button class="btn-aig">✨ AI ảnh 🚫</button>
                   </div>
                 </div>
-                <div class="p-info"><h3>Red Roses</h3><div class="price">299.000₫</div></div>
+                <div class="p-info">
+                  <h3>Hoa Hồng</h3>
+                  <div class="price">299.000₫</div>
+                </div>
               </div>
               <div class="p-card">
                 <div class="p-img">🌻</div>
-                <div class="p-info"><h3>Sunflowers</h3><div class="price">199.000₫</div></div>
+                <div class="p-info">
+                  <h3>Hướng Dương</h3>
+                  <div class="price">199.000₫</div>
+                </div>
               </div>
             </div>
           </div>
@@ -4054,7 +2683,7 @@
       </div>
       <div class="bot-bar" onclick="openSheet(&#39;chat&#39;)">
         <div class="swipe-h"></div>
-        <div class="bot-bar-text"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Open AI Chat &amp; Tools <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--primary-teal)"><path d="m18 15-6-6-6 6"/></svg></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ ▲</div>
       </div>
     </div>
 
@@ -4064,40 +2693,35 @@
     <div class="screen" id="s6">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
           <div class="m-hero" style="background:linear-gradient(135deg,#f472b6,#ec4899)">
-            <h1>Fresh Flowers Every Day</h1>
-            <p>Fast delivery in 2 hours</p><span class="m-hero-btn">Shop Now →</span>
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p><span class="m-hero-btn">Mua ngay →</span>
           </div>
         </div>
       </div>
       <div class="bs-overlay on" onclick="showS(1)"></div>
       <div class="bs open h60">
         <div class="bs-handle"></div>
-        <div class="bs-tabs">
-          <button class="bs-tab on" data-t="chat"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> AI Chat</button>
-          <button class="bs-tab" data-t="components"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Components</button>
-          <button class="bs-tab" data-t="pages"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Pages</button>
-        </div>
-        <div class="bs-panel on" data-p="chat" style="flex:1;display:flex;flex-direction:column">
+        <div class="bs-tabs"><button class="bs-tab on">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab">⚙️ Cài đặt</button></div>
+        <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
           <div class="chat-msgs" style="flex:1">
-            <div class="bubble ai">Hello! What would you like to edit?</div>
-            <div class="bubble user">Change hero background to pink</div>
-            <div class="bubble ai">Done! 🌸 <button class="act">🔄 Try another option</button></div>
-            <div class="bubble user">What's the weather today?</div>
-            <div class="bubble sys">⚠️ I only help with web design. Try: "Change font", "Add section", "Rewrite content"</div>
+            <div class="bubble ai">Xin chào! Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble user">Đổi nền hero sang hồng</div>
+            <div class="bubble ai">Đã hoàn tất! 🌸 <button class="act">🔄 Thử phương án khác</button></div>
+            <div class="bubble user">Thời tiết hôm nay?</div>
+            <div class="bubble sys">⚠️ Mình chỉ hỗ trợ thiết kế web. Thử: "Đổi font", "Thêm section", "Viết lại nội
+              dung"</div>
           </div>
           <div class="chat-bar">
-            <input class="chat-in" placeholder="Tell AI what to change...">
-            <button class="chat-send"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg></button>
+            <input class="chat-in" placeholder="Nhập lệnh cho AI...">
+            <button class="chat-send">▶</button>
           </div>
-          <div class="chat-helper">Enter = send · Shift+Enter = new line</div>
         </div>
       </div>
     </div>
@@ -4108,40 +2732,56 @@
     <div class="screen" id="s7">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
         <div class="h-actions"><span class="h-status">Draft</span></div>
       </div>
       <div class="preview" style="filter:blur(2px);opacity:.35">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
-          <div class="m-hero"><h1>Fresh Flowers Every Day</h1></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+          </div>
         </div>
       </div>
       <div class="pub-sheet slide-up">
         <div class="pub-hdr"><span style="font-size:20px">🚀</span>
-          <h3>Publish Website</h3><button class="x" onclick="showS(1)">✕</button>
+          <h3>Xuất bản Website</h3><button class="x" onclick="showS(1)">✕</button>
         </div>
         <div class="checklist">
           <div class="chk-item"><span class="chk-ico">✅</span>
-            <div class="chk-c"><h4>Homepage ready</h4><p>Homepage has content and has been saved</p></div>
+            <div class="chk-c">
+              <h4>Trang chủ sẵn sàng</h4>
+              <p>Homepage có nội dung và đã được lưu</p>
+            </div>
           </div>
           <div class="chk-item"><span class="chk-ico">✅</span>
-            <div class="chk-c"><h4>Payment configured</h4><p>Stripe connected, cart working</p></div>
+            <div class="chk-c">
+              <h4>Cấu hình thanh toán</h4>
+              <p>Stripe đã kết nối, giỏ hàng hoạt động</p>
+            </div>
           </div>
           <div class="chk-item"><span class="chk-ico">⚠️</span>
-            <div class="chk-c"><h4>SEO incomplete</h4><p>"About" page missing Meta Description</p></div>
+            <div class="chk-c">
+              <h4>SEO chưa đầy đủ</h4>
+              <p>Trang "Giới thiệu" thiếu Meta Description</p>
+            </div>
           </div>
           <div class="chk-item"><span class="chk-ico">✅</span>
-            <div class="chk-c"><h4>Responsive OK</h4><p>Layout looks good on mobile and desktop</p></div>
+            <div class="chk-c">
+              <h4>Responsive OK</h4>
+              <p>Giao diện hiển thị tốt trên mobile và desktop</p>
+            </div>
           </div>
           <div class="chk-item"><span class="chk-ico">✅</span>
-            <div class="chk-c"><h4>Navigation complete</h4><p>Main menu links all Live pages</p></div>
+            <div class="chk-c">
+              <h4>Navigation hoàn chỉnh</h4>
+              <p>Menu chính đã liên kết tất cả trang Live</p>
+            </div>
           </div>
         </div>
         <div class="pub-foot">
-          <button class="btn-back" onclick="showS(1)">← Back</button>
-          <button class="btn-gopub" onclick="pubDone()">Publish Now</button>
+          <button class="btn-back" onclick="showS(1)">← Quay lại</button>
+          <button class="btn-gopub" onclick="pubDone()">👉 Publish ngay</button>
         </div>
       </div>
     </div>
@@ -4151,30 +2791,31 @@
      ══════════════════════════════════════════════════════════════ -->
     <div class="screen" id="s8">
       <div class="ed-header">
-        <button class="hbtn" onclick="openDrawer()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg></button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub" style="opacity:.5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="hbtn">☰</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub" style="opacity:.5">🚀</button></div>
       </div>
       <div class="preview" style="filter:blur(3px);opacity:.25">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
-          <div class="m-hero"><h1>Fresh Flowers</h1></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi</h1>
+          </div>
         </div>
       </div>
       <div class="alert-ov">
         <div class="alert-box fade">
           <div style="font-size:28px">⚠️</div>
-          <h3>Hide Website?</h3>
-          <p>You're about to put the site into Maintenance mode:</p>
+          <h3>Tạm ẩn Website?</h3>
+          <p>Bạn đang chuẩn bị đưa trang web về chế độ Bảo trì:</p>
           <ul>
-            <li>Visitors will <strong>not be able to access</strong> the site</li>
-            <li>Search bots receive <strong>HTTP 503</strong></li>
-            <li>All data and content is preserved</li>
+            <li>Khách hàng sẽ <strong>không thể truy cập</strong> trang web</li>
+            <li>SEO Bot nhận mã lỗi <strong>503 HTTP</strong></li>
+            <li>Dữ liệu và nội dung vẫn được giữ nguyên</li>
           </ul>
           <div class="alert-acts">
-            <button class="btn-cancel" onclick="showS(1)">Cancel</button>
-            <button class="btn-danger" onclick="pubDone2()">Yes, Hide Now</button>
+            <button class="btn-cancel" onclick="showS(1)">Huỷ bỏ</button>
+            <button class="btn-danger" onclick="pubDone2()">Có, Ẩn ngay</button>
           </div>
         </div>
       </div>
@@ -4186,30 +2827,30 @@
     <div class="screen" id="s9">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <span style="font-size:13px;font-weight:600;flex:1">Menu Manager</span>
-        <button style="color:var(--primary-blue);font-size:12px;font-weight:600" onclick="showS(1)">Done</button>
+        <span style="font-size:13px;font-weight:600;flex:1">Quản lý Menu</span>
+        <button style="color:var(--primary-blue);font-size:12px;font-weight:600" onclick="showS(1)">Xong</button>
       </div>
       <div style="flex:1;overflow-y:auto;background:var(--bg)">
         <div class="nav-list">
-          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🏠 Home</span>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🏠 Trang chủ</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
           </div>
-          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🛍️ Products</span>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🛍️ Sản phẩm</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
           </div>
-          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Fresh Flowers</span>
+          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Áo dài</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button><button style="color:var(--error)">✕</button></div>
           </div>
-          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Wedding Dress</span>
+          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Váy cưới</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button><button style="color:var(--error)">✕</button></div>
           </div>
-          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📄 About</span>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📄 Giới thiệu</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
           </div>
-          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📞 Contact</span>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📞 Liên hệ</span>
             <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
           </div>
-          <button class="nv-add">➕ Add new link</button>
+          <button class="nv-add">➕ Thêm link mới</button>
         </div>
       </div>
     </div>
@@ -4220,46 +2861,46 @@
     <div class="screen" id="s10">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot"></span>Saved</div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
         <div class="preview-inner">
           <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
-          <div class="m-hero"><h1>Fresh Flowers Every Day</h1><p>Fast delivery in 2 hours</p></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p>
+          </div>
         </div>
       </div>
       <div class="bs-overlay on" onclick="showS(1)"></div>
       <div class="bs open h75">
         <div class="bs-handle"></div>
-        <div class="bs-tabs">
-          <button class="bs-tab" data-t="chat"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> AI Chat</button>
-          <button class="bs-tab" data-t="components"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> Components</button>
-          <button class="bs-tab on" data-t="pages"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Pages</button>
-        </div>
-        <div class="bs-panel on" data-p="pages" style="flex:1;display:flex;flex-direction:column">
+        <div class="bs-tabs"><button class="bs-tab">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab on">⚙️ Cài đặt</button></div>
+        <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
           <div class="stg-list" style="flex:1;overflow-y:auto">
             <div class="stg-grp">
               <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🔍 SEO Settings</button>
               <div class="stg-body open">
                 <div style="padding:6px 0">
-                  <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 chars)</span></div>
-                  <input class="stg-in" value="Fresh Flower Shop" style="width:100%">
+                  <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 ký
+                      tự)</span></div><input class="stg-in" value="Cửa hàng Hoa Tươi" style="width:100%">
                 </div>
                 <div style="padding:6px 0">
-                  <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160 chars)</span></div>
-                  <textarea class="stg-in" style="width:100%;height:50px;resize:none">Buy fresh flowers, delivered in 2 hours!</textarea>
+                  <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160
+                      ký tự)</span></div><textarea class="stg-in" style="width:100%;height:50px;resize:none">Mua hoa tươi giao ngay trong 2h!</textarea>
                 </div>
-                <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--secondary-bg);color:var(--muted);font-size:11px;font-weight:600;margin-top:4px;opacity:.5" disabled="">✨ Auto-Optimize SEO</button>
-                <p style="font-size:10px;color:var(--warning);margin-top:5px;text-align:center">🔒 AI Credits used up — you can still edit manually</p>
-                <div style="text-align:center;margin-top:8px"><button style="padding:6px 16px;background:var(--gradient-primary);color:#fff;border-radius:16px;font-size:11px;font-weight:600">💎 Upgrade</button></div>
+                <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--secondary-bg);color:var(--muted);font-size:11px;font-weight:600;margin-top:4px;opacity:.5" disabled="">✨ Tự động Tối ưu SEO</button>
+                <p style="font-size:10px;color:var(--warning);margin-top:5px;text-align:center">🔒 Đã hết AI Token — bạn
+                  vẫn có thể chỉnh sửa thủ công</p>
+                <div style="text-align:center;margin-top:8px"><button style="padding:6px 16px;background:var(--gradient-primary);color:#fff;border-radius:16px;font-size:11px;font-weight:600">💎
+                    Nâng cấp</button></div>
               </div>
             </div>
             <div class="stg-grp">
               <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand Identity</button>
               <div class="stg-body open">
-                <div class="stg-row"><span class="stg-lbl">Name</span><input class="stg-in" value="FloraShop"></div>
+                <div class="stg-row"><span class="stg-lbl">Tên</span><input class="stg-in" value="FloraShop"></div>
               </div>
             </div>
           </div>
@@ -4274,29 +2915,27 @@
     <div class="screen" id="s11">
       <div class="ed-header">
         <button class="hbtn" onclick="showS(1)">←</button>
-        <div class="h-saved"><span class="saved-dot" style="background:var(--warning)"></span><span style="color:var(--warning)">Draft</span></div>
-        <div style="flex:1"></div>
-        <div class="h-actions"><button class="btn-pub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg> Publish</button></div>
+        <button class="page-sel"><span>🎉 Khuyến mãi</span><span class="chevron">▼</span></button>
+        <div class="h-actions"><span class="h-status" style="color:var(--warning)">Draft</span><button class="btn-pub">🚀</button></div>
       </div>
       <div class="preview">
-        <div class="preview-inner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:500px;background:#0B1120;">
+        <div class="preview-inner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:500px;background:#fff;">
           <div style="text-align:center;padding:40px 20px">
             <div style="font-size:40px;margin-bottom:12px">📄</div>
-            <div style="font-size:16px;font-weight:700;color:#F1F5F9;margin-bottom:6px">New page created!</div>
-            <div style="font-size:12px;color:#9CA3AF;margin-bottom:20px;line-height:1.5">"Promotions" page is empty. Start adding content with AI or drag &amp; drop blocks.</div>
+            <div style="font-size:16px;font-weight:700;color:#1f2937;margin-bottom:6px">Trang mới đã tạo!</div>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:20px;line-height:1.5">Trang "Khuyến mãi" đang trống.
+              Bắt đầu thêm nội dung bằng AI hoặc kéo thả block.</div>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-              <button style="padding:10px 18px;background:linear-gradient(135deg,#3b82f6,#2dd4bf);color:#fff;border-radius:10px;font-size:12px;font-weight:700" onclick="showS(1)">🪄 Use AI to build page</button>
-              <button style="padding:10px 18px;background:#1F2937;color:#E5E7EB;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #1F2937" onclick="showS(1)">🧩 Add Block</button>
+              <button style="padding:10px 18px;background:linear-gradient(135deg,#3b82f6,#2dd4bf);color:#fff;border-radius:10px;font-size:12px;font-weight:700" onclick="showS(1)">🪄 Dùng AI tạo nội dung</button>
+              <button style="padding:10px 18px;background:#f1f5f9;color:#1f2937;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #e2e8f0" onclick="showS(1)">🧩 Thêm Block</button>
             </div>
           </div>
         </div>
       </div>
-      <div class="fab" onclick="openSheet('chat')">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
-      </div>
-      <div class="bot-bar" onclick="openSheet('chat')">
+      <div class="fab" onclick="openSheet(&#39;chat&#39;)">🪄</div>
+      <div class="bot-bar">
         <div class="swipe-h"></div>
-        <div class="bot-bar-text"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg> Open AI Chat &amp; Tools <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--primary-teal)"><path d="m18 15-6-6-6 6"/></svg></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ ▲</div>
       </div>
     </div>
 
@@ -4323,15 +2962,19 @@
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById('s' + n).classList.add('active');
       document.querySelectorAll('.screen-nav button').forEach((b, i) => b.classList.toggle('active', i === n - 1));
-      if (n === 1) { closeSheet(); closeDrawer(); hideAddPageForm(); hidePgConfirm(); }
+      if (n === 1) { closeSheet(); closeDrawer(); document.getElementById('pgDrop').classList.remove('on'); hideAddPageForm(); hidePgConfirm(); }
     }
 
     /* ═══════ CMS DRAWER ═══════ */
     function openDrawer() { document.getElementById('drawer').classList.add('on'); document.getElementById('drawerOv').classList.add('on'); }
     function closeDrawer() { document.getElementById('drawer').classList.remove('on'); document.getElementById('drawerOv').classList.remove('on'); }
 
-    /* ═══════ PAGE PANEL (in bottom sheet) ═══════ */
-    function togglePages() { /* pgDrop removed — pages now in sheet panel */ }
+    /* ═══════ PAGE DROPDOWN ═══════ */
+    function togglePages() {
+      const d = document.getElementById('pgDrop');
+      d.classList.toggle('on');
+      hideAddPageForm(); hidePgConfirm();
+    }
 
     /* Page actions */
     function pageAction(page, action) {
@@ -4340,22 +2983,22 @@
         const tag = item.querySelector('.pg-tag');
         if (tag.classList.contains('hidden')) {
           tag.classList.remove('hidden'); tag.classList.add('live'); tag.textContent = 'Live';
-          showToast('Page visible again', '');
+          showToast('Trang đã hiển thị trở lại', '');
         } else {
-          tag.classList.remove('live', 'draft'); tag.classList.add('hidden'); tag.textContent = 'Hidden';
-          showToast('Page hidden — visitors will see 404', '');
+          tag.classList.remove('live', 'draft'); tag.classList.add('hidden'); tag.textContent = 'Ẩn';
+          showToast('Đã ẩn trang — khách sẽ thấy 404', '');
         }
       }
       if (action === 'up' || action === 'down') {
         const list = document.getElementById('pageList');
         const items = [...list.querySelectorAll('.pg-item')];
         const idx = items.findIndex(i => i.dataset.page === page);
-        if (action === 'up' && idx > 0) { list.insertBefore(items[idx], items[idx - 1]); showToast('Page order updated', ''); }
-        if (action === 'down' && idx < items.length - 1) { items[idx].nextElementSibling.after(items[idx]);/* swap */list.insertBefore(items[idx], items[idx].nextElementSibling?.nextElementSibling || null); showToast('Page order updated', ''); }
+        if (action === 'up' && idx > 0) { list.insertBefore(items[idx], items[idx - 1]); showToast('Đã đổi vị trí trang', ''); }
+        if (action === 'down' && idx < items.length - 1) { items[idx].nextElementSibling.after(items[idx]);/* swap */list.insertBefore(items[idx], items[idx].nextElementSibling?.nextElementSibling || null); showToast('Đã đổi vị trí trang', ''); }
       }
       if (action === 'edit') {
-        // Page name label removed from toolbar; just close sheet or show toast
-        closeSheet();
+        document.getElementById('currentPageName').textContent = { home: '🏠 Trang chủ', products: '🛍️ Sản phẩm', about: '📄 Giới thiệu', contact: '📞 Liên hệ', '404': '🚫 Trang 404' }[page] || page;
+        togglePages();
       }
       if (action === 'delete') {
         document.getElementById('pgConfirmName').textContent = document.querySelector(`.pg-item[data-page="${page}"] .pg-name`).textContent;
@@ -4368,7 +3011,7 @@
       const page = document.getElementById('pgConfirm').dataset.page;
       const item = document.querySelector(`.pg-item[data-page="${page}"]`);
       if (item) item.style.display = 'none';
-      hidePgConfirm();
+      hidePgConfirm(); togglePages();
       // Show undo toast
       const ut = document.getElementById('undoToast');
       ut.classList.add('on');
@@ -4380,7 +3023,7 @@
       const ut = document.getElementById('undoToast'); clearInterval(ut._iv); ut.classList.remove('on');
       const item = document.querySelector(`.pg-item[data-page="${ut._page}"]`);
       if (item) item.style.display = '';
-      showToast('Page deletion undone', '');
+      showToast('Đã hoàn tác xoá trang', '');
     }
 
     /* Add new page */
@@ -4388,7 +3031,7 @@
       document.getElementById('pgAddBtn').style.display = 'none';
       document.getElementById('pgForm').classList.add('on');
       document.getElementById('pgNameIn').value = '';
-      document.getElementById('slugPreview').textContent = '/page-name';
+      document.getElementById('slugPreview').textContent = '/ten-trang';
       setTimeout(() => document.getElementById('pgNameIn').focus(), 100);
     }
     function hideAddPageForm() {
@@ -4397,14 +3040,14 @@
     }
     function updateSlugPreview() {
       const v = document.getElementById('pgNameIn').value;
-      const slug = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'page-name';
+      const slug = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'ten-trang';
       document.getElementById('slugPreview').textContent = '/' + slug;
     }
     function createNewPage() {
       const name = document.getElementById('pgNameIn').value.trim();
       if (!name) { document.getElementById('pgNameIn').style.borderColor = 'var(--error)'; return; }
       hideAddPageForm(); togglePages();
-      showToast('Created page "' + name + '"', '');
+      showToast('Đã tạo trang "' + name + '"', '');
       setTimeout(() => showS(11), 800);
     }
 
@@ -4412,61 +3055,21 @@
     function openSheet(tab) {
       document.getElementById('sheet').classList.add('open');
       document.getElementById('shOv').classList.add('on');
-      document.getElementById('fab')?.classList.add('hide');
+      document.getElementById('fab').classList.add('hide');
       if (tab) swTab(tab);
     }
     function closeSheet() {
       document.getElementById('sheet').classList.remove('open');
       document.getElementById('shOv').classList.remove('on');
-      document.getElementById('fab')?.classList.remove('hide');
+      document.getElementById('fab').classList.remove('hide');
       // Clear block selection
       document.querySelectorAll('#s1 .blk').forEach(b => b.classList.remove('sel'));
+      document.getElementById('gStg').style.display = '';
+      document.getElementById('bStg').style.display = 'none';
     }
     function swTab(t) {
       document.querySelectorAll('#shTabs .bs-tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
       document.querySelectorAll('#sheet .bs-panel').forEach(p => p.classList.toggle('on', p.dataset.p === t));
-    }
-    /* Settings sub-tabs: Global / Menu / SEO */
-    function swStgTab(t) {
-      document.querySelectorAll('.stg-subtab').forEach(b => b.classList.toggle('on', b.dataset.st === t));
-      document.querySelectorAll('.stg-subpanel').forEach(p => p.classList.toggle('on', p.dataset.sp === t));
-    }
-
-    /* ═══════ TEMPLATE PICKER ═══════ */
-    function openTemplates() { document.getElementById('tmplModal').classList.add('on'); }
-    function closeTemplates() {
-      document.getElementById('tmplModal').classList.remove('on');
-      document.getElementById('tmplConfirm').classList.remove('on');
-    }
-    function pickTemplate(name) {
-      document.getElementById('tcfTitle').textContent = 'Apply "' + name + '"?';
-      document.getElementById('tmplConfirm').dataset.name = name;
-      document.getElementById('tmplConfirm').classList.add('on');
-    }
-    function cancelTemplate() { document.getElementById('tmplConfirm').classList.remove('on'); }
-    function applyTemplate() {
-      const name = document.getElementById('tmplConfirm').dataset.name || 'Template';
-      closeTemplates();
-      showToast('Applied template "' + name + '"', '');
-    }
-
-    /* ═══════ BLOCK SETTINGS BOTTOM SHEET ═══════ */
-    function openBsBlock() {
-      document.getElementById('bsBlock').classList.add('open');
-      document.getElementById('bsBlockOv').classList.add('on');
-    }
-    function closeBsBlock() {
-      document.getElementById('bsBlock').classList.remove('open');
-      document.getElementById('bsBlockOv').classList.remove('on');
-      document.querySelectorAll('#s1 .blk').forEach(b => b.classList.remove('sel'));
-    }
-    function openBsSite() {
-      document.getElementById('bsSite').classList.add('open');
-      document.getElementById('bsSiteOv').classList.add('on');
-    }
-    function closeBsSite() {
-      document.getElementById('bsSite').classList.remove('open');
-      document.getElementById('bsSiteOv').classList.remove('on');
     }
 
     /* ═══════ BLOCK SELECT ═══════ */
@@ -4476,7 +3079,7 @@
       const map = {
         header: ['HEADER', 'Header / Nav'],
         hero: ['HERO', 'Hero Section'],
-        products: ['PRODUCTS', 'Products'],
+        products: ['PRODUCTS', 'Sản phẩm'],
         footer: ['FOOTER', 'Footer'],
         text: ['TEXT', 'Rich Text'],
         cta: ['CTA', 'Call to Action']
@@ -4486,20 +3089,22 @@
         document.getElementById('bNameL').textContent = map[type][1];
         renderBlockSettings(type);
       }
-      openBsBlock();
+      document.getElementById('gStg').style.display = 'none';
+      document.getElementById('bStg').style.display = 'block';
+      openSheet('settings');
     }
 
     /* ═══════ DYNAMIC BLOCK SETTINGS RENDERER ═══════ */
     const BLOCK_CONFIGS = {
       header: {
-        name: 'Header / Navigation',
+        name: 'Header / Điều hướng',
         groups: [
           {
-            title: '🎨 Appearance',
+            title: '🎨 Giao diện',
             fields: [
-              { label: 'Height (px)', type: 'number', key: 'h', val: '60' },
-              { label: 'Text color', type: 'color', key: 'c', val: '#1f2937' },
-              { label: 'Sticky', type: 'select', key: 'sticky', options: ['Yes', 'No'], val: 'Yes' }
+              { label: 'Chiều cao (px)', type: 'number', key: 'h', val: '60' },
+              { label: 'Màu chữ', type: 'color', key: 'c', val: '#1f2937' },
+              { label: 'Nền dính (Sticky)', type: 'select', key: 'sticky', options: ['Có', 'Không'], val: 'Có' }
             ]
           }
         ]
@@ -4510,41 +3115,41 @@
           {
             title: '🎨 Background',
             fields: [
-              { label: 'Background type', type: 'select', key: 'bgType', options: ['Gradient', 'Image', 'Solid'], val: 'Gradient' },
-              { label: 'Color 1', type: 'color', key: 'color1', val: '#667eea' },
-              { label: 'Color 2', type: 'color', key: 'color2', val: '#764ba2' }
+              { label: 'Kiểu nền', type: 'select', key: 'bgType', options: ['Gradient', 'Ảnh', 'Màu đơn'], val: 'Gradient' },
+              { label: 'Màu 1', type: 'color', key: 'color1', val: '#667eea' },
+              { label: 'Màu 2', type: 'color', key: 'color2', val: '#764ba2' }
             ]
           },
           {
             title: '📐 Padding',
             fields: [
-              { label: 'Top', type: 'number', key: 'pt', val: '40' },
-              { label: 'Bottom', type: 'number', key: 'pb', val: '40' }
+              { label: 'Trên', type: 'number', key: 'pt', val: '40' },
+              { label: 'Dưới', type: 'number', key: 'pb', val: '40' }
             ]
           }
         ]
       },
       products: {
-        name: 'Product List',
+        name: 'Danh sách sản phẩm',
         groups: [
           {
-            title: '📦 Display',
+            title: '📦 Hiển thị',
             fields: [
-              { label: 'Columns (Mobile)', type: 'select', key: 'cols', options: ['1 Column', '2 Columns'], val: '2 Columns' },
-              { label: 'Product count', type: 'number', key: 'limit', val: '4' },
-              { label: 'Show price', type: 'select', key: 'showPrice', options: ['Yes', 'No'], val: 'Yes' }
+              { label: 'Số cột (Mobile)', type: 'select', key: 'cols', options: ['1 Cột', '2 Cột'], val: '2 Cột' },
+              { label: 'Số lượng SP', type: 'number', key: 'limit', val: '4' },
+              { label: 'Hiện giá', type: 'select', key: 'showPrice', options: ['Có', 'Không'], val: 'Có' }
             ]
           }
         ]
       },
       footer: {
-        name: 'Footer',
+        name: 'Chân trang',
         groups: [
           {
-            title: '🎨 Appearance',
+            title: '🎨 Giao diện',
             fields: [
-              { label: 'Background color', type: 'color', key: 'bgFooter', val: '#1f2937' },
-              { label: 'Text color', type: 'color', key: 'fgFooter', val: '#9ca3af' }
+              { label: 'Màu nền', type: 'color', key: 'bgFooter', val: '#1f2937' },
+              { label: 'Màu chữ', type: 'color', key: 'fgFooter', val: '#9ca3af' }
             ]
           }
         ]
@@ -4553,11 +3158,11 @@
         name: 'Rich Text',
         groups: [
           {
-            title: '📝 Content',
+            title: '📝 Nội dung',
             fields: [
-              { label: 'Alignment', type: 'select', key: 'align', options: ['Left', 'Center', 'Right'], val: 'Center' },
-              { label: 'Font size', type: 'number', key: 'fs', val: '14' },
-              { label: 'Text color', type: 'color', key: 'color', val: '#1f2937' }
+              { label: 'Căn lề', type: 'select', key: 'align', options: ['Trái', 'Giữa', 'Phải'], val: 'Giữa' },
+              { label: 'Cỡ chữ', type: 'number', key: 'fs', val: '14' },
+              { label: 'Màu chữ', type: 'color', key: 'color', val: '#1f2937' }
             ]
           }
         ]
@@ -4566,11 +3171,11 @@
         name: 'CTA Banner',
         groups: [
           {
-            title: '📢 Action',
+            title: '📢 Hành động',
             fields: [
-              { label: 'Button text', type: 'text', key: 'btnText', val: 'Buy now' },
-              { label: 'Button color', type: 'color', key: 'btnColor', val: '#3b82f6' },
-              { label: 'Corner radius', type: 'number', key: 'radius', val: '8' }
+              { label: 'Text nút', type: 'text', key: 'btnText', val: 'Mua ngay' },
+              { label: 'Màu nút', type: 'color', key: 'btnColor', val: '#3b82f6' },
+              { label: 'Góc bo', type: 'number', key: 'radius', val: '8' }
             ]
           }
         ]
@@ -4659,7 +3264,7 @@
 
     /* ═══════ ADD BLOCK ═══════ */
     function addBlk(name) {
-      showToast('Added "' + name + '" to the page', '');
+      showToast('Đã thêm "' + name + '" vào trang', '');
       if (navigator.vibrate) navigator.vibrate(50);
       setTimeout(() => closeSheet(), 500);
     }
@@ -4672,7 +3277,7 @@
       inp.value = '';
       const tp = document.createElement('div'); tp.className = 'typing'; tp.innerHTML = '<span></span><span></span><span></span>'; box.appendChild(tp);
       box.scrollTop = box.scrollHeight;
-      setTimeout(() => { tp.remove(); const ab = document.createElement('div'); ab.className = 'bubble ai fade'; ab.innerHTML = 'Done: "' + msg + '" ✨<br><button class="act">🔄 Try another option</button>'; box.appendChild(ab); box.scrollTop = box.scrollHeight; }, 1200);
+      setTimeout(() => { tp.remove(); const ab = document.createElement('div'); ab.className = 'bubble ai fade'; ab.innerHTML = 'Đã thực hiện: "' + msg + '" ✨<br><button class="act">🔄 Thử phương án khác</button>'; box.appendChild(ab); box.scrollTop = box.scrollHeight; }, 1200);
     }
     document.addEventListener('keydown', e => { if (e.key === 'Enter' && document.activeElement.id === 'chatIn') sendChat(); });
 
@@ -4684,14 +3289,14 @@
       t.classList.add('on'); if (navigator.vibrate) navigator.vibrate(30);
       setTimeout(() => t.classList.remove('on'), 2500);
     }
-    function pubDone() { showS(1); setTimeout(() => showToast('🎉 Website published!', ''), 400); }
-    function pubDone2() { showS(1); setTimeout(() => showToast('Website unpublished', ''), 400); }
+    function pubDone() { showS(1); setTimeout(() => showToast('🎉 Website đã được xuất bản!', ''), 400); }
+    function pubDone2() { showS(1); setTimeout(() => showToast('Website đã tạm ẩn', ''), 400); }
 
     /* ═══════ THEME ═══════ */
     function toggleTheme() {
       const h = document.documentElement; const b = document.querySelector('.theme-btn');
-      if (h.dataset.theme === 'dark') { h.dataset.theme = 'light'; if (b) b.textContent = '☀️'; }
-      else { h.dataset.theme = 'dark'; if (b) b.textContent = '🌙'; }
+      if (h.dataset.theme === 'dark') { h.dataset.theme = 'light'; b.textContent = '☀️'; }
+      else { h.dataset.theme = 'dark'; b.textContent = '🌙'; }
     }
 
     /* ═══════ SWIPE ═══════ */
