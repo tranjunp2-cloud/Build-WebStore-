@@ -140,6 +140,10 @@ export default async function PreviewBlogDetailPage({ params, searchParams }: Pr
     navBlock = {
         ...navBlock,
         links: rewriteNavLinkUrls(navBlock.links, rewritePreview),
+        // Logo links home via `_logoHref` (NavLogoLink). Without this the logo falls back
+        // to raw '/' and clicking it escapes the iframe to the platform root — same bug as
+        // the nav tabs (#1443). Mirrors SiteRenderer's `_logoHref: rewriteUrl('/')`.
+        _logoHref: rewritePreview('/'),
         ...(navBlock.ctaButton && typeof navBlock.ctaButton === 'object'
             ? {
                 ctaButton: {
