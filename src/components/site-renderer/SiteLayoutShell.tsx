@@ -192,10 +192,12 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children, forceCart
                 ` : ''}
             `}</style>
 
-            {headerBlock && renderBlock(headerBlock, headerBlock.blockType as string || 'navigation')}
-            {fixedNavSpacer && <div style={{ height: fixedNavSpacer }} aria-hidden="true" />}
-            {children}
-            {footerBlock && renderBlock(footerBlock, footerBlock.blockType as string || 'footer')}
+            <div className="min-h-screen flex flex-col">
+                {headerBlock && renderBlock(headerBlock, headerBlock.blockType as string || 'navigation')}
+                {fixedNavSpacer && <div style={{ height: fixedNavSpacer }} aria-hidden="true" />}
+                <main className="flex-1">{children}</main>
+                {footerBlock && renderBlock(footerBlock, footerBlock.blockType as string || 'footer')}
+            </div>
             {cartWidgetBlock ? renderBlock(cartWidgetBlock as Record<string, unknown>, 'cartWidget') : forceCartWidget && renderBlock({ blockType: 'cartWidget' }, 'cartWidget')}
         </OwnerProvider>
     )

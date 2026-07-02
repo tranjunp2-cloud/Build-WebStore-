@@ -70,6 +70,20 @@ CartDrawer.tsx (CSR - 'use client')
 | AnalyticsDashboard | `src/app/(dashboard)/dashboard/analytics/page.tsx` | CSR | Stats, chart, top pages |
 | cartStore | `src/store/cartStore.ts` | — | Zustand + localStorage |
 
+### Layout Pattern: Sticky Footer
+
+Both `SiteLayoutShell` (Product/Blog detail pages) and `SiteRenderer` (page-builder storefront pages) use a consistent sticky-footer pattern to keep the footer anchored at the bottom of short-content pages:
+
+```tsx
+<div className="min-h-screen flex flex-col">
+  <header>...</header>
+  <main className="flex-1">{children}</main>
+  <footer>...</footer>
+</div>
+```
+
+The flex column with `flex-1` on main stretches content to fill available space, pushing the footer to the viewport bottom. This prevents visual gaps when content is shorter than the viewport (GH-1466 fix). Floating widgets (cart, WhatsApp, sticky CTAs) render as `position:fixed` siblings outside this tree, unaffected.
+
 ## 4. Data Flow
 
 ### Add to Cart → Checkout → Order
