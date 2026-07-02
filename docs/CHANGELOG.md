@@ -28,6 +28,8 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 - **[#1179]** fix(cart): validate quantity against variant stock not aggregate inventory — `src/components/storefront/product-add-to-cart-section.tsx` now uses `selectedVariant?.stock` as inventory source when variant is selected, preventing UX mismatch with server-side CAS. Component previously checked `product.inventory` (aggregate), causing users to be able to add quantities unavailable in the selected variant. Affected by TC-F09.237x, TC-F09.238x regression tests.
 
+- **GH-1293** fix(sso): increase timeout + deduplicate step events via upsert — SSO Hub provisioning timeout raised from 10s to 30s to handle slow network conditions; `sso_step_events` collection now uses unique index and upsert logic to prevent duplicate (user_id, step) entries on retry; 4 provisioning routes updated to use Next.js `after()` for reliable event notification without blocking response. See `src/lib/sso/sso-api-client.ts` + `scripts/db-setup.js` migrations + `src/__tests__/unit/lib/sso-api-client.test.ts`.
+
 ---
 
 ### F34 — Subscription Enforcement Error Message i18n
