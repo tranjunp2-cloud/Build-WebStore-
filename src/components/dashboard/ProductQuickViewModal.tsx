@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import { ProductImageWithFallback } from './ProductImageWithFallback'
-import { ChevronRight, Trash2, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/i18n'
 import { getDisplayPrice } from '@/lib/products/display-price'
@@ -109,6 +109,8 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
         .map(img => ({ url: getImageUrl(img.image), alt: img.alt }))
         .filter(img => img.url !== null) as { url: string; alt?: string }[]
     const displayImages = processedImages.length > 0 ? processedImages : [{ url: '/images/crate-carton.png', alt: undefined }]
+    const handlePrev = () => setSelectedImageIdx(i => (i - 1 + displayImages.length) % displayImages.length)
+    const handleNext = () => setSelectedImageIdx(i => (i + 1) % displayImages.length)
 
     // Process Categories (Assuming populated)
     const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || ''
@@ -163,29 +165,48 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                 {/* Column 1: Visuals & Core Status (Node 30928:3970) */}
                 <div className="flex flex-col w-full md:w-[480px] shrink-0 bg-[#0B0E14] rounded-tl-[16px] border-r border-white/5 h-full overflow-y-auto custom-scrollbar p-[32px] gap-[24px]">
                     
-                    {/* Main Image */}
-                    <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full aspect-square shrink-0 overflow-hidden relative border border-white/5">
-                        <ProductImageWithFallback
-                            imgUrl={displayImages[selectedImageIdx]?.url ?? null}
-                            alt={displayImages[selectedImageIdx]?.alt || product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"}
-                            size="lg"
-                            sizes="480px"
-                        />
+                    {/* Main Image — wrapper is relative so nav buttons overlay without being clipped by overflow-hidden */}
+                    <div className="relative flex-1 min-h-0 max-h-[416px]">
+                        <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full h-full overflow-hidden border border-white/5">
+                            <ProductImageWithFallback
+                                imgUrl={displayImages[selectedImageIdx]?.url ?? null}
+                                alt={displayImages[selectedImageIdx]?.alt || product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"}
+                                size="lg"
+                                sizes="480px"
+                                className="object-contain"
+                            />
+                        </div>
+                        {displayImages.length > 1 && (
+                            <>
+                                <button type="button" onClick={handlePrev} aria-label="Previous image"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[#1D2026] border border-white/10 text-[#E1E2EB] hover:bg-[#1E293B] transition-colors shadow-sm cursor-pointer">
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button type="button" onClick={handleNext} aria-label="Next image"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[#1D2026] border border-white/10 text-[#E1E2EB] hover:bg-[#1E293B] transition-colors shadow-sm cursor-pointer">
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </>
+                        )}
                     </div>
 
-                    {/* Thumbnails */}
+                    {/* Thumbnails — outer div constrains to column width + scrolls; inner div grows to natural content width */}
                     {displayImages.length > 1 && (
-                        <div className="grid grid-cols-3 gap-[16px]">
-                            {displayImages.slice(0, 3).map((img, idx) => (
-                                <button key={idx} onClick={() => setSelectedImageIdx(idx)} className={`relative w-full aspect-square rounded-[4px] overflow-hidden ${selectedImageIdx === idx ? 'border-2 border-[#44DDC1]' : 'opacity-60 hover:opacity-100 transition-opacity bg-[#1D2026] border border-white/5'}`}>
-                                    <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="120px" />
-                                </button>
-                            ))}
+                        <div style={{ width: '100%', minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+                            <div style={{ display: 'flex', gap: '12px', width: 'max-content' }}>
+                                {displayImages.map((img, idx) => (
+                                    <button key={idx} onClick={() => setSelectedImageIdx(idx)}
+                                        style={{ width: '128px', height: '128px', flexShrink: 0 }}
+                                        className={`relative rounded-[4px] overflow-hidden bg-[#1D2026] cursor-pointer ${selectedImageIdx === idx ? 'border-2 border-[#44DDC1]' : 'opacity-60 hover:opacity-100 transition-opacity border border-white/5'}`}>
+                                        <ProductImageWithFallback imgUrl={img.url} alt={img.alt || product.name} size="sm" sizes="128px" className="object-contain" />
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 
                     {/* Stock Level Section */}
-                    <div className="mt-auto pt-[40px] flex flex-col justify-end h-full min-h-[147px]">
+                    <div className="mt-auto pt-[40px] flex flex-col justify-end min-h-[147px]">
                         <div className="flex flex-col gap-[8px] p-[20px] bg-[#1D2026] border border-white/[0.05] rounded-[8px]">
                             <div className="flex justify-between items-center w-full">
                                 <span className="text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.stockLevel || 'Stock Level'}</span>

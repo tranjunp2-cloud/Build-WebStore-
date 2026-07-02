@@ -1536,4 +1536,14 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
   .dash-logo-seg.sb-dark .hover\:bg-dash-surface-hover:hover { background-color: hsl(var(--muted)) !important; }
   .dash-logo-seg.sb-dark .border-dash-border { border-color: hsl(var(--border)) !important; }
 }
+} /* end @layer utilities */
+
+/* Storefront product gallery nav buttons — outside @layer so cascade priority is correct */
+.gallery-nav-btn {
+  transform: translateY(-50%);
+  transition: background 0.15s, transform 0.1s;
+}
+.gallery-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.7) !important;
+  transform: translateY(-50%) scale(1.08);
 }
