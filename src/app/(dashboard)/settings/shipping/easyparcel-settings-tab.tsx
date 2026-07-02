@@ -7,9 +7,9 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PickupAddresses } from './pickup-addresses'
-import { CourierPicker } from './courier-picker'
+import { EpWalletBanner } from './ep-wallet-banner'
 import { EpSetupStepper } from './ep-setup-stepper'
-import { getAllowedCouriers, getDefaultWarehouse, isWarehouseComplete, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isWarehouseComplete, type Warehouse } from '@/lib/shipping/easyparcel/warehouse'
 
 export interface EasyParcelIntegrationConfig {
     enabled?: boolean
@@ -57,14 +57,6 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         return []
     })
 
-    const [selectedCouriers, setSelectedCouriers] = useState<string[]>(() =>
-        getAllowedCouriers(initialEpConfig),
-    )
-
-    function onToggle(id: string) {
-        setSelectedCouriers(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
-    }
-
     const [isSaving, setIsSaving] = useState(false)
 
     const searchParams = useSearchParams()
@@ -87,23 +79,18 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // At least one pickup address is required (each is validated inside the add form). A specific
-    // courier must also be chosen so checkout never offers a non-COD courier to COD buyers.
-    const warehouseComplete = warehouses.length > 0
+    // Ready = default pickup is complete. Mirrors server isEpReady (minus token).
+    const warehouseComplete = isWarehouseComplete(getDefaultWarehouse({ warehouses }))
     const hasWarehouse = warehouses.length > 0
-    const courierMissing = selectedCouriers.length === 0
-    const canSave = testStatus === 'connected' && !isSaving && warehouseComplete && !courierMissing
-
-    // Ready = default pickup complete (incl. phone) + at least one courier chosen. Mirrors server isEpReady
-    // (minus token, which the client can't see). Drives the toggle guard + not-ready badge.
-    const localReady = isWarehouseComplete(getDefaultWarehouse({ warehouses })) && selectedCouriers.length > 0
+    const canSave = testStatus === 'connected' && !isSaving && warehouseComplete
+    const localReady = warehouseComplete
 
     // Master toggle: activate/deactivate EP for checkout. Persists immediately; can only turn ON when
-    // ready. Sends the full group so Payload doesn't drop warehouses/courier.
+    // ready. Sends the full group so Payload doesn't drop warehouses.
     async function handleToggleEnabled() {
         const next = !enabled
         if (next && !localReady) {
-            toast.error('Add a complete pickup address and select a courier before activating.')
+            toast.error('Add a complete pickup address before activating.')
             return
         }
         const prev = enabled
@@ -113,7 +100,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled: next, warehouses, selectedCouriers }),
+                body: JSON.stringify({ enabled: next, warehouses }),
             })
             if (!res.ok) throw new Error()
             toast.success(next ? 'EasyParcel activated' : 'EasyParcel deactivated — checkout uses flat rate')
@@ -152,8 +139,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         }
     }
 
-    // Pull EP's default pickup address into the local warehouse (server writes it, then we reload so
-    // the geo-cascade selects reconcile via the same path as connect-time seeding).
+    // Pull EP's default pickup address into the local warehouse.
     async function handleSyncFromEp() {
         setIsSyncing(true)
         try {
@@ -182,7 +168,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         }
     }
 
-    // Clear the EP OAuth session for this tenant. Warehouse/courier config is kept server-side.
+    // Clear the EP OAuth session for this tenant. Warehouse config is kept server-side.
     async function handleDisconnect() {
         setIsDisconnecting(true)
         try {
@@ -205,9 +191,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
         }
     }
 
-    // Persist pickup-address mutations immediately. The inline "Add/Update/Delete/Set default"
-    // actions only change local state; without this they'd need a separate "Save Settings" click
-    // to reach the DB, which reads as "editing the address does nothing".
+    // Persist pickup-address mutations immediately.
     async function handleWarehousesChange(next: Warehouse[]) {
         setWarehouses(next)
         if (testStatus !== 'connected') return
@@ -216,7 +200,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled, warehouses: next, selectedCouriers }),
+                body: JSON.stringify({ enabled, warehouses: next }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to save')
@@ -234,7 +218,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ enabled, warehouses, selectedCouriers }),
+                body: JSON.stringify({ enabled, warehouses }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Failed to save')
@@ -247,12 +231,11 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
     }
 
     // Connection state: "connected" = completed OAuth at least once (testedAt set, cleared on
-    // disconnect). "persistedSetup" = a pickup + courier were saved (only via Save & Activate or a
-    // management save). Drives which of the 3 views renders.
+    // disconnect). "persistedSetup" = a pickup was saved (only via Save & Activate or a management
+    // save). Drives which of the 3 views renders.
     const connected = !!initialEpConfig?.testedAt
     const persistedSetup =
-        ((initialEpConfig?.warehouses?.length ?? 0) > 0 || !!initialEpConfig?.warehouse?.address1) &&
-        getAllowedCouriers(initialEpConfig).length > 0
+        (initialEpConfig?.warehouses?.length ?? 0) > 0 || !!initialEpConfig?.warehouse?.address1
 
     // --- Not connected → intro card ---
     if (!connected) {
@@ -368,7 +351,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         {enabled && !localReady && (
                             <div role="alert" className="flex items-center gap-2 rounded-[10px] border border-[hsl(var(--warning)/0.3)] bg-[hsl(var(--warning)/0.1)] px-4 py-3 text-[13px] text-[hsl(var(--warning))]">
                                 <XCircle className="h-4 w-4 shrink-0" />
-                                Not ready — checkout is using flat rate. Add a complete default pickup address (incl. phone) and select a courier.
+                                Not ready — checkout is using flat rate. Add a complete default pickup address (incl. phone).
                             </div>
                         )}
                         {!enabled && (
@@ -412,8 +395,19 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                                     {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                                     Sync from EasyParcel
                                 </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setConfirm('disconnect')}
+                                    disabled={isDisconnecting}
+                                    className="flex items-center gap-1.5 border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive)/0.06)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.12)]"
+                                >
+                                    {isDisconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />}
+                                    Disconnect
+                                </Button>
                             </div>
                         </div>
+                        <EpWalletBanner tenantId={tenantId} active />
                     </>
                 ) : (
                     <div className="flex flex-col gap-3">
@@ -446,29 +440,8 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
             {/* ─── Pickup Addresses ─────────────────────────── */}
             <div className="p-6 flex flex-col gap-5" style={{ opacity: testStatus === 'testing' ? 0.5 : 1, pointerEvents: testStatus === 'testing' ? 'none' : undefined }}>
                 <PickupAddresses value={warehouses} onChange={handleWarehousesChange} />
-                {testStatus === 'connected' && (
-                    <div>
-                        <Button
-                            variant="outline"
-                            onClick={() => setConfirm('disconnect')}
-                            disabled={isDisconnecting}
-                            className="flex items-center gap-2 border-[hsl(var(--destructive)/0.4)] bg-[hsl(var(--destructive)/0.06)] text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.12)]"
-                        >
-                            {isDisconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
-                            Disconnect Account
-                        </Button>
-                    </div>
-                )}
             </div>
 
-            {testStatus === 'connected' && <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />}
-
-            {/* ─── Courier picker — only after connection verified ── */}
-            {testStatus === 'connected' && (
-                <div className="p-6">
-                    <CourierPicker tenantId={tenantId} active selected={selectedCouriers} onToggle={onToggle} />
-                </div>
-            )}
 
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
@@ -494,12 +467,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                         </Button>
                         {!warehouseComplete && (
                             <p className="text-[12px] text-[hsl(var(--destructive))]">
-                                Add at least one pickup address first.
-                            </p>
-                        )}
-                        {warehouseComplete && courierMissing && (
-                            <p className="text-[12px] text-[hsl(var(--destructive))]">
-                                Select a courier for checkout first.
+                                Add at least one complete pickup address first.
                             </p>
                         )}
                     </>
@@ -515,7 +483,7 @@ export function EasyParcelSettingsTab({ tenantId, initialEpConfig }: Props) {
                     : <RefreshCw className="h-7 w-7 text-[hsl(var(--primary))]" />}
                 title={confirm === 'disconnect' ? 'Disconnect EasyParcel?' : 'Sync from EasyParcel?'}
                 description={confirm === 'disconnect'
-                    ? 'You will need to reconnect to quote live rates and buy labels. Your pickup address and courier settings are kept.'
+                    ? 'You will need to reconnect to quote live rates and buy labels. Your pickup address settings are kept.'
                     : 'Replace your saved pickup address with the one configured in EasyParcel?'}
                 confirmLabel={confirm === 'disconnect' ? 'Disconnect' : 'Sync'}
                 cancelLabel="Cancel"

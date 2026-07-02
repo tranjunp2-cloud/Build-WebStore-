@@ -8,7 +8,7 @@ type RouteContext = { params: Promise<{ id: string }> }
 
 /**
  * POST /api/tenant/[id]/easyparcel-save
- * Persist the merchant-editable EasyParcel settings (enabled / warehouses / selectedCouriers).
+ * Persist the merchant-editable EasyParcel settings (enabled / warehouses).
  * Uses overrideAccess after an explicit ownership check — the client can't PATCH /api/tenants
  * directly because the group holds server-only token fields guarded by field access.
  */
@@ -35,15 +35,12 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const body = await request.json().catch(() => ({}))
         const enabled = body?.enabled === true
         const warehouses: Warehouse[] = Array.isArray(body?.warehouses) ? body.warehouses : []
-        // Parse and sanitize allowlist; filter to non-empty strings only.
-        const selectedCouriers: string[] = Array.isArray(body?.selectedCouriers)
-            ? body.selectedCouriers.filter((c: unknown) => typeof c === 'string' && c.trim().length > 0)
-            : []
 
-        // Guard: can only activate (enabled=true) when the default pickup is complete + at least one courier is allowed.
-        if (enabled && (!isWarehouseComplete(getDefaultWarehouse({ warehouses })) || selectedCouriers.length < 1)) {
+        // Guard: can only activate (enabled=true) when the default pickup address is complete.
+        // Courier selection is fully automatic (cheapest that serves the route) — no allowlist needed.
+        if (enabled && !isWarehouseComplete(getDefaultWarehouse({ warehouses }))) {
             return NextResponse.json(
-                { success: false, error: { code: 'EP_NOT_READY', message: 'A complete default pickup address and at least one courier are required to activate.' } },
+                { success: false, error: { code: 'EP_NOT_READY', message: 'A complete default pickup address is required to activate.' } },
                 { status: 400 },
             )
         }
@@ -56,10 +53,6 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 easyParcelIntegration: {
                     enabled,
                     warehouses,
-                    selectedCouriers,
-                    // Legacy scalar kept for one release so any un-migrated read path stays valid.
-                    // Removable after all consumers are updated to read selectedCouriers[].
-                    selectedCourier: selectedCouriers[0] ?? '',
                 },
             } as any,
             overrideAccess: true,

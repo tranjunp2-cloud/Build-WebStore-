@@ -14,7 +14,6 @@ interface GetRatesParams {
     senderPostcode: string
     subtotalSen: number      // for flat-rate free-shipping threshold check
     codAmountSen?: number    // 0 or undefined = non-COD; >0 = COD order (sen)
-    allowedCouriers?: string[] // EP courier_ids merchant allows; checkout quotes cheapest that serves route
 }
 
 interface GetRatesResult {
@@ -86,26 +85,24 @@ export async function getRates(
             }
         })
 
-        if (rates.length > 0) {
-            // Allowlist: merchant may restrict to a set of EP courier_ids.
-            // 'flat' sentinel is excluded — it is never a real EP courier_id.
-            const allow = params.allowedCouriers?.filter((c) => c && c !== 'flat')
+        // Exclude BYOC ("Bring Your Own Contract") couriers from auto-selection. They only ship on
+        // the merchant's own carrier contract, which isn't linked here — auto-picking one would fail
+        // at submit_orders. This mirrors how Shippo/EasyPost/ShipStation keep bring-your-own carriers
+        // opt-in rather than in the default cheapest-rate pool.
+        const usableRates = rates.filter((r) => !isByocCourier(r))
 
-            let candidates = allow?.length ? rates.filter((r) => allow.includes(r.courier)) : rates
-
+        if (usableRates.length > 0) {
             // COD filter: if this is a COD order, keep only COD-capable couriers.
+            let candidates = usableRates
             if (params.codAmountSen != null && params.codAmountSen > 0) {
-                candidates = candidates.filter((r) => r.codAvailable === true)
+                candidates = usableRates.filter((r) => r.codAvailable === true)
             }
 
             const best = pickCheapest(candidates)
             if (best) return { rates: [best], degraded: false }
 
-            // No candidate survived (allowlist ∩ route empty, or no COD-capable courier).
-            const reason = params.codAmountSen != null && params.codAmountSen > 0
-                ? 'no COD-capable courier in allowlist serves this route'
-                : 'none of the allowed couriers serve this route'
-            console.warn(`[get-rates] ${reason}; available=[${rates.map((r) => r.courier).join(', ')}] → flat fallback`)
+            // No candidate survived (no COD-capable courier serves this route).
+            console.warn(`[get-rates] no COD-capable courier serves this route; available=[${usableRates.map((r) => r.courier).join(', ')}] → flat fallback`)
             return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
         }
 
@@ -119,6 +116,15 @@ export async function getRates(
         rates: [buildFlatRateOption(params, flatConfig, destState)],
         degraded: true,
     }
+}
+
+/**
+ * BYOC = "Bring Your Own Contract" courier (e.g. "BYOC FedEx", "BYOC GDEX"). EP lists them in the
+ * catalog, but they only book on a merchant-linked carrier account we don't manage, so they must
+ * never be auto-selected. Matched on the EP courier_name prefix.
+ */
+function isByocCourier(r: RateOption): boolean {
+    return /^byoc\b/i.test((r.courierName ?? '').trim())
 }
 
 /** Returns the rate with the lowest priceSen, or undefined if the list is empty. */

@@ -24,7 +24,7 @@ import type { PlanCode } from '@/collections/PlanSubscriptions'
 import { buildStorefrontUrl } from '@/lib/utils/storefront-url'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse, isEpReady, getAllowedCouriers } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 
 /** Minimal shape of a tenant document used in stripe-checkout flow. */
 interface TenantDoc {
@@ -273,7 +273,6 @@ export async function POST(request: NextRequest) {
                 senderState: warehouseState,
                 subtotalSen: subtotalSen - discountSen,
                 codAmountSen: undefined,  // Stripe = no COD
-                allowedCouriers: getAllowedCouriers(epIntegration),
             },
             epToken,
             (site as any)?.shippingConfig ?? {},
@@ -317,7 +316,7 @@ export async function POST(request: NextRequest) {
                         discountAmount: discountSen,
                     } : {}),
                     // EP shipping fields — only written when a real EP courier is selected
-                    ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier } : {}),
+                    ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
                     ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                     parcelWeight: totalWeightGrams,
                 } as Record<string, unknown>,
@@ -418,7 +417,7 @@ export async function POST(request: NextRequest) {
                     discountAmount: discountSen,
                 } : {}),
                 // EP shipping fields — only written when a real EP courier is selected
-                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier } : {}),
+                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
                 ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                 parcelWeight: totalWeightGrams,
             } as Record<string, unknown>,

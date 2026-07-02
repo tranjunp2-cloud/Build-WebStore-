@@ -8,7 +8,7 @@ import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
 import { getShippingRate } from '@/lib/shipping'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
-import { getDefaultWarehouse, isEpReady, getAllowedCouriers } from '@/lib/shipping/easyparcel/warehouse'
+import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
@@ -302,7 +302,6 @@ export async function POST(request: Request) {
                 destState: customer.address?.state ?? '',
                 senderPostcode: defaultWarehouse.postcode ?? '47500',
                 senderState: warehouseState,
-                allowedCouriers: getAllowedCouriers(epIntegration),
                 subtotalSen: effSubtotalSen,
                 codAmountSen: paymentMethod === 'cod' ? effSubtotalSen : undefined,
             },
@@ -382,7 +381,7 @@ export async function POST(request: Request) {
                     discountAmount: discountSen,
                 } : {}),
                 // EP shipping fields — only written when a real EP courier is selected (not flat fallback)
-                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier } : {}),
+                ...(bestRate.courier !== 'flat' ? { shippingCourier: bestRate.courier, shippingCourierName: bestRate.courierName } : {}),
                 ...(bestRate.serviceId !== 'flat' ? { shippingServiceId: bestRate.serviceId } : {}),
                 parcelWeight: totalWeightGrams,
                 // COD amount in sen — only for COD orders; final total after shipping is now known
