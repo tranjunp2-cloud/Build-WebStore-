@@ -80,12 +80,12 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 │ ┌──────────────────────────────────────┐ │
 │ │ ✅ Connected — Live (account + ví)   │ │ ◄── green Alert
 │ │                                      │ │
-│ │ 🚚 Courier (chọn 1 cho shop)         │ │
-│ │  (•) J&T Express                     │ │
-│ │  ( ) DHL eCommerce                   │ │
-│ │  ( ) Flash Express                   │ │
-│ │  ( ) Pos Laju                        │ │
-│ │  ( ) [+3 more...]                    │ │
+│ │ 🚚 Courier (chọn ≥1 cho allowlist)   │ │
+│ │  ☑ J&T Express                       │ │
+│ │  ☐ DHL eCommerce                     │ │
+│ │  ☑ Flash Express                     │ │
+│ │  ☐ Pos Laju                          │ │
+│ │  ☐ [+3 more...]                      │ │
 │ │  ⚠️ Ví dưới RM10 → cảnh báo          │ │
 │ │  (không show giá — giá thật ở        │ │
 │ │   checkout · vận đơn tạo manual)     │ │
@@ -99,7 +99,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - OAuth callback (backend): POST `/oauth/token` exchanges `code` + Basic auth → `access_token` (10h) + `refresh_token` (1yr), stores securely per tenant.oauthTokens
 - Connected state: Green `<Alert>` showing account name + wallet balance + Disconnect button
 - Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → dùng cho COD West-MY. Force-validate postcode via rate-check call.
-- Courier: `<RadioGroup>` **single-select** từ live `/courier/list?country_code=MY` response (tất cả couriers available, không giới hạn 4 loại). Hiện wallet threshold warning nếu balance < RM10.
+- Courier: `<Checkbox>` list **multi-select allowlist** `selectedCouriers[]` từ live `/courier/list?country_code=MY` response (tất cả couriers available, không giới hạn 4 loại). **UX recommendation: chọn ≥1 courier; checkout sẽ tự pick cheapest trong allowlist.** Hiện wallet threshold warning nếu balance < RM10.
 - Parcel weight/dims: KHÔNG có form — lấy từ `Products.weight` + `Products.dimensions`; product=0 → const `DEFAULT_PARCEL`
 
 **States:**
@@ -171,7 +171,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 |----------------|-------------------------------------|
 | Địa chỉ East MY (Sabah/Sarawak) | "COD chỉ khả dụng cho địa chỉ West Malaysia" |
 | Đơn vượt hạn mức COD của courier | "Đơn vượt hạn mức COD của courier (tối đa theo courier, từ quotation)" |
-| selectedCourier không hỗ trợ COD | "Courier đang chọn không hỗ trợ COD" |
+| Không có courier COD-capable trong allowlist cho route này | "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
 | Đơn dưới mức tối thiểu COD của courier | "Đơn dưới mức tối thiểu COD của courier (tối thiểu theo courier, từ quotation)" |
 
 **COD selected — fee disclosure (informational):**
@@ -205,7 +205,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | COD available | COD option enabled trong payment methods |
 | COD East MY | COD `<RadioGroupItem disabled>` + helper "COD chỉ khả dụng cho địa chỉ West Malaysia" |
 | COD over limit | COD disabled + helper "Đơn vượt hạn mức COD của courier (tối đa theo courier)" |
-| COD courier không hỗ trợ | COD disabled + helper "Courier đang chọn không hỗ trợ COD" |
+| COD allowlist no COD-capable | COD disabled + helper "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
 | COD under limit | COD disabled + helper "Đơn dưới mức tối thiểu COD của courier" |
 | COD selected | `<Alert>` fee disclosure hiện (informational) |
 
@@ -288,10 +288,10 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 **Components:**
 - Modal: `<Dialog>` tạo label gắn vào action "Ready to Ship" của `OrderDetailPanel`. **Điểm intercept (code-level):** nút status-dependent ở `OrderDetailPanel.tsx` (onClick ~L861–863). EP tenant chặn đúng nhánh `status==='confirmed'` (hiện gọi `handleAction('ready_to_ship')`) → mở `<Dialog>` Create Label thay vì flip status thẳng. **KHÔNG** đụng nhánh `status==='ready_to_ship'` (`setIsShipModalOpen(true)`) — đó là bước "Ship Order" (xác nhận pickup → shipped), giữ nguyên. `ShipOrderModal.tsx` giữ nguyên cho nhánh manual non-EP.
-- Courier: **KHÔNG hiển thị trong modal** — shop đã khoá 1 courier (`selectedCourier`), không cần nhắc lại ở đây (courier vẫn dùng `selectedCourier` ngầm khi gọi label).
+- Courier: **KHÔNG hiển thị trong modal** — checkout đã tự pick cheapest courier từ allowlist cho đơn này (`selectedCourier` = auto-picked for order). Courier này sẽ dùng ngầm khi gọi label submit; không cần buyer/merchant chọn lại.
 - Weight: `<Input type="number">` prefill từ `order.parcelWeight` (snapshot `Σ(qty×Products.weight)` lúc checkout; =0 → `DEFAULT_PARCEL`). Sửa được.
 - Dims (thùng): `<Input type="number">` × 3 (L/W/H) = thùng thật merchant gói — prefill `DEFAULT_PARCEL` box (đơn 1 món → `Products.dimensions`). **KHÔNG gộp dims đa-SP.** Sửa được.
-- Pickup: `<RadioGroup>` pickup/dropoff + `<DatePicker>` (`collection_date`) — **CUT-OFF-AWARE**: `min = HÔM NAY` nếu T2–T6 & giờ MYT (server-side) < cut-off của `selectedCourier` (J&T 13:50 / Flash 14:00 / Pos 12:50 — const `COURIER_CUTOFF`), ngược lại `min = ngày làm việc kế`; default = min; disable quá khứ + Sat/Sun; holiday để API bump; KHÔNG time picker. Hint: "Lấy hôm nay nếu tạo trước HH:MM". Dropoff vẫn truyền `collection_date`.
+- Pickup: `<RadioGroup>` pickup/dropoff + `<DatePicker>` (`collection_date`) — **CUT-OFF-AWARE**: `min = HÔM NAY` nếu T2–T6 & giờ MYT (server-side) < cut-off của courier auto-picked (J&T 13:50 / Flash 14:00 / Pos 12:50 — const `COURIER_CUTOFF`), ngược lại `min = ngày làm việc kế`; default = min; disable quá khứ + Sat/Sun; holiday để API bump; KHÔNG time picker. Hint: "Lấy hôm nay nếu tạo trước HH:MM". Dropoff vẫn truyền `collection_date`.
 - Primary: `<Button>` "Tạo & trừ ví" → spinner 1 bước (submit, ví trừ ngay); idempotent theo `awbNo` (đã có `awbNo` → disable)
 - Print: `<Button variant="outline">` mở `labelUrl` (PDF) tab mới
 - Copy AWB: `<Button size="icon">` + clipboard
@@ -474,7 +474,7 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 
 ## 3. Mobile 375px <a id="mobile"></a>
 
-**Settings (Mobile):** tabs full-width; keys/warehouse stack vertical; courier list 1-col radio (single-select); Save full-width sticky bottom.
+**Settings (Mobile):** tabs full-width; keys/warehouse stack vertical; courier list 1-col checkbox (multi-select allowlist); Save full-width sticky bottom.
 
 **Checkout shipping fee (Mobile):** buyer KHÔNG chọn courier (shop đã khoá 1 courier) — chỉ 1 dòng "Shipping" trong Order Summary, đồng nhất desktop §2.2.
 
@@ -527,7 +527,8 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 | Connect button | `Button variant="default"` → OAuth redirect | Connect with EasyParcel (no secret inputs) |
 | Text/number input | `Input` | Warehouse, weight, dims |
 | Dropdown | `Select` | MY states (geo cascade) |
-| Radio | `RadioGroup`, `RadioGroupItem` | Courier picker (settings, single-select), return fee responsibility (Case 2), pickup |
+| Radio | `RadioGroup`, `RadioGroupItem` | Return fee responsibility (Case 2), pickup |
+| Checkbox | `Checkbox` | Courier allowlist (settings, multi-select) |
 | Switch | `Switch` | Connect enable |
 | Date picker | `Popover` + `Calendar` | `collection_date` pickup |
 | Dialog | `Dialog` | Create label (→ Sheet on mobile) |

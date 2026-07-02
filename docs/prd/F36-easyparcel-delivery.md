@@ -100,22 +100,25 @@ Platform **không đụng** cả 3 luồng → sạch liability, RM0 chi phí.
 
 **Phase A + B (built):**
 ```
-Merchant ──settings──> Connect with EasyParcel (OAuth) + warehouse + select courier + test connection
+Merchant ──settings──> Connect with EasyParcel (OAuth) + warehouses[] + select allowed couriers + test connection
    ▼
-order.tenant.easyParcelIntegration = { enabled, accessToken, refreshToken, warehouses[], selectedCourier, ... }
+order.tenant.easyParcelIntegration = { enabled, accessToken, refreshToken, warehouses[], selectedCouriers[], selectedCourier*, ... }
    ▼
 Buyer ──checkout──> [Next.js storefront]
    │  POST /api/orders/calculate-shipping { siteId, dest postcode, items(weight) }
    ▼
-getRates() ──┬─ tenant.easyParcelIntegration.enabled + accessToken + defaultWarehouse
-             │     └─YES─> POST /shipment/quotations (origin↔dest, weight, dims) + COD check ──> EasyParcel
-             │              → giá RM (÷100 → sen) + COD available/max + ETA của selectedCourier
+getRates() ──┬─ tenant.easyParcelIntegration.enabled + accessToken + allowedCouriers[]
+             │     └─YES─> POST /shipment/quotations (origin↔dest, weight, dims) ──> EasyParcel
+             │              → filter by allowedCouriers[] → pick cheapest; COD orders → cheapest COD-capable
+             │              → giá RM (÷100 → sen) + COD available/max + ETA của courier auto-pick
              └─NO──> flat West/East (getShippingRate hiện tại)          [HYBRID FALLBACK]
    ▼
 order lưu shippingCourier + shippingServiceId + shippingFee + codAmount (buyer KHÔNG chọn courier)
    ▼  (buyer trả tiền hàng qua F34/F13 → order paid)
    ▼
 Buyer xem tracking trên trang đơn (shippingTrackingStatus = pending khi đơn mới)
+
+* selectedCourier (legacy text field) coalesced via getAllowedCouriers() for back-compat; selectedCouriers[] is current model.
 ```
 
 **Phase C + D (NOT BUILT — forward-looking):**
@@ -131,7 +134,8 @@ Create label → submit order → tracking sync via webhooks/polling → returns
 | `refreshToken`* | text | server-only | OAuth refresh token; 1yr expiry |
 | `tokenExpiresAt`* | timestamp | server-only | Access token expiry; auto-refresh if <60s to expiry |
 | `tokenRefreshExpiresAt`* | timestamp | server-only | Refresh token expiry; needs reconnect if expired |
-| `selectedCourier` | text | — | Merchant's chosen courier (e.g., "flash", "jnt", "poslaju"); used for rate-check |
+| `selectedCouriers` | json array | current | **Allowlist of courier IDs** (e.g., `["flash", "jnt", "poslaju"]`). Checkout auto-quotes cheapest allowlisted courier serving route; COD orders → cheapest COD-capable. UX default/recommend 1 courier, multiple allowed. |
+| `selectedCourier` | text | legacy | Deprecated: Merchant's single chosen courier (e.g., "flash"). Coalesced via `getAllowedCouriers()` for back-compat if `selectedCouriers` empty; will phase-out after migration. |
 | `warehouses` | json (array) | current | `[{id?, label?, phone, address1, address2?, city, state, postcode, country, isDefault?}]` — multiple pickup addresses; one marked `isDefault` (origin for rates/labels) |
 | `warehouse` | json | legacy | Deprecated single warehouse field; phase-out after migration |
 | `testedAt`* | timestamp | readOnly | Last successful test-connection; shows merchant connection health |

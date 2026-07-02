@@ -117,7 +117,7 @@ THEN  throws AUTH_EXPIRED error (needs reconnect)
 
 ---
 
-## US-F36-02: Courier Selection (Single)
+## US-F36-02: Courier Allowlist Selection (Multi-Select)
 
 **Wave 7** | **P0** | **S** | **Status:** Draft
 
@@ -125,42 +125,44 @@ THEN  throws AUTH_EXPIRED error (needs reconnect)
 
 ```
 As a   SME Owner đã connect EasyParcel
-I want chọn 1 courier cho shop
-So that shop tôi giao qua đúng 1 hãng courier
+I want chọn một hay nhiều courier để dùng cho shop
+So that checkout tự lựa chọn courier rẻ nhất từ danh sách tôi cho phép
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Chọn 1 courier (single-select) cho shop
+#### AC-1: Chọn một hay nhiều courier (multi-select allowlist) cho shop
 
 ```gherkin
 GIVEN tenant đã connect, thấy list courier khả dụng (courier_id, courier_name, logo)
-WHEN  chọn 1 courier (radio single-select, map theo courier_id)
-THEN  lưu selectedCourier (single courier_id) vào tenant.easyParcelIntegration
-  AND chỉ 1 courier active mỗi lúc (chọn cái mới → bỏ cái cũ)
-  AND checkout chỉ rate + hiển thị đúng courier đã chọn
+WHEN  chọn một hay nhiều courier (checkbox multi-select, map theo courier_id)
+THEN  lưu selectedCouriers[] (JSON array courier_ids) vào tenant.easyParcelIntegration
+  AND multiple couriers active cùng lúc (allowlist); checkout chọn rẻ nhất trong danh sách
+  AND UI default: recommend 1 courier, but allow any ≥1 selection
+  AND isEpReady gate on allowlist length ≥ 1 (not 0)
 ```
 
-> 📌 Source: PRD FR A-3 + §10 RESOLVED (map theo `courier_id`, hiển thị `courier_name`+logo, mua label bằng `service_id`)
+> 📌 Source: Commit 722b47f0 (ep courier allowlist); allowlist model in get-rates.ts + easyparcel-save route
 
-#### AC-2: List ALL live couriers từ EasyParcel (single-select)
+#### AC-2: List ALL live couriers từ EasyParcel (multi-select)
 
 ```gherkin
 GIVEN merchant vừa connect xong
 WHEN  render section Courier Selection
 THEN  GET /api/tenant/[id]/easyparcel-couriers → fetch full live courier list (country=MY) + wallet
   AND list ALL returned couriers (no 4-courier restriction)
-  AND each courier shows: courier name + logo + selection as radio (single-select)
+  AND each courier shows: courier name + logo + selection as checkbox (multi-select)
   AND default chọn J&T Express (nếu có, otherwise first available)
-  AND merchant chọn 1 courier để dùng cho all orders (vẫn single-select)
+  AND merchant chọn ≥1 courier cho checkout (multi-select, not single)
   AND warn if wallet < RM10 (LOW_WALLET_THRESHOLD)
 ```
 
-> 📌 Source: PRD FR A-3 (courier picker fetches full live list) + brief as-built facts
+> 📌 Source: Commit 722b47f0 (courier-picker.tsx shows multi-select UI)
 
 ### Additional Criteria
 
-- [ ] `selectedCourier` = single field (courier_id text), KHÔNG hasMany. Chưa chọn → default J&T.
+- [ ] `selectedCouriers[]` = JSON array field (courier_ids), allowlist model. Chưa chọn → empty array. Gate: ≥1 required to enable EP (isEpReady).
+- [ ] Legacy `selectedCourier` (single scalar, old) kept in schema for back-compat; coalesced by getAllowedCouriers() helper. Will be removed after all consumers migrate.
 - [ ] GET /api/tenant/[id]/easyparcel-couriers → live courier list, wallet balance per currency.
 - [ ] KHÔNG show giá ở settings; KHÔNG còn section "Default parcel" (đã bỏ — weight lấy từ Products.weight/dimensions, fallback hằng số hệ thống).
 - [ ] KHÔNG có setting label mode (tạo label luôn manual ở Phase C); KHÔNG show số dư ví EP chi tiết (chỉ cảnh báo RM10 threshold).
@@ -168,8 +170,8 @@ THEN  GET /api/tenant/[id]/easyparcel-couriers → fetch full live courier list 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Cột mới (`selectedCourier`) → MIGRATIONS (NFR-9)
-- [ ] Test: single-select (chọn mới bỏ cũ); checkout chỉ rate courier đã chọn
+- [ ] Cột mới (`selectedCouriers` JSON array) → MIGRATIONS (NFR-9). Legacy `selectedCourier` kept for back-compat, coalesced by helper.
+- [ ] Test: multi-select (chọn 2+ couriers OK); checkout lấy rẻ nhất từ allowlist; isEpReady gate ≥1
 
 ---
 
@@ -201,13 +203,13 @@ THEN  getRates() dùng nhánh flat West/East (getShippingRate hiện tại)
 #### AC-2: Cấu hình thiếu → vẫn fallback, không lỗi
 
 ```gherkin
-GIVEN tenant enabled=true nhưng thiếu warehouse postcode HOẶC chưa chọn courier (`selectedCourier` rỗng)
+GIVEN tenant enabled=true nhưng thiếu warehouse postcode HOẶC allowlist trống (selectedCouriers[] length < 1)
 WHEN  buyer tới checkout
 THEN  getRates() fallback flat rate (không gọi EasyParcel với input thiếu)
   AND log cảnh báo cấu hình thiếu (không lộ key)
 ```
 
-> 📌 Source: PRD FR A-7, NFR-4
+> 📌 Source: PRD FR A-7, NFR-4; Commit 722b47f0 (isEpReady gate on allowlist ≥1)
 
 ### Definition of Done
 
@@ -231,10 +233,10 @@ So that tôi thấy đúng giá ship trước khi trả tiền
 
 ### Acceptance Criteria
 
-#### AC-1: EasyParcel ON → trả phí ship của 1 courier (shop chọn)
+#### AC-1: EasyParcel ON → trả phí ship (auto-cheapest từ allowlist)
 
 ```gherkin
-GIVEN tenant EasyParcel ON + đã chọn selectedCourier
+GIVEN tenant EasyParcel ON + allowlist couriers ≥1 (selectedCouriers[])
   AND POST /api/orders/calculate-shipping { siteId, destPostcode/destState, items, codAmountSen? }
 WHEN  getRates() chạy
 THEN  tính tổng weight = sum(Products.weight × qty); product = 0/thiếu → hằng số DEFAULT_PARCEL
@@ -243,11 +245,13 @@ THEN  tính tổng weight = sum(Products.weight × qty); product = 0/thiếu →
   AND gọi POST /open_api/2026-03/shipment/quotations (OAuth Bearer token) với:
         { shipment: [{ sender (warehouse), receiver (dest address), parcel_value(RM float), weight(kg), width?/length?/height?(cm) }] }
   AND trả rates[] array với { courier, serviceId, courierName, serviceName, priceSen, codAvailable, codMaxSen, estDelivery }
-  AND filter để return chỉ rate của selectedCourier (KHÔNG mảng nhiều courier)
+  AND filter rates to allowlist ∩ route-serving couriers
+  AND NGOÀI RA nếu COD order (codAmountSen > 0) → further filter to COD-capable couriers
+  AND pick cheapest từ candidates → return 1 rate (auto-selected for checkout)
   AND backward-compat field fee (single price)
 ```
 
-> 📌 Source: PRD FR B-1, B-2 + brief as-built facts
+> 📌 Source: Commit 722b47f0 (get-rates.ts allowlist filter + cheapest pick; COD filter)
 
 #### AC-2: Currency RM→sen đúng, KHÔNG markup
 
@@ -266,13 +270,14 @@ THEN  compute nội bộ = 800 sen (×100 chính xác) để compare/discount lo
 #### AC-3: Lưu courier vào order ở mọi nhánh checkout
 
 ```gherkin
-GIVEN order với courier shop đã chọn (selectedCourier)
+GIVEN order với courier được lựa chọn tự động (cheapest từ allowlist serving route)
 WHEN  tạo order qua /api/orders/checkout (COD/bank) HOẶC stripe-checkout (nhánh Xendit thuộc F34, nhánh riêng — wire khi F34 merge)
 THEN  order lưu shippingCourier + shippingServiceId + shippingFee (RM-float, đồng nhất field hiện tại)
   AND các nhánh checkout hiện có đều persist 3 field này
+  AND shippingCourier = courier_id được pick từ getRates() (auto-cheapest, không merchant-fixed)
 ```
 
-> 📌 Source: PRD FR B-4
+> 📌 Source: PRD FR B-4; Commit 722b47f0 (auto-pick cheapest)
 
 #### AC-4: OFF → flat fee đơn (giữ shape cũ)
 
@@ -327,15 +332,15 @@ THEN  dùng lại cascade State → City → Postcode của F14 (/api/geo/* + Ch
 #### AC-1: phí ship + courier branding → 1 dòng "Shipping" trong Order Summary
 
 ```gherkin
-GIVEN calculate-shipping trả rates[] với courier name + logo của selectedCourier
+GIVEN calculate-shipping trả rates[] với courier name + logo (auto-picked cheapest từ allowlist)
 WHEN  checkout render
 THEN  Order Summary hiển thị 1 dòng "Shipping: [Courier Logo] Courier Name — RM X.XX"
-  AND KHÔNG có section vận chuyển picker (buyer không chọn courier — fixed by selectedCourier)
+  AND KHÔNG có section vận chuyển picker (buyer không chọn courier — auto-pick cheapest từ allowlist)
   AND KHÔNG có dòng SST (gỡ ở checkout từ F33 phase-06)
   AND phí + total đúng (total = subtotal − discount + shipping); lưu vào order khi đặt
 ```
 
-> 📌 Source: PRD FR B-3 + brief as-built facts (courier branding)
+> 📌 Source: PRD FR B-3; Commit 722b47f0 (auto-cheapest at checkout)
 
 #### AC-2: Rate API lỗi/timeout → fallback flat, KHÔNG chặn checkout
 
@@ -451,7 +456,7 @@ THEN  hiển thị nhánh nhập trackingNumber thủ công như HÔM NAY (0 đ�
 ### Additional Criteria
 
 - [ ] Create-label p95 < 6s (NFR-6).
-- [ ] Modal **KHÔNG hiển thị courier** (đã khoá 1 courier; dùng `selectedCourier` ngầm). Hiển thị: weight (prefill `order.parcelWeight`, sửa được) + dims thùng (prefill `DEFAULT_PARCEL`/dims SP nếu đơn 1 món, sửa được — KHÔNG cộng dims đa-SP) + pickup date + nút in label sau OK.
+- [ ] Modal **KHÔNG hiển thị courier** (dùng auto-picked courier từ `order.shippingCourier` ngầm; không merchant-selectable). Hiển thị: weight (prefill `order.parcelWeight`, sửa được) + dims thùng (prefill `DEFAULT_PARCEL`/dims SP nếu đơn 1 món, sửa được — KHÔNG cộng dims đa-SP) + pickup date + nút in label sau OK.
 
 ### Definition of Done
 
@@ -491,9 +496,9 @@ THEN  pickup truyền collection_date (YYYY-MM-DD, giờ MY UTC+8) trong POST /s
 #### AC-2: Date picker CUT-OFF-AWARE (same-day nếu trước cut-off; chặn quá khứ)
 
 ```gherkin
-GIVEN merchant mở date picker pickup, shop đã khoá selectedCourier
+GIVEN merchant mở date picker pickup, order đã assign courier tự động (from allowlist)
 WHEN  render (tính giờ hiện tại theo MYT/UTC+8, server-side)
-THEN  min = HÔM NAY nếu hôm nay là T2–T6 VÀ giờ MYT < cut-off(selectedCourier)
+THEN  min = HÔM NAY nếu hôm nay là T2–T6 VÀ giờ MYT < cut-off(auto-picked courier)
   AND ngược lại (sau cut-off / cuối tuần) min = ngày làm việc kế
   AND default = min
   AND disable mọi ngày quá khứ (KHÔNG cho chọn ngày quá khứ — bug hiện tại) + Sat/Sun
@@ -521,6 +526,7 @@ THEN  server re-tính earliest theo MYT tại thời điểm request (KHÔNG tin
 
 ```gherkin
 GIVEN const COURIER_CUTOFF (MYT): J&T 13:50, Flash 14:00, Pos Laju 12:50 (conservative)
+  AND auto-picked courier dùng cut-off từ const này
 WHEN  courier khác / chưa biết cut-off
 THEN  fallback conservative (vd 12:00 hoặc chỉ cho ngày làm việc kế)
   AND Pos Laju cut-off PHẢI confirm với Pos/EasyParcel trước go-live
@@ -568,15 +574,16 @@ So that tôi mua hàng không cần thanh toán trước
 ```gherkin
 GIVEN buyer đã nhập địa chỉ + calculate-shipping trả rates[]
   AND rate response chứa codAvailable (boolean) + codMaxSen (cap per courier)
+  AND auto-picked courier có sẵn từ getRates() result
 WHEN  render payment options tại checkout
 THEN  COD option ENABLED chỉ khi ĐỒNG THỜI:
         (1) zone của địa chỉ buyer = 'west' (từ /api/geo/lookup/[postcode])
-        (2) selectedCourier có codAvailable=true (live from quotation)
-        (3) order grand total ∈ [codMinAmount, codMaxAmount] của courier đó (per-courier, live)
+        (2) auto-picked courier có codAvailable=true (live from quotation)
+        (3) order grand total ∈ [codMinAmount, codMaxAmount] của auto-picked courier (per-courier, live)
   AND thiếu bất kỳ điều kiện nào → COD option disabled với helper text lý do cụ thể
 ```
 
-> 📌 Source: PRD FR C-6a + brief as-built facts
+> 📌 Source: PRD FR C-6a; Commit 722b47f0 (auto-picked courier with COD filter)
 
 #### AC-2: COD disabled — helper text đúng theo từng lý do
 
@@ -585,15 +592,15 @@ GIVEN buyer East MY (Sabah/Sarawak)
 WHEN  render payment options
 THEN  COD disabled + helper "COD chỉ khả dụng cho địa chỉ West Malaysia"
 
-GIVEN buyer West MY + selectedCourier không hỗ trợ COD (defensive — với tenant EP ON settings đã chặn, chỉ xảy ra edge/EP OFF)
+GIVEN buyer West MY + auto-picked courier không hỗ trợ COD (defensive — với tenant EP ON settings đã chặn allowlist COD-capable, chỉ xảy ra edge/EP OFF)
 WHEN  render payment options
 THEN  COD disabled (buyer KHÔNG thấy tên courier — helper chung chung)
 
-GIVEN buyer West MY + total > max_cod_amount của courier đang dùng (per-courier, live từ quotation)
+GIVEN buyer West MY + total > max_cod_amount của auto-picked courier (per-courier, live từ quotation)
 WHEN  render payment options
 THEN  COD disabled + helper chung chung "COD chỉ áp dụng cho đơn dưới RM X" (KHÔNG lộ tên courier)
 
-GIVEN buyer West MY + total < min_cod_amount của courier đang dùng (per-courier, live từ quotation)
+GIVEN buyer West MY + total < min_cod_amount của auto-picked courier (per-courier, live từ quotation)
 WHEN  render payment options
 THEN  COD disabled + helper chung chung "Đơn dưới mức tối thiểu để dùng COD" (KHÔNG lộ tên courier)
 ```
@@ -655,15 +662,15 @@ THEN  ignore cod_amount (KHÔNG parse)
 #### AC-5: Create label COD — gửi flag COD + codAmount
 
 ```gherkin
-GIVEN order paymentMethod='cod' + buyer West MY + codAmount trong giới hạn courier
+GIVEN order paymentMethod='cod' + buyer West MY + codAmount trong giới hạn auto-picked courier
 WHEN  merchant tạo label qua modal Ready to Ship → POST /api/orders/[id]/create-label
-THEN  POST /open_api/2026-03/shipment/submit_orders gửi { cod_amount (RM float = codAmount/100) }
+THEN  POST /open_api/2026-03/shipment/submit_orders gửi { cod_amount (RM float = codAmount/100) } với auto-picked courier
   AND modal hiện COD badge + "Thu hộ: RM X" + fee note trước khi confirm
   AND codStatus = 'pending' (unchanged — tiền chưa thu)
   AND cước ship vẫn trừ ví merchant (tách biệt khỏi COD amount)
 ```
 
-> 📌 Source: PRD FR C-6e + brief as-built facts (cod_amount is the verified param name)
+> 📌 Source: PRD FR C-6e; Commit 722b47f0 (order.shippingCourier used for label creation)
 
 #### AC-6: COD East MY tại create-label → block
 
