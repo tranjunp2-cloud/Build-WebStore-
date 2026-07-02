@@ -69,6 +69,7 @@ export type SiteRendererProps = {
     }
     page: {
         layout?: unknown[]
+        isHomepage?: boolean
         [key: string]: unknown
     }
     pages?: NavPage[]
@@ -417,7 +418,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     }) as PreviewBlock[]
 
     // JSON-LD schemas — auto-detect from blocks present
-    const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
+    // Organization/WebSite (vs. WebPage) schema gates on `page.isHomepage`, the Payload `pages`
+    // collection's own ground-truth flag — every SiteRenderer call site's `page` originates from
+    // a `payload.find`/`findByID` on that collection (or a spread thereof), so the field is
+    // reliably present. Previously this used a block-order heuristic
+    // (`blocks[0]?.blockType === 'navigation'`), which broke once bucketing (below) started
+    // rendering nav visually first regardless of its authored position in page.layout — the
+    // heuristic no longer reflected what actually renders on screen.
+    const isHomepage = page?.isHomepage === true
     const jsonLdSchemas = generatePageSchemas({ blocks, site, page, isHomepage })
 
     // Heading hierarchy — compute levels for all blocks
@@ -479,6 +487,123 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         floatingByPos.set(pos, arr)
     })
 
+    // GH-1466: bucket rendered blocks into header/main/footer so the return tree can wrap
+    // them in a sticky-footer flex layout. Per-block render logic is unchanged from the
+    // previous blocks.map() — only the destination (return → push) differs.
+    // Intentional side effect: header/navigation and footer blocks now ALWAYS render at the
+    // very top/bottom of the page regardless of their position inside page.layout. Previously
+    // they rendered in-place (interleaved with content) if stored at a non-canonical index —
+    // possible via ensureNavigationBlocks (src/lib/ai/ensure-navigation.ts), which patches an
+    // existing nav/footer's content but never repositions it. Snapping to top/bottom is the
+    // correct fix for that latent display bug, not a regression.
+    // Note: 'announcement-bar' is the one block type conventionally authored ABOVE the nav
+    // (root element is `sticky top-0 z-50`). It is NOT in the header/footer bucket check below,
+    // so it falls into mainEls and renders BELOW nav — banner + nav sticky collision on scroll
+    // if a layout ever has announcement-bar before nav. Low reach today: structure-enforcer.ts
+    // forces nav to index 0 on the AI-gen path, and the editor blocks dropping around nav.
+    const headerEls: React.ReactNode[] = []
+    const mainEls: React.ReactNode[] = []
+    const footerEls: React.ReactNode[] = []
+    blocks.forEach((block, index) => {
+        if (!block.blockType) return
+
+        // Floating widgets are rendered in grouped stacking containers below
+        if (floatingBlockSet.has(index)) return
+
+        const BlockComponent = blockRegistry.getComponent(block.blockType)
+        if (!BlockComponent) {
+            // Unknown block type — skip silently (AC-6)
+            return
+        }
+
+        const normalizedBlock = block
+
+        const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
+
+        // Block spacing — navigation/footer default to 0, others use custom or default
+        const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
+        const isBreadcrumb = block.blockType === 'breadcrumb'
+        // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
+        // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
+        const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
+        const breadcrumbOffset =
+            isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
+                ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
+                : undefined
+        const blockVariant = (block as Record<string, unknown>).variant as string | undefined
+        const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
+        const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+        const spacingStyle = (isGlobalBlock || isFloatingBlock)
+            ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
+            : {
+                // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
+                // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
+                // silently overriding it with the nav height.
+                paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
+                    ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
+                    : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
+            }
+
+        // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
+        // Falls back to loop index only for non-editor contexts or uninjected blocks.
+        // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
+        // shifts all loop indices by +1, but the store has no injected nav, so hero is at
+        // store index 0 while its loop index would be 1.
+        const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
+            ? block.__editorBlockIndex
+            : index
+        const callbackValue = onBlockFieldChange
+            ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
+            : null
+
+        const blockContent = (
+            <BlockEditCallbackProvider key={`${block.blockType}-${index}`} value={callbackValue}>
+                <BlockErrorBoundary blockType={block.blockType}>
+                    <HeadingProvider level={headingLevel}>
+                        <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                    </HeadingProvider>
+                </BlockErrorBoundary>
+            </BlockEditCallbackProvider>
+        )
+
+        let rendered: React.ReactNode
+        if (isEditor) {
+            rendered = (
+                <div
+                    key={`${block.blockType}-${index}`}
+                    data-block-index={block.__editorBlockIndex ?? index}
+                    data-block-type={block.blockType}
+                    className="group/block relative w-full"
+                    style={spacingStyle}
+                >
+                    {blockContent}
+                </div>
+            )
+        } else if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
+            // Public site: wrap non-global blocks with spacing style so
+            // user-customized blockSpacing (paddingTop/paddingBottom) is
+            // preserved on the live published site. Global blocks (nav,
+            // footer, breadcrumb) normally return unwrapped; breadcrumb gets
+            // wrapped when a fixed-nav offset applies.
+            rendered = (
+                <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                    {blockContent}
+                </div>
+            )
+        } else {
+            rendered = blockContent
+        }
+
+        if (block.blockType === 'header' || block.blockType === 'navigation') {
+            headerEls.push(rendered)
+        } else if (block.blockType === 'footer') {
+            footerEls.push(rendered)
+        } else {
+            mainEls.push(rendered)
+        }
+    })
+
     return (
         <HiddenSlugsProvider value={showIndicators ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
@@ -536,97 +661,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 />
             ))}
 
-            {blocks.map((block, index) => {
-                if (!block.blockType) return null
-
-                // Floating widgets are rendered in grouped stacking containers below
-                if (floatingBlockSet.has(index)) return null
-
-                const BlockComponent = blockRegistry.getComponent(block.blockType)
-                if (!BlockComponent) {
-                    // Unknown block type — skip silently (AC-6)
-                    return null
-                }
-
-                const normalizedBlock = block
-
-                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
-
-                // Block spacing — navigation/footer default to 0, others use custom or default
-                const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
-                const isBreadcrumb = block.blockType === 'breadcrumb'
-                // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
-                // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
-                const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
-                const breadcrumbOffset =
-                    isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
-                        ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
-                        : undefined
-                const blockVariant = (block as Record<string, unknown>).variant as string | undefined
-                const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
-                const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                const spacingStyle = (isGlobalBlock || isFloatingBlock)
-                    ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
-                    : {
-                        // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
-                        // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
-                        // silently overriding it with the nav height.
-                        paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
-                            ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
-                            : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
-                        paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
-                    }
-
-                // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
-                // Falls back to loop index only for non-editor contexts or uninjected blocks.
-                // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
-                // shifts all loop indices by +1, but the store has no injected nav, so hero is at
-                // store index 0 while its loop index would be 1.
-                const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
-                    ? block.__editorBlockIndex
-                    : index
-                const callbackValue = onBlockFieldChange
-                    ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
-                    : null
-
-                const blockContent = (
-                    <BlockEditCallbackProvider key={`${block.blockType}-${index}`} value={callbackValue}>
-                        <BlockErrorBoundary blockType={block.blockType}>
-                            <HeadingProvider level={headingLevel}>
-                                <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
-                            </HeadingProvider>
-                        </BlockErrorBoundary>
-                    </BlockEditCallbackProvider>
-                )
-
-                if (isEditor) {
-                    return (
-                        <div
-                            key={`${block.blockType}-${index}`}
-                            data-block-index={block.__editorBlockIndex ?? index}
-                            data-block-type={block.blockType}
-                            className="group/block relative w-full"
-                            style={spacingStyle}
-                        >
-                            {blockContent}
-                        </div>
-                    )
-                }
-
-                // Public site: wrap non-global blocks with spacing style so
-                // user-customized blockSpacing (paddingTop/paddingBottom) is
-                // preserved on the live published site. Global blocks (nav,
-                // footer, breadcrumb) normally return unwrapped; breadcrumb gets
-                // wrapped when a fixed-nav offset applies.
-                if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
-                    return (
-                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
-                            {blockContent}
-                        </div>
-                    )
-                }
-                return blockContent
-            })}
+            <div className="min-h-screen flex flex-col">
+                {headerEls}
+                <main className="flex-1">{mainEls}</main>
+                {footerEls}
+            </div>
 
             {/* Floating widgets — grouped by corner so they stack vertically instead of overlapping */}
             {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => {
