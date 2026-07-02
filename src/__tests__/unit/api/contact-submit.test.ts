@@ -1,6 +1,6 @@
 /**
  * Unit Tests: POST /api/contact-submit — contact form rate-limiting & submission
- * TC-ID: TC-F04.CS.01..12 — GH-1464 rate-limit key scoping, fail-open,
+ * TC-ID: TC-F04.CS.01..16 — GH-1464 rate-limit key scoping, fail-open,
  * spoof-resistant IP extraction, invalid-site-only probe ceiling, error-path coverage
  * (code-review follow-up)
  * Convention: docs/TEST_CONVENTION.md, .claude/rules/testing.md
@@ -17,7 +17,7 @@ vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('payload', () => ({
 	getPayload: vi.fn().mockResolvedValue({
 		findByID: vi.fn().mockResolvedValue({
-			id: 'site-1',
+			id: 1,
 			name: 'Test Site',
 			ownerEmail: 'owner@example.com',
 		}),
@@ -68,7 +68,7 @@ const validBody = (overrides = {}) => ({
 	email: 'john@example.com',
 	phone: '123-456-7890',
 	message: 'This is a test message for contact',
-	siteId: 'site-1',
+	siteId: '1',
 	website: '', // honeypot: empty (not spam)
 	...overrides,
 })
@@ -86,7 +86,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 	it('TC-F04.CS.01 — Fresh siteId+IP → 200 success; rate-limit key scoped by site+IP', async () => {
 		// Arrange
-		const body = validBody({ siteId: 'site-1' })
+		const body = validBody({ siteId: '1' })
 		const req = makeReq(body, { xff: '1.1.1.1' })
 
 		// Act
@@ -96,22 +96,22 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		// Assert
 		expect(res.status).toBe(200)
 		expect(data.success).toBe(true)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:site-1:1.1.1.1', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:1.1.1.1', 5, 5 * 60 * 1000)
 	})
 
 	it('TC-F04.CS.02 — Same siteId+IP submitted 6× → 6th call returns 429', async () => {
 		// Arrange
-		const siteIp = 'contact-submit:site-1:2.2.2.2'
+		const siteIp = 'contact-submit:1:2.2.2.2'
 
 		// Act & Assert: calls 1-5 succeed
 		for (let i = 1; i <= 5; i++) {
-			const req = makeReq(validBody({ siteId: 'site-1' }), { xff: '2.2.2.2' })
+			const req = makeReq(validBody({ siteId: '1' }), { xff: '2.2.2.2' })
 			const res = await POST(req)
 			expect(res.status, `Call ${i} should succeed`).toBe(200)
 		}
 
 		// 6th call should be blocked
-		const sixthReq = makeReq(validBody({ siteId: 'site-1' }), { xff: '2.2.2.2' })
+		const sixthReq = makeReq(validBody({ siteId: '1' }), { xff: '2.2.2.2' })
 		const sixthRes = await POST(sixthReq)
 		const sixthData = await sixthRes.json()
 
@@ -121,8 +121,8 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 	it('TC-F04.CS.03 — Two siteIds same IP have independent counters', async () => {
 		// Arrange: Site A with IP 3.3.3.3 (submit 5×), then Site B with same IP (submit 1×)
-		const siteABody = validBody({ siteId: 'site-A' })
-		const siteBBody = validBody({ siteId: 'site-B' })
+		const siteABody = validBody({ siteId: '101' })
+		const siteBBody = validBody({ siteId: '102' })
 
 		// Act: Submit site-A 5 times
 		for (let i = 1; i <= 5; i++) {
@@ -137,19 +137,19 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert
 		expect(siteBRes.status, 'Site B first call should succeed (independent counter)').toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:site-A:3.3.3.3', 5, 5 * 60 * 1000)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:site-B:3.3.3.3', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:101:3.3.3.3', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:102:3.3.3.3', 5, 5 * 60 * 1000)
 	})
 
 	it('TC-F04.CS.04 — Missing x-forwarded-for header → fail open (no rate-limit check)', async () => {
 		// Arrange
-		const body = validBody({ siteId: 'site-1' })
+		const body = validBody({ siteId: '1' })
 
 		// Act: Submit 6+ times without XFF header
 		const results: number[] = []
 		for (let i = 1; i <= 6; i++) {
 			// Must create new request each time due to body consumption
-			const reqBody = validBody({ siteId: 'site-1' })
+			const reqBody = validBody({ siteId: '1' })
 			const req = makeReq(reqBody) // No xff parameter
 			const res = await POST(req)
 			results.push(res.status)
@@ -198,7 +198,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 	it('TC-F04.CS.07 — Spoofed leftmost XFF entry ignored; rightmost (Vercel-appended) IP used for rate-limit key', async () => {
 		// Arrange: XFF chain "attacker-spoofed, real-vercel-appended" (rightmost = real)
-		const body = validBody({ siteId: 'site-1' })
+		const body = validBody({ siteId: '1' })
 		const req = makeReq(body, { xff: '9.9.9.9, 6.6.6.6' })
 
 		// Act
@@ -206,7 +206,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert: rate-limit key uses the rightmost (real) IP, never the spoofed leftmost one
 		expect(res.status).toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:site-1:6.6.6.6', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:6.6.6.6', 5, 5 * 60 * 1000)
 		expect(checkRateLimit).not.toHaveBeenCalledWith(
 			expect.stringContaining('9.9.9.9'),
 			expect.anything(),
@@ -216,7 +216,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 	it('TC-F04.CS.08 — x-real-ip header takes priority over x-forwarded-for', async () => {
 		// Arrange: x-real-ip present (Vercel-set) alongside an unrelated XFF value
-		const body = validBody({ siteId: 'site-1' })
+		const body = validBody({ siteId: '1' })
 		const req = makeReq(body, { xff: '8.8.8.8', realIp: '7.1.1.1' })
 
 		// Act
@@ -224,7 +224,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Assert: x-real-ip wins over x-forwarded-for
 		expect(res.status).toBe(200)
-		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:site-1:7.1.1.1', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:7.1.1.1', 5, 5 * 60 * 1000)
 	})
 
 	it('TC-F04.CS.09 — Many distinct VALID siteIds from one IP → no false-positive IP-wide block (200-people/200-sites regression)', async () => {
@@ -234,7 +234,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Act
 		for (let i = 1; i <= 25; i++) {
-			const req = makeReq(validBody({ siteId: `site-${i}` }), { xff: ip })
+			const req = makeReq(validBody({ siteId: `${i}` }), { xff: ip })
 			const res = await POST(req)
 			results.push(res.status)
 		}
@@ -260,7 +260,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 
 		// Act: 11 requests, each a distinct nonexistent siteId, same IP
 		for (let i = 1; i <= 11; i++) {
-			const req = makeReq(validBody({ siteId: `nonexistent-${i}` }), { xff: ip })
+			const req = makeReq(validBody({ siteId: `${900 + i}` }), { xff: ip })
 			const res = await POST(req)
 			const data = await res.json()
 			results.push({ status: res.status, error: data.error })
@@ -281,7 +281,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		const mockPayload = await payloadModule.getPayload({} as never)
 		vi.mocked(mockPayload.findByID).mockResolvedValueOnce(null as never)
 
-		const req = makeReq(validBody({ siteId: 'nonexistent-1' })) // no xff, no realIp
+		const req = makeReq(validBody({ siteId: '999901' })) // no xff, no realIp
 
 		// Act
 		const res = await POST(req)
@@ -299,7 +299,7 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		const mockPayload = await payloadModule.getPayload({} as never)
 		vi.mocked(mockPayload.create).mockRejectedValueOnce(new Error('DB connection lost'))
 
-		const req = makeReq(validBody({ siteId: 'site-1' }), { xff: '11.11.11.11' })
+		const req = makeReq(validBody({ siteId: '1' }), { xff: '11.11.11.11' })
 
 		// Act
 		const res = await POST(req)
@@ -308,5 +308,72 @@ describe('POST /api/contact-submit — rate-limiting & honeypot', () => {
 		// Assert: generic 500, no internal error details leaked
 		expect(res.status).toBe(500)
 		expect(data.error).toBe('Something went wrong. Please try again.')
+	})
+
+	it('TC-F04.CS.13 — Non-numeric siteId → 400 before rate-limit/DB lookup (cost-amplification guard)', async () => {
+		// Arrange: siteId is free-form junk, not a numeric site PK
+		const body = validBody({ siteId: 'not-a-real-site-id' })
+		const req = makeReq(body, { xff: '12.12.12.12' })
+
+		// Act
+		const res = await POST(req)
+		const data = await res.json()
+
+		// Assert: zod regex rejects before any Redis/DB call is made
+		expect(res.status).toBe(400)
+		expect(data.error).toBe('Invalid site ID')
+		expect(checkRateLimit).not.toHaveBeenCalled()
+	})
+
+	it('TC-F04.CS.14 — Leading-zero-padded siteId collapses to the same canonical rate-limit key (bypass regression)', async () => {
+		// Arrange: '1' and '01' are the same site (Postgres implicit int cast: '01'::int = 1)
+		// but are different strings — the key must be built from the canonicalized number,
+		// not the raw string, or an attacker could pad zeros for unlimited extra buckets.
+		const req1 = makeReq(validBody({ siteId: '1' }), { xff: '13.13.13.13' })
+		const req2 = makeReq(validBody({ siteId: '01' }), { xff: '13.13.13.13' })
+
+		// Act
+		const res1 = await POST(req1)
+		const res2 = await POST(req2)
+
+		// Assert: both requests hit the SAME rate-limit key (canonical numeric form)
+		expect(res1.status).toBe(200)
+		expect(res2.status).toBe(200)
+		expect(checkRateLimit).toHaveBeenCalledWith('contact-submit:1:13.13.13.13', 5, 5 * 60 * 1000)
+		expect(checkRateLimit).not.toHaveBeenCalledWith(
+			expect.stringContaining(':01:'),
+			expect.anything(),
+			expect.anything(),
+		)
+	})
+
+	it('TC-F04.CS.15 — siteId exceeding Postgres int4 range → 400 before rate-limit/DB lookup', async () => {
+		// Arrange: all-digit string passes the regex but overflows a Postgres int4 PK
+		const body = validBody({ siteId: '99999999999999999999' })
+		const req = makeReq(body, { xff: '14.14.14.14' })
+
+		// Act
+		const res = await POST(req)
+		const data = await res.json()
+
+		// Assert: rejected before touching Redis/DB, not silently truncated or DB-erroring
+		expect(res.status).toBe(400)
+		expect(data.error).toBe('Invalid site ID')
+		expect(checkRateLimit).not.toHaveBeenCalled()
+	})
+
+	it('TC-F04.CS.16 — siteId of "0" → 400 (not a valid positive PK)', async () => {
+		// Arrange
+		const body = validBody({ siteId: '0' })
+		const req = makeReq(body, { xff: '15.15.15.15' })
+
+		// Act
+		const res = await POST(req)
+		const data = await res.json()
+
+		// Assert
+		expect(res.status).toBe(400)
+		expect(data.error).toBe('Invalid site ID')
+		expect(checkRateLimit).not.toHaveBeenCalled()
 	})
 })
