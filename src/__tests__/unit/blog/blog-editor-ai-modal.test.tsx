@@ -564,15 +564,16 @@ describe('[TC-F17-02-01] Blog editor page — Create new post flow', () => {
         expect(buttonTexts.some(t => t.includes('Publish'))).toBe(true)
     })
 
-    it('AI and Save Draft buttons are icon-only on mobile (hidden text spans with xl:inline)', async () => {
+    it('AI and Save Draft buttons are icon-only on mobile (hidden text spans with sm:inline)', async () => {
         // Arrange + Act
         await act(async () => {
             render(<BlogEditorPage />)
         })
 
-        // Assert — text spans inside AI and Save Draft buttons use "hidden xl:inline"
-        const hiddenXlSpans = document.querySelectorAll('span.hidden.xl\\:inline')
-        expect(hiddenXlSpans.length).toBeGreaterThanOrEqual(2)
+        // Assert — text spans inside AI and Save Draft buttons use "hidden sm:inline"
+        // (text shows from the sm breakpoint; icon-only below)
+        const hiddenSmSpans = document.querySelectorAll('span.hidden.sm\\:inline')
+        expect(hiddenSmSpans.length).toBeGreaterThanOrEqual(2)
     })
 
     it('shows validation error when Save Draft is clicked with empty title', async () => {

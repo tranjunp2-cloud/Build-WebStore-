@@ -21,6 +21,17 @@ const DIALOG_SHADOW = '0 20px 48px -8px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0
 const KEEP_NOTE =
     'Note: Some new template elements added later in the CMS will display in EN/MY by default.'
 
+// Dark editor tokens (globals.css :root .dark block) — pinned so the modal is
+// always dark regardless of the builder's current light/dark theme.
+const DARK_EDITOR_TOKENS = {
+    '--editor-bg': '#0B1120',
+    '--editor-surface': '#0F172A',
+    '--editor-surface-elevated': '#1E293B',
+    '--editor-border': 'rgba(255, 255, 255, 0.06)',
+    '--editor-text': '#F8FAFC',
+    '--editor-text-muted': '#94A3B8',
+} as React.CSSProperties
+
 // Option card background/border per state.
 function optionStyle(isSelected: boolean, reco: boolean): React.CSSProperties {
     if (isSelected) {
@@ -54,7 +65,12 @@ export function LanguageConfirmBanner({ isOpen, detectedLocale, onAction }: Lang
     }
 
     return (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm px-4">
+        <div
+            className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+            // Always dark: pin the editor-* tokens to their dark values so this
+            // modal stays dark even when the builder is in light theme.
+            style={DARK_EDITOR_TOKENS}
+        >
             <div
                 className="relative w-full max-w-[520px] overflow-hidden rounded-[14px] border border-[var(--editor-border)] bg-[var(--editor-surface)]"
                 style={{ boxShadow: DIALOG_SHADOW }}

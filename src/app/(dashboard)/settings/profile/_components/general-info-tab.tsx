@@ -87,7 +87,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 w-full">
             {/* Name row — 2 columns */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.firstName}
@@ -112,7 +112,7 @@ function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
             </div>
 
             {/* Email + Phone row */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-2">
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-[22px]">
                         {t.profile.general.email}

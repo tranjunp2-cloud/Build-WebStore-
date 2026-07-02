@@ -1203,12 +1203,12 @@
             "status": {
                 "pending": "Menunggu",
                 "confirmed": "Disahkan",
-                "readyToShip": "Sedia untuk Dihantar",
-                "shipped": "Sedang Dihantar",
+                "readyToShip": "Sedia Dihantar",
+                "shipped": "Dihantar",
                 "completed": "Selesai",
                 "cancelled": "Dibatalkan",
                 "refunded": "Dikembalikan",
-                "processing": "Sedang Diproses",
+                "processing": "Diproses",
                 "paid": "Telah Dibayar"
             },
             "toast": {
@@ -1838,7 +1838,8 @@
             "deleteConfirmPost": "dan tidak boleh dibatalkan.",
             "cancel": "Batal",
             "deleteButton": "Padam",
-            "colProfile": "Profil Pelanggan",
+            "colCustomer": "Pelanggan",
+            "colProfile": "Profil",
             "colEmail": "E-mel",
             "colSource": "Sumber & Laman",
             "colMessage": "Mesej",
@@ -1906,10 +1907,10 @@
                 "tabOrders": "Pesanan",
                 "unsavedBanner": "Anda mempunyai perubahan yang belum disimpan.",
                 "revert": "Batal Perubahan",
+                "cancel": "Batal",
                 "saveChanges": "Simpan perubahan",
                 "upToDate": "Terkini",
                 "unsaved": "Perubahan belum disimpan",
-                "lastSaved": "Disimpan terakhir",
                 "saved": "Pelanggan disimpan",
                 "saveFailed": "Gagal menyimpan pelanggan",
                 "fieldEmail": "E-mel",
@@ -2231,7 +2232,9 @@
                     "disabled": "Templat dilumpuhkan",
                     "updateFailed": "Gagal mengemas kini templat",
                     "testSent": "E-mel ujian dihantar ke {email}",
-                    "testFailed": "Gagal menghantar e-mel ujian"
+                    "testFailed": "Gagal menghantar e-mel ujian",
+                    "popupBlocked": "Pop timbul disekat — benarkan pop timbul untuk membuka pratonton",
+                    "previewFailed": "Gagal membuka pratonton"
                 },
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",

@@ -12,7 +12,8 @@ import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { discountReserveErrorResponse } from '@/lib/discounts/messages'
-import { computeOrderTotal } from '@/lib/orders/order-total'
+import { computeOrderTotal, effectiveSubtotalSen } from '@/lib/orders/order-total'
+import { getShippingRate } from '@/lib/shipping'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
@@ -202,9 +203,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Calculate totals (flat shipping — #962 will replace shipping calc).
         // SST tax removed at checkout (F33 phase-06) — kept as 0 so the order column stays populated.
-        const shippingFee = 10
         const tax = 0
         const subtotalSen = Math.round(subtotal * 100)
 
@@ -245,8 +244,9 @@ export async function POST(request: NextRequest) {
             }
         }
         const discountRM = discountSen / 100
-        // Shared gateway-agnostic total (F33) — identical formula as COD/QR so all gateways charge the same.
-        const shippingFeeSen = Math.round(shippingFee * 100)
+        const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
+        const shippingFeeSen = getShippingRate(customer.address?.state, (site as any).shippingConfig, effSubtotalSen)
+        const shippingFee = shippingFeeSen / 100
         const { total } = computeOrderTotal({ subtotalSen, discountSen, shippingFeeSen })
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
         // Per-order secret for magic-link tokens — enables cross-device retry from the re-payment email (AC-3)
@@ -464,7 +464,7 @@ export async function POST(request: NextRequest) {
             ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
             : [
                 ...checkoutItems,
-                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+                ...(shippingFeeSen > 0 ? [{ name: 'Shipping', price: shippingFeeSen, quantity: 1, images: [] }] : []),
               ]
 
         let checkout

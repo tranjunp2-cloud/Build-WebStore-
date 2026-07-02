@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies } from 'next/headers'
+import { FONT_VARIABLES } from '@/lib/fonts/variables'
 
 export const metadata: Metadata = {
     title: {
@@ -39,13 +40,12 @@ export const viewport: Viewport = {
 /**
  * Root layout — minimal html/body wrapper (required by Next.js).
  *
- * IMPORTANT: Keep this minimal! Do NOT add:
- * - Google Fonts (next/font/google) — these go in AppShell
- * - globals.css import — goes in AppShell
- * - Font class names on <html>
+ * FONT_VARIABLES applied to <html> so --font-* CSS properties are available
+ * globally, including portals/modals that render into document.body outside
+ * the AppShell subtree (fixes system-ui fallback in portal content).
+ * globals.css and non-admin styles remain scoped to AppShell only.
  *
- * Payload CMS admin has its own RootLayout that adds data-theme
- * and other attributes. suppressHydrationWarning prevents conflicts.
+ * Payload CMS admin has its own RootLayout; suppressHydrationWarning prevents conflicts.
  */
 export default async function RootLayout({
     children,
@@ -58,7 +58,7 @@ export default async function RootLayout({
     const initialClass = themeCookie === 'light' ? '' : 'dark'
 
     return (
-        <html lang="en" className={initialClass} suppressHydrationWarning data-scroll-behavior="smooth">
+        <html lang="en" className={`${FONT_VARIABLES}${initialClass ? ` ${initialClass}` : ''}`} suppressHydrationWarning data-scroll-behavior="smooth">
             <head>
                 {/*
                   * FOUC prevention — reads localStorage before first paint.

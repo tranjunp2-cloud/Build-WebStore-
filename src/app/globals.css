@@ -40,13 +40,6 @@
   --border-semantic: var(--border-legacy);
   --divider: var(--border-legacy);
 
-  /* Typography fallbacks — ensure `font-sans` / body rule resolves even
-     OUTSIDE the AppShell wrapper (portals, toasts, modals mounted directly
-     on document.body). next/font's `.inter_xxx__variable` class on the
-     AppShell div overrides these with the real self-hosted font names. */
-  --font-inter: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-outfit: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-
   /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
   --nav-height: 64px;
 
@@ -215,6 +208,22 @@
 .dash-table thead tr { border-bottom: 1px solid var(--dash-border); }
 .dash-table tbody tr { border-bottom: 1px solid var(--dash-border); }
 .dash-table tbody tr:last-child { border-bottom: none; }
+
+/* ── Shared compact table sizing (CMS dashboard) ─────────────────────────────
+   Opt-in: <Table className="dash-table-compact">. Unifies header/body font across
+   EVERY dashboard table at all widths so sizes stay consistent:
+     • desktop (>= xl / 1280px): header 10px / body 12px
+     • tablet band (< xl):       header 8px  / body 10px  (+ 8px cell padding so a
+                                  wide table fits without horizontal scroll)
+   Column ratios stay per-page via each table's <colgroup>; element sizes that aren't
+   text (thumbnails, action buttons) are tuned per-page. Higher specificity (class +
+   element) overrides the component's px-4 / text-[10px] / text-[13px] / text-[14px]. */
+.dash-table-compact th { font-size: 10px; }
+.dash-table-compact td, .dash-table-compact td span { font-size: 12px; }
+@media (max-width: 1279.98px) {
+  .dash-table-compact th { font-size: 8px; padding-left: 8px; padding-right: 8px; }
+  .dash-table-compact td, .dash-table-compact td span { font-size: 10px; padding-left: 8px; padding-right: 8px; }
+}
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
 /* Dark mode (default — matches current hardcoded values) */
@@ -1508,12 +1517,14 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
 
 /* ── Logo segment: MOBILE follows theme (not sidebar-dark) ────────────────────
    Top-bar left cluster (☰ + ⊞ + logo) dùng .sb-dark để KHỚP cột sidebar ở
-   DESKTOP. Ở mobile nó chỉ là cụm control của top-bar (sidebar = drawer) nên
-   forced-dark tạo "khoảng đen" trên header sáng. Dưới đây: chỉ ở mobile,
-   neutralize sb-dark về theme hiện hành (light = trắng, dark = giữ tối).
+   DESKTOP (lg+). Dưới lg sidebar = drawer nên cụm này chỉ là control của
+   top-bar; forced-dark tạo "khoảng đen" trên header sáng. Dưới đây: ở mọi
+   width dưới lg (mobile + tablet portrait, gồm iPad Mini 768px), neutralize
+   sb-dark về theme hiện hành (light = trắng, dark = giữ tối). Breakpoint khớp
+   `lg:` của shell (1024px) — trước đây dừng ở 767px nên dải 768–1023 còn dark.
    Đặt SAU block .sb-dark + selector compound (.dash-logo-seg.sb-dark) → thắng
-   cascade. Desktop giữ nguyên 100%. */
-@media (max-width: 767px) {
+   cascade. Desktop (lg+) giữ nguyên 100%. */
+@media (max-width: 1023.98px) {
   .dash-logo-seg.sb-dark { --dash-sidebar-bg: #FFFFFF !important; }
   .dark .dash-logo-seg.sb-dark { --dash-sidebar-bg: #060B18 !important; }
   .dash-logo-seg.sb-dark .bg-\[var\(--dash-sidebar-bg\)\] { background-color: var(--dash-sidebar-bg) !important; }

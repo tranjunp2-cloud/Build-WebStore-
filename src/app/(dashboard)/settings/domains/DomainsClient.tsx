@@ -553,7 +553,7 @@ export function DomainsClient({
             <div className="space-y-[16px]">
                 {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
                 <div
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px]"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] p-[16px] sm:py-[25px] sm:px-[25px] rounded-[16px]"
                     style={{ minHeight: '102px', border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                 >
                     {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
@@ -561,14 +561,15 @@ export function DomainsClient({
                         <h2 className="text-[18px] font-semibold leading-[1.556em] font-['Inter']" style={{ color: 'var(--dash-text)' }}>{t?.Domains?.addDomainHeading || 'Add a Domain to your store'}</h2>
                         <p className="mt-[4px] text-[14px] font-normal leading-[1.429em] font-['Inter']" style={{ color: 'var(--dash-text-muted)' }}>{t?.Domains?.addDomainDesc || 'Connect your custom domain to make your store accessible'}</p>
                     </div>
-                    {/* Buttons — stack on mobile, row on desktop */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2  shrink-0">
+                    {/* Buttons — one row on all sizes (mobile: both share the row via flex-1,
+                        text shrinks + wraps if needed at very narrow widths). Desktop unchanged. */}
+                    <div className="flex flex-row items-stretch sm:items-center gap-2 shrink-0">
                         <Button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
                             variant="dashSecondary"
                             size="dash"
-                            className="whitespace-nowrap font-['Inter']"
+                            className="flex-1 sm:flex-none min-w-0 h-auto min-h-9 px-3 sm:px-4 py-1.5 leading-tight whitespace-normal sm:whitespace-nowrap text-xs sm:text-[13px] font-['Inter']"
                         >
                             {t?.Domains?.selectPrimary || 'Select primary domain'}
                         </Button>
@@ -577,7 +578,7 @@ export function DomainsClient({
                             onClick={() => { setIsAddModalOpen(true); setDomainError(''); setNewDomainInput(''); }}
                             variant="dashPrimary"
                             size="dash"
-                            className="whitespace-nowrap font-['Inter']"
+                            className="flex-1 sm:flex-none min-w-0 h-auto min-h-9 px-3 sm:px-4 py-1.5 leading-tight whitespace-normal sm:whitespace-nowrap text-xs sm:text-[13px] font-['Inter']"
                         >
                             <Plus className="h-4 w-4" />
                             <span>{t?.Domains?.addCustomDomain || 'Add Custom Domain'}</span>
@@ -587,7 +588,7 @@ export function DomainsClient({
 
                 {/* Platform subdomain card — F23: with slug editor */}
                 <div
-                    className="flex flex-col pt-[25px] px-[25px] pb-[25px] rounded-[16px] gap-[16px]"
+                    className="flex flex-col p-[16px] sm:pt-[25px] sm:px-[25px] sm:pb-[25px] rounded-[16px] gap-[16px]"
                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                 >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
@@ -636,24 +637,26 @@ export function DomainsClient({
                                 {t?.Domains?.connected || 'Connected'}
                             </Badge>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
                             {!isEditingSlug ? (
                                 <Button
                                     type="button"
                                     onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                     variant="dashSecondary"
                                     size="dash"
+                                    className="w-full sm:w-auto justify-center"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
                                     {t?.Domains?.changeSubdomain || 'Change subdomain'}
                                 </Button>
                             ) : (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
                                     <Button
                                         type="button"
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                         variant="dashSecondary"
                                         size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.cancel || 'Cancel'}
                                     </Button>
@@ -663,6 +666,7 @@ export function DomainsClient({
                                         onClick={() => setShowSlugConfirm(true)}
                                         variant="dashPrimary"
                                         size="dash"
+                                        className="flex-1 sm:flex-none justify-center"
                                     >
                                         {t?.Domains?.save || 'Save'}
                                     </Button>
@@ -726,7 +730,7 @@ export function DomainsClient({
                         return (
                             <div
                                 key={domain}
-                                className="flex flex-col p-[25px] rounded-[16px] gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300"
+                                className="flex flex-col p-[16px] sm:p-[25px] rounded-[16px] gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300"
                                 style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                             >
                                 <div className="flex flex-col gap-2">
@@ -852,10 +856,10 @@ export function DomainsClient({
                         return (
                             <div key={domain} className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
                                 <div
-                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] gap-[16px]"
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[16px] px-[16px] pb-[1px] sm:pt-[25px] sm:px-[25px] rounded-[16px] gap-[16px]"
                                     style={{ border: '1px solid var(--dash-border)', background: 'var(--dash-surface-hover)' }}
                                 >
-                                    <div className="flex flex-col gap-2 pb-[25px]">
+                                    <div className="flex flex-col gap-2 pb-[16px] sm:pb-[25px]">
                                         <h3 className="text-[18px] font-semibold" style={{ color: 'var(--dash-text)' }}>{domain}</h3>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {/* Active status — theme-aware success badge */}
@@ -870,7 +874,7 @@ export function DomainsClient({
                                         </div>
                                     </div>
                                     {/* Remove button — visible on all screen sizes */}
-                                    <div className="flex items-center gap-3 pb-[25px]">
+                                    <div className="flex items-center gap-3 pb-[16px] sm:pb-[25px]">
                                         {/* Shared <Button> dashSecondary, outline destructive (GH-1290 Bug 1) */}
                                         <TooltipProvider>
                                             <Tooltip>

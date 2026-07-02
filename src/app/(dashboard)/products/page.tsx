@@ -651,12 +651,15 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table (GH-1222 DS migration) --- */}
+                        {/* --- Table (iPad Air >=820 and up) — matches orders/blog dash-table-compact
+                            convention: below xl the shared `.dash-table-compact` (globals.css) shrinks
+                            font + padding so the columns fit; no minWidth floor → table-fixed w-full
+                            always fits the pane (no horizontal scroll on iPad Pro with sidebar open).
+                            At >=1280 the compact class is a no-op → desktop byte-identical. --- */}
                         {filteredAndSortedProducts.length > 0 && (
-                            <div className="hidden md:block">
+                            <div className="hidden min-[820px]:block">
                                 <Table
-                                    className="table-fixed w-full"
-                                    minWidth={860}
+                                    className="table-fixed w-full dash-table-compact"
                                     footer={
                                         <TablePagination
                                             page={currentPage}
@@ -707,7 +710,7 @@ export default function ProductsPage() {
                                                     {/* Thumbnail */}
                                                     <TableCell>
                                                         <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="40px" />
+                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="sm" sizes="40px" />
                                                         </div>
                                                     </TableCell>
 
@@ -782,8 +785,9 @@ export default function ProductsPage() {
                             </div>
                         )}
 
-                        {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
-                        <div className="md:hidden flex flex-col gap-3">
+                        {/* --- Card View (mobile + iPad mini, < 820px) (Figma Node 30945:1017).
+                            1 col on mobile, 2 cols from md; the table takes over from iPad Air (>=820). --- */}
+                        <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
@@ -800,7 +804,7 @@ export default function ProductsPage() {
                                         <div className="flex items-start gap-[12px]">
                                             {/* Thumbnail 64×64 */}
                                             <div className="relative h-[64px] w-[64px] shrink-0 rounded-[12px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="md" sizes="64px" />
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="md" sizes="64px" />
                                             </div>
 
                                             {/* Text Information Block */}
@@ -824,21 +828,20 @@ export default function ProductsPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Price column (right) — level with the name; keeps name/category tight in the middle column */}
+                                            <div className="flex flex-col items-end shrink-0 pt-[2px]">
+                                                <span className="text-[11px] font-medium text-foreground/50 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
+                                                <span className="text-[16px] font-bold text-foreground leading-[20px] whitespace-nowrap">{priceDisplay}</span>
+                                            </div>
                                         </div>
 
-                                        {/* Section 2: Price + Stock/Status */}
-                                        <div className="flex items-end justify-between">
-                                            {/* Price (Left Aligned) */}
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
-                                                <span className="text-[18px] font-bold text-foreground leading-[22px]">{priceDisplay}</span>
-                                            </div>
-
-                                            {/* Stock + Status Toggle (Right Aligned) */}
-                                            <div className="flex items-end gap-3">
-                                                <div className="flex flex-col items-end gap-0.5">
-                                                    <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                    {inv === 0 ? (
+                                        {/* Section 2: Stock (left) + Status toggle (right) — price moved up next to name */}
+                                        <div className="flex items-center justify-between gap-3">
+                                            {/* Stock (Left) */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
+                                                {inv === 0 ? (
                                                         <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
                                                             <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
                                                         </div>
@@ -857,7 +860,7 @@ export default function ProductsPage() {
                                                 {/* Status Toggle - Compacted */}
                                                 <div
                                                     onClick={(e) => handleUpdateStatus(product, e)}
-                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
+                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden"
                                                     style={{
                                                         border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)" : "var(--dash-secondary-bg)",
@@ -869,7 +872,6 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "translate-x-[20px]" : "translate-x-0"
                                                     )} />
                                                 </div>
-                                            </div>
                                         </div>
 
                                         {/* Section 3: Action Row */}
@@ -884,14 +886,15 @@ export default function ProductsPage() {
                                                 {t.dashboard.products.list.edit}
                                             </Link>
 
-                                            {/* Delete Button */}
-                                            <Button
-                                                variant="ghost"
+                                            {/* Delete Button — plain <button> mirroring the Edit <Link> classes so both are exactly equal size */}
+                                            <button
+                                                type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))] p-0"
+                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
-                                            </Button>
+                                                {t.dashboard.products.list.delete}
+                                            </button>
                                         </div>
                                     </div>
                                 )
@@ -906,9 +909,10 @@ export default function ProductsPage() {
                             />
                         )}
 
-                        {/* Mobile Pagination */}
+                        {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
+                            pager lives in its footer slot from iPad Air up. */}
                         {totalPages > 1 && (
-                            <div className="md:hidden py-4">
+                            <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
@@ -936,23 +940,40 @@ export default function ProductsPage() {
 
             {quickViewProduct && (
                 <>
-                    <div className="hidden md:block">
+                    {/* Desktop 2-col QuickView only from xl (needs ~1024px; overflows on iPad).
+                        Tablet + iPad Pro (≤1279) use the fullscreen mobile detail → fits, no overflow. */}
+                    <div className="hidden xl:block">
                         <ProductQuickViewModal
                             isOpen={!!quickViewProduct}
                             onClose={() => setQuickViewProduct(null)}
                             product={quickViewProduct}
-                            onDelete={handleDelete}
+                            // Close this z-[9999] modal first, then open the confirm popup — otherwise
+                            // the ConfirmModal (z-50) renders BEHIND this overlay and is invisible.
+                            onDelete={(prod) => { setQuickViewProduct(null); handleDelete(prod) }}
                         />
                     </div>
                     {mounted && typeof document !== 'undefined' && createPortal(
-                        <div className="block md:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
-                            <ProductDetailsMobile
-                                product={quickViewProduct}
-                                onClose={() => setQuickViewProduct(null)}
-                                onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
-                                onDelete={() => handleDelete(quickViewProduct)}
+                        <>
+                            {/* Backdrop — dim + blur, tap to close. Mirrors the order detail panel. */}
+                            <div
+                                className="xl:hidden fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+                                onClick={() => setQuickViewProduct(null)}
                             />
-                        </div>,
+                            {/* Product detail panel (< xl / iPad + mobile) — slides in from the right
+                                exactly like the order panel: full-width on phones, 488px side panel from
+                                md up so the list stays visible (dimmed) behind it. */}
+                            <div
+                                className="xl:hidden fixed right-0 top-0 z-[9999] h-[100dvh] w-full md:w-[488px] overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
+                                style={{ background: 'hsl(var(--background))', borderLeft: '1px solid var(--dash-border)' }}
+                            >
+                                <ProductDetailsMobile
+                                    product={quickViewProduct}
+                                    onClose={() => setQuickViewProduct(null)}
+                                    onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
+                                    onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
+                                />
+                            </div>
+                        </>,
                         document.body
                     )}
                 </>

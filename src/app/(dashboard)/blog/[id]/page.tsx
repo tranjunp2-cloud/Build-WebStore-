@@ -499,7 +499,7 @@ export default function BlogEditorPage() {
 
     return (
         <div className="w-full h-full space-y-6">
-            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-[12px] w-full">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-[12px] w-full">
                 {/* Row 1: Back + Breadcrumb + Title */}
                 <div className="flex flex-row items-center gap-[16px] min-w-0">
                     <Button
@@ -517,10 +517,6 @@ export default function BlogEditorPage() {
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-foreground">
-                                {isNew ? t.dashboard.blog.editor.newPost : `${t.dashboard.blog.editor.editPrefix} ${form.title || t.dashboard.blog.editor.untitled}`}
-                            </span>
                         </div>
                         <div className="h-[32px] flex items-center">
                             <h1 className="font-['Inter'] font-[700] text-[24px] leading-[32px] text-foreground">
@@ -537,7 +533,7 @@ export default function BlogEditorPage() {
                         type="button"
                         onClick={() => setShowAIGenerator(true)}
                         size="dash"
-                        className="w-[68px] xl:w-auto"
+                        className="w-auto"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <g clipPath="url(#clip0_30970_14228)">
@@ -553,7 +549,7 @@ export default function BlogEditorPage() {
                                 </clipPath>
                             </defs>
                         </svg>
-                        <span className="hidden xl:inline">{t.dashboard.blog.editor.aiAssistant}</span>
+                        <span className="hidden sm:inline">{t.dashboard.blog.editor.aiAssistant}</span>
                     </Button>
 
                     {/* Save Draft Button — icon-only on mobile per Figma */}
@@ -563,14 +559,14 @@ export default function BlogEditorPage() {
                         disabled={isSaving || success}
                         variant="dashSecondary"
                         size="dash"
-                        className="w-[70px] xl:w-auto panel-outline"
+                        className="w-auto panel-outline"
                     >
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12.6667 2.5C13.1063 2.50626 13.5256 2.68598 13.8333 3L17 6.16667C17.314 6.47438 17.4937 6.89372 17.5 7.33333V15.8333C17.5 16.2754 17.3244 16.6993 17.0118 17.0118C16.6993 17.3244 16.2754 17.5 15.8333 17.5H4.16667C3.72464 17.5 3.30072 17.3244 2.98816 17.0118C2.67559 16.6993 2.5 16.2754 2.5 15.8333V4.16667C2.5 3.72464 2.67559 3.30072 2.98816 2.98816C3.30072 2.67559 3.72464 2.5 4.16667 2.5H12.6667Z" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M14.1666 17.5007V11.6673C14.1666 11.4463 14.0788 11.2343 13.9225 11.0781C13.7662 10.9218 13.5543 10.834 13.3333 10.834H6.66659C6.44557 10.834 6.23361 10.9218 6.07733 11.0781C5.92105 11.2343 5.83325 11.4463 5.83325 11.6673V17.5007" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M5.83325 2.5V5.83333C5.83325 6.05435 5.92105 6.26631 6.07733 6.42259C6.23361 6.57887 6.44557 6.66667 6.66659 6.66667H12.4999" stroke="currentColor" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="hidden xl:inline">{t.dashboard.blog.editor.saveDraft}</span>
+                        <span className="hidden sm:inline">{t.dashboard.blog.editor.saveDraft}</span>
                     </Button>
 
                     {/* Publish Button — always shows icon + text */}
@@ -757,7 +753,7 @@ export default function BlogEditorPage() {
                     />
                 </div>
 
-                <div className="w-full xl:w-[512px] max-w-[512px] flex flex-col gap-[24px] flex-shrink-0">
+                <div className="w-full xl:w-[512px] xl:max-w-[512px] flex flex-col gap-[24px] flex-shrink-0">
                     <div className="flex flex-col p-[25px] gap-[20px] bg-[hsl(var(--card))] panel-outline rounded-[16px]">
                         <div className="flex flex-row items-center gap-[12px] h-[28px]">
                             <Tag className="w-[20px] h-[20px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
@@ -834,8 +830,10 @@ export default function BlogEditorPage() {
                                 <PopoverTrigger asChild>
                                     <Button
                                         type="button"
-                                        variant="dashSecondary"
-                                        className="flex flex-row items-center w-full h-10 px-[12px] gap-[10px] justify-start panel-outline"
+                                        variant="ghost"
+                                        // Match the shared <Input>/category trigger look (h-9, card bg, input-border) so
+                                        // the date field is consistent with the rest of Post/SEO Settings.
+                                        className="flex flex-row items-center w-full h-9 px-3 gap-[10px] justify-start font-normal rounded-lg bg-[hsl(var(--card))] [border:1px_solid_hsl(var(--input-border))] hover:bg-[hsl(var(--card))] focus-visible:border-[hsl(var(--ring))]"
                                     >
                                         <Calendar className="w-[16px] h-[16px] text-muted-foreground shrink-0" strokeWidth={1.5} />
                                         <span className={cn(

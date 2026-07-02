@@ -124,8 +124,8 @@ export function CustomersClientLayout() {
                 onExport={handleExport}
             />
 
-            {/* Mobile: card list — still gates on loading to avoid flash */}
-            <div className="md:hidden">
+            {/* Card list (mobile + iPad mini, < 820px) — still gates on loading to avoid flash */}
+            <div className="min-[820px]:hidden">
                 {loading ? (
                     <div className="py-16 text-center text-[14px]" style={{ color: 'var(--dash-text-muted)' }}>{c.loading}</div>
                 ) : (
@@ -142,8 +142,8 @@ export function CustomersClientLayout() {
                 )}
             </div>
 
-            {/* Desktop: table with inline skeleton rows */}
-            <div className="hidden md:block">
+            {/* iPad Air and up (>=820px): table (compact below xl, original at xl+) */}
+            <div className="hidden min-[820px]:block">
                 <CustomersTable
                     records={records}
                     loading={loading}

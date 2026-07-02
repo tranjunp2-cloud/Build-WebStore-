@@ -10,6 +10,7 @@ import { useUploadProgress } from '@/hooks/use-upload-progress'
 export type UploadedImage = {
     id: string | number
     url: string
+    alt?: string
 }
 
 interface ImageUploaderProps {
@@ -22,6 +23,7 @@ interface ImageUploaderProps {
     description?: string
     variant?: 'square' | 'wide'
     placeholderText?: string
+    showAltInput?: boolean
 }
 
 export function ImageUploader({
@@ -33,7 +35,8 @@ export function ImageUploader({
     label = 'Product Images',
     description = `Upload up to 5 images (Max ${maxSizeMB}MB each. JPG, PNG, WEBP)`,
     variant = 'square',
-    placeholderText = 'Upload'
+    placeholderText = 'Upload',
+    showAltInput = false,
 }: ImageUploaderProps) {
     const [isUploading, setIsUploading] = useState(false)
     const [dragActive, setDragActive] = useState(false)
@@ -95,6 +98,10 @@ export function ImageUploader({
         onChange(value.filter(img => img.id !== idToRemove))
     }
 
+    const handleAltChange = (id: string | number, newAlt: string) => {
+        onChange(value.map(img => img.id === id ? { ...img, alt: newAlt } : img))
+    }
+
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
@@ -141,19 +148,38 @@ export function ImageUploader({
                     })()
                     
                     return (
-                    <div key={img.id || idx} className="relative w-[147px] h-[147px] shrink-0">
-                        <div className="w-full h-full p-[2px] rounded-[16px] border border-white/10 bg-[#0B1120]">
-                            <div className="w-full h-full relative overflow-hidden rounded-[14px]">
-                                <Image src={safeUrl} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
+                    <div key={img.id || idx} className="flex flex-col shrink-0 w-[147px]">
+                        <div className="relative w-[147px] h-[147px]">
+                            <div className="w-full h-full p-[2px] rounded-[16px] border border-white/10 bg-[#0B1120]">
+                                <div className="w-full h-full relative overflow-hidden rounded-[14px]">
+                                    <Image src={safeUrl} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => removeImage(img.id)}
+                                className="absolute z-10 top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FB2C36] text-white border-0 outline-none ring-0 shadow-none transition-transform hover:scale-110"
+                            >
+                                <X className="h-[10px] w-[10px]" strokeWidth={2.5} />
+                            </button>
                         </div>
-                        <button 
-                            type="button" 
-                            onClick={() => removeImage(img.id)} 
-                            className="absolute z-10 top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FB2C36] text-white border-0 outline-none ring-0 shadow-none transition-transform hover:scale-110"
-                        >
-                            <X className="h-[10px] w-[10px]" strokeWidth={2.5} />
-                        </button>
+                        {showAltInput && (
+                            <div className="relative mt-1">
+                                <input
+                                    type="text"
+                                    value={img.alt || ''}
+                                    onChange={(e) => handleAltChange(img.id, e.target.value)}
+                                    placeholder="Alt text..."
+                                    className="w-full text-[11px] bg-[#0B1120] border border-white/10 rounded-[6px] px-2 py-1 text-white/70 placeholder:text-white/30 focus:outline-none focus:border-white/30 pr-9"
+                                />
+                                <span className={cn(
+                                    "absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none",
+                                    (img.alt?.length || 0) > 125 ? "text-amber-400" : "text-white/30"
+                                )}>
+                                    {img.alt?.length || 0}/125
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )})}
 

@@ -92,6 +92,7 @@ const VALID_SITE = {
     id: 1,
     tenant: 'tenant-1',
     paymentConfig: { fpxEnabled: true, cardEnabled: true },
+    shippingConfig: { westRate: 1000, eastRate: 1500 },
 }
 
 const VALID_TENANT = {
@@ -768,7 +769,7 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
     it('[TC-F33-07-02] 50% discount → single consolidated line item at discounted total, no negative items, no Stripe Coupon', async () => {
         // Arrange:
         //   subtotal = 100 RM (10000 sen), 50% off → discountSen = 5000
-        //   shippingFee = 10 RM (1000 sen, fixed in route)
+        //   shippingFee = 10 RM (1000 sen from VALID_SITE.shippingConfig.westRate, state=KL → west)
         //   total = (10000 - 5000 + 1000) / 100 = 60 RM
         //   finalTotalSen = Math.round(60 * 100) = 6000
         mockFindByID
@@ -937,7 +938,7 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const res = await POST(req)
         const body = await res.json()
 
-        // Assert — session created at full price (100 + 10 flat ship = 110 RM)
+        // Assert — session created at full price (5000 sen subtotal + 1000 sen west shipping, inactive discount silently rejected)
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
         expect(mockCreate).toHaveBeenCalled()
@@ -946,5 +947,77 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const createData = mockCreate.mock.calls[0][0].data
         expect(createData.discountCode).toBeUndefined()
         expect(createData.discountAmount).toBeUndefined()
+    })
+
+    // ─── TC-SHIP-01/02/03: Dynamic shipping from shippingConfig ──────────────────
+
+    it('[TC-SHIP-01] charges configured west rate as Shipping line item', async () => {
+        const siteWithWestRate = { ...VALID_SITE, shippingConfig: { westRate: 1200, eastRate: 1500 } }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithWestRate)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ name: 'Widget', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50, currency: 'MYR', errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act — state: 'KL' (west) from VALID_REQUEST_BODY
+        const res = await POST(mockRequest(VALID_REQUEST_BODY) as any)
+        expect(res.status).toBe(200)
+        const items = mockCreateCheckoutSession.mock.calls[0][0].items
+        const shipItem = items.find((i: any) => i.name === 'Shipping')
+        expect(shipItem?.price).toBe(1200)
+        // order row stores RM float
+        expect(mockCreate.mock.calls[0][0].data.shippingFee).toBeCloseTo(12, 2)
+    })
+
+    it('[TC-SHIP-02] charges east rate for East-MY state (Sabah)', async () => {
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE) // westRate=1000, eastRate=1500
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ name: 'Widget', price: 5000, quantity: 1, images: [] }],
+            subtotal: 50, currency: 'MYR', errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        const body = {
+            ...VALID_REQUEST_BODY,
+            customer: { ...VALID_REQUEST_BODY.customer, address: { ...VALID_REQUEST_BODY.customer.address, state: 'Sabah' } },
+        }
+        const res = await POST(mockRequest(body) as any)
+        expect(res.status).toBe(200)
+        const items = mockCreateCheckoutSession.mock.calls[0][0].items
+        const shipItem = items.find((i: any) => i.name === 'Shipping')
+        expect(shipItem?.price).toBe(1500)
+        expect(mockCreate.mock.calls[0][0].data.shippingFee).toBeCloseTo(15, 2)
+    })
+
+    it('[TC-SHIP-03] omits Shipping line item when subtotal meets freeAbove threshold', async () => {
+        const siteWithFreeShip = { ...VALID_SITE, shippingConfig: { westRate: 1000, eastRate: 1500, freeAbove: 10000 } }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithFreeShip)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 15000 }],
+            checkoutItems: [{ name: 'Widget', price: 15000, quantity: 1, images: [] }],
+            subtotal: 150, currency: 'MYR', errorResponse: null, // 15000 sen ≥ freeAbove 10000
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        const res = await POST(mockRequest(VALID_REQUEST_BODY) as any)
+        expect(res.status).toBe(200)
+        const items = mockCreateCheckoutSession.mock.calls[0][0].items
+        expect(items.some((i: any) => i.name === 'Shipping')).toBe(false)
+        expect(mockCreate.mock.calls[0][0].data.shippingFee).toBe(0)
     })
 })

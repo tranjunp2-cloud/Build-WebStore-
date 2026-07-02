@@ -29,7 +29,8 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
     }
 
     return (
-        <div className="flex flex-col gap-4">
+        // 1 col on mobile, 2 cols from md (tablet/iPad Pro) so the wide width isn't a single sparse column.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
             {records.map(record => {
                 const displayName = record.source === 'newsletter'
                     ? (record.name ?? 'Guest') + ' (Newsletter)'
@@ -72,8 +73,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
 
                         {/* Actions */}
                         <div
-                            className="flex gap-2 px-[17px] py-[10px]"
-                            style={{ borderTop: '1px solid var(--dash-border)' }}
+                            className="flex gap-2 px-[17px] pb-[14px]"
                             onClick={e => e.stopPropagation()}
                         >
                             <button
@@ -98,7 +98,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
             })}
 
             {total > 0 && (
-                <div className="pt-4" style={{ borderTop: '1px solid var(--dash-border)' }}>
+                <div className="pt-4 md:col-span-2">
                     <TablePagination
                         page={page}
                         total={total}
