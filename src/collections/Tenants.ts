@@ -640,17 +640,21 @@ export const Tenants: CollectionConfig = {
                     },
                 },
                 {
+                    // DEPRECATED — unused since courier selection became fully automatic (2026-07-01).
+                    // Column kept to avoid a migration; do NOT read or write from application code.
                     name: 'selectedCourier',
                     type: 'text',
                     defaultValue: 'flash',
-                    admin: { description: 'Default selected courier ID (e.g. flash, jnt, poslaju)' },
+                    admin: { description: '[DEPRECATED] Single courier ID — superseded by automatic cheapest-courier selection. Do not use.' },
                 },
                 {
+                    // DEPRECATED — unused since courier selection became fully automatic (2026-07-01).
+                    // Column kept to avoid a migration; do NOT read or write from application code.
                     name: 'selectedCouriers',
                     type: 'json',
                     admin: {
                         description:
-                            'Allowlist of courier IDs; checkout quotes the cheapest that serves the route. Supersedes selectedCourier.',
+                            '[DEPRECATED] Courier allowlist — superseded by automatic cheapest-courier selection. Do not use.',
                     },
                 },
                 {
