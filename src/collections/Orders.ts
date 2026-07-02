@@ -418,6 +418,11 @@ export const Orders: CollectionConfig = {
             admin: { description: 'EasyParcel courier ID (e.g. flash, jnt, poslaju)' },
         },
         {
+            name: 'shippingCourierName',
+            type: 'text',
+            admin: { description: 'Friendly courier name from rate response, e.g. J&T Express' },
+        },
+        {
             name: 'shippingServiceId',
             type: 'text',
             admin: { description: 'EasyParcel service_id from rate response' },
@@ -468,6 +473,21 @@ export const Orders: CollectionConfig = {
             name: 'parcelWeight',
             type: 'number',
             admin: { description: 'Parcel weight in grams (aggregated from order items)' },
+        },
+        {
+            name: 'selfDeliveryCourier',
+            type: 'text',
+            admin: { description: 'Manual courier name when EasyParcel not used (self-delivery flow)' },
+        },
+        {
+            name: 'pickupScheduledAt',
+            type: 'date',
+            admin: { description: 'Chosen courier pickup date/slot (persisted when merchant schedules pickup)' },
+        },
+        {
+            name: 'pickupSlot',
+            type: 'text',
+            admin: { description: "Pickup time slot label — 'am' or 'pm' (optional)" },
         },
         {
             name: 'codAmount',

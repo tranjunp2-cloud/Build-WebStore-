@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, ZoomIn, X } from 'lucide-react'
+import { Loader2, ZoomIn, X, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
@@ -327,11 +327,12 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     )
 }
 
-function OrderProgress({ status }: { status: OrderStatus }) {
+export function OrderProgress({ status }: { status: OrderStatus }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const progressLabels = t.dashboard.orders.progress
     const STEPS = getProgressSteps(progressLabels)
+    const isRefundedStatus = status === 'refunded'
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
         new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
@@ -340,7 +341,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
         shipped: 3,
         completed: 4,
         cancelled: -1,
-        refunded: -1,
+        refunded: 4, // all 5 steps done; Refunded node appended separately below
         paid: 1,
         payment_failed: -1,
         processing: 1
@@ -392,6 +393,32 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                         </React.Fragment>
                     )
                 })}
+
+                {/* Refunded node — appended after Completed when order is refunded */}
+                {isRefundedStatus && (
+                    <React.Fragment key="refunded">
+                        {/* Refund connector — fuchsia (#d946ef) */}
+                        <div
+                            className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
+                            style={{ marginTop: 15, height: 2, background: '#d946ef' }}
+                        />
+                        {/* Refunded step node */}
+                        <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
+                            <div
+                                className="flex items-center justify-center shrink-0 rounded-full shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
+                                style={{ width: 36, height: 36, background: 'rgba(217,70,239,.12)', border: '2px solid #d946ef', color: '#d946ef' }}
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                            </div>
+                            <span
+                                className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
+                                style={{ color: '#e879f9' }}
+                            >
+                                {progressLabels.refunded}
+                            </span>
+                        </div>
+                    </React.Fragment>
+                )}
             </div>
         </div>
     )
@@ -400,7 +427,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
 // ─── CUSTOMER INFORMATION ───
 // layout_MW5IYR: column, gap 12px, padding 17px 17px 1px
 // layout_0B2MTA: column, gap 12px
-function CustomerInformation({ order }: { order: OrderDetail }) {
+export function CustomerInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
 
@@ -463,7 +490,7 @@ function fmtPaymentStatus(s: string | null | undefined, labels: Record<string, s
 // Status row — icon fill_A2P9AX rgba(255,105,0,0.1), text Unconfirmed style_88PH6H fill_IGVEST #FF8904
 // Receipt image — layout_NCMUFS: column, padding 1px, height 160, borderRadius 16px
 //   Image: layout_BNH1S2 fill horizontal, height 158
-function PaymentInformation({ order }: { order: OrderDetail }) {
+export function PaymentInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const methodLabels = (d as any).paymentMethods as Record<string, string>
@@ -632,7 +659,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
 // Item row: layout_LWI4PM: row, space-between, gap 260.125px
 //   Left: layout_F9PMLN column — product name style_VWFEC1 Inter 500 14px, variant style_231QNQ rgba(248,250,252,0.5)
 //   Right: layout_MOABVK — price style_88PH6H Inter 600 14px #F8FAFC
-function OrderItems({ order }: { order: OrderDetail }) {
+export function OrderItems({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     if (!order.items || order.items.length === 0) return null
@@ -701,7 +728,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
 //   layout_VS3Y5N: column, padding 13px 0 0, borderTop 1px rgba(255,255,255,0.08)
 //   label  – style_DZKK65 Inter 700 16px #F8FAFC
 //   amount – style_QOAWPZ Inter 700 20px fill_31NCV3 #2DD4BF
-function OrderSummary({ order }: { order: OrderDetail }) {
+export function OrderSummary({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     return (
@@ -790,7 +817,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
 
 // ─── ACTION BUTTONS ───
 // layout_KSMCIE: column, alignSelf stretch, gap 12px, height 110
-function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
+export function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
     const { t } = useI18n()
     const a = t.dashboard.orders.actions
     const p = t.dashboard.orders.progress

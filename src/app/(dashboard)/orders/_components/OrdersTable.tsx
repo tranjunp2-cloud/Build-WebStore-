@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Package } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -90,8 +91,6 @@ function StatusBadge({ status, label }: { status: OrderStatus; label: string }) 
 interface InnerTableProps {
     orders: Order[]
     loading: boolean
-    onSelectOrder?: (orderId: string) => void
-    selectedOrderId?: string | null
     selectedRows: Set<string>
     onSelectionChange: (selectedIds: Set<string>) => void
     newOrderIds?: Set<string>
@@ -99,11 +98,16 @@ interface InnerTableProps {
     footer?: React.ReactNode
 }
 
-function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange, newOrderIds, footer }: InnerTableProps) {
+function OrdersTableInner({ orders, loading, selectedRows, onSelectionChange, newOrderIds, footer }: InnerTableProps) {
     const { t } = useI18n()
+    const router = useRouter()
     const o = t.dashboard.orders
     const statusLabels = o.status
     const methodLabels = (o.detail as Record<string, unknown>).paymentMethods as Record<string, string>
+
+    function navigateToOrder(id: string) {
+        router.push(`/orders/${id}`)
+    }
 
     function toggleRow(id: string) {
         const next = new Set(selectedRows)
@@ -126,13 +130,12 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                 ) : (
                     orders.map((order) => {
                         const isSelected = selectedRows.has(order.id)
-                        const isDetailOpen = selectedOrderId === order.id
 
                         return (
                             <div
                                 key={order.id}
-                                onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${isDetailOpen ? 'bg-[hsl(var(--primary)/0.1)] border-[hsl(var(--primary)/0.3)]' : newOrderIds?.has(order.id) ? 'bg-[hsl(var(--success)/0.1)] border-[hsl(var(--success)/0.3)]' : isSelected ? 'bg-[hsl(var(--primary)/0.05)] border-dash-border' : 'bg-dash-surface border-dash-border'}`}
+                                onClick={() => navigateToOrder(order.id)}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${newOrderIds?.has(order.id) ? 'bg-[hsl(var(--success)/0.1)] border-[hsl(var(--success)/0.3)]' : isSelected ? 'bg-[hsl(var(--primary)/0.05)] border-dash-border' : 'bg-dash-surface border-dash-border'}`}
                                 style={{ transition: 'background 1s ease-out, border-color 1s ease-out' }}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
@@ -206,31 +209,26 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
                             </TableRow>
                         ) : orders.map((order) => {
                             const isSelected = selectedRows.has(order.id)
-                            const isDetailOpen = selectedOrderId === order.id
 
                             return (
                                 <TableRow
                                     key={order.id}
                                     clickable
                                     style={{
-                                        background: isDetailOpen
-                                            ? 'hsl(var(--primary)/0.12)'
-                                            : newOrderIds?.has(order.id)
-                                                ? 'hsl(var(--success)/0.12)'
-                                                : isSelected ? 'hsl(var(--primary)/0.06)' : undefined,
+                                        background: newOrderIds?.has(order.id)
+                                            ? 'hsl(var(--success)/0.12)'
+                                            : isSelected ? 'hsl(var(--primary)/0.06)' : undefined,
                                         transition: 'background 1s ease-out',
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id))
+                                        if (!isSelected && !newOrderIds?.has(order.id))
                                             (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
                                     }}
                                     onMouseLeave={e => {
-                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id))
+                                        if (!isSelected && !newOrderIds?.has(order.id))
                                             (e.currentTarget as HTMLTableRowElement).style.background = ''
                                     }}
-                                    onClick={() => {
-                                        if (onSelectOrder) onSelectOrder(order.id)
-                                    }}
+                                    onClick={() => navigateToOrder(order.id)}
                                 >
                                     <TableCell style={{ color: 'var(--dash-text)', fontWeight: 600 }}>
                                         {order.orderNumber}
@@ -261,8 +259,6 @@ function OrdersTableInner({ orders, loading, onSelectOrder, selectedOrderId, sel
 }
 
 export function OrdersTable({
-    onSelectOrder,
-    selectedOrderId,
     refreshCounter = 0,
     silentRefreshTrigger = 0,
     selectedRows = new Set(),
@@ -274,8 +270,6 @@ export function OrdersTable({
     paymentMethodFilter = '',
     sortOrder = '-createdAt',
 }: {
-    onSelectOrder?: (orderId: string) => void
-    selectedOrderId?: string | null
     refreshCounter?: number
     silentRefreshTrigger?: number
     selectedRows?: Set<string>
@@ -413,8 +407,6 @@ export function OrdersTable({
             <OrdersTableInner
                 orders={orders}
                 loading={loading}
-                onSelectOrder={onSelectOrder}
-                selectedOrderId={selectedOrderId}
                 selectedRows={selectedRows}
                 onSelectionChange={onSelectionChange || (() => { })}
                 newOrderIds={newOrderIds}
