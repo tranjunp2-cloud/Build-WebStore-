@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -68,6 +68,10 @@ interface BlockLibraryPanelProps {
     onEditGlobalBlock?: (blockType: string) => void
     /** F26-04: Called when user clicks "✨ AI" auto-translate button for a block type */
     onAutoTranslate?: (blockType: string) => Promise<void>
+    /** F05 compact Tools sheet: touch has no hover/drag, so the desktop "click or drag"
+     * hover hint is replaced with an always-visible "+" affordance. Desktop omits this
+     * (defaults false) and keeps its existing hover-hint text unchanged. */
+    isCompact?: boolean
 }
 
 export function BlockLibraryPanel({
@@ -76,6 +80,7 @@ export function BlockLibraryPanel({
     onAIAction,
     onEditGlobalBlock,
     onAutoTranslate,
+    isCompact = false,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
@@ -291,9 +296,13 @@ export function BlockLibraryPanel({
                                                     <p className="truncate text-[11px] text-slate-500">{item.previewText}</p>
                                                 </div>
                                                 {!isAlreadyGlobal && (
-                                                    <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                        {bl.dragHint}
-                                                    </span>
+                                                    isCompact ? (
+                                                        <Plus className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                                                    ) : (
+                                                        <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                            {bl.dragHint}
+                                                        </span>
+                                                    )
                                                 )}
                                             </button>
                                             </TooltipTrigger>
@@ -314,11 +323,13 @@ export function BlockLibraryPanel({
                 </div>
             </div>
 
-            <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
-                <p className="text-center text-[11px] text-slate-500">
-                    {bl.footerHint}
-                </p>
-            </div>
+            {!isCompact && (
+                <div className="border-t border-white/[0.06] bg-[var(--editor-bg)]/60 px-4 py-3">
+                    <p className="text-center text-[11px] text-slate-500">
+                        {bl.footerHint}
+                    </p>
+                </div>
+            )}
         </div>
         </TooltipProvider>
     )

@@ -3497,6 +3497,27 @@
         "imageTooLarge": "Imej mestilah lebih kecil daripada 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "Chat AI",
+            "components": "Komponen",
+            "pages": "Halaman",
+            "settings": "Tetapan"
+        },
+        "advisoryBanner": {
+            "title": "Pengalaman lebih baik di Desktop",
+            "description": "Alat penyuntingan lanjutan berfungsi paling baik pada skrin yang lebih besar. Sesetengah alat mungkin terhad pada peranti mudah alih.",
+            "copyLink": "Salin Pautan",
+            "dismiss": "Tutup"
+        },
+        "compactLayout": {
+            "aiEditing": "AI sedang mengedit reka bentuk anda…",
+            "openAIChat": "Buka Chat AI",
+            "openChatAndTools": "Buka Chat AI & Alatan",
+            "moveUp": "Alih Ke Atas",
+            "moveDown": "Alih Ke Bawah",
+            "deleteBlock": "Padam Blok",
+            "deletedBlock": "{type} dipadam"
+        },
         "toolbar": {
             "publish": "Terbitkan",
             "publishing": "Menerbitkan",
@@ -3653,7 +3674,8 @@
             "undo": "Buat Asal",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
-            "newLine": "baris baru"
+            "newLine": "baris baru",
+            "stopAI": "Hentikan AI"
         },
         "menu": {
             "dashboard": "Papan Pemuka",

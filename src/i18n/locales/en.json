@@ -3497,6 +3497,27 @@
         "imageTooLarge": "Image must be smaller than 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "AI Chat",
+            "components": "Components",
+            "pages": "Pages",
+            "settings": "Settings"
+        },
+        "advisoryBanner": {
+            "title": "Better experience on Desktop",
+            "description": "Advanced editing tools work best on a larger screen. Some tools may be limited on mobile devices.",
+            "copyLink": "Copy Link",
+            "dismiss": "Dismiss"
+        },
+        "compactLayout": {
+            "aiEditing": "AI is editing your design…",
+            "openAIChat": "Open AI Chat",
+            "openChatAndTools": "Open AI Chat & Tools",
+            "moveUp": "Move Up",
+            "moveDown": "Move Down",
+            "deleteBlock": "Delete Block",
+            "deletedBlock": "Deleted {type}"
+        },
         "toolbar": {
             "publish": "Publish",
             "publishing": "Publishing",
@@ -3653,7 +3674,8 @@
             "undo": "Undo",
             "inputPlaceholder": "Tell AI what to change...",
             "send": "send",
-            "newLine": "new line"
+            "newLine": "new line",
+            "stopAI": "Stop AI"
         },
         "menu": {
             "dashboard": "Dashboard",

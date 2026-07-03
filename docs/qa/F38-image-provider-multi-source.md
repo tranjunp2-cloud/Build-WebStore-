@@ -44,6 +44,30 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | `image-library-seeder.test.ts` | 17-slot upload, idempotency, alt key |
 | `media-injector.test.ts` | `PIXABAY_BLOCKS` gating (hero-only default vs all) |
 
+## 4b. Regression — raw keyword (GH-1185, plan `plans/260702-1607-GH-1185-pixabay-raw-keyword/`)
+
+> Keyword gửi lên Pixabay GIỮ NGUYÊN ngôn ngữ user nhập (không dịch EN); `q` không trộn EN scaffolding (mood/category/modifier) khi có raw keyword. `lang` được auto-detect theo script của query để khớp ngôn ngữ input: VN (ký tự đặc trưng — nếu không Pixabay strip dấu và partial-match rác: "cơm"→"myfirstpug.com", "bò"→bò Scotland), Thai/Kana/Hangul/Han/Cyrillic/Greek → th/ja/ko/zh/ru/el. Không detect được (Latin: EN/MS/DE/…) → fallback default `lang=en`. Relevance gate + VN category fallback chỉ áp cho query tiếng Việt. Thêm `category` filter của Pixabay (map composer→food/health/sports/…) — không tăng match chính xác nhưng giữ ảnh rác/fallback nằm đúng lĩnh vực (miss của "phở bò" là món ăn khác, không phải bò sữa).
+
+| TC-ID | Loại | Mô tả | Kỳ vọng | Status |
+|---|---|---|---|---|
+| **TC-F38-RAW-01** | `[Positive]` | `buildPoolQuery` với products VN + mood | `q` = `"phở bò gỏi cuốn"` — không adjective EN, không category | [x] |
+| **TC-F38-RAW-02** | `[Positive]` | `buildPoolQuery` không products | scaffolding: chứa category (`restaurant`) | [x] |
+| **TC-F38-RAW-03** | `[Positive]` | `buildPoolQuery(relaxed=true)` với 2 products | broaden về `"phở bò"` (≠ query chính) | [x] |
+| **TC-F38-RAW-04** | `[Positive]` | `deriveKeywords` có englishKeywords (raw) | trả `["phở bò"]` verbatim — không modifier/mood | [x] |
+| **TC-F38-RAW-05** | `[Positive]` | `deriveKeywords` không raw keyword | scaffolding: category base + modifier | [x] |
+| **TC-F38-RAW-06** | `[Positive]` | Raw VN q verbatim + `lang=vi` auto-detect | pool-level: `q="phở bò"`; client-level: URL có `lang=vi` | [x] |
+| **TC-F38-RAW-07** | `[Negative]` | Query EN / loanword é ("café latte") | URL KHÔNG có `lang` param (default en, không misroute) | [x] |
+| **TC-F38-RAW-08** | `[Positive]` | `detectQueryLang` pure function (VN/Latin) | VN chars đặc trưng (ơ/ư/ă/đ/hook-above/dot-below) → 'vi'; EN/MS/café → undefined | [x] |
+| **TC-F38-RAW-09** | `[Positive]` | `detectQueryLang` script-based đa ngôn ngữ | Thai→'th', Kana→'ja' (kana thắng kanji), Hangul→'ko', Han-only→'zh', Cyrillic→'ru', Greek→'el' | [x] |
+| **TC-F38-RAW-10** | `[Positive]` | `searchPhotos` set `lang` khớp input, q raw | Query Thai → URL có `lang=th`, `q` giữ nguyên không dịch | [x] |
+| **TC-F38-RAW-11** | `[Positive]` | `searchPhotos` truyền `category` filter | opts.category='food' → URL có `category=food`; không set → không có param | [x] |
+| **TC-F38-RAW-12** | `[Positive]` | Map composer→Pixabay category | restaurant/fnb→food, fitness→sports, realestate→buildings; events/ecommerce → không map (không filter) | [x] |
+| **TC-F38-RAW-13** | `[Positive]` | Testimonials avatar = ảnh người, không phải pool | `fulfillImageNeeds` route testimonials → `getAvatarMedia` (`category=people`, query "chân dung người việt"/"portrait people"); pool bị bỏ qua; miss → avatar trống (không rơi về ảnh food) | [x] |
+| **TC-F38-RAW-14** | `[Positive]` | Team/doctor-profile cũng dùng portrait search | `PEOPLE_BLOCKS` = testimonials/team/doctor-profile → cùng đường `getAvatarMedia`; members[].image = ảnh người | [x] |
+| **TC-F38-RAW-15** | `[Positive]` | `opts.lang` override cho curated query không detect được | `VN_CATEGORY_QUERIES.fnb` "quán cà phê" chỉ chứa dấu ambiguous (á/à/ê) → detect miss; override `lang:'vi'` → URL vẫn có `lang=vi` (review fix PR #1481 — A1) | [x] |
+| **TC-F38-RAW-16** | `[Positive]` | NFC normalize: input NFD (decomposed) vẫn detect + gate đúng | "phở bò" dạng NFD → `detectQueryLang`='vi'; `photoMatchesQuery` match tag NFC của Pixabay (review fix PR #1481 — M5) | [x] |
+| **TC-F38-RAW-17** | `[Negative]` | Tier-3 VN fallback throw (429) không escape catch | `getMediaForBlock`: hero → vẫn resolve với curated hero fallback; non-hero → resolve rỗng + failures, KHÔNG unhandled rejection (review fix PR #1481 — H1 `return await`) | [x] |
+
 ## 5. Kiểm thử thủ công (staging)
 
 1. Thêm `PIXABAY_API_KEY` vào Vercel staging. Gen 1 site.

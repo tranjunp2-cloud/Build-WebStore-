@@ -13,7 +13,7 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
+import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
 import { pickManyFromPool, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
@@ -95,6 +95,10 @@ function getImageEnabledBlocks(): ReadonlySet<string> {
     return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
 }
 const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+
+// GH-1185: blocks whose image slots show PEOPLE — routed to the dedicated
+// portrait search (getAvatarMedia) instead of the product-keyword pool.
+const PEOPLE_BLOCKS: ReadonlySet<string> = new Set(['testimonials', 'team', 'doctor-profile'])
 
 
 export interface ImageNeed {
@@ -446,6 +450,27 @@ export async function fulfillImageNeeds(
         Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
             const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
             if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
+
+            // GH-1185: people slots (testimonial avatars, team members,
+            // doctor profiles) are PEOPLE — never pool photos (pool is built
+            // from product keywords → food close-ups in face slots).
+            // Dedicated portrait search; on miss leave empty (initials
+            // placeholder beats a food avatar), so no pool/legacy fallback.
+            if (PEOPLE_BLOCKS.has(blockType)) {
+                try {
+                    const result = await getAvatarMedia(totalCount, ctx.language, ctx, payload, blockType)
+                    if (result.failures.length > 0) {
+                        console.warn(
+                            `[Media Injector] ${blockType}: ${result.failures.length} portrait photo(s) failed`,
+                        )
+                    }
+                    return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: Math.max(0, totalCount - result.mediaIds.length) }
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err)
+                    console.warn(`[Media Injector] ${blockType} portrait fetch failed: ${msg}`)
+                    return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
+                }
+            }
 
             // Phase-03 pool-aware fast path: pick from pre-built site pool to
             // preserve visual cohesion across blocks.

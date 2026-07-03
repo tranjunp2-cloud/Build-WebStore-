@@ -52,6 +52,19 @@ const TIE_BREAK_ORDER: ComposerCategory[] = [
  * Scoring: +1 per keyword hit (word boundary, case-insensitive).
  * Zero matches → `business` (safe sink). Ties → fixed priority order.
  */
+/**
+ * GH-1185: accept either an already-resolved composer key OR free text.
+ * `resolveComposerCategory` is NOT idempotent — e.g. 'fnb' / 'realestate' /
+ * 'ecommerce' are not in their own keyword lists and would re-resolve to
+ * 'business'. Callers that may receive a resolved key (route passes the
+ * resolved pool category through MediaPipelineContext) must use this.
+ */
+export function normalizeComposerCategory(input: string | undefined): ComposerCategory {
+    if (!input) return 'business'
+    if (input in COMPOSER_TYPE_KEYWORDS) return input as ComposerCategory
+    return resolveComposerCategory(input)
+}
+
 export function resolveComposerCategory(prompt: string): ComposerCategory {
     if (!prompt || typeof prompt !== 'string') return 'business'
     const normalized = prompt.toLowerCase()

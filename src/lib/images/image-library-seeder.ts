@@ -9,7 +9,8 @@
  */
 
 import type { Payload } from 'payload'
-import { searchPhotos, downloadPhotoBuffer } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
+import { normalizeComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { uploadBufferToMedia } from '@/lib/ai/media-pipeline'
 import { buildSiteAltKey, siteAltKeyPrefix } from './image-library-keys'
 
@@ -188,7 +189,9 @@ export async function seedImageLibraryForSite(
             // group needs; Payload regenerates per-variant sizes on upload anyway.
             const groupWidth = Math.max(...groupSlots.map((s) => s.imgixW))
             try {
-                const photos = await searchPhotos(query, 10, { orientation, width: groupWidth })
+                // GH-1185: Pixabay category filter keeps results on-domain.
+                const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+                const photos = await searchPhotos(query, 10, { orientation, width: groupWidth, category: pixCategory })
                 photosByKey.set(key, photos)
             } catch (err) {
                 console.warn('[seeder] search failed for query', query, err instanceof Error ? err.message : err)

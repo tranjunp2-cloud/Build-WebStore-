@@ -22,25 +22,32 @@
 import {
     searchPhotos,
     downloadPhotoBuffer,
+    detectQueryLang,
+    photoMatchesQuery,
+    PIXABAY_CATEGORY_BY_COMPOSER,
     PIXABAY_ORIENTATION_BY_BLOCK,
     PixabayError,
     type PixabayPhoto,
 } from './pixabay-client'
+import { withMediaCreateLock } from './media-create-lock'
 
 /** Render-box width per block — drives Pixabay size pick (largeImageURL vs webformatURL). */
 interface SizePreset {
     w: number
 }
 
-import { resolveComposerCategory } from './composer-category-resolver'
+import { normalizeComposerCategory } from './composer-category-resolver'
 import type { ThemeMood } from './theme-moods'
-import type { ImagePool } from './image-pool'
+import { VN_CATEGORY_QUERIES, type ImagePool } from './image-pool'
 
 export interface MediaPipelineContext {
     businessName: string
     tenantId: string
-    // Raw industry string from user input (e.g. "nhà hàng hải sản", "SaaS CRM").
-    // Resolved internally via resolveComposerCategory — do NOT pass a pre-resolved ComposerCategory key.
+    // Industry — either the raw user string ("nhà hàng hải sản", "SaaS CRM")
+    // or an already-resolved composer key ('restaurant', 'fnb', …). Both are
+    // handled via normalizeComposerCategory (GH-1185: the route passes the
+    // resolved pool category, and resolveComposerCategory alone is not
+    // idempotent — 'fnb' would re-resolve to 'business').
     category?: string
     // Plan 260414-2249 phase-01: user-supplied products drive primary Unsplash
     // query via deriveKeywords. vi/ms terms are translated at query time.
@@ -165,7 +172,7 @@ export async function uploadBufferToMedia(
         tenantId: string
     },
 ): Promise<number> {
-    const doc = await payload.create({
+    const createArgs = {
         collection: 'media',
         data: {
             alt: args.alt,
@@ -177,8 +184,22 @@ export async function uploadBufferToMedia(
             name: args.filename,
             size: args.buffer.length,
         },
-    })
-    return doc.id
+    }
+    // GH-1185: DB create is serialized via withMediaCreateLock — concurrent
+    // media creates silently lose rows (drizzle transaction race, see
+    // media-create-lock.ts). Downloads/S3 stay parallel upstream.
+    try {
+        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        return doc.id
+    } catch (err) {
+        // Belt & braces for genuinely transient failures (network, S3 hiccup).
+        console.warn(
+            `[Media Pipeline] media create failed for ${args.filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
+        )
+        await new Promise((r) => setTimeout(r, 300))
+        const doc = await withMediaCreateLock(() => payload.create(createArgs))
+        return doc.id
+    }
 }
 
 /** Download + upload a single Pixabay photo; returns Media ID. */
@@ -284,7 +305,14 @@ export async function batchFetchFromPool(
     return { mediaIds, photos: [], failures }
 }
 
-/** Concurrent batch fetch with partial-failure tolerance. */
+/**
+ * Concurrent batch fetch with partial-failure tolerance.
+ * INVARIANT: never rejects — every per-photo error is caught inside the
+ * semaphore closure and returned via `failures`. Callers rely on this to
+ * `return batchFetch(...)` un-awaited inside try/catch (getMediaForBlock);
+ * moving any throwing call outside the inner try reintroduces review
+ * finding H1 (PR #1481).
+ */
 async function batchFetch(
     photos: PixabayPhoto[],
     blockType: string,
@@ -336,7 +364,7 @@ export const HERO_FALLBACK_BY_CATEGORY: Readonly<Record<string, readonly string[
 
 /** Exported for testing only. */
 export function pickHeroFallbackUrl(rawCategory: string | undefined): string {
-    const key = resolveComposerCategory(rawCategory ?? '')
+    const key = normalizeComposerCategory(rawCategory)
     const list = HERO_FALLBACK_BY_CATEGORY[key] ?? HERO_FALLBACK_BY_CATEGORY['business']!
     const photoId = list[Math.floor(Math.random() * list.length)]!
     return `https://images.unsplash.com/${photoId}?w=1920&h=1080&fit=crop&q=80`
@@ -368,6 +396,43 @@ async function heroFallbackChain(
 }
 
 /**
+ * GH-1185: people-slot photos (testimonial avatars, team members, doctor
+ * profiles) must be PEOPLE, not the site's product/food photos — the shared
+ * pool is built from product keywords, so these slots were getting bánh khọt
+ * close-ups. Language-matched portrait query + Pixabay category=people;
+ * squarish for round avatar crops.
+ * Returns empty on miss — an empty slot (initials placeholder) reads better
+ * than a food photo in a face slot, so callers must NOT fall back to the pool.
+ */
+const AVATAR_QUERY_BY_LANG: Readonly<Record<string, string>> = {
+    vi: 'chân dung người việt',
+    ms: 'asian portrait',
+}
+
+export async function getAvatarMedia(
+    count: number,
+    language: string | undefined,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+    blockType: string = 'testimonials',
+): Promise<BatchFetchResult> {
+    const query = AVATAR_QUERY_BY_LANG[language ?? ''] ?? 'portrait people'
+    try {
+        const photos = await searchPhotos(query, Math.max(count * 3, 10), {
+            orientation: 'squarish',
+            width: (SIZE_PRESET_BY_BLOCK[blockType] ?? DEFAULT_PRESET).w,
+            category: 'people',
+        })
+        if (photos.length === 0) return { mediaIds: [], photos: [], failures: [] }
+        return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+    } catch (err) {
+        const msg = err instanceof PixabayError ? err.code : (err as Error).message
+        console.warn(`[Media Pipeline] avatar search failed (${blockType}): ${msg}`)
+        return { mediaIds: [], photos: [], failures: [{ photoId: 'avatar-search', error: msg }] }
+    }
+}
+
+/**
  * PUBLIC: fetch N images for a given block type + keyword set.
  *
  * Fallback chain:
@@ -390,30 +455,84 @@ export async function getMediaForBlock(
     }
     const orientation = PIXABAY_ORIENTATION_BY_BLOCK[blockType] ?? 'landscape'
     const targetWidth = (SIZE_PRESET_BY_BLOCK[blockType] ?? DEFAULT_PRESET).w
+    const composerCategory = normalizeComposerCategory(ctx.category)
+    // GH-1185: domain filter — keeps loose/fallback matches on-topic (see
+    // PixabaySearchOptions.category). Unmapped composer categories → no filter.
+    const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[composerCategory]
+    // GH-1185: Vietnamese queries get the same relevance gate as the pool
+    // path — Pixabay AND-matching is loose ("phở bò" hits a moose photo
+    // tagged "bò đực"), so every query word must appear in the photo tags.
+    const isVN = detectQueryLang(query) === 'vi'
+    const gateVN = (photos: PixabayPhoto[], q: string): PixabayPhoto[] => {
+        if (!isVN) return photos
+        const kept = photos.filter((p) => photoMatchesQuery(p.alt, q))
+        if (kept.length < photos.length) {
+            console.info(
+                `[Media Pipeline] ${blockType} relevance gate: ${kept.length}/${photos.length} match "${q}"`,
+            )
+        }
+        return kept
+    }
+    // Tier 3 for VN queries: trusted Vietnamese category phrase, ungated —
+    // mirrors image-pool searchBucket so the legacy path degrades to
+    // on-category photos instead of off-topic AND-match noise.
+    const vnCategoryFallback = async (): Promise<BatchFetchResult> => {
+        const vnQuery = VN_CATEGORY_QUERIES[composerCategory]
+        if (isVN && vnQuery && vnQuery !== query) {
+            // lang:'vi' explicit — mirrors image-pool searchBucket; curated
+            // phrases like "quán cà phê" are not script-detectable.
+            const photos = await searchPhotos(vnQuery, Math.max(count * 2, 10), {
+                orientation,
+                width: targetWidth,
+                category: pixCategory,
+                lang: 'vi',
+            })
+            if (photos.length > 0) {
+                console.info(
+                    `[Media Pipeline] ${blockType} VN category fallback "${vnQuery}": ${photos.length} photo(s)`,
+                )
+                return batchFetch(pickRandomN(photos, count), blockType, ctx, payload)
+            }
+        }
+        return blockType === 'hero'
+            ? heroFallbackChain(ctx, payload)
+            : { mediaIds: [], photos: [], failures: [] }
+    }
     try {
         // Request 2x count to have random pool, then pickRandomN
-        const photos = await searchPhotos(query, Math.max(count * 2, 10), {
-            orientation,
-            width: targetWidth,
-        })
+        const photos = gateVN(
+            await searchPhotos(query, Math.max(count * 2, 10), {
+                orientation,
+                width: targetWidth,
+                category: pixCategory,
+            }),
+            query,
+        )
         if (photos.length === 0) {
-            // Broaden: try first keyword only
-            if (keywords[0]) {
-                const broader = await searchPhotos(keywords[0], Math.max(count * 2, 10), {
-                    orientation,
-                    width: targetWidth,
-                })
+            // Broaden: try first keyword only. Skip when the query was already
+            // a single term — the retry would re-issue the identical Pixabay
+            // call (raw 1-term keywords are common after GH-1185).
+            if (keywords[0] && keywords[0].trim() !== query) {
+                const broadQuery = keywords[0].trim()
+                const broader = gateVN(
+                    await searchPhotos(broadQuery, Math.max(count * 2, 10), {
+                        orientation,
+                        width: targetWidth,
+                        category: pixCategory,
+                    }),
+                    broadQuery,
+                )
                 if (broader.length === 0) {
-                    return blockType === 'hero'
-                        ? heroFallbackChain(ctx, payload)
-                        : { mediaIds: [], photos: [], failures: [] }
+                    // `await` is load-bearing: vnCategoryFallback can throw
+                    // (unguarded searchPhotos) — without it the rejection
+                    // escapes this try/catch and hero loses its fallback chain.
+                    return await vnCategoryFallback()
                 }
                 const picks = pickRandomN(broader, count)
                 return batchFetch(picks, blockType, ctx, payload)
             }
-            return blockType === 'hero'
-                ? heroFallbackChain(ctx, payload)
-                : { mediaIds: [], photos: [], failures: [] }
+            // See comment above — `await` keeps the rejection inside this catch.
+            return await vnCategoryFallback()
         }
         const picks = pickRandomN(photos, count)
         const result = await batchFetch(picks, blockType, ctx, payload)
