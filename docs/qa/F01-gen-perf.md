@@ -166,3 +166,10 @@ Duration:   ~45s (total)
 1. **Site 4 trang (thiếu /contact)** — nano batch trả thiếu trang / gắn cờ isHomepage sai bị filter drop. Fix: batch chỉ PASS khi đủ ĐÚNG số trang sau lọc (thiếu → composer fallback toàn bộ subpages); trang gắn cờ sai được coerce isHomepage=false thay vì drop; thêm warn log đếm trang mỗi batch. Verified 3/3 lượt gen liên tiếp đủ 5 trang.
 2. **Hero "Block validation warning" (badge/videoUrl/gradientPreset null)** — GPT emit null cho field optional, Zod expect absent. Fix: stripNullsDeep trong safeParseJson (giữ null trong array). Verified: 0 warnings trong 3 lượt.
 3. **KNOWN BEHAVIOR (không phải bug): preview ngay sau gen chỉ thấy 1 blog post, editor thấy 3** — Wave 1 chuyển blog seeding sang after() (sau response) để site hiện sớm ~35s; 3 bài đầy đủ sau ~30-60s. Nếu muốn placeholder "đang tạo bài viết" ở preview → item UI riêng (chưa scope).
+
+## Hotfix round 2 (2026-07-03 17:50 — từ test đa dạng của user)
+
+1. **Footer home lệch variant với các trang khác** — Structure Enforcer restyle footer HOME theo recipe SAU khi split path đã clone → subpages giữ bản cũ. Fix: `syncFooterAcrossPages` chạy sau enforcement (split path only). Verified: variant đồng nhất mọi trang.
+2. **Mất /contact (case Nha Khoa)** — batch fail rơi composer fallback, mà 3/4 template health của composer không có trang /contact. Fix: retry batch fail 1 lần bằng MODEL CHÍNH trước khi composer (TC-GENPERF-W2-13). Verified: Nha Khoa 2/2 lượt đủ 5 trang.
+3. **Pixabay timeout hàng loạt trong log (pool-preupload download failed / SERVER_ERROR)** — môi trường mạng/Pixabay chậm; mọi failure đều có fallback (ảnh thiếu slot rơi về inline/curated). Không phải regression; theo dõi trên staging.
+4. **Warning `image.url Required` (hero/about)** — noise Zod CÓ SẴN từ trước (block validate trước khi inject ảnh); không do perf changes; ghi nhận làm cleanup item riêng.
