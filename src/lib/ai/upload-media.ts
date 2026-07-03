@@ -6,6 +6,7 @@
 
 import type { BasePayload } from 'payload'
 import { downloadPhotoBuffer } from './pixabay-client'
+import { withMediaCreateLock } from './media-create-lock'
 
 export async function uploadImageUrl(
     imageUrl: string,
@@ -20,17 +21,18 @@ export async function uploadImageUrl(
         data: { alt, tenant: tenantId, aiGenerated: true },
         file: { data: buffer, mimetype, name: filename, size: buffer.length },
     }
+    // GH-1185: DB create serialized — concurrent media creates silently lose
+    // rows (drizzle transaction race, see media-create-lock.ts).
     let doc
     try {
-        doc = await payload.create(createArgs)
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
     } catch (err) {
-        // GH-1185 follow-up: transient create failures under parallel batch
-        // uploads (transaction rollback) — retry once, see media-pipeline.ts.
+        // Belt & braces for genuinely transient failures (network, S3 hiccup).
         console.warn(
             `[upload-media] media create failed for ${filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
         )
         await new Promise((r) => setTimeout(r, 300))
-        doc = await payload.create(createArgs)
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
     }
     const numId = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
     return Number.isFinite(numId) ? numId : undefined

@@ -46,7 +46,7 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 
 ## 4b. Regression — raw keyword (GH-1185, plan `plans/260702-1607-GH-1185-pixabay-raw-keyword/`)
 
-> Keyword gửi lên Pixabay GIỮ NGUYÊN ngôn ngữ user nhập (không dịch EN); `q` không trộn EN scaffolding (mood/category/modifier) khi có raw keyword. Query tiếng Việt → auto-detect ký tự VN → set `lang=vi` (nếu không Pixabay strip dấu và partial-match rác: "cơm"→"myfirstpug.com", "bò"→bò Scotland); query EN/MS giữ default `lang=en`.
+> Keyword gửi lên Pixabay GIỮ NGUYÊN ngôn ngữ user nhập (không dịch EN); `q` không trộn EN scaffolding (mood/category/modifier) khi có raw keyword. `lang` được auto-detect theo script của query để khớp ngôn ngữ input: VN (ký tự đặc trưng — nếu không Pixabay strip dấu và partial-match rác: "cơm"→"myfirstpug.com", "bò"→bò Scotland), Thai/Kana/Hangul/Han/Cyrillic/Greek → th/ja/ko/zh/ru/el. Không detect được (Latin: EN/MS/DE/…) → fallback default `lang=en`. Relevance gate + VN category fallback chỉ áp cho query tiếng Việt. Thêm `category` filter của Pixabay (map composer→food/health/sports/…) — không tăng match chính xác nhưng giữ ảnh rác/fallback nằm đúng lĩnh vực (miss của "phở bò" là món ăn khác, không phải bò sữa).
 
 | TC-ID | Loại | Mô tả | Kỳ vọng | Status |
 |---|---|---|---|---|
@@ -57,7 +57,13 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-RAW-05** | `[Positive]` | `deriveKeywords` không raw keyword | scaffolding: category base + modifier | [x] |
 | **TC-F38-RAW-06** | `[Positive]` | Raw VN q verbatim + `lang=vi` auto-detect | pool-level: `q="phở bò"`; client-level: URL có `lang=vi` | [x] |
 | **TC-F38-RAW-07** | `[Negative]` | Query EN / loanword é ("café latte") | URL KHÔNG có `lang` param (default en, không misroute) | [x] |
-| **TC-F38-RAW-08** | `[Positive]` | `detectQueryLang` pure function | VN chars đặc trưng (ơ/ư/ă/đ/hook-above/dot-below) → 'vi'; EN/MS/café → undefined | [x] |
+| **TC-F38-RAW-08** | `[Positive]` | `detectQueryLang` pure function (VN/Latin) | VN chars đặc trưng (ơ/ư/ă/đ/hook-above/dot-below) → 'vi'; EN/MS/café → undefined | [x] |
+| **TC-F38-RAW-09** | `[Positive]` | `detectQueryLang` script-based đa ngôn ngữ | Thai→'th', Kana→'ja' (kana thắng kanji), Hangul→'ko', Han-only→'zh', Cyrillic→'ru', Greek→'el' | [x] |
+| **TC-F38-RAW-10** | `[Positive]` | `searchPhotos` set `lang` khớp input, q raw | Query Thai → URL có `lang=th`, `q` giữ nguyên không dịch | [x] |
+| **TC-F38-RAW-11** | `[Positive]` | `searchPhotos` truyền `category` filter | opts.category='food' → URL có `category=food`; không set → không có param | [x] |
+| **TC-F38-RAW-12** | `[Positive]` | Map composer→Pixabay category | restaurant/fnb→food, fitness→sports, realestate→buildings; events/ecommerce → không map (không filter) | [x] |
+| **TC-F38-RAW-13** | `[Positive]` | Testimonials avatar = ảnh người, không phải pool | `fulfillImageNeeds` route testimonials → `getAvatarMedia` (`category=people`, query "chân dung người việt"/"portrait people"); pool bị bỏ qua; miss → avatar trống (không rơi về ảnh food) | [x] |
+| **TC-F38-RAW-14** | `[Positive]` | Team/doctor-profile cũng dùng portrait search | `PEOPLE_BLOCKS` = testimonials/team/doctor-profile → cùng đường `getAvatarMedia`; members[].image = ảnh người | [x] |
 
 ## 5. Kiểm thử thủ công (staging)
 

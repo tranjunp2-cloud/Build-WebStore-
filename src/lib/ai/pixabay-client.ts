@@ -38,6 +38,36 @@ export interface PixabaySearchOptions {
     /** Target render width — client picks largeImageURL (≥900) or webformatURL. */
     width?: number
     page?: number
+    /**
+     * GH-1185: Pixabay category slug (uploader-assigned, fixed vocabulary:
+     * food, health, sports, buildings, …). Acts as an AND filter — does not
+     * improve exact-keyword matching, but keeps the loose/fallback tiers
+     * on-domain: q="phở bò" without it returns dairy cows and street
+     * merchants; with category=food the misses are at least food photos.
+     * Map from composer category via PIXABAY_CATEGORY_BY_COMPOSER.
+     */
+    category?: string
+}
+
+/**
+ * Composer category → Pixabay category slug. Only unambiguous mappings —
+ * events/creative/ecommerce/blog have no clean Pixabay equivalent and are
+ * deliberately absent (no filter beats a wrong filter).
+ * Pixabay's fixed list: backgrounds, fashion, nature, science, education,
+ * feelings, health, people, religion, places, animals, industry, computer,
+ * food, sports, transportation, travel, buildings, business, music.
+ */
+export const PIXABAY_CATEGORY_BY_COMPOSER: Readonly<Record<string, string>> = {
+    restaurant: 'food',
+    fnb: 'food',
+    beauty: 'health',
+    health: 'health',
+    fitness: 'sports',
+    education: 'education',
+    tech: 'computer',
+    business: 'business',
+    realestate: 'buildings',
+    travel: 'travel',
 }
 
 export interface DownloadResult {
@@ -201,20 +231,41 @@ function pickSizedUrl(hit: PixabayHit, targetWidth?: number): string {
 }
 
 /**
- * GH-1185: detect Vietnamese queries so the search runs with `lang=vi`.
- * Without it, Pixabay's default lang=en strips diacritics and partial-matches
- * per word across multilingual tags — "cơm bò" ("com" + "bò") returned pug
- * dogs (tag "myfirstpug.com") and Scottish cattle (tag "bò ghàidhealach").
+ * GH-1185: detect the query language so the search runs with a matching
+ * `lang` param. Without it, Pixabay's default lang=en strips diacritics and
+ * partial-matches per word across multilingual tags — "cơm bò" ("com" + "bò")
+ * returned pug dogs (tag "myfirstpug.com") and Scottish cattle (tag
+ * "bò ghàidhealach").
  *
- * Only unambiguous Vietnamese characters are matched (horn letters ơ/ư, breve
- * ă, đ, and the hook-above/tilde/dot-below vowel series). Plain à/á/é/ô etc.
- * are excluded — they appear in French/Malay loanwords ("café") and would
- * misroute English queries to lang=vi.
+ * Detection is script-based (Unicode ranges), covering the Pixabay-supported
+ * languages that are unambiguously identifiable from their characters:
+ *   - Vietnamese: only unambiguous chars (horn letters ơ/ư, breve ă, đ, and
+ *     the hook-above/tilde/dot-below vowel series). Plain à/á/é/ô are
+ *     excluded — French/Malay loanwords ("café") would misroute to lang=vi.
+ *   - Thai / Japanese / Korean / Chinese / Cyrillic / Greek: script ranges.
+ *     Japanese is checked before Han so kana routes to `ja`; kanji-only
+ *     queries route to `zh` (both are Pixabay-supported).
+ * Latin-script languages (de/fr/es/id/ms/…) cannot be told apart reliably →
+ * undefined → Pixabay's default lang=en. Raw keywords are NEVER translated;
+ * only the `lang` param changes.
  * Exported for testing only.
  */
 const VIETNAMESE_CHAR_RE = /[ăâđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệịỉĩọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i
-export function detectQueryLang(query: string): 'vi' | undefined {
-    return VIETNAMESE_CHAR_RE.test(query) ? 'vi' : undefined
+export type PixabayQueryLang = 'vi' | 'th' | 'ja' | 'ko' | 'zh' | 'ru' | 'el'
+const SCRIPT_LANG_DETECTORS: ReadonlyArray<readonly [RegExp, PixabayQueryLang]> = [
+    [VIETNAMESE_CHAR_RE, 'vi'],
+    [/[฀-๿]/, 'th'], // Thai
+    [/[぀-ヿ]/, 'ja'], // Hiragana + Katakana
+    [/[가-힯]/, 'ko'], // Hangul syllables
+    [/[一-鿿]/, 'zh'], // Han (after ja — kana wins for Japanese text)
+    [/[Ѐ-ӿ]/, 'ru'], // Cyrillic (bg also supported; ru is the safer default)
+    [/[Ͱ-Ͽ]/, 'el'], // Greek
+]
+export function detectQueryLang(query: string): PixabayQueryLang | undefined {
+    for (const [re, lang] of SCRIPT_LANG_DETECTORS) {
+        if (re.test(query)) return lang
+    }
+    return undefined
 }
 
 /**
@@ -267,11 +318,14 @@ export async function searchPhotos(
         safesearch: 'true',
         page: String(opts.page ?? 1),
     })
-    // GH-1185: Vietnamese query → lang=vi so Pixabay matches VN-language tags
-    // instead of diacritic-stripped partial matches. English/Malay queries
-    // keep Pixabay's default lang=en (ms is not a supported Pixabay lang).
+    // GH-1185: match `lang` to the detected query language (vi/th/ja/ko/zh/
+    // ru/el) so Pixabay searches same-language tags instead of diacritic-
+    // stripped partial matches. Undetected (Latin-script en/ms/de/…) → no
+    // param → Pixabay default lang=en. Keywords stay raw either way.
     const lang = detectQueryLang(query)
     if (lang) params.set('lang', lang)
+    // GH-1185: domain filter — see PixabaySearchOptions.category.
+    if (opts.category) params.set('category', opts.category)
 
     const url = `${BASE}?${params.toString()}`
     const res = await fetchWithRetry(url, {

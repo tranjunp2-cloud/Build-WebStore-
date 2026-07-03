@@ -13,7 +13,7 @@
  * Depends on: Phase 02 theme-moods (mood.photographyFilter + mood.imageryKeywords)
  */
 
-import { searchPhotos, detectQueryLang, photoMatchesQuery, type PixabayPhoto } from './pixabay-client'
+import { searchPhotos, detectQueryLang, photoMatchesQuery, PIXABAY_CATEGORY_BY_COMPOSER, type PixabayPhoto } from './pixabay-client'
 import type { ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -181,7 +181,7 @@ function normalize(photo: PixabayPhoto, defaultRole: ImageRole): PoolPhoto {
  * mismatches) or the English category term (generic interiors).
  * Vietnamese by design — keeps the "no translation to English" decision.
  */
-const VN_CATEGORY_QUERIES: Readonly<Record<string, string>> = {
+export const VN_CATEGORY_QUERIES: Readonly<Record<string, string>> = {
   restaurant: 'ẩm thực việt nam',
   fnb:        'quán cà phê',
   ecommerce:  'cửa hàng mua sắm',
@@ -215,11 +215,15 @@ async function searchBucket(
   minCount: number,
 ): Promise<{ photos: PixabayPhoto[]; usedFallback: boolean }> {
   const isVietnamese = detectQueryLang(query) === 'vi'
+  // GH-1185: Pixabay category filter keeps loose matches on-domain (a "phở
+  // bò" miss is another dish, not a dairy cow). ctx.category is a resolved
+  // composer key; unmapped categories get no filter.
+  const category = PIXABAY_CATEGORY_BY_COMPOSER[ctx.category]
   let photos: PixabayPhoto[] = []
   let usedFallback = false
 
   try {
-    photos = (await searchPhotos(query, size, { orientation, width })) ?? []
+    photos = (await searchPhotos(query, size, { orientation, width, category })) ?? []
   } catch (err) {
     console.warn(`[image-pool] ${orientation} search failed:`, err)
   }
@@ -239,7 +243,7 @@ async function searchBucket(
   if (relaxedQuery !== query) {
     usedFallback = true
     try {
-      let extra = (await searchPhotos(relaxedQuery, size, { orientation, width })) ?? []
+      let extra = (await searchPhotos(relaxedQuery, size, { orientation, width, category })) ?? []
       if (detectQueryLang(relaxedQuery) === 'vi') {
         extra = extra.filter((p) => photoMatchesQuery(p.alt, relaxedQuery))
       }
@@ -255,7 +259,7 @@ async function searchBucket(
   if (vnQuery && vnQuery !== query) {
     usedFallback = true
     try {
-      const extra = (await searchPhotos(vnQuery, size, { orientation, width })) ?? []
+      const extra = (await searchPhotos(vnQuery, size, { orientation, width, category })) ?? []
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} VN category fallback "${vnQuery}": +${extra.length}`)
       }

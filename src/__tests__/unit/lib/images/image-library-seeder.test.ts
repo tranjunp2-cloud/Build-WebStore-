@@ -13,6 +13,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/ai/pixabay-client', () => ({
     searchPhotos: vi.fn(),
     downloadPhotoBuffer: vi.fn(),
+    // GH-1185: empty map → no category filter in these tests (param behavior
+    // covered by pixabay-client TC-F38-RAW-11/12)
+    PIXABAY_CATEGORY_BY_COMPOSER: {},
 }))
 
 vi.mock('@/lib/ai/media-pipeline', () => ({

@@ -64,6 +64,9 @@ vi.mock('@/lib/ai/pixabay-client', () => {
             } satisfies Partial<PixabayPhoto>,
         ]),
         PixabayError,
+        // GH-1185: empty map → no category filter in these tests (param
+        // behavior covered by pixabay-client TC-F38-RAW-11/12)
+        PIXABAY_CATEGORY_BY_COMPOSER: {},
     }
 })
 

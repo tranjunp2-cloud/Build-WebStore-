@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, detectQueryLang, PixabayError } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -147,7 +147,7 @@ describe('searchPhotos', () => {
         expect(url.searchParams.has('lang')).toBe(false)
     })
 
-    it('[TC-F38-RAW-08] detectQueryLang: unambiguous VN chars → vi, others → undefined', () => {
+    it('[TC-F38-RAW-08] detectQueryLang: unambiguous VN chars → vi, Latin-script → undefined', () => {
         // Arrange + Act + Assert — pure function
         expect(detectQueryLang('cơm bò')).toBe('vi')
         expect(detectQueryLang('gỏi cuốn tôm')).toBe('vi')
@@ -155,6 +155,62 @@ describe('searchPhotos', () => {
         expect(detectQueryLang('nasi lemak ayam')).toBeUndefined()
         expect(detectQueryLang('modern office')).toBeUndefined()
         expect(detectQueryLang('café résumé')).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-09] detectQueryLang: script-based detection for th/ja/ko/zh/ru/el', () => {
+        // Arrange + Act + Assert — pure function, one query per script
+        expect(detectQueryLang('อาหารไทย ต้มยำ')).toBe('th')
+        expect(detectQueryLang('ラーメン 寿司')).toBe('ja') // kana wins over kanji
+        expect(detectQueryLang('한국 음식 비빔밥')).toBe('ko')
+        expect(detectQueryLang('中国菜 面条')).toBe('zh') // kanji-only → zh
+        expect(detectQueryLang('русский ресторан')).toBe('ru')
+        expect(detectQueryLang('ελληνικό φαγητό')).toBe('el')
+    })
+
+    it('[TC-F38-RAW-10] searchPhotos sets lang matching detected script, keyword stays raw', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — Thai input → lang=th, q untouched (no translation)
+        await searchPhotos('อาหารไทย', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('lang')).toBe('th')
+        expect(url.searchParams.get('q')).toBe('อาหารไทย')
+    })
+
+    it('[TC-F38-RAW-11] searchPhotos passes category filter; omitted when unset', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — with category
+        await searchPhotos('phở bò', 5, { orientation: 'landscape', category: 'food' })
+
+        // Assert
+        let url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('category')).toBe('food')
+
+        vi.mocked(fetch).mockClear()
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — without category
+        await searchPhotos('phở bò', 5, { orientation: 'landscape' })
+
+        // Assert
+        url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.has('category')).toBe(false)
+    })
+
+    it('[TC-F38-RAW-12] PIXABAY_CATEGORY_BY_COMPOSER maps food domains; ambiguous keys absent', () => {
+        // Arrange + Act + Assert — pure mapping table
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['restaurant']).toBe('food')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['fnb']).toBe('food')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['fitness']).toBe('sports')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['realestate']).toBe('buildings')
+        // No clean Pixabay equivalent → deliberately unmapped (no filter)
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['events']).toBeUndefined()
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['ecommerce']).toBeUndefined()
     })
 
     it('[TC-F38-PIXABAY-03] missing PIXABAY_API_KEY → returns [] without fetching', async () => {
