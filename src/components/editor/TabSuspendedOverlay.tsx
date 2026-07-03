@@ -9,27 +9,27 @@ interface TabSuspendedOverlayProps {
 
 export function TabSuspendedOverlay({ onReclaim, onReload }: TabSuspendedOverlayProps) {
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--editor-bg)]/95 backdrop-blur-sm">
-            <div className="w-full max-w-sm text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                    <Lock className="h-8 w-8" aria-hidden />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+            <div className="flex w-[90%] max-w-md flex-col items-center rounded-[20px] border border-solid border-[var(--editor-border)] bg-[var(--editor-surface)] p-6 text-center shadow-2xl">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--warning)/0.1)]">
+                    <Lock className="h-6 w-6 text-[hsl(var(--warning))]" aria-hidden />
                 </div>
-                <h2 className="mt-4 text-xl font-bold text-white">Session moved to another tab</h2>
-                <p className="mt-2 text-sm text-slate-400">
+                <h2 className="mb-2 text-xl font-bold text-[var(--editor-text)]">Session moved to another tab</h2>
+                <p className="mb-6 text-sm leading-[1.5] text-[var(--editor-text-muted)]">
                     This editor is active in another browser tab. Only one tab can edit at a time.
                 </p>
-                <div className="mt-6 flex justify-center gap-3">
+                <div className="flex w-full gap-3">
                     <button
                         type="button"
                         onClick={onReload}
-                        className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10"
+                        className="flex h-11 flex-1 items-center justify-center rounded-[12px] border border-solid border-[var(--editor-text-muted)] text-sm font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)]"
                     >
                         Reload
                     </button>
                     <button
                         type="button"
                         onClick={onReclaim}
-                        className="rounded-xl bg-gradient-to-r from-blue-500 to-teal-400 px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                        className="flex h-11 flex-1 items-center justify-center rounded-[12px] bg-gradient-to-r from-blue-500 to-teal-400 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                     >
                         Use this tab
                     </button>
