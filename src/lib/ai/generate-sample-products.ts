@@ -12,7 +12,7 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { searchPhotos, PixabayError } from './pixabay-client'
+import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -188,8 +188,11 @@ async function fetchProductImage(
 
     if (!skipSearch) {
         try {
+            // GH-1185: `category` here is already a resolved composer key —
+            // Pixabay domain filter keeps loose matches on-topic.
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[category]
             // Tier A: exact AI keyword
-            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish', width: 800 })
+            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
 
             // Tier B: drop leading adjectives one by one until we get results
             if (!photos.length) {
@@ -197,7 +200,7 @@ async function fetchProductImage(
                 for (let drop = 1; drop < words.length && !photos.length; drop++) {
                     const simplified = words.slice(drop).join(' ')
                     console.warn(`[sample-products] "${keyword}" → 0, trying simplified "${simplified}"`)
-                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish', width: 800 })
+                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish', width: 800, category: pixCategory })
                 }
             }
 
@@ -205,7 +208,7 @@ async function fetchProductImage(
             if (!photos.length) {
                 const nameKeyword = deriveFallbackKeyword(productName, category)
                 console.warn(`[sample-products] all "${keyword}" variants → 0, trying name-derived "${nameKeyword}"`)
-                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish', width: 800 })
+                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
             }
 
             if (photos.length) {

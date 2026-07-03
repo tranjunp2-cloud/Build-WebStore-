@@ -3,7 +3,8 @@ import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
-import { searchPhotos, PixabayError } from './pixabay-client'
+import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import { normalizeComposerCategory } from './composer-category-resolver'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import type { BlogPost } from './content/types'
 
@@ -38,7 +39,10 @@ async function fetchBlogThumbnail(
     // Tier A: Pixabay search
     if (!searchRateLimited) {
         try {
-            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200 })
+            // GH-1185: site-domain filter — blog topics follow the site's
+            // industry, so a loose keyword match still lands on-domain.
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200, category: pixCategory })
             if (photos.length > 0) {
                 const photo = photos[0]!
                 // photo.url is already sized by the client (Pixabay fixed sizes).

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, PixabayError } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -117,6 +117,137 @@ describe('searchPhotos', () => {
         await searchPhotos('test', 1, { orientation: 'squarish' })
         url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
         expect(url.searchParams.get('orientation')).toBe('all')
+    })
+
+    it('[TC-F38-RAW-06] raw VN q URL-encoded verbatim + lang=vi auto-detected', async () => {
+        // Arrange — GH-1185: keywords sent RAW (user language). Vietnamese
+        // queries get lang=vi so Pixabay matches VN tags instead of
+        // diacritic-stripped partials ("cơm" → "myfirstpug.com").
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([]))
+
+        // Act
+        await searchPhotos('phở bò', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('q')).toBe('phở bò')
+        expect(url.searchParams.get('lang')).toBe('vi')
+    })
+
+    it('[TC-F38-RAW-07] English/Malay q keeps Pixabay default lang (no lang param)', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([]))
+
+        // Act — plain English and a French/Malay loanword with é (ambiguous
+        // diacritic) must NOT be misrouted to lang=vi.
+        await searchPhotos('café latte barista', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.has('lang')).toBe(false)
+    })
+
+    it('[TC-F38-RAW-08] detectQueryLang: unambiguous VN chars → vi, Latin-script → undefined', () => {
+        // Arrange + Act + Assert — pure function
+        expect(detectQueryLang('cơm bò')).toBe('vi')
+        expect(detectQueryLang('gỏi cuốn tôm')).toBe('vi')
+        expect(detectQueryLang('nhà hàng hải sản')).toBe('vi')
+        expect(detectQueryLang('nasi lemak ayam')).toBeUndefined()
+        expect(detectQueryLang('modern office')).toBeUndefined()
+        expect(detectQueryLang('café résumé')).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-09] detectQueryLang: script-based detection for th/ja/ko/zh/ru/el', () => {
+        // Arrange + Act + Assert — pure function, one query per script
+        expect(detectQueryLang('อาหารไทย ต้มยำ')).toBe('th')
+        expect(detectQueryLang('ラーメン 寿司')).toBe('ja') // kana wins over kanji
+        expect(detectQueryLang('한국 음식 비빔밥')).toBe('ko')
+        expect(detectQueryLang('中国菜 面条')).toBe('zh') // kanji-only → zh
+        expect(detectQueryLang('русский ресторан')).toBe('ru')
+        expect(detectQueryLang('ελληνικό φαγητό')).toBe('el')
+    })
+
+    it('[TC-F38-RAW-10] searchPhotos sets lang matching detected script, keyword stays raw', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — Thai input → lang=th, q untouched (no translation)
+        await searchPhotos('อาหารไทย', 5, { orientation: 'landscape' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('lang')).toBe('th')
+        expect(url.searchParams.get('q')).toBe('อาหารไทย')
+    })
+
+    it('[TC-F38-RAW-11] searchPhotos passes category filter; omitted when unset', async () => {
+        // Arrange
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — with category
+        await searchPhotos('phở bò', 5, { orientation: 'landscape', category: 'food' })
+
+        // Assert
+        let url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('category')).toBe('food')
+
+        vi.mocked(fetch).mockClear()
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act — without category
+        await searchPhotos('phở bò', 5, { orientation: 'landscape' })
+
+        // Assert
+        url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.has('category')).toBe(false)
+    })
+
+    it('[TC-F38-RAW-12] PIXABAY_CATEGORY_BY_COMPOSER maps food domains; ambiguous keys absent', () => {
+        // Arrange + Act + Assert — pure mapping table
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['restaurant']).toBe('food')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['fnb']).toBe('food')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['fitness']).toBe('sports')
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['realestate']).toBe('buildings')
+        // No clean Pixabay equivalent → deliberately unmapped (no filter)
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['events']).toBeUndefined()
+        expect(PIXABAY_CATEGORY_BY_COMPOSER['ecommerce']).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-15] opts.lang overrides detection for curated non-detectable VN phrases', async () => {
+        // Arrange — "quán cà phê" (VN_CATEGORY_QUERIES.fnb) carries only
+        // ambiguous diacritics (á/à/ê) → detectQueryLang misses it; the
+        // explicit override must still route the search to lang=vi.
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act
+        await searchPhotos('quán cà phê', 5, { orientation: 'landscape', lang: 'vi' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('lang')).toBe('vi')
+        expect(url.searchParams.get('q')).toBe('quán cà phê')
+        // Sanity: without the override the same query is NOT detected
+        expect(detectQueryLang('quán cà phê')).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-16] NFC normalization: decomposed (NFD) Vietnamese input still detected + gated', async () => {
+        // Arrange — NFD form of "phở bò" (o + combining horn + combining hook)
+        const nfd = 'phở bò'.normalize('NFD')
+        expect(nfd).not.toBe('phở bò') // proves the input is actually decomposed
+
+        // Act + Assert — detection must survive decomposition
+        expect(detectQueryLang(nfd)).toBe('vi')
+        // Gate must match NFD query words against NFC (Pixabay-side) tags
+        expect(photoMatchesQuery('phở bò, món ăn việt nam', nfd)).toBe(true)
+        expect(photoMatchesQuery('scottish cattle, bò ghàidhealach', nfd)).toBe(false)
+
+        // The wire-level `q` must be recomposed too — shipping decomposed
+        // code points to Pixabay would 0-hit even with lang=vi set correctly.
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+        await searchPhotos(nfd, 5, { orientation: 'landscape' })
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('q')).toBe('phở bò')
+        expect(url.searchParams.get('lang')).toBe('vi')
     })
 
     it('[TC-F38-PIXABAY-03] missing PIXABAY_API_KEY → returns [] without fetching', async () => {
