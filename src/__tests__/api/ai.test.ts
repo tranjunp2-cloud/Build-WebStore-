@@ -99,6 +99,27 @@ vi.mock('@/lib/ai/generate-sample-products', () => ({
     generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
 }))
 
+// gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
+// prove seeding is DEFERRED (scheduled, not awaited in-request) and then
+// invoke the captured tasks to assert post-response behavior. NextRequest/
+// NextResponse stay real via importOriginal.
+vi.mock('next/server', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    after: vi.fn(),
+}))
+
+// Seeder boundaries — the route schedules these via after(); mocked so tests
+// observe scheduling without running GPT/Pixabay work.
+vi.mock('@/lib/ai/seed-blog-posts', () => ({
+    seedBlogPosts: vi.fn().mockResolvedValue(0),
+}))
+vi.mock('@/lib/images/image-library-seeder', () => ({
+    seedImageLibraryForSite: vi.fn().mockResolvedValue({ hero: [], gallery: [], about: null, team: [], features: [] }),
+}))
+vi.mock('@/lib/sso/sso-api-client', () => ({
+    notifyStepComplete: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Mock AI Generator (SSE logic)
 // GH-1190: generateSiteWithAI now forwards events via onEvent callback (6th param) in real-time
 // instead of returning them in the events[] array for post-hoc replay. Mock must call onEvent.
@@ -686,6 +707,143 @@ describe('AI Streaming APIs', () => {
             expect(json.products[0].name).toContain('Không API Key')
             
             process.env.OPENAI_API_KEY = prev
+        })
+    })
+
+    // ── gen-perf Wave 1 (plan 260703-1341, docs/qa/F01-gen-perf.md) ─────────
+    // Proves blog + imglib seeding are scheduled via next/server after() and
+    // never run inside the request. Mutation check: reverting route.ts to the
+    // old inline fire-and-forget makes W1-01 fail (seeder called in-request).
+    describe('TC-GENPERF-W1 — seeding deferred via after()', () => {
+        const genPerfReq = () =>
+            new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+        // Invoke every captured after() callback WITHOUT catching — every task
+        // the route schedules is contractually never-throw (.catch inside), so
+        // any rejection here is a real defect.
+        const runCapturedAfterTasks = async () => {
+            const { after } = await import('next/server')
+            for (const call of vi.mocked(after).mock.calls) {
+                await (call[0] as () => unknown)()
+            }
+        }
+        // Drain the event loop so any stray fire-and-forget chain (the mutant
+        // this suite guards against — dynamic import().then(seed)) gets a
+        // chance to run BEFORE the not-called assertions. Without this, an
+        // inline-fired seeder wouldn't have resolved yet and the deferral
+        // assertions would pass vacuously (verified by mutation test).
+        const drainEventLoop = async () => {
+            for (let i = 0; i < 25; i++) await new Promise((r) => setImmediate(r))
+        }
+
+        it('[TC-GENPERF-W1-01] imglib seeding scheduled via after(), not run in-request', async () => {
+            // Arrange
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { after } = await import('next/server')
+
+            // Act — full route call
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — response OK, seeder NOT called during the request
+            // (drain first: an inline-fired mutant only resolves after ticks)
+            expect(res.status).toBe(200)
+            await drainEventLoop()
+            expect(vi.mocked(seedImageLibraryForSite)).not.toHaveBeenCalled()
+            expect(vi.mocked(after)).toHaveBeenCalled()
+
+            // Post-response: captured after() tasks run the seeder exactly once
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {
+            // Arrange
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert
+            expect(res.status).toBe(200)
+            await drainEventLoop()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-GENPERF-W1-05] seeder rejection is non-fatal — no captured task ever rejects', async () => {
+            // Arrange — both seeders blow up
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(seedImageLibraryForSite).mockRejectedValueOnce(new Error('imglib boom'))
+            vi.mocked(seedBlogPosts).mockRejectedValueOnce(new Error('blog boom'))
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — response unaffected; invoking tasks resolves (route wraps
+            // each in .catch), errors logged not propagated
+            expect(res.status).toBe(200)
+            await expect(runCapturedAfterTasks()).resolves.toBeUndefined()
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+            errorSpy.mockRestore()
+            warnSpy.mockRestore()
+        })
+
+        it('[TC-GENPERF-W1-06] SSE done payload keys unchanged', async () => {
+            // Arrange
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+
+            // Act — read the REAL stream to the end and extract the done event
+            const res = await GenerateSitePOST(req)
+            const reader = res.body!.getReader()
+            let full = ''
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                full += new TextDecoder().decode(value)
+            }
+
+            // Assert — done event exists with the exact client-contract keys
+            const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
+            expect(m).toBeTruthy()
+            expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
+                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+            )
+        })
+
+        it('[TC-GENPERF-W1-07] after() unavailable → fallback executes seeding anyway', async () => {
+            // Arrange — simulate no-request-scope (after throws, e.g. Vitest/local)
+            const { after } = await import('next/server')
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(after).mockImplementation(() => { throw new Error('after called outside request scope') })
+
+            try {
+                // Act
+                const res = await GenerateSitePOST(genPerfReq())
+
+                // Assert — route falls back to `void task()`: seeders still invoked
+                expect(res.status).toBe(200)
+                await vi.waitFor(() => {
+                    expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+                    expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+                })
+            } finally {
+                vi.mocked(after).mockImplementation(() => undefined)
+            }
         })
     })
 

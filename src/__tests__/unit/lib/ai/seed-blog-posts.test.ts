@@ -571,3 +571,31 @@ describe('TC-F08-BS.21 — all tiers fail: Tier A/B uploads reject + carton null
         }
     })
 })
+
+/**
+ * TC-GENPERF-W1-04 — blog seeder regeneration skip in Wave 1 context
+ * Thin addition verifying integration point: gen-perf-wave1.test.ts has full coverage.
+ * This verifies the seeder skip logic when tenant already has blogs.
+ */
+describe('TC-GENPERF-W1-04 — blog seeder skip on regeneration (Wave 1 integration)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-GENPERF-W1-04: second regeneration when tenant.blogs > 0 → skips seeding', async () => {
+        // First regeneration: tenant has no blogs yet, create 3
+        const payload1 = makePayload(0)
+        const result1 = await seedBlogPosts(payload1, 42, 99, 'restaurant', 'FoodBiz', 7)
+        expect(result1).toBe(3)
+        expect(payload1.create).toHaveBeenCalledTimes(3)
+
+        // Second regeneration: tenant now has blogs, should skip
+        const payload2 = makePayload(3) // Return count=3 (tenant has 3 blogs already)
+        const result2 = await seedBlogPosts(payload2, 42, 99, 'restaurant', 'FoodBiz', 7)
+
+        // Assert: Skipped seeding when count > 0
+        expect(result2).toBe(0)
+        expect(payload2.create).not.toHaveBeenCalled()
+        expect(payload2.count).toHaveBeenCalled()
+    })
+})

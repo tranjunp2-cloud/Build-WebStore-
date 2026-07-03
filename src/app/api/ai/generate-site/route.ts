@@ -1142,19 +1142,10 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
-        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
-        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
-        if (resolvedTenantId) {
-            const _seedCategory = safeSiteType
-            import('@/lib/images/image-library-seeder')
-                .then(({ seedImageLibraryForSite }) =>
-                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
-                )
-                .catch(err =>
-                    console.error('[generate-site] image-library seed failed',
-                        err instanceof Error ? err.message : err),
-                )
-        }
+        // GH-727 imglib seeding moved to after() — scheduled next to the blog
+        // seed below (gen-perf plan 260703 phase-02). Raw fire-and-forget here
+        // was killed on Vercel function freeze and its ~15 media creates
+        // contended with critical-path uploads before `done`.
 
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
@@ -1345,6 +1336,34 @@ export async function POST(req: NextRequest) {
             after(_blogSeedTask)
         } catch {
             void _blogSeedTask()
+        }
+
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
+        // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
+        // fire-and-forget) so it runs reliably post-response on Vercel and
+        // its media creates never contend with critical-path uploads.
+        // Use safeSiteType (same key used by storefront blocks) so seeder
+        // alt keys match resolver lookups. Seeder is idempotent + never
+        // throws; until rows land, blocks fall back to static CDN images.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            const _imglibSeedTask = () => {
+                const t = Date.now()
+                console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
+                return import('@/lib/images/image-library-seeder')
+                    .then(({ seedImageLibraryForSite }) =>
+                        seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                    )
+                    .catch(err =>
+                        console.error('[generate-site] image-library seed failed',
+                            err instanceof Error ? err.message : err),
+                    )
+            }
+            try {
+                after(_imglibSeedTask)
+            } catch {
+                void _imglibSeedTask()
+            }
         }
 
             const timeMs = Date.now() - startTime
