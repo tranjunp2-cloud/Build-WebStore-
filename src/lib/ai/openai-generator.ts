@@ -41,7 +41,7 @@ import { detectLanguage } from './lang-detect'
 import { getNavLabels, hasDedicatedStrings } from './block-i18n'
 import { prefetchNavLabels } from './nav-label-translator'
 import { prefetchBlockStrings } from './block-strings-translator'
-import { runParallelPageSplit } from './gen-page-split'
+import { runParallelPageSplit, syncFooterAcrossPages } from './gen-page-split'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -530,6 +530,13 @@ export async function generateSiteWithAI(
             }
 
             validBlocks = allBlocks
+
+            // gen-perf phase-09: the structure enforcer above may restyle the
+            // HOMEPAGE footer per its recipe — re-sync subpage footers so all
+            // pages share one footer (split path clones it pre-enforcement).
+            if (process.env.GEN_PARALLEL_PAGES === 'true') {
+                syncFooterAcrossPages(generatedPages)
+            }
 
             // Phase 06 — override per-page SEO with deterministic unique values
             // mined from page content, and attach ogImage + JSON-LD. AI-returned

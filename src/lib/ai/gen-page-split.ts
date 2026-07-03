@@ -225,6 +225,25 @@ export function applyDeterministicChrome(
     })
 }
 
+/**
+ * Re-sync subpage footers from the (possibly enforcer-modified) homepage
+ * footer. applyDeterministicChrome clones the footer BEFORE the structure
+ * enforcer runs, and the enforcer may then restyle the HOMEPAGE footer per
+ * its recipe — leaving subpages on the stale clone (live finding 2026-07-03:
+ * home footer one variant, every other page another). Call AFTER per-page
+ * enforcement. Generic over the caller's page/block shape.
+ */
+export function syncFooterAcrossPages(pages: Array<{ blocks?: unknown[] }>): void {
+    if (pages.length < 2) return
+    const homeBlocks = Array.isArray(pages[0]?.blocks) ? (pages[0]!.blocks as Record<string, unknown>[]) : []
+    const homeFooter = homeBlocks.find((b) => b?.blockType === 'footer')
+    if (!homeFooter) return
+    for (let i = 1; i < pages.length; i++) {
+        const blocks = Array.isArray(pages[i]?.blocks) ? (pages[i]!.blocks as Record<string, unknown>[]) : []
+        pages[i]!.blocks = [...blocks.filter((b) => b?.blockType !== 'footer'), { ...homeFooter }]
+    }
+}
+
 /** composeTemplateResult is pure/synchronous (fallback-adapter.ts) — safe to
  *  call inline as a per-call fallback without an extra async round-trip. */
 function composerFallback(gr: GenerationResult, scope: 'home' | 'subpages'): Record<string, unknown> | null {
@@ -288,13 +307,44 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // - each batch is capped at its requested page count;
     // - a batch missing pages (nano sometimes returns 1 of 2) counts as
     //   FAILED → composer fallback for ALL subpages. Never a short site.
-    const batchPages = batchOutcomes.map((o, i) => {
+    const extractBatchPages = (o: SplitCallOutcome, i: number): Record<string, unknown>[] => {
         const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as Record<string, unknown>[]) : []
         return pages
             .filter((p) => p.slug !== '/')
             .map((p): Record<string, unknown> => ({ ...p, isHomepage: false }))
             .slice(0, SUBPAGE_BATCHES[i]!.pages.length)
-    })
+    }
+    let batchPages = batchOutcomes.map(extractBatchPages)
+
+    // Retry pass (live finding 2026-07-03 17:40, Nha Khoa case): a failed
+    // batch used to drop straight to composer fallback, whose per-category
+    // templates may not include a /contact page at all (3 of 4 health
+    // templates use Book Now / Get in Touch instead) → user-visible "missing
+    // contact page". One retry on the MAIN model rescues nearly all
+    // intermittent nano/parse failures; composer stays as the last resort.
+    const failedIdx = batchOutcomes
+        .map((o, i) => (o.parsed !== null && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length ? -1 : i))
+        .filter((i) => i >= 0)
+    if (failedIdx.length > 0) {
+        console.warn(`[AI][GEN_PARALLEL_PAGES] retrying ${failedIdx.length} failed batch(es) with main model`)
+        const retries = await Promise.all(
+            failedIdx.map((i) => {
+                const batch = SUBPAGE_BATCHES[i]!
+                return runSplitCall(
+                    input.openai, input.model,
+                    buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
+                    scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.join(', ')}. No Homepage.`),
+                    SUBPAGE_BATCH_MAX_TOKENS,
+                )
+            }),
+        )
+        retries.forEach((o, k) => {
+            const i = failedIdx[k]!
+            logOutcome(o)
+            batchOutcomes[i] = o
+            batchPages[i] = extractBatchPages(o, i)
+        })
+    }
     // Slug sanity across ALL batch pages: non-empty string, unique after
     // normalization. A dup/empty slug would fail Payload's unique-per-site
     // validation at page-create time ("field is invalid: site_id, slug" —

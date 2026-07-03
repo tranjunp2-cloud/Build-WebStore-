@@ -296,28 +296,35 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 	})
 
 	it('TC-GENPERF-W2-04: makes 3 parallel calls (home + 2 batches)', async () => {
-		// Arrange
+		// Arrange — scope-aware mock returning the CORRECT page count per call
+		// (a generic 1-page response would now trigger the batch retry pass
+		// and inflate the call count).
+		const scopedResponse = (pages: Array<Record<string, unknown>>) => ({
+			model: 'gpt-4o',
+			usage: { prompt_tokens: 500, completion_tokens: 1000 },
+			choices: [{ message: { content: JSON.stringify({
+				siteName: 'Test', category: 'business', theme: { palette: 'blue' }, seo: {}, language: 'en', pages,
+			}) } }],
+		})
 		const mockOpenai = {
 			chat: {
 				completions: {
-					create: vi.fn(async (opts: any) => ({
-						model: 'gpt-4o',
-						usage: { prompt_tokens: 500, completion_tokens: 1000 },
-						choices: [
-							{
-								message: {
-									content: JSON.stringify({
-										siteName: 'Test',
-										category: 'business',
-										theme: { palette: 'blue' },
-										seo: {},
-										language: 'en',
-										pages: [{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }],
-									}),
-								},
-							},
-						],
-					})),
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) {
+							return scopedResponse([{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }])
+						}
+						if (sys.includes('Contact, Blog')) {
+							return scopedResponse([
+								{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] },
+								{ title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] },
+							])
+						}
+						return scopedResponse([
+							{ title: 'About', slug: '/about', isHomepage: false, blocks: [] },
+							{ title: 'Services', slug: '/services', isHomepage: false, blocks: [] },
+						])
+					}),
 				},
 			},
 		}
@@ -511,6 +518,58 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		const pages = result.pages as any[]
 		expect(pages[0].isHomepage).toBe(true)
 		expect(pages[0].slug).toBe('/')
+	})
+
+	it('[TC-GENPERF-W2-13] failed batch is retried once on the MAIN model before composer fallback', async () => {
+		// Arrange — light batch (Contact, Blog) fails on nano, succeeds on retry
+		const { composeTemplateResult } = await import('@/lib/ai/fallback-adapter')
+		const scoped = (pages: Array<Record<string, unknown>>) => ({
+			model: 'gpt-4o',
+			usage: { prompt_tokens: 1, completion_tokens: 1 },
+			choices: [{ message: { content: JSON.stringify({ siteName: 'T', category: 'business', theme: {}, seo: {}, language: 'en', pages }) } }],
+		})
+		const mockOpenai = {
+			chat: {
+				completions: {
+					create: vi.fn(async (opts: any) => {
+						const sys = String(opts.messages?.[0]?.content ?? '')
+						if (sys.includes('HOMEPAGE ONLY')) return scoped([{ title: 'Home', slug: '/', isHomepage: true, blocks: [] }])
+						if (sys.includes('Contact, Blog')) {
+							// nano attempt fails; MAIN-model retry succeeds
+							if (opts.model === 'gpt-4.1-nano') throw new Error('nano flake')
+							return scoped([
+								{ title: 'Contact', slug: '/contact', isHomepage: false, blocks: [] },
+								{ title: 'Blog', slug: '/blog', isHomepage: false, blocks: [] },
+							])
+						}
+						return scoped([
+							{ title: 'About', slug: '/about', isHomepage: false, blocks: [] },
+							{ title: 'Services', slug: '/services', isHomepage: false, blocks: [] },
+						])
+					}),
+				},
+			},
+		}
+		const input: ParallelSplitInput = {
+			openai: mockOpenai as any,
+			model: 'gpt-4.1-mini',
+			systemPrompt: 'System',
+			userPromptText: 'User prompt',
+			promptText: 'Prompt text',
+			businessInfo: { businessName: 'Test', siteType: 'service' },
+			seed: 42,
+			language: 'en',
+			blockLang: 'en',
+		}
+
+		// Act
+		const result = await runParallelPageSplit(input)
+
+		// Assert — 4 calls (3 + 1 retry), full 5-page site from GPT, composer NOT used
+		expect(mockOpenai.chat.completions.create).toHaveBeenCalledTimes(4)
+		expect(vi.mocked(composeTemplateResult)).not.toHaveBeenCalled()
+		const slugs = (result.pages as Array<{ slug?: string }>).map((p) => p.slug)
+		expect(slugs).toEqual(['/', '/about', '/services', '/contact', '/blog'])
 	})
 
 	it('[TC-GENPERF-W2-12] Contact+Blog batch runs on the light model, others on the main model', async () => {
