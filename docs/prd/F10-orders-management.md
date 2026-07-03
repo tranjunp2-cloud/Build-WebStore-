@@ -598,9 +598,9 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 
 ¹ **Indicative baseline only.** Live limits vary by merchant account; read from `min_cod_amount` + `max_cod_amount` per courier in API response. Sandbox set = 7 COD-capable couriers (Aramex, DHL eCommerce, J&T, Lazada, Pos Malaysia/Melplus, Poslaju, SPX); Flash was NOT returned on the sandbox account — courier availability varies per account.
 
-**Shared COD constraints (all couriers):** West Malaysia only (`zone='east'` has no COD; couriers still deliver East for prepaid). COD payout prerequisite (seller): eKYC + bank account verification before first withdrawal; manual withdraw on EP dashboard (Pending → To Release → Released); no API/webhook settlement → Prime stores `codStatus` display-only. COD fee deducted from collected cash (merchant nets remainder); failed delivery → sender (merchant) bears return cost.
+**Shared COD constraints (per R1–R5 rules):** COD eligibility determined **PER-ROUTE, LIVE from quotation response** — NO hardcoded region block. Courier `cod.available`, `min_cod_amount`, `max_cod_amount` are live signals; region correctness is emergent (unsupported routes return no COD couriers). COD payout prerequisite (seller): eKYC + bank account verification before first withdrawal; manual withdraw on EP dashboard (Pending → To Release → Released); no API/webhook settlement → Prime stores `codStatus` display-only. COD fee deducted from collected cash (merchant nets remainder); failed delivery → sender (merchant) bears return cost.
 
-**Critical Validation Note:** EasyParcel `submit_orders` endpoint does **NOT validate** COD eligibility (accepts under-min, over-max, non-COD couriers, East MY addresses). **Prime enforces all COD validation server-side** + picker filters non-COD couriers client-side to prevent invalid orders.
+**Critical Validation Note:** EasyParcel `submit_orders` endpoint does **NOT validate** COD eligibility (accepts under-min, over-max, non-COD couriers, any destination). **Prime enforces all COD validation server-side (R1–R5)** + picker filters non-COD couriers client-side to prevent invalid orders. See [F36 PRD §8](./F36-easyparcel-delivery.md#8-key-api-contract-decisions-v2026-03-spec) for rule details + evidence.
 
 **Consequence:** COD max differs per courier → gating (F19 C-6a) must use per-courier `max_cod_amount` from the `quotations` API response, NOT a shared constant. Source: `plans/reports/researcher-260622-1500-easyparcel-cod-courier-support.md`.
 
@@ -623,8 +623,8 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 
 **Acceptance Criteria:**
 
-1. GIVEN order COD West MY courier COD-enabled total∈[min,max] WHEN label created THEN cod_enabled=true, cod_amount (RM); codStatus='pending'.
-2. GIVEN buyer East MY WHEN COD THEN disabled (system-level per F19 gating).
+1. GIVEN order COD courier COD-enabled (R3: cod.available=true) total∈[min,max] (R1–R2) WHEN label created THEN cod_enabled=true, cod_amount (RM); codStatus='pending'.
+2. GIVEN buyer submits with COD pero isCodEligible=false (R1–R5 violation) WHEN server processes THEN rejects order; hard-gates validation (see F36 PRD §8 + stories AC-4b).
 3. GIVEN order COD shipped, buyer refused WHEN cron Returned THEN shipping_tracking_status='Returned'; cod_status='pending' (chưa thu).
 4. GIVEN courierStatus='Returned' WHEN merchant Refund THEN F10 /refund reused; goods refunded, inventory restocked; COD không thu.
 

@@ -1,6 +1,6 @@
 # PRD Overview: EasyParcel Delivery Integration — Malaysia (F36)
 
-> **Version:** 2.1 | **Updated:** 2026-07-01 | **Owner:** Domin (Product)
+> **Version:** 2.1 | **Updated:** 2026-07-03 | **Owner:** Domin (Product)
 > **Priority:** P1 | **Size:** XL
 > **Depends on:** F09 Storefront Commerce ✅, F10 Order lifecycle + cancel-restock ✅, F34 Xendit Payment (song hành — luồng tiền hàng)
 > **Provider:** **EasyParcel** (aggregator MY) — OAuth 2.0 Authorization-Code per merchant, non-custody (platform RM0 chi phí).
@@ -23,6 +23,27 @@ Phase-specific Functional Requirements and Acceptance Criteria have been merged 
 | **D** | Returns + refund + cancel + manual buyer-return with fee tracking | US-F36-10, US-F36-11, US-F36-12 | [F10-orders-management.md § 20.3](./F10-orders-management.md#easyparcel--returns--cancel) |
 
 Sub-PRDs have been merged into their home PRDs; this file is the overview + index. Shared context (NFR, architecture, cost, resolved questions) lives here.
+
+---
+
+## Related Documents Index
+
+**Design & Implementation:**
+- [`docs/design/F36-easyparcel-delivery-design.md`](../design/F36-easyparcel-delivery-design.md) — Wireframes + UI specs (Settings, Checkout COD gating, Label modal, Tracking)
+- [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md) — User stories + acceptance criteria (US-F36-01 to US-F36-12)
+
+**Host PRDs (where F36 phases are embedded):**
+- [`docs/prd/F10-orders-management.md § 20.2`](./F10-orders-management.md) — EasyParcel COD order runtime: creation, fields, codAmount, codStatus
+- [`docs/prd/F19-store-configuration.md § EasyParcel COD`](./F19-store-configuration.md) — COD eligibility gating + fee disclosure, R1–R5 rules
+- [`docs/prd/F14-shipping.md § 20`](./F14-shipping.md) — Flat-rate fallback, EasyParcel integration overview
+
+**Verified Decision & Evidence (source of truth for COD rules):**
+- [`docs/plans/reports/260703-ep-cod-proof/brief.md`](../plans/reports/260703-ep-cod-proof/brief.md) — **Primary:** empirical UI-vs-API proof (Cases A–D), R1–R5 verified with screenshots, follow-EP decision
+- [`plans/reports/decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) — Dev handoff: R1–R5 rules, NO region hardcode, code enforces all COD validation
+- [`plans/reports/ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) — EasyParcel sandbox empirical probe: COD-capable courier coverage by route (W→W, W→E, E→W, E→E)
+
+**Architecture:**
+- [`docs/architecture/F14-shipping.md`](../architecture/F14-shipping.md) — Shipping architecture: `cod-block.ts`, fulfillment states, EasyParcel client (F36-specific arch doc not yet split out)
 
 ---
 
@@ -52,7 +73,7 @@ Tích hợp **EasyParcel** làm courier aggregator, mỗi merchant kết nối *
 - Merchant clicks **"Connect with EasyParcel"** button → redirected to `https://api.easyparcel.com/oauth/login` → logs in + grants access → callback returns `code` → backend exchanges for access + refresh token (10h + 1yr), stored securely per tenant.
 - Checkout gọi **rate real-time** (`POST /shipment/quotations`, OAuth Bearer auth) theo origin postcode + dest postcode + cân nặng → trả **giá thật của courier shop đã chọn + COD info** (buyer không phải chọn courier). **Hybrid**: chưa kết nối → fallback flat West/East hiện tại (không phá merchant cũ).
 - Merchant **mua nhãn vận đơn (AWB)** qua API (`POST /shipment/submit_orders` với `cod_amount` nếu COD enabled) — cước + COD phí trừ thẳng từ **ví EasyParcel của merchant** (wallet auto-deducted on submit). Tracking đồng bộ qua **polling** `GET /shipment/tracking` (Phase B); webhook listeners (Phase C, forward-looking).
-- **COD** qua EasyParcel COD service: merchant chọn courier hỗ trợ + kích hoạt COD ở checkout → param `cod_amount` (RM float, read from quotation `features[].cod.available`) gửi submit_orders → courier thu hộ → settle thẳng về merchant. **Platform RM0, không giữ tiền cước, không markup** (giá hiển thị = giá EasyParcel raw). **West-MY default (East blocked by code); COD couriers determined LIVE per route from quotation response, NOT hardcoded**. **EP does NOT validate COD eligibility — code enforces both UI + server-side gating (min/max amount, destination, courier capability)**. Ref: `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md`.
+- **COD** qua EasyParcel COD service: merchant chọn courier hỗ trợ + kích hoạt COD ở checkout → param `cod_amount` (RM float, read from quotation `features[].cod.available`) gửi submit_orders → courier thu hộ → settle thẳng về merchant. **Platform RM0, không giữ tiền cước, không markup** (giá hiển thị = giá EasyParcel raw). **NO hardcoded region block — COD eligibility is decided PER-ROUTE, LIVE from quotation response** per R1–R5 below. **EP does NOT validate COD eligibility — code enforces both UI + server-side gating (R1–R5 rules)**. Evidence: `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md`, `plans/reports/ep-cod-matrix-260702.md`.
 
 > **Decision (kiến trúc):** Codebase đã có `src/lib/shipping/` (flat rate) — giữ nguyên làm **fallback**. Thêm EasyParcel = **file mới** (`src/lib/shipping/easyparcel/*` + API routes), 0 phá flat-rate logic. OAuth token per merchant = mirror `echIntegration.oauthTokens`. Rủi ro kỹ thuật: **thấp**.
 
@@ -89,7 +110,7 @@ Platform **không đụng** cả 3 luồng → sạch liability, RM0 chi phí.
 | OAuth setup (no additional cost) | — | **Miễn phí** |
 | Cước ship | **Merchant** | trừ ví prepaid; 1kg West MY ~**RM4-8** (J&T từ RM5.42) |
 | Nạp ví | Merchant | tùy ý từ RM20, credit hạn 365 ngày, **không có API topup** |
-| COD phí + limits | Merchant | **Per-courier min/max** (live from quotation response, not fixed values). Example sandbox: J&T 7.5–1000 RM, DHL 6.5–2000 RM, Aramex 11–1000 RM, Pos/Poslaju 7.5–2000 RM, Lazada/SPX varies. Fee: max(flat, 4%) trừ vào tiền thu hộ. **West MY only (East blocked by default)**. Code enforces min/max validation (EP does NOT). Hạn mức + settlement T+X differ per courier. COD param = `cod_amount` (RM float); full COD gating/validation = Prime responsibility (Phase C/F). Ref: GH-1333, decision-260702-1503. |
+| COD phí + limits | Merchant | **Per-courier min/max + per-route availability** (live from quotation response, not fixed values). Example sandbox: J&T 7.5–1000 RM, DHL 6.5–2000 RM, Aramex 11–1000 RM, Pos/Poslaju 7.5–2000 RM, Lazada/SPX varies. Fee: max(flat, 4%) trừ vào tiền thu hộ. **R1–R5 rules determine eligibility per-route per-courier** (NO region hardcode). Code enforces R1–R5 validation; EP does NOT. Hạn mức + settlement T+X differ per courier. COD param = `cod_amount` (RM float); full COD gating/validation = Prime responsibility (Phase B/C/F). Ref: GH-1333, decision-260702-1503, ep-cod-matrix-260702. |
 | **Platform** | — | **RM0** (vs Xendit RM7.50/merchant/tháng) |
 
 > EasyParcel kiếm tiền bằng margin gộp sẵn trong giá cước (mua sỉ volume) — merchant thường trả **rẻ hơn** đi thẳng courier. Giá rate-check (quotation response) = giá all-in, không hidden fees.
@@ -207,7 +228,7 @@ Phase A (Connect) ─▶ Phase B (Rate@Checkout) ─▶ [PHASE C+D — NOT BUILT
 - **Delyva** + provider khác (chỉ EasyParcel MVP).
 - API nạp ví (EasyParcel không hỗ trợ — merchant tự nạp trên dashboard EasyParcel).
 - **Multi-warehouse routing per order** (1 default warehouse dùng cho rate/label; Phase B select warehouse; Phase C multi-warehouse per order TBD).
-- COD ngoài West Malaysia (**default BLOCKED by code; official EP policy = West only; opening East Malaysia COD requires EP support confirmation, not sandbox validation**).
+- COD eligibility follows **R1–R5 rules** per-route LIVE from EasyParcel quotation response, **NOT hardcoded by region** (see §8 "Key API Contract Decisions — COD Validation Responsibility").
 - EasyParcel-native reverse label is NOT used — returns use a manual model (see [F10-orders-management.md § 20.3](./F10-orders-management.md#easyparcel--returns--cancel)).
 
 ---
@@ -281,14 +302,35 @@ Sub-PRDs reference these NFRs by ID. No duplication needed.
 
 **Cancel:** `POST /shipment/cancel` → body `{cancel_list: [{shipment_number, remark}]}` (7-day window, NOT `shipment[{tracking_number}]`). **Not wired to Phase B** — merchant cancels via EP dashboard or support; Phase D may wire to `/api/orders/[id]/cancel` refund flow.
 
-**COD (Phase B — resolved):** `cod_amount` (RM float) param in submit_orders when COD enabled. Rate quotation exposes COD availability + pricing via `features[].cod` (available/min/max per courier). **West-MY default; COD couriers read live (NOT hardcoded); EP validates NOTHING — Prime enforces all gates.**
+**COD (Phase B — resolved):** `cod_amount` (RM float) param in submit_orders when COD enabled. Rate quotation exposes COD availability + pricing via `features[].cod` (available/min/max per courier). **NO region hardcode — COD eligibility follows rules R1–R5 PER-ROUTE, LIVE from quotation response.**
 
-**COD Validation Responsibility (CRITICAL for Phase B/F):**
-- **COD eligibility check:** destination = West Malaysia (reject East) + courier.cod.available = true + amount ∈ [min_cod_amount, max_cod_amount].
-- **EP behavior:** submit_orders accepts ANY amount/courier/destination combo; sandbox accepted under-min, over-max, non-COD courier, East-MY without error.
-- **Decision authority:** `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md` (PA2: code enforces, EP does not).
-- **Evidence:** `plans/reports/ep-cod-matrix-260702.md` (sandbox validation sweep; 7 COD couriers confirmed, NOT fixed 4).
+**COD Validation Responsibility (CRITICAL for Phase B/F) — R1 through R5 verified rules:**
+
+| Rule | Description | Verified | Enforcement |
+|---|---|---|---|
+| **R1** | `codAmount ≤ courier.max_cod_amount` | J&T max RM1,000 | UI + server gate |
+| **R2** | `codAmount ≥ courier.min_cod_amount` | J&T min RM7.50 | UI + server gate |
+| **R3** | `courier.cod.available = true` (from quotation) | Live per-route | Courier picker filters; server validates |
+| **R4** | NO region hardcode — follow LIVE `cod.available` per-route | Case D: J&T + Sarawak accepted | Both UI + server follow quotation response |
+| **R5** | COD fee = max(4% × amount, RM7.00), informational only | Per courier in quotation | Display only; never block |
+
+**Key points:**
+- **EP behavior:** submit_orders accepts ANY amount/courier/destination combo; sandbox accepted under-min, over-max, non-COD courier, East-MY without validation.
+- **Prime enforcement:** Code enforces R1–R5 server-side + mirrors in UI (courier picker filter, COD option gating).
+- **Decision authority:** `plans/reports/decision-260702-1503-GH-1333-cod-handoff.md` (dev handoff doc).
+- **Evidence:** `plans/reports/ep-cod-matrix-260702.md` (sandbox validation sweep; couriers vary per-route, NOT fixed list).
 - **Issue:** GH-1333.
+
+**COD Courier Coverage (reference snapshot — code reads LIVE, never hardcode):**
+
+| Direction | COD-capable couriers | Typical count |
+|---|---|---|
+| West→West | Aramex, DHL eCommerce, J&T, Lazada, Pos Malaysia, Poslaju, SPX | 7 |
+| West→East | DHL eCommerce, J&T, Pos Malaysia, Poslaju, SPX (Labuan: fewer) | 4–6 |
+| East→West | DHL eCommerce, J&T, Pos Malaysia, Poslaju | 4 |
+| East→East | DHL eCommerce, J&T, Pos Malaysia, Poslaju (Labuan: fewer) | 3–4 |
+
+Source: `plans/reports/ep-cod-matrix-260702.md` (empirical sandbox probe, 2026-07-02). **Common to all routes:** DHL eCommerce, Pos Malaysia, Poslaju. **Caveat:** Sandbox ≠ production end-to-end COD remittance proof — authoritative signal is `cod.available=true` per-route per-courier. Confirm East MY COD settlement in production before relying operationally.
 
 ---
 

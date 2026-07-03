@@ -558,7 +558,7 @@ I want chọn COD (trả tiền mặt khi nhận) tại checkout khi courier sho
 So that tôi mua hàng không cần thanh toán trước
 ```
 
-> **COD eligibility (West MY only):** COD-capable couriers determined live from quotation `cod.available`. No hardcoded courier list. Picker filters to COD-capable couriers; backend enforces all three eligibility rules.
+> **COD eligibility (R1–R5 verified rules):** NO hardcoded region block — COD eligibility follows rules **R1–R5 PER-ROUTE, LIVE from quotation response**. COD-capable couriers vary by route; picker filters to live `cod.available` couriers per-route; backend enforces R1–R5. See [F36 PRD §8](../prd/F36-easyparcel-delivery.md#8-key-api-contract-decisions-v2026-03-spec) for rule details + evidence.
 > **"Confirmed but unpaid" model:** COD order tạo với `paymentStatus='unpaid'` — tiền chưa thu tại checkout. Merchant nhận tiền sau khi courier settle qua EasyParcel dashboard.
 > **Platform RM0:** platform không đụng tiền COD; không build reconciliation; merchant tự withdraw trên EasyParcel.
 >
@@ -573,14 +573,15 @@ So that tôi mua hàng không cần thanh toán trước
 
 ```gherkin
 GIVEN buyer đã nhập địa chỉ + calculate-shipping trả rates[]
-  AND rate response chứa codAvailable (boolean) + codMaxSen (cap per courier)
+  AND rate response chứa codAvailable (boolean) + codMinSen + codMaxSen (per courier)
   AND auto-picked courier có sẵn từ getRates() result
 WHEN  render payment options tại checkout
-THEN  COD option ENABLED chỉ khi ĐỒNG THỜI:
-        (1) zone của địa chỉ buyer = 'west' (từ /api/geo/lookup/[postcode])
-        (2) auto-picked courier có codAvailable=true (live from quotation)
-        (3) order grand total ∈ [codMinAmount, codMaxAmount] của auto-picked courier (per-courier, live)
-  AND thiếu bất kỳ điều kiện nào → COD option disabled với helper text lý do cụ thể
+THEN  COD option ENABLED chỉ khi ĐỒNG THỜI (R1–R5 rules):
+        (R3) auto-picked courier có codAvailable=true (live from quotation)
+        (R2) order grand total ≥ codMinAmount của auto-picked courier (per-courier, live)
+        (R1) order grand total ≤ codMaxAmount của auto-picked courier (per-courier, live)
+  AND thiếu bất kỳ điều kiện nào (R1–R3) → COD option disabled với helper text lý do cụ thể
+  AND NO region hardcode (R4) — follow live cod.available per-route per-courier
 ```
 
 > 📌 Source: PRD FR C-6a; Commit 722b47f0 (auto-picked courier with COD filter)
@@ -588,21 +589,17 @@ THEN  COD option ENABLED chỉ khi ĐỒNG THỜI:
 #### AC-2: COD disabled — helper text đúng theo từng lý do
 
 ```gherkin
-GIVEN buyer East MY (Sabah/Sarawak)
+GIVEN auto-picked courier không hỗ trợ COD (cod.available=false ở quotation cho route này)
 WHEN  render payment options
-THEN  COD disabled + helper "COD chỉ khả dụng cho địa chỉ West Malaysia"
+THEN  COD disabled + helper "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này"
 
-GIVEN buyer West MY + auto-picked courier không hỗ trợ COD (defensive — với tenant EP ON settings đã chặn allowlist COD-capable, chỉ xảy ra edge/EP OFF)
+GIVEN total > max_cod_amount của auto-picked courier (per-courier, live từ quotation) — R1 violation
 WHEN  render payment options
-THEN  COD disabled (buyer KHÔNG thấy tên courier — helper chung chung)
+THEN  COD disabled + helper "Đơn vượt hạn mức COD của courier"
 
-GIVEN buyer West MY + total > max_cod_amount của auto-picked courier (per-courier, live từ quotation)
+GIVEN total < min_cod_amount của auto-picked courier (per-courier, live từ quotation) — R2 violation
 WHEN  render payment options
-THEN  COD disabled + helper chung chung "COD chỉ áp dụng cho đơn dưới RM X" (KHÔNG lộ tên courier)
-
-GIVEN buyer West MY + total < min_cod_amount của auto-picked courier (per-courier, live từ quotation)
-WHEN  render payment options
-THEN  COD disabled + helper chung chung "Đơn dưới mức tối thiểu để dùng COD" (KHÔNG lộ tên courier)
+THEN  COD disabled + helper "Đơn dưới mức tối thiểu để dùng COD"
 ```
 
 > 📌 Source: PRD FR C-6a, design §2.2 COD disabled states
@@ -639,12 +636,12 @@ THEN  hiển thị <Alert> thông tin phí COD max(flat, 4%) theo courier đã c
 #### AC-4b: Server hard-rejects ineligible COD
 
 ```gherkin
-GIVEN buyer submit checkout với cod_amount pero isCodEligible=false (East MY hoặc courier không hỗ trợ hoặc amount out-of-range)
+GIVEN buyer submit checkout với cod_amount pero isCodEligible=false (courier không hỗ trợ R3 OR amount out-of-range R1/R2 per-route per-courier)
 WHEN  POST /api/orders/checkout executes
 THEN  server hard-rejects: KHÔNG tạo order
   AND trả 400 Bad Request hoặc 422 Unprocessable Entity: "COD not eligible for this order"
-  AND ordinal cause: East Malaysia, courier không hỗ trợ COD, hoặc total ngoài giới hạn courier
-  AND UI-only disable là không đủ — EP không validate; code PHẢI enforce
+  AND ordinal cause: courier không hỗ trợ COD (R3), hoặc total ngoài giới hạn courier (R1/R2)
+  AND UI-only disable là không đủ — EP không validate; code PHẢI enforce R1–R5
 
 AND GIVEN cod_amount không submitted (buyer chọn bank/Stripe)
 WHEN  checkout submit
@@ -672,17 +669,18 @@ THEN  POST /open_api/2026-03/shipment/submit_orders gửi { cod_amount (RM float
 
 > 📌 Source: PRD FR C-6e; Commit 722b47f0 (order.shippingCourier used for label creation)
 
-#### AC-6: COD East MY tại create-label → block
+#### AC-6: COD tại create-label — validate R1–R5 before submit
 
 ```gherkin
-GIVEN order COD nhưng địa chỉ East MY (Sabah/Sarawak)
-WHEN  merchant mở modal Ready to Ship
-THEN  hiển thị block "EasyParcel COD chỉ West Malaysia"
+GIVEN order paymentMethod='cod' + merchant mở modal Ready to Ship (Phase C)
+WHEN  modal renders + merchant nhập cân nặng/dims
+THEN  validate isCodEligible(route, courier, total) == R1–R5 check
+  AND nếu isCodEligible=false → hiển thị block "Courier không hỗ trợ COD cho địa chỉ này" (generic, per-route per-courier live decision)
   AND nút tạo label disabled
-  AND merchant phải xử lý thủ công (đổi phương thức hoặc cancel)
+  AND merchant phải xử lý thủ công (đổi courier hoặc cancel)
 ```
 
-> 📌 Source: PRD §8 Phase C AC#5, design §2.3 COD East MY state
+> 📌 Source: PRD §8 R1–R5 decision (no region hardcode; follow live quotation response). Phase C will re-validate at label creation.
 
 #### AC-7: COD không thu được (buyer từ chối / returned)
 
@@ -714,12 +712,12 @@ THEN  codStatus giữ nguyên 'pending' (không thu được tiền)
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test AC-1: COD enabled đúng khi West MY + courier COD + total trong range (3 conditions)
-- [ ] Test AC-2: disabled states — đúng helper text từng lý do (East MY, non-COD courier, out-of-range amount, under minimum)
+- [ ] Test AC-1: COD enabled per R1–R3 when courier COD-capable + total trong range (no region hardcode)
+- [ ] Test AC-2: disabled states — đúng helper text từng lý do (non-COD courier R3, out-of-range amount R1/R2)
 - [ ] Test AC-3: order fields codAmount (sen), codStatus='pending', paymentStatus='unpaid'
-- [ ] Test AC-4b: server rejects ineligible COD (returns 400/422); UI disable alone insufficient
+- [ ] Test AC-4b: server rejects ineligible COD (R1–R5 violation, returns 400/422); UI disable alone insufficient
 - [ ] Test AC-5: label payload gửi cod_enabled + cod_amount đúng; param name verify sandbox (Phase C)
-- [ ] Test AC-6: East MY COD order → modal block + disable nút (Phase C)
+- [ ] Test AC-6: COD ineligibility (per-route per-courier) detected at create-label modal (Phase C)
 - [ ] `cod_amount` (number, sen) + `cod_status` varchar → 2 cột mới trên `orders` → MIGRATIONS entries (NFR-9)
 
 ---

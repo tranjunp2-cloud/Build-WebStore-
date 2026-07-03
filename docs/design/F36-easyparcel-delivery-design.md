@@ -3,7 +3,7 @@
 > **Epic:** Storefront Commerce & Fulfillment (Malaysia)
 > **Feature Code:** F36
 > **Links:**
-> - PRD: [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md)
+> - **PRD (main):** [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md) ← Read first for context
 > - Stories: [`docs/stories/F36-easyparcel-delivery-stories.md`](../stories/F36-easyparcel-delivery-stories.md)
 > - Architecture: `docs/architecture/F36-easyparcel-delivery.md` _(planned — chưa tạo)_
 > - Research: [`easyparcel-api-deep-dive`](../../plans/reports/researcher-260611-1614-easyparcel-api-deep-dive.md), [`my-shipping-aggregators`](../../plans/reports/researcher-260611-1614-my-shipping-aggregators.md)
@@ -98,7 +98,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - Connect button: `<Button variant="default">` "Connect with EasyParcel ↗" (blue) → redirects OAuth popup to `https://api.easyparcel.com/oauth/login?client_id=...&redirect_uri=...&state=...`
 - OAuth callback (backend): POST `/oauth/token` exchanges `code` + Basic auth → `access_token` (10h) + `refresh_token` (1yr), stores securely per tenant.oauthTokens
 - Connected state: Green `<Alert>` showing account name + wallet balance + Disconnect button
-- Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → dùng cho COD West-MY. Force-validate postcode via rate-check call.
+- Warehouse: `line1/2` = `<Input>` (locked until OAuth succeeds); **State → City → Postcode = geo cascade `<Select>`** reuse từ checkout component (`/api/geo/{states,districts,postcodes}`). Cascade trả `zone` (west/east) → informational only; COD eligibility determined by live quotation response per-route. Force-validate postcode via rate-check call.
 - Courier: `<Checkbox>` list **multi-select allowlist** `selectedCouriers[]` từ live `/courier/list?country_code=MY` response (tất cả couriers available, không giới hạn 4 loại). **UX recommendation: chọn ≥1 courier; checkout sẽ tự pick cheapest trong allowlist.** Hiện wallet threshold warning nếu balance < RM10.
 - Parcel weight/dims: KHÔNG có form — lấy từ `Products.weight` + `Products.dimensions`; product=0 → const `DEFAULT_PARCEL`
 
@@ -169,10 +169,9 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 
 | Điều kiện chặn | Helper Text (hiện dưới COD option) |
 |----------------|-------------------------------------|
-| Địa chỉ East MY (Sabah/Sarawak) | "COD chỉ khả dụng cho địa chỉ West Malaysia" |
-| Đơn vượt hạn mức COD của courier | "Đơn vượt hạn mức COD của courier (tối đa theo courier, từ quotation)" |
-| Không có courier COD-capable trong allowlist cho route này | "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
-| Đơn dưới mức tối thiểu COD của courier | "Đơn dưới mức tối thiểu COD của courier (tối thiểu theo courier, từ quotation)" |
+| Không có courier COD-capable (R3: `cod.available=false` cho tất cả couriers trong allowlist) | "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
+| Đơn vượt hạn mức COD của courier (R1: `codAmount > max_cod_amount`) | "Đơn vượt hạn mức COD của courier" |
+| Đơn dưới mức tối thiểu COD của courier (R2: `codAmount < min_cod_amount`) | "Đơn dưới mức tối thiểu để dùng COD" |
 
 **COD selected — fee disclosure (informational):**
 
@@ -186,9 +185,9 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - Shipping address: **reuse F14 geo cascade** State → City → Postcode (`<Select>` × 3, `/api/geo/*` + `CheckoutForm`) — KHÔNG dựng form mới
 - Phí ship: 1 dòng trong Order Summary — `formatPrice(fee,'MYR')` + **courier name + logo + ETA** (từ calculate-shipping response `rates[]` array — selected/cheapest rate). KHÔNG section vận chuyển riêng, KHÔNG picker (shop đã chốt 1 courier).
 - **KHÔNG có dòng SST** ở Order Summary (SST gỡ ở checkout từ F33 phase-06 — `total = subtotal − discount + shipping`)
-- COD option: `<RadioGroup>` trong payment methods; eligibility check từ 3 điều kiện: (1) zone = West Malaysia (geo lookup `/api/geo/lookup/[postcode]` → `zone='west'`), (2) `cod.available=true` từ rate response của selected courier, (3) total ∈ [`min_cod_amount`, `max_cod_amount`] của courier đó (read live từ quotation, per-courier). Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
+- COD option: `<RadioGroup>` trong payment methods; eligibility check từ **R1–R5 live rules** (see PRD §8): (1) **R3:** `cod.available=true` từ rate response của selected courier, (2) **R2:** total ≥ `min_cod_amount` của courier đó, (3) **R1:** total ≤ `max_cod_amount` của courier đó. Tất cả read live từ quotation, per-route, per-courier. **NO region hardcode** (R4) — follow quotation response. Disabled → `<RadioGroupItem disabled>` + `<p className="text-xs text-muted-foreground">` helper text.
   
-  > **COD Validation (PA2 decision):** Code enforces ALL COD rules; EasyParcel does NOT validate ineligible orders. UI gating chặn checkout, server route cũng hard-rejects COD param nếu không đủ điều kiện. Courier picker chỉ show COD-capable couriers (from live rate response). Ref: [`decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) · [`ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) · GH-1333
+  > **COD Validation (R1–R5 decision):** Code enforces ALL COD rules; EasyParcel does NOT validate ineligible orders. UI gating chặn checkout, server route cũng hard-rejects COD param nếu không đủ điều kiện. Courier picker chỉ show COD-capable couriers (from live rate response). Ref: [`decision-260702-1503-GH-1333-cod-handoff.md`](../../plans/reports/decision-260702-1503-GH-1333-cod-handoff.md) · [`ep-cod-matrix-260702.md`](../../plans/reports/ep-cod-matrix-260702.md) · GH-1333 · [F36 PRD §8](../prd/F36-easyparcel-delivery.md#8-key-api-contract-decisions-v2026-03-spec)
 
 - COD fee disclosure: `<Alert variant="default" className="text-xs">` hiện khi buyer chọn COD — informational only, không block.
 - Loading: `<Skeleton>` 1 row khi gọi `/api/orders/calculate-shipping` (debounce 300ms sau khi đủ địa chỉ)
@@ -203,10 +202,9 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Rate API lỗi/timeout | Fallback flat-rate F14 + log warning (im lặng với buyer, không chặn) |
 | Free triggered | Badge "FREE" trên dòng phí ship |
 | COD available | COD option enabled trong payment methods |
-| COD East MY | COD `<RadioGroupItem disabled>` + helper "COD chỉ khả dụng cho địa chỉ West Malaysia" |
 | COD over limit | COD disabled + helper "Đơn vượt hạn mức COD của courier (tối đa theo courier)" |
 | COD allowlist no COD-capable | COD disabled + helper "Không có courier nào trong danh sách được chọn hỗ trợ COD cho địa chỉ này" |
-| COD under limit | COD disabled + helper "Đơn dưới mức tối thiểu COD của courier" |
+| COD under limit | COD disabled + helper "Đơn dưới mức tối thiểu để dùng COD" |
 | COD selected | `<Alert>` fee disclosure hiện (informational) |
 
 ---
@@ -299,7 +297,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 **Components (COD-specific additions):**
 - COD badge: `<Badge variant="secondary">COD</Badge>` hiện dưới tiêu đề modal khi `order.paymentMethod='cod'`; kèm `codAmount` = `formatPrice(order.codAmount, 'MYR')`.
 - COD fee note: `<Alert variant="default" className="text-xs">` thông tin phí COD max(flat, 4%) của courier — informational; không block.
-- COD East MY block: `<Alert variant="destructive">` "EasyParcel COD chỉ West Malaysia — không thể tạo label COD cho địa chỉ này" + disable nút tạo; merchant phải xử lý thủ công.
+- COD ineligibility block: `<Alert variant="destructive">` "Courier không hỗ trợ COD cho địa chỉ này (per R1–R5)" + disable nút tạo; merchant phải xử lý thủ công (recheck route/courier availability).
 
 **States:**
 | State | UI |
@@ -310,7 +308,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 | Creating | Spinner "Đang tạo & trừ ví..." (1 bước — submit_orders trừ ví ngay) |
 | Wallet low | Red `<Alert>` `EASYPARCEL_WALLET_LOW` + link nạp + Thử lại; order unchanged |
 | API error | Red `<Alert>` generic + Thử lại; order unchanged |
-| COD East MY | Red `<Alert>` "EasyParcel COD chỉ West Malaysia" + disable nút tạo |
+| COD ineligible (R1–R5 check) | Red `<Alert>` "Courier không hỗ trợ COD cho địa chỉ này" + disable nút tạo (per-route per-courier check) |
 
 ---
 
@@ -508,9 +506,9 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 |--------|---------|-------|-------|---------|-----------|
 | A Settings | Connect redirect / Save spinner | Chỉ block Connect | Red Alert `EP_NOT_CONNECTED` / OAuth err, không lộ token | Toast "Đã lưu" + green Connected (account + ví) | Chưa connect → warehouse/courier khoá; warehouse thiếu field → helper |
 | B Checkout | Skeleton 1 row (debounce 300ms) | "Nhập địa chỉ để xem cước" | **Fallback flat-rate F14** (im lặng) + log | 1 dòng "Shipping" trong Order Summary / FREE badge | Postcode `^\d{5}$` (reuse F14) |
-| B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | East MY → disabled + helper; over limit → disabled; courier không hỗ trợ → disabled |
-| C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | COD East MY → block + disable nút; idempotent khi có AWB |
-| C COD label | COD badge + codAmount prefill | — | East MY block (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
+| B COD option | Skeleton khi check eligibility | COD ẩn (non-eligible) | — | COD option enabled + fee disclosure | R1–R3: courier không hỗ trợ / over limit / under minimum → disabled |
+| C Create label | Spinner 1 bước (submit, trừ ví ngay) | Form prefill | `WALLET_LOW`/API err — order unchanged + Thử lại | Toast + AWB + In nhãn | R1–R5 ineligibility → block + disable; idempotent khi có AWB |
+| C COD label | COD badge + codAmount prefill | — | R1–R5 ineligibility (Alert destructive + disable) | COD badge + fee note trong modal | cod_enabled + cod_amount gửi đi; param name verify sandbox |
 | D Tracking | Timeline skeleton | "Đang chuẩn bị hàng" | "Chưa lấy được trạng thái" | Timeline mốc mới | — |
 | D COD status | — | codStatus badge ẩn (non-COD) | — | Badge pending/collected/settled | Merchant update thủ công; no API auto-transition |
 | E Returns | Refund spinner (reuse) | — | API err + Thử lại | Toast refund + restock | Case 1 auto (`RETURNED`); Case 2 cancel tiers theo label gốc |

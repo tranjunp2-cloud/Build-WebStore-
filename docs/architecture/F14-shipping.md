@@ -427,6 +427,13 @@ New fields on `Orders` collection:
 
 New helper module: `src/lib/shipping/cod-block.ts` exports `isCodBlocked()` to detect orders with COD amount + East Malaysia state → blocked fulfillment recovery options.
 
+> **⚠️ Superseded decision (pending code rework):** the East-Malaysia hardcode below is
+> the *as-built* behavior. Verified decision (2026-07-03) is to **follow EasyParcel** —
+> COD eligibility read LIVE per-route (`cod.available` + per-courier min/max, rules R1–R5),
+> **no region hardcode**. `cod-block.ts` is to be reworked accordingly. This doc describes
+> current code; it updates when the code changes. See
+> [`docs/prd/F36-easyparcel-delivery.md`](../prd/F36-easyparcel-delivery.md) §8 + COD proof brief.
+
 #### Fulfillment State Machine (Phase 03)
 
 Fulfillment zone displays 1 of 7 states based on: EasyParcel enabled, order status, label creation, tracking data.
