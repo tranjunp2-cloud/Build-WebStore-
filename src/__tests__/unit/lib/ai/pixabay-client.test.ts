@@ -230,7 +230,7 @@ describe('searchPhotos', () => {
         expect(detectQueryLang('quán cà phê')).toBeUndefined()
     })
 
-    it('[TC-F38-RAW-16] NFC normalization: decomposed (NFD) Vietnamese input still detected + gated', () => {
+    it('[TC-F38-RAW-16] NFC normalization: decomposed (NFD) Vietnamese input still detected + gated', async () => {
         // Arrange — NFD form of "phở bò" (o + combining horn + combining hook)
         const nfd = 'phở bò'.normalize('NFD')
         expect(nfd).not.toBe('phở bò') // proves the input is actually decomposed
@@ -240,6 +240,14 @@ describe('searchPhotos', () => {
         // Gate must match NFD query words against NFC (Pixabay-side) tags
         expect(photoMatchesQuery('phở bò, món ăn việt nam', nfd)).toBe(true)
         expect(photoMatchesQuery('scottish cattle, bò ghàidhealach', nfd)).toBe(false)
+
+        // The wire-level `q` must be recomposed too — shipping decomposed
+        // code points to Pixabay would 0-hit even with lang=vi set correctly.
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+        await searchPhotos(nfd, 5, { orientation: 'landscape' })
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('q')).toBe('phở bò')
+        expect(url.searchParams.get('lang')).toBe('vi')
     })
 
     it('[TC-F38-PIXABAY-03] missing PIXABAY_API_KEY → returns [] without fetching', async () => {

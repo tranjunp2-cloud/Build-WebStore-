@@ -271,7 +271,14 @@ export async function batchFetchFromPool(
     return { mediaIds, photos: [], failures }
 }
 
-/** Concurrent batch fetch with partial-failure tolerance. */
+/**
+ * Concurrent batch fetch with partial-failure tolerance.
+ * INVARIANT: never rejects — every per-photo error is caught inside the
+ * semaphore closure and returned via `failures`. Callers rely on this to
+ * `return batchFetch(...)` un-awaited inside try/catch (getMediaForBlock);
+ * moving any throwing call outside the inner try reintroduces review
+ * finding H1 (PR #1481).
+ */
 async function batchFetch(
     photos: PixabayPhoto[],
     blockType: string,

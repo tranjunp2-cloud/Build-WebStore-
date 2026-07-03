@@ -12,12 +12,13 @@
  *
  * Cost: the locked section is the FULL payload.create({file}) — Payload runs
  * sharp resizing and the cloud-storage PUT inside it, so each create holds
- * the lock for roughly 0.5-3s, not just the DB insert. Pixabay downloads
- * still overlap freely; per-gen wall-clock impact measured acceptable on
- * staging, but keep an eye on it (follow-up: scope the lock to the drizzle
- * transaction if gen time regresses). The lock is per-process — concurrent
- * requests on the same instance serialize with each other; separate
- * instances were never affected (the race is in-process drizzle state).
+ * the lock for an ESTIMATED 0.5-3s (extrapolated from review analysis, not
+ * yet measured — verify per-gen wall-clock on staging). Pixabay downloads
+ * still overlap freely. Follow-up: scope the lock down to the drizzle
+ * transaction if gen time regresses. The lock is per-process — concurrent
+ * requests on the same instance serialize with each other. The reproduced
+ * race is in-process drizzle state; cross-instance concurrent creates
+ * against the same DB were not tested.
  */
 
 let chain: Promise<unknown> = Promise.resolve()

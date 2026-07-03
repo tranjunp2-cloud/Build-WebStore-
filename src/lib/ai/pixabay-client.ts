@@ -315,7 +315,13 @@ export async function searchPhotos(
     count: number,
     opts: PixabaySearchOptions = {},
 ): Promise<PixabayPhoto[]> {
-    if (!query.trim()) return []
+    // NFC once at entry — the `q` param, lang detection, and the 100-char cap
+    // all operate on the same normalized string. Decomposed (NFD) input would
+    // otherwise ship decomposed code points to Pixabay even when lang=vi is
+    // correctly detected, and slice() could sever a base char from its
+    // combining marks at the cap boundary.
+    const normalizedQuery = query.normalize('NFC').trim()
+    if (!normalizedQuery) return []
     if (!hasPixabayKey()) {
         warnNoKeyOnce()
         return []
@@ -327,7 +333,7 @@ export async function searchPhotos(
     const perPage = Math.min(Math.max(isSquarish ? count * 3 : count, 3), 200)
     const params = new URLSearchParams({
         key: getKey(),
-        q: query.trim().slice(0, 100),
+        q: normalizedQuery.slice(0, 100),
         image_type: 'photo',
         orientation: ORIENTATION_MAP[opts.orientation ?? 'landscape'],
         per_page: String(perPage),
@@ -340,7 +346,7 @@ export async function searchPhotos(
     // param → Pixabay default lang=en. Keywords stay raw either way.
     // opts.lang overrides for curated queries not script-detectable (see
     // PixabaySearchOptions.lang).
-    const lang = opts.lang ?? detectQueryLang(query)
+    const lang = opts.lang ?? detectQueryLang(normalizedQuery)
     if (lang) params.set('lang', lang)
     // GH-1185: domain filter — see PixabaySearchOptions.category.
     if (opts.category) params.set('category', opts.category)
