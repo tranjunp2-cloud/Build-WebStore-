@@ -30,6 +30,7 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
+import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
@@ -488,6 +489,30 @@ export async function POST(req: NextRequest) {
                 }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
 
+            // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
+            // photos to Payload `media` DURING the GPT window instead of after
+            // it (Wave 2b). Chained directly off imagePoolPromise (not awaited
+            // here) so it runs concurrently with the GPT call below. Post-GPT,
+            // fulfillImageNeeds/batchFetchFromPool consumes the resolved map
+            // and only assigns pre-uploaded Media IDs — no re-download/upload.
+            // Flag off (default) = resolves an empty Map immediately, so the
+            // downstream pool path is byte-identical to pre-Phase-06 behavior.
+            const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD === 'true'
+            const preUploadedPoolPromise: Promise<Map<string, number>> = GEN_POOL_PREUPLOAD
+                ? imagePoolPromise
+                    .then(({ pool }) =>
+                        pool
+                            ? preUploadPool(
+                                pool,
+                                String(resolvedTenantId),
+                                businessInfo.businessName,
+                                payload as unknown as Parameters<typeof preUploadPool>[3],
+                            )
+                            : new Map<string, number>(),
+                    )
+                    .catch((): Map<string, number> => new Map())
+                : Promise.resolve(new Map<string, number>())
+
             // Start sample product generation AFTER imagePool completes to avoid competing
             // for Unsplash rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
             // sample products (~7-12s) then run during AI (~30-77s) so await below still
@@ -593,6 +618,13 @@ export async function POST(req: NextRequest) {
                         )
                     }
 
+                    // Phase 06 — await the pre-upload map kicked off alongside
+                    // imagePoolPromise above. Flag off / pool-build failed / no
+                    // pool needs = resolves an already-empty Map (0ms wait),
+                    // and batchFetchFromPool treats an empty map exactly like
+                    // an absent one (legacy inline download+upload path).
+                    const preUploadedPool = await preUploadedPoolPromise
+
                     await trackPhase('media', () =>
                         fulfillImageNeeds(
                             needs,
@@ -605,6 +637,7 @@ export async function POST(req: NextRequest) {
                                 mood: _themeMoodForPool,
                                 pool: imagePool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
+                                preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),

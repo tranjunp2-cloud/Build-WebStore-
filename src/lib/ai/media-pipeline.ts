@@ -54,6 +54,12 @@ export interface MediaPipelineContext {
     pool?: ImagePool
     // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
     englishKeywords?: string[]
+    // Plan 260703 Phase 06 (gen-perf) — pool photo id -> Media id, populated
+    // during the GPT window when GEN_POOL_PREUPLOAD=true. batchFetchFromPool
+    // consumes this to skip download+upload for photos already persisted.
+    // Absent/empty when the flag is off — falls through to the legacy inline
+    // download+upload path unchanged.
+    preUploadedPool?: Map<string, number>
 }
 
 export interface BatchFetchResult {
@@ -80,8 +86,12 @@ const POOL_CONCURRENCY = 6
 // Legacy per-block Unsplash search path: keep conservative to avoid search API 429s.
 const SEARCH_CONCURRENCY = 3
 
-/** Minimal semaphore for bounded parallelism without extra deps. */
-class Semaphore {
+/**
+ * Minimal semaphore for bounded parallelism without extra deps.
+ * Exported so `pool-preupload.ts` (Phase 06 — gen-perf plan 260703) reuses the
+ * same bounded-concurrency pattern instead of duplicating it (DRY).
+ */
+export class Semaphore {
     private queue: Array<() => void> = []
     private active = 0
     constructor(private readonly max: number) {}
@@ -232,9 +242,33 @@ export async function batchFetchFromPool(
 ): Promise<BatchFetchResult> {
     const mediaIds: number[] = []
     const failures: BatchFetchResult['failures'] = []
+
+    // Plan 260703 Phase 06 — reuse Media IDs pre-uploaded during the GPT
+    // window (GEN_POOL_PREUPLOAD=true). When the flag is off/empty this map
+    // is undefined/empty so every photo falls through to the inline path
+    // below, identical to pre-Phase-06 behavior.
+    const preUploaded = ctx.preUploadedPool
+    const toFetch: Array<{ id: string; url: string; alt: string }> = []
+    if (preUploaded && preUploaded.size > 0) {
+        for (const photo of poolPhotos) {
+            const cachedId = preUploaded.get(photo.id)
+            if (cachedId != null) {
+                mediaIds.push(cachedId)
+            } else {
+                toFetch.push(photo)
+            }
+        }
+    } else {
+        toFetch.push(...poolPhotos)
+    }
+
+    if (toFetch.length === 0) {
+        return { mediaIds, photos: [], failures }
+    }
+
     const sem = new Semaphore(POOL_CONCURRENCY)
     await Promise.all(
-        poolPhotos.map((photo) =>
+        toFetch.map((photo) =>
             sem.run(async () => {
                 try {
                     const id = await fetchAndStorePoolPhoto(photo, blockType, ctx, payload)

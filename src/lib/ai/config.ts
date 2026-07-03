@@ -39,6 +39,10 @@ function isValidModel(value: string): value is AIModel {
 
 export type AITask =
     | 'site-generation'
+    // gen-perf phase-08: cheaper model for the LOW-stakes subpage batch
+    // (Contact + Blog) in the GEN_PARALLEL_PAGES split. Home + About/Services
+    // stay on 'site-generation'.
+    | 'site-generation-subpages-light'
     | 'personalize'
     | 'chat-edit'
     | 'inline-edit'
@@ -65,6 +69,9 @@ export type AITask =
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
     // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
     'site-generation':    'gpt-4.1-mini',
+    // gen-perf phase-08: Contact+Blog batch is formulaic → nano (~4x cheaper,
+    // faster). Quality gate: eval before enabling in the split; env-overridable.
+    'site-generation-subpages-light': 'gpt-4.1-nano',
     // Template-first: GPT only personalizes 4 fields (hero headline/sub, SEO).
     // nano is cheapest + fastest (~2-3s for ~200 tokens).
     'personalize':        'gpt-4.1-nano',
@@ -91,6 +98,7 @@ const DEFAULT_MODELS: Record<AITask, AIModel> = {
  */
 const ENV_KEY: Record<AITask, string> = {
     'site-generation':    'AI_MODEL_SITEGEN',
+    'site-generation-subpages-light': 'AI_MODEL_SITEGEN_SUB_LIGHT',
     'personalize':        'AI_MODEL_PERSONALIZE',
     'chat-edit':          'AI_MODEL_EDIT',
     'inline-edit':        'AI_MODEL_INLINE_EDIT',
@@ -134,6 +142,7 @@ export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
 export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     free: {
         'site-generation': 1,        // 1 total (lifetime)
+        'site-generation-subpages-light': 1, // rides site-generation (same gen)
         'personalize':     1,        // tied to site-generation
         'chat-edit': 20,             // per day
         'inline-edit': 10,           // per day
@@ -146,6 +155,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     starter: {
         'site-generation': 5,        // per month
+        'site-generation-subpages-light': 5, // rides site-generation (same gen)
         'personalize':     5,
         'chat-edit': 100,            // per day
         'inline-edit': 50,           // per day
@@ -158,6 +168,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     pro: {
         'site-generation': 20,       // per month
+        'site-generation-subpages-light': 20, // rides site-generation (same gen)
         'personalize':     20,
         'chat-edit': 500,            // per day
         'inline-edit': 200,          // per day
@@ -170,6 +181,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     business: {
         'site-generation': 999999,   // unlimited
+        'site-generation-subpages-light': 999999,
         'personalize':     999999,
         'chat-edit': 999999,
         'inline-edit': 999999,
@@ -237,6 +249,7 @@ Output: product description (plain text).`,
  */
 export const ESTIMATED_COSTS: Record<AITask, number> = {
     'site-generation': 0.004,     // gpt-4.1-mini, ~3.8K in + 7K out
+    'site-generation-subpages-light': 0.0005, // gpt-4.1-nano, ~3.8K in + ~2K out
     'personalize':     0.0001,    // gpt-4.1-nano, ~200 in + 80 out
     'chat-edit': 0.0005,          // GPT-4o-mini, ~1.5K in + 500 out
     'inline-edit': 0.0002,        // GPT-4o-mini, ~500 in + 200 out

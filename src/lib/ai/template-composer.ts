@@ -171,7 +171,10 @@ function resolveNavCtaUrl(pages: string[]): string {
   return '/#contact'
 }
 
-function buildNavigation(
+// Exported for gen-page-split (gen-perf phase-09): the parallel-split path
+// injects this deterministic navigation on every page instead of letting GPT
+// write it — identical links guaranteed, ~200 output tokens saved per call.
+export function buildNavigation(
   biz: BusinessSample,
   pages: string[],
   category: string = 'business',

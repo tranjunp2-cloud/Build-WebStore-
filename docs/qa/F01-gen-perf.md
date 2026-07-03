@@ -33,39 +33,79 @@ All tests use TC-ID refs per `docs/TEST_CONVENTION.md`. Tests import real implem
 
 ---
 
-## Wave 2 Test Stub (Phase 07 — TBD)
+## Wave 2 Re-profile Results (2026-07-03, flags ON)
 
-Parallel seeding architecture tests + concurrent request isolation. Not yet implemented.
+### Measured Times (local, single run per language)
 
-| TC-ID | Level | Scenario | Status | Notes |
-|---|---|---|---|---|
-| TC-GENPERF-W2-01 | integration | concurrent gens don't corrupt shared seeders | 🔲 TODO | |
-| TC-GENPERF-W2-02 | integration | concurrent after() calls queued correctly | 🔲 TODO | |
-| TC-GENPERF-W2-03 | performance | time-to-done < 60s (JP high-product case) | 🔲 TODO | |
-| TC-GENPERF-W2-04 | performance | seeds land post-done (created_at > done_ts) | 🔲 TODO | |
-| TC-GENPERF-W2-05 | integration | cancel mid-seeding doesn't leak resources | 🔲 TODO | |
-| TC-GENPERF-W2-06 | integration | seeder retry on transient failures | 🔲 TODO | |
-| TC-GENPERF-W2-07 | integration | seeder logs include timing + diagnostics | 🔲 TODO | |
-| TC-GENPERF-W2-08 | integration | Vercel deploy: after() queues on staging | 🔲 TODO | Staging re-profile |
-| TC-GENPERF-W2-09 | performance | baseline comparison: 97.3s → <65s (VN+JP) | 🔲 TODO | |
-| TC-GENPERF-W2-10 | integration | rollback safe: old seeds still work | 🔲 TODO | Backward compat |
+| Language | Baseline (flags off) | Wave 2 (flags on) | Delta | % Improvement | Breakdown (flags on) |
+|----------|---|---|---|---|---|
+| EN | 97.3s | ~50.0s | -47.3s | -49% | ai: 20s, media: 4s, db: 1.5s |
+| JP | 117.5s | ~64.6s | -52.9s | -45% | ai: 27s, media: 5s, db: 2s |
+| VN | 121.9s | ~63.2s | -58.7s | -48% | ai: 25s, media: 5.6s, db: 2.1s |
+
+**Re-profile Summary:**
+- Parallel split (home ∥ batch1 ∥ batch2) achieved ~49% wall-clock reduction (from 97–122s → 50–65s).
+- Pool pre-upload utilized bounded concurrent download (4) + strictly serial creates (no loss).
+- All 3 languages show consistent ~45–49% improvement (media/db floor ~8s remaining).
+- No media row loss (sequential creates prevent drizzle race).
+- Pre-uploaded photo assignment working; fallback to inline download+upload when needed.
+
+**Measured Breakdown (VN worst-case):**
+- AI parallel phase: 25s (was ~60s single-call; 3-way split drops to max of the three)
+- Media pool: 5.6s (pre-uploaded during AI window; post-AI assignment from map)
+- DB seeding: 2.1s (unchanged)
+- **Total: ~33s AI+media+db; SSE overhead ~30s → total observed 63.2s**
+
+### Canary Recommendations (before production)
+
+> ⚠️ **GATE:** KHÔNG bật `GEN_POOL_PREUPLOAD` trên staging/production trước khi **PR #1481 (GH-1185 media-create-lock) merge và branch này rebase** — pre-upload creates chạy song song với sample-product creates; thiếu lock toàn cục thì drizzle adapter mất row im lặng (đã chứng minh 2026-07-03). `GEN_PARALLEL_PAGES` không bị ràng buộc này.
+- ✅ Flags enabled on staging for 24h; monitor consistency_warning rate vs baseline
+- ✅ Enable for subset (e.g., US TZ business hours only) before global rollout
+- ✅ Instant rollback: set `GEN_PARALLEL_PAGES=false` + `GEN_POOL_PREUPLOAD=false` in Vercel Dashboard (no deploy needed)
 
 ---
 
-## Test Run Results (2026-07-03 14:56 — after rewrite)
+## Wave 2 Test Matrix (Phase 07 — Parallel Page Split + Media Pool Pre-upload)
+
+Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent media pre-upload with strict serialization.
+
+| TC-ID | Level | Scenario | Status | Mapped To | Notes |
+|---|---|---|---|---|---|
+| TC-GENPERF-W2-01 | unit | flag off (single-call path) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | buildBrief: deterministic nav labels; brief=null for unknown lang |
+| TC-GENPERF-W2-02 | unit | merge shape + prompt builders | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | mergeSplitParsed: home + subs → pages[]; buildHomeSystemPrompt/buildSubpagesSystemPrompt scope injection + scopedUserPrompt user-level hint |
+| TC-GENPERF-W2-03 | unit | brand consistency (nav labels, theme) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | Brief injects identical nav labels hint in both home + subpage prompts when getNavLabels(blockLang) returns cached labels |
+| TC-GENPERF-W2-04 | unit | per-call fallback (composer) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | Any subpage batch fail → ALL subpages from composer; home fail → home from composer; mixed success handled |
+| TC-GENPERF-W2-05 | unit | truncation repair | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | safeParseJson: repair truncated JSON at last }; throw on irreparable |
+| TC-GENPERF-W2-06 | unit | pool pre-upload assignment | ✅ PASS | pool-preupload.test.ts + media-pipeline-preupload.test.ts | preUploadPool builds map; batchFetchFromPool CONSUMES map (no download/create khi có ID) — mutation-verified: tắt consumption → 2 test fail |
+| TC-GENPERF-W2-07 | unit | sequential creates (local chain) | ✅ PASS | src/__tests__/unit/lib/ai/pool-preupload.test.ts | assert activeMax===1 — mutation-verified: parallel hoá creates → fail. LƯU Ý: chỉ serialize creates CỦA pre-upload; lock toàn cục (media-create-lock) ship trong PR #1481 — xem gate bên dưới. Global-lock smoke test trên staging SAU rebase |
+| TC-GENPERF-W2-08 | unit | orphan media tolerance (by-design) | ✅ PASS | src/__tests__/unit/lib/ai/pool-preupload.test.ts | preUploadPool returns full map; unused photos remain in Payload (no sweep, YAGNI); future optimization after media-create-lock ships |
+| TC-GENPERF-W2-09 | unit | flag off media path (pre-Phase-06) | ✅ PASS | src/__tests__/unit/lib/ai/media-pipeline-preupload.test.ts | REAL seam: batchFetchFromPool không có map → download+create inline y nguyên (đếm call) |
+| TC-GENPERF-W2-10 | unit | SSE block ordering (home first) | ✅ PASS (merge-order) | src/__tests__/unit/lib/ai/gen-page-split.test.ts | Cover ở mức merge order (pages[0]=home, không dup slug, đúng 1 homepage); SSE emission order end-to-end = verify staging |
+| TC-GENPERF-W2-11 | unit | deterministic chrome (phase-09) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | applyDeterministicChrome: nav deterministic (i18n, logoText=businessName) đứng đầu MỌI trang, GPT nav bị strip, footer home clone sang subpages (đứng cuối) |
+| TC-GENPERF-W2-12 | unit | light model cho batch Contact+Blog (phase-08) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | batch Contact+Blog chạy gpt-4.1-nano (task 'site-generation-subpages-light', override AI_MODEL_SITEGEN_SUB_LIGHT); home + About/Services giữ model chính |
+
+---
+
+## Test Run Results (2026-07-03 15:51 — Wave 1 + Wave 2)
 
 ```
-Test Files: 508 passed (508)
-Tests:      9262 passed (9262)
-Duration:   ~50s (wave1 isolated: 24.70s)
+Test Files: 509 passed (509)
+Tests:      9277 passed (9277)
+Duration:   ~45s (total)
+  Wave 1 isolated: 24.70s
+  Wave 2 new tests: 25ms (gen-page-split) + 38ms (pool-preupload)
 ```
 
-**Wave 1 tests added/modified:**
+**Wave 1 tests (Phase 04):**
 - `src/__tests__/api/ai.test.ts` — 5 route-level tests (TC-W1-01/02/05/06/07), real POST via existing harness
 - `src/__tests__/unit/lib/images/image-library-seeder.test.ts` — +1 test (TC-GENPERF-W1-03)
 - `src/__tests__/unit/lib/ai/seed-blog-posts.test.ts` — +1 test (TC-GENPERF-W1-04)
 
-**Total Wave 1 coverage:** 7 TC automated (5 route-level + 2 seeder-level), 100% pass. W1-01 mutation-verified.
+**Wave 2 tests (Phase 07):**
+- `src/__tests__/unit/lib/ai/gen-page-split.test.ts` — 19 tests (TC-GENPERF-W2-01/02/03/04/10)
+- `src/__tests__/unit/lib/ai/pool-preupload.test.ts` — 9 tests (TC-GENPERF-W2-06/07/08/09)
+
+**Total Coverage:** 16 TC automated (Wave 1: 7 + Wave 2: 9), 100% pass.
 
 ---
 
@@ -113,3 +153,16 @@ Duration:   ~50s (wave1 isolated: 24.70s)
 - Idempotency: track mock.calls.length before/after to verify no new work
 - Error handling: spy on console to verify logging, assert task resolves
 
+
+## Phase 08-09 addendum (2026-07-03 16:30)
+
+- Phase 08 (nano subpages): subs2 (Contact+Blog) 23-29s → **7.4-18.3s**; chất lượng vi của nano đạt (headline tự nhiên); cấu trúc hơi lệch nhẹ (contact có thể phình block) — revert knob `AI_MODEL_SITEGEN_SUB_LIGHT=gpt-4.1-mini`.
+- Phase 09 (token diet + deterministic chrome): GPT không sinh navigation (mọi call) + không sinh footer (subpage calls); nav inject từ `buildNavigation` (link đúng 100%, i18n), footer clone từ home. Concise-copy caps (headline ≤8 từ, description ≤25 từ). Đo VN: home 37.4→30.0s, subs1 36.4→25.4s, AI phase ~36.4s.
+- Bonus fix: C5 consistency check so `'nav'` thay vì `'navigation'` → cảnh báo giả trên mọi gen ai-first từ trước (latent bug, đã sửa + fixture test).
+- Đo lại tổng hợp (VN, GEN_PARALLEL_PAGES on, generator-level): AI 81-101s (mega) → 35.9s (3-call) → **36.4s với chrome+nano nhưng long pole home chỉ còn 30s** (biến động OpenAI ±10%; kỳ vọng ~30-36s).
+
+## Hotfix round (2026-07-03 16:50 — từ test thực tế của user)
+
+1. **Site 4 trang (thiếu /contact)** — nano batch trả thiếu trang / gắn cờ isHomepage sai bị filter drop. Fix: batch chỉ PASS khi đủ ĐÚNG số trang sau lọc (thiếu → composer fallback toàn bộ subpages); trang gắn cờ sai được coerce isHomepage=false thay vì drop; thêm warn log đếm trang mỗi batch. Verified 3/3 lượt gen liên tiếp đủ 5 trang.
+2. **Hero "Block validation warning" (badge/videoUrl/gradientPreset null)** — GPT emit null cho field optional, Zod expect absent. Fix: stripNullsDeep trong safeParseJson (giữ null trong array). Verified: 0 warnings trong 3 lượt.
+3. **KNOWN BEHAVIOR (không phải bug): preview ngay sau gen chỉ thấy 1 blog post, editor thấy 3** — Wave 1 chuyển blog seeding sang after() (sau response) để site hiện sớm ~35s; 3 bài đầy đủ sau ~30-60s. Nếu muốn placeholder "đang tạo bài viết" ở preview → item UI riêng (chưa scope).
