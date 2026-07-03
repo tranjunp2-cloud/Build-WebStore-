@@ -138,6 +138,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-31** | `GH-1410/AC2` | `Unit` | BulkCreateModal: action throws plain Error → `toast.error` contains error message | Unit: `saveProductAction` rejects with `Error('Product management not available on your plan')`. | - `toast.error` called with string containing `Product management`. | High | [x] |
 | **TC-F08-04-32** | `GH-1410/AC3` | `Unit` | saveProductAction: tenantIdForQuery returns 83 → payload.create called with tenant:83 (Fix A coverage) | Unit: mock `tenantIdForQuery` → 83, call `saveProductAction`. | - `mockCreate` called with `data` containing `{ tenant: 83 }`. | High | [x] |
 | **TC-F08-04-32b** | `GH-1410/AC3` | `Unit` | saveProductAction: tenantIdForQuery returns null → tenant field NOT injected into payload.create | Unit: mock `tenantIdForQuery` → null, call `saveProductAction`. | - `mockCreate` called with `data` NOT containing `tenant` key. | High | [x] |
+| **TC-F08-04-33** | `GH-1491/AC1` | `Unit` | BulkCreateModal: mounting locks page body scroll (background can't scroll behind the modal); unmounting restores it | Unit: render `BulkCreateModal`, assert `document.body.style.overflow`; unmount, assert restored. | - `document.body.style.overflow === 'hidden'` while mounted.<br>- Restored to `''` after unmount. | High | [x] |
 
 ---
 ### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (12 Cases)

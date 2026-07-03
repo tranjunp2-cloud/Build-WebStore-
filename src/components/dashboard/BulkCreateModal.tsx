@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
 import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
@@ -159,6 +160,10 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [hasParsed, setHasParsed] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [showExitConfirm, setShowExitConfirm] = useState(false)
+    // GH-1491 issue 1 audit: parent only mounts this component while the modal should be
+    // open, so it's locked for this component's whole lifetime — no internal open/closed
+    // state to gate on.
+    useLockBodyScroll(true)
 
     useEffect(() => {
         setMounted(true)

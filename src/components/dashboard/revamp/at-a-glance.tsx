@@ -41,7 +41,9 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
         <div className={`stat-card${comingSoon ? ' stat-card-soon' : ''}`}>
             {!comingSoon && <Sparkline data={spark} color={`var(${accentVar})`} />}
             <div className="stat-top">
-                {/* Left block: main icon + (title + info tooltip) — symmetric to the % on the right */}
+                {/* Icon + (title + info tooltip) — the delta/badge used to live here too, on its
+                    own line above the value (GH-1491 issue 2: wasted a whole extra row). It now
+                    pairs with the value below instead, so this row is icon+label only. */}
                 <div className="stat-top-left">
                     <span className="stat-ic" style={{ background: `var(${bgVar})`, color: `var(${accentVar})` }}>
                         <Icon aria-hidden />
@@ -49,13 +51,16 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
                     {/* Title text + tooltip stay glued together (inline-flex, no justify-between) */}
                     <span className="stat-label">{label}{tip && <InfoTooltip tip={tip} />}</span>
                 </div>
-                <div className="stat-change">
-                    {comingSoon
-                        ? <ComingSoonBadgeTooltip label={comingSoonLabel ?? ''} tip={comingSoonTip ?? ''} />
-                        : <><Delta value={stat.delta} /><span className="delta-note">{note}</span></>}
-                </div>
             </div>
-            <div className="stat-val">{statDisplay(stat)}</div>
+            {/* Value + delta/badge on ONE row (GH-1491 issue 2 fix) instead of the value sitting
+                alone on its own line below a separate delta row. */}
+            <div className="stat-bottom">
+                <span className="stat-val">{statDisplay(stat)}</span>
+                {comingSoon
+                    ? <ComingSoonBadgeTooltip label={comingSoonLabel ?? ''} tip={comingSoonTip ?? ''} />
+                    : <Delta value={stat.delta} />}
+            </div>
+            {!comingSoon && <span className="delta-note">{note}</span>}
         </div>
     )
 }
