@@ -292,10 +292,24 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
         const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as Record<string, unknown>[]) : []
         return pages
             .filter((p) => p.slug !== '/')
-            .map((p) => ({ ...p, isHomepage: false }))
+            .map((p): Record<string, unknown> => ({ ...p, isHomepage: false }))
             .slice(0, SUBPAGE_BATCHES[i]!.pages.length)
     })
-    const allBatchesOk = batchOutcomes.every(
+    // Slug sanity across ALL batch pages: non-empty string, unique after
+    // normalization. A dup/empty slug would fail Payload's unique-per-site
+    // validation at page-create time ("field is invalid: site_id, slug" —
+    // seen intermittently live 2026-07-03 17:02) → composer fallback instead.
+    const seenSlugs = new Set<string>(['/'])
+    const slugsOk = batchPages.flat().every((p) => {
+        const slug = typeof p.slug === 'string' ? p.slug.trim().toLowerCase() : ''
+        if (!slug || seenSlugs.has(slug)) return false
+        seenSlugs.add(slug)
+        return true
+    })
+    if (!slugsOk) {
+        console.warn('[AI][GEN_PARALLEL_PAGES] duplicate/empty subpage slug detected — composer fallback for subpages')
+    }
+    const allBatchesOk = slugsOk && batchOutcomes.every(
         (o, i) => o.parsed !== null && batchPages[i]!.length === SUBPAGE_BATCHES[i]!.pages.length,
     )
     if (!allBatchesOk) {
