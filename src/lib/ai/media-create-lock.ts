@@ -10,8 +10,14 @@
  * persisted; 6 parallel creates → 1 row persisted; 12 parallel → TypeError in
  * @payloadcms/drizzle upsertRow.
  *
- * Only the DB create is serialized (~50-100ms each). Image downloads and S3
- * PUTs remain parallel, so wall-clock cost per generation is negligible.
+ * Cost: the locked section is the FULL payload.create({file}) — Payload runs
+ * sharp resizing and the cloud-storage PUT inside it, so each create holds
+ * the lock for roughly 0.5-3s, not just the DB insert. Pixabay downloads
+ * still overlap freely; per-gen wall-clock impact measured acceptable on
+ * staging, but keep an eye on it (follow-up: scope the lock to the drizzle
+ * transaction if gen time regresses). The lock is per-process — concurrent
+ * requests on the same instance serialize with each other; separate
+ * instances were never affected (the race is in-process drizzle state).
  */
 
 let chain: Promise<unknown> = Promise.resolve()

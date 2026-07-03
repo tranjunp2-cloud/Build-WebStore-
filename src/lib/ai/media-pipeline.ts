@@ -438,10 +438,13 @@ export async function getMediaForBlock(
     const vnCategoryFallback = async (): Promise<BatchFetchResult> => {
         const vnQuery = VN_CATEGORY_QUERIES[composerCategory]
         if (isVN && vnQuery && vnQuery !== query) {
+            // lang:'vi' explicit — mirrors image-pool searchBucket; curated
+            // phrases like "quán cà phê" are not script-detectable.
             const photos = await searchPhotos(vnQuery, Math.max(count * 2, 10), {
                 orientation,
                 width: targetWidth,
                 category: pixCategory,
+                lang: 'vi',
             })
             if (photos.length > 0) {
                 console.info(
@@ -479,12 +482,16 @@ export async function getMediaForBlock(
                     broadQuery,
                 )
                 if (broader.length === 0) {
-                    return vnCategoryFallback()
+                    // `await` is load-bearing: vnCategoryFallback can throw
+                    // (unguarded searchPhotos) — without it the rejection
+                    // escapes this try/catch and hero loses its fallback chain.
+                    return await vnCategoryFallback()
                 }
                 const picks = pickRandomN(broader, count)
                 return batchFetch(picks, blockType, ctx, payload)
             }
-            return vnCategoryFallback()
+            // See comment above — `await` keeps the rejection inside this catch.
+            return await vnCategoryFallback()
         }
         const picks = pickRandomN(photos, count)
         const result = await batchFetch(picks, blockType, ctx, payload)

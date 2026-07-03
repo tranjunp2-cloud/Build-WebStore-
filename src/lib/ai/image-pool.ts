@@ -259,7 +259,10 @@ async function searchBucket(
   if (vnQuery && vnQuery !== query) {
     usedFallback = true
     try {
-      const extra = (await searchPhotos(vnQuery, size, { orientation, width, category })) ?? []
+      // lang:'vi' explicit — curated phrases like "quán cà phê" (fnb) carry
+      // only ambiguous diacritics, so auto-detection would miss them and the
+      // search would run diacritic-stripped under Pixabay's default lang=en.
+      const extra = (await searchPhotos(vnQuery, size, { orientation, width, category, lang: 'vi' })) ?? []
       if (extra.length > 0) {
         console.info(`[image-pool] ${orientation} VN category fallback "${vnQuery}": +${extra.length}`)
       }

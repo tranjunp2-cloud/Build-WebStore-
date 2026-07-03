@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchPhotos, downloadPhotoBuffer, detectQueryLang, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
+import { searchPhotos, downloadPhotoBuffer, detectQueryLang, photoMatchesQuery, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from '@/lib/ai/pixabay-client'
 
 // Stub global fetch at module scope (top-level vi.mock not needed; fetch is global)
 vi.stubGlobal('fetch', vi.fn())
@@ -211,6 +211,35 @@ describe('searchPhotos', () => {
         // No clean Pixabay equivalent → deliberately unmapped (no filter)
         expect(PIXABAY_CATEGORY_BY_COMPOSER['events']).toBeUndefined()
         expect(PIXABAY_CATEGORY_BY_COMPOSER['ecommerce']).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-15] opts.lang overrides detection for curated non-detectable VN phrases', async () => {
+        // Arrange — "quán cà phê" (VN_CATEGORY_QUERIES.fnb) carries only
+        // ambiguous diacritics (á/à/ê) → detectQueryLang misses it; the
+        // explicit override must still route the search to lang=vi.
+        vi.mocked(fetch).mockResolvedValue(makeApiResponse([makeHit(1)]))
+
+        // Act
+        await searchPhotos('quán cà phê', 5, { orientation: 'landscape', lang: 'vi' })
+
+        // Assert
+        const url = new URL(vi.mocked(fetch).mock.calls[0]![0] as string)
+        expect(url.searchParams.get('lang')).toBe('vi')
+        expect(url.searchParams.get('q')).toBe('quán cà phê')
+        // Sanity: without the override the same query is NOT detected
+        expect(detectQueryLang('quán cà phê')).toBeUndefined()
+    })
+
+    it('[TC-F38-RAW-16] NFC normalization: decomposed (NFD) Vietnamese input still detected + gated', () => {
+        // Arrange — NFD form of "phở bò" (o + combining horn + combining hook)
+        const nfd = 'phở bò'.normalize('NFD')
+        expect(nfd).not.toBe('phở bò') // proves the input is actually decomposed
+
+        // Act + Assert — detection must survive decomposition
+        expect(detectQueryLang(nfd)).toBe('vi')
+        // Gate must match NFD query words against NFC (Pixabay-side) tags
+        expect(photoMatchesQuery('phở bò, món ăn việt nam', nfd)).toBe(true)
+        expect(photoMatchesQuery('scottish cattle, bò ghàidhealach', nfd)).toBe(false)
     })
 
     it('[TC-F38-PIXABAY-03] missing PIXABAY_API_KEY → returns [] without fetching', async () => {

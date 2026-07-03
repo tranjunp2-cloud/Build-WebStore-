@@ -47,6 +47,16 @@ export interface PixabaySearchOptions {
      * Map from composer category via PIXABAY_CATEGORY_BY_COMPOSER.
      */
     category?: string
+    /**
+     * Explicit `lang` override for curated queries whose language is KNOWN
+     * but not script-detectable — e.g. VN_CATEGORY_QUERIES.fnb "quán cà phê"
+     * carries only ambiguous diacritics (á/à/ê excluded from detection so
+     * "café" doesn't misroute), so detectQueryLang returns undefined and the
+     * search would go out with Pixabay's default lang=en (diacritic-strip
+     * partial matching — the exact GH-1185 failure mode). Takes precedence
+     * over detectQueryLang.
+     */
+    lang?: PixabayQueryLang
 }
 
 /**
@@ -262,8 +272,12 @@ const SCRIPT_LANG_DETECTORS: ReadonlyArray<readonly [RegExp, PixabayQueryLang]> 
     [/[Ͱ-Ͽ]/, 'el'], // Greek
 ]
 export function detectQueryLang(query: string): PixabayQueryLang | undefined {
+    // NFC-normalize first: decomposed input (e.g. "phở" as o + combining horn
+    // + combining hook) would silently miss the precomposed char classes and
+    // disable lang=vi + the relevance gate — the exact bug this fixes.
+    const normalized = query.normalize('NFC')
     for (const [re, lang] of SCRIPT_LANG_DETECTORS) {
-        if (re.test(query)) return lang
+        if (re.test(normalized)) return lang
     }
     return undefined
 }
@@ -280,8 +294,10 @@ export function detectQueryLang(query: string): PixabayQueryLang | undefined {
  */
 export function photoMatchesQuery(photoTags: string | null | undefined, query: string): boolean {
     if (!photoTags) return false
-    const tags = photoTags.toLowerCase()
-    const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1)
+    // NFC on both sides — a decomposed query word would never substring-match
+    // Pixabay's (precomposed) tags, silently failing every gate check.
+    const tags = photoTags.normalize('NFC').toLowerCase()
+    const words = query.normalize('NFC').toLowerCase().split(/\s+/).filter((w) => w.length > 1)
     if (words.length === 0) return true
     return words.every((w) => tags.includes(w))
 }
@@ -322,7 +338,9 @@ export async function searchPhotos(
     // ru/el) so Pixabay searches same-language tags instead of diacritic-
     // stripped partial matches. Undetected (Latin-script en/ms/de/…) → no
     // param → Pixabay default lang=en. Keywords stay raw either way.
-    const lang = detectQueryLang(query)
+    // opts.lang overrides for curated queries not script-detectable (see
+    // PixabaySearchOptions.lang).
+    const lang = opts.lang ?? detectQueryLang(query)
     if (lang) params.set('lang', lang)
     // GH-1185: domain filter — see PixabaySearchOptions.category.
     if (opts.category) params.set('category', opts.category)

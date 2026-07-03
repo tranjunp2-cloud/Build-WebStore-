@@ -64,6 +64,9 @@ Xác minh `src/lib/ai/pixabay-client.ts` thay thế đúng Unsplash search ở 6
 | **TC-F38-RAW-12** | `[Positive]` | Map composer→Pixabay category | restaurant/fnb→food, fitness→sports, realestate→buildings; events/ecommerce → không map (không filter) | [x] |
 | **TC-F38-RAW-13** | `[Positive]` | Testimonials avatar = ảnh người, không phải pool | `fulfillImageNeeds` route testimonials → `getAvatarMedia` (`category=people`, query "chân dung người việt"/"portrait people"); pool bị bỏ qua; miss → avatar trống (không rơi về ảnh food) | [x] |
 | **TC-F38-RAW-14** | `[Positive]` | Team/doctor-profile cũng dùng portrait search | `PEOPLE_BLOCKS` = testimonials/team/doctor-profile → cùng đường `getAvatarMedia`; members[].image = ảnh người | [x] |
+| **TC-F38-RAW-15** | `[Positive]` | `opts.lang` override cho curated query không detect được | `VN_CATEGORY_QUERIES.fnb` "quán cà phê" chỉ chứa dấu ambiguous (á/à/ê) → detect miss; override `lang:'vi'` → URL vẫn có `lang=vi` (review fix PR #1481 — A1) | [x] |
+| **TC-F38-RAW-16** | `[Positive]` | NFC normalize: input NFD (decomposed) vẫn detect + gate đúng | "phở bò" dạng NFD → `detectQueryLang`='vi'; `photoMatchesQuery` match tag NFC của Pixabay (review fix PR #1481 — M5) | [x] |
+| **TC-F38-RAW-17** | `[Negative]` | Tier-3 VN fallback throw (429) không escape catch | `getMediaForBlock`: hero → vẫn resolve với curated hero fallback; non-hero → resolve rỗng + failures, KHÔNG unhandled rejection (review fix PR #1481 — H1 `return await`) | [x] |
 
 ## 5. Kiểm thử thủ công (staging)
 
