@@ -16,6 +16,7 @@ import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
+import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,7 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
+import { getMissingFields } from '@/lib/products/missing-fields'
 
 type ProductImage = {
     url?: string
@@ -700,6 +702,7 @@ export default function ProductsPage() {
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                             const inv = product.inventory || 0
+                                            const missing = getMissingFields(product)
 
                                             return (
                                                 <TableRow
@@ -708,7 +711,7 @@ export default function ProductsPage() {
                                                     onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                                 >
                                                     {/* Thumbnail */}
-                                                    <TableCell>
+                                                    <TableCell style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}>
                                                         <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
                                                             <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="sm" sizes="40px" />
                                                         </div>
@@ -717,9 +720,12 @@ export default function ProductsPage() {
                                                     {/* Name + SKU */}
                                                     <TableCell>
                                                         <div className="flex flex-col min-w-0">
-                                                            <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
-                                                                {product.name}
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
+                                                                    {product.name}
+                                                                </span>
+                                                                <MissingInfoIndicator missing={missing} t={t} />
+                                                            </div>
                                                             {product.sku && (
                                                                 <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
                                                                     {t.dashboard.products.list.sku} {product.sku}
@@ -793,12 +799,14 @@ export default function ProductsPage() {
                                 const inv = product.inventory || 0
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
+                                const missing = getMissingFields(product)
 
                                 return (
                                     <div
                                         key={product.id}
                                         onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                         className="flex flex-col gap-[12px] rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary))]/70 p-[16px] relative group overflow-hidden"
+                                        style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}
                                     >
                                         {/* Section 1: Thumbnail + Name/Category/Variants/SKU */}
                                         <div className="flex items-start gap-[12px]">
@@ -809,8 +817,11 @@ export default function ProductsPage() {
 
                                             {/* Text Information Block */}
                                             <div className="flex flex-col flex-1 min-w-0 pt-[2px] gap-[2px]">
-                                                <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
-                                                    {product.name}
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
+                                                        {product.name}
+                                                    </div>
+                                                    <MissingInfoIndicator missing={missing} t={t} />
                                                 </div>
                                                 {product.category && product.category.length > 0 && (
                                                     <div className="text-[12px] text-[hsl(var(--primary))] font-medium leading-[16px] truncate">
