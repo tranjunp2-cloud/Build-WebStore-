@@ -282,7 +282,7 @@ export function EditorToolbar({
                     <button
                         type="button"
                         onClick={onOpenMenu}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white min-[768px]:h-11 min-[768px]:w-11"
                         title={et.menu}
                     >
                         <Menu className="h-4 w-4" />
@@ -295,24 +295,52 @@ export function EditorToolbar({
                     <button
                         type="button"
                         onClick={onOpenTemplates}
-                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-1.5 text-amber-300/80 transition-colors hover:bg-white/[0.06]"
+                        className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-1.5 text-amber-300/80 transition-colors hover:bg-white/[0.06] min-[768px]:h-11 min-[768px]:px-2.5"
                         title={et.templates}
                     >
                         <Palette className="h-4 w-4 shrink-0" />
-                        <span className="text-[11px] font-medium">{et.templates}</span>
+                        <span className="text-[11px] font-medium min-[768px]:text-xs">{et.templates}</span>
                     </button>
+
+                    {/* Phase 06: tablet-only language chip (site content locale) — reuses the
+                        same `languageSwitcherSlot` the desktop header already supports (currently
+                        unpopulated by page.tsx on either branch, per audit #10); revealing it here
+                        keeps compact ready for the slot without forking a second switcher. */}
+                    {languageSwitcherSlot && (
+                        <div className="hidden min-[768px]:flex items-center pl-0.5">
+                            {languageSwitcherSlot}
+                        </div>
+                    )}
 
                     <div className="mx-1 h-4 w-px shrink-0 bg-white/[0.06]" />
 
                     <div className="flex min-w-0 items-center gap-1">
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', aiRunning ? 'animate-pulse bg-blue-400' : isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="truncate text-[11px] text-slate-400">{aiRunning ? processingLabel : isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
+                        <span className="truncate text-[11px] text-slate-400 min-[768px]:text-xs">{aiRunning ? processingLabel : isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
                     </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                    {/* Phase 04 (audit #12): publish-state badge removed (2026-07-02, user: redundant
-                        with the saved-status dot + the Live/Publish button's own color — not in F05). */}
+                    {/* Phase 04 (audit #12): publish-state badge removed from phone (2026-07-02,
+                        user: redundant with the saved-status dot + the Live/Publish button's own
+                        color — not in F05). Phase 06: tablet has room to spare, so re-surface a
+                        compact version ≥768 only (phone stays exactly as Phase 04 left it). */}
+                    {(() => {
+                        const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
+                        const tabletBadge: Record<PublishState, { label: string; cls: string }> = {
+                            draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
+                            publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                            live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400' },
+                            'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400' },
+                            updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                        }
+                        const { label, cls } = tabletBadge[ps]
+                        return (
+                            <span className={cn('hidden min-[768px]:inline-flex h-6 shrink-0 items-center rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider', cls)}>
+                                {label}
+                            </span>
+                        )
+                    })()}
 
                     {previewDisabled ? (
                         <Button
@@ -320,12 +348,12 @@ export function EditorToolbar({
                             size="icon"
                             disabled
                             title={previewDisabledTitle}
-                            className="h-8 w-8 rounded-lg text-slate-500 cursor-not-allowed opacity-50"
+                            className="h-8 w-8 rounded-lg text-slate-500 cursor-not-allowed opacity-50 min-[768px]:h-11 min-[768px]:w-11"
                         >
                             <SquareArrowOutUpRight className="h-3.5 w-3.5" />
                         </Button>
                     ) : (
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white">
+                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white min-[768px]:h-11 min-[768px]:w-11">
                             <a
                                 href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                                 target="_blank"
@@ -345,19 +373,25 @@ export function EditorToolbar({
                                 size="sm"
                                 onClick={onRepublish}
                                 disabled={isPublishing || isSaving || aiRunning}
-                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4"
                             >
                                 {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
                             </Button>
                         )}
                         {/* Phase 04 (audit #15-18): View-Live dropdown ported from the desktop
-                            branch — Open Website / Copy Link / Unpublish (→ UnpublishModal). */}
+                            branch — Open Website / Copy Link / Unpublish (→ UnpublishModal).
+                            Phone (2026-07-03, chị): header too tight to show Update + Live at
+                            once — hide Live while dirty so only Update shows; tablet keeps both
+                            (has room). */}
                         <DropdownMenu.Root>
                             <DropdownMenu.Trigger asChild>
                                 <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                                    className={cn(
+                                        'h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
+                                        (hasUnsavedChanges || hasUnpublishedChanges) && 'hidden min-[768px]:inline-flex',
+                                    )}
                                 >
                                     <Globe className="h-3.5 w-3.5" />
                                     {et.live}
@@ -403,7 +437,7 @@ export function EditorToolbar({
                             onClick={onPublish}
                             disabled={isPublishing || publishSuccess || aiRunning}
                             className={cn(
-                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
+                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white hover:opacity-95 min-[768px]:h-11 min-[768px]:px-4',
                                 publishSuccess && 'from-emerald-500 to-emerald-400',
                             )}
                         >

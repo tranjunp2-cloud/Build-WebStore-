@@ -86,10 +86,10 @@ export interface CompactEditorLayoutProps {
 const SWIPE_UP_THRESHOLD = 30
 
 const MOVE_BTN_CLS =
-    'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-overlay-bg)] py-2 text-xs font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)] disabled:cursor-not-allowed disabled:opacity-40'
+    'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-solid border-[var(--editor-border)] bg-[var(--editor-overlay-bg)] py-2 text-xs font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)] disabled:cursor-not-allowed disabled:opacity-40 min-[768px]:min-h-11 min-[768px]:text-sm'
 
 /**
- * Compact (≤767px) `/editor/[siteId]` layout: canvas-first — the live `PreviewFrame`
+ * Compact (<1280px, phone + all iPads) `/editor/[siteId]` layout: canvas-first — the live `PreviewFrame`
  * is the main surface; tap-selecting a block auto-opens its own block-settings bottom
  * sheet (F05 `bsBlock`: header + move up/down + `SettingsPanel` block view + delete).
  *
@@ -170,7 +170,10 @@ export function CompactEditorLayout({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="relative flex min-h-0 flex-1 flex-col">
+            {/* Phase 06: tablet band (≥768) caps + centers the canvas so it reads as a
+                comfortable "sheet" on iPad instead of edge-to-edge full-bleed; phone
+                (<768) keeps the previous unconstrained full-width canvas untouched. */}
+            <div className="relative flex min-h-0 flex-1 flex-col min-[768px]:mx-auto min-[768px]:w-full min-[768px]:max-w-[920px]">
                 <PreviewFrame {...previewFrameProps} onBlockSelect={onBlockSelect} disableDragDrop hideBlockActionBar />
 
                 {/* F05 screen 2: AI-processing overlay — canvas dims + spinner while an AI edit is in flight. */}
@@ -224,9 +227,9 @@ export function CompactEditorLayout({
                     const endY = e.changedTouches[0]?.clientY ?? startY
                     if (startY - endY > SWIPE_UP_THRESHOLD) onOpenTools()
                 }}
-                className="relative z-20 flex min-h-[56px] shrink-0 cursor-pointer items-center justify-center gap-1.5 border-t border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 pb-[env(safe-area-inset-bottom)] text-xs font-semibold text-[hsl(var(--primary))]"
+                className="relative z-20 flex min-h-[56px] shrink-0 cursor-pointer items-center justify-center gap-1.5 border-t border-solid border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 pb-[env(safe-area-inset-bottom)] text-xs font-semibold text-[hsl(var(--primary))]"
             >
-                <span className="absolute top-1.5 h-1 w-9 rounded-full bg-[var(--editor-text-muted)]/35" aria-hidden />
+                <span className="absolute top-1.5 h-1 w-9 rounded-full bg-[var(--editor-text-muted)]" style={{ opacity: 0.35 }} aria-hidden />
                 {aiRunning ? (
                     <>
                         <Square className="h-3.5 w-3.5 fill-current" aria-hidden /> Stop AI
@@ -249,7 +252,7 @@ export function CompactEditorLayout({
 
             {/* F05 screen 4: block-settings bottom sheet (bsBlock) — auto-opens on tap-select */}
             {isMobileSettingsOpen && currentBlock && (
-                <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                <div className="fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center">
                     <div
                         className="absolute inset-0 bg-black/60"
                         onClick={onCloseMobileSettings}
@@ -258,16 +261,20 @@ export function CompactEditorLayout({
                         tabIndex={0}
                         aria-label="Close block settings"
                     />
-                    <div className="relative flex max-h-[70vh] landscape:max-h-[90vh] flex-col overflow-hidden rounded-t-2xl border-t border-[var(--editor-border)] bg-[var(--editor-surface)]">
-                        <div className="flex items-center justify-between border-b border-[var(--editor-border)] px-4 py-3">
+                    {/* Phase 06: tablet band caps width + height and centers horizontally, but
+                        stays flush against the bottom edge (top corners only, no bottom margin)
+                        same as phone; phone (<768) keeps the original edge-to-edge bottom sheet
+                        unchanged. */}
+                    <div className="relative flex max-h-[70vh] max-[767px]:landscape:max-h-[90vh] min-[768px]:max-h-[640px] flex-col overflow-hidden rounded-t-2xl border-t border-solid border-[var(--editor-border)] bg-[var(--editor-surface)] min-[768px]:w-full min-[768px]:max-w-[680px] min-[768px]:shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-solid border-[var(--editor-border)] px-4 py-3">
                             <div className="flex min-w-0 items-baseline gap-2">
                                 <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Block</span>
-                                <span className="truncate text-sm font-medium text-[var(--editor-text)]">{blockLabel}</span>
+                                <span className="truncate text-sm font-medium text-[var(--editor-text)] min-[768px]:text-base">{blockLabel}</span>
                             </div>
                             <button
                                 type="button"
                                 onClick={onCloseMobileSettings}
-                                className="rounded-lg p-1.5 text-[var(--editor-text-muted)] hover:bg-[var(--editor-overlay-hover)] hover:text-[var(--editor-text)]"
+                                className="flex items-center justify-center rounded-lg p-1.5 text-[var(--editor-text-muted)] hover:bg-[var(--editor-overlay-hover)] hover:text-[var(--editor-text)] min-[768px]:h-11 min-[768px]:w-11"
                                 aria-label="Close block settings"
                             >
                                 <X className="h-5 w-5" aria-hidden />
@@ -275,7 +282,7 @@ export function CompactEditorLayout({
                         </div>
 
                         {/* mv-bar (F05): calls the same reorder handler the desktop BlockActionBar uses */}
-                        <div className="flex gap-2 border-b border-[var(--editor-border)] px-4 py-2.5">
+                        <div className="flex gap-2 border-b border-solid border-[var(--editor-border)] px-4 py-2.5">
                             <button
                                 type="button"
                                 disabled={!canMoveUp}
@@ -330,11 +337,11 @@ export function CompactEditorLayout({
                         </div>
 
                         {/* F05 bs-del-bar: reuses the same delete handler as the desktop BlockActionBar */}
-                        <div className="border-t border-[var(--editor-border)] px-4 py-3">
+                        <div className="border-t border-solid border-[var(--editor-border)] px-4 py-3">
                             <button
                                 type="button"
                                 onClick={() => setDeleteConfirmOpen(true)}
-                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] py-2.5 text-sm font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)]"
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-solid border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] py-2.5 text-sm font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)] min-[768px]:min-h-11"
                             >
                                 <Trash2 className="h-4 w-4" aria-hidden /> Delete Block
                             </button>

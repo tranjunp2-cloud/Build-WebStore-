@@ -1511,6 +1511,11 @@ export default function EditorPage() {
         const { autoSaveTimer } = useEditorStore.getState()
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
 
+        // Real final position of a newly-added block, found by object identity after
+        // insertion — avoids fragile `afterIndex + 1` arithmetic that can drift from the
+        // store's actual array position (e.g. across chained adds with a stale afterIndex).
+        let insertedBlockIndex: number | null = null
+
         switch (action.action) {
             case 'update_block': {
                 const blockIndex = action.blockIndex ?? selectedBlock ?? 0
@@ -1552,7 +1557,8 @@ export default function EditorPage() {
                     }
                     nextBlock = patchBlockCtaUrls(nextBlock, pagesNowAI)
                     addBlock(afterIndex, nextBlock)
-                    setSelectedBlock(Math.max(0, afterIndex + 1))
+                    insertedBlockIndex = useEditorStore.getState().blocks.indexOf(nextBlock)
+                    setSelectedBlock(insertedBlockIndex >= 0 ? insertedBlockIndex : Math.max(0, afterIndex + 1))
                     if (nextBlock.blockType === 'gallery') void triggerImageSeed()
                 } else {
                     toast.error('Unable to add this section yet')
@@ -1617,9 +1623,8 @@ export default function EditorPage() {
                 // Sync globalBlocks alongside layout — covers cases where addBlock mutates globalBlocks
                 // (e.g. commerce block auto-restoring cart) and undo/redo of globalBlock changes.
                 previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: currentGlobalBlocks })
-                if (action.action === 'add_block') {
-                    const afterIndex = action.afterIndex ?? (blocks.length - 1)
-                    previewFrameSendRef.current?.setScrollToBlock?.(Math.max(0, afterIndex + 1))
+                if (action.action === 'add_block' && insertedBlockIndex !== null && insertedBlockIndex >= 0) {
+                    previewFrameSendRef.current?.setScrollToBlock?.(insertedBlockIndex)
                 }
                 void handleSave({ showToast: false, refreshPreview: false })
             } else {
@@ -2038,6 +2043,10 @@ export default function EditorPage() {
         // Floating blocks route via onEditGlobalBlock → handleBlockSelectWithContext, not here.
         // Guard clears global type state when switching to a page block (index >= 0 or null).
         if (blockIndex === null || blockIndex >= 0) setSelectedGlobalBlockType(null)
+        // Clear a stale Menu/SEO/Global requestedTab left over from onEditGlobalBlock —
+        // otherwise SettingsPanel's requestedTab effect (SettingsPanel.tsx:425) keeps
+        // forcing that tab instead of the newly-tapped block's own settings.
+        setSettingsRequestedTab(null)
         if (isCompactLayout && blockIndex !== null) {
             setIsMobileSettingsOpen(true)
             setToolsSheetOpen(false) // Phase 03: XOR — block sheet takes over from the Tools sheet
@@ -2193,18 +2202,28 @@ export default function EditorPage() {
             blocks,
             selectedBlock,
             onBlockSelect: handleMobileBlockSelect,
-            onAIAction: handleAIAction,
+            // Tapping a block adds it then closes the sheet so the canvas (already
+            // scrolling to the new block via handleAIAction's setScrollToBlock) is visible.
+            onAIAction: async (action) => {
+                await handleAIAction(action)
+                if (action.action === 'add_block') closeTools()
+            },
             onEditGlobalBlock: (blockType: string) => {
                 handleBlockSelectWithContext(-1, blockType)
                 openTools('settings') // F05 screen 9: edit nav/footer → Settings→Menu tab
             },
             onAutoTranslate: handleAutoTranslate,
+            isCompact: true,
         },
         pages: {
             siteId,
             currentPageId,
             siteStatus: site?.status,
-            onPageSelected: handlePageSelected,
+            // Selecting/creating a page closes the sheet so the newly-navigated canvas is visible.
+            onPageSelected: (pageId: string) => {
+                void handlePageSelected(pageId)
+                closeTools()
+            },
             onPagesChanged: handlePagesChanged,
             onEditPage: () => openTools('chat'),
         },

@@ -52,7 +52,11 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
     ]
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+        // Phase 06: ≥768 centers the sheet horizontally (`items-center`) instead of the
+        // phone's edge-to-edge stretch; the panel itself carries the width/height cap
+        // below. Both breakpoints sit flush against the bottom edge (top corners only,
+        // no bottom margin). Phone (<768) is untouched (still `justify-end` stretch).
+        <div className="fixed inset-0 z-50 flex flex-col justify-end min-[768px]:items-center">
             <div
                 className="absolute inset-0 bg-black/60"
                 onClick={onClose}
@@ -61,9 +65,12 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
                 tabIndex={0}
                 aria-label="Close tools"
             />
-            <div className="relative flex max-h-[88vh] landscape:max-h-[94vh] flex-col overflow-hidden rounded-t-2xl border-t border-[var(--editor-border)] bg-[var(--editor-surface)] pb-[env(safe-area-inset-bottom)]">
+            {/* 2026-07-03 (chị): fixed 2/3-screen height on mobile+tablet (this sheet never
+                renders on desktop) instead of a content-driven max-height, so it doesn't jump
+                around per tab. */}
+            <div className="relative flex h-[66.6667vh] flex-col overflow-hidden rounded-t-2xl border-t border-[var(--editor-border)] bg-[var(--editor-surface)] pb-[env(safe-area-inset-bottom)] min-[768px]:w-full min-[768px]:max-w-[680px] min-[768px]:shadow-2xl">
                 <div className="flex shrink-0 justify-center pt-2">
-                    <span className="h-1 w-9 rounded-full bg-[var(--editor-text-muted)]/35" aria-hidden />
+                    <span className="h-1 w-9 rounded-full bg-[var(--editor-text-muted)]" style={{ opacity: 0.35 }} aria-hidden />
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1 border-b border-[var(--editor-border)] px-2 pb-1 pt-1.5" role="tablist" aria-label="Editor tools">
@@ -75,7 +82,7 @@ export function EditorToolsSheet({ open, activeTab, onTabChange, onClose, panelP
                             aria-selected={activeTab === tab.id}
                             onClick={() => onTabChange(tab.id)}
                             className={cn(
-                                'relative flex min-h-[44px] flex-1 items-center justify-center gap-1.5 px-2 text-[11px] font-medium transition-colors',
+                                'relative flex min-h-[44px] flex-1 items-center justify-center gap-1.5 px-2 text-[11px] font-medium transition-colors min-[768px]:min-h-12 min-[768px]:gap-2 min-[768px]:px-3 min-[768px]:text-sm',
                                 activeTab === tab.id
                                     ? "text-[hsl(var(--primary))] after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-[hsl(var(--primary))] after:content-['']"
                                     : 'rounded-lg text-[var(--editor-text-muted)] hover:bg-[var(--editor-overlay-hover)]',

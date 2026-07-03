@@ -552,37 +552,41 @@ function SettingsPanelInner({
                             placeholder={s.businessNamePlaceholder}
                         />
                     </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
-                        <div className="mt-2">
-                            <LogoEditor
-                                currentLogo={
-                                    (siteBranding.logo as string | undefined) ||
-                                    (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
-                                        ? ((headerBlock as Record<string, unknown>)?.logo as string)
-                                        : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
-                                    null
-                                }
-                                onLogoChange={(logoUrl) => {
-                                    // Save logo directly via branding (no draft/publish step).
-                                    // handleSiteSettingsChange syncs header/footer blocks in DB.
-                                    void onSiteSettingsChange?.({ branding: { ...siteBranding, logo: logoUrl } })
-                                    if (onLogoChange) onLogoChange(logoUrl)
-                                }}
-                            />
+                    {/* 2026-07-03 (chị): tablet-only (compact, ≥768) puts Logo + Favicon side
+                        by side in 1 row; phone (<768) and desktop (fullWidth=false) unchanged. */}
+                    <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
+                            <div className="mt-2">
+                                <LogoEditor
+                                    currentLogo={
+                                        (siteBranding.logo as string | undefined) ||
+                                        (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
+                                            ? ((headerBlock as Record<string, unknown>)?.logo as string)
+                                            : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
+                                        null
+                                    }
+                                    onLogoChange={(logoUrl) => {
+                                        // Save logo directly via branding (no draft/publish step).
+                                        // handleSiteSettingsChange syncs header/footer blocks in DB.
+                                        void onSiteSettingsChange?.({ branding: { ...siteBranding, logo: logoUrl } })
+                                        if (onLogoChange) onLogoChange(logoUrl)
+                                    }}
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                            {s.uploadFavicon}
-                        </label>
-                        <div className="mt-2">
-                            <FaviconEditor
-                                currentFavicon={(siteBranding.favicon as string | undefined) || null}
-                                onFaviconChange={(faviconUrl) => {
-                                    void onSiteSettingsChange?.({ branding: { ...siteBranding, favicon: faviconUrl } })
-                                }}
-                            />
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                                {s.uploadFavicon}
+                            </label>
+                            <div className="mt-2">
+                                <FaviconEditor
+                                    currentFavicon={(siteBranding.favicon as string | undefined) || null}
+                                    onFaviconChange={(faviconUrl) => {
+                                        void onSiteSettingsChange?.({ branding: { ...siteBranding, favicon: faviconUrl } })
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -590,41 +594,46 @@ function SettingsPanelInner({
 
             {renderGlobalAccordion('contact', s.contactInfo, (
                 <div className="space-y-4">
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
-                        <Input
-                            defaultValue={siteContactInfo.phone || ''}
-                            key={`contact-phone-${siteContactInfo.phone || ''}`}
-                            onBlur={(e: FieldBlurEvent) => {
-                                const v = e.target.value.trim()
-                                if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
-                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
-                                } else {
-                                    toast.error(t.editor.settingsValidation.invalidPhone)
-                                }
-                            }}
-                            variant="editor"
-                            className={editorInputClassName}
-                            placeholder={s.phonePlaceholder}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
-                        <Input
-                            type="email"
-                            defaultValue={siteContactInfo.email || ''}
-                            key={`contact-email-${siteContactInfo.email || ''}`}
-                            onBlur={(e: FieldBlurEvent) => {
-                                if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
-                                } else {
-                                    toast.error(s.invalidEmail)
-                                }
-                            }}
-                            variant="editor"
-                            className={editorInputClassName}
-                            placeholder={s.emailPlaceholder}
-                        />
+                    {/* 2026-07-03 (chị): tablet-only (compact, ≥768) puts Phone + Email side by
+                        side in 1 row, same as Logo/Favicon above; phone (<768) and desktop
+                        (fullWidth=false) unchanged. */}
+                    <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
+                            <Input
+                                defaultValue={siteContactInfo.phone || ''}
+                                key={`contact-phone-${siteContactInfo.phone || ''}`}
+                                onBlur={(e: FieldBlurEvent) => {
+                                    const v = e.target.value.trim()
+                                    if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
+                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
+                                    } else {
+                                        toast.error(t.editor.settingsValidation.invalidPhone)
+                                    }
+                                }}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.phonePlaceholder}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
+                            <Input
+                                type="email"
+                                defaultValue={siteContactInfo.email || ''}
+                                key={`contact-email-${siteContactInfo.email || ''}`}
+                                onBlur={(e: FieldBlurEvent) => {
+                                    if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                                        void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
+                                    } else {
+                                        toast.error(s.invalidEmail)
+                                    }
+                                }}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.emailPlaceholder}
+                            />
+                        </div>
                     </div>
                     <div>
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
@@ -641,7 +650,7 @@ function SettingsPanelInner({
             ))}
 
             {renderGlobalAccordion('social', s.socialLinks, (
-                <div className="space-y-3">
+                <div className={cn('grid gap-3', fullWidth && 'min-[768px]:grid-cols-2')}>
                     {(['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] as const).map(platform => (
                         <Input
                             key={`social-${platform}-${(siteSocialLinks as Record<string, string>)[platform] || ''}`}

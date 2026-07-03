@@ -1266,6 +1266,11 @@ function PreviewFrameInner({
             url.searchParams.set('pageId', pageId)
         }
         url.searchParams.set('editor', '1')
+        // Mobile/tablet compact chrome (same signal CompactEditorLayout already passes as
+        // disableDragDrop) — the injected click handler uses this to skip activating the
+        // inline WYSIWYG text-edit toolbar, which is desktop-only in the F05-v2 spec (text
+        // edits go through the block-settings sheet's fields on mobile/tablet instead).
+        if (disableDragDrop) url.searchParams.set('compact', '1')
 
         // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
         // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
@@ -1277,7 +1282,7 @@ function PreviewFrameInner({
 
         return url.pathname + url.search
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [siteId, effectiveIframeKey, pageId]) // DO NOT depend on savedScrollYRef to prevent constant reloads
+    }, [siteId, effectiveIframeKey, pageId, disableDragDrop]) // DO NOT depend on savedScrollYRef to prevent constant reloads
 
 
     if (isLoading) {

@@ -19,16 +19,16 @@ export interface EditorLayoutModeState {
  * then syncs to the real viewport post-mount via `matchMedia` — identical
  * behavior to the inline effect this hook replaces.
  *
- * Threshold stays `max-width: 767px` for Phase 01 (pure extract, no behavior
- * change). Phase 05 widens this to `<1280px` once the compact layout is
- * feature-complete; `isTablet` stays `false` until that phase distinguishes
- * phone vs tablet bands.
+ * Threshold is `max-width: 1279px` (Phase 05) — the compact layout now covers
+ * phone + every iPad band; desktop 3-pane starts at `xl` (1280px). `isTablet`
+ * stays `false` since no caller currently needs to distinguish phone vs tablet
+ * (Phase 06 tablet polish scopes via `min-[768px]:` classes instead).
  */
 export function useEditorLayoutMode(): EditorLayoutModeState {
     const [isCompact, setIsCompact] = useState(false)
 
     useEffect(() => {
-        const mediaQuery = window.matchMedia('(max-width: 767px)')
+        const mediaQuery = window.matchMedia('(max-width: 1279px)')
         const applyLayoutMode = (matches: boolean) => setIsCompact(matches)
 
         applyLayoutMode(mediaQuery.matches)
