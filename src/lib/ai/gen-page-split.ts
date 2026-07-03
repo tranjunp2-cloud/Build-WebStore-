@@ -35,10 +35,15 @@ const SUBPAGE_BATCH_MAX_TOKENS = 6000
 // → runs on the cheaper/faster 'site-generation-subpages-light' model (nano
 // by default; revert per-env via AI_MODEL_SITEGEN_SUB_LIGHT=gpt-4.1-mini).
 // Home + About/Services (brand-voice-heavy) stay on the main model.
-const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; light: boolean }> = [
-    { pages: ['About', 'Services/Products'], light: false },
-    { pages: ['Contact', 'Blog'], light: true },
+const SUBPAGE_BATCHES: ReadonlyArray<{ pages: readonly string[]; slugs: readonly string[]; light: boolean }> = [
+    { pages: ['About', 'Services/Products'], slugs: ['/about', '/services'], light: false },
+    { pages: ['Contact', 'Blog'], slugs: ['/contact', '/blog'], light: true },
 ]
+
+/** '/About ' → 'about' — one comparison form for model-emitted slugs. */
+function canonicalSlug(s: unknown): string {
+    return String(s ?? '').trim().toLowerCase().replace(/^\/+/, '')
+}
 
 export type PageSplitBrief = { navLabels: NavLabels | null }
 
@@ -285,7 +290,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                 input.openai,
                 batch.light ? selectModel('site-generation-subpages-light') : input.model,
                 buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
-                scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.join(', ')}. No Homepage.`),
+                scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                 SUBPAGE_BATCH_MAX_TOKENS,
             ),
         ),
@@ -307,12 +312,25 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
     // - each batch is capped at its requested page count;
     // - a batch missing pages (nano sometimes returns 1 of 2) counts as
     //   FAILED → composer fallback for ALL subpages. Never a short site.
+    // Slot matching BY SLUG, not by position/count: live 2026-07-03 17:55 the
+    // Contact+Blog batch returned an About page again — right count, wrong
+    // pages — which slipped a duplicate "Giới Thiệu" into the nav and dropped
+    // /contact. Each batch slot must be filled by a page whose slug matches
+    // the deterministic plan; the slug is then rewritten to the canonical
+    // '/x' form (kills 'about' vs '/about' ambiguity in one move).
     const extractBatchPages = (o: SplitCallOutcome, i: number): Record<string, unknown>[] => {
         const pages = Array.isArray(o.parsed?.pages) ? (o.parsed!.pages as Record<string, unknown>[]) : []
-        return pages
-            .filter((p) => p.slug !== '/')
-            .map((p): Record<string, unknown> => ({ ...p, isHomepage: false }))
-            .slice(0, SUBPAGE_BATCHES[i]!.pages.length)
+        const bySlug = new Map<string, Record<string, unknown>>()
+        for (const p of pages) {
+            const key = canonicalSlug(p.slug)
+            if (key && key !== '' && !bySlug.has(key)) bySlug.set(key, p)
+        }
+        const out: Record<string, unknown>[] = []
+        for (const slug of SUBPAGE_BATCHES[i]!.slugs) {
+            const p = bySlug.get(canonicalSlug(slug))
+            if (p) out.push({ ...p, slug, isHomepage: false })
+        }
+        return out
     }
     let batchPages = batchOutcomes.map(extractBatchPages)
 
@@ -333,7 +351,7 @@ export async function runParallelPageSplit(input: ParallelSplitInput): Promise<R
                 return runSplitCall(
                     input.openai, input.model,
                     buildSubpagesSystemPrompt(input.systemPrompt, brief, batch.pages),
-                    scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.join(', ')}. No Homepage.`),
+                    scopedUserPrompt(input.userPromptText, `generate ONLY these ${batch.pages.length} pages (pages array with exactly ${batch.pages.length} entries): ${batch.pages.map((t, k) => `${t} (slug "${batch.slugs[k]}")`).join(', ')}. Use those EXACT slugs. No Homepage, no other pages.`),
                     SUBPAGE_BATCH_MAX_TOKENS,
                 )
             }),
