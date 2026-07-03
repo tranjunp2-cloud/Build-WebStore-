@@ -501,8 +501,10 @@ function AIChatPanelInner({
 
                 <div className={cn('border-t border-white/[0.06] bg-[rgb(var(--editor-bg-rgb)/0.8)] backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
                     {/* PR #1485 review fix (C1): in-panel Stop control — reachable without closing
-                        the host Tools sheet (unlike the bottom bar's Stop AI, which sits under it). */}
-                    {isProcessing && (
+                        the host Tools sheet (unlike the bottom bar's Stop AI, which sits under it).
+                        Re-review N-minor: gate on externalProcessing too, not just local isProcessing,
+                        so it still shows after a remount mid-stream (close/reopen sheet, tab switch). */}
+                    {(isProcessing || externalProcessing) && (
                         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5">
                             <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
                                 <span className="flex gap-1">

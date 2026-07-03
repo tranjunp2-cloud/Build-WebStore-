@@ -173,14 +173,21 @@ export function CompactEditorLayout({
     const blockLabel = currentBlock
         ? blockRegistry.getBlockMeta(currentBlock.blockType)?.name || currentBlock.blockType
         : ''
+    // Floating global widgets (cartWidget/whatsapp-button/social) use negative indices and
+    // aren't part of the page's block flow — move/delete don't apply to them (their own
+    // enable/disable + variant controls live in the SettingsPanel block view below).
+    const isGlobalWidget = selectedBlock !== null && selectedBlock < 0
     const canMoveUp = selectedBlock !== null && selectedBlock > 0
-    const canMoveDown = selectedBlock !== null && selectedBlock < totalBlocks - 1
+    const canMoveDown = selectedBlock !== null && selectedBlock >= 0 && selectedBlock < totalBlocks - 1
     // F05 screen 11: empty new-page state — FAB is the ONLY screen showing it, and it
     // hides while the Tools sheet is open (mirrors the F05 `.fab.hide` behavior).
     const showFab = totalBlocks === 0 && !toolsSheetOpen
 
     const handleConfirmDelete = () => {
-        if (selectedBlock === null) return
+        // Defense-in-depth: the delete-bar button itself is hidden for floating widgets
+        // (isGlobalWidget) above, but guard here too — deleteBlock(negativeIndex) is a
+        // silent no-op against the page's block array and must never fire a fake success.
+        if (selectedBlock === null || selectedBlock < 0) return
         const deletedType = currentBlock?.blockType || 'block'
         onDeleteBlockConfirmed(selectedBlock)
         setDeleteConfirmOpen(false)
@@ -308,25 +315,29 @@ export function CompactEditorLayout({
                             </button>
                         </div>
 
-                        {/* mv-bar (F05): calls the same reorder handler the desktop BlockActionBar uses */}
-                        <div className="flex gap-2 border-b border-solid border-[var(--editor-border)] px-4 py-2.5">
-                            <button
-                                type="button"
-                                disabled={!canMoveUp}
-                                onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock - 1)}
-                                className={MOVE_BTN_CLS}
-                            >
-                                <ChevronUp className="h-3.5 w-3.5" aria-hidden /> {cl.moveUp}
-                            </button>
-                            <button
-                                type="button"
-                                disabled={!canMoveDown}
-                                onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock + 1)}
-                                className={MOVE_BTN_CLS}
-                            >
-                                <ChevronDown className="h-3.5 w-3.5" aria-hidden /> {cl.moveDown}
-                            </button>
-                        </div>
+                        {/* mv-bar (F05): calls the same reorder handler the desktop BlockActionBar uses.
+                            Hidden for floating global widgets — negative indices aren't page-flow
+                            positions, so move up/down doesn't apply. */}
+                        {!isGlobalWidget && (
+                            <div className="flex gap-2 border-b border-solid border-[var(--editor-border)] px-4 py-2.5">
+                                <button
+                                    type="button"
+                                    disabled={!canMoveUp}
+                                    onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock - 1)}
+                                    className={MOVE_BTN_CLS}
+                                >
+                                    <ChevronUp className="h-3.5 w-3.5" aria-hidden /> {cl.moveUp}
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!canMoveDown}
+                                    onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock + 1)}
+                                    className={MOVE_BTN_CLS}
+                                >
+                                    <ChevronDown className="h-3.5 w-3.5" aria-hidden /> {cl.moveDown}
+                                </button>
+                            </div>
+                        )}
 
                         <div className="flex-1 overflow-y-auto px-1 py-1">
                             <SettingsPanel
@@ -363,16 +374,21 @@ export function CompactEditorLayout({
                             />
                         </div>
 
-                        {/* F05 bs-del-bar: reuses the same delete handler as the desktop BlockActionBar */}
-                        <div className="border-t border-solid border-[var(--editor-border)] px-4 py-3">
-                            <button
-                                type="button"
-                                onClick={() => setDeleteConfirmOpen(true)}
-                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-solid border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] py-2.5 text-sm font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)] min-[768px]:min-h-11"
-                            >
-                                <Trash2 className="h-4 w-4" aria-hidden /> {cl.deleteBlock}
-                            </button>
-                        </div>
+                        {/* F05 bs-del-bar: reuses the same delete handler as the desktop BlockActionBar.
+                            Hidden for floating global widgets — deleteBlock(negativeIndex) is a
+                            no-op against the page's block array (widgets aren't in it); their
+                            on/off toggle already lives in the SettingsPanel block view above. */}
+                        {!isGlobalWidget && (
+                            <div className="border-t border-solid border-[var(--editor-border)] px-4 py-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeleteConfirmOpen(true)}
+                                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-solid border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] py-2.5 text-sm font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)] min-[768px]:min-h-11"
+                                >
+                                    <Trash2 className="h-4 w-4" aria-hidden /> {cl.deleteBlock}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
