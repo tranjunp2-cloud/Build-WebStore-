@@ -1977,6 +1977,21 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .stat-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* Mobile + tablet (<1280, matches this file's desktop cutoff elsewhere): native HTML5
+   drag-and-drop doesn't work reliably via touch, so hide the drag-dots handle icon.
+   Desktop (≥1280) keeps the original drag handle — byte-identical. */
+@media (max-width: 1279px) {
+  .dash-revamp .cz-handle { display: none; }
+}
+
+/* "Top performing" card title used a smaller inline fontSize (15px vs the default 16px
+   .sh-title) to sit a notch below the "Traffic & performance" section title. Removed the
+   inline override (see traffic-performance.tsx) so mobile/tablet inherits the same size
+   as Traffic's title. Desktop (≥1280) restores the original 15px here — byte-identical. */
+@media (min-width: 1280px) {
+  .dash-revamp .chart-head .sh-title { font-size: 15px; }
+}
+
 @media (max-width: 560px) {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
@@ -2001,4 +2016,14 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .issues-list.cols2      { grid-template-columns: 1fr; }
   .dash-revamp .tp-row                 { grid-template-columns: 26px 1fr auto; }
   .dash-revamp .tp-share               { display: none; }
+
+  /* Top performing card head: title ("Top performing") + tp-tabs (Pages/Blogs/Referrers/
+     Products) no longer fit on one row on mobile — the flex row has no wrap, so tabs
+     overlap the title. Wrap onto title-row + tabs-row. Tabs themselves stay on ONE row
+     (matches the pill-tab pattern elsewhere) and scroll horizontally instead of wrapping
+     — 4 buttons + Soon badge don't fit ~335px of card width on narrow phones. */
+  .dash-revamp .chart-head             { flex-wrap: wrap; row-gap: 10px; }
+  .dash-revamp .tp-tabs                { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .dash-revamp .tp-tabs::-webkit-scrollbar { display: none; }
+  .dash-revamp .tp-tabs button         { flex-shrink: 0; }
 }

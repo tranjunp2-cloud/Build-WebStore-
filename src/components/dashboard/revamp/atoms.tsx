@@ -5,12 +5,39 @@
  * Ports the design's SectionHead / Delta / ComingSoon / HelpTip primitives.
  * Styling comes from dashboard-revamp.css (class names kept identical to the design).
  */
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
     LayoutGrid, BarChart3, SearchCheck, Wrench, PackageCheck, ListChecks,
     TrendingUp, TrendingDown, Minus, Clock, Info, type LucideIcon,
 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+
+/**
+ * Radix Tooltip only opens on hover/focus — it intentionally ignores touch
+ * pointers, so info icons never open on iPad/mobile taps. This makes the
+ * trigger tap-to-toggle (closes on next outside tap) while leaving desktop
+ * hover/focus behavior untouched.
+ */
+function useTapTooltip<T extends HTMLElement>() {
+    const [open, setOpen] = useState(false)
+    const ref = useRef<T>(null)
+
+    useEffect(() => {
+        if (!open) return
+        const onOutside = (e: PointerEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener('pointerdown', onOutside)
+        return () => document.removeEventListener('pointerdown', onOutside)
+    }, [open])
+
+    const onClick = (e: MouseEvent) => {
+        e.stopPropagation()
+        setOpen((o) => !o)
+    }
+
+    return { open, onOpenChange: setOpen, onClick, ref }
+}
 
 /** Lucide icon lookup for dynamic (string-named) block/section icons. */
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -64,10 +91,18 @@ export function ComingSoonBadge({ label }: { label: string }) {
  * Used in place of the stat comparison cluster so the badge never overlaps real metrics.
  */
 export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: string }) {
+    const { open, onOpenChange, onClick, ref } = useTapTooltip<HTMLSpanElement>()
     return (
-        <Tooltip>
+        <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
-                <span className="cs-badge cs-badge-interactive" tabIndex={0} role="note" aria-label={`${label}. ${tip}`}>
+                <span
+                    ref={ref}
+                    className="cs-badge cs-badge-interactive"
+                    tabIndex={0}
+                    role="note"
+                    aria-label={`${label}. ${tip}`}
+                    onClick={onClick}
+                >
                     <Clock aria-hidden />{label}<Info className="cs-info" aria-hidden />
                 </span>
             </TooltipTrigger>
@@ -81,10 +116,11 @@ export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: str
  * is NOT clipped by a parent's overflow (e.g. the overflow:hidden stat-card).
  */
 export function InfoTooltip({ tip }: { tip: string }) {
+    const { open, onOpenChange, onClick, ref } = useTapTooltip<HTMLButtonElement>()
     return (
-        <Tooltip>
+        <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
-                <button type="button" className="stat-info" aria-label={tip}>
+                <button ref={ref} type="button" className="stat-info" aria-label={tip} onClick={onClick}>
                     <Info aria-hidden />
                 </button>
             </TooltipTrigger>
