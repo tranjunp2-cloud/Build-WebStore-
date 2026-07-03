@@ -160,6 +160,16 @@ export default function EditorPage() {
     const [aiRunning, setAiRunning] = useState(false)
     const stopAIRef = useRef<(() => void) | null>(null)
 
+    // PR #1485 review fix (I3): rotating/resizing across the 1280px compact↔desktop
+    // boundary must not leave a sheet open from before the flip — reset both compact
+    // sheet states whenever the layout mode changes (either direction) so a sheet left
+    // open pre-flip doesn't silently reappear when flipping back.
+    useEffect(() => {
+        setToolsSheetOpen(false)
+        setIsMobileSettingsOpen(false)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isCompactLayout])
+
     // Auto-open the publish modal when arriving from an external "Publish" CTA
     // (e.g. the dashboard onboarding "Publish your website" step → /editor/:id?publish=1).
     // Waits for editor data to finish loading, then strips the param so a refresh won't reopen.
@@ -2080,6 +2090,23 @@ export default function EditorPage() {
         stopAIRef.current?.()
     }, [])
 
+    // PR #1485 review fix (C1): the compact AIChatPanel applies AI actions incrementally
+    // (and DB-saves each one) as SSE events stream in. On abort, `appliedCount` of those
+    // actions already landed — compact hides the global undo/redo pill, so this is the
+    // only recovery path. Fully revert everything the aborted stream applied, then
+    // persist the reverted state so the DB no longer holds the orphaned partial edit.
+    const handleAbortRollback = useCallback((appliedCount: number) => {
+        for (let i = 0; i < appliedCount; i++) {
+            if (!useEditorStore.getState().canUndo()) break
+            useEditorStore.getState().undo()
+        }
+        previewFrameSendRef.current?.sendToIframe({
+            type: 'UPDATE_FULL_LAYOUT',
+            bodyBlocks: useEditorStore.getState().getDisplayBlocks(),
+        })
+        void handleSave({ showToast: false, refreshPreview: false })
+    }, [handleSave])
+
     // Lifted from the inline onHeaderUpdate/onFooterUpdate closures previously in the
     // compact branch's SettingsPanel mount (bodies copied verbatim) so CompactEditorLayout
     // can receive them as named props. Desktop's own SettingsPanel mount keeps its
@@ -2197,6 +2224,9 @@ export default function EditorPage() {
             compact: true,
             onProcessingChange: setAiRunning,
             onStopHandlerChange: (stop) => { stopAIRef.current = stop },
+            onAbortRollback: handleAbortRollback,
+            onRequestStop: handleStopAI,
+            externalProcessing: aiRunning,
         },
         components: {
             blocks,
@@ -2210,7 +2240,16 @@ export default function EditorPage() {
             },
             onEditGlobalBlock: (blockType: string) => {
                 handleBlockSelectWithContext(-1, blockType)
-                openTools('settings') // F05 screen 9: edit nav/footer → Settings→Menu tab
+                if (['navigation', 'footer', 'breadcrumb'].includes(blockType)) {
+                    openTools('settings') // F05 screen 9: edit nav/footer → Settings→Menu tab
+                } else {
+                    // Floating widgets (cartWidget/whatsapp-button/social/...) — route to the
+                    // compact block-settings sheet (same destination canvas taps use via
+                    // handleMobileBlockSelect) instead of the Tools sheet's Settings tab,
+                    // which is fullWidth and always passes block: null (no per-widget controls).
+                    setToolsSheetOpen(false)
+                    setIsMobileSettingsOpen(true)
+                }
             },
             onAutoTranslate: handleAutoTranslate,
             isCompact: true,

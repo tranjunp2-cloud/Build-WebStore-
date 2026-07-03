@@ -3506,6 +3506,15 @@
             "copyLink": "Salin Pautan",
             "dismiss": "Tutup"
         },
+        "compactLayout": {
+            "aiEditing": "AI sedang mengedit reka bentuk anda…",
+            "openAIChat": "Buka Chat AI",
+            "openChatAndTools": "Buka Chat AI & Alatan",
+            "moveUp": "Alih Ke Atas",
+            "moveDown": "Alih Ke Bawah",
+            "deleteBlock": "Padam Blok",
+            "deletedBlock": "{type} dipadam"
+        },
         "toolbar": {
             "publish": "Terbitkan",
             "publishing": "Menerbitkan",
@@ -3662,7 +3671,8 @@
             "undo": "Buat Asal",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
-            "newLine": "baris baru"
+            "newLine": "baris baru",
+            "stopAI": "Hentikan AI"
         },
         "menu": {
             "dashboard": "Papan Pemuka",

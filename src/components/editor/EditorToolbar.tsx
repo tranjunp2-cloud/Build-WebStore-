@@ -642,7 +642,7 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing || isSaving}
+                                disabled={isPublishing || isSaving || aiRunning}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
                             >
                                 {isPublishing ? (
@@ -704,7 +704,7 @@ export function EditorToolbar({
                         type="button"
                         size="sm"
                         onClick={onPublish}
-                        disabled={isPublishing || publishSuccess}
+                        disabled={isPublishing || publishSuccess || aiRunning}
                         className={cn(
                             'h-8 rounded-lg border-0 bg-gradient-to-r from-[hsl(var(--info))] to-[hsl(var(--primary))] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
                             publishSuccess && 'from-emerald-500 to-emerald-400',

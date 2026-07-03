@@ -7,8 +7,6 @@ export type EditorLayoutMode = 'desktop' | 'compact'
 export interface EditorLayoutModeState {
     mode: EditorLayoutMode
     isCompact: boolean
-    isPhone: boolean
-    isTablet: boolean
 }
 
 /**
@@ -20,8 +18,8 @@ export interface EditorLayoutModeState {
  * behavior to the inline effect this hook replaces.
  *
  * Threshold is `max-width: 1279px` (Phase 05) — the compact layout now covers
- * phone + every iPad band; desktop 3-pane starts at `xl` (1280px). `isTablet`
- * stays `false` since no caller currently needs to distinguish phone vs tablet
+ * phone + every iPad band; desktop 3-pane starts at `xl` (1280px). No caller
+ * currently needs to distinguish phone vs tablet within compact mode
  * (Phase 06 tablet polish scopes via `min-[768px]:` classes instead).
  */
 export function useEditorLayoutMode(): EditorLayoutModeState {
@@ -42,7 +40,5 @@ export function useEditorLayoutMode(): EditorLayoutModeState {
     return {
         mode: isCompact ? 'compact' : 'desktop',
         isCompact,
-        isPhone: isCompact,
-        isTablet: false,
     }
 }

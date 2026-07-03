@@ -3506,6 +3506,15 @@
             "copyLink": "Copy Link",
             "dismiss": "Dismiss"
         },
+        "compactLayout": {
+            "aiEditing": "AI is editing your design…",
+            "openAIChat": "Open AI Chat",
+            "openChatAndTools": "Open AI Chat & Tools",
+            "moveUp": "Move Up",
+            "moveDown": "Move Down",
+            "deleteBlock": "Delete Block",
+            "deletedBlock": "Deleted {type}"
+        },
         "toolbar": {
             "publish": "Publish",
             "publishing": "Publishing",
@@ -3662,7 +3671,8 @@
             "undo": "Undo",
             "inputPlaceholder": "Tell AI what to change...",
             "send": "send",
-            "newLine": "new line"
+            "newLine": "new line",
+            "stopAI": "Stop AI"
         },
         "menu": {
             "dashboard": "Dashboard",

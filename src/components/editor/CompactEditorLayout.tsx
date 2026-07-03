@@ -1,10 +1,10 @@
 'use client'
 
-import { useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { ChevronDown, ChevronUp, Loader2, MessageCircle, Square, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
+import { useI18n } from '@/i18n'
 import { PreviewFrame } from './PreviewFrame'
 import { SettingsPanel, type SettingsTab } from './SettingsPanel'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
@@ -85,6 +85,13 @@ export interface CompactEditorLayoutProps {
 /** Swipe-up gesture threshold (px) — matches F05's `touchend` Δ>30 → open sheet. */
 const SWIPE_UP_THRESHOLD = 30
 
+/** FAB bottom clearance (px) above the bottom bar when the advisory banner is hidden. */
+const FAB_BASE_OFFSET_PX = 68
+/** Default advisory-banner height (px) assumed before the first ResizeObserver
+ * measurement fires — matches the previous hardcoded `178px` total (68 + 110) so
+ * there's no flash on first paint while the banner is visible. */
+const FAB_DEFAULT_BANNER_HEIGHT_PX = 110
+
 const MOVE_BTN_CLS =
     'flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-solid border-[var(--editor-border)] bg-[var(--editor-overlay-bg)] py-2 text-xs font-medium text-[var(--editor-text)] transition-colors hover:bg-[var(--editor-overlay-hover)] disabled:cursor-not-allowed disabled:opacity-40 min-[768px]:min-h-11 min-[768px]:text-sm'
 
@@ -141,9 +148,27 @@ export function CompactEditorLayout({
     onStopAI,
     onCopyLink,
 }: CompactEditorLayoutProps) {
+    const { t, ti } = useI18n()
+    const cl = t.editor.compactLayout
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     const [bannerVisible, setBannerVisible] = useState(false)
     const swipeStartYRef = useRef<number | null>(null)
+    // M3 (PR #1485 review fix): measure the advisory banner's real rendered height
+    // instead of assuming a fixed ~110px — its text can wrap to more lines (e.g.
+    // longer Malay strings), which would otherwise push the FAB under the banner.
+    const bannerWrapperRef = useRef<HTMLDivElement | null>(null)
+    const [bannerHeight, setBannerHeight] = useState(FAB_DEFAULT_BANNER_HEIGHT_PX)
+
+    useEffect(() => {
+        const el = bannerWrapperRef.current
+        if (!el) return
+        const observer = new ResizeObserver((entries) => {
+            const height = entries[0]?.contentRect.height
+            if (typeof height === 'number') setBannerHeight(height)
+        })
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
 
     const blockLabel = currentBlock
         ? blockRegistry.getBlockMeta(currentBlock.blockType)?.name || currentBlock.blockType
@@ -162,9 +187,9 @@ export function CompactEditorLayout({
         onCloseMobileSettings()
         // Mirrors the desktop BlockActionBar's delete confirm + undo toast (PreviewFrame.tsx)
         // so both entry points give the same feedback — reuses the store's own undo(), no forked logic.
-        toast.success(`Deleted ${deletedType.replace(/-/g, ' ')}`, {
+        toast.success(ti(cl.deletedBlock, { type: deletedType.replace(/-/g, ' ') }), {
             duration: 5000,
-            action: { label: 'Undo', onClick: () => useEditorStore.getState().undo() },
+            action: { label: t.editor.aiChat.undo, onClick: () => useEditorStore.getState().undo() },
         })
     }
 
@@ -180,23 +205,21 @@ export function CompactEditorLayout({
                 {aiRunning && (
                     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[var(--editor-bg)]/70 backdrop-blur-sm">
                         <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--primary))]" aria-hidden />
-                        <p className="text-sm font-medium text-[var(--editor-text)]">AI is editing your design…</p>
+                        <p className="text-sm font-medium text-[var(--editor-text)]">{cl.aiEditing}</p>
                     </div>
                 )}
             </div>
 
             {/* F05 FAB — empty-page screen (11) ONLY; hides while the Tools sheet is open.
-                Bottom offset grows while the advisory banner is showing (its rough
-                rendered height, ~110px) so the two never overlap. */}
+                Bottom offset grows by the advisory banner's real measured height (M3 fix)
+                while it's showing, so the two never overlap regardless of text wrap. */}
             {showFab && (
                 <button
                     type="button"
                     onClick={() => onOpenTools('chat')}
-                    aria-label="Open AI Chat"
-                    className={cn(
-                        'fixed right-3.5 z-40 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-[hsl(var(--primary)/0.35)] transition-transform active:scale-90',
-                        bannerVisible ? 'bottom-[calc(178px+env(safe-area-inset-bottom))]' : 'bottom-[calc(68px+env(safe-area-inset-bottom))]',
-                    )}
+                    aria-label={cl.openAIChat}
+                    className="fixed right-3.5 z-40 flex h-[50px] w-[50px] items-center justify-center rounded-full bg-gradient-to-br from-[hsl(var(--info))] to-[hsl(var(--primary))] text-white shadow-lg shadow-[hsl(var(--primary)/0.35)] transition-transform active:scale-90"
+                    style={{ bottom: `calc(${bannerVisible ? FAB_BASE_OFFSET_PX + bannerHeight : FAB_BASE_OFFSET_PX}px + env(safe-area-inset-bottom))` }}
                 >
                     <MessageCircle className="h-5 w-5" aria-hidden />
                 </button>
@@ -204,15 +227,19 @@ export function CompactEditorLayout({
 
             {/* #1472 Part B: dismissible "better on Desktop" advisory — a normal flow row
                 stacked directly above the bottom bar (not fixed/overlaid), so the two
-                never overlap and both stay tappable. */}
-            <EditorAdvisoryBanner onCopyLink={onCopyLink} onVisibleChange={setBannerVisible} />
+                never overlap and both stay tappable. Wrapped so the FAB above can measure
+                its real rendered height via ResizeObserver (M3 fix) — the wrapper carries
+                no size of its own, it collapses to 0 when the banner renders `null`. */}
+            <div ref={bannerWrapperRef}>
+                <EditorAdvisoryBanner onCopyLink={onCopyLink} onVisibleChange={setBannerVisible} />
+            </div>
 
             {/* F05 bottom bar — tap or swipe-up opens the 4-tab Tools sheet; becomes
                 "■ Stop AI" while an AI edit is running (no undo/redo pill — hidden per F05-v2). */}
             <div
                 role="button"
                 tabIndex={0}
-                aria-label={aiRunning ? 'Stop AI' : 'Open AI Chat & Tools'}
+                aria-label={aiRunning ? t.editor.aiChat.stopAI : cl.openChatAndTools}
                 onClick={() => (aiRunning ? onStopAI() : onOpenTools())}
                 onKeyDown={(e) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return
@@ -232,11 +259,11 @@ export function CompactEditorLayout({
                 <span className="absolute top-1.5 h-1 w-9 rounded-full bg-[var(--editor-text-muted)]" style={{ opacity: 0.35 }} aria-hidden />
                 {aiRunning ? (
                     <>
-                        <Square className="h-3.5 w-3.5 fill-current" aria-hidden /> Stop AI
+                        <Square className="h-3.5 w-3.5 fill-current" aria-hidden /> {t.editor.aiChat.stopAI}
                     </>
                 ) : (
                     <>
-                        <MessageCircle className="h-3.5 w-3.5" aria-hidden /> Open AI Chat &amp; Tools
+                        <MessageCircle className="h-3.5 w-3.5" aria-hidden /> {cl.openChatAndTools}
                         <ChevronUp className="h-4 w-4" aria-hidden />
                     </>
                 )}
@@ -289,7 +316,7 @@ export function CompactEditorLayout({
                                 onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock - 1)}
                                 className={MOVE_BTN_CLS}
                             >
-                                <ChevronUp className="h-3.5 w-3.5" aria-hidden /> Move Up
+                                <ChevronUp className="h-3.5 w-3.5" aria-hidden /> {cl.moveUp}
                             </button>
                             <button
                                 type="button"
@@ -297,7 +324,7 @@ export function CompactEditorLayout({
                                 onClick={() => selectedBlock !== null && onReorderBlock(selectedBlock, selectedBlock + 1)}
                                 className={MOVE_BTN_CLS}
                             >
-                                <ChevronDown className="h-3.5 w-3.5" aria-hidden /> Move Down
+                                <ChevronDown className="h-3.5 w-3.5" aria-hidden /> {cl.moveDown}
                             </button>
                         </div>
 
@@ -343,7 +370,7 @@ export function CompactEditorLayout({
                                 onClick={() => setDeleteConfirmOpen(true)}
                                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-solid border-[hsl(var(--destructive)/0.35)] bg-[hsl(var(--destructive)/0.1)] py-2.5 text-sm font-medium text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/0.16)] min-[768px]:min-h-11"
                             >
-                                <Trash2 className="h-4 w-4" aria-hidden /> Delete Block
+                                <Trash2 className="h-4 w-4" aria-hidden /> {cl.deleteBlock}
                             </button>
                         </div>
                     </div>
