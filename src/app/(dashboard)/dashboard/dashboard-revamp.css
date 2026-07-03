@@ -1978,10 +1978,16 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 /* Mobile + tablet (<1280, matches this file's desktop cutoff elsewhere): native HTML5
-   drag-and-drop doesn't work reliably via touch, so hide the drag-dots handle icon.
-   Desktop (≥1280) keeps the original drag handle — byte-identical. */
+   drag-and-drop doesn't work reliably via touch, so hide the drag-dots handle icon and
+   show the up/down arrow buttons (.cz-arrows) instead as the working reorder path.
+   .cz-arrows is `display: none` unconditionally in the base rule above (pre-existing,
+   from the original dashboard revamp) — it was never actually wired to appear anywhere,
+   desktop included, so surfacing it here is a real (not cosmetic) fix, not just hiding
+   a non-functional icon. Desktop (≥1280) keeps the original drag handle, arrows still
+   hidden — byte-identical. */
 @media (max-width: 1279px) {
   .dash-revamp .cz-handle { display: none; }
+  .dash-revamp .cz-arrows { display: flex; }
 }
 
 /* "Top performing" card title used a smaller inline fontSize (15px vs the default 16px

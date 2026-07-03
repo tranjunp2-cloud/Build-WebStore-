@@ -15,12 +15,26 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 /**
  * Radix Tooltip only opens on hover/focus — it intentionally ignores touch
  * pointers, so info icons never open on iPad/mobile taps. This makes the
- * trigger tap-to-toggle (closes on next outside tap) while leaving desktop
- * hover/focus behavior untouched.
+ * trigger tap-to-toggle (closes on next outside tap). Desktop hover/focus-open
+ * still works unchanged.
+ *
+ * Radix's TooltipTrigger composes its own `onClick: composeEventHandlers(props.onClick,
+ * context.onClose)` — without preventDefault() that unconditionally re-closes right
+ * after our handler runs, so a plain toggle never actually opens. Radix's trigger also
+ * force-closes on its own onPointerDown whenever already open (its built-in "click
+ * trigger again to close" behavior), which races with our toggle if we read `open` from
+ * the click closure. wasOpenRef tracks the state onClick should toggle from, kept in sync
+ * three ways: (1) onPointerDown captures pre-event state before either handler can mutate
+ * it, for taps/clicks; (2) onFocus seeds it for pure-keyboard Tab-entry, which has no
+ * pointerdown to sync from — gated on isPointerRef so it doesn't clobber (1) when a
+ * pointer click also happens to focus the element; (3) onClick writes its own outcome
+ * back, so repeated Enter/Space with no intervening pointer event still toggles correctly.
  */
 function useTapTooltip<T extends HTMLElement>() {
     const [open, setOpen] = useState(false)
     const ref = useRef<T>(null)
+    const wasOpenRef = useRef(false)
+    const isPointerRef = useRef(false)
 
     useEffect(() => {
         if (!open) return
@@ -31,12 +45,23 @@ function useTapTooltip<T extends HTMLElement>() {
         return () => document.removeEventListener('pointerdown', onOutside)
     }, [open])
 
+    const onPointerDown = () => {
+        wasOpenRef.current = open
+        isPointerRef.current = true
+    }
+    const onFocus = () => {
+        if (!isPointerRef.current) wasOpenRef.current = true
+    }
     const onClick = (e: MouseEvent) => {
+        e.preventDefault()
         e.stopPropagation()
-        setOpen((o) => !o)
+        const next = !wasOpenRef.current
+        wasOpenRef.current = next
+        isPointerRef.current = false
+        setOpen(next)
     }
 
-    return { open, onOpenChange: setOpen, onClick, ref }
+    return { open, onOpenChange: setOpen, onPointerDown, onFocus, onClick, ref }
 }
 
 /** Lucide icon lookup for dynamic (string-named) block/section icons. */
@@ -91,7 +116,7 @@ export function ComingSoonBadge({ label }: { label: string }) {
  * Used in place of the stat comparison cluster so the badge never overlaps real metrics.
  */
 export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: string }) {
-    const { open, onOpenChange, onClick, ref } = useTapTooltip<HTMLSpanElement>()
+    const { open, onOpenChange, onPointerDown, onFocus, onClick, ref } = useTapTooltip<HTMLSpanElement>()
     return (
         <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
@@ -101,6 +126,9 @@ export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: str
                     tabIndex={0}
                     role="note"
                     aria-label={`${label}. ${tip}`}
+                    aria-expanded={open}
+                    onPointerDown={onPointerDown}
+                    onFocus={onFocus}
                     onClick={onClick}
                 >
                     <Clock aria-hidden />{label}<Info className="cs-info" aria-hidden />
@@ -116,11 +144,11 @@ export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: str
  * is NOT clipped by a parent's overflow (e.g. the overflow:hidden stat-card).
  */
 export function InfoTooltip({ tip }: { tip: string }) {
-    const { open, onOpenChange, onClick, ref } = useTapTooltip<HTMLButtonElement>()
+    const { open, onOpenChange, onPointerDown, onFocus, onClick, ref } = useTapTooltip<HTMLButtonElement>()
     return (
         <Tooltip open={open} onOpenChange={onOpenChange}>
             <TooltipTrigger asChild>
-                <button ref={ref} type="button" className="stat-info" aria-label={tip} onClick={onClick}>
+                <button ref={ref} type="button" className="stat-info" aria-label={tip} aria-expanded={open} onPointerDown={onPointerDown} onFocus={onFocus} onClick={onClick}>
                     <Info aria-hidden />
                 </button>
             </TooltipTrigger>
