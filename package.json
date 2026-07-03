@@ -17,6 +17,8 @@
     "db:seed": "tsx --require ./scripts/seed-preload.cjs scripts/seed.ts",
     "db:seed-sso": "tsx --require ./scripts/seed-preload.cjs scripts/seed-sso-account.ts",
     "db:reset": "tsx --require ./scripts/seed-preload.cjs scripts/reset-account.ts",
+    "db:seed-qc": "tsx --require ./scripts/seed-preload.cjs scripts/seed-qc-data.ts",
+    "db:reset-qc": "tsx --require ./scripts/seed-preload.cjs scripts/reset-qc-data.ts",
     "db:migrate:global-blocks": "tsx --require ./scripts/seed-preload.cjs scripts/migrate-global-blocks-from-inline.ts",
     "test": "vitest run",
     "test:watch": "vitest",
