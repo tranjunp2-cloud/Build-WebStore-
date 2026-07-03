@@ -58,7 +58,7 @@ All tests use TC-ID refs per `docs/TEST_CONVENTION.md`. Tests import real implem
 
 ### Canary Recommendations (before production)
 
-> ⚠️ **GATE:** KHÔNG bật `GEN_POOL_PREUPLOAD` trên staging/production trước khi **PR #1481 (GH-1185 media-create-lock) merge và branch này rebase** — pre-upload creates chạy song song với sample-product creates; thiếu lock toàn cục thì drizzle adapter mất row im lặng (đã chứng minh 2026-07-03). `GEN_PARALLEL_PAGES` không bị ràng buộc này.
+> ✅ **GATE RESOLVED (2026-07-03 17:00):** PR #1481 đã merge vào staging và branch này đã merge lại origin/staging (21b96a08) — `uploadBufferToMedia` giờ serialize qua media-create-lock toàn cục, pre-upload creates an toàn. Cả 2 flag đều bật được sau deploy.
 - ✅ Flags enabled on staging for 24h; monitor consistency_warning rate vs baseline
 - ✅ Enable for subset (e.g., US TZ business hours only) before global rollout
 - ✅ Instant rollback: set `GEN_PARALLEL_PAGES=false` + `GEN_POOL_PREUPLOAD=false` in Vercel Dashboard (no deploy needed)
