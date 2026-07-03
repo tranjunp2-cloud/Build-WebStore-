@@ -1,6 +1,7 @@
 'use client'
 
 import { useFormContext } from 'react-hook-form'
+import { AlertTriangle } from 'lucide-react'
 import { ProductFormValues } from './schema'
 import { CategorySelect, Category } from '../CategorySelect'
 import { ImageUploader } from '../ImageUploader'
@@ -59,7 +60,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                 <label className="text-[14px] font-medium text-foreground leading-[1.43]">
                     {t.dashboard.products.form.sections?.category || 'Category'} <span className="text-foreground">*</span>
                 </label>
-                <CategorySelect 
+                <CategorySelect
                     categories={categories}
                     selectedIds={categoryIds || []}
                     onChange={(ids) => setValue('categoryIds', ids, { shouldDirty: true, shouldValidate: true })}
@@ -81,6 +82,13 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                 />
                 {errors.images && (
                     <p className="text-xs text-destructive mt-1">{errors.images.message}</p>
+                )}
+                {/* Advisory hint (GH-1458): non-blocking — Save/Draft always succeeds regardless. */}
+                {(images || []).some((img) => !img.alt?.trim()) && (
+                    <p className="flex items-center gap-1.5 text-xs text-[hsl(var(--warning))] mt-1">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        {t.dashboard.products.form.sections?.imagesAltHint || 'Adding Alt text improves SEO and buyer reachability.'}
+                    </p>
                 )}
             </div>
         </div>

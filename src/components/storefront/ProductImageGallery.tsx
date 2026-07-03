@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 type GalleryImage = { image?: { url: string }; alt?: string }
 
 interface ProductImageGalleryProps {
     images: GalleryImage[]
     productName: string
+    siteName?: string
     primaryColor: string
 }
 
@@ -23,7 +25,7 @@ const navBtnStyle: CSSProperties = {
 
 const MAX_THUMBNAILS = 5
 
-export function ProductImageGallery({ images, productName, primaryColor }: ProductImageGalleryProps) {
+export function ProductImageGallery({ images, productName, siteName, primaryColor }: ProductImageGalleryProps) {
     const displayCount = Math.min(images.length, MAX_THUMBNAILS)
     const [selectedIdx, setSelectedIdx] = useState(0)
     const current = images[selectedIdx]
@@ -41,7 +43,7 @@ export function ProductImageGallery({ images, productName, primaryColor }: Produ
                     {current?.image?.url ? (
                         <img
                             src={current.image.url}
-                            alt={current.alt || productName}
+                            alt={buildProductAlt(current.alt, productName, siteName)}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                     ) : (
@@ -86,7 +88,7 @@ export function ProductImageGallery({ images, productName, primaryColor }: Produ
                             {img.image?.url && (
                                 <img
                                     src={img.image.url}
-                                    alt={img.alt || `${productName} ${i + 1}`}
+                                    alt={`${buildProductAlt(img.alt, productName, siteName)} ${i + 1}`}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                 />
                             )}

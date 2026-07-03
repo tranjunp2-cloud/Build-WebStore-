@@ -17,6 +17,7 @@ import {
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -89,6 +90,7 @@ function QuickViewModal({
     siteSlug,
     siteId,
     siteBasePath,
+    siteName,
 }: {
     product: QuickViewProductWithCurrency
     currency: string
@@ -96,6 +98,7 @@ function QuickViewModal({
     siteSlug: string
     siteId?: string
     siteBasePath: string
+    siteName?: string
 }) {
     const router = useRouter()
     const [selectedImage, setSelectedImage] = useState(0)
@@ -125,7 +128,7 @@ function QuickViewModal({
                     {/* Images */}
                     <div className="relative aspect-square overflow-hidden">
                         {images.length > 0 ? (
-                            <img src={images[selectedImage]} alt={product.imageAlts?.[selectedImage] || product.name} className="w-full h-full object-cover" />
+                            <img src={images[selectedImage]} alt={buildProductAlt(product.imageAlts?.[selectedImage], product.name, siteName)} className="w-full h-full object-cover" />
                         ) : (
                             <ImagePlaceholder size="lg" />
                         )}
@@ -263,12 +266,14 @@ function ProductCard({
     defaultCurrency,
     showQuickView,
     onQuickView,
+    siteName,
 }: {
     product: QuickViewProductWithCurrency
     minimal?: boolean
     defaultCurrency: string
     showQuickView: boolean
     onQuickView: (p: QuickViewProductWithCurrency) => void
+    siteName?: string
 }) {
     const currency = product._currency ?? defaultCurrency
     return (
@@ -278,7 +283,7 @@ function ProductCard({
         >
             <div className="relative aspect-square overflow-hidden">
                 {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.imageAlts?.[0] || product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={product.imageUrls[0]} alt={buildProductAlt(product.imageAlts?.[0], product.name, siteName)} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                     <ImagePlaceholder size="md" />
                 )}
@@ -404,7 +409,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                    <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                 </motion.div>
             ))}
         </div>
@@ -419,7 +424,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
             return (
                 <div className={`grid ${sparseGrid} gap-6 max-w-5xl mx-auto`}>
                     {displayProducts.map((product, i) => (
-                        <ProductCard key={i} product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                        <ProductCard key={i} product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                     ))}
                 </div>
             )
@@ -437,7 +442,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 >
                     {displayProducts.map((product, i) => (
                         <div key={i} className="snap-start shrink-0 w-[260px]">
-                            <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                            <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                         </div>
                     ))}
                 </div>
@@ -460,7 +465,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} minimal defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                    <ProductCard product={product} minimal defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                 </motion.div>
             ))}
         </div>
@@ -532,6 +537,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                         siteSlug={siteSlug}
                         siteId={siteId ?? undefined}
                         siteBasePath={siteBasePath}
+                        siteName={site?.name ?? undefined}
                     />
                 )}
             </AnimatePresence>

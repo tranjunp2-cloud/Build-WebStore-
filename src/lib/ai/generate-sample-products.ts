@@ -29,6 +29,13 @@ export interface SampleProduct {
     imageId?: number // Payload Media ID — undefined if image fetch failed
     galleryUrl?: string // Tier-C CDN URL used; carried to route.ts for FK-violation re-upload
     status: 'active'
+    // AI-estimated shipping fields (Tier-1 only — Tier-2 curated fallback never sets these).
+    // Undefined here means "AI didn't provide it" — the constant fallback (weight:1, dims:0) is
+    // applied downstream in generate-site/route.ts, mirroring BulkCreateModal.buildSavePayload().
+    weight?: number
+    length?: number
+    width?: number
+    height?: number
 }
 
 type ImageFailReason = 'rate_limited' | 'no_results' | 'gallery_failed' | 'upload_failed'
@@ -86,8 +93,8 @@ Output strictly JSON matching the requested schema. No markdown.`
     const prompt = `Generate ${count} sample products for a ${businessInfo.industry} business called "${businessInfo.businessName}".
 ${businessInfo.products ? `Products hint: ${businessInfo.products}` : ''}
 ${exclusion}
-Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)"}]}
-Use MYR pricing. No markdown. JSON only.`
+Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
+Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
     const completion = await openai.chat.completions.create({
         model: selectModel('product-description'),
@@ -106,12 +113,29 @@ Use MYR pricing. No markdown. JSON only.`
         throw new Error('AI returned empty products array')
     }
 
+    // AI-estimated shipping fields — left undefined when the model omits/malforms/hallucinates an
+    // out-of-range value, so generate-site/route.ts's `|| 1`/`|| 0` fallback (mirroring
+    // BulkCreateModal) applies downstream. NOT defaulted here — this function only reports what the
+    // AI actually said, and only when it's within the same bounds the product-form Zod schema
+    // enforces (schema.ts: weight 0.01-1000, dimensions 0-10000) — the AI's JSON response is
+    // untrusted input feeding directly into a `status:'active'` payload.create(), with no other
+    // validation layer downstream (unlike form saves, which go through Zod).
+    // Strict type check (not parseFloat(String(v))) — GPT's json_object mode returns real JSON
+    // numbers for numeric fields; parseFloat(String(v)) would lenient-parse garbage like "5kg" -> 5
+    // or an array [5,10] -> "5,10" -> 5, silently accepting malformed AI output as if it were valid.
+    const toBoundedNumber = (v: unknown, min: number, max: number): number | undefined =>
+        typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
+
     return (parsed.products as Array<Record<string, unknown>>).slice(0, count).map((p) => ({
         name: String(p.name ?? ''),
         shortDescription: String(p.shortDescription ?? '').slice(0, 100),
         description: String(p.description ?? ''),
         ...(includeBM && p.descriptionBM ? { descriptionBM: String(p.descriptionBM) } : {}),
         price: typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0,
+        weight: toBoundedNumber(p.weight, 0.01, 1000),
+        length: toBoundedNumber(p.length, 0, 10000),
+        width: toBoundedNumber(p.width, 0, 10000),
+        height: toBoundedNumber(p.height, 0, 10000),
         imageId: undefined,
         status: 'active' as const,
         sku: '',       // overridden in withImages.push

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ProductQuickViewConfigSchema } from '@/blocks/product-quick-view/config'
 import { pairImagesWithAlts } from '@/blocks/product-quick-view/index'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 // ─── TC-F08-01-15: Alt text carried through product block data pipeline ──────
 
@@ -116,4 +117,30 @@ describe('products-grid and products-featured single-image alt extraction [TC-F0
         expect(extractFirstImageAlt(undefined)).toBeUndefined()
     })
 
+})
+
+// ─── TC-09.38: alt-fallback threading — data pipeline output feeds buildProductAlt ─
+// GH-1458: storefront blocks (ProductImageGallery, products-grid, products-featured,
+// product-quick-view) all replaced `alt || productName` with
+// `buildProductAlt(alt, productName, siteName)`. This verifies the raw extraction
+// helpers above (pairImagesWithAlts / extractFirstImageAlt) compose correctly with
+// buildProductAlt — i.e. the blank/undefined values they produce still resolve to a
+// non-empty final alt once buildProductAlt is applied, matching Phase 1's exhaustive
+// unit coverage of buildProductAlt itself (src/__tests__/unit/products/build-product-alt.test.ts).
+
+describe('buildProductAlt composed with block data pipeline [TC-09.38]', () => {
+    it('pairImagesWithAlts blank alt ("") + buildProductAlt -> "{name} - {store}"', () => {
+        const { imageAlts } = pairImagesWithAlts([{ image: { url: 'https://cdn/a.jpg' } }])
+        expect(buildProductAlt(imageAlts[0], 'Baju Pink', 'My Shop')).toBe('Baju Pink - My Shop')
+    })
+
+    it('pairImagesWithAlts real alt passes through buildProductAlt unchanged', () => {
+        const { imageAlts } = pairImagesWithAlts([{ image: { url: 'https://cdn/a.jpg' }, alt: 'Front view' }])
+        expect(buildProductAlt(imageAlts[0], 'Baju Pink', 'My Shop')).toBe('Front view')
+    })
+
+    it('no images (undefined first-image alt) + buildProductAlt -> hard fallback when name/store also blank', () => {
+        const firstImageAlt: string | undefined = ([] as Array<{ alt?: string }>)[0]?.alt
+        expect(buildProductAlt(firstImageAlt, '', '')).toBe('Product image')
+    })
 })

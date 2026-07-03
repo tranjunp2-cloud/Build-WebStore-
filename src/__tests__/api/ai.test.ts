@@ -8,6 +8,7 @@ import { POST as SeoGeneratePOST } from '@/app/api/ai/seo-generate/route'
 import { POST as BulkParsePOST } from '@/app/api/ai/products-bulk-parse/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
+import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
 vi.mock('@/lib/auth', () => ({
@@ -55,6 +56,7 @@ vi.mock('payload', () => {
             }),
             findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
                 if (collection === 'tenants' && id === mockTenant.id) return mockTenant
+                if (collection === 'media') return { id, url: 'https://example.com/media.jpg' }
                 return null
             }),
             find: vi.fn().mockImplementation(async ({ collection }) => {
@@ -391,6 +393,155 @@ describe('AI Streaming APIs', () => {
              )
              expect(siteCreateCall).toBeDefined()
              expect(siteCreateCall![0].data.generationLocale).toBe('ja')
+        })
+
+        // GH-1458 — generate-site creates products directly via payload.create(), bypassing the
+        // publish-guard/alt-fallback logic in saveProductAction. These verify the parity fix.
+        // Phase 2 correction: generateSampleProducts' AI tier estimates weight/dimensions PER
+        // PRODUCT (mirrors products-bulk-parse) — the constants below are the fallback for when
+        // the AI omits them, NOT the primary source. Both cases covered.
+        it('[TC-09.41] sample product create falls back to weight:1/dimensions:0 when SampleProduct omits them (GH-1458)', async () => {
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Bread',
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    status: 'active',
+                    // weight/length/width/height intentionally omitted — AI didn't estimate them
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                })
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+            const productCreateCall = createCalls.find(
+                (c: [{ collection: string; data?: { weight?: number; dimensions?: unknown } }]) => c[0].collection === 'products'
+            )
+            expect(productCreateCall).toBeDefined()
+            expect(productCreateCall![0].data.weight).toBe(1)
+            expect(productCreateCall![0].data.dimensions).toEqual({ length: 0, width: 0, height: 0 })
+        })
+
+        it('[TC-09.44] sample product create falls back to weight:1 when AI hallucinates weight:0 (GH-1458)', async () => {
+            // Regression guard: `product.weight || 1` (not `?? 1`) — publish-guard.ts treats weight:0
+            // as invalid (never a real physical weight), and this route bypasses that guard entirely
+            // by creating status:'active' directly, so this fallback is the only enforcement point.
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Bread',
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    status: 'active',
+                    weight: 0,
+                    length: 0,
+                    width: 0,
+                    height: 0,
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                })
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+            const productCreateCall = createCalls.find(
+                (c: [{ collection: string; data?: { weight?: number; dimensions?: unknown } }]) => c[0].collection === 'products'
+            )
+            expect(productCreateCall).toBeDefined()
+            expect(productCreateCall![0].data.weight).toBe(1)
+        })
+
+        it('[TC-09.43] sample product create passes through AI-estimated weight/dimensions unchanged (GH-1458)', async () => {
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Sofa',
+                    shortDescription: 'Comfy sofa',
+                    description: 'A big comfy sofa',
+                    price: 1200,
+                    sku: 'SOFA-001',
+                    inventory: 0,
+                    status: 'active',
+                    weight: 45.5,
+                    length: 200,
+                    width: 90,
+                    height: 85,
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Furniture Co', industry: 'Home', products: 'Sofa', shortDescription: 'Comfy furniture' }
+                })
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+            const productCreateCall = createCalls.find(
+                (c: [{ collection: string; data?: { weight?: number; dimensions?: unknown } }]) => c[0].collection === 'products'
+            )
+            expect(productCreateCall).toBeDefined()
+            expect(productCreateCall![0].data.weight).toBe(45.5)
+            expect(productCreateCall![0].data.dimensions).toEqual({ length: 200, width: 90, height: 85 })
+        })
+
+        it('[TC-09.42] sample product create persists alt-text fallback (GH-1458)', async () => {
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: 'Sample Bread',
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    imageId: 555,
+                    status: 'active',
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                })
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+            const productCreateCall = createCalls.find(
+                (c: [{ collection: string; data?: { images?: Array<{ alt?: string }> } }]) => c[0].collection === 'products'
+            )
+            expect(productCreateCall).toBeDefined()
+            // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
+            expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread - AI Bakery')
         })
     })
 

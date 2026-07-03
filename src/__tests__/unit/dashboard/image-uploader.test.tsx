@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 // Mock dependencies
 vi.mock('sonner', () => ({
@@ -15,6 +15,17 @@ vi.mock('lucide-react', () => ({
     X: () => <span data-testid="x-icon">X</span>,
     Loader2: () => <span data-testid="loader-icon">Loading</span>,
     ImageIcon: () => <span data-testid="image-icon">Image</span>,
+    AlertCircle: () => <span data-testid="alert-icon">Alert</span>,
+    Pencil: () => <span data-testid="pencil-icon">Pencil</span>,
+}))
+
+// GH-1458 comment ("Alt text Popover"): ImageUploader now calls useI18n() for the Popover's
+// strings. No I18nProvider in this test file → mock with an empty-but-present `dashboard`
+// object so `t.dashboard.imageUploader?.x` optional-chains safely and falls through to the
+// component's inline fallback strings (e.g. '+ Add Alt text') — same pattern as
+// src/__tests__/unit/dashboard/bulk-create-save.test.tsx.
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({ t: { dashboard: { imageUploader: {} } }, locale: 'en' }),
 }))
 
 import { ImageUploader } from '@/components/dashboard/ImageUploader'
@@ -81,21 +92,90 @@ describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
         expect(screen.getByText('Max 5 images, 5MB each')).toBeDefined()
     })
 
-    // ─── TC-F08-01-15: Alt text input ──────────────────────────────────────
+    // ─── TC-F08-01-15: Alt text Popover trigger ─────────────────────────────
+    // GH-1458 comment: the inline <input> was replaced with a trigger button that opens a
+    // Popover (see TC-F08-01-33..37 below for the Popover's own behavior).
 
-    it('shows alt input when showAltInput is true [TC-F08-01-15]', () => {
+    it('shows "+ Add Alt text" trigger when showAltInput is true and image has no alt [TC-F08-01-15]', () => {
         render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} showAltInput={true} />)
-        expect(screen.getByPlaceholderText('Alt text...')).toBeDefined()
-    })
-
-    it('hides alt input when showAltInput is false (default) [TC-F08-01-15]', () => {
-        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} />)
+        expect(screen.getByText('+ Add Alt text')).toBeDefined()
         expect(screen.queryByPlaceholderText('Alt text...')).toBeNull()
     })
 
-    it('shows amber counter when alt text exceeds 125 chars [TC-F08-01-15]', () => {
-        const longAlt = 'a'.repeat(126)
+    it('hides the alt trigger when showAltInput is false (default) [TC-F08-01-15]', () => {
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg' }]} />)
+        expect(screen.queryByText('+ Add Alt text')).toBeNull()
+    })
+
+    it('[TC-F08-01-15] Popover counter turns red at the 125-char hard limit', () => {
+        const maxAlt = 'a'.repeat(125)
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg', alt: maxAlt }]} showAltInput={true} />)
+
+        // Open the popover via the has-alt trigger (truncated text button)
+        fireEvent.click(screen.getByTitle(maxAlt))
+
+        const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+        expect(textarea.value).toBe(maxAlt)
+        const counter = screen.getByText('125/125')
+        expect(counter.className).toContain('destructive')
+    })
+
+    // ─── TC-F08-01-33..37: Popover open/save/cancel behavior ────────────────
+
+    it('[TC-F08-01-33] has-alt trigger shows truncated text + Pencil icon, not "+ Add Alt text"', () => {
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg', alt: 'Front view' }]} showAltInput={true} />)
+        expect(screen.getByText('Front view')).toBeDefined()
+        expect(screen.getByTestId('pencil-icon')).toBeDefined()
+        expect(screen.queryByText('+ Add Alt text')).toBeNull()
+    })
+
+    it('[TC-F08-01-34] clicking trigger opens Popover with a seeded Textarea and Cancel/Save buttons', () => {
+        render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg', alt: 'Front view' }]} showAltInput={true} />)
+
+        fireEvent.click(screen.getByTitle('Front view'))
+
+        const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+        expect(textarea.value).toBe('Front view')
+        expect(screen.getByText('Cancel')).toBeDefined()
+        expect(screen.getByText('Save')).toBeDefined()
+    })
+
+    it('[TC-F08-01-35] Save commits the trimmed draft via onChange and closes the popover', () => {
+        const onChange = vi.fn()
+        render(<ImageUploader {...defaultProps} onChange={onChange} value={[{ id: 'img1', url: '/img1.jpg' }]} showAltInput={true} />)
+
+        fireEvent.click(screen.getByText('+ Add Alt text'))
+        const textarea = screen.getByRole('textbox')
+        fireEvent.change(textarea, { target: { value: '  New alt text  ' } })
+        fireEvent.click(screen.getByText('Save'))
+
+        expect(onChange).toHaveBeenCalledWith([{ id: 'img1', url: '/img1.jpg', alt: 'New alt text' }])
+        expect(screen.queryByRole('textbox')).toBeNull()
+    })
+
+    it('[TC-F08-01-36] Cancel discards the draft — onChange not called, committed alt unchanged', () => {
+        const onChange = vi.fn()
+        render(<ImageUploader {...defaultProps} onChange={onChange} value={[{ id: 'img1', url: '/img1.jpg', alt: 'Original' }]} showAltInput={true} />)
+
+        fireEvent.click(screen.getByTitle('Original'))
+        const textarea = screen.getByRole('textbox')
+        fireEvent.change(textarea, { target: { value: 'Typed but not saved' } })
+        fireEvent.click(screen.getByText('Cancel'))
+
+        expect(onChange).not.toHaveBeenCalled()
+        expect(screen.getByText('Original')).toBeDefined()
+        expect(screen.queryByRole('textbox')).toBeNull()
+    })
+
+    it('[TC-F08-01-37] pre-existing alt >125 chars is shown in full on open, not silently truncated', () => {
+        const longAlt = 'b'.repeat(130)
         render(<ImageUploader {...defaultProps} value={[{ id: 'img1', url: '/img1.jpg', alt: longAlt }]} showAltInput={true} />)
-        expect(screen.getByText('126/125')).toBeDefined()
+
+        fireEvent.click(screen.getByTitle(longAlt))
+
+        const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+        expect(textarea.value).toBe(longAlt)
+        expect(textarea.value.length).toBe(130)
+        expect(textarea.getAttribute('maxlength')).toBe('125')
     })
 })

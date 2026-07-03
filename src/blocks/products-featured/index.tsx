@@ -14,6 +14,7 @@ import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
 import type { ThemeConfig } from '../types'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -41,11 +42,12 @@ function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
     )
 }
 
-function HeroProductView({ product, block, theme, siteBasePath }: {
+function HeroProductView({ product, block, theme, siteBasePath, siteName }: {
     product: FeaturedProduct
     block: { sectionLabel?: string }
     theme: ThemeConfig
     siteBasePath: string
+    siteName?: string
 }) {
     const isFallback = product.isFallback ?? false
 
@@ -59,7 +61,7 @@ function HeroProductView({ product, block, theme, siteBasePath }: {
                         {product.image ? (
                             <img
                                 src={product.image}
-                                alt={product.imageAlt || product.name}
+                                alt={buildProductAlt(product.imageAlt, product.name, siteName)}
                                 className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal"
                             />
                         ) : (
@@ -251,7 +253,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
                             {p.image ? (
-                                <img src={p.image} alt={p.imageAlt || p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
+                                <img src={p.image} alt={buildProductAlt(p.imageAlt, p.name, site?.name ?? undefined)} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
                             ) : (
                                 <div className="w-full h-[500px] bg-black/5 flex items-center justify-center text-6xl opacity-20">🛍️</div>
                             )}
@@ -291,6 +293,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
             block={block}
             theme={theme}
             siteBasePath={siteBasePath}
+            siteName={site?.name ?? undefined}
         />
     )
 }

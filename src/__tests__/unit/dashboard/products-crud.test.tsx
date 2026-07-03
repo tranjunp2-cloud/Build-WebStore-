@@ -44,6 +44,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        shippingWeight: 0.5,
         urlSlug: 'valid-product-name',
     })
 
@@ -103,12 +104,32 @@ describe('Products CRUD Form Zod Validation Logic', () => {
     it('returns error when weight is zero or negative (TC-F08-01-01d)', () => {
         const resZero = productFormSchema.safeParse({ ...getValidBaseData(), shippingWeight: 0 })
         expect(resZero.success).toBe(false)
-        
+
         const resNeg = productFormSchema.safeParse({ ...getValidBaseData(), shippingWeight: -1.5 })
         expect(resNeg.success).toBe(false)
-        
+
         if (!resNeg.success) {
             expect(resNeg.error.flatten().fieldErrors.shippingWeight?.[0]).toMatch(/greater than 0/)
+        }
+    })
+
+    it('returns error when weight is omitted — required in both variant and non-variant mode (GH-1458)', () => {
+        const { shippingWeight: _omit, ...withoutWeight } = getValidBaseData()
+        const result = productFormSchema.safeParse(withoutWeight)
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.shippingWeight?.[0]).toMatch(/Weight is required/)
+        }
+
+        const variantResult = productFormSchema.safeParse({
+            ...withoutWeight,
+            hasVariants: true,
+            baseSku: 'SKU-123',
+            variants: [{ id: 'v1', variantName: 'Red', skuCode: 'SKU-123-RED', price: 50, stock: 5 }],
+        })
+        expect(variantResult.success).toBe(false)
+        if (!variantResult.success) {
+            expect(variantResult.error.flatten().fieldErrors.shippingWeight?.[0]).toMatch(/Weight is required/)
         }
     })
 
@@ -173,6 +194,7 @@ describe('F08-bug-1032-01: variant product price/SKU schema contract', () => {
             basePrice: 0,
             baseSku: 'TSHIRT-001',
             baseInventory: 0,
+            shippingWeight: 0.5,
             urlSlug: 't-shirt',
             variants: [{ id: 'v1', variantName: 'White - M', skuCode: 'TSHIRT-001-WHT-M', price: 0, stock: 10 }],
         })
@@ -211,6 +233,7 @@ describe('TC-F08-06: Attributes schema validation', () => {
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        shippingWeight: 0.5,
         urlSlug: 'valid-product-name',
     })
 
