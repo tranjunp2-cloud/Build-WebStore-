@@ -37,7 +37,11 @@ export function PreviewScripts() {
         const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
-        
+        // Mobile/tablet compact chrome (PreviewFrame sets ?compact=1 when disableDragDrop is
+        // on) — inline WYSIWYG text editing is desktop-only per F05-v2; text on mobile/tablet
+        // is edited via the block-settings sheet's fields instead. Image edit stays enabled.
+        const isCompactPreview = new URLSearchParams(window.location.search).get('compact') === '1'
+
         let hoveredEl: HTMLElement | null = null
         let hoverTimer: number | null = null
         let hoveredBlock: Element | null = null
@@ -331,6 +335,7 @@ export function PreviewScripts() {
         }
 
         const onTextClick = (e: MouseEvent) => {
+            if (isCompactPreview) return
             let target = e.target as HTMLElement
             if ((target as HTMLElement).closest('[data-editor-control]')) return
             const blockContainer = target.closest('[data-block-index]')
@@ -1118,11 +1123,20 @@ export function PreviewScripts() {
             if (e.data?.type === 'SCROLL_TO_BLOCK') {
                 const idx = e.data.index
                 if (idx !== undefined && idx !== null) {
-                    const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement
-                    if (el) {
-                        const top = el.getBoundingClientRect().top + window.scrollY
-                        window.scrollTo({ top: top - 80, behavior: 'smooth' })
+                    // The preceding UPDATE_FULL_LAYOUT message re-renders React state
+                    // asynchronously, so the target block's DOM node may not exist on the
+                    // very next frame yet — retry across a few frames before giving up.
+                    let attempts = 0
+                    const tryScroll = () => {
+                        const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement | null
+                        if (el) {
+                            const top = el.getBoundingClientRect().top + window.scrollY
+                            window.scrollTo({ top: top - 80, behavior: 'smooth' })
+                        } else if (attempts++ < 20) {
+                            requestAnimationFrame(tryScroll)
+                        }
                     }
+                    tryScroll()
                 }
             }
         }
