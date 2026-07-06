@@ -261,7 +261,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                         </div>
                     </div>
 
-                    {/* Activity Timeline (contact-form only) */}
+                    {/* Message History (contact-form only) */}
                     {record.source === 'contact-form' && (
                         <div className="flex flex-col gap-6">
                             {/* Section title */}
