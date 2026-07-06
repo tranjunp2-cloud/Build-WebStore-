@@ -24,6 +24,7 @@ import PricingSettings from './PricingSettings'
 import FeatureComparisonSettings from './FeatureComparisonSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
+import { FontSelect } from './FontSelect'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FeatureComparisonConfig } from '@/blocks/feature-comparison/config'
@@ -505,17 +506,23 @@ function SettingsPanelInner({
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.headingFont}</label>
-                <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
-                    {HEADING_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <FontSelect
+                    role="heading"
+                    label={s.headingFont}
+                    value={(theme.fontHeading as string) || 'Outfit'}
+                    onChange={v => onThemeChange('fontHeading', v)}
+                    options={HEADING_FONT_OPTIONS}
+                />
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.bodyFont}</label>
-                <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 py-1.5 text-xs text-white outline-none">
-                    {BODY_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <FontSelect
+                    role="body"
+                    label={s.bodyFont}
+                    value={(theme.fontBody as string) || 'Inter'}
+                    onChange={v => onThemeChange('fontBody', v)}
+                    options={BODY_FONT_OPTIONS}
+                />
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.colorMode}</label>
