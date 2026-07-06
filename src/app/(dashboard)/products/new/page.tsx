@@ -50,7 +50,9 @@ export default function NewProductPage() {
                 width: data.shippingWidth || 0,
                 height: data.shippingHeight || 0,
             },
-            images: data.images?.map(img => ({ image: img.id, alt: img.alt?.trim() || data.name })) || [],
+            // Alt fallback ("{name} - {store}") is computed server-side (saveProductAction),
+            // which has the tenant's store name — send the raw trimmed alt only (GH-1458).
+            images: data.images?.map(img => ({ image: img.id, alt: img.alt?.trim() || '' })) || [],
             hasVariants: data.hasVariants,
             variantConfigs: data.hasVariants ? data.tiers?.map((t) => ({
                 name: t.name,

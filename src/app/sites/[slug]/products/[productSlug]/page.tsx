@@ -249,6 +249,7 @@ export default async function ProductDetailPage({ params }: Props) {
                 <ProductImageGallery
                     images={images}
                     productName={p.name}
+                    siteName={site.name ?? undefined}
                     primaryColor={primaryColor}
                 />
 

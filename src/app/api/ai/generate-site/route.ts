@@ -33,6 +33,7 @@ import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
@@ -1245,13 +1246,32 @@ export async function POST(req: NextRequest) {
                     inventory: product.inventory,
                     ...(sampleCategoryId ? { category: [sampleCategoryId] } : {}),
                     status: 'active' as const,
+                    // Publishing gate (GH-1458) requires weight > 0. Tier-1 AI estimates weight/
+                    // dimensions per product (generate-sample-products.ts prompt, mirrors
+                    // products-bulk-parse); Tier-2 curated fallback never sets these. `||` fallback
+                    // constants (matching BulkCreateModal.buildSavePayload() exactly, NOT `??`) apply
+                    // when the AI omitted a value OR hallucinated weight:0 — publish-guard.ts treats
+                    // 0 as invalid too. This create is now also gated by the collection-level
+                    // publishGateHook (src/collections/Products.ts) same as every other write path,
+                    // so this `||` fallback is defense-in-depth, not the only enforcement point.
+                    weight: product.weight || 1,
+                    dimensions: {
+                        length: product.length || 0,
+                        width: product.width || 0,
+                        height: product.height || 0,
+                    },
                 }
+                // Persisted alt fallback (GH-1458) — mirrors saveProductAction's buildProductAlt()
+                // call, but result.siteName is already in scope here so no extra query is needed.
+                // Re-capped at 500 (matches saveProductAction's cap, actions.ts) since `name` here
+                // is unbounded AI output, unlike the form's client-validated 120-char product name.
+                const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
                     await payload.create({
                         collection: 'products',
                         data: {
                             ...baseData,
-                            ...(safeImageId ? { images: [{ image: safeImageId }] } : {}),
+                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                         },
                     })
                     productsCreatedCount++
@@ -1277,7 +1297,7 @@ export async function POST(req: NextRequest) {
                                 try {
                                     await payload.create({
                                         collection: 'products',
-                                        data: { ...baseData, images: [{ image: retryImageId }] },
+                                        data: { ...baseData, images: [{ image: retryImageId, alt: fallbackAlt }] },
                                     })
                                     productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)

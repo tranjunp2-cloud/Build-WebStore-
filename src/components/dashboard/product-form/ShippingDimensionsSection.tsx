@@ -20,7 +20,7 @@ export function ShippingDimensionsSection() {
                 {/* Weight */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
-                        {t.dashboard.products.form.sections?.weight || 'Weight (kg)'}
+                        {t.dashboard.products.form.sections?.weight || 'Weight (kg)'} <span className="text-foreground">*</span>
                     </label>
                     <div className="relative flex items-center">
                         <Input

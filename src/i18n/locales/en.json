@@ -1540,6 +1540,7 @@
                     "uniqueTiers": "Option names must be unique (no duplicate categories)",
                     "weightMin": "Weight must be greater than 0",
                     "weightMax": "Weight is too large",
+                    "weightRequired": "Weight is required",
                     "dimMin": "Dimension must be 0 or greater",
                     "dimMax": "Dimension is too large",
                     "maxTiers": "Maximum 2 variant tiers allowed",
@@ -1594,6 +1595,8 @@
                 "restored": "Product restored",
                 "failedRestore": "Failed to restore product",
                 "failedUpdateStatus": "Failed to update status",
+                "publishGateTitle": "Cannot activate yet",
+                "publishGateAck": "Got it",
                 "failedDelete": "Failed to delete product",
                 "productDeleted": "Product deleted.",
                 "size": "Size:",
@@ -1618,7 +1621,8 @@
                     "tiers": "Variant Options",
                     "basePrice": "Price",
                     "baseSku": "SKU Code",
-                    "baseInventory": "Inventory"
+                    "baseInventory": "Inventory",
+                    "weight": "Weight"
                 },
                 "sections": {
                     "general": "General Information",
@@ -1626,6 +1630,7 @@
                     "productNamePlaceholder": "Enter product name",
                     "category": "Category",
                     "images": "Images (Up to 5 images, each < 5MB)",
+                    "imagesAltHint": "Adding Alt text improves SEO and buyer reachability.",
                     "variants": "Variants & Inventory",
                     "hasVariants": "Product has multiple Options/Variants",
                     "hasVariantsExample": "Example: color, size, style",
@@ -1800,6 +1805,15 @@
                 }
             },
             "subtitle": "Manage store products"
+        },
+        "imageUploader": {
+            "addAltText": "+ Add Alt text",
+            "editAltText": "Edit Alt text",
+            "label": "Alt text",
+            "placeholder": "Briefly describe this image…",
+            "helperText": "Briefly describe the image to improve your SEO score on Google.",
+            "cancel": "Cancel",
+            "save": "Save"
         },
         "customers": {
             "title": "Contact Leads",

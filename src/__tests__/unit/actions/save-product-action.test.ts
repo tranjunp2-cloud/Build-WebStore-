@@ -401,6 +401,179 @@ describe('saveProductAction', () => {
             ]))
         })
     })
+
+    // ── TC-09.38: alt-text fallback threading (GH-1458) ─────────────────────────
+
+    describe('alt-text fallback (GH-1458)', () => {
+        it('[TC-09.38] blank alt + tenant has a site name → "{name} - {store}"', async () => {
+            vi.mocked(tenantIdForQuery).mockReturnValue(83)
+            mockFind.mockImplementation((args: { collection: string }) =>
+                args.collection === 'sites'
+                    ? Promise.resolve({ docs: [{ id: 1, name: 'My Shop' }] })
+                    : Promise.resolve({ docs: [] }))
+
+            await saveProductAction({ name: 'Baju Pink', images: [{ image: 10, alt: '' }] })
+
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink - My Shop' }] }),
+            }))
+        })
+
+        it('[TC-09.38] non-blank alt passes through unchanged even when a store name is available', async () => {
+            vi.mocked(tenantIdForQuery).mockReturnValue(83)
+            mockFind.mockImplementation((args: { collection: string }) =>
+                args.collection === 'sites'
+                    ? Promise.resolve({ docs: [{ id: 1, name: 'My Shop' }] })
+                    : Promise.resolve({ docs: [] }))
+
+            await saveProductAction({ name: 'Baju Pink', images: [{ image: 10, alt: 'Custom alt text' }] })
+
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ images: [{ image: 10, alt: 'Custom alt text' }] }),
+            }))
+        })
+
+        it('[TC-09.38] no tenant → no store lookup, falls back to product name only', async () => {
+            vi.mocked(tenantIdForQuery).mockReturnValue(null)
+
+            await saveProductAction({ name: 'Baju Pink', images: [{ image: 10, alt: '  ' }] })
+
+            expect(mockFind).not.toHaveBeenCalled()
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ images: [{ image: 10, alt: 'Baju Pink' }] }),
+            }))
+        })
+
+        it('[TC-09.38] no images provided → placeholder image gets the same buildProductAlt fallback', async () => {
+            vi.mocked(tenantIdForQuery).mockReturnValue(83)
+            mockGetOrCreateCrateCartonId.mockResolvedValue(99)
+            mockFind.mockImplementation((args: { collection: string }) =>
+                args.collection === 'sites'
+                    ? Promise.resolve({ docs: [{ id: 1, name: 'My Shop' }] })
+                    : Promise.resolve({ docs: [] }))
+
+            await saveProductAction({ name: 'Baju Pink' })
+
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ images: [{ image: 99, alt: 'Baju Pink - My Shop' }] }),
+            }))
+        })
+    })
+
+    // ── TC-09.39: save-as-draft regression (GH-1458) ────────────────────────────
+    // Publishing gate (productPublishBlocks) never blocks a save that leaves `status` untouched
+    // (Draft stays Draft) — only an explicit `status:'active'` in the payload triggers the gate
+    // (see 'publishing gate (direct saveProductAction call)' describe below).
+
+    describe('save-as-draft regression (GH-1458)', () => {
+        it('[TC-09.39] missing category AND missing image alt → create succeeds (no gate on save)', async () => {
+            const draftProduct = {
+                name: 'Draft Product No Category No Alt',
+                price: 100,
+                images: [{ image: 10, alt: '' }],
+                // category intentionally omitted
+            }
+
+            await expect(saveProductAction(draftProduct)).resolves.not.toThrow()
+
+            expect(mockCreate).toHaveBeenCalledOnce()
+            const call = mockCreate.mock.calls[0][0]
+            expect(call.data.category).toBeUndefined()
+            // saveProductAction never forces `status` — Payload's collection defaultValue:'draft'
+            // (src/collections/Products.ts) applies at the DB layer for new products.
+            expect(call.data.status).toBeUndefined()
+        })
+
+        it('[TC-09.39] editing an existing product (id provided), same missing fields → update succeeds', async () => {
+            const draftProduct = {
+                name: 'Draft Product Edit',
+                images: [{ image: 10, alt: '' }],
+            }
+
+            await expect(saveProductAction(draftProduct, 42)).resolves.not.toThrow()
+
+            expect(mockUpdate).toHaveBeenCalledOnce()
+        })
+    })
+
+    // ── TC-09.45: publishing gate on direct saveProductAction calls (GH-1458, code-review fix) ──
+    // Adversarial review found saveProductAction never called productPublishBlocks(), so a direct
+    // call (bypassing the React form, which never sends `status` on edits) could smuggle
+    // status:'active' + missing core fields straight past the gate. Fixed by gating whenever the
+    // incoming `data.status === 'active'`, evaluated against the merged existing+incoming fields.
+
+    describe('publishing gate on direct saveProductAction calls (GH-1458)', () => {
+        it('[TC-09.45] create with status:active and missing sku/inventory/weight → throws PUBLISH_BLOCKED, no create', async () => {
+            const incompleteActiveProduct = {
+                name: 'Sneaky Active Product',
+                price: 100,
+                status: 'active',
+                // sku/inventory/weight intentionally omitted
+            }
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction(incompleteActiveProduct)
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('PUBLISH_BLOCKED')
+            expect(parsed.missingFields.sort()).toEqual(['inventory', 'sku', 'weight'])
+            expect(mockCreate).not.toHaveBeenCalled()
+        })
+
+        it('[TC-09.45] edit with status:active, existing doc missing weight → throws PUBLISH_BLOCKED, no update', async () => {
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', price: 100, sku: 'SKU-1', inventory: 10 })
+            const activatePayload = { name: 'Test Product', status: 'active' }
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction(activatePayload, 42)
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('PUBLISH_BLOCKED')
+            expect(parsed.missingFields).toEqual(['weight'])
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+
+        it('[TC-09.45] edit with status:active, merged existing+incoming fields are complete → update proceeds', async () => {
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', price: 100, sku: 'SKU-1', inventory: 10, weight: 500 })
+            const activatePayload = { name: 'Test Product', status: 'active' }
+
+            await expect(saveProductAction(activatePayload, 42)).resolves.not.toThrow()
+            expect(mockUpdate).toHaveBeenCalledOnce()
+        })
+
+        it('[TC-09.45] create with status:active and all core fields present (including weight) → create proceeds', async () => {
+            const completeActiveProduct = {
+                name: 'Complete Active Product',
+                price: 100,
+                sku: 'SKU-COMPLETE',
+                inventory: 10,
+                weight: 500,
+                status: 'active',
+            }
+
+            await expect(saveProductAction(completeActiveProduct)).resolves.not.toThrow()
+            expect(mockCreate).toHaveBeenCalledOnce()
+        })
+    })
+
+    // ── TC-09.50: id===0 falsy-zero bug (code-review fix) ──────────────────────
+    describe('id===0 routes to update, not create (TC-09.50)', () => {
+        it('[TC-09.50] saveProductAction(data, 0) calls payload.update, not payload.create', async () => {
+            mockFindByID.mockResolvedValue({ id: 0, name: 'Test Product' })
+
+            await saveProductAction({ name: 'Test Product' }, 0)
+
+            expect(mockUpdate).toHaveBeenCalledOnce()
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 0 }))
+            expect(mockCreate).not.toHaveBeenCalled()
+        })
+    })
 })
 
 describe('updateProductFieldAction', () => {
@@ -408,7 +581,10 @@ describe('updateProductFieldAction', () => {
         vi.clearAllMocks()
         vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
         mockUpdate.mockResolvedValue({ id: 42, status: 'active' })
-        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68 })
+        // price/sku/inventory/weight set so these non-gate-focused tests pass the GH-1458 publishing
+        // gate by default when they set status:'active' — see 'publishing gate' describe below
+        // for dedicated gate coverage.
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68, price: 100, sku: 'SKU-001', inventory: 10, weight: 500 })
     })
 
     // ── ID Guard ──────────────────────────────────────────────────────────────
@@ -488,6 +664,9 @@ describe('updateProductFieldAction', () => {
             id: 42,
             name: 'Test Product',
             tenant: 68,
+            hasVariants: true,
+            sku: 'BASE-SKU',
+            weight: 500,
             variants: [
                 { id: 'uuid-v1', name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 },
                 { id: 'uuid-v2', name: 'Blue/M', sku: 'P-B-M', price: 10, stock: 3 },
@@ -517,5 +696,100 @@ describe('updateProductFieldAction', () => {
         // Non-id fields must be preserved
         expect(call.data.variants[0]).toMatchObject({ name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 })
         expect(call.data.variantConfigs[0]).toMatchObject({ name: 'Color' })
+    })
+
+    // ── TC-09.37: soft validation publishing gate (GH-1458) ────────────────────
+
+    describe('publishing gate (GH-1458)', () => {
+        it('[TC-09.37] status:active on product missing price/sku/inventory/weight → throws PUBLISH_BLOCKED, no update', async () => {
+            // Arrange — persisted product has none of the core fields
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68 })
+
+            // Act & Assert
+            let thrown: Error | null = null
+            try {
+                await updateProductFieldAction(42, { status: 'active' })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('PUBLISH_BLOCKED')
+            expect(parsed.missingFields.sort()).toEqual(['inventory', 'price', 'sku', 'weight'])
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+
+        it('[TC-09.37] status:active on complete product → proceeds to payload.update', async () => {
+            // Arrange — beforeEach default already sets price/sku/inventory
+
+            // Act
+            await updateProductFieldAction(42, { status: 'active' })
+
+            // Assert
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'products',
+                id: 42,
+                data: expect.objectContaining({ status: 'active' }),
+            }))
+        })
+
+        it('[TC-09.37] status:active on variant product missing variants matrix → throws PUBLISH_BLOCKED', async () => {
+            // Arrange — hasVariants true but matrix empty
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68, hasVariants: true, sku: 'BASE-SKU', weight: 500, variants: [] })
+
+            // Act & Assert
+            let thrown: Error | null = null
+            try {
+                await updateProductFieldAction(42, { status: 'active' })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('PUBLISH_BLOCKED')
+            expect(parsed.missingFields).toEqual(['variants'])
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
+
+        it('[TC-09.37] status:archived on incomplete product → gate NOT applied, update proceeds', async () => {
+            // Arrange — incomplete product, but only Draft/Archived -> Active is gated
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68 })
+
+            // Act
+            await updateProductFieldAction(42, { status: 'archived' })
+
+            // Assert — no gate check for non-active transitions
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'products',
+                id: 42,
+                data: expect.objectContaining({ status: 'archived' }),
+            }))
+        })
+
+        it('[TC-09.37] price:0 and inventory:0 on complete-otherwise product → NOT blocked', async () => {
+            // Arrange — zero values must not be treated as missing (matches Phase 1 guard behavior)
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68, price: 0, sku: 'SKU-ZERO', inventory: 0, weight: 500 })
+
+            // Act
+            await updateProductFieldAction(42, { status: 'active' })
+
+            // Assert
+            expect(mockUpdate).toHaveBeenCalledOnce()
+        })
+
+        it('[TC-09.37] weight:0 on otherwise-complete product → throws PUBLISH_BLOCKED (weight required)', async () => {
+            // Arrange — weight:0 is the collection default, never a valid physical weight
+            mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68, price: 100, sku: 'SKU-001', inventory: 10, weight: 0 })
+
+            // Act & Assert
+            let thrown: Error | null = null
+            try {
+                await updateProductFieldAction(42, { status: 'active' })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('PUBLISH_BLOCKED')
+            expect(parsed.missingFields).toEqual(['weight'])
+            expect(mockUpdate).not.toHaveBeenCalled()
+        })
     })
 })

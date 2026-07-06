@@ -79,3 +79,17 @@ describe('TC-GH1290-CM-06: description optional', () => {
         expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
     })
 })
+
+describe('TC-GH1290-CM-07: hideCancel (GH-1458 publish-gate alert modal)', () => {
+    it('renders only the confirm button when hideCancel is true', () => {
+        setup({ hideCancel: true, cancelLabel: undefined })
+        expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
+        expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
+    })
+
+    it('still renders both buttons when hideCancel is omitted (default false)', () => {
+        setup()
+        expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy()
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
+    })
+})

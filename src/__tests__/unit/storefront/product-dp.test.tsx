@@ -235,4 +235,14 @@ describe('ProductImageGallery (TC-F09-1451)', () => {
             expect(getByLabelText(`View image ${i}`)).toBeInTheDocument()
         }
     })
+
+    it('TC-F09-1451-07 — thumbnail <img alt> does not append an index to a real merchant-authored alt (code-review fix)', () => {
+        // The parent <button> already carries aria-label={`View image ${i+1}`} — appending the
+        // index to the <img>'s own alt as well corrupted real alt text (e.g. "Front view 2").
+        const { getByLabelText } = render(
+            <ProductImageGallery images={mockImages} productName="Test Product" primaryColor="#0ea5e9" />
+        )
+        const thumb2 = getByLabelText('View image 2').querySelector('img')
+        expect(thumb2).toHaveAttribute('alt', 'Ảnh 2')
+    })
 })

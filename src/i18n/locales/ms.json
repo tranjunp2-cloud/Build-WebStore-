@@ -1540,6 +1540,7 @@
                     "uniqueTiers": "Nama pilihan mesti unik (tiada kategori pendua)",
                     "weightMin": "Berat mesti lebih dari 0",
                     "weightMax": "Berat terlalu besar",
+                    "weightRequired": "Berat diperlukan",
                     "dimMin": "Dimensi mesti 0 atau lebih",
                     "dimMax": "Dimensi terlalu besar",
                     "maxTiers": "Maksimum 2 tahap variasi dibenarkan",
@@ -1594,6 +1595,8 @@
                 "restored": "Produk dipulihkan",
                 "failedRestore": "Gagal memulihkan produk",
                 "failedUpdateStatus": "Gagal mengemas kini status",
+                "publishGateTitle": "Belum boleh diaktifkan",
+                "publishGateAck": "Faham",
                 "failedDelete": "Gagal memadam produk",
                 "productDeleted": "Produk dipadamkan.",
                 "size": "Saiz:",
@@ -1618,7 +1621,8 @@
                     "tiers": "Pilihan Varian",
                     "basePrice": "Harga",
                     "baseSku": "Kod SKU",
-                    "baseInventory": "Stok"
+                    "baseInventory": "Stok",
+                    "weight": "Berat"
                 },
                 "sections": {
                     "general": "Maklumat Umum",
@@ -1626,6 +1630,7 @@
                     "productNamePlaceholder": "Masukkan nama produk",
                     "category": "Kategori",
                     "images": "Imej (Hingga 5 imej, setiap < 5MB)",
+                    "imagesAltHint": "Menambah teks Alt meningkatkan SEO dan capaian pembeli.",
                     "variants": "Varian & Inventori",
                     "hasVariants": "Produk mempunyai pelbagai Pilihan/Varian",
                     "hasVariantsExample": "Contoh: warna, saiz, gaya",
@@ -1800,6 +1805,15 @@
                 }
             },
             "subtitle": "Urus produk kedai"
+        },
+        "imageUploader": {
+            "addAltText": "+ Tambah teks Alt",
+            "editAltText": "Edit teks Alt",
+            "label": "Teks Alt",
+            "placeholder": "Terangkan ringkas imej ini…",
+            "helperText": "Terangkan ringkas imej untuk tingkatkan skor SEO anda di Google.",
+            "cancel": "Batal",
+            "save": "Simpan"
         },
         "customers": {
             "title": "Kenalan",

@@ -17,6 +17,7 @@ import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/P
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
+import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
     url?: string
@@ -96,6 +98,31 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     }
 
     return url
+}
+
+// Publishing gate (GH-1458) — missingFields keys from productPublishBlocks map to the same
+// labels already used by the create/edit form (t.dashboard.products.form.fields.*).
+const PUBLISH_GATE_FIELD_KEYS: Record<string, 'basePrice' | 'baseSku' | 'baseInventory' | 'variants' | 'weight'> = {
+    price: 'basePrice',
+    sku: 'baseSku',
+    inventory: 'baseInventory',
+    variants: 'variants',
+    weight: 'weight',
+}
+
+// Server throws Error(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields })) — parse it back
+// out so the client can show the same modal as the (redundant) client-side check.
+function parsePublishBlockedError(e: unknown): string[] | null {
+    if (!(e instanceof Error)) return null
+    try {
+        const parsed = JSON.parse(e.message)
+        if (parsed?.code === 'PUBLISH_BLOCKED' && Array.isArray(parsed.missingFields)) {
+            return parsed.missingFields
+        }
+    } catch {
+        // Not JSON — a normal error message, fall through to generic handling.
+    }
+    return null
 }
 
 export default function ProductsPage() {
@@ -234,16 +261,34 @@ export default function ProductsPage() {
         setShowBulkCreate(true)
     }
 
+    const [publishGateFields, setPublishGateFields] = useState<string[] | null>(null)
+
     const handleUpdateStatus = async (prod: Product | DetailedProduct, e: React.MouseEvent) => {
         e.stopPropagation()
         const newStatus = prod.status === 'active' ? 'archived' : 'active'
+
+        // Soft validation publishing gate (GH-1458) — block Draft/Archived -> Active when core
+        // fields are missing, before any optimistic update or server call.
+        if (newStatus === 'active') {
+            const gate = productPublishBlocks(prod)
+            if (!gate.ok) {
+                setPublishGateFields(gate.missingFields)
+                return
+            }
+        }
+
         // Optimistic update
         setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
         } catch (e: unknown) {
-            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
+            const blockedFields = parsePublishBlockedError(e)
+            if (blockedFields) {
+                setPublishGateFields(blockedFields)
+            } else {
+                toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
+            }
             setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
         }
     }
@@ -1000,6 +1045,32 @@ export default function ProductsPage() {
                 onConfirm={confirmDelete}
                 productName={productToDelete?.name || ''}
                 isDeleting={isDeletingProduct}
+            />
+
+            {/* Publishing gate (GH-1458) — alert-style: single acknowledge button, no destructive
+                action to confirm/cancel between. See ConfirmModal's `hideCancel` prop. */}
+            <ConfirmModal
+                open={!!publishGateFields}
+                onConfirm={() => setPublishGateFields(null)}
+                onCancel={() => setPublishGateFields(null)}
+                title={t.dashboard.products.form.publishGateTitle}
+                description={publishGateFields && (
+                    <span className="flex flex-col gap-2 text-left">
+                        <span>{t.dashboard.products.form.checkFields}</span>
+                        <ul className="list-disc pl-5">
+                            {publishGateFields.map(field => (
+                                <li key={field}>
+                                    {PUBLISH_GATE_FIELD_KEYS[field]
+                                        ? t.dashboard.products.form.fields[PUBLISH_GATE_FIELD_KEYS[field]]
+                                        : field}
+                                </li>
+                            ))}
+                        </ul>
+                    </span>
+                )}
+                confirmLabel={t.dashboard.products.form.publishGateAck}
+                hideCancel
+                variant="default"
             />
         </div>
     )

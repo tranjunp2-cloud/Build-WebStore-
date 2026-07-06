@@ -12,6 +12,7 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -28,11 +29,12 @@ interface ProductItem {
     imageAlt?: string
 }
 
-function ProductCard({ product, variant, theme, siteBasePath }: {
+function ProductCard({ product, variant, theme, siteBasePath, siteName }: {
     product: ProductItem
     variant: 'grid-3' | 'grid-4' | 'list'
     theme: ThemeConfig
     siteBasePath: string
+    siteName?: string
 }) {
     // Prefetched soft-nav to the PDP. <Link> prefetches the (force-dynamic) detail
     // route as the card enters the viewport, so the click feels instant instead of
@@ -51,7 +53,7 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                 {product.image ? (
                     <img
                         src={product.image}
-                        alt={product.imageAlt || product.name}
+                        alt={buildProductAlt(product.imageAlt, product.name, siteName)}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
                         loading="lazy"
                     />
@@ -212,6 +214,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                             variant={variant}
                             theme={theme}
                             siteBasePath={siteBasePath}
+                            siteName={site?.name ?? undefined}
                         />
                     </StaggerItem>
                 ))}

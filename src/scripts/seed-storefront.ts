@@ -246,6 +246,10 @@ async function seed() {
                 status: 'active',
                 inventory: p.inventory,
                 sku: p.sku,
+                // Publishing gate (GH-1458) requires weight > 0 for status:'active' — the
+                // collection's own defaultValue:0 is treated as missing. Seed data has no
+                // per-product weight, so a flat placeholder is used (dev/demo data only).
+                weight: 500,
             } as any,
         })
         console.log(`✅ Created product: ${p.name} — RM ${p.price.toFixed(2)}`)
