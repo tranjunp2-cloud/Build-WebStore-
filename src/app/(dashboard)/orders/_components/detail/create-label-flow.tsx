@@ -52,6 +52,19 @@ export function CreateLabelFlow({
   const dateValid = collectionDate >= earliest && dateIsBusiness
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
   const cosmeticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dateInputRef = useRef<HTMLInputElement>(null)
+
+  // Whole date card opens the native picker — not just the tiny calendar icon
+  const openDatePicker = () => {
+    const input = dateInputRef.current
+    if (!input) return
+    try {
+      if (typeof input.showPicker === 'function') input.showPicker()
+      else input.focus()
+    } catch {
+      // showPicker throws if the picker is already open (e.g. icon click) — ignore
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -223,49 +236,53 @@ export function CreateLabelFlow({
         )}
       </div>
 
-      {/* US-F36-07: collection method + date, chosen BEFORE the label is bought */}
-      <div className="ship-meta">
-        <div>
+      {/* US-F36-07: collection method + date, chosen BEFORE the label is bought.
+          Columns stretch to the same height (wrapped tile text can't misalign the
+          date input); the hint sits below the whole row, full-width. */}
+      <div className="collect-row">
+        <div className="collect-col">
           <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionMethod}</div>
-          <div className="sched-slots" role="radiogroup" aria-label={cl.collectionMethod}>
+          <div className="collect-methods" role="radiogroup" aria-label={cl.collectionMethod}>
             <button
               type="button"
               role="radio"
               aria-checked={method === 'pickup'}
-              className={`sched-slot${method === 'pickup' ? ' on' : ''}`}
+              className={`collect-method${method === 'pickup' ? ' on' : ''}`}
               onClick={() => setMethod('pickup')}
             >
-              <span className="ss-time">{cl.methodPickup}</span>
-              <span className="ss-name">{cl.methodPickupDesc}</span>
+              <span className="cm-title">{cl.methodPickup}</span>
+              <span className="cm-desc">{cl.methodPickupDesc}</span>
             </button>
             <button
               type="button"
               role="radio"
               aria-checked={method === 'dropoff'}
-              className={`sched-slot${method === 'dropoff' ? ' on' : ''}`}
+              className={`collect-method${method === 'dropoff' ? ' on' : ''}`}
               onClick={() => setMethod('dropoff')}
             >
-              <span className="ss-time">{cl.methodDropoff}</span>
-              <span className="ss-name">{cl.methodDropoffDesc}</span>
+              <span className="cm-title">{cl.methodDropoff}</span>
+              <span className="cm-desc">{cl.methodDropoffDesc}</span>
             </button>
           </div>
         </div>
-        <div>
+        <div className="collect-col collect-date">
           <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionDateLabel}</div>
-          <div className="sched-custom" style={{ marginTop: 0 }}>
+          {/* Date card mirrors the method tiles: value + its note live INSIDE the card */}
+          <div className="collect-date-card" onClick={openDatePicker}>
             <input
+              ref={dateInputRef}
               type="date"
               value={collectionDate}
               min={earliest}
               onChange={(e) => setCollectionDate(e.target.value)}
             />
             {!dateIsBusiness ? (
-              <div className="sched-warn">
+              <div className="cd-note warn">
                 <TriangleAlert /> {cl.weekendWarning}
               </div>
             ) : (
-              <div className="help" style={{ marginTop: 6 }}>
-                <Info style={{ width: 12, height: 12 }} />
+              <div className="cd-note">
+                <Info />
                 {method === 'pickup'
                   ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
                   : cl.dropoffHint}

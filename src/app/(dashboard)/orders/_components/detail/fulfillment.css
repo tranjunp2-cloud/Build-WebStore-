@@ -493,3 +493,46 @@
   .sched-anchor, .sched-anchor .btn, .sched-locked { width: 100%; }
   .sched-pop { width: 100%; right: auto; left: 0; }
 }
+
+/* ── US-F36-07: collection method + date row (Ready-to-Ship step) ──────────────
+   Method tiles and the date input share the same 58px height so the two columns
+   sit flush — the date field previously reused the 36px .sched-custom input and
+   looked sunken next to the tiles. */
+.collect-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; align-items: stretch; }
+@media (max-width: 900px) { .collect-row { grid-template-columns: 1fr; } }
+.collect-col { display: flex; flex-direction: column; }
+.collect-methods { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.collect-method {
+  display: flex; flex-direction: column; justify-content: center; gap: 3px; text-align: left;
+  height: 100%; min-height: 58px; box-sizing: border-box; padding: 10px 13px;
+  border: 1px solid var(--dash-border); border-radius: 10px; background: var(--dash-secondary-bg);
+  cursor: pointer; transition: border-color 0.12s, background 0.12s; font-family: inherit;
+}
+.collect-method:hover { border-color: var(--dash-text-muted); }
+.collect-method.on { border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.1); }
+.collect-method .cm-title { font-size: 13px; font-weight: 700; color: var(--dash-text); }
+.collect-method .cm-desc { font-size: 11px; font-weight: 500; color: var(--dash-text-muted); line-height: 1.35; }
+.collect-method.on .cm-desc { color: hsl(var(--primary)); }
+.collect-date { display: flex; flex-direction: column; }
+/* Date rendered as a card matching the method tiles — value on top, note inside,
+   so nothing floats loose under the grid and all three cards stay flush. */
+.collect-date-card {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  box-sizing: border-box; min-height: 58px; padding: 10px 14px;
+  border: 1px solid var(--dash-border); border-radius: 10px; background: var(--dash-secondary-bg);
+  transition: border-color 0.12s; cursor: pointer;
+}
+.collect-date-card:hover { border-color: var(--dash-text-muted); }
+.collect-date-card:focus-within { border-color: hsl(var(--primary)); }
+.collect-date-card input[type="date"] {
+  width: 100%; border: none; background: transparent; color: var(--dash-text);
+  font-size: 14px; font-weight: 700; font-family: inherit; color-scheme: dark; padding: 0;
+}
+.collect-date-card input[type="date"]:focus { outline: none; }
+.cd-note {
+  display: flex; align-items: flex-start; gap: 5px;
+  font-size: 11px; font-weight: 500; color: var(--dash-text-muted); line-height: 1.35;
+}
+.cd-note svg { width: 11px; height: 11px; flex-shrink: 0; margin-top: 1.5px; }
+.cd-note.warn { color: hsl(var(--warning)); }
+@media (max-width: 560px) { .collect-methods { grid-template-columns: 1fr; } .collect-method { min-height: 0; } }
