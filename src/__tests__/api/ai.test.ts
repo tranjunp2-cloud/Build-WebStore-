@@ -112,6 +112,11 @@ vi.mock('next/server', async (importOriginal) => ({
 // observe scheduling without running GPT/Pixabay work.
 vi.mock('@/lib/ai/seed-blog-posts', () => ({
     seedBlogPosts: vi.fn().mockResolvedValue(0),
+    // Default: prep "failed" (null) → route takes the legacy after() seeding
+    // path, which keeps the W1 blog tests meaningful. Inline-path tests
+    // (TC-GENPERF-BI-*) override per-case.
+    prepareBlogPosts: vi.fn().mockResolvedValue(null),
+    persistBlogPosts: vi.fn().mockResolvedValue(3),
 }))
 vi.mock('@/lib/images/image-library-seeder', () => ({
     seedImageLibraryForSite: vi.fn().mockResolvedValue({ hero: [], gallery: [], about: null, team: [], features: [] }),
@@ -843,6 +848,71 @@ describe('AI Streaming APIs', () => {
                 })
             } finally {
                 vi.mocked(after).mockImplementation(() => undefined)
+            }
+        })
+
+        it('[TC-GENPERF-BI-01] prepared blog posts persist inline BEFORE done; legacy seeding unused', async () => {
+            // Arrange — prep finished during the GPT window
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
+                { title: 'B', slug: 'b', content: '<p>b</p>' },
+                { title: 'C', slug: 'c', content: '<p>c</p>' },
+            ])
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — persisted IN-REQUEST (before any after() task runs)
+            expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(persistBlogPosts).mock.calls[0]![1]).toHaveLength(3)
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+        })
+
+        it('[TC-GENPERF-BI-02] tenant already has posts (prep []) → no persist, no legacy seeding', async () => {
+            // Arrange — regenerate case
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([])
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert
+            expect(res.status).toBe(200)
+            await runCapturedAfterTasks()
+            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+        })
+
+        it('[TC-GENPERF-BI-03] prep still running at persist site → done not blocked; posts persist post-response', async () => {
+            // Arrange — prep unresolved when the route reaches the grace race;
+            // tiny grace so the pending branch fires deterministically
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            let resolvePrep: (v: Array<{ title: string; slug: string; content: string }>) => void = () => {}
+            vi.mocked(prepareBlogPosts).mockReturnValueOnce(new Promise((r) => { resolvePrep = r }))
+            process.env.GEN_BLOG_PREP_GRACE_MS = '50'
+
+            try {
+                // Act — response returns without waiting for prep
+                const res = await GenerateSitePOST(genPerfReq())
+
+                // Assert — nothing persisted in-request
+                expect(res.status).toBe(200)
+                expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
+
+                // Prep finishes after the response → captured after() task persists
+                resolvePrep([
+                    { title: 'A', slug: 'a', content: '<p>a</p>' },
+                    { title: 'B', slug: 'b', content: '<p>b</p>' },
+                    { title: 'C', slug: 'c', content: '<p>c</p>' },
+                ])
+                await runCapturedAfterTasks()
+                expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+                expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+            } finally {
+                delete process.env.GEN_BLOG_PREP_GRACE_MS
             }
         })
     })

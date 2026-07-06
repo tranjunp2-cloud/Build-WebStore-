@@ -40,7 +40,7 @@ import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
-import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
+import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
@@ -513,6 +513,25 @@ export async function POST(req: NextRequest) {
                     payload,
                 )
             )
+
+            // gen-perf blog-inline: prepare all 3 blog posts (AI seed topics +
+            // full article bodies + thumbnails) DURING the GPT window so the
+            // blog page ships complete at `done` (was: everything post-response
+            // via after(), leaving the blog empty for ~60s). GPT article calls
+            // start immediately; the Pixabay thumbnail phase waits for
+            // sampleProductsPromise (GH-1190 rate-limit serialization).
+            // Never rejects: null = prep failed → legacy after() seeding at the
+            // persist site below.
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+                payload,
+                tenantId: resolvedTenantId,
+                category: resolveComposerCategory(businessInfo.industry),
+                businessName: businessInfo.businessName,
+                products: parseProductsString(businessInfo.products),
+                industry: businessInfo.industry,
+                seed: computeGenSeed(businessInfo),
+                pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
+            }).catch((): null => null)
 
             // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
             const { result, events } = await trackPhase('ai', () =>
@@ -1338,25 +1357,56 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
         }
 
-        // Seed 3 blog posts after response is sent (non-fatal, skips on regenerate).
-        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
-        const _blogSeedTask = () =>
-            seedBlogPosts(
-                payload,
-                resolvedTenantId,
-                site.id as string | number,
-                resolveComposerCategory(businessInfo.industry),
-                businessInfo.businessName,
-                user.id,
-                parseProductsString(businessInfo.products),
-                businessInfo.industry,
-                computeGenSeed(businessInfo),
-            ).catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
-        try {
-            after(_blogSeedTask)
-        } catch {
-            void _blogSeedTask()
+        // gen-perf blog-inline: blog prep overlapped the GPT window (kicked
+        // pre-AI above) — persist the 3 prepared posts BEFORE `done` so the
+        // blog page ships complete. The grace race bounds the worst case: if
+        // prep is still running (Pixabay/GPT drag) or failed (null), fall back
+        // to post-response seeding via after() exactly like the old path.
+        // Internal tuning knob (tests use a tiny value to exercise the
+        // pending branch deterministically) — not required in production env.
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS ?? 15_000)
+        let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
+        const preparedBlogs = await Promise.race([
+            blogPrepPromise,
+            new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
+        ])
+        if (blogGraceTimer) clearTimeout(blogGraceTimer)
+        if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
+            const blogsCreated = await persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id)
+                .catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
+            console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
+        } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
+            // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+            const _blogSeedTask = () =>
+                blogPrepPromise
+                    .then((prepared) => {
+                        if (Array.isArray(prepared) && prepared.length > 0) {
+                            return persistBlogPosts(payload, prepared, resolvedTenantId, site.id as string | number, user.id)
+                        }
+                        if (prepared === null) {
+                            // Prep failed entirely — legacy full seeding (skips on regenerate).
+                            return seedBlogPosts(
+                                payload,
+                                resolvedTenantId,
+                                site.id as string | number,
+                                resolveComposerCategory(businessInfo.industry),
+                                businessInfo.businessName,
+                                user.id,
+                                parseProductsString(businessInfo.products),
+                                businessInfo.industry,
+                                computeGenSeed(businessInfo),
+                            )
+                        }
+                        return 0
+                    })
+                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+            try {
+                after(_blogSeedTask)
+            } catch {
+                void _blogSeedTask()
+            }
         }
+        // preparedBlogs === [] → tenant already has posts (regenerate) — nothing to seed.
 
         // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
         // gen-perf phase-02: scheduled via after() (was mid-pipeline raw

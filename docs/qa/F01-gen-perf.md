@@ -86,6 +86,11 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 | TC-GENPERF-W2-13 | unit | retry batch fail bằng model chính | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | batch fail được retry 1 lần trên MODEL CHÍNH trước khi rơi composer fallback (case Nha Khoa mất /contact) |
 | TC-GENPERF-W2-14 | unit | home slug ép về '/' (review fix A1) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | home call trả sai trang (slug '/about') → mergeSplitParsed vẫn ép slug '/', không đụng unique (site,slug) với batch page |
 | TC-GENPERF-W2-15 | unit | chrome share-nothing (review fix A2) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | nav/footer structuredClone per page — mutate nested links/columns của home không leak sang page khác; syncFooterAcrossPages cũng share-nothing |
+| TC-GENPERF-BI-01 | route | blog-inline: persist TRƯỚC done | ✅ PASS | src/__tests__/api/ai.test.ts | prep xong trong cửa sổ GPT → persistBlogPosts chạy in-request (trước mọi after() task), seedBlogPosts legacy KHÔNG được gọi |
+| TC-GENPERF-BI-02 | route | blog-inline: regenerate skip | ✅ PASS | src/__tests__/api/ai.test.ts | prepare trả [] (tenant đã có posts) → không persist, không legacy seeding |
+| TC-GENPERF-BI-03 | route | blog-inline: grace fallback | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong tại persist site (grace GEN_BLOG_PREP_GRACE_MS) → done không bị chặn; prep xong sau response → after() task persist đủ 3 bài |
+| TC-F08-BS.24 | unit | blog prep chờ pixabayGate | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepareBlogPosts không gọi searchPhotos khi gate chưa settle (GH-1190 serialization); gate mở → thumbnail phase chạy, trả đủ 3 prepared posts |
+| TC-F08-BS.25 | unit | prepare/persist contract | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepare trả null khi hard-fail (count throw) để caller fallback legacy; trả [] khi tenant có posts; persistBlogPosts insert đúng prepared rows (slug prefix, thumbnail optional) |
 
 ---
 
