@@ -16,6 +16,7 @@ import {
 	mergeSplitParsed,
 	runParallelPageSplit,
 	applyDeterministicChrome,
+	syncFooterAcrossPages,
 	type ParallelSplitInput,
 } from '@/lib/ai/gen-page-split'
 
@@ -282,6 +283,34 @@ describe('[TC-GENPERF-W2-02] mergeSplitParsed — merge shape', () => {
 		expect(Array.isArray(result.pages)).toBe(true)
 		expect((result.pages as any[])[0].isHomepage).toBe(true)
 		expect((result.pages as any[])[0].blocks).toEqual([{ type: 'hero' }, { type: 'features' }])
+	})
+
+	it('[TC-GENPERF-W2-14] forces homepage slug to "/" even when the home call returns a subpage', () => {
+		// Arrange — scope-ignoring home call returned an About page (same
+		// failure class measured on batches, live 2026-07-03). Keeping its
+		// '/about' slug would collide with the real batch page at page-create
+		// (unique site+slug constraint).
+		const homeParsed = {
+			siteName: 'Rogue',
+			category: 'business',
+			theme: {},
+			seo: {},
+			language: 'en',
+			pages: [{ title: 'About Us', slug: '/about', blocks: [{ blockType: 'about' }], isHomepage: false }],
+		}
+		const subsParsed = {
+			pages: [{ title: 'About', slug: '/about', blocks: [], isHomepage: false }],
+		}
+
+		// Act
+		const result = mergeSplitParsed(homeParsed, subsParsed)
+
+		// Assert
+		const pages = result.pages as Array<Record<string, unknown>>
+		expect(pages[0]!.slug).toBe('/')
+		expect(pages[0]!.isHomepage).toBe(true)
+		// Exactly one page may carry the '/about' slug (the batch one)
+		expect(pages.filter((p) => p.slug === '/about')).toHaveLength(1)
 	})
 })
 
@@ -640,5 +669,41 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		expect(aboutFooter.columns[0]!.title).toBe('Real')
 		// Subpage footer is LAST block
 		expect(pages[1]!.blocks[pages[1]!.blocks.length - 1]!.blockType).toBe('footer')
+	})
+
+	it('[TC-GENPERF-W2-15] chrome is share-nothing — mutating one page nav/footer never leaks to others', () => {
+		// Arrange
+		const merged: Record<string, unknown> = {
+			pages: [
+				{ title: 'Home', slug: '/', isHomepage: true, blocks: [{ blockType: 'hero' }, { blockType: 'footer', columns: [{ title: 'Real' }] }] },
+				{ title: 'About', slug: '/about', isHomepage: false, blocks: [{ blockType: 'about' }] },
+			],
+		}
+		applyDeterministicChrome(merged, { businessName: 'Cơm Ba Má', industry: 'Nhà hàng' } as never, 'vi')
+		const pages = merged.pages as Array<{ blocks: Array<Record<string, unknown>> }>
+		const homeNav = pages[0]!.blocks[0]!
+		const aboutNav = pages[1]!.blocks[0]!
+
+		// Act — downstream passes (structure enforcer, grid alignment) mutate
+		// blocks in place; simulate a mutation on the HOME page only, deep
+		// into the nested links/columns arrays (a shallow spread would leak it)
+		expect(aboutNav).not.toBe(homeNav)
+		homeNav.logoText = 'MUTATED'
+		;(homeNav.links as Array<Record<string, unknown>>).push({ label: 'X', url: '/x' })
+		const homeFooter = pages[0]!.blocks.find((b) => b.blockType === 'footer')!
+		;(homeFooter.columns as Array<Record<string, unknown>>).push({ title: 'HomeOnly' })
+
+		// Assert — About page chrome unaffected
+		expect(aboutNav.logoText).toBe('Cơm Ba Má')
+		expect((aboutNav.links as unknown[]).length).toBe((homeNav.links as unknown[]).length - 1)
+		const aboutFooter = pages[1]!.blocks.find((b) => b.blockType === 'footer')!
+		expect((aboutFooter.columns as Array<{ title: string }>).some((c) => c.title === 'HomeOnly')).toBe(false)
+
+		// syncFooterAcrossPages (post-enforcer re-clone) must be share-nothing too
+		syncFooterAcrossPages(pages)
+		const aboutFooterSynced = pages[1]!.blocks.find((b) => b.blockType === 'footer')!
+		expect(aboutFooterSynced).not.toBe(homeFooter)
+		;(homeFooter.columns as Array<Record<string, unknown>>).push({ title: 'AfterSync' })
+		expect((aboutFooterSynced.columns as Array<{ title: string }>).some((c) => c.title === 'AfterSync')).toBe(false)
 	})
 })

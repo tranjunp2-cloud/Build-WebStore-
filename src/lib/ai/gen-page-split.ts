@@ -166,7 +166,11 @@ function logOutcome(outcome: SplitCallOutcome): void {
  *  `blocks` shape, in case GPT ignores the scoped hint. */
 function extractHomePage(parsed: Record<string, unknown>): Record<string, unknown> | null {
     const pages = Array.isArray(parsed.pages) ? (parsed.pages as Record<string, unknown>[]) : null
-    if (pages && pages.length > 0) return { ...pages[0], isHomepage: true, slug: pages[0]!.slug || '/' }
+    // Slug forced to '/' regardless of what the model emitted: a scope-ignoring
+    // home call can return a subpage (same failure class measured on batches
+    // 2026-07-03), and its slug would collide with the real batch page at
+    // page-create time (unique site+slug constraint).
+    if (pages && pages.length > 0) return { ...pages[0], isHomepage: true, slug: '/' }
     if (Array.isArray(parsed.blocks)) {
         return { title: parsed.siteName ?? 'Homepage', slug: '/', isHomepage: true, blocks: parsed.blocks, seo: parsed.seo ?? {} }
     }
@@ -225,8 +229,11 @@ export function applyDeterministicChrome(
     pages.forEach((page, i) => {
         const blocks = Array.isArray(page.blocks) ? (page.blocks as Record<string, unknown>[]) : []
         const body = blocks.filter((b) => b.blockType !== 'navigation' && (i === 0 || b.blockType !== 'footer'))
-        const footer = i === 0 ? [] : homeFooter ? [{ ...homeFooter }] : []
-        page.blocks = [nav, ...body, ...footer]
+        // structuredClone (not spread): downstream passes mutate blocks in
+        // place (structure enforcer, grid alignment) — pages must not share
+        // nav/footer references, including nested arrays like nav items.
+        const footer = i === 0 ? [] : homeFooter ? [structuredClone(homeFooter)] : []
+        page.blocks = [structuredClone(nav), ...body, ...footer]
     })
 }
 
@@ -245,7 +252,7 @@ export function syncFooterAcrossPages(pages: Array<{ blocks?: unknown[] }>): voi
     if (!homeFooter) return
     for (let i = 1; i < pages.length; i++) {
         const blocks = Array.isArray(pages[i]?.blocks) ? (pages[i]!.blocks as Record<string, unknown>[]) : []
-        pages[i]!.blocks = [...blocks.filter((b) => b?.blockType !== 'footer'), { ...homeFooter }]
+        pages[i]!.blocks = [...blocks.filter((b) => b?.blockType !== 'footer'), structuredClone(homeFooter)]
     }
 }
 

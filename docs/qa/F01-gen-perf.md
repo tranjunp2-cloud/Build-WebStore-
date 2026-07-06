@@ -83,6 +83,9 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 | TC-GENPERF-W2-10 | unit | SSE block ordering (home first) | ✅ PASS (merge-order) | src/__tests__/unit/lib/ai/gen-page-split.test.ts | Cover ở mức merge order (pages[0]=home, không dup slug, đúng 1 homepage); SSE emission order end-to-end = verify staging |
 | TC-GENPERF-W2-11 | unit | deterministic chrome (phase-09) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | applyDeterministicChrome: nav deterministic (i18n, logoText=businessName) đứng đầu MỌI trang, GPT nav bị strip, footer home clone sang subpages (đứng cuối) |
 | TC-GENPERF-W2-12 | unit | light model cho batch Contact+Blog (phase-08) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | batch Contact+Blog chạy gpt-4.1-nano (task 'site-generation-subpages-light', override AI_MODEL_SITEGEN_SUB_LIGHT); home + About/Services giữ model chính |
+| TC-GENPERF-W2-13 | unit | retry batch fail bằng model chính | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | batch fail được retry 1 lần trên MODEL CHÍNH trước khi rơi composer fallback (case Nha Khoa mất /contact) |
+| TC-GENPERF-W2-14 | unit | home slug ép về '/' (review fix A1) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | home call trả sai trang (slug '/about') → mergeSplitParsed vẫn ép slug '/', không đụng unique (site,slug) với batch page |
+| TC-GENPERF-W2-15 | unit | chrome share-nothing (review fix A2) | ✅ PASS | src/__tests__/unit/lib/ai/gen-page-split.test.ts | nav/footer structuredClone per page — mutate nested links/columns của home không leak sang page khác; syncFooterAcrossPages cũng share-nothing |
 
 ---
 
