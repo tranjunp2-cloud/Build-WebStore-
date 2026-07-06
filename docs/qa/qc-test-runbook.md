@@ -21,8 +21,8 @@ owner is escalation, not day-one support.
 | Database | Neon project `ech-prime-web-v2-qc-test` (Singapore, Free tier) — direct endpoint `ep-dawn-scene-ao97yus8` (do NOT use `-pooler` variant) |
 | Git branch | `qc-test` (protected — push restricted) |
 | CI job | `Deploy: Vercel (qc-test)` — routes via Vercel Preview scope + branch-filter (Pro plan permits only 1 custom env slot, already used by staging) |
-| Owner | QC lead — TBD |
-| Backup | Dev owner — phuongltweb |
+| Owner | QC lead — **Ngân (Ary)** |
+| Backup | Dev owner — phuongltweb (anh Phuong) |
 
 ## Common tasks
 
@@ -145,11 +145,25 @@ Automated Neon quota polling (Vercel Cron → Neon API → Lark webhook) is
 - Do NOT keep long-lived JMeter runs against QC (>1 hour) without warning
   dev owner — Neon Free tier throttles transfer
 
+## Test cases (TC-ID registry)
+
+QC-scoped tests. Keep this table in sync when adding new QC-only test files.
+
+| TC-ID | Scenario | Test file |
+|-------|----------|-----------|
+| TC-QC-OTP-01 | OTP bypass refused when `APP_ENV=production` even if other bypass vars set | `src/__tests__/unit/otp/qc-bypass-guard.test.ts` |
+| TC-QC-OTP-02 | OTP bypass requires literal `QC_OTP_BYPASS_ENABLED="true"` — refuses unset / `false` / `1` | `src/__tests__/unit/otp/qc-bypass-guard.test.ts` |
+| TC-QC-OTP-03 | OTP bypass restricted to `QC_OTP_BYPASS_DOMAIN` email suffix — rejects real-customer domains | `src/__tests__/unit/otp/qc-bypass-guard.test.ts` |
+| TC-QC-OTP-04 | `isValidQcBypass()` accepts matching code for allowed domain, rejects mismatched code / disallowed domain | `src/__tests__/unit/otp/qc-bypass-guard.test.ts` |
+
 ## Files referenced
 
 - `scripts/qc-guard.ts` — safety guard
 - `scripts/seed-qc-data.ts` — populate dummy fixtures
+- `scripts/qc-seed-products.ts` — product + extra-page helpers used by main seed
 - `scripts/reset-qc-data.ts` — wipe tenant data
+- `src/lib/otp/qc-bypass.ts` — triple-guarded OTP bypass helper
+- `src/__tests__/unit/otp/qc-bypass-guard.test.ts` — 18 tests covering TC-QC-OTP-01→04
 - `.env.qc-test.example` — env template
 - `.jmx-config/qc-test.properties.example` — JMeter template
 - `.github/workflows/ci.yml` — `Deploy: Vercel (qc-test)` job

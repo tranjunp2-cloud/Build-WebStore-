@@ -168,6 +168,12 @@ export default buildConfig({
       // Remote DB (Neon): require valid SSL cert.
       // Local dev: no SSL needed.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: true } } : {}),
+      // Bumped 10 → 25 (2026-07-06) for QC beta event 200 concurrent users.
+      // Payload session pooling + Drizzle needs ~25 conns for 200 VU load test.
+      // Applied to all envs (QC + staging + prod) so staging load tests
+      // reproduce prod behaviour. Plan: plans/260706-1653-GH-02-.../plan.md
+      // (Validation Summary decision #3).
+      max: 25,
     },
     // Push schema only when explicitly requested to avoid expensive sync on every
     // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
