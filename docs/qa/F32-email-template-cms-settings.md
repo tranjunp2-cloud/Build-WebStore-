@@ -533,6 +533,8 @@ Bộ kiểm thử bao gồm **92 test cases** (Positive + Negative + Security + 
 | **TC-F32.90** | `REQ-F32-01 / §8` | `Func` | **[Positive]** Tất cả 15 templateType trong enum đều selectable | **1.** Lần lượt chọn từng type trong dropdown: welcome, otp-verification, forgot-password, password-changed, order-confirmation, order-cancelled, order-delivered, order-failed, order-shipped, payment-timeout-cancelled-buyer, contact-buyer-confirmation, contact-seller-notification, newsletter-buyer-confirmation, newsletter-seller-notification, new-order-seller<br>**2.** Verify form mở được | **Điều kiện:** any of 15 types **Khi:** selected **Thì:** form loads without error; all 15 types present in dropdown | High | [ ] |
 | **TC-F32.91** | `REQ-F32-03` | `Func` | **[Edge]** Subject bị xóa trắng sau khi đã save — behavior rõ ràng | **1.** Save subject = "Custom Subject"<br>**2.** Clear subject field thành empty string<br>**3.** Save lại<br>**4.** Trigger email | **Điều kiện:** subject cleared to empty **Khi:** saved **Thì:** system behavior is one of: (a) empty saved → fallback to default on send, OR (b) validation error blocks save; behavior documented | High | [ ] |
 | **TC-F32.92** | `REQ-F32-01 / §8` | `Func` | **[Edge]** Save without changes — idempotent, no duplicate row | **1.** Open template với config đã có<br>**2.** Không thay đổi gì<br>**3.** Click Save | **Điều kiện:** no changes made **Khi:** Save clicked **Thì:** UPDATE existing row (not INSERT new); DB row count unchanged; no duplicate (tenant, templateType, recipient) | High | [ ] |
+| **TC-F32.93** | `GH-1499 Issue 4` | `UI/Func` (AUTO) | **[Positive]** Preview pane Desktop/Mobile toggle chỉ hiện từ `xl` (1280px) trở lên | **1.** Resize viewport < 1280px<br>**2.** Kiểm tra toggle Desktop/Mobile bị ẩn, chỉ còn nút Refresh<br>**3.** Resize ≥ 1280px<br>**4.** Kiểm tra toggle hiện lại | **Điều kiện:** viewport width thay đổi qua ngưỡng 1280px **Khi:** rendered **Thì:** dưới `xl` chỉ hiện Refresh + preview mobile-width cố định (360px), không cần bấm toggle; từ `xl` hiện đủ Desktop/Mobile/Refresh | Medium | [ ] |
+| **TC-F32.94** (manual) | `GH-1499 Issue 4 — deviation` | `UI` (MANUAL) | **[Positive]** Tablet KHÔNG còn toggle Desktop/Mobile — baseline mới, khác AC gốc | **1.** Mở Email Template detail trên iPad (768–1279px, kể cả md–xl cũ)<br>**2.** Xác nhận preview luôn ở mobile-width, KHÔNG có toggle Desktop/Mobile (chỉ Refresh) | **Điều kiện:** tablet viewport (768–1279px) **Khi:** preview rendered **Thì:** đây là hành vi ĐÚNG theo baseline mới (không phải bug) — AC gốc "Tablet ≥ md: hiển thị toggle như hiện tại" đã lỗi thời, ngưỡng ẩn/hiện toggle chuyển từ `md` (768px) sang `xl` (1280px) theo PR #1508 | Medium | [ ] |
 
 ---
 
@@ -558,7 +560,7 @@ Bộ kiểm thử bao gồm **92 test cases** (Positive + Negative + Security + 
 
 | Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú |
 |---|---|---|
-| **1. UI/UX Coverage** | [ ] 0/38 TC run | TC-F32.01–04, 17–22, 51–56, 61–62, 66–75, 80–86 — layout, preview, badges, empty state, responsive, fake data |
+| **1. UI/UX Coverage** | [ ] 0/40 TC run | TC-F32.01–04, 17–22, 51–56, 61–62, 66–75, 80–86, 93–94 — layout, preview, badges, empty state, responsive, fake data, Desktop/Mobile toggle breakpoint |
 | **2. Logic & Functions** | [ ] 0/29 TC run | TC-F32.05–16, 23–26, 42–45, 46–50, 57–58, 87–92 — toggle, edit, fallback, char limits, recipient isolation, default enabled, optimistic update, enum, empty field, idempotent |
 | **3. Security & DB Validation** | [ ] 0/12 TC run | TC-F32.27–39 — IDOR, XSS, CSRF, SQLi, auth, integrity |
 | **4. Performance SLA** | [ ] 0/5 TC run | TC-F32.40–41, 63–65 — cache, N+1, preview vs production |
@@ -598,6 +600,7 @@ Bộ kiểm thử bao gồm **92 test cases** (Positive + Negative + Security + 
 | Logic — all 15 templateType enum | TC-F32.90 | ✅ Full |
 | Logic — empty field behavior | TC-F32.91 | ✅ Full |
 | Logic — idempotent save | TC-F32.92 | ✅ Full |
+| Design — responsive `xl` breakpoint (preview toggle) | TC-F32.93, TC-F32.94 | ✅ Full |
 | PRD Open Question #5 — order-shipped | TC-F32.42 | ✅ Flagged |
 | Design — list enabled badge + last-updated | TC-F32.66, TC-F32.67, TC-F32.68, TC-F32.69 | ✅ Full |
 | Design — toggle visual cue | TC-F32.70, TC-F32.71 | ✅ Full |
