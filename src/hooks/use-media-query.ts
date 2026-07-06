@@ -23,13 +23,3 @@ export function useMediaQuery(query: string): boolean {
 
     return matches
 }
-
-/**
- * `<768px` (phone) viewport check. Deliberately finer than `useEditorLayoutMode`'s
- * `<1280px` bucket (that hook conflates phone+tablet for the editor's compact
- * layout) — use this one when a component needs to distinguish phone from
- * tablet-and-up specifically.
- */
-export function useIsMobileViewport(): boolean {
-    return useMediaQuery('(max-width: 767px)')
-}
