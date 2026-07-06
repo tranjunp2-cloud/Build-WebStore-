@@ -38,6 +38,11 @@ export function PaymentMethodCard({
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const isActive = on && !locked;
+    // GH-1499 issue 2: long descriptions overflow the card unbounded — truncate to
+    // 2 lines with a "See more" toggle instead. Only show the toggle when truncation
+    // would actually kick in (short descriptions never wrap to 3+ lines anyway).
+    const [expanded, setExpanded] = React.useState(false);
+    const isLongDesc = desc.length > 120;
 
     return (
         <div className={cn(
@@ -66,7 +71,23 @@ export function PaymentMethodCard({
                                     </span>
                                 )}
                             </h3>
-                            <p className="text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]">{desc}</p>
+                            {/* Truncate + "see more" on mobile/tablet only — desktop (xl+) keeps
+                                showing the full description untouched (issue AC: no desktop regression). */}
+                            <p className={cn(
+                                'text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]',
+                                !expanded && isLongDesc && 'line-clamp-2 xl:line-clamp-none',
+                            )}>
+                                {desc}
+                            </p>
+                            {isLongDesc && (
+                                <button
+                                    type="button"
+                                    onClick={() => setExpanded(v => !v)}
+                                    className="text-[12px] text-[hsl(var(--primary))] font-medium mt-[2px] hover:underline xl:hidden"
+                                >
+                                    {expanded ? pt.seeLess : pt.seeMore}
+                                </button>
+                            )}
                         </div>
 
                         {/* Toggle switch — shared <Switch> (GH-1222) for consistency with Shipping

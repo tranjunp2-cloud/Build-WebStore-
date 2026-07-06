@@ -6,6 +6,7 @@ import type { EmailTemplateType } from '@/lib/email/types'
 import type { EmailTemplateConfig } from '@/lib/email/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 interface Props {
     templateType: EmailTemplateType
@@ -22,6 +23,17 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
     const [fetchError, setFetchError] = useState(false)
     const abortRef = useRef<AbortController | null>(null)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // GH-1499 issue 4: only true desktop (≥1280px, xl) gets to pick Desktop vs Mobile —
+    // on phone AND tablet/iPad (mobile through iPad Pro, all <1280px) there's no real
+    // "view the desktop layout" use case, so hide the toggle entirely and just show the
+    // (mobile-sized) preview. Re-forced on any resize INTO the <xl range (e.g. shrinking
+    // a resizable window) so it never gets stuck showing the desktop toggle/frame at a
+    // width where switching to it wouldn't make sense.
+    const isBelowDesktop = useMediaQuery('(max-width: 1279px)')
+    useEffect(() => {
+        if (isBelowDesktop) setPreviewMode('mobile')
+    }, [isBelowDesktop])
 
     function doFetch(signal: AbortSignal) {
         setLoading(true)
@@ -85,34 +97,41 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                 </div>
                 <TooltipProvider>
                     <div className="flex items-center gap-1">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    type="button"
-                                    onClick={() => setPreviewMode('desktop')}
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                                >
-                                    <Monitor className="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Desktop</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    type="button"
-                                    onClick={() => setPreviewMode('mobile')}
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
-                                >
-                                    <Smartphone className="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Mobile</TooltipContent>
-                        </Tooltip>
+                        {/* GH-1499 issue 4: below xl (desktop), only mobile preview makes sense —
+                            no toggle needed, and no replacement label either (redundant UI
+                            noise) — mode is force-set to 'mobile' above, Refresh stays visible. */}
+                        {isBelowDesktop ? null : (
+                            <>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setPreviewMode('desktop')}
+                                            variant="ghost"
+                                            size="icon"
+                                            className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                        >
+                                            <Monitor className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Desktop</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            onClick={() => setPreviewMode('mobile')}
+                                            variant="ghost"
+                                            size="icon"
+                                            className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
+                                        >
+                                            <Smartphone className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Mobile</TooltipContent>
+                                </Tooltip>
+                            </>
+                        )}
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
