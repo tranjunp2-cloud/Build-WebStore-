@@ -22,7 +22,9 @@ const SelectTrigger = React.forwardRef<
       // border-solid: trigger is a <button>; Tailwind preflight is OFF so the `border`
       // utility sets width+color but no style → the border won't render. globals.css base
       // only forces border-style on input/textarea/select, so declare it here for the button.
-      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      // Hover matches the dashSecondary Button pattern (see Discounts "Export CSV") — a subtle
+      // surface wash, not a border-color change.
+      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-lg border border-solid border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-sm ring-offset-background transition-colors hover:bg-white/[0.05] focus:outline-none focus:ring-1 focus:ring-ring data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent [&>span]:line-clamp-1",
       className
     )}
     {...props}

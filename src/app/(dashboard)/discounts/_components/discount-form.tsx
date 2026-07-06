@@ -242,13 +242,18 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 />
             </div>
 
-            <DiscountSaveBar
-                dirty={dirty}
-                isNew={isNew}
-                saving={saving}
-                onCancel={handleCancel}
-                onSave={handleSave}
-            />
+            {/* GH-1509 bug #11: was always mounted (only the Save button disabled when clean),
+                so it showed up on first load before any edit. Match Payments/Shipping — only
+                render while there's something unsaved. */}
+            {dirty && (
+                <DiscountSaveBar
+                    dirty={dirty}
+                    isNew={isNew}
+                    saving={saving}
+                    onCancel={handleCancel}
+                    onSave={handleSave}
+                />
+            )}
         </div>
     )
 }

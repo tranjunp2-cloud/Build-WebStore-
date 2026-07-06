@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, User, ShoppingBag, UndoDot, Check } from 'lucide-react'
+import { ArrowLeft, Loader2, User, ShoppingBag, UndoDot, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -185,21 +185,20 @@ export function CustomersDetail({ customer }: Props) {
                 : <CustomersDetailOrdersTab customerId={original.id} />
             }
 
-            {/* Sticky save bar — synced with discount-save-bar style */}
-            {activeTab === 'default' && (
+            {/* Save bar — GH-1509: aligned to the same template as PaymentsFormClient.tsx /
+                Shipping's SettingsFooter (sticky floating rounded card, `--save-bar-bg`, amber
+                "unsaved changes" indicator, size="sm" buttons) instead of the old full-width
+                fixed bar. Also only renders while dirty — was previously always visible on the
+                default tab, just swapping "Unsaved changes" / "Up to date" text. */}
+            {activeTab === 'default' && dirty && (
                 <div
-                    // left-0 on tablet (drawer sidebar); from lg align to the live sidebar width
-                    // (--dash-content-pl = 250 / 64 collapsed) so the bar isn't left floating/misaligned.
-                    className="fixed bottom-0 left-0 right-0 lg:left-[var(--dash-content-pl)] transition-[left] duration-200 flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
-                    style={{
-                        background: 'var(--dash-surface)',
-                        borderColor: 'var(--dash-border)',
-                        backdropFilter: 'blur(12px)',
-                    }}
+                    className="sticky bottom-4 z-40 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                    style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
                 >
-                    <span className="text-xs" style={{ color: 'var(--dash-text-muted)' }}>
-                        {dirty ? cd.unsaved : cd.upToDate}
-                    </span>
+                    <div className="flex items-center gap-2 text-[13px]">
+                        <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
+                        <span className="text-amber-300 font-medium">{cd.unsaved}</span>
+                    </div>
                     <div className="flex items-center gap-2">
                         <Button
                             type="button"
@@ -214,7 +213,6 @@ export function CustomersDetail({ customer }: Props) {
                             type="button"
                             onClick={handleSave}
                             disabled={!dirty || saving}
-                            variant="dashPrimary"
                             size="sm"
                         >
                             {saving
