@@ -1,7 +1,7 @@
 /**
  * Single source of truth for theme enum values.
- * Must stay in sync with the Sites collection schema.
  * Consumed by:
+ *  - `src/collections/Sites.ts`                (fontHeading/fontBody select options)
  *  - `src/app/api/sites/[siteId]/save/route.ts` (runtime validation via Set<string>)
  *  - `src/app/api/ai/edit-block/route.ts`      (AI system prompt constraints)
  */

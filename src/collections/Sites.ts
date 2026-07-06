@@ -1,11 +1,9 @@
 import type { CollectionConfig } from 'payload'
 import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
+import { THEME_ENUMS } from '../lib/theme/enums'
 
-// Keep in sync with `THEME_ENUMS.fontHeading`/`.fontBody` (`src/lib/theme/enums.ts`).
-const HEADING_FONT_OPTIONS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
-    .map(font => ({ label: font, value: font }))
-const BODY_FONT_OPTIONS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
-    .map(font => ({ label: font, value: font }))
+const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
+const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
 
 export const Sites: CollectionConfig = {
     slug: 'sites',
