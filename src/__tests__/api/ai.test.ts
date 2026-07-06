@@ -543,6 +543,42 @@ describe('AI Streaming APIs', () => {
             // Mocked generateSiteWithAI (top of file) returns result.siteName = 'AI Bakery'
             expect(productCreateCall![0].data.images?.[0]?.alt).toBe('Sample Bread - AI Bakery')
         })
+
+        it('[TC-09.49] persisted alt-text fallback is capped at 500 chars, matching saveProductAction (code-review fix)', async () => {
+            const longName = 'B'.repeat(600)
+            vi.mocked(generateSampleProducts).mockResolvedValueOnce({
+                products: [{
+                    name: longName,
+                    shortDescription: 'Fresh bread',
+                    description: 'Delicious fresh bread',
+                    price: 10,
+                    sku: 'BREAD-001',
+                    inventory: 0,
+                    imageId: 555,
+                    status: 'active',
+                }],
+                stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                })
+            })
+            await GenerateSitePOST(req)
+
+            const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+            const resolvedPayload = await mockPayload
+            const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+            const productCreateCall = createCalls.find(
+                (c: [{ collection: string; data?: { images?: Array<{ alt?: string }> } }]) => c[0].collection === 'products'
+            )
+            expect(productCreateCall).toBeDefined()
+            const alt = productCreateCall![0].data.images?.[0]?.alt
+            expect(alt).toBeDefined()
+            expect(alt!.length).toBeLessThanOrEqual(500)
+        })
     })
 
     describe('POST /api/ai/edit-block', () => {

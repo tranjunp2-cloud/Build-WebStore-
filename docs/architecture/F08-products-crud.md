@@ -153,6 +153,49 @@ check's read to either action's write — a concurrent edit clearing `weight` co
 a concurrent activate between the read and write. Same risk class as the pre-existing variant-loss
 race documented next to it in `actions.ts`; narrow window, no known exploit path.
 
+### Collection-level Enforcement (added 2026-07-03, PR #1500 code review)
+
+**Critical gap found and fixed:** the two Server Action checks above only fire when the *incoming
+payload* explicitly sets `status: 'active'`. Editing an already-`active` product without touching
+`status` (exactly what the edit form does on every save) skipped the gate entirely — `sku`/
+`inventory`/`weight` have no `required` flag at the Payload field level, so a direct
+`saveProductAction` call could silently clear them on a live active product. Worse, since both gates
+lived only in Next.js Server Actions, Payload's default REST/GraphQL API bypassed both outright — any
+authenticated tenant user with product-management access could `PATCH /api/products/:id` directly.
+
+- Location: `publishGateHook` (`beforeChange`), `src/collections/Products.ts` — runs after
+  `beforeChangeHook` (so the variant inventory auto-calc has already run) on **every** write path:
+  both Server Actions, REST, GraphQL, Local API, and any future write path (bulk import, etc.)
+- Keyed on the RESULTING status (`data.status` if present in the write, else `originalDoc.status`),
+  not just the incoming payload — this is what closes the "edit an active product without touching
+  status" gap.
+- Fires when resulting status is `active` AND either (a) `status` is being explicitly set to
+  `active` in this write, (b) a scalar gate-relevant field (`price`/`sku`/`inventory`/`weight`/
+  `hasVariants`) is present in the write, or (c) `variants` CONTENT (id-normalized) differs from
+  `originalDoc.variants`.
+- `variants` needed special handling, found via self-review: `updateProductFieldAction` always
+  re-passes `existing.variants` stripped of Payload's auto-managed row `id` (a Payload 3.79
+  workaround, see `stripIds()` in `actions.ts`), so a naive **key-presence** trigger would wrongly
+  re-fire the gate on unrelated writes (e.g. soft-delete) to a legacy-incomplete active product. But
+  naively **excluding** `variants` from the trigger set entirely (the first-draft fix) reopened the
+  exact bug this hook exists to close: a direct call with only `{variants: [bad data]}` (no status/
+  hasVariants key) would then skip the check outright. Resolved with `normalizeVariantsForCompare()`
+  — strips row/option `id` the same way `stripIds()` does (including coercing non-array/`null` to
+  `[]`, matching `stripIds(null) === []`, so a legacy row storing `variants: null` doesn't spuriously
+  compare as "changed") — then compares CONTENT, not key presence.
+- Throws the same `APIError(JSON.stringify({code:'PUBLISH_BLOCKED', missingFields}))` shape as the
+  two Server Action checks, so existing client-side error parsing (`parsePublishBlockedError` in
+  `page.tsx`) keeps working unchanged for both call sites; the hook is now the authoritative
+  backstop for every other path.
+- `productPublishBlocks()` itself was hardened in the same review round: `isBlank()` now type-guards
+  instead of throwing on a non-string truthy value (`sku: {}` from a raw API call), and `price`/
+  `inventory`/variant `price`/`stock` now share the same explicit `isValidNumber()` type-check
+  `weight` already used — a non-numeric string previously passed as "present and valid."
+- Tests: TC-09.47 (`src/__tests__/unit/collections/products-hooks.test.ts`, 9 scenarios including
+  the regression guards — unrelated-field edits, soft-deletes on a legacy-incomplete active
+  product, and a `variants:null` legacy row must NOT be blocked) + TC-09.51
+  (`publish-guard.test.ts` — type-safety, no-throw on non-string input).
+
 ### UX Flow
 
 ```

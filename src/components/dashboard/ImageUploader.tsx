@@ -138,7 +138,10 @@ export function ImageUploader({
     }
 
     const saveAlt = (id: string | number) => {
-        handleAltChange(id, draftAlt.trim())
+        // Clamp on save, not just via the Textarea's maxLength attribute — pre-existing alt text
+        // longer than the cap (legacy data, imports) opens uncut for display, but Save must still
+        // enforce the cap; maxLength only blocks new keystrokes, not an untouched draft.
+        handleAltChange(id, draftAlt.trim().slice(0, MAX_ALT_LENGTH))
         setOpenAltId(null)
     }
 

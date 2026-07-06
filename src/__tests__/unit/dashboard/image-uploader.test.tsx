@@ -178,4 +178,19 @@ describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
         expect(textarea.value.length).toBe(130)
         expect(textarea.getAttribute('maxlength')).toBe('125')
     })
+
+    it('[TC-F08-01-38] Save clamps a pre-existing >125-char alt to 125 on commit (code-review fix)', () => {
+        // maxLength only blocks NEW keystrokes — a pre-existing over-cap alt opened and saved
+        // without editing must still be clamped, not silently persisted over the advertised cap.
+        const longAlt = 'c'.repeat(130)
+        const onChange = vi.fn()
+        render(<ImageUploader {...defaultProps} onChange={onChange} value={[{ id: 'img1', url: '/img1.jpg', alt: longAlt }]} showAltInput={true} />)
+
+        fireEvent.click(screen.getByTitle(longAlt))
+        fireEvent.click(screen.getByText('Save'))
+
+        const [saved] = onChange.mock.calls[0]
+        expect(saved[0].alt.length).toBe(125)
+        expect(saved[0].alt).toBe('c'.repeat(125))
+    })
 })

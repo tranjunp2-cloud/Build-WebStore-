@@ -1264,8 +1264,9 @@ export async function POST(req: NextRequest) {
                     // products-bulk-parse); Tier-2 curated fallback never sets these. `||` fallback
                     // constants (matching BulkCreateModal.buildSavePayload() exactly, NOT `??`) apply
                     // when the AI omitted a value OR hallucinated weight:0 — publish-guard.ts treats
-                    // 0 as invalid too, and this route creates status:'active' directly (bypassing
-                    // the guard), so this is the only place that invariant gets enforced here.
+                    // 0 as invalid too. This create is now also gated by the collection-level
+                    // publishGateHook (src/collections/Products.ts) same as every other write path,
+                    // so this `||` fallback is defense-in-depth, not the only enforcement point.
                     weight: product.weight || 1,
                     dimensions: {
                         length: product.length || 0,
@@ -1275,7 +1276,9 @@ export async function POST(req: NextRequest) {
                 }
                 // Persisted alt fallback (GH-1458) — mirrors saveProductAction's buildProductAlt()
                 // call, but result.siteName is already in scope here so no extra query is needed.
-                const fallbackAlt = buildProductAlt(undefined, name, result.siteName)
+                // Re-capped at 500 (matches saveProductAction's cap, actions.ts) since `name` here
+                // is unbounded AI output, unlike the form's client-validated 120-char product name.
+                const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
                     await payload.create({
                         collection: 'products',

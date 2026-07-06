@@ -153,3 +153,63 @@ describe('productPublishBlocks — TC-09.37: edge inputs', () => {
         expect(r.missingFields).not.toContain('category')
     })
 })
+
+// ── TC-09.46: weight type-safety (code-review fix) ─────────────────────────────
+// saveProductAction's schema is .passthrough(), so weight can arrive as any type. The guard
+// must not rely on JS coercion (`!value` / `value <= 0`), which treats a non-numeric string as
+// "present and valid" (`!"abc"` is false, `"abc" <= 0` is false via NaN comparison).
+describe('productPublishBlocks — TC-09.46: weight type-safety', () => {
+    const complete = { price: 50, sku: 'X', inventory: 1 }
+
+    it('flags "weight" when weight is a non-numeric string', () => {
+        const r = productPublishBlocks({ ...complete, weight: 'abc' as unknown as number })
+        expect(r.missingFields).toContain('weight')
+    })
+
+    it('flags "weight" when weight is NaN', () => {
+        const r = productPublishBlocks({ ...complete, weight: NaN })
+        expect(r.missingFields).toContain('weight')
+    })
+
+    it('accepts a genuine positive numeric weight', () => {
+        const r = productPublishBlocks({ ...complete, weight: 500 })
+        expect(r.missingFields).not.toContain('weight')
+    })
+})
+
+// ── TC-09.51: price/inventory/variant-field type-safety (adversarial review fix) ──────────────
+// Same class of bug as TC-09.46 (weight), but for price/inventory/variant sku-price-stock: raw
+// REST/GraphQL callers aren't constrained to the types a form would send. `== null` alone treats
+// a non-numeric string/object as "present and valid".
+describe('productPublishBlocks — TC-09.51: price/inventory/variant type-safety', () => {
+    it('flags "price" and "inventory" when they are non-numeric strings', () => {
+        const r = productPublishBlocks({ price: 'abc' as unknown as number, sku: 'X', inventory: 'xyz' as unknown as number, weight: 500 })
+        expect(r.missingFields).toContain('price')
+        expect(r.missingFields).toContain('inventory')
+    })
+
+    it('does not throw when sku is a non-string truthy value (object/array) — flags it as missing instead', () => {
+        expect(() => productPublishBlocks({ price: 50, sku: {} as unknown as string, inventory: 1, weight: 500 })).not.toThrow()
+        const r = productPublishBlocks({ price: 50, sku: [] as unknown as string, inventory: 1, weight: 500 })
+        expect(r.missingFields).toContain('sku')
+    })
+
+    it('flags "variants" when a variant price/stock is a non-numeric type', () => {
+        const r = productPublishBlocks({
+            hasVariants: true,
+            sku: 'SP-A01',
+            weight: 500,
+            variants: [{ sku: 'SP-A01-RED', price: 'abc' as unknown as number, stock: 5 }],
+        })
+        expect(r.missingFields).toContain('variants')
+    })
+
+    it('does not throw when a variant sku is a non-string truthy value', () => {
+        expect(() => productPublishBlocks({
+            hasVariants: true,
+            sku: 'SP-A01',
+            weight: 500,
+            variants: [{ sku: {} as unknown as string, price: 100, stock: 5 }],
+        })).not.toThrow()
+    })
+})

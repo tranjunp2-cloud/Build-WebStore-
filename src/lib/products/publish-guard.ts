@@ -29,28 +29,37 @@ export interface ProductPublishResult {
     missingFields: string[]
 }
 
-function isBlank(value?: string | null): boolean {
-    return !value || !value.trim()
+// Type-guards, not just null-checks — this function evaluates untrusted input from ANY write path
+// (REST/GraphQL callers included), so `value?.trim()`/`value <= 0` cannot assume the field actually
+// arrived as the type the collection schema declares it as.
+function isBlank(value: unknown): boolean {
+    return typeof value !== 'string' || value.trim() === ''
+}
+
+function isValidNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value)
 }
 
 export function productPublishBlocks(product: ProductPublishInput): ProductPublishResult {
     const missing = new Set<string>()
 
     if (!product.hasVariants) {
-        if (product.price == null) missing.add('price')
+        if (!isValidNumber(product.price)) missing.add('price')
         if (isBlank(product.sku)) missing.add('sku')
-        if (product.inventory == null) missing.add('inventory')
+        if (!isValidNumber(product.inventory)) missing.add('inventory')
     } else {
         if (isBlank(product.sku)) missing.add('sku')
 
         const variants = product.variants ?? []
         const hasCompleteMatrix =
             variants.length > 0 &&
-            variants.every((v) => !isBlank(v.sku) && v.price != null && v.stock != null)
+            variants.every((v) => !isBlank(v.sku) && isValidNumber(v.price) && isValidNumber(v.stock))
         if (!hasCompleteMatrix) missing.add('variants')
     }
 
-    if (!product.weight || product.weight <= 0) missing.add('weight')
+    if (!isValidNumber(product.weight) || product.weight <= 0) {
+        missing.add('weight')
+    }
 
     const missingFields = Array.from(missing)
     return { ok: missingFields.length === 0, missingFields }

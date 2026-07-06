@@ -94,6 +94,32 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### PR #1500 code review — collection-level gate enforcement (2026-07-03)
+
+External `/code-review` on PR #1500 escalated the "gate duplicated across 2 Server Actions" item above from deferred tech debt to a live, trivially exploitable bypass — confirmed via manual trace + adversarial subagent, not hypothetical:
+
+- **Critical — `saveProductAction`'s gate only fired on payloads explicitly setting `status:'active'`.** Editing an already-`active` product without touching `status` (exactly what the edit form does on every save) skipped the gate entirely; `sku`/`inventory`/`weight` have no `required` flag at the Payload field level, so `''`/`null`/`0` were silently accepted, deterministically leaving a live active product with missing core fields.
+- **Critical — no collection-level enforcement at all.** Both Server Action gates were the *only* enforcement; Payload's default REST/GraphQL API (not disabled on this collection) bypassed both outright — any authenticated tenant user with product-management access could `PATCH /api/products/:id` directly.
+- **Fix (both, same root cause):** new `publishGateHook` (`beforeChange`) on the `products` collection (`src/collections/Products.ts`) — single source of truth enforced on every write path (both Server Actions, REST, GraphQL, Local API, future bulk import), keyed on the RESULTING status (`data.status` if present, else `originalDoc.status`) rather than only the incoming payload. Fires when status resolves to `active` AND (status is being explicitly set active, OR a scalar gate field — price/sku/inventory/weight/hasVariants — is present in the write, OR `variants` CONTENT differs from the original doc). Existing two Server Action checks kept as-is (fast, structured client errors); the hook is the new authoritative backstop. Tests: TC-09.47 (`products-hooks.test.ts`, 9 cases).
+- **Medium — alt-text length caps enforced inconsistently.** `ImageUploader`'s 125-char cap was DOM-`maxLength`-only — a pre-existing over-cap alt saved without editing persisted uncut. `generate-site`'s persisted alt fallback had no cap at all, unlike `saveProductAction`'s 500-char cap it claimed to mirror. Fixed: clamp on `saveAlt()` (`ImageUploader.tsx`) and `.slice(0, 500)` on `generate-site`'s `fallbackAlt` (`route.ts`). Tests: TC-F08-01-38, TC-09.49.
+- **Medium — `productPublishBlocks`'s weight check relied on JS coercion.** `!value || value <= 0` treats a non-numeric string (e.g. `"abc"`, reachable via `saveProductAction`'s `.passthrough()` schema) as valid. Fixed with an explicit `typeof`/`Number.isFinite` check. Test: TC-09.46.
+- **Low — `id === 0` falsy-zero bug.** `saveProductAction`'s `id ? ... : undefined` treated a legitimate `id:0` as absent, routing to create instead of update. Not currently reachable (Payload serial PKs start at 1) but fixed for correctness. Test: TC-09.50.
+
+**Impact:** the publishing gate is now enforced at the correct architectural layer — no write path (present or future) can set/leave a product `active` with missing core fields, closing the exact class of bug this feature already fixed once, permanently this time.
+
+**Self-review + adversarial round 2 (same day):** re-ran `/code-review` on this fix itself before commit. Self-review caught one Critical regression the fix's own first draft introduced; a follow-up adversarial subagent pass caught 3 more (all fixed same session):
+
+- **Critical (self-caught) — excluding `variants` from the trigger set reopened the exact bypass class being closed.** First draft excluded `variants`/`variantConfigs` entirely from `PUBLISH_GATE_TRIGGER_FIELDS` to avoid `updateProductFieldAction`'s always-re-passed-variants workaround from falsely blocking soft-deletes. But a direct call with only `{variants: [bad data]}` (no status/hasVariants key) then skipped the gate outright. Fixed by comparing `variants` CONTENT (id-normalized via new `normalizeVariantsForCompare()`, mirroring `actions.ts`'s `stripIds()`) against `originalDoc` instead of checking key presence — catches genuine variant edits while still not re-firing on the no-op re-pass.
+- **Medium — `isBlank()` could throw on non-string truthy input.** `sku: {}` or `sku: []` from a raw REST/GraphQL call reached `value.trim()` without a type guard, throwing an unhandled `TypeError` instead of a clean `PUBLISH_BLOCKED`. Fixed: `isBlank()` now type-guards (`typeof value !== 'string'`).
+- **Medium — `price`/`inventory` retained the type-unsafe `== null` pattern that `weight` was already fixed for.** A non-numeric `price`/`inventory` (e.g. `"abc"`) would pass the `== null` check as "present." Unified all three (plus variant `price`/`stock`) behind one `isValidNumber()` type-guard helper.
+- **Medium — `normalizeVariantsForCompare` diverged from `stripIds()` on non-array input.** `stripIds(null)` returns `[]`; the new compare function passed non-array values through unchanged, so a legacy row storing `variants: null` would spuriously compare as "changed" against `updateProductFieldAction`'s re-passed `[]`, re-firing the gate on an untouched soft-delete. Fixed to coerce non-array to `[]`, matching `stripIds()`.
+- **Low — stale comment.** `generate-site/route.ts`'s comment still claimed this route "bypasses the guard," no longer true now that the collection-level hook covers it. Updated for accuracy.
+- **Deferred (not fixed, Low, safe-direction):** if Payload applies field `defaultValue`s AFTER `beforeChange` hooks run (unconfirmed — Payload docs are ambiguous on ordering, `node_modules` inspection blocked by this repo's sandbox policy), a raw API create with `status:'active'` omitting `inventory` (relying on its `defaultValue:0`) would be incorrectly blocked rather than defaulting to 0. Fail-closed (over-blocks), not a bypass; narrow edge case only reachable via a direct API call bypassing both Server Actions (which always send `inventory` explicitly).
+
+Tests: TC-09.51 (`publish-guard.test.ts` + `products-hooks.test.ts`). Full suite after all fixes: 9321/9324 pass (3 pre-existing DB-connectivity failures, no local Postgres in this sandbox — unrelated). Typecheck clean.
+
+---
+
 ### F34 — Subscription Enforcement Error Message i18n
 
 **Malay localization for subscription block errors in editor and dashboard:**

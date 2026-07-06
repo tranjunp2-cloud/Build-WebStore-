@@ -1,8 +1,10 @@
 import type { CollectionConfig, Where, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
+import { APIError } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import { productPublishBlocks, type ProductPublishInput } from '@/lib/products/publish-guard'
 import {
     revalidateBadgeCountsAfterChange,
     revalidateBadgeCountsAfterDelete,
@@ -133,6 +135,72 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
     return data
 }
 
+// Publishing gate (GH-1458) — collection-level enforcement so EVERY write path (the two Next.js
+// server actions, Payload REST, GraphQL, Local API, future bulk import) is covered, not just the
+// two call sites that already check productPublishBlocks() for fast, structured client errors.
+// Adversarial review found those two call-site checks only fire when the incoming payload
+// explicitly sets `status:'active'` — editing an already-active product without touching `status`
+// (exactly what the edit form does on every save) skipped both gates entirely, and Payload's
+// default REST/GraphQL API bypassed them outright (no beforeChange enforcement existed here).
+//
+// 'variants' needs special handling: updateProductFieldAction always re-passes
+// existing.variants stripped of Payload's auto-managed row `id` (a Payload 3.79 workaround, see
+// actions.ts stripIds()), so a naive "is the key present" trigger would wrongly re-fire this gate
+// on unrelated updates (e.g. soft-delete) to a legacy active product that predates this gate — but
+// naively EXCLUDING 'variants' from the trigger set entirely reopens the exact bug this hook exists
+// to close: a direct saveProductAction call with only `{variants: [bad data]}` (no status/
+// hasVariants key) would then skip the check outright. Resolved by comparing variants CONTENT
+// (id-normalized) against originalDoc rather than just checking key presence.
+const PUBLISH_GATE_TRIGGER_FIELDS = ['price', 'sku', 'inventory', 'weight', 'hasVariants'] as const
+
+function normalizeVariantsForCompare(value: unknown): unknown {
+    // Coerce non-array to [] — matching stripIds() in actions.ts — so a legacy row storing
+    // variants as null/undefined compares equal to updateProductFieldAction's re-passed `[]`
+    // (stripIds(null) === []), instead of "null" !== "[]" spuriously tripping variantsChanged.
+    if (!Array.isArray(value)) return []
+    return value.map((item) => {
+        if (!item || typeof item !== 'object') return item
+        const { id: _id, ...rest } = item as Record<string, unknown>
+        if (Array.isArray(rest.options)) {
+            rest.options = (rest.options as Record<string, unknown>[]).map((opt) => {
+                if (!opt || typeof opt !== 'object') return opt
+                const { id: _optId, ...o } = opt as Record<string, unknown>
+                return o
+            })
+        }
+        return rest
+    })
+}
+
+const publishGateHook: CollectionBeforeChangeHook = async ({ data, originalDoc }) => {
+    const record = data as Record<string, unknown>
+    const original = originalDoc as Record<string, unknown> | undefined
+
+    const statusBeingSetActive = 'status' in record && record.status === 'active'
+    const resultingStatus = 'status' in record ? record.status : original?.status
+    if (resultingStatus !== 'active') return data
+
+    const touchesScalarTriggerField = PUBLISH_GATE_TRIGGER_FIELDS.some((field) => field in record)
+    const variantsChanged = 'variants' in record && JSON.stringify(normalizeVariantsForCompare(record.variants)) !== JSON.stringify(normalizeVariantsForCompare(original?.variants))
+    if (!statusBeingSetActive && !touchesScalarTriggerField && !variantsChanged) return data
+
+    const pick = (key: string): unknown => (key in record ? record[key] : original?.[key])
+    const blocks = productPublishBlocks({
+        price: pick('price'),
+        sku: pick('sku'),
+        inventory: pick('inventory'),
+        weight: pick('weight'),
+        hasVariants: pick('hasVariants'),
+        variants: pick('variants'),
+    } as ProductPublishInput)
+
+    if (!blocks.ok) {
+        throw new APIError(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields: blocks.missingFields }), 400)
+    }
+
+    return data
+}
+
 // Extract tenant IDs from user session. Numeric strings (e.g. "1") are coerced to numbers
 // so that Neon PostgreSQL strict mode can match them against integer FK columns.
 // Non-numeric strings are kept as-is for compatibility.
@@ -152,7 +220,7 @@ function getTenantIds(user: unknown): (string | number)[] {
 export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
-        beforeChange: [beforeChangeHook],
+        beforeChange: [beforeChangeHook, publishGateHook],
         afterChange: [afterChangeHook, lowStockHook, revalidateBadgeCountsAfterChange],
         afterDelete: [revalidateBadgeCountsAfterDelete],
     },

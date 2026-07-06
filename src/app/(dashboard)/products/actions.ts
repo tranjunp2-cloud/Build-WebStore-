@@ -146,7 +146,10 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
         storeName = sitesRes.docs[0]?.name ?? undefined
     }
 
-    const numId = id ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
+    // `id != null` (not truthy `id`) — a falsy `id === 0` is a legitimate Payload primary key
+    // and must route to the update branch below, not silently fall through to create.
+    const hasId = id != null && id !== ''
+    const numId = hasId ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
     if (numId !== undefined && Number.isNaN(numId)) throw new Error('Invalid product ID')
 
     // Publishing gate (GH-1458) — updateProductFieldAction() is not the only path to
@@ -218,10 +221,10 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
         data.images = data.images.map((img) => ({ ...img, alt: buildProductAlt(img.alt, data.name, storeName).slice(0, 500) }))
     }
 
-    if (id) {
+    if (hasId) {
         const res = await payload.update({
             collection: 'products',
-            id,
+            id: id as string | number,
             data,
             user,
             overrideAccess: false,

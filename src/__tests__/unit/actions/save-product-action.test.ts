@@ -561,6 +561,19 @@ describe('saveProductAction', () => {
             expect(mockCreate).toHaveBeenCalledOnce()
         })
     })
+
+    // ── TC-09.50: id===0 falsy-zero bug (code-review fix) ──────────────────────
+    describe('id===0 routes to update, not create (TC-09.50)', () => {
+        it('[TC-09.50] saveProductAction(data, 0) calls payload.update, not payload.create', async () => {
+            mockFindByID.mockResolvedValue({ id: 0, name: 'Test Product' })
+
+            await saveProductAction({ name: 'Test Product' }, 0)
+
+            expect(mockUpdate).toHaveBeenCalledOnce()
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 0 }))
+            expect(mockCreate).not.toHaveBeenCalled()
+        })
+    })
 })
 
 describe('updateProductFieldAction', () => {
