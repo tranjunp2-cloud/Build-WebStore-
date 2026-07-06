@@ -109,6 +109,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                             onClick={() => setPreviewMode('desktop')}
                                             variant="ghost"
                                             size="icon"
+                                            aria-label="Desktop"
                                             className={`h-7 w-7 ${previewMode === 'desktop' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                                         >
                                             <Monitor className="h-4 w-4" />
@@ -123,6 +124,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                             onClick={() => setPreviewMode('mobile')}
                                             variant="ghost"
                                             size="icon"
+                                            aria-label="Mobile"
                                             className={`h-7 w-7 ${previewMode === 'mobile' ? 'bg-slate-200 dark:bg-white/[0.1] text-[hsl(var(--primary))]' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'}`}
                                         >
                                             <Smartphone className="h-4 w-4" />
@@ -139,6 +141,7 @@ export function EmailPreviewPane({ templateType, locale, draftConfig, onReset }:
                                     onClick={handleRefresh}
                                     variant="ghost"
                                     size="icon"
+                                    aria-label="Refresh"
                                     className="h-7 w-7 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white"
                                 >
                                     <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
