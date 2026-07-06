@@ -334,7 +334,7 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-2">
+                    <div className="flex flex-row items-center gap-2 w-full">
                         {/* Input — shared <Input> nguyên bản design-system (nền card, viền --input-border,
                             focus ring chuẩn), chỉ override cỡ chữ 13px như ô search. */}
                         <Input
@@ -344,7 +344,7 @@ export default function ProductsPage() {
                                 if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                            className="w-full md:flex-1 text-[13px]"
+                            className="flex-1 min-w-0 text-[13px]"
                         />
                         {/* Create — shared dashboard primary button (size="dash") */}
                         <Button
@@ -353,7 +353,7 @@ export default function ProductsPage() {
                             onClick={() => {
                                 if (aiPrompt.trim()) handleCreateAi()
                             }}
-                            className="w-full md:w-auto justify-center"
+                            className="shrink-0 justify-center"
                         >
                             <Plus className="h-4 w-4" />
                             {t.dashboard.products.list.aiChatBtn}
@@ -372,14 +372,14 @@ export default function ProductsPage() {
                             <h1 className="text-[24px] font-bold leading-none text-foreground">{t.dashboard.products.title}</h1>
                             <span className="block text-[14px] leading-none text-foreground/60">{t.dashboard.products.subtitle}</span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-                            <Button asChild variant="dashSecondary" size="dash" className="w-full sm:w-auto justify-center">
+                        <div className="flex flex-row items-center gap-2 w-full md:w-auto">
+                            <Button asChild variant="dashSecondary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/categories">
                                     <Tag className="w-3.5 h-3.5" />
                                     {t.dashboard.products.list.category}
                                 </Link>
                             </Button>
-                            <Button asChild variant="dashPrimary" size="dash" className="w-full sm:w-auto justify-center">
+                            <Button asChild variant="dashPrimary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/new">
                                     <Image src="/images/figma/add-product.svg" alt="Add" width={16} height={16} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
                                 </Link>
@@ -423,8 +423,8 @@ export default function ProductsPage() {
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
-                        <div className="relative w-full h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
+                        <div className="relative w-full h-9">
+                            <Image src="/images/figma/search-icon.svg" width={16} height={16} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
                             <Input
                                 type="text"
@@ -432,40 +432,44 @@ export default function ProductsPage() {
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
                                 style={{ background: 'transparent', color: 'var(--dash-text)' }}
-                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-9 pr-4 text-[13px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                             />
                         </div>
 
-                        {/* Row 2: Sort — shadcn Select (design system, themed) */}
-                        <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-full h-[50px] rounded-[16px] border-[var(--dash-border)] px-4 text-[16px] font-medium text-[var(--dash-text)] shadow-none">
-                                <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SORT_OPTIONS.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {sortTranslateMap[option]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {/* Row 2: Sort + Filter — merged into one row (GH-1492) */}
+                        <div className="flex flex-row items-center gap-2 w-full">
+                            {/* Sort — shadcn Select (design system, themed) */}
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                                <SelectTrigger className="h-9 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
+                                    <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {SORT_OPTIONS.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {sortTranslateMap[option]}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                        {/* Row 3: Filter Button — full-width, centered */}
-                        <Button
-                            variant="dashSecondary"
-                            onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
-                            className="w-full h-[50px] rounded-[16px] text-[16px] font-medium"
-                        >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
-                            <span>
-                                {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                    ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
-                                    : ''}
-                            </span>
-                        </Button>
+                            {/* Filter Button */}
+                            <Button
+                                variant="dashSecondary"
+                                size="dash"
+                                onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+                                style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                    ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                    : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
+                                className="shrink-0 rounded-[16px]"
+                            >
+                                <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
+                                <span>
+                                    {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                        ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
+                                        : ''}
+                                </span>
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}

@@ -1,6 +1,12 @@
 import type { CollectionConfig } from 'payload'
 import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
 
+// Keep in sync with `THEME_ENUMS.fontHeading`/`.fontBody` (`src/lib/theme/enums.ts`).
+const HEADING_FONT_OPTIONS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+    .map(font => ({ label: font, value: font }))
+const BODY_FONT_OPTIONS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+    .map(font => ({ label: font, value: font }))
+
 export const Sites: CollectionConfig = {
     slug: 'sites',
     admin: {
@@ -163,26 +169,13 @@ export const Sites: CollectionConfig = {
                     name: 'fontHeading',
                     type: 'select',
                     defaultValue: 'Outfit',
-                    options: [
-                        { label: 'Outfit', value: 'Outfit' },
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'Playfair Display', value: 'Playfair Display' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Poppins', value: 'Poppins' },
-                        { label: 'Raleway', value: 'Raleway' },
-                    ],
+                    options: HEADING_FONT_OPTIONS,
                 },
                 {
                     name: 'fontBody',
                     type: 'select',
                     defaultValue: 'Inter',
-                    options: [
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Lato', value: 'Lato' },
-                        { label: 'Open Sans', value: 'Open Sans' },
-                        { label: 'Nunito', value: 'Nunito' },
-                    ],
+                    options: BODY_FONT_OPTIONS,
                 },
                 {
                     name: 'borderRadius',
