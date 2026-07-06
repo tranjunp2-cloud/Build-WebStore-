@@ -143,14 +143,21 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
 // (exactly what the edit form does on every save) skipped both gates entirely, and Payload's
 // default REST/GraphQL API bypassed them outright (no beforeChange enforcement existed here).
 //
-// 'variants' needs special handling: updateProductFieldAction always re-passes
-// existing.variants stripped of Payload's auto-managed row `id` (a Payload 3.79 workaround, see
-// actions.ts stripIds()), so a naive "is the key present" trigger would wrongly re-fire this gate
-// on unrelated updates (e.g. soft-delete) to a legacy active product that predates this gate — but
-// naively EXCLUDING 'variants' from the trigger set entirely reopens the exact bug this hook exists
-// to close: a direct saveProductAction call with only `{variants: [bad data]}` (no status/
-// hasVariants key) would then skip the check outright. Resolved by comparing variants CONTENT
-// (id-normalized) against originalDoc rather than just checking key presence.
+// All trigger fields compare by VALUE CHANGED against originalDoc, not by key presence. Two
+// call shapes need this distinction:
+//   - Payload's own /admin panel (src/app/(payload)/admin) submits the FULL document on every
+//     save, not a partial diff — a key-presence trigger would re-fire this gate on EVERY admin
+//     save of a legacy-incomplete active product (e.g. editing just `description`), not only
+//     saves that actually change a gate-relevant field. Found via independent code review.
+//   - updateProductFieldAction always re-passes existing.variants stripped of Payload's
+//     auto-managed row `id` (a Payload 3.79 workaround, see actions.ts stripIds()) — a naive
+//     "is the key present" trigger would wrongly re-fire this gate on unrelated updates (e.g.
+//     soft-delete) to a legacy active product. But naively EXCLUDING 'variants' from the trigger
+//     set entirely reopens the exact bug this hook exists to close: a direct saveProductAction
+//     call with only `{variants: [bad data]}` (no status/hasVariants key) would then skip the
+//     check outright.
+// `variants` needs id-normalization before comparing (see normalizeVariantsForCompare); the
+// other fields are plain scalars, so strict equality is enough.
 const PUBLISH_GATE_TRIGGER_FIELDS = ['price', 'sku', 'inventory', 'weight', 'hasVariants'] as const
 
 function normalizeVariantsForCompare(value: unknown): unknown {
@@ -176,13 +183,16 @@ const publishGateHook: CollectionBeforeChangeHook = async ({ data, originalDoc }
     const record = data as Record<string, unknown>
     const original = originalDoc as Record<string, unknown> | undefined
 
-    const statusBeingSetActive = 'status' in record && record.status === 'active'
     const resultingStatus = 'status' in record ? record.status : original?.status
     if (resultingStatus !== 'active') return data
 
-    const touchesScalarTriggerField = PUBLISH_GATE_TRIGGER_FIELDS.some((field) => field in record)
+    // A real transition (draft/archived -> active, or create with status:active), not just "the
+    // full-document write happens to include status:'active' because it was already active."
+    const statusBeingSetActive = resultingStatus === 'active' && original?.status !== 'active'
+
+    const scalarFieldChanged = PUBLISH_GATE_TRIGGER_FIELDS.some((field) => field in record && record[field] !== original?.[field])
     const variantsChanged = 'variants' in record && JSON.stringify(normalizeVariantsForCompare(record.variants)) !== JSON.stringify(normalizeVariantsForCompare(original?.variants))
-    if (!statusBeingSetActive && !touchesScalarTriggerField && !variantsChanged) return data
+    if (!statusBeingSetActive && !scalarFieldChanged && !variantsChanged) return data
 
     const pick = (key: string): unknown => (key in record ? record[key] : original?.[key])
     const blocks = productPublishBlocks({
@@ -529,7 +539,13 @@ export const Products: CollectionConfig = {
             type: 'number',
             min: 0,
             defaultValue: 0,
-            admin: { description: 'Product weight in grams (for shipping calculation)' },
+            // Canonical unit is kg (confirmed 2026-07-06) — matches the create/edit form label,
+            // AI weight-estimation prompts (generate-sample-products.ts, products-bulk-parse), and
+            // seed data. This admin.description previously said "grams", contradicting every other
+            // reader of this field. Safe to correct without a data migration: no consumer reads
+            // `weight` yet (F14 flat-rate shipping calc isn't wired up to it), so no stored value's
+            // meaning changes — this only fixes what the number displayed in /admin claims to be.
+            admin: { description: 'Product weight in kg (for shipping calculation)' },
         },
         {
             name: 'dimensions',

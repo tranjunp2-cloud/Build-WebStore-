@@ -169,20 +169,35 @@ authenticated tenant user with product-management access could `PATCH /api/produ
 - Keyed on the RESULTING status (`data.status` if present in the write, else `originalDoc.status`),
   not just the incoming payload — this is what closes the "edit an active product without touching
   status" gap.
-- Fires when resulting status is `active` AND either (a) `status` is being explicitly set to
-  `active` in this write, (b) a scalar gate-relevant field (`price`/`sku`/`inventory`/`weight`/
-  `hasVariants`) is present in the write, or (c) `variants` CONTENT (id-normalized) differs from
-  `originalDoc.variants`.
-- `variants` needed special handling, found via self-review: `updateProductFieldAction` always
-  re-passes `existing.variants` stripped of Payload's auto-managed row `id` (a Payload 3.79
-  workaround, see `stripIds()` in `actions.ts`), so a naive **key-presence** trigger would wrongly
-  re-fire the gate on unrelated writes (e.g. soft-delete) to a legacy-incomplete active product. But
-  naively **excluding** `variants` from the trigger set entirely (the first-draft fix) reopened the
-  exact bug this hook exists to close: a direct call with only `{variants: [bad data]}` (no status/
-  hasVariants key) would then skip the check outright. Resolved with `normalizeVariantsForCompare()`
-  — strips row/option `id` the same way `stripIds()` does (including coercing non-array/`null` to
-  `[]`, matching `stripIds(null) === []`, so a legacy row storing `variants: null` doesn't spuriously
-  compare as "changed") — then compares CONTENT, not key presence.
+- Fires when resulting status is `active` AND either (a) `status` is a REAL transition
+  (`original?.status !== 'active'` — a draft/archived → active toggle, or a create with
+  `status:'active'`), (b) a scalar gate-relevant field (`price`/`sku`/`inventory`/`weight`/
+  `hasVariants`) has a VALUE that differs from `originalDoc`, or (c) `variants` CONTENT
+  (id-normalized) differs from `originalDoc.variants`.
+- Every trigger check compares by VALUE CHANGED against `originalDoc`, not by key presence —
+  this was a two-step fix:
+  - `variants` needed special handling, found via self-review: `updateProductFieldAction` always
+    re-passes `existing.variants` stripped of Payload's auto-managed row `id` (a Payload 3.79
+    workaround, see `stripIds()` in `actions.ts`), so a naive **key-presence** trigger would
+    wrongly re-fire the gate on unrelated writes (e.g. soft-delete) to a legacy-incomplete active
+    product. But naively **excluding** `variants` from the trigger set entirely (the first-draft
+    fix) reopened the exact bug this hook exists to close: a direct call with only
+    `{variants: [bad data]}` (no status/hasVariants key) would then skip the check outright.
+    Resolved with `normalizeVariantsForCompare()` — strips row/option `id` the same way
+    `stripIds()` does (including coercing non-array/`null` to `[]`, matching
+    `stripIds(null) === []`, so a legacy row storing `variants: null` doesn't spuriously compare
+    as "changed") — then compares CONTENT, not key presence.
+  - The scalar fields (`price`/`sku`/`inventory`/`weight`/`hasVariants`) and `statusBeingSetActive`
+    itself had the SAME key-presence bug, found by an independent review after the above fix
+    shipped: Payload's own `/admin` panel (`src/app/(payload)/admin`) submits the FULL document on
+    every save, not a partial diff like the two Server Actions — so `price`/`sku`/`inventory`/
+    `weight`/`hasVariants`/`status` are ALWAYS present in that payload regardless of what a human
+    actually edited. A key-presence trigger re-fired `PUBLISH_BLOCKED` on EVERY `/admin` save of a
+    legacy-incomplete active product, even a pure `description` edit. Fixed by comparing each
+    scalar field's VALUE against `originalDoc` (strict equality is sufficient — these are plain
+    primitives, no id-normalization needed) and redefining `statusBeingSetActive` as
+    `original?.status !== 'active'` rather than "the payload happens to include
+    `status:'active'`."
 - Throws the same `APIError(JSON.stringify({code:'PUBLISH_BLOCKED', missingFields}))` shape as the
   two Server Action checks, so existing client-side error parsing (`parsePublishBlockedError` in
   `page.tsx`) keeps working unchanged for both call sites; the hook is now the authoritative
@@ -194,7 +209,9 @@ authenticated tenant user with product-management access could `PATCH /api/produ
 - Tests: TC-09.47 (`src/__tests__/unit/collections/products-hooks.test.ts`, 9 scenarios including
   the regression guards — unrelated-field edits, soft-deletes on a legacy-incomplete active
   product, and a `variants:null` legacy row must NOT be blocked) + TC-09.51
-  (`publish-guard.test.ts` — type-safety, no-throw on non-string input).
+  (`publish-guard.test.ts` — type-safety, no-throw on non-string input) + TC-09.52
+  (`products-hooks.test.ts` — Payload `/admin` full-document save must NOT be blocked on an
+  unrelated field edit, but MUST be blocked when a gate field's value actually changes).
 
 ### UX Flow
 

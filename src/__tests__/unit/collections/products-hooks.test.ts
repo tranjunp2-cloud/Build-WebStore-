@@ -75,6 +75,30 @@ describe('Products Collection Hooks (TC-F08)', () => {
             await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
         })
 
+        it('[TC-09.52] Payload /admin panel full-document save (all fields re-sent unchanged) on a legacy-incomplete ACTIVE product, only description edited → does not throw (independent review fix)', async () => {
+            // Payload's own admin panel submits the FULL document on every save, not a partial
+            // diff — unlike the two Server Actions. A key-presence trigger (the original design)
+            // would re-fire this gate on EVERY /admin save of a legacy-incomplete active product,
+            // even when the human only edited `description`, since price/sku/inventory/weight are
+            // always present in the full-document payload. Trigger must be value-CHANGED, not
+            // value-PRESENT, against originalDoc.
+            const originalDoc = {
+                id: 1, status: 'active', price: null, sku: '', inventory: null, weight: 0,
+                hasVariants: false, description: 'Old copy',
+            }
+            const data = {
+                status: 'active', price: null, sku: '', inventory: null, weight: 0,
+                hasVariants: false, description: 'Updated copy via /admin',
+            }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.52] Payload /admin panel full-document save that DOES change a gate field (weight cleared) on an ACTIVE product → throws PUBLISH_BLOCKED', async () => {
+            const originalDoc = { id: 1, status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 500, hasVariants: false }
+            const data = { status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 0, hasVariants: false }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+
         it('[TC-09.47] soft-delete (deletedAt only) on a legacy-incomplete ACTIVE product → does not throw', async () => {
             // updateProductFieldAction always re-passes existing.variants/variantConfigs stripped of
             // their auto-managed `id` (Payload 3.79 workaround) even on a deletedAt-only call — the

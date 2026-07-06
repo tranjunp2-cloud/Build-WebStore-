@@ -86,9 +86,13 @@ export function ProductImageGallery({ images, productName, siteName, primaryColo
                             }}
                         >
                             {img.image?.url && (
+                                // No index suffix here (unlike the pre-GH-1458 fallback name) — the
+                                // parent <button> already carries aria-label={`View image ${i+1}`},
+                                // and appending it to buildProductAlt()'s result would corrupt a
+                                // real merchant-authored alt (e.g. "Front view" -> "Front view 2").
                                 <img
                                     src={img.image.url}
-                                    alt={`${buildProductAlt(img.alt, productName, siteName)} ${i + 1}`}
+                                    alt={buildProductAlt(img.alt, productName, siteName)}
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                 />
                             )}

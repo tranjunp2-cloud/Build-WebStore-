@@ -700,18 +700,20 @@ LOGIC:
 - Else: address_1 = address, address_2 = ""
 ```
 
-#### aggregateWeightKg(items) — DB stores grams, API needs kg
+#### aggregateWeightKg(items) — DB stores kg, API needs kg
 
 ```
-CRITICAL: DB stores weight in GRAMS. EasyParcel expects KILOGRAMS as decimal.
-Divide by 1000 ONCE. Do NOT divide a value that is already in kg.
+UPDATED 2026-07-06 (GH-1458): Products.weight's canonical unit is KG, not grams — confirmed
+with product owner, matches the create/edit form label, AI weight-estimation prompts, and seed
+data. This doc previously assumed grams (see NOT_IMPLEMENTED status below) — do NOT divide by
+1000 when this route is finally built. If any `weight`/`parcelWeight` value already went through
+a grams-based aggregation before this date, re-verify its unit before trusting it.
 
-INPUT:  items = [{ weight_g: 250 }, { weight_g: 750 }, { weight_g: 500 }]
+INPUT:  items = [{ weight_kg: 0.25 }, { weight_kg: 0.75 }, { weight_kg: 0.5 }]
 OUTPUT: weight = 1.5  (kg, decimal)
 
-total_grams = SUM(item.weight_g for each item)
-weight_kg   = total_grams / 1000      // divide ONCE — double-division bug = weight off by 1000x
-weight_kg   = ROUND(weight_kg, 2)
+total_kg  = SUM(item.weight_kg for each item)
+weight_kg = ROUND(total_kg, 2)         // no unit conversion needed — already kg
 return weight_kg
 ```
 
@@ -722,7 +724,7 @@ return weight_kg
 - **Subdivision is ISO 3166-2** `subdivision_code` (e.g. `"MY-07"` Penang, `"MY-14"` KL), not a 3-letter state code.
 - **Country must be `"MY"`** (ISO 3166-1 alpha-2 in `country` / `country_code`), not `"Malaysia"`. Full name not accepted by API.
 - **Address has 2 separate fields** (`address_1` / `address_2`). Do not concatenate into one string.
-- **Weight: DB=grams → EP=kg.** `aggregateWeightKg` divides by 1000. Never divide a value already converted.
+- **Weight: DB=kg → EP=kg (updated 2026-07-06, GH-1458 — was previously documented as grams).** `aggregateWeightKg` sums directly, no unit conversion. Do NOT divide by 1000 — `Products.weight` is already kg.
 - **Money: DB=sen → EP=RM.** Divide by 100 when sending to EasyParcel rate/order calls. Multiply by 100 when receiving prices back. Wrong direction = 100× error (NFR-1).
 
 ---
