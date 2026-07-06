@@ -5,7 +5,8 @@
  */
 
 import type { BasePayload } from 'payload'
-import { downloadPhotoBuffer } from './unsplash-client'
+import { downloadPhotoBuffer } from './pixabay-client'
+import { withMediaCreateLock } from './media-create-lock'
 
 export async function uploadImageUrl(
     imageUrl: string,
@@ -15,11 +16,24 @@ export async function uploadImageUrl(
     payload: BasePayload,
 ): Promise<number | undefined> {
     const { buffer, mimetype } = await downloadPhotoBuffer(imageUrl)
-    const doc = await payload.create({
-        collection: 'media',
+    const createArgs = {
+        collection: 'media' as const,
         data: { alt, tenant: tenantId, aiGenerated: true },
         file: { data: buffer, mimetype, name: filename, size: buffer.length },
-    })
+    }
+    // GH-1185: DB create serialized — concurrent media creates silently lose
+    // rows (drizzle transaction race, see media-create-lock.ts).
+    let doc
+    try {
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
+    } catch (err) {
+        // Belt & braces for genuinely transient failures (network, S3 hiccup).
+        console.warn(
+            `[upload-media] media create failed for ${filename}, retrying once: ${err instanceof Error ? err.message : String(err)}`,
+        )
+        await new Promise((r) => setTimeout(r, 300))
+        doc = await withMediaCreateLock(() => payload.create(createArgs))
+    }
     const numId = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
     return Number.isFinite(numId) ? numId : undefined
 }

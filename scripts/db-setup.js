@@ -4851,6 +4851,25 @@ const MIGRATIONS = [
   { name: 'tenants.easy_parcel_integration_account_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_name varchar;` },
   { name: 'tenants.easy_parcel_integration_account_email', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_email varchar;` },
   { name: 'tenants.easy_parcel_integration_warehouses', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_warehouses jsonb;` },
+  // GH-1293: dedupe pre-existing (user_id, step) duplicates before adding the unique
+  // index below — keeps 'completed' first if present in the group, else latest updated_at.
+  // Must run before sso_step_events.user_step_uniq (order matters in this array).
+  {
+    name: 'sso_step_events.dedupe_user_step',
+    sql: `DELETE FROM sso_step_events WHERE id IN (
+      SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+          PARTITION BY user_id, step
+          ORDER BY (status = 'completed') DESC, updated_at DESC, id DESC
+        ) AS rn
+        FROM sso_step_events
+      ) ranked WHERE rn > 1
+    );`,
+  },
+  {
+    name: 'sso_step_events.user_step_uniq',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS sso_step_events_user_step_uniq ON sso_step_events (user_id, step);`,
+  },
   {
     name: 'media.thumbnail',
     sql: `ALTER TABLE media ADD COLUMN IF NOT EXISTS thumbnail varchar;`,
@@ -4894,6 +4913,28 @@ async function runMigrations(pool) {
 }
 
 /**
+ * GH-1293: runMigrations() warns-and-continues on any failure (by design, for the
+ * hundreds of additive/idempotent migrations above). But persistStepEvent()'s
+ * `ON CONFLICT (user_id, step)` upsert has a hard runtime dependency on
+ * sso_step_events_user_step_uniq actually existing — if the dedupe DELETE or the
+ * CREATE UNIQUE INDEX silently failed (e.g. a duplicate row written by old-code
+ * traffic mid-deploy), every future persistStepEvent call would throw, get
+ * swallowed by its own caller's .catch(console.error), and step-event bookkeeping
+ * would silently stop working entirely. Fail the build loudly instead of at runtime.
+ */
+async function verifyCriticalIndexes(pool) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'sso_step_events_user_step_uniq'`
+  );
+  if (rows.length === 0) {
+    throw new Error(
+      'sso_step_events_user_step_uniq index missing after migrations — persistStepEvent() upsert would fail at runtime. Check dedupe migration for duplicate (user_id, step) rows that survived it.'
+    );
+  }
+  console.log('[db-setup] ✅ verified sso_step_events_user_step_uniq exists');
+}
+
+/**
  * All collection slugs in the project (source of truth).
  * When adding a new collection, add its slug here.
  * Hyphens are converted to underscores for DB column naming.
@@ -4919,6 +4960,7 @@ const COLLECTION_SLUGS = [
   'plan-features',
   'discounts',
   'discount_usage_history',
+  'sso-step-events',
 
 ];
 
@@ -5228,6 +5270,7 @@ async function main() {
 
       if (tableCount > 0) {
         await runMigrations(pool);
+        await verifyCriticalIndexes(pool);
         await syncPayloadRelsTables(pool);
         await runBootstrapSeed(pool);
       }

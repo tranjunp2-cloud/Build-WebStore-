@@ -262,6 +262,26 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
     }, [reset])
 
+    // Recover from a stale/deleted siteId: the preview iframe reports via postMessage
+    // when the requested site row no longer exists (localStorage pointing at a
+    // reseeded/removed id). Clear the dead session and return to start instead of
+    // trapping the user on a broken preview. Guarded by siteId match so it can't loop
+    // after reset() nulls the id.
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const onMessage = (e: MessageEvent) => {
+            if (e.origin !== window.location.origin) return
+            if (e.data?.type !== 'PREVIEW_SITE_NOT_FOUND') return
+            if (!siteId || String(e.data.siteId) !== String(siteId)) return
+            reset()
+            clearBuilderSessionStorage()
+            setStep('info')
+            toast.error(t.onboarding.generating.draftExpired)
+        }
+        window.addEventListener('message', onMessage)
+        return () => window.removeEventListener('message', onMessage)
+    }, [siteId, reset, setStep, t])
+
     // Draft recovery dialog — show on mount if a valid draft exists
     useEffect(() => {
         const stored = useBuilderStore.getState()

@@ -11,6 +11,7 @@ import { getCustomerDetailAction, updateContactStatusAction } from '../actions'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import type { CustomerRecord, CustomerStatus } from '../_lib/customer-record'
+import { STATUS_COLORS } from '../_lib/badge-tokens'
 
 // Fixed to 'en-US' intentionally — dashboard date format is English regardless of active locale
 function formatLatestDate(iso: string): string {
@@ -27,15 +28,6 @@ const ALLOWED_TRANSITIONS: Record<CustomerStatus, CustomerStatus[]> = {
     contacted:  ['ignored'],
     ignored:    [],
     subscribed: [],
-}
-
-// GH-1337: tinted rgba per Figma spec — inline style object so Tailwind classes not applicable here.
-const STATUS_COLORS: Record<CustomerStatus, { bg: string; border: string; text: string }> = {
-    new:        { bg: 'rgba(251,191,36,0.1)',  border: 'rgba(251,191,36,0.3)',  text: '#fbbf24' },
-    read:       { bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.3)', text: '#818cf8' },
-    contacted:  { bg: 'rgba(45,212,191,0.1)',  border: 'rgba(45,212,191,0.3)',  text: '#2dd4bf' },
-    ignored:    { bg: 'rgba(156,163,175,0.1)', border: 'rgba(156,163,175,0.3)', text: '#9ca3af' },
-    subscribed: { bg: 'rgba(167,139,250,0.1)', border: 'rgba(138,129,245,0.3)', text: '#8a81f5' },
 }
 
 function StatusDropdown({ status, disabled, onChange }: {
@@ -68,7 +60,7 @@ function StatusDropdown({ status, disabled, onChange }: {
             <button
                 type="button"
                 onClick={() => canChange && !disabled && setOpen(v => !v)}
-                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-sm font-medium border bg-transparent cursor-pointer"
                 style={{ borderColor: c.border, background: c.bg, color: c.text, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
             >
                 {statusLabels[status]}
@@ -86,7 +78,7 @@ function StatusDropdown({ status, disabled, onChange }: {
                             key={s}
                             type="button"
                             onClick={() => { onChange(s); setOpen(false) }}
-                            className={`w-full px-4 py-[10px] text-left text-[14px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'}`}
+                            className={`w-full px-4 py-[10px] text-left text-sm transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'}`}
                         >
                             {statusLabels[s]}
                         </button>
@@ -187,7 +179,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                 {/* Header row: title + close */}
                 <div className="flex items-center justify-between px-6 py-5 shrink-0" style={{ borderBottom: '1px solid var(--dash-border)' }}>
-                    <h2 className="text-[18px] md:text-[20px] font-bold text-[var(--dash-text)]">{c.profileTitle}</h2>
+                    <h2 className="text-lg md:text-xl font-bold text-[var(--dash-text)]">{c.profileTitle}</h2>
                     <button
                         onClick={onClose}
                         className="flex items-center justify-center w-9 h-9 rounded-[12px] text-[var(--dash-text-muted)] hover:text-[var(--dash-text)] hover:bg-black/[0.04] dark:hover:bg-white/10 transition-colors border-none bg-transparent cursor-pointer"
@@ -201,7 +193,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     <div className="flex items-center gap-5">
                         <CustomerAvatar name={record.name} email={record.email} source={record.source} size={60} />
                         <h3
-                            className="text-[24px] font-bold text-[var(--dash-text)]"
+                            className="text-2xl font-bold text-[var(--dash-text)]"
                             style={{ letterSpacing: '-0.6px' }}
                         >
                             {displayName}
@@ -210,12 +202,12 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                     {/* Customer Information card */}
                     <div
-                        className="flex flex-col gap-3 rounded-[16px] px-[17px] py-6"
+                        className="flex flex-col gap-3 rounded-[16px] px-4 py-6"
                         style={{ background: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }}
                     >
                         {/* Section header + status */}
                         <div className="flex items-center justify-between">
-                            <p className="text-[12px] font-semibold uppercase tracking-[0.3px] text-[var(--dash-text-muted)]">
+                            <p className="text-xs font-semibold uppercase tracking-[0.3px] text-[var(--dash-text-muted)]">
                                 {c.infoTitle}
                             </p>
 
@@ -238,8 +230,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <User className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldName}</span>
-                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">{displayName}</span>
+                                    <span className="text-xs text-[var(--dash-text-muted)] leading-4">{c.fieldName}</span>
+                                    <span className="text-sm text-[var(--dash-text)] leading-5">{displayName}</span>
                                 </div>
                             </div>
 
@@ -249,8 +241,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <Mail className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldEmail}</span>
-                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">{record.email}</span>
+                                    <span className="text-xs text-[var(--dash-text-muted)] leading-4">{c.fieldEmail}</span>
+                                    <span className="text-sm text-[var(--dash-text)] leading-5">{record.email}</span>
                                 </div>
                             </div>
 
@@ -260,8 +252,8 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <CalendarDays className="w-4 h-4 text-[hsl(var(--info))]" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-[var(--dash-text-muted)] leading-4">{c.fieldLatestDate}</span>
-                                    <span className="text-[14px] text-[var(--dash-text)] leading-5">
+                                    <span className="text-xs text-[var(--dash-text-muted)] leading-4">{c.fieldLatestDate}</span>
+                                    <span className="text-sm text-[var(--dash-text)] leading-5">
                                         {formatLatestDate(record.createdAt)}
                                     </span>
                                 </div>
@@ -269,12 +261,12 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                         </div>
                     </div>
 
-                    {/* Activity Timeline (contact-form only) */}
+                    {/* Message History (contact-form only) */}
                     {record.source === 'contact-form' && (
                         <div className="flex flex-col gap-6">
                             {/* Section title */}
                             <div className="pb-[17px]" style={{ borderBottom: '1px solid var(--dash-border)' }}>
-                                <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[var(--dash-text)]">
+                                <p className="text-sm font-bold uppercase tracking-[1.4px] text-[var(--dash-text)]">
                                     {c.timeline}
                                 </p>
                             </div>
@@ -287,24 +279,23 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                 <p className="text-[13px] text-[var(--dash-text-muted)]">{c.noTimeline}</p>
                             ) : (
                                 /* Vertical timeline */
-                                <div className="relative flex flex-col gap-10 pl-[26px]">
-                                    {/* Vertical line — runs from top of container, stops at top-4 of the last item via overlay */}
-                                    <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: 'var(--dash-border)' }} />
+                                <div className="relative flex flex-col gap-10 pl-[34px]">
+                                    {/* Vertical line — centered at left-[9px] to align with circle bullets */}
+                                    <div className="absolute left-[8px] top-0 bottom-0 w-[2px]" style={{ background: 'var(--dash-border)' }} />
                                     {timeline.map((t, idx) => (
                                         <div
                                             key={t.id}
                                             className={cn(
                                                 'relative',
-                                                // Mask the line below the last bullet using panel bg color
-                                                idx === timeline.length - 1 && "after:content-[''] after:absolute after:left-[-26px] after:top-4 after:bottom-0 after:w-[2px] after:bg-[var(--dash-surface)]"
+                                                idx === timeline.length - 1 && "after:content-[''] after:absolute after:left-[-25px] after:top-4 after:bottom-0 after:w-[2px] after:bg-[var(--dash-surface)]"
                                             )}
                                         >
-                                            {/* Half-circle (D-shape) bullet — flat side flush with the vertical line */}
-                                            <div className="absolute -left-[26px] top-0 w-2 h-4 rounded-r-full bg-[hsl(var(--primary))]" />
+                                            {/* Full circle bullet with ring shadow (Figma: size-16, rounded-full, 4px ring) */}
+                                            <div className="absolute -left-[33px] top-0 w-4 h-4 rounded-full bg-[hsl(var(--primary))] shadow-[0_0_0_4px_var(--dash-surface)]" />
                                             <div className="flex flex-col gap-2">
                                                 {/* Title + date */}
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[12px] font-bold text-[var(--dash-text)]">{c.timelineEntry}</span>
+                                                    <span className="text-xs font-bold text-[var(--dash-text)]">{c.timelineEntry}</span>
                                                     <span className="text-[10px]" style={{ color: 'var(--dash-text-muted)' }}>
                                                         {formatLatestDate(t.createdAt)}
                                                     </span>
@@ -315,7 +306,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                         className="rounded-[12px] p-[17px]"
                                                         style={{ background: 'var(--dash-secondary-bg)', border: '1px solid var(--dash-border)' }}
                                                     >
-                                                        <p className="text-[12px] text-[var(--dash-text-muted)] leading-[19.5px]">{t.message}</p>
+                                                        <p className="text-xs text-[var(--dash-text-muted)] leading-[19.5px]">{t.message}</p>
                                                     </div>
                                                 )}
                                             </div>

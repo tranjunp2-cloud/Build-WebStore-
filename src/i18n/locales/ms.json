@@ -1203,12 +1203,12 @@
             "status": {
                 "pending": "Menunggu",
                 "confirmed": "Disahkan",
-                "readyToShip": "Sedia untuk Dihantar",
-                "shipped": "Sedang Dihantar",
+                "readyToShip": "Sedia Dihantar",
+                "shipped": "Dihantar",
                 "completed": "Selesai",
                 "cancelled": "Dibatalkan",
                 "refunded": "Dikembalikan",
-                "processing": "Sedang Diproses",
+                "processing": "Diproses",
                 "paid": "Telah Dibayar",
                 "paymentFailed": "Pembayaran gagal"
             },
@@ -1648,6 +1648,9 @@
                 "sku": "SKU:",
                 "fromPrefix": "Dari ",
                 "filterBtn": "Tapis",
+                "missingInfoTitle": "Maklumat tidak lengkap",
+                "missingAlt": "Teks alt imej",
+                "missingCategory": "Kategori",
                 "failedToLoad": "Gagal memuatkan produk",
                 "retry": "Cuba Lagi",
                 "aiChatTitle": "Sembang AI: Cipta pelbagai produk dengan pantas",
@@ -1735,6 +1738,7 @@
                     "uniqueTiers": "Nama pilihan mesti unik (tiada kategori pendua)",
                     "weightMin": "Berat mesti lebih dari 0",
                     "weightMax": "Berat terlalu besar",
+                    "weightRequired": "Berat diperlukan",
                     "dimMin": "Dimensi mesti 0 atau lebih",
                     "dimMax": "Dimensi terlalu besar",
                     "maxTiers": "Maksimum 2 tahap variasi dibenarkan",
@@ -1789,6 +1793,8 @@
                 "restored": "Produk dipulihkan",
                 "failedRestore": "Gagal memulihkan produk",
                 "failedUpdateStatus": "Gagal mengemas kini status",
+                "publishGateTitle": "Belum boleh diaktifkan",
+                "publishGateAck": "Faham",
                 "failedDelete": "Gagal memadam produk",
                 "productDeleted": "Produk dipadamkan.",
                 "size": "Saiz:",
@@ -1813,7 +1819,8 @@
                     "tiers": "Pilihan Varian",
                     "basePrice": "Harga",
                     "baseSku": "Kod SKU",
-                    "baseInventory": "Stok"
+                    "baseInventory": "Stok",
+                    "weight": "Berat"
                 },
                 "sections": {
                     "general": "Maklumat Umum",
@@ -1821,6 +1828,7 @@
                     "productNamePlaceholder": "Masukkan nama produk",
                     "category": "Kategori",
                     "images": "Imej (Hingga 5 imej, setiap < 5MB)",
+                    "imagesAltHint": "Menambah teks Alt meningkatkan SEO dan capaian pembeli.",
                     "variants": "Varian & Inventori",
                     "hasVariants": "Produk mempunyai pelbagai Pilihan/Varian",
                     "hasVariantsExample": "Contoh: warna, saiz, gaya",
@@ -1912,7 +1920,8 @@
                 "saveButton": "Simpan",
                 "productsItem": "Produk",
                 "saveEmptyError": "Sila pilih sekurang-kurangnya 1 produk untuk disunting",
-                "saveSuccess": "Telah dibina {count} produk draf. Sila isikan imej sebelum menyiarkannya.",
+                "saveSuccessOne": "Telah dibina 1 produk draf. Sila isikan imej sebelum menyiarkannya.",
+                "saveSuccessMany": "Telah dibina {count} produk draf. Sila isikan imej sebelum menyiarkannya.",
                 "saveFailed": "Gagal melakar produk",
                 "saveError": "Kesalahan menyimpan produk",
                 "aiWorking": "AI sedang memproses...",
@@ -1995,6 +2004,15 @@
             },
             "subtitle": "Urus produk kedai"
         },
+        "imageUploader": {
+            "addAltText": "+ Tambah teks Alt",
+            "editAltText": "Edit teks Alt",
+            "label": "Teks Alt",
+            "placeholder": "Terangkan ringkas imej ini…",
+            "helperText": "Terangkan ringkas imej untuk tingkatkan skor SEO anda di Google.",
+            "cancel": "Batal",
+            "save": "Simpan"
+        },
         "customers": {
             "title": "Kenalan",
             "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
@@ -2021,7 +2039,7 @@
             "viewDetails": "Lihat butiran",
             "close": "Tutup",
             "update": "Kemas Kini",
-            "timeline": "Garis Masa Aktiviti",
+            "timeline": "Sejarah Mesej",
             "noTimeline": "Tiada penghantaran sebelum ini",
             "statusRead": "Dibaca",
             "tooltipNew": "Permintaan perundingan baharu dari Borang Hubungi. Penjual perlu menghubungi dalam masa 24 jam untuk keberkesanan penukaran tertinggi.",
@@ -2035,7 +2053,8 @@
             "deleteConfirmPost": "dan tidak boleh dibatalkan.",
             "cancel": "Batal",
             "deleteButton": "Padam",
-            "colProfile": "Profil Pelanggan",
+            "colCustomer": "Pelanggan",
+            "colProfile": "Profil",
             "colEmail": "E-mel",
             "colSource": "Sumber & Laman",
             "colMessage": "Mesej",
@@ -2047,7 +2066,7 @@
             "fieldName": "Nama",
             "fieldEmail": "E-mel",
             "fieldLatestDate": "Tarikh Terkini",
-            "timelineEntry": "Penghantaran Hubungi",
+            "timelineEntry": "Mesej",
             "loadDetailsFailed": "Gagal memuatkan butiran",
             "sourceBadgeContact": "Borang Hubungi",
             "sourceBadgeNewsletter": "Langganan Newsletter",
@@ -2103,10 +2122,10 @@
                 "tabOrders": "Pesanan",
                 "unsavedBanner": "Anda mempunyai perubahan yang belum disimpan.",
                 "revert": "Batal Perubahan",
+                "cancel": "Batal",
                 "saveChanges": "Simpan perubahan",
                 "upToDate": "Terkini",
                 "unsaved": "Perubahan belum disimpan",
-                "lastSaved": "Disimpan terakhir",
                 "saved": "Pelanggan disimpan",
                 "saveFailed": "Gagal menyimpan pelanggan",
                 "fieldEmail": "E-mel",
@@ -2428,7 +2447,9 @@
                     "disabled": "Templat dilumpuhkan",
                     "updateFailed": "Gagal mengemas kini templat",
                     "testSent": "E-mel ujian dihantar ke {email}",
-                    "testFailed": "Gagal menghantar e-mel ujian"
+                    "testFailed": "Gagal menghantar e-mel ujian",
+                    "popupBlocked": "Pop timbul disekat — benarkan pop timbul untuk membuka pratonton",
+                    "previewFailed": "Gagal membuka pratonton"
                 },
                 "descriptions": {
                     "welcome": "Sapaan pertama apabila pembeli mendaftar atau membuat pesanan pertama.",
@@ -2556,20 +2577,16 @@
                 "duplicateCodeField": "Kod ini sudah digunakan untuk penyewa anda. Cuba kod yang berbeza atau tambah nombor.",
                 "saveFailed": "Gagal menyimpan",
                 "created": "Diskaun dicipta",
-                "saved": "Diskaun disimpan",
-                "deleted": "Diskaun dipadamkan",
-                "deleteFailed": "Gagal memadamkan"
+                "saved": "Diskaun disimpan"
             },
             "header": {
                 "createTitle": "Cipta diskaun",
                 "defaultTitle": "Diskaun",
                 "backTitle": "Kembali ke diskaun",
-                "deleteBtn": "Padam",
                 "newCode": "Kod baru · {tenantName}",
                 "createdOn": "Dicipta {date}",
                 "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan.",
-                "revert": "Kembalikan",
-                "save": "Simpan"
+                "revert": "Kembalikan"
             },
             "saveBar": {
                 "unsavedChanges": "Perubahan belum disimpan",
@@ -3692,6 +3709,27 @@
         "imageTooLarge": "Imej mestilah lebih kecil daripada 2MB"
     },
     "editor": {
+        "sidebar": {
+            "aiChat": "Chat AI",
+            "components": "Komponen",
+            "pages": "Halaman",
+            "settings": "Tetapan"
+        },
+        "advisoryBanner": {
+            "title": "Pengalaman lebih baik di Desktop",
+            "description": "Alat penyuntingan lanjutan berfungsi paling baik pada skrin yang lebih besar. Sesetengah alat mungkin terhad pada peranti mudah alih.",
+            "copyLink": "Salin Pautan",
+            "dismiss": "Tutup"
+        },
+        "compactLayout": {
+            "aiEditing": "AI sedang mengedit reka bentuk anda…",
+            "openAIChat": "Buka Chat AI",
+            "openChatAndTools": "Buka Chat AI & Alatan",
+            "moveUp": "Alih Ke Atas",
+            "moveDown": "Alih Ke Bawah",
+            "deleteBlock": "Padam Blok",
+            "deletedBlock": "{type} dipadam"
+        },
         "toolbar": {
             "publish": "Terbitkan",
             "publishing": "Menerbitkan",
@@ -3848,7 +3886,8 @@
             "undo": "Buat Asal",
             "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
             "send": "hantar",
-            "newLine": "baris baru"
+            "newLine": "baris baru",
+            "stopAI": "Hentikan AI"
         },
         "menu": {
             "dashboard": "Papan Pemuka",

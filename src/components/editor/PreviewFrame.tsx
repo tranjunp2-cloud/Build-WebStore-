@@ -43,6 +43,14 @@ interface PreviewFrameProps {
     onPageNavigate?: (pageId: string) => void
     onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
+    /**
+     * F05 compact canvas (mobile + iPad): hide the floating `BlockActionBar`
+     * overlay (duplicate/AI-edit/delete icons above the selected block) — the
+     * compact block-settings sheet already covers move/delete. Optional,
+     * additive; desktop (incl. its own "preview as mobile" viewport toggle)
+     * omits this and is unaffected.
+     */
+    hideBlockActionBar?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
@@ -239,6 +247,7 @@ function PreviewFrameInner({
     onPageNavigate,
     onBlockAIEdit,
     disableDragDrop = false,
+    hideBlockActionBar = false,
     onInlineEditSave,
     onHandleReady,
     onFooterUpdate,
@@ -1257,6 +1266,11 @@ function PreviewFrameInner({
             url.searchParams.set('pageId', pageId)
         }
         url.searchParams.set('editor', '1')
+        // Mobile/tablet compact chrome (same signal CompactEditorLayout already passes as
+        // disableDragDrop) — the injected click handler uses this to skip activating the
+        // inline WYSIWYG text-edit toolbar, which is desktop-only in the F05-v2 spec (text
+        // edits go through the block-settings sheet's fields on mobile/tablet instead).
+        if (disableDragDrop) url.searchParams.set('compact', '1')
 
         // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
         // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
@@ -1268,7 +1282,7 @@ function PreviewFrameInner({
 
         return url.pathname + url.search
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [siteId, effectiveIframeKey, pageId]) // DO NOT depend on savedScrollYRef to prevent constant reloads
+    }, [siteId, effectiveIframeKey, pageId, disableDragDrop]) // DO NOT depend on savedScrollYRef to prevent constant reloads
 
 
     if (isLoading) {
@@ -1396,7 +1410,7 @@ function PreviewFrameInner({
                             const selectedLayout = selectedBlock !== null
                                 ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                                 : null
-                            if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
+                            if (!selectedLayout || !overlayOffset || dragState || textEditingData || hideBlockActionBar) return null
 
                             return (
                                 <>

@@ -118,8 +118,8 @@ export function PasswordChangeForm() {
                 )}
             </div>
 
-            {/* New + Confirm — side by side */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* New + Confirm — side by side on desktop, stacked on tablet/mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                     <Label className="text-[14px] font-medium text-[hsl(var(--muted-foreground))] leading-5">
                         {t.profile.security.newPassword}

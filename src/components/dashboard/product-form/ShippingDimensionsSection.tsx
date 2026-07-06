@@ -14,11 +14,13 @@ export function ShippingDimensionsSection() {
         <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-5">
             <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.shipping || 'Shipping Configuration'}</h2>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+            {/* Tablet (md, ~518px content): keep 2 cols — 4 cols squeezes inputs to ~110px.
+                Desktop unchanged: 4 cols from lg+. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* Weight */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-foreground leading-[1.43] m-0">
-                        {t.dashboard.products.form.sections?.weight || 'Weight (kg)'}
+                        {t.dashboard.products.form.sections?.weight || 'Weight (kg)'} <span className="text-foreground">*</span>
                     </label>
                     <div className="relative flex items-center">
                         <Input

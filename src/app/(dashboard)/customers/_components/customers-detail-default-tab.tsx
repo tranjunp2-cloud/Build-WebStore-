@@ -2,9 +2,13 @@
 
 import { Info } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useI18n } from '@/i18n'
 import type { ShopCustomerRecord, AddressRecord } from '../_lib/shop-customer-record'
 import type { EditableFields } from './customers-detail'
+
+// Radix SelectItem rejects an empty-string value — sentinel for "no rank" (same convention as CategoryManager.tsx).
+const RANK_UNRANKED_VALUE = '__none__'
 
 const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full'
 const INPUT_READONLY_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] font-mono text-white/40 w-full flex items-center select-all cursor-default'
@@ -53,10 +57,12 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
 
     return (
         <TooltipProvider delayDuration={200}>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
+        {/* 2-col (form + 300px stats) only from xl — at iPad Pro (≤1279) the content with the sidebar
+            open (~710px) is too narrow for 1fr+300px, so stack to 1 col below xl. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
             {/* Left: form card */}
             <div className="rounded-[16px] p-6" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
-                <div className="grid gap-x-6 gap-y-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
 
                     {/* Email — read-only identity (col 1) */}
                     <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
@@ -85,20 +91,25 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
                         <span className={HELP_CLS}>{cd.fieldPhoneHelp}</span>
                     </div>
 
-                    {/* Rank */}
+                    {/* Rank — shared ui/select.tsx (Radix, DS-consistent); side="bottom" + avoidCollisions={false}
+                        keeps it always opening downward so it never flips up and disrupts the form layout. */}
                     <div className="flex flex-col gap-1.5 pb-5" style={{ borderBottom: '1px solid var(--cus-border-medium)' }}>
                         <label className={LABEL_CLS}>{cd.fieldRank}</label>
-                        <div className="relative">
-                            <select
-                                value={draft.rank ?? ''}
-                                onChange={e => onChange({ rank: (e.target.value as ShopCustomerRecord['rank']) || null })}
-                                className={INPUT_CLS + ' appearance-none cursor-pointer pr-8'}
-                                style={{ background: 'var(--cus-surface-dropdown)' }}
-                            >
-                                {RANKS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                            </select>
-                            <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                        </div>
+                        <Select
+                            value={draft.rank || RANK_UNRANKED_VALUE}
+                            onValueChange={v => onChange({ rank: (v === RANK_UNRANKED_VALUE ? null : v) as ShopCustomerRecord['rank'] })}
+                        >
+                            <SelectTrigger className={INPUT_CLS + ' cursor-pointer data-[state=open]:border-[hsl(var(--primary))]'}>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent side="bottom" align="start" avoidCollisions={false} style={{ background: 'var(--cus-surface-dropdown)' }}>
+                                {RANKS.map(r => (
+                                    <SelectItem key={r.id || RANK_UNRANKED_VALUE} value={r.id || RANK_UNRANKED_VALUE}>
+                                        {r.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <span className={HELP_CLS}>{cd.fieldRankHelp}</span>
                     </div>
 

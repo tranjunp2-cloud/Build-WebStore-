@@ -117,6 +117,96 @@ export function buildSlugCanonicalMap(
     return map
 }
 
+/**
+ * Build a `{ anyFormOfSlug → pageId }` map from the pages list, for the editor/builder
+ * preview iframe. Mirrors buildSlugCanonicalMap's indexing (exact / lowercased / bare)
+ * plus a homepage block so `/` and HOMEPAGE_ALIASES resolve to the homepage's pageId.
+ * Used by createPreviewUrlRewriter — kept separate so the alias set never drifts.
+ */
+export function buildPreviewSlugToPageId(
+    pages: NavPageLike[] | null | undefined,
+): Map<string, string> {
+    const map = new Map<string, string>()
+    if (!Array.isArray(pages)) return map
+
+    for (const p of pages) {
+        const pid = String(p?.id)
+        const rawSlug = (p?.slug ?? '').trim()
+        if (!rawSlug) continue
+        const withSlash = rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`
+        map.set(withSlash, pid)
+        map.set(withSlash.toLowerCase(), pid)
+        if (rawSlug !== '/') {
+            map.set(rawSlug.replace(/^\//, ''), pid)
+        }
+    }
+    const homepage = pages.find((p) => p?.isHomepage) ?? pages[0]
+    if (homepage) {
+        const homepageId = String(homepage.id)
+        map.set('/', homepageId)
+        for (const alias of HOMEPAGE_ALIASES) {
+            if (!map.has(alias)) map.set(alias, homepageId)
+        }
+    }
+    return map
+}
+
+/**
+ * Create a URL rewriter that keeps internal nav/CTA/footer links inside the preview
+ * iframe scope: internal path ("/about") → `/preview/{siteId}?pageId={matchedPageId}`
+ * (+`&builder=1` in builder preview); unmatched internal → '#'; external/anchor/mailto
+ * preserved as-is. Extracted from SiteRenderer so preview routes that render blocks
+ * WITHOUT SiteRenderer (e.g. blog detail) rewrite links identically instead of leaking
+ * raw `/` hrefs that navigate the iframe out to the platform root.
+ */
+export function createPreviewUrlRewriter(opts: {
+    pages: NavPageLike[] | null | undefined
+    siteId: string | number | null | undefined
+    isBuilderPreview?: boolean
+}): (url: string | undefined) => string {
+    const previewSiteId = String(opts.siteId ?? '')
+    const slugToPageId = buildPreviewSlugToPageId(opts.pages)
+    const builderSuffix = opts.isBuilderPreview ? '&builder=1' : ''
+
+    return (url: string | undefined): string => {
+        if (!url) return '#'
+        if (/^https?:\/\//i.test(url)) return url
+        if (url.startsWith('#')) return url
+        if (url.includes('#') && !url.startsWith('/')) return url
+        if (!previewSiteId) return '#'
+        const [path] = splitPathAndTail(url)
+        const hit =
+            slugToPageId.get(path) ??
+            slugToPageId.get(path.toLowerCase()) ??
+            slugToPageId.get(path.replace(/^\//, ''))
+        if (hit) return `/preview/${previewSiteId}?pageId=${hit}${builderSuffix}`
+        return '#'
+    }
+}
+
+/**
+ * Recursively apply a URL rewriter to a nav/footer links array (`{ url, children? }[]`).
+ * Returns a shallow-cloned array; non-array input passes through. Paired with
+ * createPreviewUrlRewriter for preview routes that render nav/footer WITHOUT SiteRenderer.
+ */
+export function rewriteNavLinkUrls(
+    links: unknown,
+    rewrite: (url: string | undefined) => string,
+): unknown {
+    if (!Array.isArray(links)) return links
+    return links.map((l) => {
+        if (!l || typeof l !== 'object') return l
+        const link = l as Record<string, unknown>
+        return {
+            ...link,
+            url: rewrite(link.url as string | undefined),
+            ...(Array.isArray(link.children)
+                ? { children: rewriteNavLinkUrls(link.children, rewrite) }
+                : {}),
+        }
+    })
+}
+
 /** Split `/Services?tab=a#x` → `['/Services', '?tab=a#x']`. */
 export function splitPathAndTail(url: string): [string, string] {
     const qIdx = url.indexOf('?')

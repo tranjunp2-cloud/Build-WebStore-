@@ -34,12 +34,12 @@ type Props = {
 function SkeletonRow() {
     return (
         <TableRow>
+            {/* Customer (avatar) */}
             <TableCell>
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full animate-pulse shrink-0" style={{ background: 'var(--dash-border)' }} />
-                    <div className="h-3 w-28 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} />
-                </div>
+                <div className="w-8 h-8 rounded-full animate-pulse" style={{ background: 'var(--dash-border)' }} />
             </TableCell>
+            {/* Profile (name) */}
+            <TableCell><div className="h-3 w-28 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
             <TableCell><div className="h-3 w-32 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
             <TableCell><div className="h-5 w-20 rounded-full animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
             <TableCell><div className="h-3 w-40 rounded animate-pulse" style={{ background: 'var(--dash-border)' }} /></TableCell>
@@ -72,21 +72,31 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
         )
     }
 
+    // Matches /blog convention: `dash-table-compact` (globals.css) shrinks font+padding below xl
+    // and NO min-w floor → table-fixed w-full shrinks to fit any iPad width (no horizontal scroll).
+    // min-w only at desktop (>=1280) restores the original 780px floor → desktop byte-identical.
     return (
-        <Table minWidth={780} className="table-fixed w-full" footer={footer}>
-            {/* table-fixed + % colgroup: even, stable columns. Message (lead text) is
-                widest; Actions stays compact at the edge. */}
+        <Table className="table-fixed w-full dash-table-compact min-[1280px]:min-w-[780px]" footer={footer}>
+            {/* Responsive colgroup. The Profile column is split into Customer (avatar only) +
+                Profile (name text). Customer stays narrow (fits the 32px avatar); the sum of
+                Customer+Profile equals the old Profile width so every other column keeps its ratio.
+                Below xl (iPad band, table ~756px) widths fit each nowrap header + content: Email +
+                Message truncate (…); Source pill wraps (see badge); Date/Status hold nowrap badges.
+                Sums to 100% → table-fixed w-full fits the viewport, no horizontal scroll. At >=1280px
+                the desktop ratios are restored (6+12=18 / 18 / 12 / 21 / 12 / 13 / 6). */}
             <colgroup>
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '21%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '6%' }} />
+                <col className="w-[9%]  min-[1280px]:w-[7%]" />{/* Customer (avatar) */}
+                <col className="w-[16%] min-[1280px]:w-[12%]" />{/* Profile (name)    */}
+                <col className="w-[12%] min-[1280px]:w-[18%]" />{/* Email   */}
+                <col className="w-[16%] min-[1280px]:w-[12%]" />{/* Source  */}
+                <col className="w-[12%] min-[1280px]:w-[21%]" />{/* Message */}
+                <col className="w-[13%] min-[1280px]:w-[12%]" />{/* Date    */}
+                <col className="w-[14%] min-[1280px]:w-[13%]" />{/* Status  */}
+                <col className="w-[8%]  min-[1280px]:w-[5%]" />{/* Actions */}
             </colgroup>
             <TableHeader>
                 <TableRow>
+                    <TableHead>{c.colCustomer}</TableHead>
                     <TableHead>{c.colProfile}</TableHead>
                     <TableHead>{c.colEmail}</TableHead>
                     <TableHead>{c.colSource}</TableHead>
@@ -114,14 +124,16 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
                                     : undefined
                                 }
                             >
-                                {/* Profile */}
+                                {/* Customer (avatar) */}
                                 <TableCell>
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <CustomerAvatar name={record.name} email={record.email} source={record.source} />
-                                        <span title={displayName} className="text-[13px] font-semibold truncate max-w-[140px]" style={{ color: 'var(--dash-text)' }}>
-                                            {displayName}
-                                        </span>
-                                    </div>
+                                    <CustomerAvatar name={record.name} email={record.email} source={record.source} />
+                                </TableCell>
+
+                                {/* Profile (name) */}
+                                <TableCell>
+                                    <span title={displayName} className="text-[13px] font-semibold truncate block max-w-[140px]" style={{ color: 'var(--dash-text)' }}>
+                                        {displayName}
+                                    </span>
                                 </TableCell>
 
                                 {/* Email */}

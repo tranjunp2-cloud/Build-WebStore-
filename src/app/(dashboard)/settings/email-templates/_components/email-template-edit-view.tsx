@@ -173,10 +173,7 @@ export function EmailTemplateEditView({
             )}
 
             {/* Split layout */}
-            <div
-                className="grid gap-6"
-                style={{ gridTemplateColumns: 'minmax(360px, 4fr) minmax(420px, 6fr)' }}
-            >
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-[minmax(360px,4fr)_minmax(420px,6fr)]">
                 <EmailTemplateFormCard
                     templateType={templateType}
                     locale={locale}

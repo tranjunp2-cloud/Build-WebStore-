@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { Package, Check, AlertTriangle, X } from 'lucide-react'
+import { Check, AlertTriangle, X } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -7,6 +7,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductAddToCartSection } from '@/components/storefront/product-add-to-cart-section'
+import { ProductImageGallery } from '@/components/storefront/ProductImageGallery'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
 import { getServerI18n } from '@/i18n/server'
@@ -245,35 +246,12 @@ export default async function ProductDetailPage({ params }: Props) {
             {/* Product Detail */}
             <div className="pd-grid">
                 {/* Images */}
-                <div>
-                    <div style={{
-                        borderRadius: '16px', overflow: 'hidden', background: 'var(--surface, #f8f8f8)',
-                        aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                        {images[0]?.image?.url ? (
-                            <img src={images[0].image.url} alt={images[0].alt || p.name}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <Package size={80} aria-hidden style={{ opacity: 0.15 }} />
-                        )}
-                    </div>
-
-                    {images.length > 1 && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                            {images.slice(0, 5).map((img: any, i: number) => (
-                                <div key={i} style={{
-                                    width: '64px', height: '64px', borderRadius: '8px', overflow: 'hidden',
-                                    border: i === 0 ? `2px solid ${primaryColor}` : '1px solid rgba(var(--brand-primary-rgb), 0.125)',
-                                }}>
-                                    {img.image?.url && (
-                                        <img src={img.image.url} alt={img.alt || `${p.name} ${i + 1}`}
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <ProductImageGallery
+                    images={images}
+                    productName={p.name}
+                    siteName={site.name ?? undefined}
+                    primaryColor={primaryColor}
+                />
 
                 {/* Product Info */}
                 <div>

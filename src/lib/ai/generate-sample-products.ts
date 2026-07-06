@@ -12,7 +12,7 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { searchPhotos, buildImgixUrl, trackDownload, UnsplashError } from './unsplash-client'
+import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
 import { uploadImageUrl } from './upload-media'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -29,6 +29,13 @@ export interface SampleProduct {
     imageId?: number // Payload Media ID — undefined if image fetch failed
     galleryUrl?: string // Tier-C CDN URL used; carried to route.ts for FK-violation re-upload
     status: 'active'
+    // AI-estimated shipping fields (Tier-1 only — Tier-2 curated fallback never sets these).
+    // Undefined here means "AI didn't provide it" — the constant fallback (weight:1, dims:0) is
+    // applied downstream in generate-site/route.ts, mirroring BulkCreateModal.buildSavePayload().
+    weight?: number
+    length?: number
+    width?: number
+    height?: number
 }
 
 type ImageFailReason = 'rate_limited' | 'no_results' | 'gallery_failed' | 'upload_failed'
@@ -86,8 +93,8 @@ Output strictly JSON matching the requested schema. No markdown.`
     const prompt = `Generate ${count} sample products for a ${businessInfo.industry} business called "${businessInfo.businessName}".
 ${businessInfo.products ? `Products hint: ${businessInfo.products}` : ''}
 ${exclusion}
-Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)"}]}
-Use MYR pricing. No markdown. JSON only.`
+Return JSON: {"products":[{"name":"...","shortDescription":"max 100 chars","description":"2-3 sentences","price":number${includeBM ? ',"descriptionBM":"Bahasa Melayu translation"' : ''},"imageKeyword":"2-3 word English-only Unsplash search query (e.g. pet shampoo bottle, cat carrier bag)","weight":number (estimated shipping weight in kg for this specific product, minimum 0.1),"length":number (estimated length in cm),"width":number (estimated width in cm),"height":number (estimated height in cm)}]}
+Use MYR pricing. Estimate weight/dimensions realistically per product (e.g. a chair is heavier than earrings). No markdown. JSON only.`
 
     const completion = await openai.chat.completions.create({
         model: selectModel('product-description'),
@@ -106,12 +113,29 @@ Use MYR pricing. No markdown. JSON only.`
         throw new Error('AI returned empty products array')
     }
 
+    // AI-estimated shipping fields — left undefined when the model omits/malforms/hallucinates an
+    // out-of-range value, so generate-site/route.ts's `|| 1`/`|| 0` fallback (mirroring
+    // BulkCreateModal) applies downstream. NOT defaulted here — this function only reports what the
+    // AI actually said, and only when it's within the same bounds the product-form Zod schema
+    // enforces (schema.ts: weight 0.01-1000, dimensions 0-10000) — the AI's JSON response is
+    // untrusted input feeding directly into a `status:'active'` payload.create(), with no other
+    // validation layer downstream (unlike form saves, which go through Zod).
+    // Strict type check (not parseFloat(String(v))) — GPT's json_object mode returns real JSON
+    // numbers for numeric fields; parseFloat(String(v)) would lenient-parse garbage like "5kg" -> 5
+    // or an array [5,10] -> "5,10" -> 5, silently accepting malformed AI output as if it were valid.
+    const toBoundedNumber = (v: unknown, min: number, max: number): number | undefined =>
+        typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? v : undefined
+
     return (parsed.products as Array<Record<string, unknown>>).slice(0, count).map((p) => ({
         name: String(p.name ?? ''),
         shortDescription: String(p.shortDescription ?? '').slice(0, 100),
         description: String(p.description ?? ''),
         ...(includeBM && p.descriptionBM ? { descriptionBM: String(p.descriptionBM) } : {}),
         price: typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0,
+        weight: toBoundedNumber(p.weight, 0.01, 1000),
+        length: toBoundedNumber(p.length, 0, 10000),
+        width: toBoundedNumber(p.width, 0, 10000),
+        height: toBoundedNumber(p.height, 0, 10000),
         imageId: undefined,
         status: 'active' as const,
         sku: '',       // overridden in withImages.push
@@ -169,7 +193,7 @@ function deriveFallbackKeyword(productName: string, category: string): string {
  *   Tier B2 — name-derived keyword as final text-search attempt
  *   Tier C  — direct gallery URL (bypasses search API entirely)
  * Never throws — returns imageId (may be undefined) and optional failure reason.
- * skipSearch=true jumps directly to Tier C (used when quota is exhausted or UNSPLASH_FALLBACK_ONLY=1).
+ * skipSearch=true jumps directly to Tier C (used when quota is exhausted or PIXABAY_FALLBACK_ONLY=1).
  */
 async function fetchProductImage(
     keyword: string,
@@ -188,8 +212,11 @@ async function fetchProductImage(
 
     if (!skipSearch) {
         try {
+            // GH-1185: `category` here is already a resolved composer key —
+            // Pixabay domain filter keeps loose matches on-topic.
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[category]
             // Tier A: exact AI keyword
-            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish' })
+            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
 
             // Tier B: drop leading adjectives one by one until we get results
             if (!photos.length) {
@@ -197,7 +224,7 @@ async function fetchProductImage(
                 for (let drop = 1; drop < words.length && !photos.length; drop++) {
                     const simplified = words.slice(drop).join(' ')
                     console.warn(`[sample-products] "${keyword}" → 0, trying simplified "${simplified}"`)
-                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish' })
+                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish', width: 800, category: pixCategory })
                 }
             }
 
@@ -205,15 +232,14 @@ async function fetchProductImage(
             if (!photos.length) {
                 const nameKeyword = deriveFallbackKeyword(productName, category)
                 console.warn(`[sample-products] all "${keyword}" variants → 0, trying name-derived "${nameKeyword}"`)
-                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish' })
+                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish', width: 800, category: pixCategory })
             }
 
             if (photos.length) {
                 const photo = photos[0]!
-                const url = buildImgixUrl(photo.urls.raw, { w: 800, h: 800, fit: 'crop' })
-                trackDownload(photo.links.download_location)
+                // photo.url is already sized by the client (Pixabay fixed sizes).
                 try {
-                    const id = await uploadImageUrl(url, filename, productName, tenantId, payload)
+                    const id = await uploadImageUrl(photo.url, filename, productName, tenantId, payload)
                     if (id != null) {
                         // Verify row still exists — orphan stripper may delete unreferenced media.
                         const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
@@ -227,11 +253,11 @@ async function fetchProductImage(
                 }
             }
         } catch (err) {
-            if (err instanceof UnsplashError && err.code === 'RATE_LIMITED') {
+            if (err instanceof PixabayError && err.code === 'RATE_LIMITED') {
                 wasRateLimited = true
                 // fall through to Tier C; outer loop will skip search for subsequent products
             } else {
-                console.warn(`[sample-products] Unsplash search failed for "${keyword}":`, (err as Error).message)
+                console.warn(`[sample-products] Pixabay search failed for "${keyword}":`, (err as Error).message)
             }
         }
     }
@@ -273,7 +299,7 @@ async function fetchProductImage(
  * Generate 6 sample products for a newly created site.
  * Tier 1: AI. Tier 2: curated library. Images: Unsplash fetched sequentially to avoid rate limits.
  * Never throws — returns whatever was successfully generated (may be []).
- * Set UNSPLASH_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
+ * Set PIXABAY_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
  */
 export async function generateSampleProducts(
     businessInfo: BusinessInfoInput,
@@ -344,7 +370,7 @@ export async function generateSampleProducts(
     const stats: ProductImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
     // Set to true after first 429 — no point searching for remaining products this gen
     let searchRateLimited = false
-    const fallbackOnly = process.env.UNSPLASH_FALLBACK_ONLY === '1'
+    const fallbackOnly = process.env.PIXABAY_FALLBACK_ONLY === '1'
 
     for (let i = 0; i < rawProducts.length; i++) {
         const p = rawProducts[i]!

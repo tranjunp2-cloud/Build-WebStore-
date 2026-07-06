@@ -67,6 +67,11 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-01-30** | `US-01/Val` | `Unit` | urlSlug rỗng sau trim → Zod báo lỗi "URL Slug is required" | Unit test: `productFormSchema.safeParse({ ...validData, urlSlug: '' })`. | - `result.success` = false.<br>- `fieldErrors.urlSlug[0]` khớp /URL Slug is required/. | Blocker | [x] |
 | **TC-F08-01-31** | `US-01/Val` | `Unit` | urlSlug có ký tự không hợp lệ → Zod báo lỗi "lowercase alphanumeric" | Unit test: `productFormSchema.safeParse({ ...validData, urlSlug: 'Invalid Slug!' })`. | - `result.success` = false.<br>- `fieldErrors.urlSlug[0]` khớp /lowercase alphanumeric/. | Blocker | [x] |
 | **TC-F08-01-32** | `US-01/Bug` | `Unit` | updateProductFieldAction — sản phẩm có variants → id tự quản lý bị strip trước khi gọi payload.update | Unit test: findByID trả về product với variants/variantConfigs có `id` trên mỗi phần tử. Gọi action với `{ status: 'active' }`. | - `payload.update` được gọi với variants/variantConfigs không chứa `id` trên bất kỳ phần tử nào.<br>- Cả options lồng trong variantConfigs cũng không chứa `id`. | Blocker | [x] |
+| **TC-F08-01-33** | `GH-1458` | `Unit` | ImageUploader — ảnh có alt text → trigger hiển thị text truncate + icon Pencil (không phải "+ Add Alt text") | Unit test: render với `value=[{ alt: 'Front view' }]`, `showAltInput=true`. | - `screen.getByText('Front view')` tồn tại.<br>- `pencil-icon` tồn tại.<br>- Không có text "+ Add Alt text". | Medium | [x] |
+| **TC-F08-01-34** | `GH-1458` | `Unit` | ImageUploader — click trigger mở Popover với Textarea đã seed giá trị + nút Cancel/Save | Unit test: click trigger, kiểm tra `getByRole('textbox')` value + Cancel/Save buttons. | - Textarea value = alt đã lưu.<br>- Cancel và Save đều hiển thị. | Medium | [x] |
+| **TC-F08-01-35** | `GH-1458` | `Unit` | ImageUploader — Save commit draft đã trim qua onChange, đóng Popover | Unit test: mở Popover, gõ `"  New alt text  "`, click Save. | - `onChange` được gọi với alt đã trim `"New alt text"`.<br>- Popover đóng (textbox không còn trong DOM). | High | [x] |
+| **TC-F08-01-36** | `GH-1458` | `Unit` | ImageUploader — Cancel hủy draft, không gọi onChange, giá trị đã lưu giữ nguyên | Unit test: mở Popover, gõ text mới, click Cancel. | - `onChange` KHÔNG được gọi.<br>- Text gốc vẫn hiển thị dưới thumbnail. | High | [x] |
+| **TC-F08-01-37** | `GH-1458` | `Unit` | ImageUploader — Alt text sẵn có >125 ký tự hiển thị đầy đủ khi mở Popover, không bị cắt ngầm | Unit test: seed `alt` 130 ký tự, mở Popover. | - Textarea value = đầy đủ 130 ký tự (không cắt).<br>- `maxlength="125"` chặn gõ thêm ký tự mới. | Medium | [x] |
 
 ---
 
@@ -101,7 +106,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
-### US-04: Tạo Hàng Loạt bằng AI (Bulk Create) & Ảnh mặc định (15 Cases)
+### US-04: Tạo Hàng Loạt bằng AI (Bulk Create) & Ảnh mặc định (23 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
@@ -130,6 +135,15 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-23** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN configured, CDN ok → fetches + creates | Unit test: `fs.existsSync`=false, `NEXT_PUBLIC_SERVER_URL` set, fetch ok. | - `fetch` called with `{SERVER_URL}/images/crate-carton.png`; `payload.create` called; result=99. | High | [x] |
 | **TC-F08-04-24** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN returns non-200 → returns null | Unit test: `fs.existsSync`=false, fetch returns `ok:false`. | - `payload.create` NOT called; result=null. | High | [x] |
 | **TC-F08-04-25** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN fetch throws network error → returns null | Unit test: `fs.existsSync`=false, fetch throws. | - `payload.create` NOT called; result=null; `console.error` with `[Crate Carton Seed] CDN fetch error:`. | High | [x] |
+| **TC-F08-04-26** | `GH-1410/Auth` | `Unit` | tenantIdForQuery: numeric string → number; non-numeric → unchanged; empty → null | Unit tests (5 cases) for `tenantIdForQuery()` in `src/lib/auth.ts`. | - `'1'` → `1` (Number); `{ id: 42 }` → `42`; `'abc-tenant'` → `'abc-tenant'`; empty tenants → `null`; no tenants field → `null`. | High | [x] |
+| **TC-F08-04-27** | `GH-1410/AC1` | `Unit` | BulkCreateModal: 1 product saved (id returned) → singular toast, callbacks fired | Unit: `saveProductAction` returns `{ id: 123 }`. | - `toast.success` called once with text containing `1 draft product` (not plural); `onSuccess` and `onClose` each called once; `router.refresh` called. | High | [x] |
+| **TC-F08-04-28** | `GH-1410/AC1` | `Unit` | BulkCreateModal: 2 products saved → plural toast "2 draft products" | Unit: two products, both return `{ id: 1 }`. | - `toast.success` called once with text containing `2 draft products`; `onSuccess` and `onClose` each called once. | High | [x] |
+| **TC-F08-04-29** | `GH-1410/AC2` | `Unit` | BulkCreateModal: first product throws JSON error → per-item `toast.error` with parsed message; loop continues for second product | Unit: product 1 throws `Error(JSON.stringify({message:'SKU already in use: SHIRT-001'}))`, product 2 returns `{ id: 456 }`. | - `toast.error` called with string containing `SKU already in use`; `toast.success` called once (second product); `onSuccess` called. | High | [x] |
+| **TC-F08-04-30** | `GH-1410/AC1` | `Unit` | BulkCreateModal: action returns `{}` (no id) → NOT counted as success → `toast.error`, no `toast.success` | Unit: `saveProductAction` resolves `{}`. | - `toast.error` called; `toast.success` NOT called. | High | [x] |
+| **TC-F08-04-31** | `GH-1410/AC2` | `Unit` | BulkCreateModal: action throws plain Error → `toast.error` contains error message | Unit: `saveProductAction` rejects with `Error('Product management not available on your plan')`. | - `toast.error` called with string containing `Product management`. | High | [x] |
+| **TC-F08-04-32** | `GH-1410/AC3` | `Unit` | saveProductAction: tenantIdForQuery returns 83 → payload.create called with tenant:83 (Fix A coverage) | Unit: mock `tenantIdForQuery` → 83, call `saveProductAction`. | - `mockCreate` called with `data` containing `{ tenant: 83 }`. | High | [x] |
+| **TC-F08-04-32b** | `GH-1410/AC3` | `Unit` | saveProductAction: tenantIdForQuery returns null → tenant field NOT injected into payload.create | Unit: mock `tenantIdForQuery` → null, call `saveProductAction`. | - `mockCreate` called with `data` NOT containing `tenant` key. | High | [x] |
+| **TC-F08-04-33** | `GH-1491/AC1` | `Unit` | BulkCreateModal: mounting locks page body scroll (background can't scroll behind the modal); unmounting restores it | Unit: render `BulkCreateModal`, assert `document.body.style.overflow`; unmount, assert restored. | - `document.body.style.overflow === 'hidden'` while mounted.<br>- Restored to `''` after unmount. | High | [x] |
 
 ---
 ### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (12 Cases)

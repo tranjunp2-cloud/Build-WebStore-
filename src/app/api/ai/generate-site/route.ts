@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 // Override vercel.json's 60s default — AI site generation runs:
-//   OpenAI GPT-4.1-mini → Unsplash pipeline (5-10 images) → Payload create
+//   OpenAI GPT-4.1-mini → Pixabay pipeline (5-10 images) → Payload create
 // Real-world timing sits around 60-120s, previous 60s cap produced 504
 // Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
 // Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
@@ -8,6 +8,7 @@ export const maxDuration = 300
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
@@ -29,11 +30,10 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
-import { translateProductTerm } from '@/lib/ai/product-translator'
-import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
@@ -333,7 +333,7 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         // Image sourcing strategy — feature flag
         // ────────────────────────────────────────────────────────────────────
-        // Default: Unsplash pipeline (free, 8+ images per gen). Runs AFTER AI
+        // Default: Pixabay pipeline (free, 8+ images per gen). Runs AFTER AI
         // returns blocks so we know exactly which fields need images.
         //
         // Legacy: DALL-E hero-only ($0.04/gen). Enable via ENABLE_DALLE_HERO=true.
@@ -435,20 +435,11 @@ export async function POST(req: NextRequest) {
             productImageStats: { rateLimited: number; uploadFailed: number; noImage: number }
             normalizedPageLinks: Array<{ label: string; url: string }>
         }> => {
-            // F1: start translation before AI call — saves 3-5s sequential wait (GH-1190).
-            // translateToEnglishKeywords is only used in the Unsplash image pipeline (!ENABLE_DALLE_HERO).
-            const translateKeywordsPromise: Promise<string[]> = !ENABLE_DALLE_HERO
-                ? translateToEnglishKeywords({
-                    industry: businessInfo.industry,
-                    products: businessInfo.products,
-                }).then((r): string[] => r ?? []).catch((): string[] => [])
-                : Promise.resolve([] as string[])
-
-            // O1: pre-compute sync values and chain imagePool build off translation
-            // so the 2 Unsplash search calls run during AI generation (GH-1190).
-            // translateKeywordsPromise resolves in ~3-5s → buildImagePool starts at ~t=3s
-            // → finishes at ~t=5s — well before AI (~10-30s) completes.
-            // await below costs ~0ms in the common case.
+            // GH-1185: keywords are sent to Pixabay RAW (user input language, no
+            // GPT/dict translation). Pixabay q is AND-matched on tags with default
+            // lang=en; translation was producing off-industry generic terms.
+            // O1: pre-compute sync values so the Pixabay search calls run during
+            // AI generation (GH-1190). await below costs ~0ms in the common case.
             const _parsedProductsForPool = !ENABLE_DALLE_HERO
                 ? parseProductsString(businessInfo.products) : []
             const _presetCategoryForPool = !ENABLE_DALLE_HERO
@@ -457,40 +448,35 @@ export async function POST(req: NextRequest) {
             const _themeMoodForPool = !ENABLE_DALLE_HERO
                 ? pickCategoryThemeWithMood(_presetCategoryForPool, _themeSeedForPool).mood : undefined
 
+            // NOTE: field keeps the historical name `englishKeywords` — it now carries
+            // the RAW user-language keywords (see plan 260702-1607-GH-1185).
             type _PoolResult = { pool: ImagePool | null; englishKeywords: string[] }
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
-                ? translateKeywordsPromise.then(async (aiKeywords): Promise<_PoolResult> => {
-                    const topProd = _parsedProductsForPool[0]
-                    let kws = aiKeywords.length > 0 ? [...aiKeywords] : []
-                    if (kws.length === 0) {
-                        const dictKw = translateProductTerm(topProd || '')
-                        if (dictKw) kws = [dictKw]
-                    }
-                    // Isolate buildImagePool failure so kws (englishKeywords) is always
-                    // preserved for the fulfillImageNeeds legacy search path even when
-                    // pool build fails (e.g. Unsplash 429 on demo key).
+                ? (async (): Promise<_PoolResult> => {
+                    const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // Isolate buildImagePool failure so rawKeywords is always
+                    // preserved for the fulfillImageNeeds legacy search path even
+                    // when pool build fails (e.g. Pixabay 429 / missing key).
                     let pool: ImagePool | null = null
                     try {
                         pool = await buildImagePool({
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
-                            topProduct: kws[0] || translateProductTerm(topProd || ''),
-                            products: kws.length > 0
-                                ? kws
-                                : _parsedProductsForPool.slice(0, 3).map(p => translateProductTerm(p)),
+                            topProduct: rawKeywords[0],
+                            products: rawKeywords,
                             seed: _themeSeedForPool,
                         })
                     } catch {
-                        // pool stays null; kws still returned below for legacy search
+                        // pool stays null; rawKeywords still returned for legacy search
                     }
-                    return { pool, englishKeywords: kws }
-                }).catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
+                    return { pool, englishKeywords: rawKeywords }
+                })().catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
 
             // Start sample product generation AFTER imagePool completes to avoid competing
-            // for Unsplash rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
+            // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
             // sample products (~7-12s) then run during AI (~30-77s) so await below still
-            // costs ~0ms in the common case. Both phases use separate Unsplash search calls.
+            // costs ~0ms in the common case. Both phases use separate Pixabay search calls.
             // Note: siteId intentionally omitted — products run before site row is created so site.id
             // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
             // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
@@ -541,7 +527,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ────────────────────────────────────────────────────────────────────
-        // Unsplash media pipeline — default path (ENABLE_DALLE_HERO=false)
+        // Pixabay media pipeline — default path (ENABLE_DALLE_HERO=false)
         // ────────────────────────────────────────────────────────────────────
         // Fetches 5-10 real stock images (hero, gallery, team, testimonials, about)
         // and injects Media IDs into block fields before sanitizer runs.
@@ -555,8 +541,8 @@ export async function POST(req: NextRequest) {
         // survive into payload.create and crash with:
         //   "The following field is invalid: Page Blocks > Block N (…) > Image"
         // Staging log 2026-04-14 21:06:15 confirmed this path after the
-        // Unsplash fallback chain failed to upgrade the object to a numeric
-        // Media ID (UNSPLASH_ACCESS_KEY missing on staging env + mkdir
+        // stock-image fallback chain failed to upgrade the object to a numeric
+        // Media ID (image API key missing on staging env + mkdir
         // 'public' ENOENT on Vercel read-only fs).
         const collectAllBlockBuckets = (): Record<string, unknown>[][] => {
             const buckets: Record<string, unknown>[][] = []
@@ -598,7 +584,10 @@ export async function POST(req: NextRequest) {
                             {
                                 businessName: businessInfo.businessName,
                                 tenantId: String(resolvedTenantId),
-                                category: businessInfo.industry,
+                                // GH-1185: pass the RESOLVED composer category (not raw
+                                // industry) so the no-keyword fallback path can hit
+                                // CATEGORY_BASE_KEYWORDS instead of 'modern business'.
+                                category: _presetCategoryForPool,
                                 language: resolvedLang,
                                 products: _parsedProductsForPool.length > 0 ? _parsedProductsForPool : undefined,
                                 mood: _themeMoodForPool,
@@ -609,7 +598,7 @@ export async function POST(req: NextRequest) {
                         ),
                     )
                 }
-                // Strip any slot still holding a URL/object (Unsplash failed or missing) —
+                // Strip any slot still holding a URL/object (Pixabay failed or missing) —
                 // Payload upload fields are optional; better empty than reject.
                 // Run over every bucket so multi-page subpages get cleaned too.
                 for (const bucket of allBuckets) {
@@ -643,8 +632,8 @@ export async function POST(req: NextRequest) {
                         )
                     }
                 }
-            } catch (unsplashErr) {
-                console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
+            } catch (pixabayErr) {
+                console.error('[AI Generate] Pixabay pipeline error (non-fatal):', pixabayErr)
                 // Best-effort cleanup on any unexpected throw — still run
                 // cleanup on every bucket so a partial failure can't leak
                 // raw image objects into payload.create.
@@ -1257,13 +1246,32 @@ export async function POST(req: NextRequest) {
                     inventory: product.inventory,
                     ...(sampleCategoryId ? { category: [sampleCategoryId] } : {}),
                     status: 'active' as const,
+                    // Publishing gate (GH-1458) requires weight > 0. Tier-1 AI estimates weight/
+                    // dimensions per product (generate-sample-products.ts prompt, mirrors
+                    // products-bulk-parse); Tier-2 curated fallback never sets these. `||` fallback
+                    // constants (matching BulkCreateModal.buildSavePayload() exactly, NOT `??`) apply
+                    // when the AI omitted a value OR hallucinated weight:0 — publish-guard.ts treats
+                    // 0 as invalid too. This create is now also gated by the collection-level
+                    // publishGateHook (src/collections/Products.ts) same as every other write path,
+                    // so this `||` fallback is defense-in-depth, not the only enforcement point.
+                    weight: product.weight || 1,
+                    dimensions: {
+                        length: product.length || 0,
+                        width: product.width || 0,
+                        height: product.height || 0,
+                    },
                 }
+                // Persisted alt fallback (GH-1458) — mirrors saveProductAction's buildProductAlt()
+                // call, but result.siteName is already in scope here so no extra query is needed.
+                // Re-capped at 500 (matches saveProductAction's cap, actions.ts) since `name` here
+                // is unbounded AI output, unlike the form's client-validated 120-char product name.
+                const fallbackAlt = buildProductAlt(undefined, name, result.siteName).slice(0, 500)
                 try {
                     await payload.create({
                         collection: 'products',
                         data: {
                             ...baseData,
-                            ...(safeImageId ? { images: [{ image: safeImageId }] } : {}),
+                            ...(safeImageId ? { images: [{ image: safeImageId, alt: fallbackAlt }] } : {}),
                         },
                     })
                     productsCreatedCount++
@@ -1289,7 +1297,7 @@ export async function POST(req: NextRequest) {
                                 try {
                                     await payload.create({
                                         collection: 'products',
-                                        data: { ...baseData, images: [{ image: retryImageId }] },
+                                        data: { ...baseData, images: [{ image: retryImageId, alt: fallbackAlt }] },
                                     })
                                     productsCreatedCount++
                                     console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
@@ -1408,9 +1416,16 @@ export async function POST(req: NextRequest) {
                         controller.enqueue(_encoder.encode(doneData))
 
                         // Notify SSO Hub: user created their first site (step 1)
-                        import('@/lib/sso/sso-api-client')
-                            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-                            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+                        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+                        const _notifyStep1Stream = () =>
+                            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+                            )
+                        try {
+                            after(_notifyStep1Stream)
+                        } catch {
+                            void _notifyStep1Stream()
+                        }
                     } catch (streamErr) {
                         const errMsg =
                             streamErr instanceof Error ? streamErr.message : String(streamErr)
@@ -1461,9 +1476,16 @@ export async function POST(req: NextRequest) {
         await syncTenantSlug()
 
         // Notify SSO Hub: user created their first site (step 1)
-        import('@/lib/sso/sso-api-client')
-            .then(({ notifyStepComplete }) => notifyStepComplete(payload, user.id, 1))
-            .catch((err) => console.error('[GenerateSite] SSO step 1 import failed:', err))
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _notifyStep1 = () =>
+            notifyStepComplete(payload, user.id, 1).catch((err) =>
+                console.error('[GenerateSite] SSO step 1 notify failed:', err),
+            )
+        try {
+            after(_notifyStep1)
+        } catch {
+            void _notifyStep1()
+        }
 
         return NextResponse.json({
             success: true,
@@ -2012,6 +2034,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                         title: item.title || item.role || item.position || '',
                         company: item.company || item.organization || '',
                         rating: item.rating || 5,
+                        // GH-1185 follow-up: preserve the Media ID assigned by the
+                        // media injector — this whitelist rebuild silently dropped
+                        // `avatar`, leaving EVERY generated site with 0/N
+                        // testimonial avatars (confirmed sites 116/174/178).
+                        // Numeric-only guard: URL/object values must stay out so
+                        // cleanupNonNumericImageFields semantics are unchanged.
+                        ...(typeof item.avatar === 'number' && Number.isFinite(item.avatar)
+                            ? { avatar: item.avatar }
+                            : {}),
                     }
                 })
                 : []

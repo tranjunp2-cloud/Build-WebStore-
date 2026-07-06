@@ -144,6 +144,22 @@ Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lư�
 
 ---
 
+### GH-1491: Dashboard Responsive Fixes (Welcome popup scroll, at-a-glance layout, top tabs wrap)
+
+> Unit tests below verify the JS/DOM-level behavior (hook logic, scroll-lock lifecycle). The
+> CSS breakpoint layout itself (2-row wrap, tab scroll, value+delta 1-row) isn't verifiable
+> in jsdom — no real media-query evaluation — so those parts rely on manual/QA visual check
+> at 375/768/1280 per the issue's test matrix, not automated coverage here.
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.68** | `GH-1491/Issue1` | `Unit` | **[Scroll Lock]** `useLockBodyScroll(true)` sets `body.style.overflow=hidden`; unmount restores it | 1. Render hook với `locked=true`.<br>2. Unmount. | - Overflow = `hidden` khi mount.<br>- Overflow = `''` sau unmount. | Blocker | [x] |
+| **TC-F03.69** | `GH-1491/Issue1` | `Unit` | **[Scroll Lock Toggle]** Toggle `locked` false→true→false lock rồi restore đúng lúc | 1. Render hook `locked=false`.<br>2. Rerender `locked=true`.<br>3. Rerender `locked=false`. | - Ban đầu `''`.<br>- Sau true: `hidden`.<br>- Sau false: `''` lại. | High | [x] |
+| **TC-F03.70** | `GH-1491/Issue1` | `Unit` | **[Overlapping Locks]** 2 modal cùng lock — đóng 1 cái không mở khóa scroll khi cái kia còn mở | 1. Mount 2 instance `useLockBodyScroll(true)` độc lập.<br>2. Unmount instance A.<br>3. Unmount instance B. | - Sau unmount A: vẫn `hidden` (B còn mở).<br>- Sau unmount B: restore `''`. | High | [x] |
+| **TC-F03.71** | `GH-1491/Issue1` | `Integrate` | **[Welcome Popup = Customize Modal]** Mở Customize dashboard modal lock scroll nền; đóng (Cancel) hoặc unmount restore lại | 1. Render `CustomizeModal`.<br>2. Click nút mở modal.<br>3. Click Cancel. | - Mở: `document.body.style.overflow === 'hidden'`.<br>- Đóng: restore `''`. | Blocker | [x] |
+
+---
+
 ## 4. Hành Trình E2E UAT Flow
 
 | Bước | Hành Động | Kết Quả Mong Đợi |

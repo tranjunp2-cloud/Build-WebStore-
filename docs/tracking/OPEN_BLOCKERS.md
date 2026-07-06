@@ -1,6 +1,6 @@
 ---
 owner: PM
-last_updated: 2026-06-11
+last_updated: 2026-07-02
 ---
 
 # Open Blockers
@@ -25,6 +25,19 @@ Source of truth: Lark `[PrimeWeb - V2] — CI/CD` + GitHub issues labelled `P0`.
 
 - ⚠️ **Missing Vercel secrets** — Stripe, Lark, ECH credentials not yet added to Vercel Production scope. S3 added 2026-04-15.
 - ⚠️ **Coverage below target** — `docs/TEST_CONVENTION.md` deadline 2026-04-15 passed. Targets raised to 70/70/70 on 2026-04-19. Catch-up sprint pending.
+
+## QC test environment (isolated `qc-test`)
+
+Plan: `plans/260702-1719-qc-test-env-setup/`. Code + docs landed 2026-07-02;
+the external items below block QC handover.
+
+- [ ] Neon project `ech-prime-web-v2-qc-test` created (Singapore region, Free tier) + schema migrated via `db-setup.js` (Phase 01)
+- [ ] Vercel custom env `qc-test` scope created + env vars set (DATABASE_URI etc.) (Phase 02 Step 1-2)
+- [ ] Git branch `qc-test` pushed + branch protection applied per `.github/branch-protection.md` (Phase 02 Step 3, 5)
+- [ ] 1Password vault "PrimeWeb QC" created + members added (Phase 04 Step 4)
+- [ ] Custom domain `qc-test.web-v2.dev.ecommercehub.my` decision — custom vs Vercel URL (Phase 02 Step 7)
+- [ ] QC lead confirms ownership + added to vault + `qc-test` push permission (Phase 05 handover)
+- [ ] End-to-end smoke test: JMeter 100 req/s for 5 min against QC → staging metrics unaffected (Phase 05 Step 6)
 
 ## F35 — Webstore template migrate (9 V1 templates → Payload)
 

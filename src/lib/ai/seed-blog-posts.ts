@@ -3,7 +3,8 @@ import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
-import { searchPhotos, buildImgixUrl, trackDownload, UnsplashError } from './unsplash-client'
+import { searchPhotos, PixabayError, PIXABAY_CATEGORY_BY_COMPOSER } from './pixabay-client'
+import { normalizeComposerCategory } from './composer-category-resolver'
 import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import type { BlogPost } from './content/types'
 
@@ -35,22 +36,24 @@ async function fetchBlogThumbnail(
         category
     let wasRateLimited = false
 
-    // Tier A: Unsplash search
+    // Tier A: Pixabay search
     if (!searchRateLimited) {
         try {
-            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape' })
+            // GH-1185: site-domain filter — blog topics follow the site's
+            // industry, so a loose keyword match still lands on-domain.
+            const pixCategory = PIXABAY_CATEGORY_BY_COMPOSER[normalizeComposerCategory(category)]
+            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape', width: 1200, category: pixCategory })
             if (photos.length > 0) {
                 const photo = photos[0]!
-                const url = buildImgixUrl(photo.urls.raw, { w: 1200, h: 630, fit: 'crop' })
-                trackDownload(photo.links.download_location)
-                const id = await uploadImageUrl(url, filename, seed.title, tenantId, payload)
+                // photo.url is already sized by the client (Pixabay fixed sizes).
+                const id = await uploadImageUrl(photo.url, filename, seed.title, tenantId, payload)
                 if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
                 console.warn(`[seed-blog-posts] Tier A orphan for "${seed.slug}", falling to Tier B`)
             }
         } catch (err) {
-            if (err instanceof UnsplashError && err.code === 'RATE_LIMITED') {
+            if (err instanceof PixabayError && err.code === 'RATE_LIMITED') {
                 wasRateLimited = true
-                console.warn(`[seed-blog-posts] Unsplash rate-limited for "${seed.slug}", using curated URL`)
+                console.warn(`[seed-blog-posts] Pixabay rate-limited for "${seed.slug}", using curated URL`)
             } else {
                 console.warn(`[seed-blog-posts] Tier A failed for "${seed.slug}":`, (err as Error).message)
             }

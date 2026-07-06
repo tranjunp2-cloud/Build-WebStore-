@@ -17,8 +17,18 @@ import {
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+
+export function pairImagesWithAlts(
+    images: Array<{ image?: { url?: string }; alt?: string }> | undefined
+): { imageUrls: string[]; imageAlts: string[] } {
+    const pairs = (images ?? [])
+        .map(i => ({ url: i.image?.url, alt: i.alt ?? '' }))
+        .filter((p): p is { url: string; alt: string } => typeof p.url === 'string')
+    return { imageUrls: pairs.map(p => p.url), imageAlts: pairs.map(p => p.alt) }
+}
 type QuickViewProductWithCurrency = QuickViewProduct & {
     _currency?: string
     _currencyCode?: string  // raw ISO code (MYR/USD)
@@ -80,6 +90,7 @@ function QuickViewModal({
     siteSlug,
     siteId,
     siteBasePath,
+    siteName,
 }: {
     product: QuickViewProductWithCurrency
     currency: string
@@ -87,6 +98,7 @@ function QuickViewModal({
     siteSlug: string
     siteId?: string
     siteBasePath: string
+    siteName?: string
 }) {
     const router = useRouter()
     const [selectedImage, setSelectedImage] = useState(0)
@@ -116,7 +128,7 @@ function QuickViewModal({
                     {/* Images */}
                     <div className="relative aspect-square overflow-hidden">
                         {images.length > 0 ? (
-                            <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                            <img src={images[selectedImage]} alt={buildProductAlt(product.imageAlts?.[selectedImage], product.name, siteName)} className="w-full h-full object-cover" />
                         ) : (
                             <ImagePlaceholder size="lg" />
                         )}
@@ -217,6 +229,10 @@ function QuickViewModal({
                                 className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
                                 onClick={(e) => {
+                                    // Both editor and builder gate PDP nav — product preview routes
+                                    // are not rewritten to /preview, so navigating would leak to a live
+                                    // storefront PDP that 404s for a draft site. (Out of scope for the
+                                    // menu-tab navigation fix; needs a productPreviewPath rewrite first.)
                                     if (isInEditorPreview()) { handleCartClick(e); return }
                                     if (product.slug) {
                                         router.push(`${siteBasePath}/products/${product.slug}`)
@@ -250,12 +266,14 @@ function ProductCard({
     defaultCurrency,
     showQuickView,
     onQuickView,
+    siteName,
 }: {
     product: QuickViewProductWithCurrency
     minimal?: boolean
     defaultCurrency: string
     showQuickView: boolean
     onQuickView: (p: QuickViewProductWithCurrency) => void
+    siteName?: string
 }) {
     const currency = product._currency ?? defaultCurrency
     return (
@@ -265,7 +283,7 @@ function ProductCard({
         >
             <div className="relative aspect-square overflow-hidden">
                 {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <img src={product.imageUrls[0]} alt={buildProductAlt(product.imageAlts?.[0], product.name, siteName)} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                     <ImagePlaceholder size="md" />
                 )}
@@ -342,14 +360,16 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
             .then(json => {
                 const docs = (json.docs || []) as Array<Record<string, unknown>>
                 const mapped: QuickViewProductWithCurrency[] = docs.map((doc) => {
-                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
                     const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    const { imageUrls, imageAlts } = pairImagesWithAlts(images)
                     return {
                         name: String(doc.name || ''),
                         slug: String(doc.slug || ''),
                         price,
-                        imageUrls: (images ?? []).map(i => i.image?.url).filter((u): u is string => typeof u === 'string'),
+                        imageUrls,
+                        imageAlts,
                         description: typeof doc.shortDescription === 'string' ? doc.shortDescription : undefined,
                         _currency: CURRENCY_DISPLAY[currencyCode] ?? currencyCode,
                         _currencyCode: currencyCode,
@@ -389,7 +409,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                    <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                 </motion.div>
             ))}
         </div>
@@ -404,7 +424,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
             return (
                 <div className={`grid ${sparseGrid} gap-6 max-w-5xl mx-auto`}>
                     {displayProducts.map((product, i) => (
-                        <ProductCard key={i} product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                        <ProductCard key={i} product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                     ))}
                 </div>
             )
@@ -422,7 +442,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                 >
                     {displayProducts.map((product, i) => (
                         <div key={i} className="snap-start shrink-0 w-[260px]">
-                            <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                            <ProductCard product={product} defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                         </div>
                     ))}
                 </div>
@@ -445,7 +465,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.03 }}
                 >
-                    <ProductCard product={product} minimal defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} />
+                    <ProductCard product={product} minimal defaultCurrency={defaultCurrency} showQuickView={showQuickView} onQuickView={setQuickViewProduct} siteName={site?.name ?? undefined} />
                 </motion.div>
             ))}
         </div>
@@ -517,6 +537,7 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                         siteSlug={siteSlug}
                         siteId={siteId ?? undefined}
                         siteBasePath={siteBasePath}
+                        siteName={site?.name ?? undefined}
                     />
                 )}
             </AnimatePresence>

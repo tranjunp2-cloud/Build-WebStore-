@@ -308,7 +308,9 @@ export function CustomersListToolbar({
                 value={search}
                 onSearch={onSearch}
                 placeholder={tb.searchPlaceholder}
-                className="flex-1 min-w-[200px]"
+                // Full-width own row below lg so the placeholder isn't clipped on iPad (override the
+                // component's built-in max-w-[360px]); filters wrap below. Back to capped flex at lg+.
+                className="w-full max-w-none lg:flex-1 lg:w-auto lg:min-w-[200px] lg:max-w-[360px]"
             />
 
             <FilterChip<RankFilter>

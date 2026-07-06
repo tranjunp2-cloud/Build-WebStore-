@@ -1,21 +1,8 @@
 'use client'
 
-import { useI18n } from '@/i18n'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import type { CustomerSource } from '../_lib/customer-record'
-
-const SOURCE_VARIANT: Record<CustomerSource, 'default' | 'secondary'> = {
-    'contact-form': 'default',
-    'newsletter':   'secondary',
-}
-
-// GH-1337: tinted pill badges per Figma spec. !rounded-full overrides Badge default rounded-md.
-// whitespace-nowrap prevents "Newsletter Subscriptions" from wrapping in narrow table columns.
-const SOURCE_SOLID: Record<CustomerSource, string> = {
-    'contact-form': '!bg-blue-500/10 !border-blue-500/30 !text-blue-500 !rounded-full whitespace-nowrap',
-    'newsletter':   '!bg-[rgba(167,139,250,0.1)] !border-[rgba(138,129,245,0.3)] !text-[#8a81f5] !rounded-full whitespace-nowrap',
-}
+import { SOURCE_COLORS } from '../_lib/badge-tokens'
+import { useI18n } from '@/i18n'
 
 export function CustomerSourceBadge({ source }: { source: CustomerSource }) {
     const { t } = useI18n()
@@ -24,9 +11,13 @@ export function CustomerSourceBadge({ source }: { source: CustomerSource }) {
         'contact-form': c.sourceBadgeContact,
         'newsletter':   c.sourceBadgeNewsletter,
     }
+    const colors = SOURCE_COLORS[source]
     return (
-        <Badge variant={SOURCE_VARIANT[source]} className={cn(SOURCE_SOLID[source])}>
+        <span
+            className="inline-flex items-center rounded-[12px] text-xs font-medium border whitespace-nowrap"
+            style={{ background: colors.bg, borderColor: colors.border, color: colors.text, paddingTop: '5px', paddingBottom: '5px', paddingLeft: '13px', paddingRight: '13px' }}
+        >
             {labelMap[source]}
-        </Badge>
+        </span>
     )
 }

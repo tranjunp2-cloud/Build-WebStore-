@@ -12,7 +12,7 @@ import { applyDiscount } from '@/lib/discounts/apply-discount'
 import { recordDiscountRedemption } from '@/lib/discounts/record-discount-redemption'
 import { releaseDiscountRedemption } from '@/lib/discounts/release-discount-redemption'
 import { discountReserveErrorResponse } from '@/lib/discounts/messages'
-import { computeOrderTotal } from '@/lib/orders/order-total'
+import { computeOrderTotal, effectiveSubtotalSen } from '@/lib/orders/order-total'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
@@ -246,8 +246,9 @@ export async function POST(request: NextRequest) {
             }
         }
         const discountRM = discountSen / 100
-
-        // EP-aware shipping rate (replaces hardcoded flat rate).
+        // EP-aware shipping rate — supersedes staging's flat-rate calc (#962): getRates
+        // quotes EasyParcel when the tenant is connected and falls back to the same flat
+        // rate otherwise. Free-ship gates on the POST-discount subtotal (F33 phase-07).
         // tenant is already fetched above as `tenant` / `tenantTyped`.
         const epIntegration = (tenant as any)?.easyParcelIntegration ?? {}
         let epToken: string | null = null
@@ -264,6 +265,7 @@ export async function POST(request: NextRequest) {
         // Aggregate parcel weight; default 500g per item when product.weight is unset
         const totalWeightGrams = orderItems.reduce((acc: number, item: any) => acc + ((item.weightGrams || 500) * item.quantity), 0)
 
+        const effSubtotalSen = effectiveSubtotalSen(subtotalSen, discountSen)
         const rateResult = await getRates(
             {
                 weightGrams: totalWeightGrams,
@@ -271,7 +273,7 @@ export async function POST(request: NextRequest) {
                 destState: customer.address?.state ?? '',
                 senderPostcode: defaultWarehouse.postcode ?? '47500',
                 senderState: warehouseState,
-                subtotalSen: subtotalSen - discountSen,
+                subtotalSen: effSubtotalSen,
                 codAmountSen: undefined,  // Stripe = no COD
             },
             epToken,
@@ -508,7 +510,7 @@ export async function POST(request: NextRequest) {
             ? [{ name: 'Order total (discount applied)', price: finalTotalSen, quantity: 1, images: [] }]
             : [
                 ...checkoutItems,
-                ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+                ...(shippingFeeSen > 0 ? [{ name: 'Shipping', price: shippingFeeSen, quantity: 1, images: [] }] : []),
               ]
 
         let checkout

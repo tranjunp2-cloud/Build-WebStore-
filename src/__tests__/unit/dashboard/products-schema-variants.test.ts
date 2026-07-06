@@ -12,6 +12,7 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        shippingWeight: 0.5,
         urlSlug: 'test-product',
     }
     // Minimal valid variant row required whenever hasVariants=true (schema enforces variantsRequired)

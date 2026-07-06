@@ -55,19 +55,22 @@ type MotionSectionProps = ComponentProps<typeof motion.section> & {
     delay?: number
 }
 
-/** Animated section that fades in when scrolled into view. Respects prefers-reduced-motion. */
+/** Animated section that fades in when scrolled into view. Respects prefers-reduced-motion.
+ *
+ *  Reduced motion must still render the SAME motion.section (just with initial={false}),
+ *  NOT a plain <section>. SSR can't read the media query so it always emits the motion
+ *  branch with the hidden state baked in (opacity:0). A plain <section> on the client would
+ *  hydrate onto that node WITHOUT framer-motion to clear the inline opacity:0 → content stays
+ *  invisible. Keeping motion.section + initial={false} lets framer-motion own the node and
+ *  reset it to the visible state on mount. */
 export function AnimatedSection({ children, delay = 0, ...props }: MotionSectionProps) {
     const shouldReduce = useReducedMotion()
 
-    if (shouldReduce) {
-        const { className, style } = props as { className?: string; style?: React.CSSProperties }
-        return <section className={className} style={style}>{children as ReactNode}</section>
-    }
-
     return (
         <motion.section
-            initial="hidden"
-            whileInView="visible"
+            initial={shouldReduce ? false : 'hidden'}
+            animate={shouldReduce ? 'visible' : undefined}
+            whileInView={shouldReduce ? undefined : 'visible'}
             viewport={{ once: true, margin: '-80px' }}
             variants={{
                 hidden: { opacity: 0, y: 30 },
@@ -84,18 +87,17 @@ export function AnimatedSection({ children, delay = 0, ...props }: MotionSection
     )
 }
 
-/** Animated grid/list container with staggered children. Respects prefers-reduced-motion. */
+/** Animated grid/list container with staggered children. Respects prefers-reduced-motion.
+ *  Keeps motion.div under reduced motion (initial={false}) so framer-motion clears the
+ *  SSR-baked opacity:0 — see AnimatedSection note. */
 export function StaggerGrid({ children, className, ...props }: ComponentProps<typeof motion.div>) {
     const shouldReduce = useReducedMotion()
 
-    if (shouldReduce) {
-        return <div className={className}>{children as ReactNode}</div>
-    }
-
     return (
         <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={shouldReduce ? false : 'hidden'}
+            animate={shouldReduce ? 'visible' : undefined}
+            whileInView={shouldReduce ? undefined : 'visible'}
             viewport={{ once: true, margin: '-50px' }}
             variants={staggerContainer}
             className={className}
@@ -106,16 +108,19 @@ export function StaggerGrid({ children, className, ...props }: ComponentProps<ty
     )
 }
 
-/** Individual stagger item. Falls back to plain div when reduced motion. */
+/** Individual stagger item. Keeps motion.div under reduced motion (initial={false}) so the
+ *  SSR-baked opacity:0 from the parent's hidden state gets cleared — see AnimatedSection note. */
 export function StaggerItem({ children, className, ...props }: ComponentProps<typeof motion.div>) {
     const shouldReduce = useReducedMotion()
 
-    if (shouldReduce) {
-        return <div className={className}>{children as ReactNode}</div>
-    }
-
     return (
-        <motion.div variants={staggerItem} className={className} {...props}>
+        <motion.div
+            initial={shouldReduce ? false : undefined}
+            animate={shouldReduce ? 'visible' : undefined}
+            variants={staggerItem}
+            className={className}
+            {...props}
+        >
             {children}
         </motion.div>
     )

@@ -89,7 +89,7 @@ export async function PATCH(
         }
 
         // Verify site exists
-        const existing = await payload.findByID({ collection: 'sites', id: siteId })
+        const existing = await payload.findByID({ collection: 'sites', id: siteId, disableErrors: true })
         if (!existing) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
@@ -472,7 +472,7 @@ export async function DELETE(
         const payload = await getPayload({ config })
         const { siteId } = await params
 
-        const existing = await payload.findByID({ collection: 'sites', id: siteId })
+        const existing = await payload.findByID({ collection: 'sites', id: siteId, disableErrors: true })
         if (!existing) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },

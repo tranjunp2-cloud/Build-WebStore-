@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Pencil, Trash2, Banknote, Percent } from 'lucide-react'
 import { DiscountStatusBadge } from './discount-status-badge'
 import { DiscountUsageMeter } from './discount-usage-meter'
+import { DiscountsCardList } from './discounts-card-list'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     Table,
@@ -67,9 +68,19 @@ export function DiscountsTable({
     }
 
     return (
-        /* table-fixed + colgroup by %: stable column widths, no layout shift on description (#7).
-           min-w-[920px] keeps layout intact on narrow viewports (horizontal scroll). */
-        <Table className="table-fixed w-full" minWidth={920} footer={footer}>
+        <>
+        {/* Mobile + iPad mini (< 820px): card list — matches orders/blog cutoff. */}
+        <div className="min-[820px]:hidden">
+            <DiscountsCardList discounts={discounts} onEdit={onEdit} onDelete={onDelete} footer={footer} />
+        </div>
+
+        {/* Table (iPad Air >=820 and up). Matches orders/blog dash-table-compact convention:
+            `.dash-table-compact` (globals.css) shrinks font + padding below xl; no minWidth floor
+            → table-fixed w-full fits any pane (no horizontal scroll). >=1280 = no-op → desktop
+            byte-identical. */}
+        <div className="hidden min-[820px]:block">
+        {/* table-fixed + colgroup by %: stable column widths, no layout shift on description (#7). */}
+        <Table className="table-fixed w-full dash-table-compact" footer={footer}>
             <colgroup>
                 <col style={{ width: '24%' }} />
                 <col style={{ width: '12%' }} />
@@ -104,13 +115,33 @@ export function DiscountsTable({
                             min-w-0 required so truncate works inside flex. */}
                         <TableCell>
                             <div className="flex flex-col gap-1 min-w-0">
-                                {/* Code chip — themed pill (bordered, matches Usage-history table) */}
-                                <span
-                                    className="inline-flex w-fit items-center rounded-[4px] border px-2.5 py-[3px] font-mono text-[12px] font-semibold tracking-wide"
-                                    style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
-                                >
-                                    {discount.code}
-                                </span>
+                                {/* Code chip — themed pill (bordered, matches Usage-history table).
+                                    max-w-full + inner truncate: long codes never overflow into the Type
+                                    column when the pane narrows (sidebar open / iPad Air+); full code via
+                                    hover tooltip (#tablet). */}
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span
+                                            className="inline-flex w-fit max-w-full items-center rounded-[4px] border px-2.5 py-[3px] font-mono text-[12px] font-semibold tracking-wide cursor-default"
+                                            style={{ background: 'var(--dash-surface-hover)', color: 'var(--dash-text)', borderColor: 'var(--dash-border)' }}
+                                        >
+                                            <span className="min-w-0 truncate">{discount.code}</span>
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                        side="top"
+                                        align="start"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="max-w-[360px] whitespace-normal break-words font-mono"
+                                        style={{
+                                            backgroundColor: 'var(--dash-surface)',
+                                            color: 'var(--dash-text)',
+                                            borderColor: 'var(--dash-border)',
+                                        }}
+                                    >
+                                        {discount.code}
+                                    </TooltipContent>
+                                </Tooltip>
                                 {discount.description && (
                                     <Tooltip>
                                         <TooltipTrigger asChild>
@@ -210,5 +241,7 @@ export function DiscountsTable({
                 ))}
             </TableBody>
         </Table>
+        </div>
+        </>
     )
 }

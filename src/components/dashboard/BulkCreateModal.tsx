@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
 import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
@@ -159,6 +160,10 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [hasParsed, setHasParsed] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [showExitConfirm, setShowExitConfirm] = useState(false)
+    // GH-1491 issue 1 audit: parent only mounts this component while the modal should be
+    // open, so it's locked for this component's whole lifetime — no internal open/closed
+    // state to gate on.
+    useLockBodyScroll(true)
 
     useEffect(() => {
         setMounted(true)
@@ -275,15 +280,31 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 const payload = buildSavePayload(prod, cartonMediaId, categoryId, t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')
 
                 try {
-                    await saveProductAction(payload)
-                    successCount++
+                    const res = await saveProductAction(payload)
+                    if (res?.id) {
+                        successCount++
+                    } else {
+                        const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
+                        toast.error(`${prod.name}: ${fallback}`)
+                        console.error('[bulk-create] saveProductAction returned no id', { name: prod.name, res })
+                    }
                 } catch (err) {
+                    let msg: string
+                    try {
+                        msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
+                    } catch {
+                        msg = err instanceof Error ? err.message : ''
+                    }
+                    toast.error(`${prod.name}: ${msg || t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'}`)
                     console.warn('Failed to save product', prod.name, err)
                 }
             }
 
             if (successCount > 0) {
-                toast.success((t.dashboard?.products?.bulkCreate?.saveSuccess?.replace('{count}', successCount.toString())) || `Saved ${successCount} products as draft`)
+                const tmpl = successCount === 1
+                    ? (t.dashboard?.products?.bulkCreate?.saveSuccessOne || 'Created 1 draft product. Please add images before publishing.')
+                    : (t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`)
+                toast.success(tmpl)
                 if (onSuccess) onSuccess()
                 router.refresh()
                 onClose()

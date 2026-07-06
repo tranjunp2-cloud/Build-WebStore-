@@ -2,9 +2,11 @@
 
 import { getPayload, type Where } from 'payload'
 import configPromise from '@payload-config'
-import { getCurrentUser, extractTenantId } from '@/lib/auth'
+import { getCurrentUser, tenantIdForQuery } from '@/lib/auth'
 import { getActivePlanSubscription, canUse } from '@/lib/subscriptions/plan-subscription'
 import type { PlanCode } from '@/collections/PlanSubscriptions'
+import { productPublishBlocks } from '@/lib/products/publish-guard'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 // Upper bound for SKU conflict query results. If totalDocs exceeds this, the save is aborted
 // with a user-facing error. In practice a single SKU or small batch rarely matches > 100 products.
@@ -66,7 +68,8 @@ export async function getProductsAction() {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
-    const tenantId = extractTenantId(user)
+    // Fix B: coerce to number so payload WHERE matches Neon integer FK (tenant_id integer)
+    const tenantId = tenantIdForQuery(user)
     const payload = await getPayload({ config: configPromise })
     const res = await payload.find({
         collection: 'products',
@@ -74,7 +77,7 @@ export async function getProductsAction() {
         where: {
             and: [
                 { deletedAt: { exists: false } },
-                ...(tenantId ? [{ tenant: { equals: tenantId } }] : []),
+                ...(tenantId != null ? [{ tenant: { equals: tenantId } }] : []),
             ],
         },
         limit: 100,
@@ -100,10 +103,18 @@ export async function getProductAction(id: string | number) {
 import { z } from 'zod'
 
 const ProductServerSchema = z.object({
-    name: z.string().min(3, "Name must be at least 3 characters"),
+    // max(120) matches product-form/schema.ts's client-side cap — without it here, a direct
+    // saveProductAction call could submit an arbitrarily long name, which then flows unbounded
+    // into the alt-text fallback below ("{name} - {store}") despite that field's own .max(500).
+    name: z.string().min(3, "Name must be at least 3 characters").max(120, "Name must not exceed 120 characters"),
     images: z.array(z.object({
         image: z.union([z.string(), z.number(), z.record(z.unknown())]).optional(),
-        alt: z.string().optional()
+        // ImageUploader.tsx enforces a 125-char UX cap (MAX_ALT_LENGTH) via <textarea maxLength>,
+        // but that's client-only — a direct saveProductAction call bypasses it entirely. This 500
+        // cap is a generous defense-in-depth ceiling (not the UX limit itself), sized to never
+        // reject legitimate pre-existing over-125-char alt text (grandfathered, per TC-F08-01-37 —
+        // the Popover shows it uncut, doesn't retroactively truncate), only pathological input.
+        alt: z.string().max(500, 'Alt text is too long').optional()
     })).optional(),
 }).passthrough();
 
@@ -121,9 +132,51 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             .map(v => typeof v.sku === 'string' ? v.sku.trim() : '')
             .filter(Boolean),
     ]
-    const tenantId = extractTenantId(user)
-    const numId = id ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
+    // Fix B: coerce to number so SKU scope and tenant filter match Neon integer FK
+    const tenantId = tenantIdForQuery(user)
+
+    // Alt-text fallback (GH-1458) needs the store name — fetched once per save, same
+    // "one site per tenant" lookup pattern used elsewhere in the dashboard (see
+    // src/app/(dashboard)/actions.ts addTrackedKeyword).
+    let storeName: string | undefined
+    if (tenantId != null) {
+        const sitesRes = await payload.find({
+            collection: 'sites', where: { tenant: { equals: tenantId } }, limit: 1, depth: 0,
+        })
+        storeName = sitesRes.docs[0]?.name ?? undefined
+    }
+
+    // `id != null` (not truthy `id`) — a falsy `id === 0` is a legitimate Payload primary key
+    // and must route to the update branch below, not silently fall through to create.
+    const hasId = id != null && id !== ''
+    const numId = hasId ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
     if (numId !== undefined && Number.isNaN(numId)) throw new Error('Invalid product ID')
+
+    // Publishing gate (GH-1458) — updateProductFieldAction() is not the only path to
+    // status:'active'. saveProductAction is a directly-callable Server Action with a
+    // .passthrough() schema, so a caller (not just the React form, which never sends `status`
+    // on edits — see [id]/page.tsx) could otherwise smuggle `status:'active'` past this action
+    // with no core-field validation, bypassing the gate entirely. Re-check here against the
+    // MERGED view (existing doc + this save's incoming fields) since a save may only touch a
+    // subset of fields.
+    if (data.status === 'active') {
+        const existing = numId !== undefined
+            ? await payload.findByID({ collection: 'products', id: numId, user, depth: 0, overrideAccess: false, disableErrors: true })
+            : null
+        const merged = { ...(existing ?? {}), ...data }
+        const blocks = productPublishBlocks({
+            price: merged.price,
+            sku: merged.sku,
+            inventory: merged.inventory,
+            weight: merged.weight,
+            hasVariants: merged.hasVariants,
+            variants: merged.variants,
+        })
+        if (!blocks.ok) {
+            throw new Error(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields: blocks.missingFields }))
+        }
+    }
+
     const conflicts = await findConflictingSkus(payload, candidateSkus, tenantId, numId)
 
     if (conflicts.length > 0) {
@@ -153,30 +206,72 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
             const { getOrCreateCrateCartonIdAction } = await import('@/app/(dashboard)/actions/media')
             const cartonId = await getOrCreateCrateCartonIdAction()
             if (cartonId) {
-                data.images = [{ image: cartonId, alt: data.name || 'Placeholder Image' }]
+                data.images = [{ image: cartonId }]
             }
         } catch (err) {
             console.error('Failed to attach placeholder image', err)
         }
     }
-    
-    if (id) {
+
+    // Alt-text fallback (GH-1458): blank alt -> "{name} - {store}", so the storefront <img alt>
+    // is never empty. Single source of truth shared with the storefront render paths. Re-capped
+    // at 500 (matches the schema's alt max) since the derived string is computed AFTER Zod
+    // validation and isn't re-checked otherwise.
+    if (data.images && data.images.length > 0) {
+        data.images = data.images.map((img) => ({ ...img, alt: buildProductAlt(img.alt, data.name, storeName).slice(0, 500) }))
+    }
+
+    if (hasId) {
         const res = await payload.update({
             collection: 'products',
-            id,
+            id: id as string | number,
             data,
             user,
             overrideAccess: false,
         })
         return JSON.parse(JSON.stringify(res))
     } else {
-        const res = await payload.create({
-            collection: 'products',
-            data,
-            user,
-            overrideAccess: false,
-        })
-        return JSON.parse(JSON.stringify(res))
+        // Fix A: explicitly set tenant so the product is always scoped to the user's tenant.
+        // beforeChangeHook injects it too, but only if req.user.tenants is populated — this
+        // guarantees the write even when tenants aren't deeply populated in the server action ctx.
+        if (tenantId != null) (data as Record<string, unknown>).tenant = tenantId
+
+        try {
+            const res = await payload.create({
+                collection: 'products',
+                data,
+                user,
+                overrideAccess: false,
+                // Bypass Payload/Drizzle transaction: commitTransaction silently swallows COMMIT
+                // errors (done.catch(()=>{}) in beginTransaction absorbs PostgreSQL commit failures),
+                // so products appear created but are rolled back. Without a transaction each INSERT
+                // auto-commits, avoiding the silent-commit-failure bug. Tradeoff: if variants INSERT
+                // fails after the products row commits, the product row stays with no variants;
+                // that failure still propagates to the user via handleUpsertError → throw.
+                disableTransaction: true,
+            })
+            // Verify the product actually exists in DB — detects silent Payload/Drizzle commit failures
+            // where commitTransaction swallows COMMIT errors and returns the doc as if it succeeded.
+            try {
+                const verify = await payload.findByID({ collection: 'products', id: res.id, overrideAccess: true, depth: 0 })
+                if (!verify?.id) {
+                    console.error('[products.create] VERIFY FAILED — product not in DB after create!', { id: res?.id })
+                    throw new Error('Product was not saved. Please try again.')
+                }
+            } catch (verifyErr) {
+                if ((verifyErr as Error)?.message === 'Product was not saved. Please try again.') throw verifyErr
+                console.error('[products.create] VERIFY ERROR', { id: res?.id, verifyErr })
+                throw new Error('Product was not saved. Please try again.')
+            }
+            return JSON.parse(JSON.stringify(res))
+        } catch (createErr) {
+            console.error('[products.create] failed', {
+                tenant: tenantId,
+                name: (data as Record<string, unknown>).name,
+                err: createErr,
+            })
+            throw createErr
+        }
     }
 }
 
@@ -196,8 +291,9 @@ export async function updateProductFieldAction(id: string | number, data: unknow
 
     // Subscription gate — checked here because the update below uses overrideAccess: true
     // (required to work around a Payload 3.79 bug with variant array 'id' fields).
-    const tenantId = extractTenantId(user)
-    if (tenantId) {
+    // Fix B: coerce to number so getActivePlanSubscription WHERE matches Neon integer FK
+    const tenantId = tenantIdForQuery(user)
+    if (tenantId != null) {
         const sub = await getActivePlanSubscription(payload, tenantId)
         if (!sub || !(await canUse(payload, sub.plan as PlanCode, 'product_management'))) {
             throw new Error('Product management is not available on your current plan.')
@@ -211,6 +307,28 @@ export async function updateProductFieldAction(id: string | number, data: unknow
         collection: 'products', id, user, depth: 0, overrideAccess: false, disableErrors: true,
     })
     if (!existing) throw new Error('Product not found or access denied')
+
+    // Soft validation publishing gate (GH-1458) — only Draft/Archived -> Active is gated.
+    // Re-checked server-side (not just in the client UI) because the payload.update below runs
+    // with overrideAccess:true, which bypasses Payload's own field-level required checks.
+    if ('status' in validated && validated.status === 'active') {
+        const blocks = productPublishBlocks({
+            price: existing.price,
+            sku: existing.sku,
+            inventory: existing.inventory,
+            weight: existing.weight,
+            hasVariants: existing.hasVariants,
+            variants: existing.variants,
+        })
+        if (!blocks.ok) {
+            throw new Error(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields: blocks.missingFields }))
+        }
+    }
+    // KNOWN LIMITATION (same class as the variant-loss race below): the gate check reads
+    // `existing` here, then `saveProductAction` (a separate action) could concurrently clear
+    // weight/sku on the same product between this read and the write below — no transaction/row
+    // lock ties the two together. Accepted in practice: same risk profile as the variant race,
+    // narrow window, no known exploit path beyond "two admins editing the same product at once."
 
     // Payload 3.79 Drizzle updateOne internally fetches the existing doc, merges it with the
     // incoming data, then runs traverseFields on the merged result. Variant array rows have an

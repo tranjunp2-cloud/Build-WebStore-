@@ -68,7 +68,7 @@ function BuilderGenerationCard({
     const { t, ti } = useI18n()
     const activeStep = getActiveStep(progress)
     return (
-        <div className="mx-auto flex w-full max-w-[864px] items-center justify-center px-12">
+        <div className="mx-auto flex w-full max-w-[864px] items-center justify-center px-6 sm:px-12">
             <div className="relative w-full max-w-[448px] rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] p-8 shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
                 <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
                 <div className="relative">

@@ -5,11 +5,10 @@ import type { ThemeConfig } from '@/blocks/types'
 import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import {
     BROKEN_URL_PREFIX,
-    HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
+    createPreviewUrlRewriter,
     resolveInternalUrlPath,
     rewriteLiveUrl,
-    splitPathAndTail,
 } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
@@ -70,6 +69,7 @@ export type SiteRendererProps = {
     }
     page: {
         layout?: unknown[]
+        isHomepage?: boolean
         [key: string]: unknown
     }
     pages?: NavPage[]
@@ -200,60 +200,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)
     // - Unmatched internal paths → '#' (prevent 404)
     // - External URLs (http*) → preserved as-is
-    const previewSiteId = String(
-        (site as { id?: string | number })?.id ?? '',
-    )
+    // Extracted to createPreviewUrlRewriter so preview routes that render blocks WITHOUT
+    // SiteRenderer (blog detail) reuse the exact same slug→pageId resolution.
+    const rewritePreviewUrl = createPreviewUrlRewriter({
+        pages,
+        siteId: (site as { id?: string | number })?.id,
+        isBuilderPreview,
+    })
 
-    // Use the real pages list as the source of truth for URL resolution:
-    //
-    // - slugToPageId: any-form slug → pageId. Editor preview routes nav
-    //   links to `/preview/{siteId}?pageId=...` so the iframe stays in
-    //   preview scope.
-    // - slugCanonical: any-form slug → canonical `/slug`. Live mode
-    //   rewrites nav/footer/cta URLs to the real slug, fixing cases like
-    //   AI-seeded `/Services` → stored `/services`. Built once via
-    //   buildSlugCanonicalMap; both helpers index three forms (exact,
-    //   lowercased, bare) so case and leading-slash drift both resolve.
-    const slugToPageId = new Map<string, string>()
-    for (const p of pages) {
-        const pid = String(p.id)
-        const rawSlug = (p.slug ?? '').trim()
-        if (!rawSlug) continue
-        const withSlash = rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`
-        slugToPageId.set(withSlash, pid)
-        slugToPageId.set(withSlash.toLowerCase(), pid)
-        if (rawSlug !== '/') {
-            slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
-        }
-    }
-    const homepage = pages.find((p) => p.isHomepage) ?? pages[0]
-    if (homepage) {
-        const homepageId = String(homepage.id)
-        slugToPageId.set('/', homepageId)
-        // Mirror buildSlugCanonicalMap's HOMEPAGE_ALIASES so preview clicks on
-        // `/Home`, `/Index`, etc. resolve the iframe to the homepage pageId
-        // instead of dead-ending at `#`. Sharing the const prevents drift.
-        for (const alias of HOMEPAGE_ALIASES) {
-            if (!slugToPageId.has(alias)) slugToPageId.set(alias, homepageId)
-        }
-    }
-
+    // slugCanonical: any-form slug → canonical `/slug`. Live mode rewrites nav/footer/cta
+    // URLs to the real slug, fixing cases like AI-seeded `/Services` → stored `/services`.
+    // Indexes three forms (exact, lowercased, bare) so case + leading-slash drift resolve.
     const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
-
-    const rewritePreviewUrl = (url: string | undefined): string => {
-        if (!url) return '#'
-        if (/^https?:\/\//i.test(url)) return url
-        if (url.startsWith('#')) return url
-        if (url.includes('#') && !url.startsWith('/')) return url
-        if (!previewSiteId) return '#'
-        const [path] = splitPathAndTail(url)
-        const hit =
-            slugToPageId.get(path) ??
-            slugToPageId.get(path.toLowerCase()) ??
-            slugToPageId.get(path.replace(/^\//, ''))
-        if (hit) return `/preview/${previewSiteId}?pageId=${hit}${isBuilderPreview ? '&builder=1' : ''}`
-        return '#'
-    }
 
     const rewriteUrl = isEditor
         ? rewritePreviewUrl
@@ -460,7 +418,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     }) as PreviewBlock[]
 
     // JSON-LD schemas — auto-detect from blocks present
-    const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
+    // Organization/WebSite (vs. WebPage) schema gates on `page.isHomepage`, the Payload `pages`
+    // collection's own ground-truth flag — every SiteRenderer call site's `page` originates from
+    // a `payload.find`/`findByID` on that collection (or a spread thereof), so the field is
+    // reliably present. Previously this used a block-order heuristic
+    // (`blocks[0]?.blockType === 'navigation'`), which broke once bucketing (below) started
+    // rendering nav visually first regardless of its authored position in page.layout — the
+    // heuristic no longer reflected what actually renders on screen.
+    const isHomepage = page?.isHomepage === true
     const jsonLdSchemas = generatePageSchemas({ blocks, site, page, isHomepage })
 
     // Heading hierarchy — compute levels for all blocks
@@ -499,7 +464,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Group floating widgets by their corner position so they stack vertically
     // instead of overlapping when multiple are placed on the same corner.
-    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+    // GH-1412: 'cta' joins the floating stack ONLY in its floating-sticky variant, so a
+    // floating CTA no longer overlaps the WhatsApp/social/cart launchers (same bottom-right corner).
+    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'cta'])
     const getFloatingBlockPos = (b: PreviewBlock) => {
         if (b.blockType === 'cartWidget') return 'bottom-left'
         if (b.blockType === 'whatsapp-button' && (b.position as string) === 'bottom-left') return 'bottom-left'
@@ -508,12 +475,133 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const floatingBlockSet = new Set<number>()
     const floatingByPos = new Map<string, number[]>()
     blocks.forEach((b, i) => {
-        if (!FLOATING_WIDGET_TYPES.has(b.blockType) || (b.variant as string) === 'inline') return
+        if (!FLOATING_WIDGET_TYPES.has(b.blockType)) return
+        // CTA only floats in the floating-sticky variant; every other variant stays in normal flow.
+        if (b.blockType === 'cta' && (b.variant as string) !== 'floating-sticky') return
+        // Other widgets keep their existing behavior: skip the inline (in-flow) variant.
+        if (b.blockType !== 'cta' && (b.variant as string) === 'inline') return
         floatingBlockSet.add(i)
         const pos = getFloatingBlockPos(b)
         const arr = floatingByPos.get(pos) ?? []
         arr.push(i)
         floatingByPos.set(pos, arr)
+    })
+
+    // GH-1466: bucket rendered blocks into header/main/footer so the return tree can wrap
+    // them in a sticky-footer flex layout. Per-block render logic is unchanged from the
+    // previous blocks.map() — only the destination (return → push) differs.
+    // Intentional side effect: header/navigation and footer blocks now ALWAYS render at the
+    // very top/bottom of the page regardless of their position inside page.layout. Previously
+    // they rendered in-place (interleaved with content) if stored at a non-canonical index —
+    // possible via ensureNavigationBlocks (src/lib/ai/ensure-navigation.ts), which patches an
+    // existing nav/footer's content but never repositions it. Snapping to top/bottom is the
+    // correct fix for that latent display bug, not a regression.
+    // Note: 'announcement-bar' is the one block type conventionally authored ABOVE the nav
+    // (root element is `sticky top-0 z-50`). It is NOT in the header/footer bucket check below,
+    // so it falls into mainEls and renders BELOW nav — banner + nav sticky collision on scroll
+    // if a layout ever has announcement-bar before nav. Low reach today: structure-enforcer.ts
+    // forces nav to index 0 on the AI-gen path, and the editor blocks dropping around nav.
+    const headerEls: React.ReactNode[] = []
+    const mainEls: React.ReactNode[] = []
+    const footerEls: React.ReactNode[] = []
+    blocks.forEach((block, index) => {
+        if (!block.blockType) return
+
+        // Floating widgets are rendered in grouped stacking containers below
+        if (floatingBlockSet.has(index)) return
+
+        const BlockComponent = blockRegistry.getComponent(block.blockType)
+        if (!BlockComponent) {
+            // Unknown block type — skip silently (AC-6)
+            return
+        }
+
+        const normalizedBlock = block
+
+        const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
+
+        // Block spacing — navigation/footer default to 0, others use custom or default
+        const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
+        const isBreadcrumb = block.blockType === 'breadcrumb'
+        // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
+        // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
+        const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
+        const breadcrumbOffset =
+            isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
+                ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
+                : undefined
+        const blockVariant = (block as Record<string, unknown>).variant as string | undefined
+        const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
+        const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+        const spacingStyle = (isGlobalBlock || isFloatingBlock)
+            ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
+            : {
+                // GH-1412: nav-offset is only a DEFAULT — when the user has explicitly set
+                // a Top Spacing value (blockSpacing.paddingTop), respect it instead of
+                // silently overriding it with the nav height.
+                paddingTop: applyNavOffset && index === firstContentBlockIdx && blockSpacing?.paddingTop === undefined
+                    ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
+                    : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
+            }
+
+        // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
+        // Falls back to loop index only for non-editor contexts or uninjected blocks.
+        // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
+        // shifts all loop indices by +1, but the store has no injected nav, so hero is at
+        // store index 0 while its loop index would be 1.
+        const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
+            ? block.__editorBlockIndex
+            : index
+        const callbackValue = onBlockFieldChange
+            ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
+            : null
+
+        const blockContent = (
+            <BlockEditCallbackProvider key={`${block.blockType}-${index}`} value={callbackValue}>
+                <BlockErrorBoundary blockType={block.blockType}>
+                    <HeadingProvider level={headingLevel}>
+                        <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                    </HeadingProvider>
+                </BlockErrorBoundary>
+            </BlockEditCallbackProvider>
+        )
+
+        let rendered: React.ReactNode
+        if (isEditor) {
+            rendered = (
+                <div
+                    key={`${block.blockType}-${index}`}
+                    data-block-index={block.__editorBlockIndex ?? index}
+                    data-block-type={block.blockType}
+                    className="group/block relative w-full"
+                    style={spacingStyle}
+                >
+                    {blockContent}
+                </div>
+            )
+        } else if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
+            // Public site: wrap non-global blocks with spacing style so
+            // user-customized blockSpacing (paddingTop/paddingBottom) is
+            // preserved on the live published site. Global blocks (nav,
+            // footer, breadcrumb) normally return unwrapped; breadcrumb gets
+            // wrapped when a fixed-nav offset applies.
+            rendered = (
+                <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                    {blockContent}
+                </div>
+            )
+        } else {
+            rendered = blockContent
+        }
+
+        if (block.blockType === 'header' || block.blockType === 'navigation') {
+            headerEls.push(rendered)
+        } else if (block.blockType === 'footer') {
+            footerEls.push(rendered)
+        } else {
+            mainEls.push(rendered)
+        }
     })
 
     return (
@@ -573,139 +661,89 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 />
             ))}
 
-            {blocks.map((block, index) => {
-                if (!block.blockType) return null
-
-                // Floating widgets are rendered in grouped stacking containers below
-                if (floatingBlockSet.has(index)) return null
-
-                const BlockComponent = blockRegistry.getComponent(block.blockType)
-                if (!BlockComponent) {
-                    // Unknown block type — skip silently (AC-6)
-                    return null
-                }
-
-                const normalizedBlock = block
-
-                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
-
-                // Block spacing — navigation/footer default to 0, others use custom or default
-                const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
-                const isBreadcrumb = block.blockType === 'breadcrumb'
-                // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
-                // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
-                const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
-                const breadcrumbOffset =
-                    isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
-                        ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
-                        : undefined
-                const blockVariant = (block as Record<string, unknown>).variant as string | undefined
-                const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
-                const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                const spacingStyle = (isGlobalBlock || isFloatingBlock)
-                    ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
-                    : {
-                        paddingTop: applyNavOffset && index === firstContentBlockIdx
-                            ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
-                            : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
-                        paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
-                    }
-
-                // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
-                // Falls back to loop index only for non-editor contexts or uninjected blocks.
-                // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
-                // shifts all loop indices by +1, but the store has no injected nav, so hero is at
-                // store index 0 while its loop index would be 1.
-                const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
-                    ? block.__editorBlockIndex
-                    : index
-                const callbackValue = onBlockFieldChange
-                    ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
-                    : null
-
-                const blockContent = (
-                    <BlockEditCallbackProvider key={`${block.blockType}-${index}`} value={callbackValue}>
-                        <BlockErrorBoundary blockType={block.blockType}>
-                            <HeadingProvider level={headingLevel}>
-                                <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
-                            </HeadingProvider>
-                        </BlockErrorBoundary>
-                    </BlockEditCallbackProvider>
-                )
-
-                if (isEditor) {
-                    return (
-                        <div
-                            key={`${block.blockType}-${index}`}
-                            data-block-index={block.__editorBlockIndex ?? index}
-                            data-block-type={block.blockType}
-                            className="group/block relative w-full"
-                            style={spacingStyle}
-                        >
-                            {blockContent}
-                        </div>
-                    )
-                }
-
-                // Public site: wrap non-global blocks with spacing style so
-                // user-customized blockSpacing (paddingTop/paddingBottom) is
-                // preserved on the live published site. Global blocks (nav,
-                // footer, breadcrumb) normally return unwrapped; breadcrumb gets
-                // wrapped when a fixed-nav offset applies.
-                if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
-                    return (
-                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
-                            {blockContent}
-                        </div>
-                    )
-                }
-                return blockContent
-            })}
+            <div className="min-h-screen flex flex-col">
+                {headerEls}
+                <main className="flex-1">{mainEls}</main>
+                {footerEls}
+            </div>
 
             {/* Floating widgets — grouped by corner so they stack vertically instead of overlapping */}
-            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => (
-                <div
-                    key={pos}
-                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
-                >
-                    {blockIndices.map(blockIndex => {
-                        const floatingBlock = blocks[blockIndex]
-                        const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
-                        if (!FloatingComponent) return null
-                        const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
-                            ? floatingBlock.__editorBlockIndex : blockIndex
-                        const floatingCallback = onBlockFieldChange
-                            ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
-                            : null
-                        const floatingContent = (
-                            <FloatingContainerProvider value={true}>
-                                <BlockEditCallbackProvider value={floatingCallback}>
-                                    <BlockErrorBoundary blockType={floatingBlock.blockType}>
-                                        <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
-                                    </BlockErrorBoundary>
-                                </BlockEditCallbackProvider>
-                            </FloatingContainerProvider>
+            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => {
+                const renderFloating = (blockIndex: number) => {
+                    const floatingBlock = blocks[blockIndex]
+                    const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
+                    if (!FloatingComponent) return null
+                    const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
+                        ? floatingBlock.__editorBlockIndex : blockIndex
+                    const floatingCallback = onBlockFieldChange
+                        ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
+                        : null
+                    const floatingContent = (
+                        <FloatingContainerProvider value={true}>
+                            <BlockEditCallbackProvider value={floatingCallback}>
+                                <BlockErrorBoundary blockType={floatingBlock.blockType}>
+                                    <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
+                                </BlockErrorBoundary>
+                            </BlockEditCallbackProvider>
+                        </FloatingContainerProvider>
+                    )
+                    if (isEditor) {
+                        // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
+                        const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
+                            ? floatingBlock.__editorBlockIndex
+                            : editorIdx
+                        return (
+                            <div
+                                key={blockIndex}
+                                data-block-index={dataBlockIndex}
+                                data-block-type={floatingBlock.blockType}
+                                className="group/block relative"
+                            >
+                                {floatingContent}
+                            </div>
                         )
-                        if (isEditor) {
-                            // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
-                            const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
-                                ? floatingBlock.__editorBlockIndex
-                                : editorIdx
-                            return (
-                                <div
-                                    key={blockIndex}
-                                    data-block-index={dataBlockIndex}
-                                    data-block-type={floatingBlock.blockType}
-                                    className="group/block relative"
-                                >
-                                    {floatingContent}
-                                </div>
-                            )
-                        }
-                        return <div key={blockIndex}>{floatingContent}</div>
-                    })}
-                </div>
-            ))}
+                    }
+                    // GH-1412: `empty:hidden` so a floating-sticky CTA that renders null (before
+                    // the storefront scroll-gate fires) doesn't occupy a flex slot / leave a gap.
+                    return <div key={blockIndex} className="empty:hidden">{floatingContent}</div>
+                }
+
+                // GH-1412: keep the launcher column (WhatsApp/social/cart) exactly as before and
+                // place a floating-sticky CTA as a SEPARATE block beside it — to the left on desktop
+                // (md:flex-row), above it on mobile (flex-col) so the wide CTA card never overflows.
+                const ctaIndices = blockIndices.filter(i => blocks[i].blockType === 'cta')
+                const widgetIndices = blockIndices.filter(i => blocks[i].blockType !== 'cta')
+
+                if (ctaIndices.length === 0) {
+                    // Widget-only group — unchanged original layout.
+                    return (
+                        <div
+                            key={pos}
+                            className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
+                        >
+                            {widgetIndices.map(renderFloating)}
+                        </div>
+                    )
+                }
+
+                return (
+                    <div
+                        key={pos}
+                        className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col md:flex-row items-end gap-3`}
+                    >
+                        {/* CTA column — multiple floating-sticky CTAs stack vertically here instead
+                            of overflowing the row horizontally on desktop. */}
+                        <div className="flex flex-col items-end gap-3">
+                            {ctaIndices.map(renderFloating)}
+                        </div>
+                        {widgetIndices.length > 0 && (
+                            <div className="flex flex-col-reverse items-end gap-3">
+                                {widgetIndices.map(renderFloating)}
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
         </OwnerProvider>
         </HiddenSlugsProvider>
     )

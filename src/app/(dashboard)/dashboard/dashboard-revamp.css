@@ -589,7 +589,9 @@ html[data-period-pending="1"] .dash-revamp .stream {
   border-radius: var(--dr-radius-lg);
   box-shadow: var(--dr-shadow-card);
   padding: 16px 18px;
-  min-height: 132px;
+  /* GH-1491 issue 2: was 132px sized for value+delta on 2 separate rows. Now value+delta
+     share one row (.stat-bottom below), so the card no longer needs that much floor height. */
+  min-height: 112px;
   display: flex;
   flex-direction: column;
 }
@@ -608,7 +610,6 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .stat-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 9px;
   margin-bottom: 14px;
   position: relative;
@@ -624,14 +625,14 @@ html[data-period-pending="1"] .dash-revamp .stream {
   min-width: 0;
 }
 
-.dash-revamp .stat-change {
-  /* right block — separated from the left block via .stat-top justify-between */
-  flex-shrink: 0;
+/* GH-1491 issue 2: value + delta/badge on one row instead of value alone on its own
+   line below a separate delta row — halves the vertical space the pair needs. */
+.dash-revamp .stat-bottom {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  text-align: right;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
 }
 
 .dash-revamp .stat-ic {
@@ -689,13 +690,19 @@ html[data-period-pending="1"] .dash-revamp .stream {
   line-height: 1.05;
   position: relative;
   font-variant-numeric: tabular-nums;
-  margin-top: auto;
-  margin-bottom: 10px;
+  /* Flex default min-width:auto won't let long numbers (6-digit view counts, etc.) shrink
+     below their full text width, pushing the delta pill in .stat-bottom past the card edge
+     to be silently clipped by .stat-card's overflow:hidden. Let it shrink + ellipsize instead. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dash-revamp .delta {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 3px;
   font-size: 12px;
   font-weight: 700;
@@ -725,7 +732,12 @@ html[data-period-pending="1"] .dash-revamp .stream {
 
 .dash-revamp .delta-note {
   /* Comparison note (e.g. "vs 30h lepas") — keep on ONE line, never wrap.
-     Slightly smaller + tighter tracking so the longer localized strings still fit. */
+     Slightly smaller + tighter tracking so the longer localized strings still fit.
+     Sits as its own caption line under .stat-bottom (value + delta), right-aligned
+     under the delta pill it describes. */
+  display: block;
+  text-align: right;
+  margin-top: 2px;
   font-size: 10px;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -749,6 +761,7 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .cs-badge {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 4px;
   font-size: 10.5px;
   font-weight: 700;
@@ -765,7 +778,7 @@ html[data-period-pending="1"] .dash-revamp .stream {
   height: 11px;
 }
 
-/* Interactive Coming-Soon badge (tooltip trigger) — sits in the stat-change slot */
+/* Interactive Coming-Soon badge (tooltip trigger) — sits in the .stat-bottom row, beside .stat-val */
 .dash-revamp .cs-badge-interactive {
   cursor: help;
   outline: none;
@@ -1969,13 +1982,75 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .tools-grid  { grid-template-columns: 1fr; }
 }
 
+/* iPad Pro / small laptops (981–1279px): the sidebar leaves the content pane ~784px,
+   so 4 stat cards across collide (label overlaps the delta/Coming-Soon badge). Keep the
+   clean 2×2 used at iPad Air until xl, where the pane is wide enough for 4. Desktop
+   (≥1280) keeps the original 4-col → byte-identical. */
+@media (min-width: 981px) and (max-width: 1279px) {
+  .dash-revamp .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Mobile + tablet (<1280, matches this file's desktop cutoff elsewhere): native HTML5
+   drag-and-drop doesn't work reliably via touch, so hide the drag-dots handle icon and
+   show the up/down arrow buttons (.cz-arrows) instead as the working reorder path.
+   .cz-arrows is `display: none` unconditionally in the base rule above (pre-existing,
+   from the original dashboard revamp) — it was never actually wired to appear anywhere,
+   desktop included, so surfacing it here is a real (not cosmetic) fix, not just hiding
+   a non-functional icon. Desktop (≥1280) keeps the original drag handle, arrows still
+   hidden — byte-identical. */
+@media (max-width: 1279px) {
+  .dash-revamp .cz-handle { display: none; }
+  .dash-revamp .cz-arrows { display: flex; }
+}
+
+/* "Top performing" card title used a smaller inline fontSize (15px vs the default 16px
+   .sh-title) to sit a notch below the "Traffic & performance" section title. Removed the
+   inline override (see traffic-performance.tsx) so mobile/tablet inherits the same size
+   as Traffic's title. Desktop (≥1280) restores the original 15px here — byte-identical. */
+@media (min-width: 1280px) {
+  .dash-revamp .chart-head .sh-title { font-size: 15px; }
+}
+
 @media (max-width: 560px) {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
 
-  /* Mobile-sim intent ported to real breakpoints */
+  /* Mobile: keep 2-up. Value + delta/badge now share one row (.stat-bottom) instead of
+     the old stacked [icon+label] → [delta/badge] → [value] layout (GH-1491 issue 2),
+     so the label row no longer needs to collide-guard against a delta/badge beside it —
+     just tighten spacing/sizing for the narrower ~160px card. */
   .dash-revamp .stat-grid              { grid-template-columns: 1fr 1fr; }
+  .dash-revamp .stat-card              { padding: 12px 13px; min-height: 100px; }
+  .dash-revamp .stat-top               { margin-bottom: 8px; }
+  .dash-revamp .stat-top-left          { gap: 7px; }
+  .dash-revamp .stat-ic                { width: 28px; height: 28px; border-radius: 8px; }
+  .dash-revamp .stat-ic svg            { width: 15px; height: 15px; }
+  .dash-revamp .stat-label             { font-size: 11.5px; gap: 3px; }
+  .dash-revamp .stat-val               { font-size: 22px; }
+  .dash-revamp .delta                  { font-size: 11px; padding: 2px 6px; }
+  /* secondary "vs …" note — drop on mobile to keep each card short */
+  .dash-revamp .delta-note             { display: none; }
   .dash-revamp .issues-list.cols2      { grid-template-columns: 1fr; }
   .dash-revamp .tp-row                 { grid-template-columns: 26px 1fr auto; }
   .dash-revamp .tp-share               { display: none; }
+}
+
+/* Top performing card head: title ("Top performing") + tp-tabs (Pages/Blogs/Referrers/
+   Products) no longer fit on one row on mobile/tablet — the flex row has no wrap, so tabs
+   overlap/clip the title (and the "Soon" badge on the last tab). Wrap onto title-row +
+   tabs-row. Tabs themselves stay on ONE row (matches the pill-tab pattern elsewhere) and
+   scroll horizontally instead of wrapping.
+   GH-1491 issue 3 / PR #1489 review: originally cut off at 819px (matching the unrelated
+   .dash-table-compact card/table cutoff), which left an 820-1279px gap — iPad Air (820, an
+   explicit AC checkpoint) and other tablet/small-laptop widths had no wrap fallback, and in
+   that same gap .sh-title is 16px (not restored to 15px until ≥1280 below), making the
+   single row tighter than it was pre-PR. Widened to match this file's own mobile+tablet
+   cutoff used one rule up (.cz-handle/.cz-arrows) and at the .sh-title restore just below —
+   guarantees the tabs row always wraps below desktop, so the badge can never get clipped
+   regardless of title size. Desktop (≥1280) unaffected — byte-identical. */
+@media (max-width: 1279px) {
+  .dash-revamp .chart-head             { flex-wrap: wrap; row-gap: 10px; }
+  .dash-revamp .tp-tabs                { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .dash-revamp .tp-tabs::-webkit-scrollbar { display: none; }
+  .dash-revamp .tp-tabs button         { flex-shrink: 0; }
 }

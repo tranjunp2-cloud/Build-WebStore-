@@ -1,11 +1,11 @@
 /**
- * Image keyword derivation — turns (category, blockType, ctx) into Unsplash search keywords.
+ * Image keyword derivation — turns (category, blockType, ctx) into Pixabay search keywords.
  *
  * Pure data + functions module. No I/O, no async. Testable in isolation.
  *
- * Target market: Malaysia (en + ms primary, vi for team QA only).
- * Non-English inputs get translated via VN_TO_EN_FALLBACKS / MS_TO_EN_FALLBACKS tables
- * (Unsplash only supports English search).
+ * GH-1185: when raw user keywords exist (ctx.englishKeywords — historical
+ * name), they are returned VERBATIM in the user's language. The vi/ms→en
+ * dictionaries below only apply on the scaffolding (no-keyword) path.
  */
 
 import { translateProductTerm } from './product-translator'
@@ -190,11 +190,15 @@ function pickRandom<T>(arr: T[]): T | undefined {
 
 /**
  * Derive search keywords for a given (category, blockType, ctx).
- * Returns 1-3 non-empty strings ready for `.join(' ')` into an Unsplash query.
+ * Returns 1-3 non-empty strings ready for `.join(' ')` into a Pixabay query.
  *
- * Plan 260414-2249 phase-01: when `ctx.products[0]` is present, it becomes
- * the PRIMARY term (translated via `translateProductTerm` for vi/ms input).
- * This makes Unsplash searches actually reflect what the user is selling.
+ * GH-1185: Pixabay `q` is AND-matched on tags. When `ctx.englishKeywords` is
+ * present (despite the historical name, it now carries RAW user-language
+ * keywords), the query is those raw terms ONLY — no block modifier, no mood,
+ * no category base. Mixing English scaffolding with raw (possibly Vietnamese)
+ * terms guarantees zero results.
+ * Scaffolding (category base + modifier + mood) only applies on the
+ * no-keyword path, where all terms are English anyway.
  */
 export function deriveKeywords(
     category: string,
@@ -207,32 +211,32 @@ export function deriveKeywords(
     const modifier = pickRandom(modifiers)
     const industryBoost = translateIndustryToEn(ctx.industry, ctx.language)
 
+    // Raw keyword path — return verbatim, undiluted (GH-1185 AND-match rule).
+    if (ctx.englishKeywords && ctx.englishKeywords.length > 0) {
+        return ctx.englishKeywords.filter((k) => k && k.trim().length > 0)
+    }
+
     const keywords: string[] = []
 
-    // Plan 260424: If dynamic LLM keywords exist, prioritize them over hardcoded dictionaries.
-    if (ctx.englishKeywords && ctx.englishKeywords.length > 0) {
-        keywords.push(...ctx.englishKeywords)
-        if (modifier) keywords.push(modifier)
-    } else {
-        // Product-primary path: user's top product → translated term → primary
-        // keyword. Fall back to category base for downstream variety.
-        const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
+    // Product-primary path: user's top product → translated term → primary
+    // keyword. Fall back to category base for downstream variety.
+    const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
 
-        if (topProduct) {
-            const productTerm = translateProductTerm(topProduct)
-            keywords.push(productTerm)
-            if (modifier) keywords.push(modifier)
-            if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
-            else if (base && base !== productTerm) keywords.push(base)
-        } else {
-            keywords.push(base)
-            if (modifier) keywords.push(modifier)
-            if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
-        }
+    if (topProduct) {
+        const productTerm = translateProductTerm(topProduct)
+        keywords.push(productTerm)
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
+        else if (base && base !== productTerm) keywords.push(base)
+    } else {
+        keywords.push(base)
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
     }
 
     // Plan 260414-2249 phase-02: append top 1-2 mood imagery adjectives.
-    // Capped at 5 total terms to keep Unsplash queries specific, not soup.
+    // Capped at 5 total terms to keep Pixabay queries specific, not soup.
+    // Only reached on the scaffolding (no raw keyword) path — all terms EN.
     if (ctx.mood && ctx.mood.imageryKeywords.length > 0) {
         const MAX_TERMS = 5
         const existing = new Set(keywords.map((k) => k.toLowerCase()))

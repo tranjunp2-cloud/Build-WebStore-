@@ -12,6 +12,7 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
+import { buildProductAlt } from '@/lib/products/build-product-alt'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
@@ -25,13 +26,15 @@ interface ProductItem {
     inventory: number
     compareAtPrice?: number
     image: string | null
+    imageAlt?: string
 }
 
-function ProductCard({ product, variant, theme, siteBasePath }: {
+function ProductCard({ product, variant, theme, siteBasePath, siteName }: {
     product: ProductItem
     variant: 'grid-3' | 'grid-4' | 'list'
     theme: ThemeConfig
     siteBasePath: string
+    siteName?: string
 }) {
     // Prefetched soft-nav to the PDP. <Link> prefetches the (force-dynamic) detail
     // route as the card enters the viewport, so the click feels instant instead of
@@ -50,7 +53,7 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                 {product.image ? (
                     <img
                         src={product.image}
-                        alt={product.name}
+                        alt={buildProductAlt(product.imageAlt, product.name, siteName)}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
                         loading="lazy"
                     />
@@ -87,6 +90,10 @@ function ProductCard({ product, variant, theme, siteBasePath }: {
                     }}
                     onClick={(e) => {
                         // Editor preview: block navigation + show toast (handleCartClick preventDefaults).
+                        // Both editor and builder gate PDP nav — product preview routes are not
+                        // rewritten to /preview, so navigating would leak to a live storefront PDP
+                        // that 404s for a draft site. (Builder product nav needs a productPreviewPath
+                        // rewrite first — out of scope for the menu-tab navigation fix.)
                         if (isInEditorPreview()) { handleCartClick(e); return }
                         // No slug → nothing to navigate to.
                         if (!product.slug) e.preventDefault()
@@ -118,7 +125,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
             .then(json => {
                 const docs = json.docs || []
                 const mapped: ProductItem[] = docs.map((doc: Record<string, unknown>) => {
-                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const images = doc.images as Array<{ image?: { url?: string }; alt?: string }> | undefined
                     const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
                     const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
                     const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
@@ -132,6 +139,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                         inventory: Number(doc.inventory) || 0,
                         compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
                         image: images?.[0]?.image?.url ?? null,
+                        imageAlt: images?.[0]?.alt,
                     }
                 })
                 setProducts(mapped)
@@ -206,6 +214,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                             variant={variant}
                             theme={theme}
                             siteBasePath={siteBasePath}
+                            siteName={site?.name ?? undefined}
                         />
                     </StaggerItem>
                 ))}

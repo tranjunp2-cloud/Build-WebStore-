@@ -154,7 +154,7 @@ export function DiscountsClientLayout() {
     return (
         <div className="space-y-5 pb-20">
             {/* Header row: title + action buttons (tabs sit BELOW, matching Email Templates) */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold" style={{ color: 'var(--dash-text)' }}>
                         {d.title}

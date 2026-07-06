@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { planImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { getAvatarMedia, batchFetchFromPool } from '@/lib/ai/media-pipeline'
+
+// GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
+// portrait search — mock the pipeline layer to observe routing.
+vi.mock('@/lib/ai/media-pipeline', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    getAvatarMedia: vi.fn().mockResolvedValue({ mediaIds: [901, 902, 903], photos: [], failures: [] }),
+    batchFetchFromPool: vi.fn().mockResolvedValue({ mediaIds: [1], photos: [], failures: [] }),
+    getMediaForBlock: vi.fn().mockResolvedValue({ mediaIds: [], photos: [], failures: [] }),
+}))
 
 beforeEach(() => {
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    process.env.UNSPLASH_BLOCKS = 'all'
+    process.env.PIXABAY_BLOCKS = 'all'
 })
 
 afterEach(() => {
-    delete process.env.UNSPLASH_BLOCKS
+    delete process.env.PIXABAY_BLOCKS
 })
 
 describe('media-injector [plan-260414-unsplash]', () => {
@@ -107,8 +117,8 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(needs.length).toBe(3)
         })
 
-        it('hero-only default: skips non-hero blocks when UNSPLASH_BLOCKS unset', () => {
-            delete process.env.UNSPLASH_BLOCKS
+        it('hero-only default: skips non-hero blocks when PIXABAY_BLOCKS unset', () => {
+            delete process.env.PIXABAY_BLOCKS
             const blocks = [
                 { blockType: 'hero', headline: 'H' },
                 { blockType: 'about', headline: 'A' },
@@ -260,6 +270,63 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(checked).toBe(0)
             expect(stripped).toBe(0)
             expect(finder.find).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('fulfillImageNeeds — testimonials avatar routing [TC-F38-RAW-13]', () => {
+        it('routes testimonials to getAvatarMedia (people portraits), never the pool', async () => {
+            // Arrange — 3 testimonial items without avatars
+            const blocks = [
+                {
+                    blockType: 'testimonials',
+                    testimonials: [{ quote: 'a', name: 'A' }, { quote: 'b', name: 'B' }, { quote: 'c', name: 'C' }],
+                },
+            ]
+            const needs = planImageNeeds(blocks)
+            const ctx = {
+                businessName: 'Cơm Ba Má',
+                tenantId: '1',
+                category: 'restaurant',
+                language: 'vi' as const,
+                // Pool present — testimonials must STILL bypass it
+                pool: { queryUsed: 'x', landscape: [], square: [{ id: 'p1', url: 'u', alt: 'food' }], underfill: false },
+            }
+
+            // Act
+            await fulfillImageNeeds(needs, ctx as never, {} as never)
+
+            // Assert — avatars come from the portrait search, pool untouched
+            expect(vi.mocked(getAvatarMedia)).toHaveBeenCalledWith(3, 'vi', expect.anything(), expect.anything(), 'testimonials')
+            expect(vi.mocked(batchFetchFromPool)).not.toHaveBeenCalled()
+            const items = blocks[0]!.testimonials as Array<Record<string, unknown>>
+            expect(items.map((i) => i.avatar)).toEqual([901, 902, 903])
+        })
+
+        it('[TC-F38-RAW-14] routes team members to getAvatarMedia too, pool untouched', async () => {
+            // Arrange — 3 team members without images
+            const blocks = [
+                {
+                    blockType: 'team',
+                    members: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
+                },
+            ]
+            const needs = planImageNeeds(blocks)
+            const ctx = {
+                businessName: 'Spa Sen',
+                tenantId: '1',
+                category: 'beauty',
+                language: 'vi' as const,
+                pool: { queryUsed: 'x', landscape: [], square: [{ id: 'p1', url: 'u', alt: 'gel' }], underfill: false },
+            }
+
+            // Act
+            await fulfillImageNeeds(needs, ctx as never, {} as never)
+
+            // Assert
+            expect(vi.mocked(getAvatarMedia)).toHaveBeenCalledWith(3, 'vi', expect.anything(), expect.anything(), 'team')
+            expect(vi.mocked(batchFetchFromPool)).not.toHaveBeenCalled()
+            const members = blocks[0]!.members as Array<Record<string, unknown>>
+            expect(members.map((m) => m.image)).toEqual([901, 902, 903])
         })
     })
 })

@@ -16,6 +16,8 @@ import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
+import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +34,8 @@ import { resolveApiError } from '@/lib/ui/resolve-api-error'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
+import { getMissingFields } from '@/lib/products/missing-fields'
+import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
     url?: string
@@ -94,6 +98,31 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     }
 
     return url
+}
+
+// Publishing gate (GH-1458) — missingFields keys from productPublishBlocks map to the same
+// labels already used by the create/edit form (t.dashboard.products.form.fields.*).
+const PUBLISH_GATE_FIELD_KEYS: Record<string, 'basePrice' | 'baseSku' | 'baseInventory' | 'variants' | 'weight'> = {
+    price: 'basePrice',
+    sku: 'baseSku',
+    inventory: 'baseInventory',
+    variants: 'variants',
+    weight: 'weight',
+}
+
+// Server throws Error(JSON.stringify({ code: 'PUBLISH_BLOCKED', missingFields })) — parse it back
+// out so the client can show the same modal as the (redundant) client-side check.
+function parsePublishBlockedError(e: unknown): string[] | null {
+    if (!(e instanceof Error)) return null
+    try {
+        const parsed = JSON.parse(e.message)
+        if (parsed?.code === 'PUBLISH_BLOCKED' && Array.isArray(parsed.missingFields)) {
+            return parsed.missingFields
+        }
+    } catch {
+        // Not JSON — a normal error message, fall through to generic handling.
+    }
+    return null
 }
 
 export default function ProductsPage() {
@@ -232,16 +261,34 @@ export default function ProductsPage() {
         setShowBulkCreate(true)
     }
 
+    const [publishGateFields, setPublishGateFields] = useState<string[] | null>(null)
+
     const handleUpdateStatus = async (prod: Product | DetailedProduct, e: React.MouseEvent) => {
         e.stopPropagation()
         const newStatus = prod.status === 'active' ? 'archived' : 'active'
+
+        // Soft validation publishing gate (GH-1458) — block Draft/Archived -> Active when core
+        // fields are missing, before any optimistic update or server call.
+        if (newStatus === 'active') {
+            const gate = productPublishBlocks(prod)
+            if (!gate.ok) {
+                setPublishGateFields(gate.missingFields)
+                return
+            }
+        }
+
         // Optimistic update
         setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
         } catch (e: unknown) {
-            toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
+            const blockedFields = parsePublishBlockedError(e)
+            if (blockedFields) {
+                setPublishGateFields(blockedFields)
+            } else {
+                toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
+            }
             setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
         }
     }
@@ -332,7 +379,7 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-col md:flex-row w-full items-stretch md:items-center gap-2">
+                    <div className="flex flex-row items-center gap-2 w-full">
                         {/* Input — shared <Input> nguyên bản design-system (nền card, viền --input-border,
                             focus ring chuẩn), chỉ override cỡ chữ 13px như ô search. */}
                         <Input
@@ -342,7 +389,7 @@ export default function ProductsPage() {
                                 if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                            className="w-full md:flex-1 text-[13px]"
+                            className="flex-1 min-w-0 text-[13px]"
                         />
                         {/* Create — shared dashboard primary button (size="dash") */}
                         <Button
@@ -351,7 +398,7 @@ export default function ProductsPage() {
                             onClick={() => {
                                 if (aiPrompt.trim()) handleCreateAi()
                             }}
-                            className="w-full md:w-auto justify-center"
+                            className="shrink-0 justify-center"
                         >
                             <Plus className="h-4 w-4" />
                             {t.dashboard.products.list.aiChatBtn}
@@ -370,14 +417,14 @@ export default function ProductsPage() {
                             <h1 className="text-[24px] font-bold leading-none text-foreground">{t.dashboard.products.title}</h1>
                             <span className="block text-[14px] leading-none text-foreground/60">{t.dashboard.products.subtitle}</span>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-                            <Button asChild variant="dashSecondary" size="dash" className="w-full sm:w-auto justify-center">
+                        <div className="flex flex-row items-center gap-2 w-full md:w-auto">
+                            <Button asChild variant="dashSecondary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/categories">
                                     <Tag className="w-3.5 h-3.5" />
                                     {t.dashboard.products.list.category}
                                 </Link>
                             </Button>
-                            <Button asChild variant="dashPrimary" size="dash" className="w-full sm:w-auto justify-center">
+                            <Button asChild variant="dashPrimary" size="dash" className="flex-1 md:flex-none basis-1/2 md:basis-auto justify-center">
                                 <Link href="/products/new">
                                     <Image src="/images/figma/add-product.svg" alt="Add" width={16} height={16} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
                                 </Link>
@@ -421,8 +468,8 @@ export default function ProductsPage() {
                     {/* Search & Filter — Mobile (Figma Node 30945:933): 3 stacked rows */}
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
-                        <div className="relative w-full h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
+                        <div className="relative w-full h-9">
+                            <Image src="/images/figma/search-icon.svg" width={16} height={16} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             {/* border ở className (không inline) để focus: variant override được — focus state chuẩn DS (GH-1290 Bug 3) */}
                             <Input
                                 type="text"
@@ -430,40 +477,44 @@ export default function ProductsPage() {
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder={t.dashboard.products.list.search}
                                 style={{ background: 'transparent', color: 'var(--dash-text)' }}
-                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-[48px] pr-4 text-[16px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
+                                className="w-full h-full rounded-[16px] border-[var(--dash-border)] pl-9 pr-4 text-[13px] placeholder:text-[var(--dash-text-muted)] focus-visible:border-[hsl(var(--primary))] focus-visible:[box-shadow:0_0_0_3px_hsl(var(--ring)/0.25)]"
                             />
                         </div>
 
-                        {/* Row 2: Sort — shadcn Select (design system, themed) */}
-                        <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-full h-[50px] rounded-[16px] border-[var(--dash-border)] px-4 text-[16px] font-medium text-[var(--dash-text)] shadow-none">
-                                <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SORT_OPTIONS.map((option) => (
-                                    <SelectItem key={option} value={option}>
-                                        {sortTranslateMap[option]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {/* Row 2: Sort + Filter — merged into one row (GH-1492) */}
+                        <div className="flex flex-row items-center gap-2 w-full">
+                            {/* Sort — shadcn Select (design system, themed) */}
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                                <SelectTrigger className="h-9 flex-1 min-w-0 rounded-[16px] border-[var(--dash-border)] px-4 text-[13px] font-medium text-[var(--dash-text)] shadow-none">
+                                    <SelectValue placeholder={t.dashboard.products.list.sortLabel} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {SORT_OPTIONS.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                            {sortTranslateMap[option]}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                        {/* Row 3: Filter Button — full-width, centered */}
-                        <Button
-                            variant="dashSecondary"
-                            onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
-                            style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
-                            className="w-full h-[50px] rounded-[16px] text-[16px] font-medium"
-                        >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
-                            <span>
-                                {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                    ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
-                                    : ''}
-                            </span>
-                        </Button>
+                            {/* Filter Button */}
+                            <Button
+                                variant="dashSecondary"
+                                size="dash"
+                                onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+                                style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                    ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
+                                    : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
+                                className="shrink-0 rounded-[16px]"
+                            >
+                                <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
+                                <span>
+                                    {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
+                                        ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
+                                        : ''}
+                                </span>
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Search & Filter — Desktop (Figma Node 30882:5844): 3-item row */}
@@ -651,12 +702,15 @@ export default function ProductsPage() {
                     {/* List Products */}
                     <div className="flex flex-col gap-4">
 
-                        {/* --- Desktop Table (GH-1222 DS migration) --- */}
+                        {/* --- Table (iPad Air >=820 and up) — matches orders/blog dash-table-compact
+                            convention: below xl the shared `.dash-table-compact` (globals.css) shrinks
+                            font + padding so the columns fit; no minWidth floor → table-fixed w-full
+                            always fits the pane (no horizontal scroll on iPad Pro with sidebar open).
+                            At >=1280 the compact class is a no-op → desktop byte-identical. --- */}
                         {filteredAndSortedProducts.length > 0 && (
-                            <div className="hidden md:block">
+                            <div className="hidden min-[820px]:block">
                                 <Table
-                                    className="table-fixed w-full"
-                                    minWidth={860}
+                                    className="table-fixed w-full dash-table-compact"
                                     footer={
                                         <TablePagination
                                             page={currentPage}
@@ -697,6 +751,7 @@ export default function ProductsPage() {
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                             const inv = product.inventory || 0
+                                            const missing = getMissingFields(product)
 
                                             return (
                                                 <TableRow
@@ -705,18 +760,21 @@ export default function ProductsPage() {
                                                     onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                                 >
                                                     {/* Thumbnail */}
-                                                    <TableCell>
+                                                    <TableCell style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}>
                                                         <div className="relative h-10 w-10 shrink-0 rounded-[8px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="40px" />
+                                                            <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="sm" sizes="40px" />
                                                         </div>
                                                     </TableCell>
 
                                                     {/* Name + SKU */}
                                                     <TableCell>
                                                         <div className="flex flex-col min-w-0">
-                                                            <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
-                                                                {product.name}
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="truncate font-medium text-[14px]" style={{ color: 'var(--dash-text)' }} title={product.name}>
+                                                                    {product.name}
+                                                                </span>
+                                                                <MissingInfoIndicator missing={missing} t={t} />
+                                                            </div>
                                                             {product.sku && (
                                                                 <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
                                                                     {t.dashboard.products.list.sku} {product.sku}
@@ -782,31 +840,37 @@ export default function ProductsPage() {
                             </div>
                         )}
 
-                        {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
-                        <div className="md:hidden flex flex-col gap-3">
+                        {/* --- Card View (mobile + iPad mini, < 820px) (Figma Node 30945:1017).
+                            1 col on mobile, 2 cols from md; the table takes over from iPad Air (>=820). --- */}
+                        <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
+                                const missing = getMissingFields(product)
 
                                 return (
                                     <div
                                         key={product.id}
                                         onClick={() => setQuickViewProduct(product as DetailedProduct)}
                                         className="flex flex-col gap-[12px] rounded-[16px] border border-white/[0.08] bg-[hsl(var(--secondary))]/70 p-[16px] relative group overflow-hidden"
+                                        style={{ borderLeft: missing.length ? '2px solid hsl(var(--warning))' : undefined }}
                                     >
                                         {/* Section 1: Thumbnail + Name/Category/Variants/SKU */}
                                         <div className="flex items-start gap-[12px]">
                                             {/* Thumbnail 64×64 */}
                                             <div className="relative h-[64px] w-[64px] shrink-0 rounded-[12px] bg-[hsl(var(--background))] border border-white/[0.08] overflow-hidden">
-                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="md" sizes="64px" />
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.images?.[0]?.alt || product.name} size="md" sizes="64px" />
                                             </div>
 
                                             {/* Text Information Block */}
                                             <div className="flex flex-col flex-1 min-w-0 pt-[2px] gap-[2px]">
-                                                <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
-                                                    {product.name}
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <div className="text-[14px] font-semibold text-foreground leading-[18px] truncate pb-[1px]">
+                                                        {product.name}
+                                                    </div>
+                                                    <MissingInfoIndicator missing={missing} t={t} />
                                                 </div>
                                                 {product.category && product.category.length > 0 && (
                                                     <div className="text-[12px] text-[hsl(var(--primary))] font-medium leading-[16px] truncate">
@@ -824,21 +888,20 @@ export default function ProductsPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Price column (right) — level with the name; keeps name/category tight in the middle column */}
+                                            <div className="flex flex-col items-end shrink-0 pt-[2px]">
+                                                <span className="text-[11px] font-medium text-foreground/50 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
+                                                <span className="text-[16px] font-bold text-foreground leading-[20px] whitespace-nowrap">{priceDisplay}</span>
+                                            </div>
                                         </div>
 
-                                        {/* Section 2: Price + Stock/Status */}
-                                        <div className="flex items-end justify-between">
-                                            {/* Price (Left Aligned) */}
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colPrice.split(' ')[0]}</span>
-                                                <span className="text-[18px] font-bold text-foreground leading-[22px]">{priceDisplay}</span>
-                                            </div>
-
-                                            {/* Stock + Status Toggle (Right Aligned) */}
-                                            <div className="flex items-end gap-3">
-                                                <div className="flex flex-col items-end gap-0.5">
-                                                    <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                    {inv === 0 ? (
+                                        {/* Section 2: Stock (left) + Status toggle (right) — price moved up next to name */}
+                                        <div className="flex items-center justify-between gap-3">
+                                            {/* Stock (Left) */}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
+                                                {inv === 0 ? (
                                                         <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
                                                             <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
                                                         </div>
@@ -857,7 +920,7 @@ export default function ProductsPage() {
                                                 {/* Status Toggle - Compacted */}
                                                 <div
                                                     onClick={(e) => handleUpdateStatus(product, e)}
-                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
+                                                    className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden"
                                                     style={{
                                                         border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg,#3b82f6 0%,#2dd4bf 100%)" : "var(--dash-secondary-bg)",
@@ -869,7 +932,6 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "translate-x-[20px]" : "translate-x-0"
                                                     )} />
                                                 </div>
-                                            </div>
                                         </div>
 
                                         {/* Section 3: Action Row */}
@@ -884,14 +946,15 @@ export default function ProductsPage() {
                                                 {t.dashboard.products.list.edit}
                                             </Link>
 
-                                            {/* Delete Button */}
-                                            <Button
-                                                variant="ghost"
+                                            {/* Delete Button — plain <button> mirroring the Edit <Link> classes so both are exactly equal size */}
+                                            <button
+                                                type="button"
                                                 onClick={e => handleDelete(product, e)}
-                                                className="w-[44px] h-[44px] rounded-[12px] text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))] p-0"
+                                                className="flex-1 flex items-center justify-center gap-2 h-[44px] rounded-[12px] text-[15px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-destructive/20 hover:bg-[hsl(var(--destructive))]/20 active:scale-[0.98] transition-all cursor-pointer"
                                             >
                                                 <Trash2 className="w-[18px] h-[18px]" strokeWidth={2} />
-                                            </Button>
+                                                {t.dashboard.products.list.delete}
+                                            </button>
                                         </div>
                                     </div>
                                 )
@@ -906,9 +969,10 @@ export default function ProductsPage() {
                             />
                         )}
 
-                        {/* Mobile Pagination */}
+                        {/* Card-view Pagination (< 820px) — pairs with the card list; the table's own
+                            pager lives in its footer slot from iPad Air up. */}
                         {totalPages > 1 && (
-                            <div className="md:hidden py-4">
+                            <div className="min-[820px]:hidden py-4">
                                 <TablePagination
                                     page={currentPage}
                                     total={filteredAndSortedProducts.length}
@@ -936,23 +1000,40 @@ export default function ProductsPage() {
 
             {quickViewProduct && (
                 <>
-                    <div className="hidden md:block">
+                    {/* Desktop 2-col QuickView only from xl (needs ~1024px; overflows on iPad).
+                        Tablet + iPad Pro (≤1279) use the fullscreen mobile detail → fits, no overflow. */}
+                    <div className="hidden xl:block">
                         <ProductQuickViewModal
                             isOpen={!!quickViewProduct}
                             onClose={() => setQuickViewProduct(null)}
                             product={quickViewProduct}
-                            onDelete={handleDelete}
+                            // Close this z-[9999] modal first, then open the confirm popup — otherwise
+                            // the ConfirmModal (z-50) renders BEHIND this overlay and is invisible.
+                            onDelete={(prod) => { setQuickViewProduct(null); handleDelete(prod) }}
                         />
                     </div>
                     {mounted && typeof document !== 'undefined' && createPortal(
-                        <div className="block md:hidden fixed inset-0 z-[9999] bg-[hsl(var(--background))] overflow-y-auto w-full h-full">
-                            <ProductDetailsMobile
-                                product={quickViewProduct}
-                                onClose={() => setQuickViewProduct(null)}
-                                onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
-                                onDelete={() => handleDelete(quickViewProduct)}
+                        <>
+                            {/* Backdrop — dim + blur, tap to close. Mirrors the order detail panel. */}
+                            <div
+                                className="xl:hidden fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+                                onClick={() => setQuickViewProduct(null)}
                             />
-                        </div>,
+                            {/* Product detail panel (< xl / iPad + mobile) — slides in from the right
+                                exactly like the order panel: full-width on phones, 488px side panel from
+                                md up so the list stays visible (dimmed) behind it. */}
+                            <div
+                                className="xl:hidden fixed right-0 top-0 z-[9999] h-[100dvh] w-full md:w-[488px] overflow-y-auto shadow-2xl animate-in slide-in-from-right duration-300"
+                                style={{ background: 'hsl(var(--background))', borderLeft: '1px solid var(--dash-border)' }}
+                            >
+                                <ProductDetailsMobile
+                                    product={quickViewProduct}
+                                    onClose={() => setQuickViewProduct(null)}
+                                    onEdit={() => router.push(`/products/${quickViewProduct.id}`)}
+                                    onDelete={() => { setQuickViewProduct(null); handleDelete(quickViewProduct) }}
+                                />
+                            </div>
+                        </>,
                         document.body
                     )}
                 </>
@@ -964,6 +1045,32 @@ export default function ProductsPage() {
                 onConfirm={confirmDelete}
                 productName={productToDelete?.name || ''}
                 isDeleting={isDeletingProduct}
+            />
+
+            {/* Publishing gate (GH-1458) — alert-style: single acknowledge button, no destructive
+                action to confirm/cancel between. See ConfirmModal's `hideCancel` prop. */}
+            <ConfirmModal
+                open={!!publishGateFields}
+                onConfirm={() => setPublishGateFields(null)}
+                onCancel={() => setPublishGateFields(null)}
+                title={t.dashboard.products.form.publishGateTitle}
+                description={publishGateFields && (
+                    <span className="flex flex-col gap-2 text-left">
+                        <span>{t.dashboard.products.form.checkFields}</span>
+                        <ul className="list-disc pl-5">
+                            {publishGateFields.map(field => (
+                                <li key={field}>
+                                    {PUBLISH_GATE_FIELD_KEYS[field]
+                                        ? t.dashboard.products.form.fields[PUBLISH_GATE_FIELD_KEYS[field]]
+                                        : field}
+                                </li>
+                            ))}
+                        </ul>
+                    </span>
+                )}
+                confirmLabel={t.dashboard.products.form.publishGateAck}
+                hideCancel
+                variant="default"
             />
         </div>
     )

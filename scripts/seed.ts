@@ -158,11 +158,11 @@ async function seed() {
   }
 
   const productList = [
-    { name: 'Baju Kurung Pink', price: 189, inventory: 50, slug: 'baju-kurung-pink', category: [bajuKurungCat?.id ?? defaultCatId] },
-    { name: 'Tudung Bawal Basic', price: 35, inventory: 100, slug: 'tudung-bawal-basic', category: [tudungCat?.id ?? defaultCatId] },
-    { name: 'Telekung Premium', price: 250, inventory: 30, slug: 'telekung-premium', category: [bajuKurungCat?.id ?? defaultCatId] },
-    { name: 'Beg Tangan Kulit', price: 120, inventory: 40, slug: 'beg-tangan-kulit', category: [bajuKurungCat?.id ?? defaultCatId] },
-    { name: 'Kasut Perempuan', price: 89, inventory: 60, slug: 'kasut-perempuan', category: [sneakerCat?.id ?? defaultCatId] },
+    { name: 'Baju Kurung Pink', price: 189, inventory: 50, slug: 'baju-kurung-pink', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-001' },
+    { name: 'Tudung Bawal Basic', price: 35, inventory: 100, slug: 'tudung-bawal-basic', category: [tudungCat?.id ?? defaultCatId], sku: 'DEMO-002' },
+    { name: 'Telekung Premium', price: 250, inventory: 30, slug: 'telekung-premium', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-003' },
+    { name: 'Beg Tangan Kulit', price: 120, inventory: 40, slug: 'beg-tangan-kulit', category: [bajuKurungCat?.id ?? defaultCatId], sku: 'DEMO-004' },
+    { name: 'Kasut Perempuan', price: 89, inventory: 60, slug: 'kasut-perempuan', category: [sneakerCat?.id ?? defaultCatId], sku: 'DEMO-005' },
   ]
 
   const existingProducts = await payload.find({
@@ -185,6 +185,11 @@ async function seed() {
           tenant: tenant.id as number,
           status: 'active',
           currency: 'MYR',
+          sku: p.sku,
+          // Publishing gate (GH-1458) requires weight > 0 for status:'active' — the collection's
+          // own defaultValue:0 is treated as missing. Seed data has no per-product weight, so a
+          // flat placeholder is used (dev/demo data only).
+          weight: 500,
         },
       })
       createdProducts.push(product)

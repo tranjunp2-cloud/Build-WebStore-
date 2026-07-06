@@ -86,3 +86,32 @@
 | **TC-1251-SYNC-UBU-04** | User not found | 404 |
 | **TC-1251-SYNC-UBU-05** | User has 0 tenants | 200 `{tenantsUpdated: 0}`, no crash |
 | **TC-1251-SYNC-UBU-06** | Restores all tenants to active | 200 `{tenantsUpdated: N}`, each tenant set to `status: active` |
+
+---
+
+## SSO Step-Sync Notify + Retry Cron — Unit Test Cases (TC-1293-SYNC-*)
+
+> **Added:** 2026-07-02 | **Issue:** #1293 | **Coverage gap closed by:** `fix/GH-1293-sso-step-sync-timeout`
+> **Automated in:** `src/__tests__/unit/lib/sso-api-client.test.ts`, `src/__tests__/api/process-sso-steps-cron.test.ts`
+
+### sso-api-client.ts (`sendSSOStepNotification`, `notifyStepComplete`, `persistStepEvent`)
+
+| ID | Title | Expected |
+|:---|:---|:---|
+| **TC-1293-SYNC-01** | `fetchWithTimeout` aborts at `SSO_FETCH_TIMEOUT_MS` (30s) — not sooner, not later | Still pending at 29,999ms; rejects with `AbortError` at 30,000ms |
+| **TC-1293-SYNC-02** | Login failure never includes the response body (request carries the real plaintext password) | Error message contains status only, never body text; `res.text()` not even called |
+| **TC-1293-SYNC-03** | step-status PATCH failure includes status and response body, with our own bearer token redacted | Error message contains status + body text (safe — no password in this request), but never the raw token even if Hub's error response echoes it back |
+| **TC-1293-SYNC-04** | `notifyStepComplete` never throws; persists a `pending` row with the error text on failure | Resolves `undefined`; `sso_step_events` upsert has `status='pending'` + error text |
+| **TC-1293-SYNC-05** | `notifyStepComplete` skips the SSO call when the step is already `completed` | No `fetch` call made |
+| **TC-1293-SYNC-06** | A failing body read on an error response still throws a status-bearing error | No unhandled rejection; error message contains status |
+| **TC-1293-SYNC-07** | `persistStepEvent` upserts via `ON CONFLICT (user_id, step)` on every attempt, never a plain insert | Two sequential calls for the same `(userId, step)` both produce an `ON CONFLICT` upsert |
+| **TC-1293-SYNC-08** | Upsert resets `retry_count` to 0 on both the insert default and the conflict-update path | SQL contains `retry_count = 0` (DO UPDATE) and `, 0) ON CONFLICT` (VALUES default) |
+
+### process-sso-steps/route.ts (retry cron finalize guard)
+
+| ID | Title | Expected |
+|:---|:---|:---|
+| **TC-1293-SYNC-09** | Finalize on success updates the row and counts it `succeeded` when the guard genuinely matches | Row transitions to `completed`; response `succeeded=1`, `raced=0` |
+| **TC-1293-SYNC-10** | Finalize on failure updates the row and counts it `failed` when the guard genuinely matches | Row transitions to `pending`; response `failed=1`, `raced=0` |
+| **TC-1293-SYNC-11** | Concurrent completion (row already off `processing`) makes the success finalize no-op | Row untouched; response `succeeded=0`, `raced=1` — not miscounted as a success |
+| **TC-1293-SYNC-12** | Concurrent update (row already off `processing`) makes the failure finalize no-op | Row untouched; response `failed=0`, `raced=1` — not miscounted as a failure |

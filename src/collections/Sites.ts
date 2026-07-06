@@ -1,5 +1,9 @@
 import type { CollectionConfig } from 'payload'
 import { revalidateSiteAfterChange, revalidateSiteAfterDelete } from '../lib/cache/revalidate-storefront'
+import { THEME_ENUMS } from '../lib/theme/enums'
+
+const HEADING_FONT_OPTIONS = THEME_ENUMS.fontHeading.map(font => ({ label: font, value: font }))
+const BODY_FONT_OPTIONS = THEME_ENUMS.fontBody.map(font => ({ label: font, value: font }))
 
 export const Sites: CollectionConfig = {
     slug: 'sites',
@@ -163,26 +167,13 @@ export const Sites: CollectionConfig = {
                     name: 'fontHeading',
                     type: 'select',
                     defaultValue: 'Outfit',
-                    options: [
-                        { label: 'Outfit', value: 'Outfit' },
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'Playfair Display', value: 'Playfair Display' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Poppins', value: 'Poppins' },
-                        { label: 'Raleway', value: 'Raleway' },
-                    ],
+                    options: HEADING_FONT_OPTIONS,
                 },
                 {
                     name: 'fontBody',
                     type: 'select',
                     defaultValue: 'Inter',
-                    options: [
-                        { label: 'Inter', value: 'Inter' },
-                        { label: 'DM Sans', value: 'DM Sans' },
-                        { label: 'Lato', value: 'Lato' },
-                        { label: 'Open Sans', value: 'Open Sans' },
-                        { label: 'Nunito', value: 'Nunito' },
-                    ],
+                    options: BODY_FONT_OPTIONS,
                 },
                 {
                     name: 'borderRadius',

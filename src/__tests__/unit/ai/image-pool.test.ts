@@ -20,17 +20,19 @@ import {
   type ImagePool,
   type PoolPhoto,
   type BuildPoolCtx,
+  buildPoolQuery,
 } from '@/lib/ai/image-pool'
+import { deriveKeywords } from '@/lib/ai/image-keywords'
 import { THEME_MOODS } from '@/lib/ai/theme-moods'
-import type { UnsplashPhoto } from '@/lib/ai/unsplash-client'
+import type { PixabayPhoto } from '@/lib/ai/pixabay-client'
 
-// ── Mock Unsplash client ────────────────────────────────────────────────────
+// ── Mock Pixabay client ─────────────────────────────────────────────────────
 
-const mockSearchPhotos = vi.fn<(...args: unknown[]) => Promise<UnsplashPhoto[]>>()
+const mockSearchPhotos = vi.fn<(...args: unknown[]) => Promise<PixabayPhoto[]>>()
 
-vi.mock('@/lib/ai/unsplash-client', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/ai/unsplash-client')>(
-    '@/lib/ai/unsplash-client',
+vi.mock('@/lib/ai/pixabay-client', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/ai/pixabay-client')>(
+    '@/lib/ai/pixabay-client',
   )
   return {
     ...actual,
@@ -38,28 +40,14 @@ vi.mock('@/lib/ai/unsplash-client', async () => {
   }
 })
 
-function fakePhoto(id: string, w: number, h: number): UnsplashPhoto {
+function fakePhoto(id: string, w: number, h: number): PixabayPhoto {
   return {
     id,
-    alt_description: `alt ${id}`,
-    description: null,
-    urls: {
-      raw: `https://unsplash.com/${id}/raw`,
-      full: `https://unsplash.com/${id}/full`,
-      regular: `https://unsplash.com/${id}/regular`,
-      small: `https://unsplash.com/${id}/small`,
-      thumb: `https://unsplash.com/${id}/thumb`,
-    },
-    links: {
-      self: '',
-      html: '',
-      download: '',
-      download_location: `https://unsplash.com/track/${id}`,
-    },
-    user: { id: 'u1', username: 'photographer', name: 'Alice Photographer' },
+    url: `https://pixabay.com/get/${id}_1280.jpg`,
+    alt: `alt ${id}`,
+    photographer: 'Alice Photographer',
     width: w,
     height: h,
-    color: null,
   }
 }
 
@@ -117,7 +105,6 @@ describe('TC-F01-W.13 — image pool shape', () => {
     expect(photo.width).toBeGreaterThan(0)
     expect(photo.height).toBeGreaterThan(0)
     expect(photo.photographer).toBeDefined()
-    expect(photo.downloadLocation).toContain('https://')
     expect(photo.role).toBe('gallery')
     expect(['16:9', '4:3', '1:1', '3:4']).toContain(photo.aspectRatio)
   })
@@ -145,17 +132,19 @@ describe('TC-F01-W.13 — image pool shape', () => {
 // ── TC-F01-W.14: buildImagePool + mood query ────────────────────────────────
 
 describe('TC-F01-W.14 — buildImagePool query construction', () => {
-  it('query contains top product + mood imagery adjectives', async () => {
+  it('query contains top product only (no mood adjectives with raw keywords)', async () => {
     mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
 
     const pool = await buildImagePool(
       baseCtx({ topProduct: 'ramen', mood: THEME_MOODS.elegant }),
     )
 
-    expect(pool.queryUsed).toContain('ramen')
-    // elegant imagery: refined, candlelit, marble, soft natural light, timeless
+    // GH-1185: raw keyword present → query = raw terms ONLY (no EN mood adjectives)
+    // to prevent AND-match failure on Pixabay (mixed user-language + EN = 0 results).
+    expect(pool.queryUsed).toBe('ramen')
     const q = pool.queryUsed.toLowerCase()
-    expect(/refined|candlelit|marble|timeless|soft natural/.test(q)).toBe(true)
+    // No mood adjectives should be present
+    expect(/refined|candlelit|marble|timeless|soft natural/.test(q)).toBe(false)
   })
 
   it('query uses category when no product + no mood', async () => {
@@ -189,9 +178,9 @@ describe('TC-F01-W.14 — buildImagePool query construction', () => {
     expect(matches.length).toBe(1)
   })
 
-  it('query uses LLM-translated product terms directly (GH-1185)', async () => {
-    // LLM should return visual concepts, not acronyms.
-    // e.g. translateToEnglishKeywords({industry:"SaaS CRM"}) → ["software team", "business dashboard"]
+  it('query uses supplied product terms directly (GH-1185)', async () => {
+    // Products arrive RAW from parseProductsString (no translation) and must
+    // reach the query verbatim, without the category injected alongside.
     mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
     const pool = await buildImagePool({
       category: 'tech',
@@ -314,7 +303,7 @@ describe('TC-F01-W.16 — underfill backoff', () => {
     expect(pool.square).toEqual([])
   })
 
-  it('relaxed query drops mood adjectives', async () => {
+  it('relaxed query broadens from product to category (raw keyword fallback)', async () => {
     mockSearchPhotos
       .mockResolvedValueOnce([fakePhoto('L0', 1920, 1080)]) // underfill initial
       .mockResolvedValueOnce([fakePhoto('RL1', 1920, 1080)]) // relaxed retry
@@ -324,9 +313,10 @@ describe('TC-F01-W.16 — underfill backoff', () => {
 
     const initialQuery = mockSearchPhotos.mock.calls[0]![0] as string
     const relaxedQuery = mockSearchPhotos.mock.calls[1]![0] as string
-    // Initial has mood adj, relaxed doesn't
-    expect(relaxedQuery).toContain('ramen')
-    expect(relaxedQuery.length).toBeLessThan(initialQuery.length + 1)
+    // Initial: raw product only = "ramen"
+    // Relaxed with ≤1 term: falls back to category = "restaurant" (different query for retry)
+    expect(initialQuery).toBe('ramen')
+    expect(relaxedQuery).toBe('restaurant')
   })
 
   it('no retry when initial query already has sufficient results', async () => {
@@ -365,8 +355,8 @@ describe('TC-F01-W.16 — underfill backoff', () => {
 describe('image-pool helpers', () => {
   const basePool: ImagePool = {
     landscape: [
-      { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' },
-      { id: 'b', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' },
+      { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' },
+      { id: 'b', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' },
     ],
     square: [],
     portrait: [],
@@ -377,8 +367,8 @@ describe('image-pool helpers', () => {
   it('mergePool dedupes by id', () => {
     const merged = mergePool(basePool, {
       landscape: [
-        { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' }, // duplicate
-        { id: 'c', url: '', alt: '', width: 1920, height: 1080, photographer: '', downloadLocation: '', role: 'gallery', aspectRatio: '16:9' }, // new
+        { id: 'a', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' }, // duplicate
+        { id: 'c', url: '', alt: '', width: 1920, height: 1080, photographer: '', role: 'gallery', aspectRatio: '16:9' }, // new
       ],
     })
     expect(merged.landscape.map((p) => p.id)).toEqual(['a', 'b', 'c'])
@@ -394,7 +384,7 @@ describe('image-pool helpers', () => {
     const withSquare: ImagePool = {
       ...basePool,
       square: [
-        { id: 's1', url: '', alt: '', width: 1000, height: 1000, photographer: '', downloadLocation: '', role: 'team', aspectRatio: '1:1' },
+        { id: 's1', url: '', alt: '', width: 1000, height: 1000, photographer: '', role: 'team', aspectRatio: '1:1' },
       ],
     }
     expect(poolSize(withSquare)).toBe(3)
@@ -422,5 +412,102 @@ describe('TC-F01-W.17 — integration cohesion spy', () => {
     const b = await buildImagePool(baseCtx({ seed: 42 }))
 
     expect(a.queryUsed).toBe(b.queryUsed)
+  })
+})
+
+// ── TC-F38-RAW: Raw keyword regression tests (GH-1185) ──────────────────────
+
+describe('TC-F38-RAW — raw keyword path (Pixabay + VN keywords)', () => {
+  // TC-F38-RAW-01: raw products → q contains raw terms only, no EN adjective/category
+  it('[TC-F38-RAW-01] buildPoolQuery with raw VN products returns raw terms only', () => {
+    const q = buildPoolQuery({
+      category: 'restaurant',
+      mood: THEME_MOODS.elegant,
+      products: ['phở bò', 'gỏi cuốn'],
+      seed: 1,
+    })
+    expect(q).toBe('phở bò gỏi cuốn')
+    // No English adjectives or category name
+    expect(/refined|candlelit|marble|elegant|restaurant/.test(q)).toBe(false)
+  })
+
+  // TC-F38-RAW-02: no products → scaffolding path with category
+  it('[TC-F38-RAW-02] buildPoolQuery without products uses category (scaffolding)', () => {
+    const q = buildPoolQuery({
+      category: 'restaurant',
+      mood: THEME_MOODS.elegant,
+      seed: 1,
+    })
+    expect(q).toContain('restaurant')
+    // Scaffolding includes mood adjective
+    expect(/refined|candlelit|marble|timeless|soft natural/.test(q)).toBe(true)
+  })
+
+  // TC-F38-RAW-03: relaxed with 2+ products → broadens to products[0] only
+  it('[TC-F38-RAW-03] buildPoolQuery relaxed with multiple products uses first only', () => {
+    const initialQ = buildPoolQuery({
+      category: 'restaurant',
+      mood: THEME_MOODS.elegant,
+      products: ['phở bò', 'gỏi cuốn'],
+      seed: 1,
+    }, false)
+
+    const relaxedQ = buildPoolQuery({
+      category: 'restaurant',
+      mood: THEME_MOODS.elegant,
+      products: ['phở bò', 'gỏi cuốn'],
+      seed: 1,
+    }, true)
+
+    expect(initialQ).toBe('phở bò gỏi cuốn')
+    expect(relaxedQ).toBe('phở bò')
+    expect(relaxedQ.length).toBeLessThan(initialQ.length)
+  })
+
+  // TC-F38-RAW-04: englishKeywords (raw path) returns raw only, no modifier/mood
+  it('[TC-F38-RAW-04] deriveKeywords with raw englishKeywords returns verbatim', () => {
+    const keywords = deriveKeywords('restaurant', 'hero', {
+      englishKeywords: ['phở bò'],
+      mood: THEME_MOODS.elegant,
+    })
+    // GH-1185: raw keyword → return verbatim, no mood/modifier/base appended
+    expect(keywords).toEqual(['phở bò'])
+    expect(keywords.length).toBe(1)
+  })
+
+  // TC-F38-RAW-05: no raw keywords → scaffolding with category + modifier
+  it('[TC-F38-RAW-05] deriveKeywords without raw keywords uses scaffolding', () => {
+    const keywords = deriveKeywords('restaurant', 'team', {
+      mood: THEME_MOODS.elegant,
+    })
+    // Scaffolding path: category base + modifier + mood
+    expect(keywords.length).toBeGreaterThan(1)
+    // Should include mood imagery adjectives
+    const q = keywords.join(' ').toLowerCase()
+    expect(/refined|candlelit|marble|timeless|soft natural/.test(q)).toBe(true)
+  })
+
+  // TC-F38-RAW-06: raw VN keyword reaches searchPhotos verbatim.
+  // URL-level behavior (lang=vi auto-detect for VN queries, no lang for
+  // EN/MS) is asserted at the client level in pixabay-client.test.ts —
+  // searchPhotos is mocked here so the URL is not observable.
+  it('[TC-F38-RAW-06] searchPhotos receives raw VN q verbatim', async () => {
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture).mockResolvedValueOnce(squareFixture)
+
+    await buildImagePool({
+      category: 'restaurant',
+      mood: THEME_MOODS.elegant,
+      products: ['phở bò'],
+      seed: 1,
+    })
+
+    // First call is landscape search with raw q
+    // (searchPhotos signature: (query, count, opts))
+    const firstCall = mockSearchPhotos.mock.calls[0]!
+    const query = firstCall[0] as string
+    const opts = firstCall[2] as Record<string, unknown>
+
+    expect(query).toBe('phở bò')
+    expect(opts.orientation).toBe('landscape')
   })
 })

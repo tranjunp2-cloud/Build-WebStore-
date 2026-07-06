@@ -31,6 +31,126 @@ describe('Products Collection Hooks (TC-F08)', () => {
         })
     })
 
+    // ── TC-09.47: publishGateHook (code-review fix, PR #1500) ──────────────────
+    // Adversarial review found the two Server Action gates (saveProductAction,
+    // updateProductFieldAction) only fire when the incoming payload explicitly sets
+    // `status:'active'` — editing an already-active product without touching `status` (exactly
+    // what the edit form does on every save) skipped both, and Payload's default REST/GraphQL API
+    // bypassed them outright. This collection-level beforeChange hook is the single source of
+    // truth: it fires on every write path, keyed on the RESULTING status, not just the payload.
+    describe('publishGateHook (TC-09.47)', () => {
+        const hook = Products.hooks!.beforeChange![1] as CollectionBeforeChangeHook
+
+        it('[TC-09.47] create with status:active and missing core fields → throws PUBLISH_BLOCKED', async () => {
+            await expect(hook({
+                data: { name: 'X', status: 'active' },
+                operation: 'create',
+            } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+
+        it('[TC-09.47] create with status:active and all core fields present → does not throw', async () => {
+            const data = { name: 'X', status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 500 }
+            await expect(hook({ data, operation: 'create' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.47] create with status omitted (draft default) → does not throw regardless of missing fields', async () => {
+            await expect(hook({ data: { name: 'X' }, operation: 'create' } as any)).resolves.toBeDefined()
+        })
+
+        it('[TC-09.47] edit an existing ACTIVE product, status omitted, clearing sku/inventory/weight → throws PUBLISH_BLOCKED (closes the gap)', async () => {
+            const originalDoc = { id: 1, status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 500 }
+            await expect(hook({
+                data: { sku: '', inventory: null, weight: 0 },
+                originalDoc,
+                operation: 'update',
+            } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+
+        it('[TC-09.47] edit an existing ACTIVE product touching only an unrelated field (description) → does not throw', async () => {
+            // Regression guard: an active product missing core fields pre-dating this gate must
+            // still be editable for unrelated content — the gate should not retroactively block
+            // every write to a legacy-incomplete active product.
+            const originalDoc = { id: 1, status: 'active', price: null, sku: '', inventory: null, weight: 0 }
+            const data = { description: 'Updated copy' }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.52] Payload /admin panel full-document save (all fields re-sent unchanged) on a legacy-incomplete ACTIVE product, only description edited → does not throw (independent review fix)', async () => {
+            // Payload's own admin panel submits the FULL document on every save, not a partial
+            // diff — unlike the two Server Actions. A key-presence trigger (the original design)
+            // would re-fire this gate on EVERY /admin save of a legacy-incomplete active product,
+            // even when the human only edited `description`, since price/sku/inventory/weight are
+            // always present in the full-document payload. Trigger must be value-CHANGED, not
+            // value-PRESENT, against originalDoc.
+            const originalDoc = {
+                id: 1, status: 'active', price: null, sku: '', inventory: null, weight: 0,
+                hasVariants: false, description: 'Old copy',
+            }
+            const data = {
+                status: 'active', price: null, sku: '', inventory: null, weight: 0,
+                hasVariants: false, description: 'Updated copy via /admin',
+            }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.52] Payload /admin panel full-document save that DOES change a gate field (weight cleared) on an ACTIVE product → throws PUBLISH_BLOCKED', async () => {
+            const originalDoc = { id: 1, status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 500, hasVariants: false }
+            const data = { status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 0, hasVariants: false }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+
+        it('[TC-09.47] soft-delete (deletedAt only) on a legacy-incomplete ACTIVE product → does not throw', async () => {
+            // updateProductFieldAction always re-passes existing.variants/variantConfigs stripped of
+            // their auto-managed `id` (Payload 3.79 workaround) even on a deletedAt-only call — the
+            // hook must recognize the id-stripped content as UNCHANGED and not treat it as "variants
+            // touched", or every soft-delete of a legacy-incomplete active variant product would break.
+            const originalDoc = {
+                id: 1, status: 'active', price: null, sku: '', inventory: null, weight: 0,
+                variants: [{ id: 'row-1', sku: '', price: null, stock: null }],
+            }
+            const data = {
+                deletedAt: '2026-07-03T00:00:00.000Z',
+                variants: [{ sku: '', price: null, stock: null }], // id stripped, content identical
+                variantConfigs: [],
+            }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.47] direct saveProductAction-style call sends only a broken `variants` array on an ACTIVE product (no status/hasVariants key) → throws PUBLISH_BLOCKED (closes a bypass introduced by excluding variants from the trigger set)', async () => {
+            const originalDoc = {
+                id: 1, status: 'active', hasVariants: true, sku: 'BASE-SKU', weight: 500,
+                variants: [{ id: 'row-1', sku: 'V-1', price: 100, stock: 5 }],
+            }
+            const data = { variants: [{ sku: '', price: null, stock: null }] }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+
+        it('[TC-09.51] soft-delete on a legacy row where originalDoc.variants is null (not []), non-variant product → does not throw (adversarial review fix)', async () => {
+            // updateProductFieldAction always calls stripIds(existing.variants), and stripIds(null)
+            // === []. If normalizeVariantsForCompare treated non-array as a passthrough instead of
+            // coercing to [] (like stripIds does), "[]" !== "null" would spuriously report
+            // variantsChanged=true and re-fire the gate on this untouched soft-delete.
+            const originalDoc = { id: 1, status: 'active', price: 100, sku: 'SKU-1', inventory: 5, weight: 500, variants: null }
+            const data = { deletedAt: '2026-07-03T00:00:00.000Z', variants: [], variantConfigs: [] }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.47] edit a DRAFT product clearing core fields → does not throw (gate only applies to active)', async () => {
+            const originalDoc = { id: 1, status: 'draft', price: 100, sku: 'SKU-1', inventory: 5, weight: 500 }
+            const data = { sku: '' }
+            await expect(hook({ data, originalDoc, operation: 'update' } as any)).resolves.toEqual(data)
+        })
+
+        it('[TC-09.47] toggle Draft → Active via updateProductFieldAction shape, existing doc missing weight → throws PUBLISH_BLOCKED', async () => {
+            const originalDoc = { id: 1, status: 'draft', price: 100, sku: 'SKU-1', inventory: 5, variants: [], variantConfigs: [] }
+            await expect(hook({
+                data: { status: 'active', variants: [], variantConfigs: [] },
+                originalDoc,
+                operation: 'update',
+            } as any)).rejects.toThrow(/PUBLISH_BLOCKED/)
+        })
+    })
+
     describe('Schema Validations (TC-F08-01)', () => {
         it('TC-F08-01-07: Default status for brand new products is draft', () => {
             const statusField = Products.fields.find((f: any) => f.name === 'status') as any

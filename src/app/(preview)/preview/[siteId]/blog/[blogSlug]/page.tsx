@@ -16,17 +16,21 @@ import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import { isNavBlock, isFooterBlock } from '@/lib/ai/ensure-navigation'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
+import { createPreviewUrlRewriter, rewriteNavLinkUrls } from '@/lib/navigation-url'
+import type { NavPageLike } from '@/lib/navigation-url'
 
 export const dynamic = 'force-dynamic'
 
 type Props = {
     params: Promise<{ siteId: string; blogSlug: string }>
+    searchParams: Promise<{ builder?: string; editor?: string }>
 }
 
 type PreviewBlock = Record<string, unknown> & { blockType: string; __editorBlockIndex?: number }
 
-export default async function PreviewBlogDetailPage({ params }: Props) {
+export default async function PreviewBlogDetailPage({ params, searchParams }: Props) {
     const { siteId, blogSlug } = await params
+    const { builder } = await searchParams
 
     // 1. Auth (P0 — matches main preview page)
     const user = await getCurrentUser() as PlatformUser | null
@@ -116,6 +120,52 @@ export default async function PreviewBlogDetailPage({ params }: Props) {
             blockType: 'footer', __editorBlockIndex: -1, variant: 'simple', logoText: siteName,
             description: `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`, columns: [],
         }
+    }
+
+    // Rewrite nav/footer link URLs into preview scope. Unlike the main preview page,
+    // this route renders nav/footer WITHOUT SiteRenderer, so raw slugs like `/` would
+    // navigate the iframe out to the platform root (#1443). Fetch the site's pages and
+    // reuse the same slug→pageId rewriter SiteRenderer uses so every internal nav link
+    // resolves to `/preview/{siteId}?pageId=…` and stays inside the preview iframe.
+    const navPagesResult = await payload.find({
+        collection: 'pages',
+        where: { site: { equals: siteId } },
+        limit: 100,
+    })
+    const rewritePreview = createPreviewUrlRewriter({
+        pages: navPagesResult.docs as unknown as NavPageLike[],
+        siteId,
+        isBuilderPreview: !!builder,
+    })
+    navBlock = {
+        ...navBlock,
+        links: rewriteNavLinkUrls(navBlock.links, rewritePreview),
+        // Logo links home via `_logoHref` (NavLogoLink). Without this the logo falls back
+        // to raw '/' and clicking it escapes the iframe to the platform root — same bug as
+        // the nav tabs (#1443). Mirrors SiteRenderer's `_logoHref: rewriteUrl('/')`.
+        _logoHref: rewritePreview('/'),
+        ...(navBlock.ctaButton && typeof navBlock.ctaButton === 'object'
+            ? {
+                ctaButton: {
+                    ...(navBlock.ctaButton as Record<string, unknown>),
+                    url: rewritePreview((navBlock.ctaButton as { url?: string }).url),
+                },
+            }
+            : {}),
+    }
+    footerBlock = {
+        ...footerBlock,
+        // The `minimal` footer variant mirrors the nav via `_filteredNavLinks`; without it
+        // it falls back to RAW site.headerBlock.links and escapes the iframe (#1443). Reuse
+        // the already-rewritten nav links. Mirrors SiteRenderer's footer injection.
+        _filteredNavLinks: navBlock.links,
+        columns: Array.isArray(footerBlock.columns)
+            ? (footerBlock.columns as Array<Record<string, unknown>>).map((col) =>
+                col && typeof col === 'object'
+                    ? { ...col, links: rewriteNavLinkUrls(col.links, rewritePreview) }
+                    : col,
+            )
+            : footerBlock.columns,
     }
 
     // 6. Theme
