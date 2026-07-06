@@ -84,25 +84,38 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
     ]
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-7 gap-3 xl:gap-[22px] w-full">
+        // Mobile + tablet (<xl, incl. iPad mini/Air/Pro, sidebar open or closed):
+        // 1-row horizontal scroll, snap per card (GH-1490 issue 1). Real-device testing
+        // showed a forced 7-col grid doesn't reliably fit anywhere below true desktop —
+        // the dashboard sidebar is a user-toggled 246-250px rail independent of viewport
+        // width (`src/components/dashboard/Sidebar.tsx`), so no tablet-range breakpoint
+        // can guarantee 7 equal columns fit while the sidebar may be expanded.
+        // `sidebar-scroll` (F18 #1138) gives a thin, faint scrollbar instead of hiding it —
+        // signals to the user there's more to scroll, without looking like a full scrollbar.
+        // xl+ (1280px, desktop): 7-col grid, one row, no wrap (GH-1490 issue 2). Sizing stays
+        // COMPACT (mobile-size icon/padding/gaps/font) through this tier — only bumps up to
+        // the bigger desktop look at 2xl (1536px) — so the tightest realistic case (1280-1535
+        // width, sidebar expanded) still has enough per-card room for the label to fit on one
+        // line instead of being cut off.
+        <div className="flex overflow-x-auto sidebar-scroll snap-x snap-mandatory gap-3 pb-1 xl:grid xl:grid-cols-7 xl:overflow-visible xl:snap-none xl:pb-0 2xl:gap-[22px] w-full">
             {metrics.map((item, index) => (
                 <div
                     key={index}
-                    className="xl:h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-2 xl:p-[17px] flex items-center gap-1.5 xl:gap-[12px]"
+                    className="shrink-0 min-w-[130px] snap-start xl:min-w-0 xl:shrink 2xl:h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-2 2xl:p-[17px] flex items-center gap-1.5 2xl:gap-[12px]"
                 >
                     {/* Icon Container */}
                     <div
-                        className={`w-8 h-8 xl:w-10 xl:h-10 rounded-xl xl:rounded-2xl flex items-center justify-center shrink-0 ${item.iconBg}`}
+                        className={`w-8 h-8 2xl:w-10 2xl:h-10 rounded-xl 2xl:rounded-2xl flex items-center justify-center shrink-0 ${item.iconBg}`}
                     >
                         {item.icon}
                     </div>
 
                     {/* Text Container */}
                     <div className="flex flex-col justify-center min-w-0">
-                        <span className="text-lg xl:text-2xl font-bold text-slate-50 leading-6 xl:leading-8">
+                        <span className="text-lg 2xl:text-2xl font-bold text-slate-50 leading-6 2xl:leading-8">
                             {item.value}
                         </span>
-                        <span className="text-[11px] xl:text-xs font-normal text-slate-400 leading-[14px] xl:leading-[16px] line-clamp-2">
+                        <span className="text-[11px] 2xl:text-xs font-normal text-slate-400 leading-[14px] 2xl:leading-[16px] line-clamp-2 xl:line-clamp-1">
                             {item.label}
                         </span>
                     </div>

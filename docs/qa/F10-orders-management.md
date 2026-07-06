@@ -361,6 +361,26 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 
 ---
 
+## 4.2 Regression Tests — GH-1490 (Orders Metrics Responsive Layout)
+
+> Tests for `OrdersMetrics` (`src/app/(dashboard)/orders/_components/OrdersMetrics.tsx`) — responsive breakpoint classes for mobile scroll vs tablet/desktop grid.
+> Automated tests (`src/__tests__/unit/dashboard/orders-metrics-responsive.test.tsx`) assert Tailwind class presence only — jsdom does not apply media queries, so manual verification per breakpoint (TC .02-.04) is required for release sign-off.
+> GH-1490 decision: tablet (<1280px, includes 768/820/1024px) keeps horizontal scroll like mobile; grid layout (7 cols, no wrap) starts only at `xl` (≥1280px). This deviates from the original AC wording ("tablet = 1 hang grid deu") — confirmed accepted as-is during code review on PR #1506.
+
+| ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10.responsive.01a** | `[Positive]` | Container co ca class scroll ngang (mobile) VA class grid (xl+) | 1. Render `OrdersMetrics`.<br>2. Kiem tra className cua container. | - Chua `flex overflow-x-auto sidebar-scroll snap-x snap-mandatory gap-3 pb-1` (<1280px).<br>- Chua `xl:grid xl:grid-cols-7 xl:overflow-visible xl:snap-none xl:pb-0 2xl:gap-[22px]` (≥1280px). | High | [x] |
+| **TC-F10.responsive.01b** | `[Positive]` | Moi card co class floor-width mobile VA override xl | 1. Render `OrdersMetrics`.<br>2. Kiem tra 7 card con. | - Moi card co `shrink-0 min-w-[130px] snap-start` (<1280px) VA `xl:min-w-0 xl:shrink` (≥1280px). | High | [x] |
+| **TC-F10.responsive.01c** | `[Positive]` | Label co line-clamp-2 VA xl:line-clamp-1 | 1. Render `OrdersMetrics`.<br>2. Kiem tra 7 label. | - Moi label co ca `line-clamp-2` (mac dinh) VA `xl:line-clamp-1` (override ≥1280px, chong tran chu). | Medium | [x] |
+| **TC-F10.responsive.01d** | `[Positive]` | Hien thi dung 7 nhan trang thai tu i18n | 1. Render `OrdersMetrics`, mock fetch metrics. | - Ca 7 label (pending/confirmed/readyToShip/shipped/completed/cancelled/refunded) hien thi dung text tu i18n. | High | [x] |
+| **TC-F10.responsive.01e** | `[Positive]` | Card co padding responsive (p-2 mobile, 2xl:p-[17px] desktop) | 1. Render `OrdersMetrics`.<br>2. Kiem tra 7 card con. | - Moi card co `p-2` (mobile) VA `2xl:p-[17px] 2xl:h-[84px]` (desktop). | Low | [x] |
+| **TC-F10.responsive.01f** | `[Positive]` | Icon + gap co kich thuoc responsive (mobile vs xl/2xl) | 1. Render `OrdersMetrics`.<br>2. Kiem tra container gap + icon container. | - Container: `gap-3` (mobile) + `2xl:gap-[22px]` (desktop).<br>- Card: `gap-1.5` (mobile) + `2xl:gap-[12px]` (desktop).<br>- Icon: `w-8 h-8` (mobile) + `2xl:w-10 2xl:h-10` (desktop). | Low | [x] |
+| **TC-F10.responsive.02** | `[Manual/Mobile]` | Man 320-767px: 7 the metric cuon ngang tung the, khong wrap layout | 1. Mo `/orders` tren viewport 375px.<br>2. Vuot ngang qua 7 the. | - Cuon muot tung the (snap), thanh scrollbar mong hien (sidebar-scroll).<br>- Khong co the nao bi wrap xuong hang 2. | High | [ ] |
+| **TC-F10.responsive.03** | `[Manual/Tablet]` | Man 768-1279px (iPad mini/Air, sidebar mo): van la cuon ngang (deviation da duoc chap nhan) | 1. Mo `/orders` tren viewport 820px va 1024px, sidebar mo. | - Van hien thi cuon ngang 7 the (KHONG len grid deu 7-cot o day — khac AC #1490 goc).<br>- Deviation da duoc xac nhan chap nhan qua code review PR #1506, khong phai bug. | High | [ ] |
+| **TC-F10.responsive.04** | `[Manual/Desktop]` | Man ≥1280px: grid deu 7 cot, khong cuon ngang | 1. Mo `/orders` tren viewport ≥1280px (sidebar mo/dong). | - 7 the xep grid deu 1 hang, khong cuon ngang, khong wrap 4+3. | Blocker | [ ] |
+
+---
+
 ## 5. Quality Gates
 
 | Nhom | Trang Thai | Ghi Chu |
