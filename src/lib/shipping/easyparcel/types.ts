@@ -21,7 +21,8 @@ export interface RateOption {
     serviceName: string
     priceSen: number      // sen
     codAvailable: boolean
-    codMaxSen?: number    // max COD amount in sen (from API)
+    codMinSen?: number    // min COD amount in sen (from API, R2 gate)
+    codMaxSen?: number    // max COD amount in sen (from API, R1 gate)
     estDelivery: string
     degraded?: boolean    // true = fallback flat rate used
 }
@@ -158,7 +159,7 @@ export interface EpSubmitOrderResponse {
     }>
 }
 
-// --- Tracking status (POST /open_api/2026-03/shipment/tracking_status) ---
+// --- Tracking status (POST /open_api/{version}/shipment/tracking_status) ---
 // Verified against EP OpenAPI docs source (github.com/easyparcel/OpenAPI, 2026-03 + 2026-06):
 // request body is { awb_numbers: string[] } (max 100), NOT a GET with ?tracking_number=.
 // status_log entries carry the numeric shipment_status_code; latest_tracking_status is
@@ -212,7 +213,7 @@ export interface EpWalletResponse {
     }
 }
 
-// --- Account info (GET /open_api/2026-03/account/get_account_information) ---
+// --- Account info (GET /open_api/{version}/account/get_account_information) ---
 // Email lives per-address (pickup/billing/delivery), NOT on the account object. The address
 // objects are empty {} until the merchant configures them in EasyParcel.
 export interface EpAccountAddress {
@@ -228,7 +229,7 @@ export interface EpAccountAddress {
     country_code?: string | null
 }
 
-// --- Courier list (GET /open_api/2026-03/courier/list?country_code=MY) ---
+// --- Courier list (GET /open_api/{version}/courier/list?country_code=MY) ---
 export interface EpCourier {
     courier_id: string      // e.g. "EP-CR0AP" — same namespace as quotation courier.courier_id
     uuid?: string

@@ -1,9 +1,14 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
-import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import {
+  earliestPickupDate,
+  isBusinessDateString,
+  courierCutoffLabel,
+} from '@/lib/shipping/easyparcel/pickup-schedule'
 import { CourierLogo } from './courier-logo'
 
 // Cosmetic 2-step display (single API call underneath)
@@ -15,6 +20,8 @@ interface CreateLabelFlowProps {
   courierName?: string | null
   shippingFee?: number | null    // quoted at checkout (RM)
   onSuccess: (awbNo: string, labelUrl: string | null) => void
+  /** Server rejected with COD_NOT_ELIGIBLE (live R1/R2/R3 gate) — parent shows the COD recovery panel. */
+  onCodBlocked?: () => void
 }
 
 /**
@@ -29,11 +36,20 @@ export function CreateLabelFlow({
   courierName,
   shippingFee,
   onSuccess,
+  onCodBlocked,
 }: CreateLabelFlowProps) {
   const { t, ti } = useI18n()
   const cl = t.dashboard.orders.createLabel
   const [step, setStep] = useState<Step>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // US-F36-07: pickup (courier collects, default) vs dropoff (merchant brings parcel).
+  // Both send the same collection_date to EP (AC-1) — no separate pickup endpoint.
+  const [method, setMethod] = useState<'pickup' | 'dropoff'>('pickup')
+  // Earliest date is cut-off aware per courier (shared helper — same math as the server clamp)
+  const earliest = useMemo(() => earliestPickupDate(courierId ?? ''), [courierId])
+  const [collectionDate, setCollectionDate] = useState(earliest)
+  const dateIsBusiness = isBusinessDateString(collectionDate)
+  const dateValid = collectionDate >= earliest && dateIsBusiness
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
   const cosmeticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -54,7 +70,7 @@ export function CreateLabelFlow({
       const res = await fetch(`/api/orders/${orderId}/create-label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ collectionDate }),
       })
       if (cosmeticTimerRef.current) { clearTimeout(cosmeticTimerRef.current); cosmeticTimerRef.current = null }
       const data = await res.json()
@@ -62,7 +78,11 @@ export function CreateLabelFlow({
       if (!res.ok) {
         const code = data?.error?.code ?? 'EASYPARCEL_ERROR'
         const msg = data?.error?.message ?? 'Failed to create shipping label'
-        if (code === 'EASYPARCEL_WALLET_LOW') {
+        if (code === 'COD_NOT_ELIGIBLE' && onCodBlocked) {
+          // Live COD gate tripped (PD-021) — parent switches to the cod-blocked recovery panel
+          setStep('idle')
+          onCodBlocked()
+        } else if (code === 'EASYPARCEL_WALLET_LOW') {
           setStep('wallet-low')
           setErrorMsg(msg)
         } else {
@@ -72,8 +92,12 @@ export function CreateLabelFlow({
         return
       }
 
-      const { awbNo, labelUrl } = data.data ?? data
+      const { awbNo, labelUrl, collectionDate: usedDate, collectionDateShifted } = data.data ?? data
       toast.success(cl.labelCreated)
+      // AC-3b: the server clamped the date (cut-off passed / weekend) — tell the merchant
+      if (collectionDateShifted && typeof usedDate === 'string') {
+        toast.info(ti(cl.dateShifted, { date: `${usedDate.slice(8, 10)}/${usedDate.slice(5, 7)}` }))
+      }
       onSuccess(awbNo, labelUrl ?? null)
     } catch {
       if (cosmeticTimerRef.current) { clearTimeout(cosmeticTimerRef.current); cosmeticTimerRef.current = null }
@@ -199,6 +223,58 @@ export function CreateLabelFlow({
         )}
       </div>
 
+      {/* US-F36-07: collection method + date, chosen BEFORE the label is bought */}
+      <div className="ship-meta">
+        <div>
+          <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionMethod}</div>
+          <div className="sched-slots" role="radiogroup" aria-label={cl.collectionMethod}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={method === 'pickup'}
+              className={`sched-slot${method === 'pickup' ? ' on' : ''}`}
+              onClick={() => setMethod('pickup')}
+            >
+              <span className="ss-time">{cl.methodPickup}</span>
+              <span className="ss-name">{cl.methodPickupDesc}</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={method === 'dropoff'}
+              className={`sched-slot${method === 'dropoff' ? ' on' : ''}`}
+              onClick={() => setMethod('dropoff')}
+            >
+              <span className="ss-time">{cl.methodDropoff}</span>
+              <span className="ss-name">{cl.methodDropoffDesc}</span>
+            </button>
+          </div>
+        </div>
+        <div>
+          <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionDateLabel}</div>
+          <div className="sched-custom" style={{ marginTop: 0 }}>
+            <input
+              type="date"
+              value={collectionDate}
+              min={earliest}
+              onChange={(e) => setCollectionDate(e.target.value)}
+            />
+            {!dateIsBusiness ? (
+              <div className="sched-warn">
+                <TriangleAlert /> {cl.weekendWarning}
+              </div>
+            ) : (
+              <div className="help" style={{ marginTop: 6 }}>
+                <Info style={{ width: 12, height: 12 }} />
+                {method === 'pickup'
+                  ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
+                  : cl.dropoffHint}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="ship-foot">
         <div className="help">
           <Info style={{ width: 12, height: 12 }} />
@@ -208,6 +284,7 @@ export function CreateLabelFlow({
           className="btn btn-grad ship-cta ship-cta-fixed"
           style={{ height: 40 }}
           onClick={handleShip}
+          disabled={!dateValid}
         >
           {cl.readyToShip}
         </button>

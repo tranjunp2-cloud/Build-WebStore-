@@ -377,7 +377,7 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 | **TC-F14.132** | Unit | High | Allowlist `['dhl']`, route offers only `['jnt','flash']` → flat fallback, `degraded:true` | allowedCouriers=['dhl'], quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flat', degraded:true}], degraded:true | F36, GH-1333 |
 | **TC-F14.133** | Unit | High | Empty/absent allowlist → cheapest of ALL (not rates[0]), `degraded:false` | allowedCouriers=undefined, quotations→{jnt:RM50, flash:RM40} | rates=[{courier:'flash', priceSen:4000}], degraded:false (cheapest regardless order) | F36, GH-1333 |
 | **TC-F14.134** | Unit | High | COD order (`codAmountSen>0`), both allowed, only `flash.codAvailable` → returns `flash` even if `jnt` cheaper | codAmountSen=1000, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'flash', codAvailable:true}], degraded:false | F36, GH-1333 |
-| **TC-F14.135** | Unit | High | COD order, NO courier is COD-capable → flat, `degraded:true` | codAmountSen=1000, allowedCouriers=['jnt','flash'], both codAvailable:false | rates=[{courier:'flat', degraded:true}], degraded:true | F36, GH-1333 |
+| **TC-F14.135** | Unit | High | COD order, NO courier is COD-capable → GIỮ EP pick (không swap flat), `codIneligible:'no_cod_courier'` (PD-021) | codAmountSen=1000, allowedCouriers=['jnt','flash'], both codAvailable:false | rates=[{courier:'jnt' — cheapest EP}], degraded:false, codIneligible='no_cod_courier'; buyer thấy courier + giá thật, chỉ hiện error | F36, GH-1333, PD-021 |
 | **TC-F14.136** | Unit | High | Non-COD order (`codAmountSen=0`) ignores `codAvailable` flag (cheapest regardless) | codAmountSen=0, allowedCouriers=['jnt','flash'], jnt:RM40 (noCOD), flash:RM50 (hasCOD) | rates=[{courier:'jnt', codAvailable:false}] (jnt cheaper) | F36, GH-1333 |
 | **TC-F14.137** | Unit | Medium | Allowlist `['flat']` (sentinel) filtered out → treated as no allowlist → cheapest of all | allowedCouriers=['flat'], quotations→{jnt:RM40, flash:RM50} | rates=[{courier:'jnt', degraded:false}] (after filtering 'flat', no restriction, pick cheapest) | F36, GH-1333 |
 
@@ -408,6 +408,40 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 | TC-ID | Type | Priority | Description | Input | Expected | Trace |
 |-------|------|----------|-------------|-------|----------|-------|
 | **TC-F14.145** | Unit | High | BYOC couriers ("Bring Your Own Contract", e.g. `BYOC FedEx`) are excluded from auto-pick even when cheapest; picks cheapest non-BYOC. All-BYOC → flat fallback | Quotations: byoc_fedex RM30, flash RM40, jnt RM50 | rates=[{courier:'flash'}] (BYOC skipped); all-BYOC → rates=[{courier:'flat', degraded:true}] | F36, GH-1333 |
+
+#### COD Eligibility R1/R2/R3 — PD-021 Follow-EP Model (ACTIVE)
+
+> COD gating theo `min_cod_amount`/`max_cod_amount`/`cod.available` LIVE per-route (KHÔNG hardcode vùng). Unit rules: `src/__tests__/unit/shipping/cod-eligibility.test.ts` (TC-F36.U01–U11, supersede bộ isCodBlocked East-MY cũ). getRates integration bên dưới.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.146** | Unit | High | COD amount vượt max của MỌI courier COD-capable (R1) → GIỮ EP pick + `codIneligible:'over_max'` | codAmountSen=500000 (RM5000), quotation jnt COD min RM7.50/max RM1000 | rates=[{courier:'jnt'}], degraded:false, codIneligible='over_max' | F36, GH-1333, PD-021 |
+| **TC-F14.147** | Unit | High | COD amount dưới min của MỌI courier COD-capable (R2) → GIỮ EP pick + `codIneligible:'under_min'` | codAmountSen=50 (RM0.50), quotation jnt COD min RM7.50/max RM1000 | rates=[{courier:'jnt'}], degraded:false, codIneligible='under_min' | F36, GH-1333, PD-021 |
+| **TC-F14.148** | Unit | High | Auto-pick enforce min/max: courier rẻ hơn nhưng out-of-range bị skip, chọn courier in-range | codAmountSen=150000 (RM1500), jnt RM40 max RM1000, dhl RM50 max RM2000 | rates=[{courier:'dhl'}], degraded:false, codIneligible undefined | F36, GH-1333, PD-021 |
+| **TC-F14.149** | Unit | High | `codMinSen` extract từ quotation `min_cod_amount` (RM→sen) để enforce R2 | Quotation flash COD min RM7.50 → min_cod_amount:'7.5' | rates[0].codMinSen=750 | F36, GH-1333, PD-021 |
+| **TC-F14.150** | Unit | High | create-label live re-check: service còn COD-eligible (kể cả route East MY — R4 không có input vùng) → ok | Re-quote SVC-JNT, cod available min 7.5/max 1000, amount RM118, dest Sarawak | {ok:true} → submit tiếp tục | F36, GH-1333, PD-021 |
+| **TC-F14.151** | Unit | High | create-label live re-check: limits đổi làm amount out-of-range HOẶC courier tắt COD → 422 COD_NOT_ELIGIBLE | (a) max giảm còn RM100, amount RM118; (b) cod.available=false | (a) {ok:false, reason:'over_max'}; (b) {ok:false, reason:'no_cod_courier'} → route trả 422 | F36, GH-1333, PD-021 |
+| **TC-F14.152** | Unit | High | create-label live re-check fail-open: quotation lỗi / service vắng mặt / status error → KHÔNG chặn tạo label | (a) quotations throw; (b) service_id khác; (c) status:'error' | {ok:true} cả 3 case — submit_orders là authority cho lỗi quote | F36, GH-1333, PD-021 |
+| **TC-F14.153** | Unit | High | `codProbeSen`: verdict COD tính trên probe amount mà KHÔNG COD-filter pick — storefront pre-disable COD trước khi buyer chọn payment method | Non-COD pick + codProbeSen=500000, jnt COD max RM1000, citylink rẻ hơn không COD | rates=[citylink] (cheapest overall), codIneligible='over_max'; probe in-range → codIneligible undefined | F36, GH-1333, PD-021 |
+| **TC-F14.154** | Unit | High | NaN guard: EP trả `min_cod_amount`/`max_cod_amount` = ""/non-numeric → coi như KHÔNG có limit (không được fail so sánh vì NaN) | Quotation pos cod.available=true, min=""/max="" , codAmountSen=950 | rates=[pos], codMinSen/codMaxSen=undefined (không NaN), codIneligible=undefined — COD đặt được | F36, GH-1333, PD-021 |
+
+#### Pickup/Dropoff Collection Date — US-F36-07 (ACTIVE)
+
+> Chọn pickup/dropoff + `collection_date` NGAY tại bước Ready-to-Ship (trước khi mua label); server clamp AC-3b dùng CHUNG helper `pickup-schedule.ts` với date picker. Popover schedule-pickup sau-label + route `/api/orders/[id]/pickup` đã gỡ (TC-F36.P01–P20 retire). Unit: `src/__tests__/unit/shipping/pickup-schedule.test.ts`.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.155** | Unit | High | `earliestPickupDate` cut-off aware (MYT): trước cut-off → hôm nay; sau cut-off → ngày làm việc kế; T6 sau cut-off → T2; courier lạ (EP-CR*) fallback cut-off 12:00 | nowUtc cố định các mốc quanh cut-off J&T 13:50 / default 12:00 | same-day / next-business-day đúng từng mốc | F36, GH-1333, US-F36-07 AC-2 |
+| **TC-F14.156** | Unit | Medium | `isBusinessDateString` phân loại T2–T6/T7-CN theo MYT; `courierCutoffLabel` trả "13:50" (jnt) / "12:00" (default) | các ngày cố định 2026-07-06..12 | Mon–Fri true, Sat/Sun false; label đúng | F36, GH-1333, US-F36-07 AC-2 |
+| **TC-F14.157** | Unit | High | `clampCollectionDate` (AC-3b): không tin client — no date → earliest; past → clamp; mở picker trước cut-off nhưng submit sau → clamp lên ngày kế + shifted:true; weekend → bump ngày làm việc; future weekday hợp lệ → giữ nguyên | requested × nowUtc matrix | {date, shifted} đúng từng case; create-label trả `collectionDate`+`collectionDateShifted` để UI toast "đã dời sang DD/MM" | F36, GH-1333, US-F36-07 AC-3b |
+
+#### Parcel Weight Unit — GH-1458 KG Canonical (ACTIVE)
+
+> `Products.weight` đơn vị chuẩn = **KG** (chốt 2026-07-06). Pipeline shipping chạy gram integer nội bộ; `productWeightToGrams()` là điểm convert duy nhất, wire vào checkout + stripe-checkout (`build-order-items`) + calculate-shipping (server lookup theo productId khi client không gửi weightG). Trước fix này weight sản phẩm không hề được đọc — mọi đơn quote 500g/item default.
+
+| TC-ID | Type | Priority | Description | Input | Expected | Trace |
+|-------|------|----------|-------------|-------|----------|-------|
+| **TC-F14.158** | Unit | High | `productWeightToGrams`: kg→gram integer; unset/0/âm/NaN → 500g default; KHÔNG chia 1000 lần nữa (regression grams-era) | 0.5 / 1.5 / null / 0 / -1 / NaN | 500 / 1500 / 500 / 500 / 500 / 500; 0.5kg qua aggregateWeightKg ra đúng 0.5kg | F36, GH-1333, GH-1458 |
 
 ---
 

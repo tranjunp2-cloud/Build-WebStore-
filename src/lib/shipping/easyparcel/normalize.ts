@@ -19,27 +19,9 @@ export function aggregateWeightKg(weightGrams: number): number {
     return Math.max(0.1, Math.ceil(kg * 10) / 10)
 }
 
-// Courier cut-off times (MYT = UTC+8)
-const COURIER_CUTOFF_HH_MM: Record<string, { hh: number; mm: number }> = {
-    jnt: { hh: 13, mm: 50 },
-    flash: { hh: 14, mm: 0 },
-    poslaju: { hh: 12, mm: 50 },
-}
-const DEFAULT_CUTOFF = { hh: 12, mm: 0 }
-
-function isMytBusinessDay(date: Date): boolean {
-    // Shift UTC date to MYT (UTC+8) to get correct local day-of-week
-    const mytDay = new Date(date.getTime() + 8 * 3600 * 1000).getUTCDay()
-    return mytDay !== 0 && mytDay !== 6  // 0=Sun, 6=Sat
-}
-
-function nextBusinessDay(date: Date): Date {
-    const next = new Date(date.getTime() + 24 * 3600 * 1000)
-    while (!isMytBusinessDay(next)) {
-        next.setTime(next.getTime() + 24 * 3600 * 1000)
-    }
-    return next
-}
+// Pickup/collection-date math moved to ./pickup-schedule (pure, client-safe — the
+// Ready-to-Ship date picker imports it too). Re-exported here for server callers.
+export { earliestPickupDate, clampCollectionDate, courierCutoffLabel, isBusinessDateString } from './pickup-schedule'
 
 // MY state name → ISO 3166-2 subdivision code (New EP API)
 const SUBDIVISION_CODE_MAP: Record<string, string> = {
@@ -66,6 +48,19 @@ export function mapSubdivisionCode(stateName: string): string {
     return SUBDIVISION_CODE_MAP[stateName] ?? stateName
 }
 
+/**
+ * Parse an EP money-string field (e.g. min_cod_amount) to integer sen.
+ * Official docs (#quotation-response-2026-06) format these as "MYR1000.00" while the
+ * sandbox returns bare "1000" — and "" / non-numeric also occurs. Currency letters and
+ * thousand-separators are stripped before parsing; a non-finite result means "no limit"
+ * → undefined (a NaN limit would silently fail every >=/<= comparison).
+ */
+export function rmStringToSen(value: string | null | undefined): number | undefined {
+    if (value == null) return undefined
+    const rm = parseFloat(String(value).replace(/[^0-9.-]/g, ''))
+    return Number.isFinite(rm) ? Math.round(rm * 100) : undefined
+}
+
 // Reverse of SUBDIVISION_CODE_MAP — built once for seeding warehouse.state from EP province_code.
 const SUBDIVISION_NAME_MAP: Record<string, string> = Object.fromEntries(
     Object.entries(SUBDIVISION_CODE_MAP).map(([name, code]) => [code, name]),
@@ -87,34 +82,3 @@ export function splitPhone(raw: string): { countryCode: string; number: string }
     return { countryCode: '60', number: digits }
 }
 
-/**
- * Return earliest pickup date for a courier as "YYYY-MM-DD" (MYT).
- * If current MYT time is past cut-off, advances to next business day.
- * @param courier - courier id (e.g. 'jnt', 'flash', 'poslaju')
- * @param nowUtc - current UTC time (defaults to Date.now())
- */
-export function earliestPickupDate(courier: string, nowUtc: Date = new Date()): string {
-    const cutoff = COURIER_CUTOFF_HH_MM[courier.toLowerCase()] ?? DEFAULT_CUTOFF
-
-    // Derive MYT hours/minutes from UTC
-    const mytMs = nowUtc.getTime() + 8 * 3600 * 1000
-    const myt = new Date(mytMs)
-    const mytHH = myt.getUTCHours()
-    const mytMM = myt.getUTCMinutes()
-
-    const pastCutoff = mytHH > cutoff.hh || (mytHH === cutoff.hh && mytMM >= cutoff.mm)
-    const candidate = pastCutoff ? nextBusinessDay(nowUtc) : nowUtc
-
-    // Ensure candidate itself is a business day (handles weekend today + before cutoff)
-    let pickup = new Date(candidate)
-    while (!isMytBusinessDay(pickup)) {
-        pickup = new Date(pickup.getTime() + 24 * 3600 * 1000)
-    }
-
-    // Format as MYT date string "YYYY-MM-DD"
-    const mytPickup = new Date(pickup.getTime() + 8 * 3600 * 1000)
-    const yyyy = mytPickup.getUTCFullYear()
-    const mm = String(mytPickup.getUTCMonth() + 1).padStart(2, '0')
-    const dd = String(mytPickup.getUTCDate()).padStart(2, '0')
-    return `${yyyy}-${mm}-${dd}`
-}

@@ -1282,7 +1282,6 @@
                 "customerInfoTitle": "Customer Information",
                 "notes": "Notes",
                 "noAddress": "No address provided",
-                "codBlocked": "East Malaysia · COD blocked",
                 "paymentInfoTitle": "Payment Information",
                 "noReceipt": "No Payment Receipt Provided",
                 "orderActionsTitle": "Order Actions",
@@ -1434,8 +1433,8 @@
                 "awbCancelHint": "Please also cancel this AWB in your EasyParcel dashboard to release wallet funds.",
                 "awbNumber": "AWB Number",
                 "downloadLabel": "Download Label PDF →",
-                "codBlockedTitle": "COD unavailable for this destination",
-                "codBlockedBody": "EasyParcel only supports COD in West Malaysia. This order is COD to East Malaysia — choose how to proceed below."
+                "codBlockedTitle": "COD unavailable for this order",
+                "codBlockedBody": "No courier can currently collect COD for this order (per live route limits) — choose how to proceed below."
             },
             "createLabel": {
                 "readyToShip": "Ready to Ship",
@@ -1454,7 +1453,17 @@
                 "epCost": "EasyParcel cost: {amount}",
                 "epCostNote": "Quoted at checkout — actual charge may vary slightly.",
                 "shipHint": "One click reserves the slot and charges your EasyParcel wallet — no extra steps.",
-                "labelCreated": "Shipping label created!"
+                "labelCreated": "Shipping label created!",
+                "collectionMethod": "Collection method",
+                "methodPickup": "Pickup",
+                "methodPickupDesc": "Courier collects at your address",
+                "methodDropoff": "Drop-off",
+                "methodDropoffDesc": "You drop the parcel at a courier point",
+                "collectionDateLabel": "Collection date",
+                "cutoffHint": "Create before {time} (MYT) for same-day collection",
+                "dropoffHint": "Drop the parcel at the courier's point on this date",
+                "weekendWarning": "Collections run on business days — pick a weekday",
+                "dateShifted": "Collection date moved to {date} (earliest available)"
             },
             "pickup": {
                 "title": "Schedule pickup",
@@ -4613,7 +4622,9 @@
             "stripePoweredBy": "Powered by Stripe",
             "codDetail": "Pay in cash when the courier delivers. Seller confirms receipt.",
             "noExtraFee": "No extra fee",
-            "westMalaysiaOnly": "West Malaysia only",
+            "codNoCourier": "COD is not available for this delivery address — please change the address or pick another payment method",
+            "codOverMax": "Your order total exceeds the courier's COD limit — please reduce the order value or pick another payment method",
+            "codUnderMin": "Your order total is below the courier's COD minimum — please add more items or pick another payment method",
             "bankTransferName": "Bank Transfer / DuitNow QR",
             "bankTransferDetail": "Transfer to seller's bank or scan a DuitNow QR. Receipt verified manually.",
             "sellerVerified": "Seller-verified",

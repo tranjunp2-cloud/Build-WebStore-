@@ -14,6 +14,12 @@ import type {
 
 const TIMEOUT_MS = 10_000
 
+// EP OpenAPI version segment (github.com/easyparcel/OpenAPI). 2026-06 is additive over
+// 2026-03: BYOC pricing fields (byoc_charges/_tax, seller_payable_amount) + category/hscode
+// list endpoints — no breaking changes to the request/response shapes we consume.
+const EP_API_VERSION = '2026-06'
+const API = `/open_api/${EP_API_VERSION}`
+
 async function epFetch<T>(
     method: 'GET' | 'POST',
     path: string,
@@ -63,7 +69,7 @@ export async function quotations(
     token: string,
     params: EpQuotationParams,
 ): Promise<EpQuotationResponse> {
-    return epFetch('POST', '/open_api/2026-03/shipment/quotations', token, { shipment: [params] })
+    return epFetch('POST', `${API}/shipment/quotations`, token, { shipment: [params] })
 }
 
 /**
@@ -74,13 +80,13 @@ export async function submitOrder(
     token: string,
     params: EpSubmitOrderParams,
 ): Promise<EpSubmitOrderResponse> {
-    return epFetch('POST', '/open_api/2026-03/shipment/submit_orders', token, { shipment: [params] })
+    return epFetch('POST', `${API}/shipment/submit_orders`, token, { shipment: [params] })
 }
 
 /**
  * Fetch tracking status for one or more AWB numbers (max 100 per call).
- * Documented endpoint (EP OpenAPI docs, 2026-03 + 2026-06):
- * POST /open_api/2026-03/shipment/tracking_status body { awb_numbers: string[] }.
+ * Documented endpoint (EP OpenAPI docs, identical in 2026-03 and 2026-06):
+ * POST /shipment/tracking_status body { awb_numbers: string[] }.
  */
 export async function trackingStatus(
     token: string,
@@ -88,7 +94,7 @@ export async function trackingStatus(
 ): Promise<EpTrackingStatusResponse> {
     return epFetch(
         'POST',
-        '/open_api/2026-03/shipment/tracking_status',
+        `${API}/shipment/tracking_status`,
         token,
         { awb_numbers: awbNumbers },
     )
@@ -107,13 +113,13 @@ export async function cancelShipment(
     token: string,
     params: EpCancelParams,
 ): Promise<unknown> {
-    return epFetch('POST', '/open_api/2026-03/shipment/cancel', token, { shipment: [params] })
+    return epFetch('POST', `${API}/shipment/cancel`, token, { shipment: [params] })
 }
 
 /** Get EP wallet balance for the authenticated account. */
 export async function walletBalance(token: string): Promise<EpWalletResponse> {
     // Live path is /wallet (NOT /account/wallet — that 404s). Verified against the API.
-    return epFetch('GET', '/open_api/2026-03/wallet', token)
+    return epFetch('GET', `${API}/wallet`, token)
 }
 
 /**
@@ -122,10 +128,10 @@ export async function walletBalance(token: string): Promise<EpWalletResponse> {
  * The sender email lives at data.address.pickup_address.email (empty until merchant configures it).
  */
 export async function getAccountInfo(token: string): Promise<EpAccountInfoResponse> {
-    return epFetch('GET', '/open_api/2026-03/account/get_account_information', token)
+    return epFetch('GET', `${API}/account/get_account_information`, token)
 }
 
 /** List available couriers for a country. courier_id here matches quotation courier.courier_id. */
 export async function courierList(token: string, countryCode = 'MY'): Promise<EpCourierListResponse> {
-    return epFetch('GET', `/open_api/2026-03/courier/list?country_code=${encodeURIComponent(countryCode)}`, token)
+    return epFetch('GET', `${API}/courier/list?country_code=${encodeURIComponent(countryCode)}`, token)
 }

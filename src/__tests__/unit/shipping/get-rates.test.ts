@@ -18,10 +18,14 @@ vi.mock('@/lib/shipping/calculate-fee', () => ({
     getShippingRate: vi.fn(() => 800), // West default
 }))
 
-vi.mock('@/lib/shipping/easyparcel/normalize', () => ({
-    mapSubdivisionCode: vi.fn((state) => state),
-    aggregateWeightKg: vi.fn((grams) => grams / 1000),
-}))
+vi.mock('@/lib/shipping/easyparcel/normalize', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/lib/shipping/easyparcel/normalize')>()
+    return {
+        ...actual, // keep rmStringToSen (and friends) real — only stub the geo/weight helpers
+        mapSubdivisionCode: vi.fn((state: string) => state),
+        aggregateWeightKg: vi.fn((grams: number) => grams / 1000),
+    }
+})
 
 import { quotations } from '@/lib/shipping/easyparcel/client'
 
@@ -40,7 +44,13 @@ const mockQuotationsSuccess = (rates: Omit<RateOption, 'degraded'>[]) => {
         },
         pricing: { total_amount: (r.priceSen / 100).toString() },
         features: r.codAvailable
-            ? [{ cod: { available: true, max_cod_amount: (r.codMaxSen ? r.codMaxSen / 100 : '1000').toString() } }]
+            ? [{
+                cod: {
+                    available: true,
+                    max_cod_amount: (r.codMaxSen ? r.codMaxSen / 100 : '1000').toString(),
+                    ...(r.codMinSen != null ? { min_cod_amount: (r.codMinSen / 100).toString() } : {}),
+                },
+            }]
             : [],
     }))
     ;(quotations as any).mockResolvedValue({
@@ -165,9 +175,9 @@ describe('getRates', () => {
         })
     })
 
-    // COD: none COD-capable → flat fallback
-    describe('[TC-F14.135] COD order, no COD-capable courier → flat fallback', () => {
-        it('returns flat when no courier supports COD', async () => {
+    // COD: none COD-capable → keep EP pick, flag codIneligible (no flat swap — fee display stays real)
+    describe('[TC-F14.135] COD order, no COD-capable courier → EP pick + codIneligible flag', () => {
+        it('keeps the cheapest EP rate and surfaces the verdict when no courier supports COD', async () => {
             mockQuotationsSuccess([
                 { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: false, estDelivery: '3–5 days' },
                 { courier: 'flash', serviceId: 'std', courierName: 'Flash', serviceName: 'Standard', priceSen: 5000, codAvailable: false, estDelivery: '3–5 days' },
@@ -180,8 +190,158 @@ describe('getRates', () => {
             )
 
             expect(result.rates).toHaveLength(1)
-            expect(result.rates[0].courier).toBe('flat')
-            expect(result.degraded).toBe(true)
+            expect(result.rates[0].courier).toBe('jnt') // cheapest EP pick kept — NOT flat
+            expect(result.degraded).toBe(false)
+            // PD-021: the ineligibility verdict is surfaced so checkout can hard-gate COD
+            expect(result.codIneligible).toBe('no_cod_courier')
+        })
+    })
+
+    // PD-021 R1: COD amount above every courier max → EP pick kept + over_max verdict
+    describe('[TC-F14.146] COD over all courier maxes → EP pick + codIneligible over_max', () => {
+        it('keeps the EP rate and flags over_max when the amount exceeds every courier max', async () => {
+            mockQuotationsSuccess([
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: true, codMinSen: 750, codMaxSen: 100_000, estDelivery: '3–5 days' },
+            ])
+
+            const result = await getRates(
+                { ...baseParams, codAmountSen: 500_000 }, // RM5000 > J&T max RM1000
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].courier).toBe('jnt') // EP pick kept — NOT flat
+            expect(result.degraded).toBe(false)
+            expect(result.codIneligible).toBe('over_max')
+        })
+    })
+
+    // PD-021 R2: COD amount below every courier min → EP pick kept + under_min verdict
+    describe('[TC-F14.147] COD under all courier mins → EP pick + codIneligible under_min', () => {
+        it('keeps the EP rate and flags under_min when the amount is under every courier min', async () => {
+            mockQuotationsSuccess([
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: true, codMinSen: 750, codMaxSen: 100_000, estDelivery: '3–5 days' },
+            ])
+
+            const result = await getRates(
+                { ...baseParams, codAmountSen: 50 }, // RM0.50 < J&T min RM7.50
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].courier).toBe('jnt') // EP pick kept — NOT flat
+            expect(result.degraded).toBe(false)
+            expect(result.codIneligible).toBe('under_min')
+        })
+    })
+
+    // PD-021 R1/R2 auto-pick: cheapest courier out of range → next courier in range wins
+    describe('[TC-F14.148] COD min/max enforced during auto-pick', () => {
+        it('skips the cheaper courier whose max is exceeded and picks the in-range one', async () => {
+            mockQuotationsSuccess([
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: true, codMinSen: 750, codMaxSen: 100_000, estDelivery: '3–5 days' },
+                { courier: 'dhl', serviceId: 'std', courierName: 'DHL', serviceName: 'Standard', priceSen: 5000, codAvailable: true, codMinSen: 650, codMaxSen: 200_000, estDelivery: '3–5 days' },
+            ])
+
+            const result = await getRates(
+                { ...baseParams, codAmountSen: 150_000 }, // RM1500: over J&T max, within DHL max
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates).toHaveLength(1)
+            expect(result.rates[0].courier).toBe('dhl')
+            expect(result.degraded).toBe(false)
+            expect(result.codIneligible).toBeUndefined()
+        })
+    })
+
+    // PD-021 NaN guard: EP sometimes sends ""/non-numeric min/max — parseFloat("") is NaN,
+    // and NaN limits must be treated as "no limit", never as a failing bound.
+    describe('[TC-F14.154] empty-string COD limits → treated as no limit (NaN guard)', () => {
+        it('keeps a codAvailable courier eligible when min/max come back as ""', async () => {
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'pos', service_id: 'std', courier_name: 'Pos Malaysia Berhad', service_name: 'Standard', delivery_duration: '3–5 days' },
+                        pricing: { total_amount: '8.00' },
+                        features: [{ cod: { available: true, min_cod_amount: '', max_cod_amount: '' } }],
+                    }],
+                }],
+            })
+
+            const result = await getRates(
+                { ...baseParams, codAmountSen: 950 }, // RM9.50 COD order
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].courier).toBe('pos')
+            expect(result.rates[0].codMinSen).toBeUndefined() // NOT NaN
+            expect(result.rates[0].codMaxSen).toBeUndefined()
+            expect(result.codIneligible).toBeUndefined()      // COD orderable
+            expect(result.degraded).toBe(false)
+        })
+
+        // Docs #quotation-response-2026-03 format limits as "MYR1000.00" (currency-prefixed)
+        it('parses currency-prefixed limits ("MYR10.00") per the official docs format', async () => {
+            ;(quotations as any).mockResolvedValue({
+                data: [{
+                    status: 'success',
+                    quotations: [{
+                        courier: { courier_id: 'jnt', service_id: 'std', courier_name: 'J&T Express', service_name: 'Standard', delivery_duration: '2–3 days' },
+                        pricing: { total_amount: '6.23' },
+                        features: [{ cod: { available: true, min_cod_amount: 'MYR10.00', max_cod_amount: 'MYR1,000.00' } }],
+                    }],
+                }],
+            })
+
+            const result = await getRates(
+                { ...baseParams, codAmountSen: 950 }, // RM9.50 < min RM10
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].codMinSen).toBe(1000)      // "MYR10.00" → 1000 sen
+            expect(result.rates[0].codMaxSen).toBe(100_000)   // "MYR1,000.00" → 100000 sen
+            expect(result.codIneligible).toBe('under_min')    // limit ENFORCED, not dropped
+        })
+    })
+
+    // PD-021 probe: non-COD pick still returns the COD verdict for the probe amount
+    describe('[TC-F14.153] codProbeSen verdict without COD-filtering the pick', () => {
+        it('returns cheapest overall AND codIneligible verdict when probe amount is out of range', async () => {
+            mockQuotationsSuccess([
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: true, codMinSen: 750, codMaxSen: 100_000, estDelivery: '3–5 days' },
+                { courier: 'citylink', serviceId: 'std', courierName: 'City-Link', serviceName: 'Standard', priceSen: 3000, codAvailable: false, estDelivery: '3–5 days' },
+            ])
+
+            // Non-COD pick (no codAmountSen): cheapest overall wins, but probe RM5000 > J&T max
+            const result = await getRates(
+                { ...baseParams, codProbeSen: 500_000 },
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].courier).toBe('citylink') // pick NOT COD-filtered
+            expect(result.degraded).toBe(false)
+            expect(result.codIneligible).toBe('over_max')    // verdict still surfaced
+        })
+
+        it('returns no verdict when the probe amount is within a courier range', async () => {
+            mockQuotationsSuccess([
+                { courier: 'jnt', serviceId: 'std', courierName: 'JNT', serviceName: 'Standard', priceSen: 4000, codAvailable: true, codMinSen: 750, codMaxSen: 100_000, estDelivery: '3–5 days' },
+            ])
+
+            const result = await getRates(
+                { ...baseParams, codProbeSen: 5000 },
+                'token123',
+                flatConfig,
+            )
+
+            expect(result.rates[0].courier).toBe('jnt')
+            expect(result.codIneligible).toBeUndefined()
         })
     })
 
@@ -323,6 +483,27 @@ describe('getRates', () => {
             const result = await getRates(baseParams, 'token123', flatConfig)
 
             expect(result.rates[0].codMaxSen).toBe(50000)
+        })
+
+        // [TC-F14.149] PD-021 R2 needs the min limit propagated from the quotation
+        it('preserves codMinSen when COD available', async () => {
+            mockQuotationsSuccess([
+                {
+                    courier: 'flash',
+                    serviceId: 'std',
+                    courierName: 'Flash',
+                    serviceName: 'Standard',
+                    priceSen: 5000,
+                    codAvailable: true,
+                    codMinSen: 750,
+                    codMaxSen: 50000,
+                    estDelivery: '3–5 days',
+                },
+            ])
+
+            const result = await getRates(baseParams, 'token123', flatConfig)
+
+            expect(result.rates[0].codMinSen).toBe(750)
         })
     })
 })

@@ -136,8 +136,9 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
    "Tài khoản EasyParcel không đủ số dư."  [ Nạp tiền ngay ↗ ]  [ Thử lại ]
    → order KHÔNG đổi trạng thái
 
-🚫 COD East MY: nút "Ready to Ship" DISABLED ngay từ đầu + note:
-   "EasyParcel chỉ hỗ trợ COD tại khu vực West MY."
+🚫 COD_NOT_ELIGIBLE (per PD-021 R1–R5, live từ quotation — KHÔNG hardcode vùng):
+   alert + note "Courier không hỗ trợ COD cho đơn này (theo hạn mức/tuyến hiện tại)"
+   → panel recovery: Ship manually (self-delivery)
 ```
 
 **Thiếu dữ liệu parcel (weight/dims) — INLINE input, KHÔNG modal (Option A):** đơn chuẩn (product đủ số đo) vẫn **1-click**. Khi product thiếu số đo → bấm Ready to Ship sẽ **chặn lại + xổ box nhập ngay dưới nút** (tái dùng component Weight/Dimensions cũ):
@@ -170,7 +171,8 @@ Actor: Merchant — tiền đề: order paid + confirmed, tenant EasyParcel ON
    System   → check product weight/dims:
               ├─ đủ    → chạy luôn (bước 2)
               └─ thiếu → xổ inline input weight/L×W×H → điền → [Tiếp tục tạo nhãn]
-   (COD + buyer East MY → nút DISABLED từ đầu + note "COD chỉ West MY")
+   (COD không đủ điều kiện R1–R5 tại thời điểm tạo nhãn → server trả COD_NOT_ELIGIBLE
+    → hiện panel recovery Ship manually; per PD-021, KHÔNG chặn tĩnh theo vùng)
 
 2. System   → POST /api/orders/[id]/create-label (2 bước, inline spinner):
    ① EPSubmitOrderBulk → "Đang giữ chỗ…"  (chưa trừ ví)

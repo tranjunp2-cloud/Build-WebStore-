@@ -1282,7 +1282,6 @@
                 "customerInfoTitle": "Maklumat Pelanggan",
                 "notes": "Nota",
                 "noAddress": "Tiada alamat disediakan",
-                "codBlocked": "Malaysia Timur · COD disekat",
                 "paymentInfoTitle": "Maklumat Pembayaran",
                 "noReceipt": "Tiada Resit Pembayaran",
                 "orderActionsTitle": "Tindakan Pesanan",
@@ -1434,8 +1433,8 @@
                 "awbCancelHint": "Sila batalkan AWB ini dalam papan pemuka EasyParcel anda untuk melepaskan dana dompet.",
                 "awbNumber": "Nombor AWB",
                 "downloadLabel": "Muat Turun Label PDF →",
-                "codBlockedTitle": "COD tidak tersedia untuk destinasi ini",
-                "codBlockedBody": "EasyParcel hanya menyokong COD di Semenanjung Malaysia. Pesanan ini adalah COD ke Malaysia Timur — pilih cara untuk meneruskan di bawah."
+                "codBlockedTitle": "COD tidak tersedia untuk pesanan ini",
+                "codBlockedBody": "Tiada kurier yang boleh mengutip COD untuk pesanan ini buat masa ini (mengikut had laluan semasa) — pilih cara untuk meneruskan di bawah."
             },
             "createLabel": {
                 "readyToShip": "Sedia Dihantar",
@@ -1454,7 +1453,17 @@
                 "epCost": "Kos EasyParcel: {amount}",
                 "epCostNote": "Ditetapkan semasa daftar keluar — caj sebenar mungkin berbeza sedikit.",
                 "shipHint": "Satu klik menempah slot dan menolak dompet EasyParcel anda — tiada langkah tambahan.",
-                "labelCreated": "Label penghantaran berjaya dicipta!"
+                "labelCreated": "Label penghantaran berjaya dicipta!",
+                "collectionMethod": "Kaedah pengambilan",
+                "methodPickup": "Pickup",
+                "methodPickupDesc": "Kurier mengambil di alamat anda",
+                "methodDropoff": "Drop-off",
+                "methodDropoffDesc": "Anda hantar bungkusan ke pusat kurier",
+                "collectionDateLabel": "Tarikh pengambilan",
+                "cutoffHint": "Cipta sebelum {time} (MYT) untuk pengambilan hari yang sama",
+                "dropoffHint": "Hantar bungkusan ke pusat kurier pada tarikh ini",
+                "weekendWarning": "Pengambilan hanya pada hari bekerja — pilih hari bekerja",
+                "dateShifted": "Tarikh pengambilan dialihkan ke {date} (terawal tersedia)"
             },
             "pickup": {
                 "title": "Jadualkan pengambilan",
@@ -4613,7 +4622,9 @@
             "stripePoweredBy": "Dikuasakan oleh Stripe",
             "codDetail": "Bayar tunai apabila kurier tiba. Penjual mengesahkan penerimaan.",
             "noExtraFee": "Tiada caj tambahan",
-            "westMalaysiaOnly": "Malaysia Barat sahaja",
+            "codNoCourier": "COD tidak tersedia untuk alamat penghantaran ini — sila tukar alamat atau pilih kaedah pembayaran lain",
+            "codOverMax": "Jumlah pesanan anda melebihi had COD kurier — sila kurangkan nilai pesanan atau pilih kaedah pembayaran lain",
+            "codUnderMin": "Jumlah pesanan anda di bawah minimum COD kurier — sila tambah barangan atau pilih kaedah pembayaran lain",
             "bankTransferName": "Pindahan Bank / DuitNow QR",
             "bankTransferDetail": "Pindah ke bank penjual atau imbas DuitNow QR. Resit disahkan secara manual.",
             "sellerVerified": "Disahkan penjual",

@@ -6,7 +6,7 @@
  * State machine mirrors phase-03 spec table.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   Truck, Copy, Printer, CalendarClock,
@@ -15,10 +15,8 @@ import {
 } from 'lucide-react'
 import './fulfillment.css'
 import { useI18n } from '@/i18n'
-import { isCodBlocked } from '@/lib/shipping/cod-block'
 import { CourierLogo, courierById } from './courier-logo'
 import { CreateLabelFlow } from './create-label-flow'
-import { SchedulePickupPopover } from './schedule-pickup-popover'
 import { PrintLabelModal } from './print-label-modal'
 import { SelfDeliveryZone } from './self-delivery-zone'
 import { CodRecovery } from './cod-recovery'
@@ -112,13 +110,9 @@ export function deriveFulfillState(order: FulfillmentOrder): FulfillState {
     return selfDeliveryCourier ? 'self-shipped' : 'self-delivery'
   }
 
-  // COD blocked check — EP + confirmed
-  if (
-    status === 'confirmed' &&
-    isCodBlocked({ codAmount: order.codAmount ?? 0, shippingAddress: order.shippingAddress ?? null })
-  ) {
-    return 'cod-blocked'
-  }
+  // NOTE (PD-021): 'cod-blocked' is no longer derivable statically — COD eligibility is
+  // per-route LIVE from the EP quotation. It is entered via the COD_NOT_ELIGIBLE error
+  // from /create-label (see forceCodBlocked in FulfillmentZone).
 
   // Missing weight — EP on + courier + confirmed but no parcel weight
   if (status === 'confirmed' && epEnabled && hasCourier && !parcelWeight) {
@@ -157,8 +151,6 @@ export function FulfillmentZone({
   const pk = t.dashboard.orders.pickup
   const [confirming, setConfirming] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
-  const [schedOpen, setSchedOpen] = useState(false)
-  const [pickupLabel, setPickupLabel] = useState<string | null>(null)
 
   // After label created: optimistically show awbNo + labelUrl before refetch
   const [localAwb, setLocalAwb] = useState<string | null>(null)
@@ -166,20 +158,8 @@ export function FulfillmentZone({
 
   // Missing-data override: user clicked "Ready to Ship" but EP returned MISSING_*
   const [forceMissing, setForceMissing] = useState(false)
-
-  const schedRef = useRef<HTMLDivElement>(null)
-
-  // Close schedule popover on outside click
-  useEffect(() => {
-    if (!schedOpen) return
-    const onDoc = (e: MouseEvent) => {
-      if (schedRef.current && !schedRef.current.contains(e.target as Node)) {
-        setSchedOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [schedOpen])
+  // COD-blocked override: create-label returned COD_NOT_ELIGIBLE (live R1/R2/R3 gate, PD-021)
+  const [forceCodBlocked, setForceCodBlocked] = useState(false)
 
   // Resolve display values
   const awbNo = localAwb ?? order.awbNo ?? null
@@ -189,8 +169,9 @@ export function FulfillmentZone({
   // Prefer the friendly name persisted at checkout; fall back to hardcoded COURIERS lookup, then raw code
   const courierName = order.shippingCourierName ?? courierDef?.name ?? order.shippingCourier ?? null
 
-  // Determine pickup label from persisted or local state
-  const pickupDisplay = pickupLabel ?? (() => {
+  // Collection date is chosen in the Ready-to-Ship step (US-F36-07) and persisted by
+  // create-label as pickupScheduledAt — display-only here, locked once the label exists.
+  const pickupDisplay = (() => {
     if (!order.pickupScheduledAt) return null
     const d = new Date(order.pickupScheduledAt)
     const dm = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -220,7 +201,7 @@ export function FulfillmentZone({
     }
   }, [order.id, onUpdate, f])
 
-  const state = forceMissing ? 'missing-data' : deriveFulfillState(order)
+  const state = forceCodBlocked ? 'cod-blocked' : forceMissing ? 'missing-data' : deriveFulfillState(order)
 
   // ── Pending ───────────────────────────────────────────────────────────────
   if (state === 'pending') {
@@ -385,6 +366,7 @@ export function FulfillmentZone({
             setLocalLabelUrl(newLabel)
             onUpdate()
           }}
+          onCodBlocked={() => setForceCodBlocked(true)}
         />
         {printOpen && (
           <PrintLabelModal
@@ -449,25 +431,11 @@ export function FulfillmentZone({
                   <Printer style={{ width: 15, height: 15 }} /> {f.printLabel}
                 </button>
 
-                {pickupDisplay ? (
+                {/* US-F36-07: collection date is chosen before buying the label —
+                    once the label exists it is locked (no post-label re-scheduling). */}
+                {pickupDisplay && (
                   <div className="sched-locked">
                     <CalendarClock style={{ width: 15, height: 15 }} /> {ti(f.pickupLocked, { label: pickupDisplay })}
-                  </div>
-                ) : (
-                  <div className="sched-anchor" ref={schedRef}>
-                    <button
-                      className={`btn btn-outline${schedOpen ? ' is-open' : ''}`}
-                      onClick={() => setSchedOpen(o => !o)}
-                    >
-                      <CalendarClock style={{ width: 15, height: 15 }} /> {f.schedulePickup}
-                    </button>
-                    {schedOpen && (
-                      <SchedulePickupPopover
-                        orderId={order.id}
-                        onCancel={() => setSchedOpen(false)}
-                        onConfirm={(label) => { setPickupLabel(label); setSchedOpen(false) }}
-                      />
-                    )}
                   </div>
                 )}
               </div>

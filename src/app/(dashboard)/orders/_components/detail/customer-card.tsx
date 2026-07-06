@@ -1,8 +1,6 @@
 "use client"
 
 import React from 'react'
-import { Ban } from 'lucide-react'
-import { isCodBlocked } from '@/lib/shipping/cod-block'
 import { useI18n } from '@/i18n'
 import './side.css'
 
@@ -95,11 +93,8 @@ export function CustomerCard({ order }: { order: CustomerCardOrder }) {
               .join(', ')
         : d.noAddress
 
-    const codBlocked = isCodBlocked({
-        codAmount: order.codAmount,
-        shippingAddress: order.shippingAddress ?? null,
-    })
-
+    // PD-021: static "East MY · COD blocked" badge removed — COD eligibility is per-route,
+    // LIVE from the EP quotation, so it cannot be derived from the address alone.
     return (
         <section className="od-card">
             <div className="od-cap">{d.customerInfoTitle}</div>
@@ -107,14 +102,6 @@ export function CustomerCard({ order }: { order: CustomerCardOrder }) {
             <InfoRow icon={<IconPhone />} label={d.phone} value={order.customerPhone || 'N/A'} />
             <InfoRow icon={<IconEmail />} label={d.email} value={order.customerEmail} />
             <InfoRow icon={<IconLocation />} label={d.address} value={addr} tone="teal" />
-            {codBlocked && (
-                <div className="od-region">
-                    <span className="region-badge blocked">
-                        <Ban style={{ width: 11, height: 11, flexShrink: 0 }} />
-                        {d.codBlocked}
-                    </span>
-                </div>
-            )}
             {order.notes ? (
                 <InfoRow
                     icon={<IconStickyNote />}

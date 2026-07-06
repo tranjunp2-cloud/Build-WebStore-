@@ -76,8 +76,9 @@ describe('FulfillmentZone state derivation', () => {
     expect(deriveFulfillState(order)).toBe('self-delivery')
   })
 
-  // TC-F36.F09: COD blocked for East Malaysia + confirmed
-  it('[TC-F36.F09] status=confirmed + COD to East MY → "cod-blocked"', () => {
+  // TC-F36.F09 (PD-021): NO static region block — East MY COD derives 'ready' like any
+  // other route; 'cod-blocked' is only entered live via COD_NOT_ELIGIBLE from /create-label.
+  it('[TC-F36.F09] status=confirmed + COD to East MY → "ready" (no static region block, PD-021)', () => {
     const order: FulfillmentOrder = {
       status: 'confirmed',
       codAmount: 5000,
@@ -87,10 +88,10 @@ describe('FulfillmentZone state derivation', () => {
       parcelWeight: 500,
       awbNo: null,
     }
-    expect(deriveFulfillState(order)).toBe('cod-blocked')
+    expect(deriveFulfillState(order)).toBe('ready')
   })
 
-  // TC-F36.F10: COD but West Malaysia → not blocked, continues to ready
+  // TC-F36.F10: COD West Malaysia → ready
   it('[TC-F36.F10] status=confirmed + COD to West MY → "ready" (not blocked)', () => {
     const order: FulfillmentOrder = {
       status: 'confirmed',
@@ -178,8 +179,8 @@ describe('FulfillmentZone state derivation', () => {
     expect(deriveFulfillState(order)).toBe('self-delivery')
   })
 
-  // TC-F36.F18: All East states trigger COD block (regression)
-  it('[TC-F36.F18] All East MY states trigger COD block with confirmed+cod', () => {
+  // TC-F36.F18 (PD-021): all East MY states derive 'ready' — region is never a static gate
+  it('[TC-F36.F18] All East MY states derive "ready" with confirmed+cod (no region hardcode, PD-021)', () => {
     const eastStates = ['Sabah', 'Sarawak', 'Labuan']
     eastStates.forEach((state) => {
       const order: FulfillmentOrder = {
@@ -191,7 +192,7 @@ describe('FulfillmentZone state derivation', () => {
         parcelWeight: 500,
         awbNo: null,
       }
-      expect(deriveFulfillState(order)).toBe('cod-blocked')
+      expect(deriveFulfillState(order)).toBe('ready')
     })
   })
 

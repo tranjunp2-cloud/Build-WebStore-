@@ -6,7 +6,7 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getRates } from '@/lib/shipping/get-rates'
-import { getShippingRate } from '@/lib/shipping'
+import { productWeightToGrams } from '@/lib/shipping/product-weight'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { getDefaultWarehouse, isEpReady } from '@/lib/shipping/easyparcel/warehouse'
 import { applyDiscount } from '@/lib/discounts/apply-discount'
@@ -104,6 +104,8 @@ export async function POST(request: Request) {
         const hasVariantsMap = new Map<string, boolean>()
         let subtotal = 0
         let currency = 'MYR'
+        // Parcel weight: Products.weight is KG (GH-1458); pipeline runs in grams, 500 g default
+        let totalWeightGrams = 0
 
         for (const item of aggregatedItems) {
             const productLookupId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
@@ -184,6 +186,7 @@ export async function POST(request: Request) {
 
             currency = p.currency || 'MYR'
             subtotal += unitPrice * item.quantity
+            totalWeightGrams += productWeightToGrams(p.weight) * item.quantity
 
             orderItems.push({
                 product: productLookupId,
@@ -287,11 +290,6 @@ export async function POST(request: Request) {
             }
         }
 
-        // Aggregate parcel weight from order items; use product.weight (grams) field, default 500g per item
-        const totalWeightGrams = orderItems.reduce((acc, item) => {
-            return acc + ((item as any).weightGrams || 500) * item.quantity
-        }, 0)
-
         // For COD rate queries: use effSubtotalSen as an approximation of the cart total.
         // The exact total (subtotal + shipping) is not yet known at rate-check time.
         // EP uses the COD amount only to filter eligible couriers — an estimate is sufficient.
@@ -309,17 +307,29 @@ export async function POST(request: Request) {
             (site as any).shippingConfig ?? {},
             customer.address?.state,
         )
-        let bestRate = rateResult.rates[0]
+        const bestRate = rateResult.rates[0]
 
-        // COD to a route the EP courier can't collect (COD is West-MY domestic only): don't use EP for
-        // this order — fall back to flat rate + manual COD (seller arranges delivery & collects cash),
-        // so a COD-only store still works from an East-Malaysia origin. Mirrors the storefront UI.
-        if (paymentMethod === 'cod' && bestRate.courier !== 'flat' && bestRate.codAvailable !== true) {
-            const flatSen = getShippingRate(customer.address?.state ?? '', (site as any).shippingConfig ?? {}, effSubtotalSen)
-            bestRate = {
-                courier: 'flat', serviceId: 'flat', courierName: 'Standard Delivery', serviceName: 'Standard Delivery',
-                priceSen: flatSen, codAvailable: false, estDelivery: '3–5 business days', degraded: false,
+        // COD hard-gate (PD-021 R1/R2/R3): the EP quotation succeeded but no courier can
+        // collect this COD amount on this route. The storefront disables the COD option in
+        // this case — reject here too so a direct API call cannot bypass the gate. EP-off
+        // stores and EP outages (degraded without codIneligible) keep the manual-COD path.
+        if (paymentMethod === 'cod' && rateResult.codIneligible) {
+            const codIneligibleMessages: Record<string, string> = {
+                no_cod_courier: 'No courier in this store\'s list supports COD for this address',
+                over_max: 'Order total exceeds the courier COD limit',
+                under_min: 'Order total is below the courier COD minimum',
             }
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'COD_NOT_ELIGIBLE',
+                        message: codIneligibleMessages[rateResult.codIneligible],
+                        reason: rateResult.codIneligible,
+                    },
+                },
+                { status: 422 }
+            )
         }
 
         const shippingFeeSen = bestRate.priceSen

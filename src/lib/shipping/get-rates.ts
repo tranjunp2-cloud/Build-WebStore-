@@ -3,7 +3,8 @@ import type { ShippingConfig } from './types'
 import { getShippingRate } from './calculate-fee'
 import { quotations } from './easyparcel/client'
 import type { RateOption } from './easyparcel/types'
-import { mapSubdivisionCode, aggregateWeightKg } from './easyparcel/normalize'
+import { mapSubdivisionCode, aggregateWeightKg, rmStringToSen } from './easyparcel/normalize'
+import { evaluateCodEligibility, type CodIneligibleReason } from './cod-eligibility'
 
 interface GetRatesParams {
     weightGrams: number
@@ -14,11 +15,24 @@ interface GetRatesParams {
     senderPostcode: string
     subtotalSen: number      // for flat-rate free-shipping threshold check
     codAmountSen?: number    // 0 or undefined = non-COD; >0 = COD order (sen)
+    /**
+     * Probe-only COD amount (sen): evaluate the R1/R2/R3 verdict for this amount WITHOUT
+     * COD-filtering the rate pick. Lets the storefront learn COD eligibility on the first
+     * rate fetch (before the buyer touches the payment method). Defaults to codAmountSen.
+     */
+    codProbeSen?: number
 }
 
 interface GetRatesResult {
     rates: RateOption[]
     degraded: boolean  // true = EP failed or disabled, flat-rate used
+    /**
+     * Set when the EP quotation SUCCEEDED but no courier satisfies R1/R2/R3 (PD-021)
+     * for the COD amount (codAmountSen, or the codProbeSen probe). Callers must treat
+     * COD as not orderable on this route — the returned rate stays the normal EP pick
+     * (display-only for a COD order; checkout hard-rejects before it is used).
+     */
+    codIneligible?: CodIneligibleReason
 }
 
 /**
@@ -78,9 +92,9 @@ export async function getRates(
                 serviceName: q.courier.service_name,
                 priceSen: Math.round(parseFloat(q.pricing.total_amount) * 100),
                 codAvailable: codFeature?.available ?? false,
-                codMaxSen: codFeature?.max_cod_amount != null
-                    ? Math.round(parseFloat(codFeature.max_cod_amount) * 100)
-                    : undefined,
+                // NaN-safe: EP sometimes sends ""/non-numeric limits → treated as no limit
+                codMinSen: rmStringToSen(codFeature?.min_cod_amount),
+                codMaxSen: rmStringToSen(codFeature?.max_cod_amount),
                 estDelivery: q.courier.delivery_duration ?? '3–5 business days',
             }
         })
@@ -92,18 +106,29 @@ export async function getRates(
         const usableRates = rates.filter((r) => !isByocCourier(r))
 
         if (usableRates.length > 0) {
-            // COD filter: if this is a COD order, keep only COD-capable couriers.
-            let candidates = usableRates
-            if (params.codAmountSen != null && params.codAmountSen > 0) {
-                candidates = usableRates.filter((r) => r.codAvailable === true)
+            // COD verdict (PD-021 R1/R2/R3): evaluated against the probe amount even when the
+            // pick itself is not COD-filtered, so the storefront can disable the COD option
+            // before the buyer selects it. Defaults to the real COD amount for COD orders.
+            const probeSen = params.codProbeSen ?? params.codAmountSen ?? 0
+            const probeCheck = evaluateCodEligibility(usableRates, probeSen)
+            const codIneligible = probeSen > 0 && probeCheck.eligible.length === 0 ? probeCheck.reason : undefined
+
+            // COD gate on the actual pick: for a COD order, keep only couriers whose live
+            // cod.available + min/max limits accept this amount — never trust EP API acceptance.
+            const codCheck = evaluateCodEligibility(usableRates, params.codAmountSen ?? 0)
+
+            const best = pickCheapest(codCheck.eligible)
+            if (best) return { rates: [best], degraded: false, ...(codIneligible ? { codIneligible } : {}) }
+
+            // COD order and no courier passes R1/R2/R3: keep the normal EP pick so the buyer
+            // still sees the real courier + rate (NOT a flat-rate swap) — only the codIneligible
+            // flag changes: the storefront shows the error and checkout hard-rejects COD.
+            console.warn(`[get-rates] COD ineligible (${codCheck.reason}); quoted=[${usableRates.map((r) => r.courier).join(', ')}] — keeping EP pick, flagging`)
+            return {
+                rates: [pickCheapest(usableRates)!],
+                degraded: false,
+                codIneligible: codCheck.reason,
             }
-
-            const best = pickCheapest(candidates)
-            if (best) return { rates: [best], degraded: false }
-
-            // No candidate survived (no COD-capable courier serves this route).
-            console.warn(`[get-rates] no COD-capable courier serves this route; available=[${usableRates.map((r) => r.courier).join(', ')}] → flat fallback`)
-            return { rates: [buildFlatRateOption(params, flatConfig, destState)], degraded: true }
         }
 
         console.warn('[get-rates] EP returned 0 quotations, falling back to flat rate')

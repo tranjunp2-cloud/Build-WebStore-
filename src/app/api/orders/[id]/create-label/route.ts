@@ -8,7 +8,9 @@ import { submitOrder } from '@/lib/shipping/easyparcel/client'
 import { getValidToken } from '@/lib/shipping/easyparcel/token-manager'
 import { EasyParcelError } from '@/lib/shipping/easyparcel/types'
 import { getDefaultWarehouse, isWarehouseComplete } from '@/lib/shipping/easyparcel/warehouse'
+import { clampCollectionDate } from '@/lib/shipping/easyparcel/pickup-schedule'
 import { buildSubmitParams } from './build-submit-params'
+import { verifyCodEligibilityLive } from './verify-cod-eligibility'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -131,9 +133,43 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const courier = (order as any).shippingCourier as string | undefined
         const weightGrams = parcelWeightGrams ?? ((order as any).parcelWeight as number | undefined) ?? 500
 
+        // US-F36-07 AC-3b: never trust the client's collection date — re-compute the
+        // earliest (cut-off aware, MYT) at request time and clamp past/weekend dates.
+        // The shifted flag is returned so the UI can tell the merchant the date moved.
+        const collection = clampCollectionDate(courier ?? '', collectionDate)
+
         // Read COD amount server-side — never trust client body
         const codAmountSen = (order as any).codAmount as number | null | undefined
         const codAmountRm = (codAmountSen != null && codAmountSen > 0) ? codAmountSen / 100 : undefined
+
+        // COD live re-check (PD-021 mirror gate): limits/cod.available may have changed since
+        // checkout, and EP submit accepts ineligible COD silently (cash never collected).
+        if (codAmountSen != null && codAmountSen > 0) {
+            const codCheck = await verifyCodEligibilityLive({
+                token,
+                senderPostcode: warehouse.postcode ?? '',
+                senderState: warehouse.state ?? '',
+                receiverPostcode: shippingAddress.postcode,
+                receiverState: shippingAddress.state ?? '',
+                weightGrams,
+                parcelValueRm: (order as any).total ?? 0,
+                codAmountSen,
+                serviceId: shippingServiceId,
+            })
+            if (!codCheck.ok) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'COD_NOT_ELIGIBLE',
+                            message: 'The selected courier can no longer collect COD for this order (per current route limits)',
+                            reason: codCheck.reason,
+                        },
+                    },
+                    { status: 422 },
+                )
+            }
+        }
 
         // Single-step submit (New EP API auto-deducts wallet)
         const submitParams = buildSubmitParams({
@@ -145,7 +181,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
             shippingServiceId,
             shippingCourier: courier,
             weightGrams,
-            collectionDate,
+            collectionDate: collection.date,
             codAmountRm,
         })
 
@@ -176,6 +212,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 trackingNumber: awbNo,
                 labelUrl,
                 shippingTrackingStatus: 'pending_pickup',
+                // Collection date the label was actually bought with (post-clamp) —
+                // shown as the locked "Pickup · DD/MM" line on the order detail.
+                pickupScheduledAt: collection.date,
                 ...(codAmountSen != null && codAmountSen > 0 ? { codStatus: 'pending' } : {}),
             } as any,
         })
@@ -189,7 +228,13 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
         return NextResponse.json({
             success: true,
-            data: { awbNo, trackingNumber: awbNo, labelUrl },
+            data: {
+                awbNo,
+                trackingNumber: awbNo,
+                labelUrl,
+                collectionDate: collection.date,
+                collectionDateShifted: collection.shifted,
+            },
         })
     } catch (error: unknown) {
         if (error instanceof EasyParcelError) {

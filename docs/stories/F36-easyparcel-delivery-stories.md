@@ -479,7 +479,7 @@ I want chọn pickup (courier tới lấy) hoặc dropoff khi tạo label
 So that hàng được lấy theo lịch phù hợp với shop
 ```
 
-> **⚠️ NOT BUILT (as of 2026-07-01) — Phase C only. Acceptance criteria are forward-looking; no code yet.**
+> **✅ BUILT 2026-07-06** — radio pickup/dropoff + date picker trong bước Ready-to-Ship (`create-label-flow.tsx`); server clamp AC-3b dùng chung helper `pickup-schedule.ts`; popover schedule-pickup sau-label + route `/pickup` đã gỡ. Tests: TC-F14.155–157.
 
 ### Acceptance Criteria
 
