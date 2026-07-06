@@ -29,6 +29,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
  * pointerdown to sync from — gated on isPointerRef so it doesn't clobber (1) when a
  * pointer click also happens to focus the element; (3) onClick writes its own outcome
  * back, so repeated Enter/Space with no intervening pointer event still toggles correctly.
+ *
+ * onOpenChange is also routed through changeOpen() so wasOpenRef stays in sync when
+ * something OTHER than our onClick changes `open` — e.g. Escape, which Radix closes via
+ * onOpenChange directly. Without this, wasOpenRef stays stale after Escape and the next
+ * Enter/click is a no-op (toggles to the same stale "from" state instead of reopening).
  */
 function useTapTooltip<T extends HTMLElement>() {
     const [open, setOpen] = useState(false)
@@ -36,10 +41,15 @@ function useTapTooltip<T extends HTMLElement>() {
     const wasOpenRef = useRef(false)
     const isPointerRef = useRef(false)
 
+    const changeOpen = (next: boolean) => {
+        wasOpenRef.current = next
+        setOpen(next)
+    }
+
     useEffect(() => {
         if (!open) return
         const onOutside = (e: PointerEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+            if (ref.current && !ref.current.contains(e.target as Node)) changeOpen(false)
         }
         document.addEventListener('pointerdown', onOutside)
         return () => document.removeEventListener('pointerdown', onOutside)
@@ -61,7 +71,7 @@ function useTapTooltip<T extends HTMLElement>() {
         setOpen(next)
     }
 
-    return { open, onOpenChange: setOpen, onPointerDown, onFocus, onClick, ref }
+    return { open, onOpenChange: changeOpen, onPointerDown, onFocus, onClick, ref }
 }
 
 /** Lucide icon lookup for dynamic (string-named) block/section icons. */
@@ -126,7 +136,6 @@ export function ComingSoonBadgeTooltip({ label, tip }: { label: string; tip: str
                     tabIndex={0}
                     role="note"
                     aria-label={`${label}. ${tip}`}
-                    aria-expanded={open}
                     onPointerDown={onPointerDown}
                     onFocus={onFocus}
                     onClick={onClick}

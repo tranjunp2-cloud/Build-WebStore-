@@ -2036,14 +2036,19 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 /* Top performing card head: title ("Top performing") + tp-tabs (Pages/Blogs/Referrers/
-   Products) no longer fit on one row on mobile/tablet-portrait — the flex row has no wrap,
-   so tabs overlap the title. Wrap onto title-row + tabs-row. Tabs themselves stay on ONE row
-   (matches the pill-tab pattern elsewhere) and scroll horizontally instead of wrapping.
-   GH-1491 issue 3: broken at both 375 (phone) and 768 (tablet portrait) per QA test matrix —
-   819px matches this file's existing mobile-card/tablet-compact cutoff (see .dash-table-compact
-   convention: card ≤iPad-mini-768, compact-table iPad-Air-820+), not just the narrower 560px
-   phone-only breakpoint used for the rest of this file's stat-grid/toolbar stacking rules. */
-@media (max-width: 819px) {
+   Products) no longer fit on one row on mobile/tablet — the flex row has no wrap, so tabs
+   overlap/clip the title (and the "Soon" badge on the last tab). Wrap onto title-row +
+   tabs-row. Tabs themselves stay on ONE row (matches the pill-tab pattern elsewhere) and
+   scroll horizontally instead of wrapping.
+   GH-1491 issue 3 / PR #1489 review: originally cut off at 819px (matching the unrelated
+   .dash-table-compact card/table cutoff), which left an 820-1279px gap — iPad Air (820, an
+   explicit AC checkpoint) and other tablet/small-laptop widths had no wrap fallback, and in
+   that same gap .sh-title is 16px (not restored to 15px until ≥1280 below), making the
+   single row tighter than it was pre-PR. Widened to match this file's own mobile+tablet
+   cutoff used one rule up (.cz-handle/.cz-arrows) and at the .sh-title restore just below —
+   guarantees the tabs row always wraps below desktop, so the badge can never get clipped
+   regardless of title size. Desktop (≥1280) unaffected — byte-identical. */
+@media (max-width: 1279px) {
   .dash-revamp .chart-head             { flex-wrap: wrap; row-gap: 10px; }
   .dash-revamp .tp-tabs                { width: 100%; overflow-x: auto; scrollbar-width: none; }
   .dash-revamp .tp-tabs::-webkit-scrollbar { display: none; }

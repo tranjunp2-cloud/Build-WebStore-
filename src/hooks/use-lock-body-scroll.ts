@@ -9,6 +9,7 @@ import { useEffect } from 'react'
  * another) don't prematurely unlock the background when just one of them closes.
  */
 let lockCount = 0
+let previousOverflow = ''
 
 /**
  * Locks page scroll while `locked` is true — for modals/popups whose overlay covers the
@@ -16,15 +17,20 @@ let lockCount = 0
  * the inline `document.body.style.overflow` pattern already used across the codebase
  * (ProductQuickViewModal, CartDrawer, etc.) as a shared, ref-counted hook instead of each
  * call site re-implementing its own unguarded set/restore.
+ *
+ * Restores the overflow value captured just before the FIRST lock (not a hardcoded '')
+ * so this doesn't clobber an unrelated inline lock set by legacy call sites when they
+ * overlap on the same page (e.g. ProductQuickViewModal + BulkCreateModal on /products).
  */
 export function useLockBodyScroll(locked: boolean) {
     useEffect(() => {
         if (!locked) return
+        if (lockCount === 0) previousOverflow = document.body.style.overflow
         lockCount++
         document.body.style.overflow = 'hidden'
         return () => {
             lockCount--
-            if (lockCount === 0) document.body.style.overflow = ''
+            if (lockCount === 0) document.body.style.overflow = previousOverflow
         }
     }, [locked])
 }
