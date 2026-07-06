@@ -52,7 +52,7 @@ export function TrafficPerformance({ data, period }: { data: TrafficData; period
             <div className="card chart-card">
                 <div className="chart-head" style={{ marginBottom: 14 }}>
                     <div className="sh-left">
-                        <h2 className="sh-title" style={{ fontSize: 15 }}>{r.topPerforming}</h2>
+                        <h2 className="sh-title">{r.topPerforming}</h2>
                     </div>
                     <div className="tp-tabs">
                         {TABS.map(({ id, label, Icon, soon: isSoon }) => (

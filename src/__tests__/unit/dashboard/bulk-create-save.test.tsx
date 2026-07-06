@@ -194,4 +194,19 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
             )
         })
     })
+
+    it('TC-F08-04-33 [GH-1491]: mounting locks body scroll; unmounting restores it', async () => {
+        // Arrange
+        document.body.style.overflow = ''
+        const { unmount } = render(
+            <BulkCreateModal onClose={vi.fn()} onSuccess={vi.fn()} initialPrompt="" />,
+        )
+
+        // Act / Assert: locked immediately on mount — no internal open/closed toggle,
+        // the parent controls visibility by mounting/unmounting this component.
+        expect(document.body.style.overflow).toBe('hidden')
+
+        unmount()
+        expect(document.body.style.overflow).toBe('')
+    })
 })

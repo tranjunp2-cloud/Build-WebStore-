@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { GripVertical, ChevronUp, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { updateDashboardPreferences } from '@/app/(dashboard)/actions'
 import {
     DEFAULT_DASHBOARD_BLOCKS, buildCustomizeRows,
@@ -44,6 +45,8 @@ export function CustomizeModal({ defaultVisible, onboardingComplete = false }: {
     // Portal target is only available on the client — gate so SSR/hydration stays clean
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), [])
+    // GH-1491 issue 1: background page was still scrollable behind the open modal.
+    useLockBodyScroll(open)
 
     const onboardingWasVisible = defaultVisible.includes('onboarding')
     const makeRows = (visible: DashboardBlockId[]) => {
