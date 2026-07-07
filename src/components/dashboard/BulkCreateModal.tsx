@@ -151,7 +151,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         sku: sanitizeXSS(prod.sku || '').trim() || generateFallbackSku(safeName),
         price: Number(prod.price) || 0,
         compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
-        description: prod.description ? textToLexical(prod.description) : undefined,
+        description: prod.description ? textToLexical(sanitizeXSS(prod.description)) : undefined,
         status: 'draft',
         aiReviewPending: true,
         hasVariants,

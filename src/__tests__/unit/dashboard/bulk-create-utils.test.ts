@@ -269,11 +269,12 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.variants![0].price).toBe(50)
     })
 
-    it('TC-F08-04-06: sanitizes HTML/XSS script tags from text inputs', () => {
+    it('TC-F08-04-06/TC-F08-04-51: sanitizes HTML/XSS script tags from text inputs (incl. description)', () => {
         const product = {
             selected: true,
             name: '<script>alert(1)</script>Hacked Name',
             price: 50,
+            description: '<script>alert(1)</script>Normal description <b>text</b>',
             seoTitle: '<iframe src="malicious"/>SEO',
             seoDescription: 'Normal <b>Desc</b>',
             category: 'Hacks',
@@ -289,6 +290,9 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.seo.description).toBe('Normal Desc')
         expect(payload.variants![0].name).toBe('Red')
         expect(payload.variants![0].sku).toBe('R-')
+        // TC-F08-04-51 (code-review follow-up): description also goes through sanitizeXSS
+        // before textToLexical — previously the only unsanitized text field in this function.
+        expect(payload.description!.root.children[0].children[0].text).toBe('Normal description text')
     })
 
     it('generates unique slug with random suffix', () => {
