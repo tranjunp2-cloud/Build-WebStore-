@@ -35,8 +35,10 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
         }
     };
 
+    // Preflight is OFF: without `border-0`, `border-solid` alone exposes the UA default
+    // `medium` (~3px) width on the top/left/right sides — only the 1px bottom divider may paint.
     return (
-        <div className={`transition-all duration-200 ${!isLast ? 'border-b border-solid border-[hsl(var(--border))]' : ''}`}>
+        <div className={`transition-all duration-200 ${!isLast ? 'border-0 border-b border-solid border-[hsl(var(--border))]' : ''}`}>
             <div
                 role="button"
                 tabIndex={0}

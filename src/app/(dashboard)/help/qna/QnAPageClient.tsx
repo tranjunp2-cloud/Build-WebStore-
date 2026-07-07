@@ -69,7 +69,8 @@ export const QnAPageClient = () => {
                                 <category.Icon className="w-4 h-4 text-[hsl(var(--primary))] shrink-0" aria-hidden />
                                 {category.title}
                             </h3>
-                            <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[12px] overflow-hidden">
+                            {/* `border-solid` required (preflight OFF) so the 1px card outline paints and closes the last row. */}
+                            <div className="bg-[hsl(var(--card))] border border-solid border-[hsl(var(--border))] rounded-[12px] overflow-hidden">
                                 {category.items.map((item, index) => (
                                     <QnAAccordion
                                         key={item.id}
