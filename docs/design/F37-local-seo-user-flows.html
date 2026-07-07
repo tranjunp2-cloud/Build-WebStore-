@@ -113,17 +113,17 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <nav class="sidebar">
     <span class="nav-label">Tổng quan</span>
     <div class="nav-item active" data-target="overview"><span class="num">◎</span>Tổng quan & phụ thuộc</div>
-    <span class="nav-label">Phase 1 — không cần OAuth</span>
+    <span class="nav-label">Phase 1 — không cần Google connection</span>
     <div class="nav-item" data-target="flow1"><span class="num">1</span>Local Business Data<span class="pdot p1"></span></div>
     <div class="nav-item" data-target="flow2"><span class="num">2</span>AI Crawler + llms.txt<span class="pdot p1"></span></div>
     <div class="nav-item" data-target="flow3"><span class="num">3</span>Score & Checklist<span class="pdot p1"></span></div>
     <div class="nav-item" data-target="flow4"><span class="num">4</span>Auto SEO/AEO<span class="pdot p1"></span></div>
     <div class="nav-item" data-target="flow5"><span class="num">5</span>Malaysia: Halal + Waze<span class="pdot p1"></span></div>
-    <span class="nav-label">Phase 2 — cần Google OAuth</span>
-    <div class="nav-item" data-target="flow6"><span class="num">6</span>Kết nối GBP (OAuth)<span class="pdot p2"></span></div>
+    <span class="nav-label">Phase 2 — cần GBP connection</span>
+    <div class="nav-item" data-target="flow6"><span class="num">6</span>Kết nối GBP<span class="pdot p2"></span></div>
     <div class="nav-item" data-target="flow7"><span class="num">7</span>Sync giờ lên GBP<span class="pdot p2"></span></div>
-    <div class="nav-item" data-target="flow8"><span class="num">8</span>GBP Insights<span class="pdot p2"></span></div>
-    <div class="nav-item" data-target="flow9"><span class="num">9</span>NAP Consistency<span class="pdot p2"></span></div>
+    <div class="nav-item" data-target="flow8"><span class="num">8</span>Local performance<span class="pdot p2"></span></div>
+    <div class="nav-item" data-target="flow9"><span class="num">9</span>Business info check<span class="pdot p2"></span></div>
     <span class="nav-label">Tự động nền</span>
     <div class="nav-item" data-target="auto"><span class="num">⚙</span>JSON-LD + Metadata</div>
   </nav>
@@ -138,8 +138,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
         <div class="intro-grid">
           <div class="intro-card c-total"><div class="big">9</div><div class="lbl">Luồng người dùng</div></div>
-          <div class="intro-card c-p1"><div class="big">5</div><div class="lbl">Phase 1 (P0, không OAuth)</div></div>
-          <div class="intro-card c-p2"><div class="big">4</div><div class="lbl">Phase 2 (P1, cần OAuth)</div></div>
+          <div class="intro-card c-p1"><div class="big">5</div><div class="lbl">Phase 1 (P0, không Google connection)</div></div>
+          <div class="intro-card c-p2"><div class="big">4</div><div class="lbl">Phase 2 (P1, cần GBP connection)</div></div>
           <div class="intro-card c-auto"><div class="big">2</div><div class="lbl">Tiến trình tự động</div></div>
         </div>
 
@@ -151,10 +151,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
             <tr><td>3</td><td>Local SEO Score & Checklist (one-click fix)</td><td>Seller</td><td><span class="tag p1">Phase 1</span></td><td>US-F37-04</td></tr>
             <tr><td>4</td><td>Auto SEO/AEO + sửa FAQ draft</td><td>Seller + System</td><td><span class="tag p1">Phase 1</span></td><td>US-F37-08</td></tr>
             <tr><td>5</td><td>Malaysia: Halal (seller) + Waze (khách)</td><td>Seller + Visitor</td><td><span class="tag p1">Phase 1</span></td><td>US-F37-09</td></tr>
-            <tr><td>6</td><td>Kết nối Google Business Profile (OAuth wizard)</td><td>Seller</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-05</td></tr>
+            <tr><td>6</td><td>Kết nối Google Business Profile trong Business Info</td><td>Seller</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-05</td></tr>
             <tr><td>7</td><td>Đồng bộ giờ mở cửa lên GBP</td><td>Seller</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-05</td></tr>
-            <tr><td>8</td><td>Xem GBP Insights Dashboard</td><td>Seller</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-06</td></tr>
-            <tr><td>9</td><td>NAP Consistency — phát hiện & xử lý</td><td>Seller + System</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-07</td></tr>
+            <tr><td>8</td><td>Xem local performance trong Dashboard &gt; SEO</td><td>Seller</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-06</td></tr>
+            <tr><td>9</td><td>Business Info Differences — phát hiện & xử lý</td><td>Seller + System</td><td><span class="tag p2">Phase 2</span></td><td>US-F37-07</td></tr>
             <tr><td>—</td><td><i>Tự động:</i> Emit LocalBusiness + FAQPage JSON-LD</td><td>System</td><td><span class="tag auto">Auto</span></td><td>US-F37-02, 08</td></tr>
             <tr><td>—</td><td><i>Tự động:</i> Metadata fallback tại render time</td><td>System</td><td><span class="tag auto">Auto</span></td><td>US-F37-08</td></tr>
           </tbody>
@@ -167,12 +167,12 @@ flowchart TD
     F2["Luồng 2<br/>AI Crawler + llms.txt"] --> F3
     F1 --> AUTO1["Tự động<br/>JSON-LD emit"]
     F1 --> F5["Luồng 5<br/>Waze / Halal"]
-    F3 -->|"checklist dẫn tới"| F6["Luồng 6<br/>Kết nối GBP (OAuth)"]
+    F3 -->|"checklist dẫn tới"| F6["Luồng 6<br/>Kết nối GBP"]
     F6 --> F7["Luồng 7<br/>Sync giờ lên GBP"]
-    F6 --> F8["Luồng 8<br/>GBP Insights"]
-    F6 --> F9["Luồng 9<br/>NAP Check"]
-    F1 -.->|"cung cấp NAP nguồn"| F9
-    subgraph P1["PHASE 1 — không cần OAuth"]
+    F6 --> F8["Luồng 8<br/>Local performance"]
+    F6 --> F9["Luồng 9<br/>Business info check"]
+    F1 -.->|"cung cấp business info nguồn"| F9
+    subgraph P1["PHASE 1 — không cần Google connection"]
         F1
         F2
         F3
@@ -180,7 +180,7 @@ flowchart TD
         F5
         AUTO1
     end
-    subgraph P2["PHASE 2 — cần Google OAuth"]
+    subgraph P2["PHASE 2 — cần GBP connection"]
         F6
         F7
         F8
@@ -192,7 +192,7 @@ flowchart TD
       <!-- FLOW 1 -->
       <div class="section" id="flow1">
         <div class="section-head"><h2>Luồng 1 — Thiết lập Local Business Data</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> Google & AI cần địa chỉ + toạ độ <b>cấu trúc</b> làm nguồn sự thật — free-text không vào được Local Pack. Đây là gốc của mọi tính năng local phía sau (JSON-LD geo, Waze, NAP check); thiếu data này thì các luồng kia không có dữ liệu để chạy.</div>
+        <div class="why"><b>🎯 Tại sao:</b> Google & AI cần địa chỉ + toạ độ <b>cấu trúc</b> làm nguồn sự thật — free-text không vào được Local Pack. Đây là gốc của mọi tính năng local phía sau (JSON-LD geo, Waze, business info check); thiếu data này thì các luồng kia không có dữ liệu để chạy.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p1">Phase 1 · P0</span><span class="badge story">US-F37-01</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
@@ -237,8 +237,8 @@ flowchart TD
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p1">Phase 1 · P0</span><span class="badge story">US-F37-04</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
-    A["Vào /dashboard → tab Local SEO"] --> B["Thấy Score (vd 20/100)<br/>+ checklist Việc cần làm"]
-    B --> C["Click item<br/>(vd 'Bật AI crawlers')"]
+    A["Vào /dashboard → tab SEO"] --> B["Thấy Local SEO score<br/>+ tối đa 3 việc cần làm"]
+    B --> C["Click item<br/>(vd 'Bật AI search')"]
     C --> D{"Có one-click fix?"}
     D -->|"Có"| E["Click 'Bật ngay'<br/>→ toggle tự bật<br/>→ robots.txt cập nhật ngay"]
     D -->|"Không"| F["Mở form Settings<br/>hoặc modal hướng dẫn"]
@@ -246,9 +246,9 @@ flowchart TD
     F --> G
     G --> H{"Còn item High?"}
     H -->|"Còn"| B
-    H -->|"Hết (Phase 1)"| I["Item Phase 2<br/>'Kết nối GBP' → Luồng 6"]
+    H -->|"Hết (Phase 1)"| I["Item Phase 2<br/>'Connect Google Business Profile' → Luồng 6"]
         </pre></div></div>
-        <div class="note info"><b>Score (PRD §13.8):</b> normalize trên bucket áp dụng. Phase 1 = Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15% → đạt 100. Bucket GBP/Reviews/NAP/Citations hiện "🔒 unlock Phase 2" từ đầu → không tụt điểm.</div>
+        <div class="note info"><b>Score (PRD §13.8):</b> normalize trên bucket áp dụng. Phase 1 = Business Data 35% / Structured Data 30% / AI Discoverability 20% / Technical Health 15% → đạt 100. Google Business Profile/Reviews/Business Info/Citations unlock ở Phase 2 → không tụt điểm.</div>
         <p class="foot">AC: AC-1 (score completeness), AC-2 (one-click fix).</p>
       </div>
 
@@ -296,31 +296,29 @@ flowchart TD
       <!-- FLOW 6 -->
       <div class="section" id="flow6">
         <div class="section-head"><h2>Luồng 6 — Kết nối Google Business Profile</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> GBP API là <b>nguồn DUY NHẤT</b> của local metrics (cuộc gọi, chỉ đường, maps views, reviews) và là yếu tố ranking local lớn nhất. Phải OAuth để chạm data riêng của seller. Đây là blocker chung của Luồng 7/8/9 → vì vậy dời sang Phase 2.</div>
+        <div class="why"><b>🎯 Tại sao:</b> GBP là nguồn Google cho cuộc gọi, chỉ đường và website visits từ Google profile. Website analytics dùng PostHog. Đây là blocker của Luồng 7/8/9 → vì vậy dời sang Phase 2.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-05</span></div>
-        <div class="note"><b>⚠️ Tiền đề quan trọng:</b> codebase CHƯA có hạ tầng Google OAuth — phải build từ đầu (consent builder, callback, token store mã hoá, auto-refresh, CSRF). Dùng chung cho GBP + GSC. Cần Google verification (~4–6 tuần).</div>
+        <div class="note"><b>⚠️ Tiền đề quan trọng:</b> codebase chưa có GBP authorization — phải build từ đầu (consent builder, callback, token store mã hoá, auto-refresh, CSRF). Scope chỉ có business.manage. Cần Google verification (~4–6 tuần).</div>
         <div class="card" style="margin-top:14px"><div class="diagram"><pre class="mermaid">
 flowchart TD
-    A["Click 'Kết nối Google Business Profile'"] --> B{"Đã có GBP token?"}
-    B -->|"Chưa"| C["Wizard B1:<br/>'Bạn có GBP chưa?'"]
-    C -->|"Chưa có GBP"| D["Link + hướng dẫn tạo tại<br/>business.google.com"] --> E["'Tôi đã tạo xong → Tiếp tục'"]
-    C -->|"Có GBP"| F
-    E --> F["Redirect Google OAuth<br/>scope business.manage + state=siteId"]
+    A["Business Info → Click<br/>'Connect Google Business Profile'"] --> B{"Đã có GBP token?"}
+    B -->|"Chưa có GBP"| D["Link tạo tại<br/>business.google.com"] --> A
+    B -->|"Có GBP"| F["Redirect Google authorization<br/>scope business.manage + state=siteId"]
     F --> G["Callback: verify state<br/>→ đổi code → access+refresh token"]
     G --> H["Lưu Sites.gbpIntegration (per-site)<br/>+ gbp_location_id"]
-    H --> I["Pull GBP info → so NAP (Luồng 9)"]
-    I --> J{"NAP khớp?"}
+    H --> I["Pull GBP info → so Business Info (Luồng 9)"]
+    I --> J{"Thông tin khớp?"}
     J -->|"Khớp"| K["Badge 'Đã kết nối ✓'<br/>+ nút Đồng bộ (Luồng 7)"]
     J -->|"Lệch"| L["Hiện mismatch + hướng dẫn fix"]
-    B -->|"Rồi"| MM["Pull GBP Insights (Luồng 8)"]
+    B -->|"Rồi"| MM["Pull GBP activity (Luồng 8)"]
         </pre></div></div>
-        <p class="foot">AC: AC-1 (OAuth connect), AC-3 (wizard cho seller chưa có GBP).</p>
+        <p class="foot">AC: AC-1 (connect), AC-3 (link tạo GBP cho seller chưa có).</p>
       </div>
 
       <!-- FLOW 7 -->
       <div class="section" id="flow7">
         <div class="section-head"><h2>Luồng 7 — Đồng bộ giờ mở cửa lên GBP</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> tránh seller phải nhập giờ ở 2 nơi (platform + GBP). Platform là nguồn sự thật → push 1 chiều, giảm lệch NAP và giữ giờ mở cửa nhất quán trên Google.</div>
+        <div class="why"><b>🎯 Tại sao:</b> tránh seller phải nhập giờ ở 2 nơi (platform + GBP). Platform là nguồn sự thật → push 1 chiều, giữ giờ mở cửa nhất quán trên Google.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-05</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
@@ -335,40 +333,40 @@ flowchart TD
 
       <!-- FLOW 8 -->
       <div class="section" id="flow8">
-        <div class="section-head"><h2>Luồng 8 — Xem GBP Insights Dashboard</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> số liệu thực gắn doanh thu (cuộc gọi, chỉ đường, clicks) là thứ seller <b>thấy được ROI</b> của Local SEO — không phải vanity metric. Đây là giá trị "thấy ngay mỗi tuần" trong user story.</div>
+        <div class="section-head"><h2>Luồng 8 — Local Performance trong Dashboard &gt; SEO</h2></div>
+        <div class="why"><b>🎯 Tại sao:</b> seller cần số liệu dễ hiểu: website activity từ PostHog, Google activity từ GBP. Không dùng GA4/GSC vì phần lớn seller dùng platform subdomain.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-06</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
-    A["Vào tab Local SEO (đã connect)"] --> B["Skeleton shimmer"]
-    B --> C{"Cache < 6h?"}
-    C -->|"Có"| D["Hiện data cache"]
-    C -->|"Không"| E["Gọi GBP Insights API<br/>(throttle 5 req/tenant/giờ)"]
-    E --> F{"API OK?"}
-    F -->|"OK"| G["≤6 cards: Cuộc gọi/Chỉ đường/<br/>Clicks/Lượt xem/Đánh giá/AI appearances"]
-    F -->|"Lỗi + có cache"| H["Banner 'Dùng cache X giờ trước'"]
-    F -->|"Lỗi + không cache"| I["Empty state + 'Thử tải lại'"]
-    D --> G
-    G --> J["Line chart Recharts 7/30 ngày<br/>(calls/directions/clicks)"]
-    J --> K["Chọn period → refetch"]
+    A["Vào Dashboard → SEO"] --> B["Skeleton shimmer"]
+    B --> C["Load website activity từ PostHog"]
+    B --> D{"GBP connected?"}
+    D -->|"Chưa"| E["Google activity empty state<br/>→ mở Business Info"]
+    D -->|"Rồi"| F{"GBP cache < 6h?"}
+    F -->|"Có"| G["Hiện GBP data cache"]
+    F -->|"Không"| H["Gọi GBP metrics API<br/>(throttle 5 req/tenant/giờ)"]
+    H --> I{"API OK?"}
+    I -->|"OK"| J["Calls / Directions / Website visits"]
+    I -->|"Lỗi + có cache"| K["Banner 'Dùng cache X giờ trước'"]
+    I -->|"Lỗi + không cache"| L["Empty state + 'Thử tải lại'"]
         </pre></div></div>
-        <div class="note info"><b>Reuse:</b> <code>DashboardStats</code> (card pattern) + Recharts. Tab dùng client-side <code>TabId</code> + <code>&lt;TabPanel&gt;</code> + <code>?tab=</code>, KHÔNG tạo route page riêng.</div>
-        <p class="foot">AC: AC-1 (cards), AC-2 (cache fallback), AC-3 (mobile 2x3).</p>
+        <div class="note info"><b>Reuse:</b> existing Dashboard &gt; SEO screen and card patterns. No new Local SEO tab, no chart dashboard in MVP.</div>
+        <p class="foot">AC: AC-1 (cards), AC-2 (cache fallback), AC-3 (mobile layout).</p>
       </div>
 
       <!-- FLOW 9 -->
       <div class="section" id="flow9">
-        <div class="section-head"><h2>Luồng 9 — NAP Consistency</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> Name/Address/Phone lệch giữa website và Google làm <b>tụt ranking local + giảm trust</b> (NAP nhất quán → +40% xuất hiện Local Pack). Phát hiện tự động + chỉ rõ chỗ lệch để seller sửa.</div>
+        <div class="section-head"><h2>Luồng 9 — Business Info Differences</h2></div>
+        <div class="why"><b>🎯 Tại sao:</b> tên, địa chỉ hoặc số điện thoại khác nhau giữa website và Google làm khách mất tin tưởng. Phát hiện tự động + chỉ rõ chỗ lệch để seller sửa.</div>
         <div class="badges"><span class="badge actor">👤 Seller + ⚙ System</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-07</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
     A["Trigger: sau GBP connect<br/>hoặc sau save site settings"] --> B["So sánh Name/Address/Phone<br/>Sites record vs GBP data"]
     B --> C{"Khớp?"}
-    C -->|"Khớp"| D["Badge 'NAP: Khớp ✓'<br/>không có item checklist"]
-    C -->|"Lệch"| E["Badge 'NAP: Có khác biệt ⚠'<br/>Score -10"]
-    E --> F["Checklist item cụ thể:<br/>giá trị Website vs GBP"]
-    F --> G["Click 'Xem chi tiết'<br/>→ modal so sánh 2 cột"]
+    C -->|"Khớp"| D["Không hiện warning<br/>không có item checklist"]
+    C -->|"Lệch"| E["Business Info panel:<br/>'Phone number is different'"]
+    E --> F["Checklist item dẫn về<br/>Settings → Business Info"]
+    F --> G["Seller chọn dùng Website value<br/>hoặc Google value từng dòng"]
         </pre></div></div>
         <p class="foot">Phụ thuộc Luồng 6 (chỉ chạy khi GBP connected). AC: AC-1 (mismatch), AC-2 (khớp).</p>
       </div>
