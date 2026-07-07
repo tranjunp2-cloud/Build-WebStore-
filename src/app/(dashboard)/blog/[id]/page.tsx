@@ -677,19 +677,22 @@ export default function BlogEditorPage() {
                         )}
                     </div>
 
-                    <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
+                    {/* GH-1511 bug #44: preview matches the storefront blog-list grid ratio (aspect-[4/3],
+                        blocks/blog-list/index.tsx) so merchants see the same crop the buyer gets — the old
+                        fixed 256px height rendered ~1.8:1 and misled. Card height is now content-driven. */}
+                    <div className="flex flex-col p-[25px] gap-[16px] bg-[hsl(var(--card))] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
                             <Label className="text-muted-foreground">
                                 {t.dashboard.blog.editor.thumbnailLabel}
                             </Label>
                         </div>
                         {thumbnailPreview ? (
-                            <div className="relative w-full h-[256px] rounded-[16px]">
+                            <div className="relative w-full max-w-[480px] aspect-[4/3] rounded-[16px] mx-auto">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={thumbnailPreview}
                                     alt="Thumbnail preview"
-                                    className="w-full h-[256px] object-cover rounded-[16px]"
+                                    className="w-full h-full object-cover rounded-[16px]"
                                 />
                                 <Button
                                     type="button"
@@ -702,7 +705,8 @@ export default function BlogEditorPage() {
                                 </Button>
                             </div>
                         ) : (
-                            <label className="flex flex-col items-center justify-center cursor-pointer gap-[12px] py-[68px] h-[256px] border-2 border-dashed border-[hsl(var(--border))] rounded-[16px] bg-transparent hover:bg-white/5 transition-colors">
+                            // Hover = teal active, same pattern as Add Product's ImageUploader dropzone
+                            <label className="flex flex-col items-center justify-center cursor-pointer gap-[12px] py-[68px] h-[256px] border-2 border-dashed border-[hsl(var(--border))] rounded-[16px] bg-transparent hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.06)] transition-colors">
                                 <div className="flex items-center justify-center w-[64px] h-[64px] rounded-[33554400px] bg-[hsl(var(--primary)/0.1)]">
                                     <Upload className="w-[32px] h-[32px] text-[hsl(var(--primary))]" strokeWidth={1.5} />
                                 </div>

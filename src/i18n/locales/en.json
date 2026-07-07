@@ -2536,7 +2536,7 @@
                 "thumbnailLabel": "Featured Thumbnail",
                 "replace": "Replace",
                 "clickToUpload": "Click to upload thumbnail",
-                "uploadHint": "PNG, JPG up to 10MB",
+                "uploadHint": "PNG, JPG up to 10MB — 4:3 ratio, ≥1200px wide recommended",
                 "startWriting": "Start writing...",
                 "postSettings": "Post Settings",
                 "category": "Category",

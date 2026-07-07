@@ -2536,7 +2536,7 @@
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
                 "clickToUpload": "Klik untuk memuat naik lakaran pribit",
-                "uploadHint": "PNG, JPG sehingga 10MB",
+                "uploadHint": "PNG, JPG sehingga 10MB — nisbah 4:3, lebar ≥1200px disyorkan",
                 "startWriting": "Mula menulis...",
                 "postSettings": "Tetapan Kiriman",
                 "category": "Kategori",
