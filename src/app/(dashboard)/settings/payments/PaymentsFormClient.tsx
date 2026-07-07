@@ -927,14 +927,14 @@ export function PaymentsFormClient({
             {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh. */}
             {isDirty && (
             <div
-                className="sticky bottom-4 z-40 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
                 style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
             >
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
                         <>
-                            <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
-                            <span className="text-amber-300 font-medium">{pt.unsavedChanges}</span>
+                            <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-amber-600 dark:text-amber-300 font-medium">{pt.unsavedChanges}</span>
                         </>
                     ) : (
                         <>

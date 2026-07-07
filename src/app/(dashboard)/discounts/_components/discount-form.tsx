@@ -247,7 +247,6 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 render while there's something unsaved. */}
             {dirty && (
                 <DiscountSaveBar
-                    dirty={dirty}
                     isNew={isNew}
                     saving={saving}
                     onCancel={handleCancel}
