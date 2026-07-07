@@ -1452,6 +1452,7 @@
                 "fromSettings": "dari Tetapan",
                 "epCost": "Kos EasyParcel: {amount}",
                 "epCostNote": "Ditetapkan semasa daftar keluar — caj sebenar mungkin berbeza sedikit.",
+                "walletBalanceLabel": "Baki dompet",
                 "shipHint": "Satu klik menempah slot dan menolak dompet EasyParcel anda — tiada langkah tambahan.",
                 "labelCreated": "Label penghantaran berjaya dicipta!",
                 "collectionMethod": "Kaedah pengambilan",

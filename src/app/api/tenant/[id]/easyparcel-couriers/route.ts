@@ -57,7 +57,7 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
             throw err
         }
 
-        // Wallet balance (best-effort) so the settings UI can show it without a separate test call.
+        // Wallet balance (best-effort) — settings UI and the order-detail EP-cost tile both use it.
         let wallet: { balance: string; currency: string } | null = null
         try {
             const w = await walletBalance(token)

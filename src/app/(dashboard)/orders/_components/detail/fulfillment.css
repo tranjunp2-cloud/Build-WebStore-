@@ -104,6 +104,8 @@
   color: #fff; font-weight: 800; letter-spacing: -0.02em; flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
 }
+/* Real courier logo image (EP courier_logo URL) — white plate so transparent PNGs read on dark bg */
+.cl-logo-img { object-fit: contain; background: #fff; padding: 3px; box-sizing: border-box; }
 
 /* ── Courier preset row ─────────────────────────────────────────────────── */
 .courier-preset {
@@ -138,6 +140,9 @@
 .wallet .w-main { font-size: 14px; font-weight: 600; color: var(--dash-text); }
 .wallet .w-main b { font-family: var(--font-mono, monospace); }
 .wallet .w-sub { font-size: 12px; color: var(--dash-text-muted); opacity: 0.75; }
+/* Wallet balance line (design 260707): divider above, mono amount like the cost figure */
+.wallet .w-balance { border-top: 1px solid var(--dash-border); padding-top: 6px; margin-top: 4px; opacity: 1; }
+.wallet .w-balance b { font-family: var(--font-mono, monospace); font-weight: 600; color: var(--dash-text-muted); }
 
 /* ── In-progress 2-step list ─────────────────────────────────────────────── */
 .ship-steps { display: flex; flex-direction: column; gap: 12px; padding: 2px; }
@@ -518,17 +523,18 @@
    so nothing floats loose under the grid and all three cards stay flush. */
 .collect-date-card {
   flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px;
-  box-sizing: border-box; min-height: 58px; padding: 10px 14px;
+  box-sizing: border-box; min-height: 58px; padding: 10px 14px; width: 100%; text-align: left;
   border: 1px solid var(--dash-border); border-radius: 10px; background: var(--dash-secondary-bg);
-  transition: border-color 0.12s; cursor: pointer;
+  transition: border-color 0.12s; cursor: pointer; font-family: inherit;
 }
 .collect-date-card:hover { border-color: var(--dash-text-muted); }
-.collect-date-card:focus-within { border-color: hsl(var(--primary)); }
-.collect-date-card input[type="date"] {
-  width: 100%; border: none; background: transparent; color: var(--dash-text);
-  font-size: 14px; font-weight: 700; font-family: inherit; color-scheme: dark; padding: 0;
+.collect-date-card:focus-visible,
+.collect-date-card[data-state="open"] { border-color: hsl(var(--primary)); outline: none; }
+.cd-value {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 14px; font-weight: 700; color: var(--dash-text);
 }
-.collect-date-card input[type="date"]:focus { outline: none; }
+.cd-value svg { width: 15px; height: 15px; color: var(--dash-text-muted); flex-shrink: 0; }
 .cd-note {
   display: flex; align-items: flex-start; gap: 5px;
   font-size: 11px; font-weight: 500; color: var(--dash-text-muted); line-height: 1.35;

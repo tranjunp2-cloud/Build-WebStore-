@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 // Ported from design-reference atoms.jsx (window.COURIERS + window.CourierLogo)
 // Used in fulfillment-zone, print-label-modal, tracking sections.
 
@@ -45,23 +47,45 @@ export function courierByName(name: string | null | undefined): CourierDef | und
 }
 
 /**
- * Monogram tile that mirrors the design .cl-logo class.
- * Falls back to a 2-char substring of courierName when id is unknown.
+ * Courier logo tile. Prefers the REAL logo URL from EP's courier list
+ * (`courier_logo`, resolved per tenant via useCourierLogos) and falls back to the
+ * monogram tile (design .cl-logo) when no URL is available or the image 404s.
  */
 export function CourierLogo({
   courierId,
   courierName,
+  logoUrl,
   size = 34,
 }: {
   courierId?: string | null
   courierName?: string | null
+  /** Real logo URL from EP courier list (courier_logo) — monogram fallback when absent/broken. */
+  logoUrl?: string | null
   size?: number
 }) {
+  const [imgFailed, setImgFailed] = React.useState(false)
+
   // Try id lookup first; fall back to fuzzy name match for opaque EP codes (e.g. "EP-CR0DW")
   const def = courierById(courierId) ?? courierByName(courierName)
   const mono = def?.mono ?? (courierName ?? 'EP').slice(0, 3).toUpperCase()
   const bg   = def?.color ?? '#3b82f6'
   const name = def?.name  ?? courierName ?? courierId ?? 'EP'
+
+  if (logoUrl && !imgFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- external EP CDN URL, unknown host list
+      <img
+        className="cl-logo cl-logo-img"
+        src={logoUrl}
+        alt={name}
+        title={name}
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+        onError={() => setImgFailed(true)}
+      />
+    )
+  }
 
   return (
     <span

@@ -16,6 +16,7 @@ import {
 import './fulfillment.css'
 import { useI18n } from '@/i18n'
 import { CourierLogo, courierById } from './courier-logo'
+import { useCourierLogos, useEpWallet, invalidateEpShippingInfo } from './use-ep-shipping-info'
 import { CreateLabelFlow } from './create-label-flow'
 import { PrintLabelModal } from './print-label-modal'
 import { SelfDeliveryZone } from './self-delivery-zone'
@@ -56,6 +57,7 @@ export interface FulfillmentOrder {
   cancelledAt?: string | null
   // Tenant integration config (depth=2 resolved)
   tenant?: {
+    id?: string | number
     easyParcelIntegration?: {
       enabled?: boolean
       selectedCouriers?: string[]
@@ -168,6 +170,11 @@ export function FulfillmentZone({
   const courierDef = courierById(courierId)
   // Prefer the friendly name persisted at checkout; fall back to hardcoded COURIERS lookup, then raw code
   const courierName = order.shippingCourierName ?? courierDef?.name ?? order.shippingCourier ?? null
+  // Real courier logo from EP courier list (per-tenant module cache) — monogram fallback when absent
+  const tenantId = typeof order.tenant === 'object' && order.tenant !== null ? order.tenant.id : order.tenant
+  const courierLogos = useCourierLogos(tenantId)
+  const courierLogoUrl = courierId ? courierLogos?.get(courierId) ?? null : null
+  const epWallet = useEpWallet(tenantId)
 
   // Collection date is chosen in the Ready-to-Ship step (US-F36-07) and persisted by
   // create-label as pickupScheduledAt — display-only here, locked once the label exists.
@@ -360,10 +367,14 @@ export function FulfillmentZone({
           orderId={order.id}
           courierId={courierId}
           courierName={courierName}
+          courierLogoUrl={courierLogoUrl}
           shippingFee={order.shippingFee}
+          wallet={epWallet}
           onSuccess={(newAwb, newLabel) => {
             setLocalAwb(newAwb)
             setLocalLabelUrl(newLabel)
+            // Wallet was charged for the label — refetch balance on next read
+            invalidateEpShippingInfo(tenantId)
             onUpdate()
           }}
           onCodBlocked={() => setForceCodBlocked(true)}
@@ -401,7 +412,7 @@ export function FulfillmentZone({
               <div className="st-field" style={{ gap: 6 }}>
                 <div className="od-info-l">{f.courier}</div>
                 <div className="st-courier">
-                  <CourierLogo courierId={courierId} courierName={courierName} size={22} />
+                  <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={22} />
                   {courierName ?? f.courier}
                 </div>
               </div>
@@ -483,7 +494,7 @@ export function FulfillmentZone({
               <div className="st-field" style={{ gap: 6 }}>
                 <div className="od-info-l">{f.courier}</div>
                 <div className="st-courier">
-                  <CourierLogo courierId={courierId} courierName={courierName} size={22} />
+                  <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={22} />
                   {courierName ?? f.courier}
                 </div>
               </div>

@@ -1,14 +1,18 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet, TriangleAlert } from 'lucide-react'
+import { Info, Check, ExternalLink, RefreshCw, Lock, Wallet, TriangleAlert, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
+import { format } from 'date-fns'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as CalendarUI } from '@/components/ui/calendar'
 import { useI18n } from '@/i18n'
 import {
   earliestPickupDate,
   isBusinessDateString,
   courierCutoffLabel,
 } from '@/lib/shipping/easyparcel/pickup-schedule'
+import type { EpWalletInfo } from './use-ep-shipping-info'
 import { CourierLogo } from './courier-logo'
 
 // Cosmetic 2-step display (single API call underneath)
@@ -18,6 +22,10 @@ interface CreateLabelFlowProps {
   orderId: string | number
   courierId?: string | null
   courierName?: string | null
+  /** Real courier logo URL (EP courier list) — CourierLogo falls back to monogram when absent. */
+  courierLogoUrl?: string | null
+  /** EP wallet balance (per-tenant cache) — shown under the cost line; note fallback when null. */
+  wallet?: EpWalletInfo | null
   shippingFee?: number | null    // quoted at checkout (RM)
   onSuccess: (awbNo: string, labelUrl: string | null) => void
   /** Server rejected with COD_NOT_ELIGIBLE (live R1/R2/R3 gate) — parent shows the COD recovery panel. */
@@ -34,6 +42,8 @@ export function CreateLabelFlow({
   orderId,
   courierId,
   courierName,
+  courierLogoUrl,
+  wallet,
   shippingFee,
   onSuccess,
   onCodBlocked,
@@ -50,21 +60,15 @@ export function CreateLabelFlow({
   const [collectionDate, setCollectionDate] = useState(earliest)
   const dateIsBusiness = isBusinessDateString(collectionDate)
   const dateValid = collectionDate >= earliest && dateIsBusiness
+
+  // "YYYY-MM-DD" string (API contract) ↔ local Date (react-day-picker works on Dates)
+  const selectedDate = useMemo(() => new Date(`${collectionDate}T00:00:00`), [collectionDate])
+  const earliestDate = useMemo(() => new Date(`${earliest}T00:00:00`), [earliest])
+  const dateToStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   // Ref tracks the cosmetic timer so it can be cleared on unmount (avoids setState-on-unmounted warning)
   const cosmeticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const dateInputRef = useRef<HTMLInputElement>(null)
-
-  // Whole date card opens the native picker — not just the tiny calendar icon
-  const openDatePicker = () => {
-    const input = dateInputRef.current
-    if (!input) return
-    try {
-      if (typeof input.showPicker === 'function') input.showPicker()
-      else input.focus()
-    } catch {
-      // showPicker throws if the picker is already open (e.g. icon click) — ignore
-    }
-  }
+  const [dateOpen, setDateOpen] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -212,7 +216,9 @@ export function CreateLabelFlow({
         <div className="courier-preset">
           <span className="cp-l">{cl.courierLabel}</span>
           <span className="cp-v">
-            <CourierLogo courierId={courierId} courierName={courierName} size={20} />
+            {/* 32px ≈ optical match with the 34px .w-ico wallet tile — the white logo plate on a
+                dark bg reads slightly larger than the tinted icon square at equal pixel size */}
+            <CourierLogo courierId={courierId} courierName={courierName} logoUrl={courierLogoUrl} size={32} />
             {displayName}
             <span className="preset-tag">
               <Lock style={{ width: 10, height: 10 }} /> {cl.fromSettings}
@@ -220,7 +226,9 @@ export function CreateLabelFlow({
           </span>
         </div>
 
-        {/* Cost line — show quoted shipping fee; wallet balance omitted (API doesn't return it) */}
+        {/* Cost tile — quoted shipping fee on top, live wallet balance under the divider
+            (design 260707); falls back to the "quoted at checkout" note while the balance
+            is loading or when EP didn't return one. */}
         {shippingFee != null && (
           <div className="wallet">
             <span className="w-ico">
@@ -230,7 +238,14 @@ export function CreateLabelFlow({
               <div className="w-main">
                 {ti(cl.epCost, { amount: `MYR ${shippingFee.toFixed(2)}` })}
               </div>
-              <div className="w-sub">{cl.epCostNote}</div>
+              {wallet ? (
+                <div className="w-sub w-balance">
+                  {cl.walletBalanceLabel}{' '}
+                  <b>{wallet.currency} {Number(wallet.balance).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                </div>
+              ) : (
+                <div className="w-sub">{cl.epCostNote}</div>
+              )}
             </div>
           </div>
         )}
@@ -267,28 +282,46 @@ export function CreateLabelFlow({
         </div>
         <div className="collect-col collect-date">
           <div className="od-info-l" style={{ marginBottom: 6 }}>{cl.collectionDateLabel}</div>
-          {/* Date card mirrors the method tiles: value + its note live INSIDE the card */}
-          <div className="collect-date-card" onClick={openDatePicker}>
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={collectionDate}
-              min={earliest}
-              onChange={(e) => setCollectionDate(e.target.value)}
-            />
-            {!dateIsBusiness ? (
-              <div className="cd-note warn">
-                <TriangleAlert /> {cl.weekendWarning}
-              </div>
-            ) : (
-              <div className="cd-note">
-                <Info />
-                {method === 'pickup'
-                  ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
-                  : cl.dropoffHint}
-              </div>
-            )}
-          </div>
+          {/* Date card mirrors the method tiles: value + its note live INSIDE the card.
+              shadcn Calendar disables past dates + weekends right on the grid. */}
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" className="collect-date-card">
+                <span className="cd-value">
+                  {format(selectedDate, 'EEE, dd/MM/yyyy')}
+                  <CalendarDays />
+                </span>
+                {!dateIsBusiness ? (
+                  <span className="cd-note warn">
+                    <TriangleAlert /> {cl.weekendWarning}
+                  </span>
+                ) : (
+                  <span className="cd-note">
+                    <Info />
+                    {method === 'pickup'
+                      ? ti(cl.cutoffHint, { time: courierCutoffLabel(courierId ?? '') })
+                      : cl.dropoffHint}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="dash-shell w-auto p-0 border-[hsl(var(--border))] text-foreground"
+              align="start"
+              style={{ backgroundColor: 'var(--dash-bg)' }}
+            >
+              <CalendarUI
+                mode="single"
+                selected={selectedDate}
+                defaultMonth={selectedDate}
+                disabled={[{ before: earliestDate }, { dayOfWeek: [0, 6] }]}
+                onSelect={(d) => {
+                  if (d) setCollectionDate(dateToStr(d))
+                  setDateOpen(false)
+                }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

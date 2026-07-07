@@ -1452,6 +1452,7 @@
                 "fromSettings": "from Settings",
                 "epCost": "EasyParcel cost: {amount}",
                 "epCostNote": "Quoted at checkout — actual charge may vary slightly.",
+                "walletBalanceLabel": "Wallet balance",
                 "shipHint": "One click reserves the slot and charges your EasyParcel wallet — no extra steps.",
                 "labelCreated": "Shipping label created!",
                 "collectionMethod": "Collection method",

@@ -386,7 +386,9 @@ export function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: i <= currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
+                                        // Connector i joins step i → i+1: filled only once the NEXT step is
+                                        // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
+                                        background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
                                     }}
                                 />
                             )}
