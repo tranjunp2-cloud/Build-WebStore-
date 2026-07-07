@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Plus, Tag, Filter } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter } from 'lucide-react'
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
@@ -17,6 +18,7 @@ import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/P
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
+import { AiReviewIndicator } from '@/components/dashboard/AiReviewIndicator'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -76,6 +78,7 @@ type Product = {
     variants?: Variant[]
     attributes?: Array<{ key: string; value: string }>
     descText?: string
+    aiReviewPending?: boolean
 }
 
 function formatPrice(price: number, currency: string) {
@@ -137,6 +140,8 @@ export default function ProductsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
+    const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
+    useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
     const [sortBy, setSortBy] = useState('Latest')
     const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -277,8 +282,12 @@ export default function ProductsPage() {
             }
         }
 
-        // Optimistic update
-        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
+        // Capture the pre-update flag from list state (not `prod`, which may be a DetailedProduct
+        // without this field) so a failed activation restores the correct prior value on rollback.
+        const prevAiReviewPending = products.find(p => p.id === prod.id)?.aiReviewPending
+
+        // Optimistic update — activating a product means it's been reviewed, so also drop the AI-review dot.
+        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus, aiReviewPending: newStatus === 'active' ? false : p.aiReviewPending } : p))
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
@@ -289,7 +298,7 @@ export default function ProductsPage() {
             } else {
                 toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
             }
-            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
+            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status, aiReviewPending: prevAiReviewPending } : p))
         }
     }
 
@@ -379,30 +388,66 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-row items-center gap-2 w-full">
-                        {/* Input — shared <Input> nguyên bản design-system (nền card, viền --input-border,
-                            focus ring chuẩn), chỉ override cỡ chữ 13px như ô search. */}
-                        <Input
+                    <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
+                    {/* Command shell — textarea + footer (hint + Generate button) share one bordered
+                        box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
+                    <div className="w-full rounded-xl border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))] transition-colors">
+                        <textarea
+                            ref={aiTextareaRef}
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
                             onKeyDown={e => {
-                                if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
+                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && aiPrompt.trim()) {
+                                    e.preventDefault()
+                                    handleCreateAi()
+                                }
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                            className="flex-1 min-w-0 text-[13px]"
+                            rows={1}
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
                         />
-                        {/* Create — shared dashboard primary button (size="dash") */}
-                        <Button
-                            variant="dashPrimary"
-                            size="dash"
-                            onClick={() => {
-                                if (aiPrompt.trim()) handleCreateAi()
-                            }}
-                            className="shrink-0 justify-center"
-                        >
-                            <Plus className="h-4 w-4" />
-                            {t.dashboard.products.list.aiChatBtn}
-                        </Button>
+                        <div className="flex items-center justify-between gap-3 border-t border-[hsl(var(--input-border))]/60 px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
+                                <span>·</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <span>+</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
+                            </div>
+                            {/* Generate Drafts — shared dashboard primary button (size="dash") */}
+                            <Button
+                                variant="dashPrimary"
+                                size="dash"
+                                onClick={handleCreateAi}
+                                disabled={!aiPrompt.trim()}
+                                className="shrink-0 justify-center"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                {t.dashboard.products.list.aiChatBtn}
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] text-muted-foreground">{t.dashboard.products.list.aiChatSuggestionsLabel}</span>
+                        {[
+                            { label: t.dashboard.products.list.aiChatSuggestion1Label, fill: t.dashboard.products.list.aiChatSuggestion1 },
+                            { label: t.dashboard.products.list.aiChatSuggestion2Label, fill: t.dashboard.products.list.aiChatSuggestion2 },
+                            { label: t.dashboard.products.list.aiChatSuggestion3Label, fill: t.dashboard.products.list.aiChatSuggestion3 },
+                        ].map((suggestion, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                    setAiPrompt(suggestion.fill)
+                                    aiTextareaRef.current?.focus()
+                                }}
+                                className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
+                            >
+                                {suggestion.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -774,6 +819,7 @@ export default function ProductsPage() {
                                                                     {product.name}
                                                                 </span>
                                                                 <MissingInfoIndicator missing={missing} t={t} />
+                                                                <AiReviewIndicator pending={product.aiReviewPending} t={t} />
                                                             </div>
                                                             {product.sku && (
                                                                 <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
@@ -871,6 +917,7 @@ export default function ProductsPage() {
                                                         {product.name}
                                                     </div>
                                                     <MissingInfoIndicator missing={missing} t={t} />
+                                                    <AiReviewIndicator pending={product.aiReviewPending} t={t} />
                                                 </div>
                                                 {product.category && product.category.length > 0 && (
                                                     <div className="text-[12px] text-[hsl(var(--primary))] font-medium leading-[16px] truncate">
@@ -993,6 +1040,8 @@ export default function ProductsPage() {
                     onClose={() => setShowBulkCreate(false)}
                     onSuccess={() => {
                         setAiPrompt('')
+                        setFilterStatus('draft')
+                        setSortBy('Latest')
                         loadProducts()
                     }}
                 />
