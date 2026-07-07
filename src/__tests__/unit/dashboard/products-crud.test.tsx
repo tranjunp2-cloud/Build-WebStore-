@@ -345,9 +345,9 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
         expect(payload.slug).toMatch(/^dep-to-ong-[a-z0-9]{5}$/)
     })
 
-    it('sets default inventory=10 when no variants', () => {
+    it('sets default inventory=0 when no variants (GH-1502: out of stock until merchant confirms)', () => {
         const payload = buildSavePayload({ ...baseProduct, variants: [] }, null, null)
-        expect(payload.inventory).toBe(10)
+        expect(payload.inventory).toBe(0)
         expect(payload.variants).toBeUndefined()
     })
 

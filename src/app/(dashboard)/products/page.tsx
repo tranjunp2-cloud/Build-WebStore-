@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Plus, Tag } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag } from 'lucide-react'
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
@@ -17,6 +18,7 @@ import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/P
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
+import { AiReviewIndicator } from '@/components/dashboard/AiReviewIndicator'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -76,6 +78,7 @@ type Product = {
     variants?: Variant[]
     attributes?: Array<{ key: string; value: string }>
     descText?: string
+    aiReviewPending?: boolean
 }
 
 function formatPrice(price: number, currency: string) {
@@ -137,6 +140,8 @@ export default function ProductsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [showBulkCreate, setShowBulkCreate] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
+    const aiTextareaRef = useRef<HTMLTextAreaElement>(null)
+    useAutoResizeTextarea(aiTextareaRef, aiPrompt, 160, t.dashboard.products.list.aiChatPlaceholder)
     const [sortBy, setSortBy] = useState('Latest')
     const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -277,8 +282,12 @@ export default function ProductsPage() {
             }
         }
 
-        // Optimistic update
-        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
+        // Capture the pre-update flag from list state (not `prod`, which may be a DetailedProduct
+        // without this field) so a failed activation restores the correct prior value on rollback.
+        const prevAiReviewPending = products.find(p => p.id === prod.id)?.aiReviewPending
+
+        // Optimistic update — activating a product means it's been reviewed, so also drop the AI-review dot.
+        setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus, aiReviewPending: newStatus === 'active' ? false : p.aiReviewPending } : p))
         try {
             await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
@@ -289,7 +298,7 @@ export default function ProductsPage() {
             } else {
                 toast.error(resolveApiError(e instanceof Error ? e.message : null, t.dashboard.products.form.failedUpdateStatus, sub))
             }
-            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
+            setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status, aiReviewPending: prevAiReviewPending } : p))
         }
     }
 
@@ -379,19 +388,23 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-row items-center gap-2 w-full">
-                        {/* Input — shared <Input> nguyên bản design-system (nền card, viền --input-border,
-                            focus ring chuẩn), chỉ override cỡ chữ 13px như ô search. */}
-                        <Input
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                        {/* Multi-line prompt box — auto-grows with content; Cmd/Ctrl+Enter submits, plain Enter = newline */}
+                        <textarea
+                            ref={aiTextareaRef}
                             value={aiPrompt}
                             onChange={e => setAiPrompt(e.target.value)}
                             onKeyDown={e => {
-                                if (e.key === 'Enter' && aiPrompt.trim()) handleCreateAi()
+                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && aiPrompt.trim()) {
+                                    e.preventDefault()
+                                    handleCreateAi()
+                                }
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
-                            className="flex-1 min-w-0 text-[13px]"
+                            rows={1}
+                            className="flex-1 min-w-0 min-h-[52px] resize-none rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus-visible:outline-none focus-visible:border-[hsl(var(--ring))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))]"
                         />
-                        {/* Create — shared dashboard primary button (size="dash") */}
+                        {/* Generate Drafts — shared dashboard primary button (size="dash") */}
                         <Button
                             variant="dashPrimary"
                             size="dash"
@@ -400,9 +413,30 @@ export default function ProductsPage() {
                             }}
                             className="shrink-0 justify-center"
                         >
-                            <Plus className="h-4 w-4" />
+                            <Sparkles className="h-4 w-4" />
                             {t.dashboard.products.list.aiChatBtn}
                         </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{t.dashboard.products.list.aiChatHint}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[12px] text-muted-foreground">{t.dashboard.products.list.aiChatSuggestionsLabel}</span>
+                        {[
+                            t.dashboard.products.list.aiChatSuggestion1,
+                            t.dashboard.products.list.aiChatSuggestion2,
+                            t.dashboard.products.list.aiChatSuggestion3,
+                        ].map((suggestion, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                    setAiPrompt(suggestion)
+                                    aiTextareaRef.current?.focus()
+                                }}
+                                className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
+                            >
+                                {suggestion}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -774,6 +808,7 @@ export default function ProductsPage() {
                                                                     {product.name}
                                                                 </span>
                                                                 <MissingInfoIndicator missing={missing} t={t} />
+                                                                <AiReviewIndicator pending={product.aiReviewPending} t={t} />
                                                             </div>
                                                             {product.sku && (
                                                                 <span className="text-[12px] truncate" style={{ color: 'var(--dash-text-muted)' }}>
@@ -871,6 +906,7 @@ export default function ProductsPage() {
                                                         {product.name}
                                                     </div>
                                                     <MissingInfoIndicator missing={missing} t={t} />
+                                                    <AiReviewIndicator pending={product.aiReviewPending} t={t} />
                                                 </div>
                                                 {product.category && product.category.length > 0 && (
                                                     <div className="text-[12px] text-[hsl(var(--primary))] font-medium leading-[16px] truncate">
@@ -993,6 +1029,8 @@ export default function ProductsPage() {
                     onClose={() => setShowBulkCreate(false)}
                     onSuccess={() => {
                         setAiPrompt('')
+                        setFilterStatus('draft')
+                        setSortBy('Latest')
                         loadProducts()
                     }}
                 />

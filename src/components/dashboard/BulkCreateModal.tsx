@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
 import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
@@ -31,6 +30,7 @@ interface ParsedProduct {
     seoTitle?: string
     seoDescription?: string
     slug?: string
+    sku?: string
     weight?: number
     length?: number
     width?: number
@@ -47,6 +47,16 @@ interface BulkCreateModalProps {
 
 export function slugify(text: string) {
     return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+// Guarantees every AI-bulk-created product/variant has a non-empty SKU, even if the AI omits
+// one \u2014 the publish gate (productPublishBlocks) blocks activation on a blank SKU.
+export function generateFallbackSku(name: string) {
+    const base = slugify(name).split('-').filter(Boolean).map(w => w.slice(0, 3)).join('').toUpperCase().slice(0, 8) || 'PRD'
+    // toString(36) on a "round" float (e.g. 0.5 -> "0.i") can yield fewer than 4 chars after
+    // substring — pad so the suffix is always exactly 4 chars, preserving collision-resistance.
+    const suffix = Math.random().toString(36).substring(2, 6).padEnd(4, '0').toUpperCase()
+    return `${base}-${suffix}`
 }
 
 const textToLexical = (text: string) => {
@@ -66,6 +76,21 @@ const textToLexical = (text: string) => {
             }))
         }
     };
+}
+
+// True when saveProductAction rejected specifically because a generated SKU already exists
+// for this tenant (base sku and/or one or more variant skus) — the one case worth an
+// automatic retry with freshly regenerated SKUs, since the AI/fallback generator can't see
+// the merchant's existing catalog and occasionally collides with it.
+function isSkuConflictError(err: unknown): boolean {
+    if (!(err instanceof Error)) return false
+    try {
+        const parsed = JSON.parse(err.message)
+        if (parsed?.code !== 'FIELD_ERRORS') return false
+        return Object.keys(parsed.fieldErrors || {}).some(f => f === 'baseSku' || /^variants\.\d+\.skuCode$/.test(f))
+    } catch {
+        return false
+    }
 }
 
 export function sanitizeXSS(text: string) {
@@ -123,10 +148,12 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
     return {
         name: safeName,
         slug: finalSlug,
-        price: prod.price,
+        sku: sanitizeXSS(prod.sku || '').trim() || generateFallbackSku(safeName),
+        price: Number(prod.price) || 0,
         compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
         description: prod.description ? textToLexical(prod.description) : undefined,
         status: 'draft',
+        aiReviewPending: true,
         hasVariants,
         variantConfigs,
         category: categoryId ? [categoryId] : undefined,
@@ -144,15 +171,14 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             name: sanitizeXSS(v.name || defaultVariantName),
             price: Number(v.price || prod.price) || 0,
             stock: Number(v.stock ?? 0),
-            sku: sanitizeXSS(v.sku || '')
+            sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
         })) : undefined,
-        inventory: hasVariants ? 0 : 10, // Top-level stock is mapped to `inventory` in schema
+        inventory: 0, // Out of stock by default until the merchant confirms real stock; mapped to `inventory` in schema
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
     }
 }
 
 export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: BulkCreateModalProps) {
-    const router = useRouter()
     const { t, locale } = useI18n()
     const [isParsing, setIsParsing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -277,26 +303,43 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     }
                 }
 
-                const payload = buildSavePayload(prod, cartonMediaId, categoryId, t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')
+                const defaultVariantName = t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default'
+                let payload = buildSavePayload(prod, cartonMediaId, categoryId, defaultVariantName)
 
-                try {
-                    const res = await saveProductAction(payload)
-                    if (res?.id) {
-                        successCount++
-                    } else {
-                        const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
-                        toast.error(`${prod.name}: ${fallback}`)
-                        console.error('[bulk-create] saveProductAction returned no id', { name: prod.name, res })
-                    }
-                } catch (err) {
-                    let msg: string
+                // Retry with freshly regenerated SKUs on a uniqueness conflict — the AI/fallback
+                // generator can't see the merchant's existing catalog, so an occasional collision
+                // is expected. A handful of attempts resolves it without bothering the merchant.
+                const MAX_SKU_ATTEMPTS = 3
+                for (let attempt = 1; attempt <= MAX_SKU_ATTEMPTS; attempt++) {
                     try {
-                        msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
-                    } catch {
-                        msg = err instanceof Error ? err.message : ''
+                        const res = await saveProductAction(payload)
+                        if (res?.id) {
+                            successCount++
+                        } else {
+                            const fallback = t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'
+                            toast.error(`${prod.name}: ${fallback}`)
+                            console.error('[bulk-create] saveProductAction returned no id', { name: prod.name, res })
+                        }
+                        break
+                    } catch (err) {
+                        if (isSkuConflictError(err) && attempt < MAX_SKU_ATTEMPTS) {
+                            payload = {
+                                ...payload,
+                                sku: generateFallbackSku(payload.name),
+                                variants: payload.variants?.map(v => ({ ...v, sku: generateFallbackSku(`${payload.name}-${v.name}`) })),
+                            }
+                            continue
+                        }
+                        let msg: string
+                        try {
+                            msg = JSON.parse((err as Error).message)?.message || (err as Error).message || ''
+                        } catch {
+                            msg = err instanceof Error ? err.message : ''
+                        }
+                        toast.error(`${prod.name}: ${msg || t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'}`)
+                        console.warn('Failed to save product', prod.name, err)
+                        break
                     }
-                    toast.error(`${prod.name}: ${msg || t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to create products'}`)
-                    console.warn('Failed to save product', prod.name, err)
                 }
             }
 
@@ -306,7 +349,6 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     : (t.dashboard?.products?.bulkCreate?.saveSuccessMany?.replace('{count}', successCount.toString()) || `Created ${successCount} draft products. Please add images before publishing.`)
                 toast.success(tmpl)
                 if (onSuccess) onSuccess()
-                router.refresh()
                 onClose()
             } else {
                 toast.error(t.dashboard?.products?.bulkCreate?.saveFailed || 'Failed to save products')
@@ -341,8 +383,14 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     if (!mounted) return null
 
     const modal = createPortal(
+        // `dash-shell` sits on this wrapper (not the overlay div below) so the theme-aware
+        // `.dash-shell .bg-black/60` override in globals.css (AC-5: light 0.4 / dark 0.7)
+        // actually matches as a descendant selector — putting both classes on the same
+        // element would never match (a descendant selector can't match an element against
+        // itself), silently falling back to Tailwind's flat bg-black/60 (0.6) in both themes.
+        <div className="dash-shell">
         <div
-            className="dash-shell fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
         >
             <div className="flex flex-col max-h-[90vh] w-full max-w-[896px] rounded-[24px] bg-[#1E293B] shadow-2xl border border-white/[0.08] overflow-hidden">
@@ -479,7 +527,8 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 <div className="flex w-full gap-[12px] p-[24px_24px_24px_24px] border-t border-white/[0.08]">
                     <button
                         onClick={handleClose}
-                        className="flex-1 h-[50px] rounded-2xl bg-transparent border border-solid border-[#F8FAFC]/30 text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors"
+                        disabled={isSaving}
+                        className="flex-1 h-[50px] rounded-2xl bg-transparent border border-solid border-[#F8FAFC]/30 text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {t.dashboard?.products?.bulkCreate?.cancel || 'Cancel'}
                     </button>
@@ -493,6 +542,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     </button>
                 </div>
             </div>
+        </div>
         </div>,
         document.body
     )

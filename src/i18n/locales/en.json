@@ -1456,8 +1456,15 @@
                 "failedToLoad": "Failed to load products",
                 "retry": "Retry",
                 "aiChatTitle": "AI Chat: Quickly create multiple products",
-                "aiChatPlaceholder": "Enter leather jacket 500k, hat 50k",
-                "aiChatBtn": "Create"
+                "aiChatPlaceholder": "List several products, one per line — e.g. Leather jacket RM250, Cotton cap RM39",
+                "aiChatHint": "Press ⌘/Ctrl + Enter to generate",
+                "aiChatSuggestionsLabel": "Try an example:",
+                "aiChatSuggestion1": "Leather jacket RM250, cotton cap RM39, canvas tote RM59",
+                "aiChatSuggestion2": "Polo shirt RM89 in red and blue, size S M L",
+                "aiChatSuggestion3": "Sneakers RM199 size 39 40 41, sports socks RM19",
+                "aiChatBtn": "Generate Drafts",
+                "aiReviewTooltip": "Created by AI — needs review",
+                "aiReviewAriaLabel": "AI-created draft pending review"
             },
             "messages": {
                 "nameRequired": "Please enter a product name first!",
@@ -1613,6 +1620,9 @@
                 "fillInfo": "Fill in complete product information",
                 "saving": "Saving...",
                 "saveChanges": "Save Changes",
+                "newProduct": "New product",
+                "unsavedChanges": "Unsaved changes",
+                "upToDate": "Up to date",
                 "fields": {
                     "name": "Product Name",
                     "categoryIds": "Category",

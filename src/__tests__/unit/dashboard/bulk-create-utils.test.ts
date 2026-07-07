@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { slugify, buildSavePayload } from '../../../components/dashboard/BulkCreateModal'
+import { slugify, buildSavePayload, generateFallbackSku } from '../../../components/dashboard/BulkCreateModal'
 
 // ─── TC-F08-04-01: Bulk product creation utilities ──────────────────────
 
@@ -39,6 +39,25 @@ describe('slugify [TC-F08-04-01]', () => {
     })
 })
 
+describe('generateFallbackSku [TC-F08-04-43]', () => {
+    it('produces a non-empty uppercase SKU from a product name', () => {
+        const sku = generateFallbackSku('Leather Jacket')
+        expect(sku).toBeTruthy()
+        expect(sku).toBe(sku.toUpperCase())
+    })
+
+    it('falls back to a generic base when the name has no alphanumeric characters', () => {
+        const sku = generateFallbackSku('!!!')
+        expect(sku).toMatch(/^PRD-[A-Z0-9]{4}$/)
+    })
+
+    it('generates different suffixes across calls (collision-resistant)', () => {
+        const sku1 = generateFallbackSku('Same Name')
+        const sku2 = generateFallbackSku('Same Name')
+        expect(sku1).not.toBe(sku2)
+    })
+})
+
 describe('buildSavePayload [TC-F08-04-01]', () => {
     it('builds payload for simple product (no variants)', () => {
         const product = {
@@ -56,6 +75,90 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.hasVariants).toBe(false)
         expect(payload.variants).toBeUndefined()
         expect(payload.slug).toContain('nasi-lemak')
+    })
+
+    it('TC-F08-04-42: no-variant product defaults inventory to 0 (out of stock)', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(0)
+    })
+
+    it('TC-F08-04-43: generates a fallback SKU when the AI omits one', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.sku).toBeTruthy()
+        expect(payload.sku.length).toBeGreaterThan(0)
+    })
+
+    it('TC-F08-04-43b: preserves the AI-provided SKU when present', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            sku: 'NL-CUSTOM-01',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.sku).toBe('NL-CUSTOM-01')
+    })
+
+    it('TC-F08-04-44: generates a fallback SKU per variant when the AI omits it', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            variants: [
+                { name: 'Small', price: 39.9, sku: '', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].sku).toBeTruthy()
+    })
+
+    it('TC-F08-04-45: variant stock preserves an explicit 0 (no forced default of 10)', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].stock).toBe(0)
+    })
+
+    it('TC-F08-04-34: marks the payload as pending AI review', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.aiReviewPending).toBe(true)
     })
 
     it('builds payload with variants', () => {

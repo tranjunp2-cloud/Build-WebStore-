@@ -1456,8 +1456,15 @@
                 "failedToLoad": "Gagal memuatkan produk",
                 "retry": "Cuba Lagi",
                 "aiChatTitle": "Sembang AI: Cipta pelbagai produk dengan pantas",
-                "aiChatPlaceholder": "Cth: jaket kulit 500k, topi 50k",
-                "aiChatBtn": "Cipta"
+                "aiChatPlaceholder": "Senaraikan beberapa produk, satu setiap baris — cth: Jaket kulit RM250, Topi kapas RM39",
+                "aiChatHint": "Tekan ⌘/Ctrl + Enter untuk menjana",
+                "aiChatSuggestionsLabel": "Cuba contoh:",
+                "aiChatSuggestion1": "Jaket kulit RM250, topi kapas RM39, beg tote kanvas RM59",
+                "aiChatSuggestion2": "Baju polo RM89 warna merah dan biru, saiz S M L",
+                "aiChatSuggestion3": "Kasut sneakers RM199 saiz 39 40 41, stokin sukan RM19",
+                "aiChatBtn": "Jana Draf",
+                "aiReviewTooltip": "Dicipta oleh AI — perlu semakan",
+                "aiReviewAriaLabel": "Draf ciptaan AI menunggu semakan"
             },
             "messages": {
                 "nameRequired": "Sila masukkan nama produk terlebih dahulu!",
@@ -1613,6 +1620,9 @@
                 "fillInfo": "Isi maklumat produk yang lengkap",
                 "saving": "Menyimpan...",
                 "saveChanges": "Simpan Perubahan",
+                "newProduct": "Produk baharu",
+                "unsavedChanges": "Perubahan belum disimpan",
+                "upToDate": "Terkini",
                 "fields": {
                     "name": "Nama Produk",
                     "categoryIds": "Kategori",

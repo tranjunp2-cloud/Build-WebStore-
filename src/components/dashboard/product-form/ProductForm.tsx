@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
 import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
-import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -123,6 +123,9 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     router.push('/products')
                 }, 1000)
             }
+            // Clear isDirty so the save-bar footer doesn't flip back to "Unsaved changes"
+            // during the redirect delay right after a confirmed-successful save.
+            methods.reset(data)
         } catch (error) {
             const parsed = parseServerError(error)
             if (parsed) {
@@ -212,26 +215,44 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     <AttributesSection />
                 </div>
 
-                {/* Fixed Footer Actions */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-background border-t border-white/[0.08] px-8 py-[18px]">
-                    <div className="flex flex-row items-center gap-3 w-full bg-background">
-                        {/* Shared <Button> dashSecondary / dashPrimary — dash size (h-9, rounded-lg) like every other action button */}
+                {/* Fixed Footer Actions — synced with discount-save-bar / customers-detail style */}
+                <div
+                    className="fixed bottom-0 left-0 right-0 lg:left-[var(--dash-content-pl)] transition-[left] duration-200 flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
+                    style={{
+                        background: 'var(--dash-surface)',
+                        borderColor: 'var(--dash-border)',
+                        backdropFilter: 'blur(12px)',
+                    }}
+                >
+                    <span className="text-xs" style={{ color: 'var(--dash-text-muted)' }}>
+                        {!isEdit
+                            ? t.dashboard.products.form.newProduct
+                            : methods.formState.isDirty
+                                ? t.dashboard.products.form.unsavedChanges
+                                : t.dashboard.products.form.upToDate}
+                    </span>
+
+                    <div className="flex items-center gap-2">
                         <Button
                             type="button"
-                            variant="dashSecondary"
                             onClick={() => router.push('/products')}
-                            className="flex-1 h-9 rounded-lg text-[13px]"
+                            disabled={isSaving}
+                            variant="dashSecondary"
+                            size="sm"
                         >
                             {t.dashboard.products.form.cancel}
                         </Button>
                         <Button
                             type="submit"
                             variant="dashPrimary"
-                            disabled={isSaving}
-                            className="flex-1 h-9 rounded-lg text-[13px] disabled:opacity-50"
+                            size="sm"
+                            disabled={isSaving || (isEdit && !methods.formState.isDirty)}
                         >
-                            <Save className="w-4 h-4 flex-shrink-0" />
-                            <span>{isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}</span>
+                            {isSaving
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Check className="h-3.5 w-3.5" />
+                            }
+                            {isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}
                         </Button>
                     </div>
                 </div>

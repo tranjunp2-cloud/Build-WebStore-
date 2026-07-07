@@ -32,6 +32,24 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6 complete)
+
+**Improved UX for AI-powered product bulk generation. New field tracks AI-generated drafts; enhanced textarea with auto-resize, suggestion pills, and visual indicators.**
+
+**All 6 phases complete:**
+- **New field:** `aiReviewPending` boolean on Products collection (`src/collections/Products.ts`, migration in `scripts/db-setup.js`, default false) — tracks whether a product was auto-created by AI chat and awaits merchant review.
+- **Backend state management:** `BulkCreateModal`'s `buildSavePayload()` sets `aiReviewPending: true` on every AI-generated draft product. `saveProductAction()` clears flag to `false` on any manual edit; `updateProductFieldAction()` clears to `false` when product transitions to `'active'` status. Archived/soft-deleted products leave flag untouched.
+- **Frontend — Enhanced textarea:** Replaced single-line `<Input>` prompt field with multi-line auto-growing `<textarea>` (new hook: `src/hooks/use-auto-resize-textarea.ts`). Plain Enter now inserts newline; Cmd/Ctrl+Enter submits. Improves UX for multi-sentence product descriptions.
+- **Frontend — Suggestion pills:** Added 3 clickable suggestion pills below textarea — "Describe your product", "Add features", "Include materials" — each pre-fills with contextual prompt text. Speeds up first-time user onboarding.
+- **Frontend — Visual indicator:** New component `src/components/dashboard/AiReviewIndicator.tsx` — emerald pulsing dot + tooltip ("Created by AI — needs review") — displays next to AI-bulk-created products in both desktop table rows and mobile cards in the Products list. Clears (optimistically + server-confirmed) when product status transitions to `'active'`.
+- **UX flow:** After successful bulk-generate, page auto-switches to Draft tab and resets sort to "Latest" so newly created drafts appear on top (no full page reload).
+- **i18n updates:** `src/i18n/locales/en.json`/`ms.json` — renamed AI-chat button label ("Create" → "Generate Drafts" / "Cipta" → "Jana Draf"), updated placeholder copy, added suggestion-pill strings and AI-review tooltip strings.
+- **Tests:** 8 new test cases (TC-F08-04-34 through 41) in `bulk-create-utils.test.ts`, `save-product-action.test.ts`, and new `ai-review-indicator.test.tsx`; amended TC-F08-04-27 (assertion changed due to `router.refresh()` removal from modal's `handleSave`). All passing.
+
+**Related:** `docs/architecture/F08-products-crud.md` § GH-1502 (UX Redesign).
+
+---
+
 ### GH-1458 — Soft validation publishing gate (Phases 1–4 complete)
 
 **Publishing gate blocking incomplete products from Active status. Storefront alt-text fallback implemented. All 4 phases shipped.**
