@@ -201,6 +201,11 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
 
         const awbNo = firstShipment.awb_number ?? null
         const labelUrl = firstShipment.awb_url || firstShipment.awb_urls_by_format?.A6 || firstShipment.awb_urls_by_format?.A4 || null
+        // Per-format URLs power the print-modal A6/A4 toggle; formats EP didn't return stay absent
+        const byFormat = firstShipment.awb_urls_by_format
+        const labelUrls = byFormat && (byFormat.A4 || byFormat.A6)
+            ? { ...(byFormat.A4 ? { A4: byFormat.A4 } : {}), ...(byFormat.A6 ? { A6: byFormat.A6 } : {}) }
+            : null
 
         // Persist shipment_number (idempotency key), AWB (nullable), label + tracking urls.
         await payload.update({
@@ -211,6 +216,7 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 awbNo,
                 trackingNumber: awbNo,
                 labelUrl,
+                labelUrls,
                 shippingTrackingStatus: 'pending_pickup',
                 // Collection date the label was actually bought with (post-clamp) —
                 // shown as the locked "Pickup · DD/MM" line on the order detail.

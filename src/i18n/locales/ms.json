@@ -1434,7 +1434,8 @@
                 "awbNumber": "Nombor AWB",
                 "downloadLabel": "Muat Turun Label PDF →",
                 "codBlockedTitle": "COD tidak tersedia untuk pesanan ini",
-                "codBlockedBody": "Tiada kurier yang boleh mengutip COD untuk pesanan ini buat masa ini (mengikut had laluan semasa) — pilih cara untuk meneruskan di bawah."
+                "codBlockedBody": "Tiada kurier yang boleh mengutip COD untuk pesanan ini buat masa ini (mengikut had laluan semasa) — pilih cara untuk meneruskan di bawah.",
+                "printedAt": "Dicetak · {date}"
             },
             "createLabel": {
                 "readyToShip": "Sedia Dihantar",
@@ -1514,7 +1515,10 @@
                 "serviceLabel": "Perkhidmatan",
                 "serviceValue": "Standard",
                 "formatMeta": "Format",
-                "copiesMeta": "Salinan"
+                "copiesMeta": "Salinan",
+                "markAsPrinted": "Tanda sebagai dicetak",
+                "formatUnavailable": "EasyParcel tidak menyediakan format ini untuk label ini",
+                "loadingLabel": "Memuatkan PDF label…"
             },
             "missingWeight": {
                 "title": "Berat bungkusan tiada",

@@ -16,7 +16,9 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
     pending: ['new', 'confirmed', 'cancelled'],  // 'new' = Stripe webhook success target
     new: ['confirmed', 'cancelled'],
     confirmed: ['ready_to_ship', 'cancelled'],
-    ready_to_ship: ['shipped', 'cancelled'],
+    // BR-Cancel-02 (chốt 2026-07-07): cancel chỉ ở pending/confirmed — đơn đã mua label
+    // (ready_to_ship) không hủy qua /cancel nữa; xử lý tiền/label đi đường refund (US-F36-11).
+    ready_to_ship: ['shipped'],
     shipped: ['completed', 'refunded'],
     completed: ['refunded'],
     // Terminal states — no further transitions
@@ -442,6 +444,16 @@ export const Orders: CollectionConfig = {
             name: 'labelUrl',
             type: 'text',
             admin: { description: 'PDF label URL from EPPayOrderBulk — buyer-hidden', hidden: true },
+        },
+        {
+            name: 'labelUrls',
+            type: 'json',
+            admin: { description: 'Per-format label PDF URLs from EP awb_urls_by_format ({A4?, A6?}) — powers the print-modal format toggle', hidden: true },
+        },
+        {
+            name: 'labelPrintedAt',
+            type: 'date',
+            admin: { description: 'Set when the merchant prints the label with "Mark as printed" checked', hidden: true },
         },
         {
             name: 'shippingTrackingStatus',

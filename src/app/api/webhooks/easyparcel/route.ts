@@ -111,8 +111,37 @@ export async function POST(req: Request) {
     const epStatus: string | number | null =
         statusCode != null ? statusCode : extractField(body, ['shipment_status', 'status_code', 'status'])
 
-    if (!awb || epStatus == null || epStatus === '') {
+    if (epStatus == null || epStatus === '') {
+        // Non-status topics — e.g. "Shipment Created" (docs 2026-06: its payload carries NO
+        // topic field and NO awb, only shipment_number + parties). Nothing to write (the
+        // order already holds these fields from submit), but log + match so the pipeline is
+        // observable end-to-end — this is also the only topic that can fire on SANDBOX
+        // (status never progresses there, so status topics never trigger).
+        const shipmentNo = extractField(body, ['shipment_number'])
+        if (shipmentNo) {
+            const found = await payload.find({
+                collection: 'orders',
+                where: { easyParcelOrderNo: { equals: shipmentNo } },
+                limit: 1,
+                depth: 0,
+                overrideAccess: true,
+            })
+            const matched = !!found.docs[0]
+            payload.logger.info(
+                { topic, shipmentNo, matched, keys: Object.keys(body) },
+                '[ep-webhook] non-status event received (shipment.created?)',
+            )
+            return NextResponse.json({ received: true, matched, reason: 'non_status_event' })
+        }
         // Keys-only log → calibrate the real EP payload shape without leaking PII
+        payload.logger.warn(
+            { keys: Object.keys(body) },
+            '[ep-webhook] payload missing awb/status — check EP schema',
+        )
+        return NextResponse.json({ received: true, matched: false, reason: 'missing_fields' })
+    }
+
+    if (!awb) {
         payload.logger.warn(
             { keys: Object.keys(body) },
             '[ep-webhook] payload missing awb/status — check EP schema',

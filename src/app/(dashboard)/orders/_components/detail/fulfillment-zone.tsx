@@ -38,12 +38,14 @@ export interface FulfillmentOrder {
   awbNo?: string | null
   easyParcelOrderNo?: string | null
   labelUrl?: string | null
+  labelUrls?: { A4?: string | null; A6?: string | null } | null
   shippingCourier?: string | null
   shippingCourierName?: string | null
   shippingServiceId?: string | null
   parcelWeight?: number | null
   pickupScheduledAt?: string | null
   pickupSlot?: string | null
+  labelPrintedAt?: string | null
   shippingTrackingHistory?: Array<{
     status?: string | null
     description?: string | null
@@ -381,8 +383,10 @@ export function FulfillmentZone({
         />
         {printOpen && (
           <PrintLabelModal
+            orderId={order.id}
             awbNo={awbNo}
             labelUrl={labelUrl}
+            labelUrls={order.labelUrls}
             courierId={courierId}
             courierName={courierName}
             onClose={() => setPrintOpen(false)}
@@ -449,6 +453,13 @@ export function FulfillmentZone({
                     <CalendarClock style={{ width: 15, height: 15 }} /> {ti(f.pickupLocked, { label: pickupDisplay })}
                   </div>
                 )}
+
+                {/* Stamped by the print modal's "Mark as printed" (labelPrintedAt) */}
+                {order.labelPrintedAt && (
+                  <div className="printed-tag" title={fmtDate(order.labelPrintedAt)}>
+                    <Printer /> {ti(f.printedAt, { date: fmtDate(order.labelPrintedAt) })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -456,11 +467,14 @@ export function FulfillmentZone({
 
         {printOpen && (
           <PrintLabelModal
+            orderId={order.id}
             awbNo={awbNo}
             labelUrl={labelUrl}
+            labelUrls={order.labelUrls}
             courierId={courierId}
             courierName={courierName}
             onClose={() => setPrintOpen(false)}
+            onPrinted={onUpdate}
           />
         )}
       </>
@@ -533,8 +547,10 @@ export function FulfillmentZone({
 
         {printOpen && (
           <PrintLabelModal
+            orderId={order.id}
             awbNo={awbNo}
             labelUrl={labelUrl}
+            labelUrls={order.labelUrls}
             courierId={courierId}
             courierName={courierName}
             onClose={() => setPrintOpen(false)}

@@ -365,6 +365,62 @@ describe('POST /api/webhooks/easyparcel', () => {
   })
 
   // ───────────────────────────────────────────────────────────────────
+  // TC-F36.OD.050: "Shipment Created" topic — docs 2026-06 sample carries NO topic
+  // field, NO awb, NO status; only shipment_number + parties. Receiver matches the
+  // order by easyParcelOrderNo, logs, and acks WITHOUT writing anything (this is
+  // also the only topic that can fire on sandbox — status never progresses there).
+  // ───────────────────────────────────────────────────────────────────
+  it('[TC-F36.OD.050] shipment.created payload (shipment_number, no status) → 200 matched:true reason:"non_status_event", update not called', async () => {
+    // Arrange — payload shape per docs "Shipment Create Sample"
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+    mockFind.mockResolvedValue({ docs: [{ id: 42, easyParcelOrderNo: 'ES-2504-G7FDF' }] })
+
+    // Act
+    const res = await callPost('my-secret', {
+      shipment_number: 'ES-2504-G7FDF',
+      uuid: 'webhook-test-uuid-123',
+      timestamp: '2017-10-28 11:40:00',
+      sender_name: 'Test Sender',
+      receiver_name: 'Test Receiver',
+      weight: 1.0,
+    })
+    const body = await res.json()
+
+    // Assert
+    expect(res.status).toBe(200)
+    expect(body.received).toBe(true)
+    expect(body.matched).toBe(true)
+    expect(body.reason).toBe('non_status_event')
+    expect(mockFind).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'orders',
+        where: { easyParcelOrderNo: { equals: 'ES-2504-G7FDF' } },
+      }),
+    )
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  it('[TC-F36.OD.050b] shipment.created with unknown shipment_number → 200 matched:false reason:"non_status_event"', async () => {
+    // Arrange
+    process.env.EASYPARCEL_WEBHOOK_SECRET = 'my-secret'
+    mockFind.mockResolvedValue({ docs: [] })
+
+    // Act
+    const res = await callPost('my-secret', {
+      shipment_number: 'ES-UNKNOWN-999',
+      sender_name: 'Test Sender',
+    })
+    const body = await res.json()
+
+    // Assert
+    expect(res.status).toBe(200)
+    expect(body.received).toBe(true)
+    expect(body.matched).toBe(false)
+    expect(body.reason).toBe('non_status_event')
+    expect(mockUpdate).not.toHaveBeenCalled()
+  })
+
+  // ───────────────────────────────────────────────────────────────────
   // TC-F36.OD.039: Idempotent — same status as current → 200 matched:true
   // result:'unchanged', update NOT called
   // ───────────────────────────────────────────────────────────────────

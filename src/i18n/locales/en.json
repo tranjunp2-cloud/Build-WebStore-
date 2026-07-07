@@ -1434,7 +1434,8 @@
                 "awbNumber": "AWB Number",
                 "downloadLabel": "Download Label PDF →",
                 "codBlockedTitle": "COD unavailable for this order",
-                "codBlockedBody": "No courier can currently collect COD for this order (per live route limits) — choose how to proceed below."
+                "codBlockedBody": "No courier can currently collect COD for this order (per live route limits) — choose how to proceed below.",
+                "printedAt": "Printed · {date}"
             },
             "createLabel": {
                 "readyToShip": "Ready to Ship",
@@ -1514,7 +1515,10 @@
                 "serviceLabel": "Service",
                 "serviceValue": "Standard",
                 "formatMeta": "Format",
-                "copiesMeta": "Copies"
+                "copiesMeta": "Copies",
+                "markAsPrinted": "Mark as printed",
+                "formatUnavailable": "EasyParcel did not provide this format for this label",
+                "loadingLabel": "Loading label PDF…"
             },
             "missingWeight": {
                 "title": "Missing parcel weight",

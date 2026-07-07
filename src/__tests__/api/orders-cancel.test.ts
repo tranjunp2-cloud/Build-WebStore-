@@ -105,6 +105,19 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.error.code).toBe('INVALID_TRANSITION')
     })
 
+    // BR-Cancel-02 (chốt 2026-07-07): đơn đã mua label (ready_to_ship) KHÔNG hủy qua
+    // /cancel — trước đây transitions còn cho phép; giờ chặn cả server lẫn UI.
+    it('[TC-F10-03-04b] rejects cancellation at ready_to_ship (label bought — BR-Cancel-02)', async () => {
+        mockFindByID.mockResolvedValue({ id: 'order-1', status: 'ready_to_ship', awbNo: 'EP123', items: [] })
+
+        const req = { json: () => Promise.resolve({ reason: 'Changed my mind' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('INVALID_TRANSITION')
+    })
+
     it('[TC-F10-03-03] rejects empty reason', async () => {
         const req = { json: () => Promise.resolve({ reason: '' }) } as unknown as Request
         const res = await POST(req, ctx as any)

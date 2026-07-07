@@ -12,18 +12,12 @@ import './side.css'
 // ── Terminal / pre-ship state logic ──────────────────────────────────────────
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded'])
 
-function isCancelAllowed(
-    status: string,
-    awbNo: string | null | undefined,
-    epTrackingStatus: string | null | undefined,
-): boolean {
+// BR-Cancel-02 (chốt 2026-07-07): cancel chỉ trước khi mua label — pending/confirmed
+// (+ tương đương Stripe: new/paid/processing). Đơn ready_to_ship trở đi KHÔNG hủy qua
+// /cancel; tiền hàng + cước xử lý qua refund flow (US-F36-11 Phase D).
+function isCancelAllowed(status: string): boolean {
     if (TERMINAL_STATUSES.has(status)) return false
-    if (['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)) return true
-    // ready_to_ship: allow only if label exists but courier hasn't collected yet
-    if (status === 'ready_to_ship' && awbNo &&
-        (!epTrackingStatus || ['order_created', 'pending_pickup'].includes(epTrackingStatus))
-    ) return true
-    return false
+    return ['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
 }
 
 function isRefundAllowed(status: string): boolean {
@@ -78,7 +72,7 @@ export function OrderActionsCard({
 
     if (!shouldShowCard(status)) return null
 
-    const canCancel = isCancelAllowed(status, awbNo, order.shippingTrackingStatus)
+    const canCancel = isCancelAllowed(status)
     const canRefund = isRefundAllowed(status)
     const isRefunded = status === 'refunded'
 
@@ -112,7 +106,8 @@ export function OrderActionsCard({
     }
 
     const handleCancel = async (reason: string) => {
-        const hadEpLabel = !!awbNo
+        // BR-Cancel-02: cancel chỉ tồn tại trước khi mua label — không còn nhánh
+        // "đơn có AWB" nào tới được đây, nên toast nhắc hủy AWB trên EP đã gỡ.
         setIsLoading(true)
         try {
             const res = await fetch(`/api/orders/${id}/cancel`, {
@@ -126,9 +121,6 @@ export function OrderActionsCard({
                 throw new Error('API_ERROR')
             }
             toast.success(t.dashboard.orders.toast.updated)
-            if (hadEpLabel) {
-                toast.message(f.awbCancelHint, { duration: 8000 })
-            }
             setCancelOpen(false)
             onUpdate()
         } catch (err: unknown) {
