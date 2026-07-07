@@ -38,9 +38,14 @@ export function EditorSidebar({
                             key={tab.id}
                             value={tab.id}
                             variant="underline"
+                            // GH-1511 #45.1: hover wash scoped here (NOT in the shared underline
+                            // variant — dashboard tabs elsewhere must stay bg-less). Same token as
+                            // the Global/SEO/Menu pills in SettingsPanel (hover:bg-white/5).
+                            // pb-0 overrides the variant's pb-2.5 (via twMerge) so the label sits
+                            // dead-center in the cell — the wash made the offset visible.
                             className={compact
-                                ? 'min-h-[44px] flex-1 justify-center px-2 text-[11px]'
-                                : 'h-11 flex-1 justify-center px-3 text-[12px]'}
+                                ? 'min-h-[44px] flex-1 justify-center px-2 pb-0 text-[11px] hover:bg-white/5'
+                                : 'h-11 flex-1 justify-center px-3 pb-0 text-[12px] hover:bg-white/5'}
                         >
                             <span className="shrink-0 text-sm leading-none">{tab.icon}</span>
                             <span className="whitespace-nowrap normal-case">{tab.label}</span>

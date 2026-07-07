@@ -1404,7 +1404,9 @@ function SettingsPanelInner({
     return (
         <div
             className={cn(
-                'flex h-full flex-col bg-[var(--editor-surface)]',
+                // GH-1511 #45.2: /90 matches the EditorToolbar nav header (bg-[var(--editor-surface)]/90)
+                // so the right column and the nav read as one continuous surface over the shell bg.
+                'flex h-full flex-col bg-[var(--editor-surface)]/90',
                 fullWidth ? 'w-full flex-1' : 'shrink-0 border-l border-white/5',
             )}
             style={fullWidth ? undefined : { width: SETTINGS_PANEL_WIDTH }}
