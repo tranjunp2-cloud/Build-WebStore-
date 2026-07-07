@@ -263,3 +263,47 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
         expect(document.body.style.overflow).toBe('')
     })
 })
+
+describe('BulkCreateModal — handleParse variant-name dedup [TC-F08-04-52 code-review follow-up]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F08-04-52: case-insensitively duplicate variant names are deduped at parse time (first occurrence kept), before buildSavePayload ever sees them', async () => {
+        // Guards against products_variants_name_parent_uniq (DB unique index on lower(name) per
+        // parent) — findConflictingSkus never checks variant-name uniqueness, only SKUs, so an
+        // AI-hallucinated same-product name repeat (or case-only difference) would otherwise slip
+        // past validation, hit this DB constraint, and get misclassified by translateDbSkuConflict
+        // as a SKU conflict. Deduped here (parse time) rather than renamed later in
+        // buildSavePayload — a post-parse rename would desync the row from buildVariantMatrix's
+        // exact-string tier-combo matching (variant-utils.ts) and reset its price/sku/stock the
+        // next time the merchant edits the tier matrix in ProductForm.
+        const productWithDupeVariants = {
+            name: 'Test Shirt',
+            price: 39.9,
+            category: '',
+            sku: 'SHIRT-001',
+            variants: [
+                { name: 'Red', price: 39.9, sku: 'TS-R1', stock: 5 },
+                { name: 'red', price: 39.9, sku: 'TS-R2', stock: 3 },
+                { name: 'Blue', price: 39.9, sku: 'TS-B1', stock: 2 },
+            ],
+        }
+        mockSaveProduct.mockResolvedValue({ id: 1 })
+        await renderAndWaitForProducts([productWithDupeVariants])
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+        const savedVariants = mockSaveProduct.mock.calls[0][0].variants
+        expect(savedVariants).toHaveLength(2)
+        expect(savedVariants.map((v: { name: string }) => v.name)).toEqual(['Red', 'Blue'])
+        // First occurrence's own sku/stock survive untouched — not merged/reset.
+        expect(savedVariants[0].sku).toBe('TS-R1')
+        expect(savedVariants[0].stock).toBe(5)
+    })
+})

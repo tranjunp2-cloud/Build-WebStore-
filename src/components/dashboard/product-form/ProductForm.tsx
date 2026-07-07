@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
 import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
-import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -215,47 +215,45 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     <AttributesSection />
                 </div>
 
-                {/* Fixed Footer Actions — synced with discount-save-bar / customers-detail style */}
-                <div
-                    className="fixed bottom-0 left-0 right-0 lg:left-[var(--dash-content-pl)] transition-[left] duration-200 flex items-center justify-between gap-3 px-6 py-3 border-t z-40"
-                    style={{
-                        background: 'var(--dash-surface)',
-                        borderColor: 'var(--dash-border)',
-                        backdropFilter: 'blur(12px)',
-                    }}
-                >
-                    <span className="text-xs" style={{ color: 'var(--dash-text-muted)' }}>
-                        {!isEdit
-                            ? t.dashboard.products.form.newProduct
-                            : methods.formState.isDirty
-                                ? t.dashboard.products.form.unsavedChanges
-                                : t.dashboard.products.form.upToDate}
-                    </span>
+                {/* Save bar — GH-1509 design-system pass (PR #1512): sticky floating card,
+                    `--save-bar-bg` token, amber "unsaved changes" indicator, size="sm" buttons —
+                    same template now shared by Payments/Shipping/Discounts/Customers-detail.
+                    Only renders while dirty (was previously always visible, cycling
+                    "New product"/"Unsaved changes"/"Up to date" status text). */}
+                {methods.formState.isDirty && (
+                    <div
+                        className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                        style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+                    >
+                        <div className="flex items-center gap-2 text-[13px]">
+                            <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-amber-600 dark:text-amber-300 font-medium">{t.dashboard.products.form.unsavedChanges}</span>
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button
-                            type="button"
-                            onClick={() => router.push('/products')}
-                            disabled={isSaving}
-                            variant="dashSecondary"
-                            size="sm"
-                        >
-                            {t.dashboard.products.form.cancel}
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="dashPrimary"
-                            size="sm"
-                            disabled={isSaving || (isEdit && !methods.formState.isDirty)}
-                        >
-                            {isSaving
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Check className="h-3.5 w-3.5" />
-                            }
-                            {isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                onClick={() => router.push('/products')}
+                                disabled={isSaving}
+                                variant="dashSecondary"
+                                size="sm"
+                            >
+                                {t.dashboard.products.form.cancel}
+                            </Button>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={isSaving}
+                            >
+                                {isSaving
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <Check className="h-3.5 w-3.5" />
+                                }
+                                {isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
             </form>
         </FormProvider>
     )

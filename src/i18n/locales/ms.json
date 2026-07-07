@@ -1625,9 +1625,7 @@
                 "fillInfo": "Isi maklumat produk yang lengkap",
                 "saving": "Menyimpan...",
                 "saveChanges": "Simpan Perubahan",
-                "newProduct": "Produk baharu",
                 "unsavedChanges": "Perubahan belum disimpan",
-                "upToDate": "Terkini",
                 "fields": {
                     "name": "Nama Produk",
                     "categoryIds": "Kategori",

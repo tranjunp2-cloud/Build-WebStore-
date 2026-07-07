@@ -126,7 +126,12 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         }
     }
 
-    // Defensive clamping on variant names to prevent > 1 hyphen if user didn't correct it
+    // Defensive clamping on variant names to prevent > 1 hyphen if user didn't correct it.
+    // Case-insensitive name-uniqueness (guarding products_variants_name_parent_uniq — see
+    // handleParse's uniqueMap above) is enforced earlier, at parse time, rather than here:
+    // renaming a variant this late (post-parse, pre-save) would desync it from
+    // buildVariantMatrix's exact-string tier-combo matching (variant-utils.ts) the next time
+    // the merchant edits the tier matrix in ProductForm, silently resetting its price/sku/stock.
     let safeVariants = prod.variants;
     if (hasVariants && safeVariants) {
         safeVariants = safeVariants.map(v => {
@@ -218,13 +223,22 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 const initProducts = data.products.map((p: ParsedProduct) => {
                     let cleanedVariants = p.variants;
                     if (cleanedVariants && cleanedVariants.length > 0) {
+                        // Case-insensitive dedup — DB has a case-insensitive unique index
+                        // (products_variants_name_parent_uniq on lower(name) per parent) that the
+                        // app-level SKU pre-check never validates against. Keying by lowercase here
+                        // (not just exact string) guarantees no case-differing duplicate ever reaches
+                        // buildSavePayload/the DB in the first place, so there's no need to rename a
+                        // saved row later — which would desync it from buildVariantMatrix's exact-
+                        // string tier-combo matching (variant-utils.ts) and reset its custom
+                        // price/sku/stock the next time the merchant edits the tier matrix.
                         const uniqueMap = new Map<string, NonNullable<ParsedProduct['variants']>[number]>();
                         cleanedVariants.forEach(v => {
                             const rawName = v.name || 'Default';
                             const parts = rawName.split(' - ');
                             const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ');
-                            if (!uniqueMap.has(truncatedName)) {
-                                uniqueMap.set(truncatedName, { ...v, name: truncatedName });
+                            const key = truncatedName.toLowerCase();
+                            if (!uniqueMap.has(key)) {
+                                uniqueMap.set(key, { ...v, name: truncatedName });
                             }
                         });
                         cleanedVariants = Array.from(uniqueMap.values());

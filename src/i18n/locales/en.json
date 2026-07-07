@@ -1625,9 +1625,7 @@
                 "fillInfo": "Fill in complete product information",
                 "saving": "Saving...",
                 "saveChanges": "Save Changes",
-                "newProduct": "New product",
                 "unsavedChanges": "Unsaved changes",
-                "upToDate": "Up to date",
                 "fields": {
                     "name": "Product Name",
                     "categoryIds": "Category",
