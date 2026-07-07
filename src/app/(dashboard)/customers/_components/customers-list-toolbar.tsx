@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n'
 import { TableSearch } from '@/components/ui/table-search'
 import { RankBadge } from './customers-shared-ui'
 import type { ShopCustomerRecord } from '../_lib/shop-customer-record'
+import { cn } from '@/lib/utils'
 
 export type RankFilter = 'all' | 'vip' | 'gold' | 'silver' | 'bronze' | 'none'
 export type DateFilter = 'any' | 'today' | 'last7d' | 'last30d' | 'last90d' | 'thisYear' | 'customRange'
@@ -46,12 +47,17 @@ function FilterChip<T extends string>({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
-                style={{
-                    background: active ? 'hsl(var(--primary)/0.12)' : 'transparent',
-                    border: active ? '1px solid hsl(var(--primary)/0.4)' : '1px solid hsl(var(--input-border))',
-                    color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
-                }}
+                // bg was inline-styled `transparent` when inactive — looked like a blank/
+                // borderless box in light mode instead of a proper card surface, and inline
+                // style always wins over a CSS `hover:` class so no hover state could apply
+                // either way. Moved to Tailwind classes: opaque `--card` + a subtle hover wash
+                // (matches dashSecondary Button / Discounts "Export CSV").
+                className={cn(
+                    "flex items-center gap-1.5 h-9 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
+                    active
+                        ? "bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.4)] text-[hsl(var(--primary))]"
+                        : "bg-[hsl(var(--card))] border-[hsl(var(--input-border))] text-[var(--dash-text-muted)] hover:bg-white/[0.05]"
+                )}
             >
                 {icon}
                 <span>
@@ -143,12 +149,14 @@ function DateFilterChip({
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[13px] font-medium transition-colors cursor-pointer"
-                style={{
-                    background: active ? 'hsl(var(--primary)/0.12)' : 'transparent',
-                    border: active ? '1px solid hsl(var(--primary)/0.4)' : '1px solid hsl(var(--input-border))',
-                    color: active ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
-                }}
+                // Same fix as the Rank FilterChip above: opaque `--card` bg (was inline
+                // `transparent`) + Tailwind `hover:` (inline style blocks hover otherwise).
+                className={cn(
+                    "flex items-center gap-1.5 h-9 px-3 rounded-md border border-solid text-[13px] font-medium transition-colors cursor-pointer",
+                    active
+                        ? "bg-[hsl(var(--primary)/0.12)] border-[hsl(var(--primary)/0.4)] text-[hsl(var(--primary))]"
+                        : "bg-[hsl(var(--card))] border-[hsl(var(--input-border))] text-[var(--dash-text-muted)] hover:bg-white/[0.05]"
+                )}
             >
                 <CalendarDays className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--dash-text-muted)' }} />
                 <span>
