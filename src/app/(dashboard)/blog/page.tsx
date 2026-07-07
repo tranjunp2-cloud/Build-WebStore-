@@ -319,7 +319,11 @@ export default function BlogListPage() {
     }
 
     return (
-        <div className="flex flex-col w-full font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
+        // GH-1518: fixed height + overflow-hidden chỉ dành cho mobile/iPad mini (<820px) — card grid
+        // bên trong tự scroll (flex-1 min-h-0). Từ 820px (table layout) KHÔNG được khóa chiều cao:
+        // table không có tầng scroll riêng nên bị cắt cụt khi nhiều bài → mất pagination footer,
+        // trang đứng im. ≥820px trả về scroll tự nhiên của shell (giống Products).
+        <div className="flex flex-col w-full font-['Inter'] h-[calc(100vh-120px)] overflow-hidden min-[820px]:h-auto min-[820px]:overflow-visible min-[820px]:pb-20">
             {/* Header Container — title + actions on one row from sm (tablet inline); stacks on mobile */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center w-full gap-4 sm:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
@@ -359,9 +363,12 @@ export default function BlogListPage() {
                 {/* Mobile (<sm): 3 chips share one row as an equal 3-col grid + hide each chip's
                     "Label :" prefix (value-only) so the whole filter bar is just 2 rows (search + chips).
                     sm+ reverts to the original auto-width flex-wrap. Scoped here — shared FilterChip untouched. */}
+                {/* GH-1518: nhắm .chip-trigger (marker của FilterChip) thay vì `button` trần —
+                    dropdown panel KHÔNG portal nên `sm:[&_button]:w-auto` cũ ăn lan vào option
+                    button bên trong panel, mất w-full → inline-block tự co → option wrap 2 cột. */}
                 <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center
-                                [&_button]:w-full sm:[&_button]:w-auto [&_button]:px-2.5 sm:[&_button]:px-3
-                                [&_button>span]:min-w-0 [&_button>span]:flex-1 sm:[&_button>span]:flex-none
+                                [&_.chip-trigger]:w-full sm:[&_.chip-trigger]:w-auto [&_.chip-trigger]:px-2.5 sm:[&_.chip-trigger]:px-3
+                                [&_.chip-trigger>span]:min-w-0 [&_.chip-trigger>span]:flex-1 sm:[&_.chip-trigger>span]:flex-none
                                 [&_[data-chip-label]]:hidden [&_[data-chip-sep]]:hidden sm:[&_[data-chip-label]]:inline sm:[&_[data-chip-sep]]:inline">
                     <FilterChip<'' | 'draft' | 'published'>
                         icon={Clock}
