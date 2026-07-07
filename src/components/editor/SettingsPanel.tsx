@@ -1409,7 +1409,8 @@ function SettingsPanelInner({
                 // dùng `bg-[var(--editor-surface)]/90` nhưng Tailwind v3 không compile alpha trên
                 // var đục (class chết) — visual này là look QA đã duyệt, giờ code nói thật.
                 'flex h-full flex-col',
-                fullWidth ? 'w-full flex-1' : 'shrink-0 border-l border-white/5',
+                // border-l bỏ theo cùng lý do: thiếu border-solid nên chưa từng paint (class chết).
+                fullWidth ? 'w-full flex-1' : 'shrink-0',
             )}
             style={fullWidth ? undefined : { width: SETTINGS_PANEL_WIDTH }}
         >

@@ -30,7 +30,8 @@ export function EditorSidebar({
     // Shared <Tabs variant="underline"> trigger bar (design-system, khớp dashboard nav).
     // Content render ngoài (parent điều khiển theo activeTab) nên chỉ dùng List + Trigger.
     const tabBar = (
-        <div className="bg-[var(--editor-bg)]/60">
+        // bg-[var(--editor-bg)]/60 cũ = class chết (Tailwind v3 không compile alpha trên var đục) — bỏ, render không đổi
+        <div>
             <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as EditorSidebarTabId)}>
                 <TabsList variant="underline" className={compact ? 'px-1 pt-1' : 'px-2 pt-1'}>
                     {tabs.map(tab => (
