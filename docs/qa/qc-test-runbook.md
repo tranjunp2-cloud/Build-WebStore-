@@ -1,6 +1,6 @@
 ---
 owner: QC lead
-last_updated: 2026-07-02
+last_updated: 2026-07-06
 ---
 
 # QC Test Environment Runbook
@@ -16,13 +16,13 @@ owner is escalation, not day-one support.
 
 | Item | Value |
 |------|-------|
-| Environment | `qc-test` (Vercel custom env) |
-| URL | `https://qc-test.web-v2.dev.ecommercehub.my` (or Vercel-generated) |
-| Database | Neon project `ech-prime-web-v2-qc-test` (Singapore, Free tier) |
+| App env | `qc-test` (via `APP_ENV`; Vercel deploy target = Preview + branch-filter) |
+| URL | `https://ech-prime-web-v2-qc.vercel.app` (stable alias, auto-updates on deploy) |
+| Database | Neon project `ech-prime-web-v2-qc-test` (Singapore, Free tier) — direct endpoint `ep-dawn-scene-ao97yus8` (do NOT use `-pooler` variant) |
 | Git branch | `qc-test` (protected — push restricted) |
-| CI job | `Deploy: Vercel (qc-test)` |
+| CI job | `Deploy: Vercel (qc-test)` — routes via Vercel Preview scope + branch-filter (Pro plan permits only 1 custom env slot, already used by staging) |
 | Owner | QC lead — TBD |
-| Backup | Dev owner — TBD |
+| Backup | Dev owner — phuongltweb |
 
 ## Common tasks
 
@@ -30,10 +30,10 @@ owner is escalation, not day-one support.
 
 1. **Health check**
    ```bash
-   curl https://qc-test.web-v2.dev.ecommercehub.my/api/health
+   curl https://ech-prime-web-v2-qc.vercel.app/api/health
    ```
-   Expect `{status:"ok"}`. Anything else → check the latest CI run for
-   `Deploy: Vercel (qc-test)`.
+   Expect `{"status":"ok",...}`. Anything else → check the latest CI run
+   for `Deploy: Vercel (qc-test)`.
 
 2. **Reset + reseed data**
    ```bash
@@ -41,8 +41,9 @@ owner is escalation, not day-one support.
    npm run db:reset-qc && npm run db:seed-qc
    ```
    The `qc-guard` inside those scripts refuses to run unless BOTH
-   `APP_ENV=qc-test` AND `DATABASE_URI` points at the QC Neon host — you
-   cannot accidentally wipe staging even with a stale env in your shell.
+   `APP_ENV=qc-test` AND `DATABASE_URI` hostname is NOT in the hardcoded
+   staging/prod denylist (`ep-blue-king-a1qufqjg` etc.). You cannot
+   accidentally wipe staging even with a stale env in your shell.
    The seed also requires `QC_SEED_PASSWORD` set (from the 1Password vault);
    it hard-fails if missing rather than defaulting to a well-known value.
 
@@ -80,8 +81,17 @@ on `staging` first — the QC lane is downstream of QA, not a bypass.
 
 1. Open the failed run under **GitHub → Actions → Deploy: Vercel (qc-test)**
 2. Common failure modes:
+   - **Preflight tripwire** — `DATABASE_URI points at staging endpoint` →
+     branch-filter env var override missing on Vercel. Fix: Dashboard →
+     Environment Variables → add `DATABASE_URI` with scope Preview +
+     branch=qc-test pointing to Neon QC connection string
    - **Preflight — Postgres reachable** — Neon DB paused / quota exhausted
-   - **`vercel pull`** — env var missing on `qc-test` scope in Vercel Dashboard
+   - **`vercel pull` returns empty DATABASE_URI** — env var was added with
+     `--sensitive` flag which breaks CLI pull. Remove + re-add without
+     `--sensitive`
+   - **Payload query fails with "relation X does not exist"** — DATABASE_URI
+     points at pooler endpoint (`-pooler` suffix). Switch to direct endpoint
+     (see `jmeter-qc-env.md` § "Neon endpoint gotcha")
    - **Build error** — same as staging, check the CLI output
 3. Fix in `qc-test` branch (or merge a fix from `staging`) and push again
 

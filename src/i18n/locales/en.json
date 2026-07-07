@@ -2019,6 +2019,8 @@
                 "bankTransferSubtitle": "Accept payments via bank transfer with QR code",
                 "active": "Active",
                 "inactive": "Inactive",
+                "seeMore": "See more",
+                "seeLess": "See less",
                 "uploadQrTitle": "Upload QR Code Image",
                 "uploadQrSub": "Click to upload QR Code",
                 "uploadHint": "JPG or PNG. Max size: 2MB",

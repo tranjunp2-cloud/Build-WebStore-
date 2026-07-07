@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag } from 'lucide-react'
+import { AlertCircle, RefreshCw, SearchX, Pencil, Trash2, Sparkles, Tag, Filter } from 'lucide-react'
 import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -552,7 +552,7 @@ export default function ProductsPage() {
                                     : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
                                 className="shrink-0 rounded-[16px]"
                             >
-                                <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
+                                <Filter size={16} className="shrink-0" />
                                 <span>
                                     {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
                                         ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
@@ -592,7 +592,7 @@ export default function ProductsPage() {
                                 ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
                                 : { background: 'hsl(var(--card))' }}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={16} height={16} alt="Filter" className="invert dark:invert-0" />
+                            <Filter size={16} className="shrink-0" />
                             {t.dashboard.products.list.filterBtn}
                         </Button>
                     </div>

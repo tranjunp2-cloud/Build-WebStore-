@@ -437,7 +437,7 @@ export default function BlogListPage() {
                 ) : posts.map((post) => (
                     <div
                         key={`mobile-${post.id}`}
-                        className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] p-4 gap-4"
+                        className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] p-4 gap-3"
                     >
                         {/* Top Content Row */}
                         <div className="flex flex-row gap-4">
@@ -515,11 +515,11 @@ export default function BlogListPage() {
                         </div>
 
                         {/* Action Buttons Row */}
-                        <div className="flex flex-row items-center gap-2 border-t border-border pt-3">
+                        <div className="flex flex-row items-center gap-2 border-t border-border pt-2">
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
+                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
                             >
                                 <Eye className="w-4 h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.view}</span>
@@ -527,7 +527,7 @@ export default function BlogListPage() {
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
+                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
                             >
                                 <Pencil className="w-4 h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.edit}</span>
@@ -535,7 +535,7 @@ export default function BlogListPage() {
                             <Button
                                 onClick={() => openDeleteConfirm(post)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-[44px] rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
+                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
                             >
                                 <Trash2 className="w-4 h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.delete}</span>

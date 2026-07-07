@@ -261,6 +261,7 @@ html:not(.dark) {
   --cus-surface-header: rgba(15,23,42,0.7);
   --cus-surface-dropdown: #1e293b;
   --cus-surface-select: #1e293b;
+  --cus-surface-input: rgba(255,255,255,0.04);
   --cus-surface-sticky: rgba(10,17,33,0.96);
   --cus-surface-info: rgba(15,23,42,0.6);
   --cus-border-subtle: rgba(255,255,255,0.04);
@@ -288,6 +289,7 @@ html:not(.dark) {
   --cus-surface-header: rgba(241,245,249,0.95);
   --cus-surface-dropdown: #ffffff;
   --cus-surface-select: #f8fafc;
+  --cus-surface-input: #ffffff;
   --cus-surface-sticky: rgba(248,250,252,0.96);
   --cus-surface-info: rgba(248,250,252,0.9);
   --cus-border-subtle: rgba(0,0,0,0.04);

@@ -38,6 +38,18 @@ export function PaymentMethodCard({
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const isActive = on && !locked;
+    // GH-1499 issue 2: long descriptions overflow the card unbounded — truncate to
+    // 2 lines with a "See more" toggle instead. Only show the toggle when truncation
+    // would actually kick in (short descriptions never wrap to 3+ lines anyway).
+    // Known limitation: this is a raw character count, not a measured/rendered check,
+    // so it's locale-fragile — a translation could push one locale's copy past 120
+    // chars while another stays under for equivalent content (verified this can happen:
+    // a sibling payments string has en=107/ms=123 chars). Currently all 4 descriptions
+    // routed through this component agree across en/ms, so no live bug, but re-verify
+    // this threshold (or switch to a real scrollHeight/clientHeight overflow check) if
+    // a translation update or new payment method starts showing inconsistent behavior.
+    const [expanded, setExpanded] = React.useState(false);
+    const isLongDesc = desc.length > 120;
 
     return (
         <div className={cn(
@@ -66,7 +78,24 @@ export function PaymentMethodCard({
                                     </span>
                                 )}
                             </h3>
-                            <p className="text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]">{desc}</p>
+                            {/* Truncate + "see more" on mobile/tablet only — desktop (xl+) keeps
+                                showing the full description untouched (issue AC: no desktop regression). */}
+                            <p className={cn(
+                                'text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]',
+                                !expanded && isLongDesc && 'line-clamp-2 xl:line-clamp-none',
+                            )}>
+                                {desc}
+                            </p>
+                            {isLongDesc && (
+                                <button
+                                    type="button"
+                                    onClick={() => setExpanded(v => !v)}
+                                    aria-expanded={expanded}
+                                    className="text-[12px] text-[hsl(var(--primary))] font-medium mt-[2px] hover:underline xl:hidden"
+                                >
+                                    {expanded ? pt.seeLess : pt.seeMore}
+                                </button>
+                            )}
                         </div>
 
                         {/* Toggle switch — shared <Switch> (GH-1222) for consistency with Shipping

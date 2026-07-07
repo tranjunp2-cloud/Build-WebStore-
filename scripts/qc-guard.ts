@@ -5,20 +5,31 @@
  * against staging / production databases. Every QC-only script MUST call
  * `assertQcEnv()` at the top of its `main()` before touching the DB.
  *
- * A run counts as QC ONLY if BOTH of the following hold:
- *   - `DATABASE_URI` hostname contains the substring `qc-test`
- *     (Neon project name convention: `ech-prime-web-v2-qc-test`), AND
- *   - APP_ENV / NEXT_PUBLIC_APP_ENV equals `qc-test`
+ * A run counts as QC when ALL of the following hold:
+ *   1. APP_ENV / NEXT_PUBLIC_APP_ENV equals `qc-test`
+ *   2. `DATABASE_URI` hostname is NOT in the known non-QC denylist below
+ *      (staging + production Neon endpoints)
+ *   3. `DATABASE_URI` hostname does NOT contain the substring `staging`
+ *      or `production` (defense-in-depth against renamed endpoints)
  *
- * Additionally, hostnames containing `staging` or `prod` are hard-blocked
- * even if both flags align, as an explicit denylist backstop.
+ * Rationale (2026-07-03 update): initial design required the substring
+ * `qc-test` in the hostname, but Neon assigns random endpoint names
+ * (e.g. `ep-dawn-scene-ao97yus8`) that never contain the project name.
+ * Switched to denylist model — allow any host EXCEPT the known
+ * staging/prod endpoints. Denylist is kept in the code (not env-driven)
+ * so it can never be silently disabled by a missing env var.
  *
- * Rationale: OR-logic allowed a stale `APP_ENV=qc-test` in a dev's shell
- * to satisfy the check while `DATABASE_URI` still pointed at staging,
- * causing reset to wipe staging. AND-logic + hostname denylist closes
- * that gap. See plans/260702-1719-qc-test-env-setup/reports/code-review-*
- * finding H1.
+ * When adding a new production endpoint, append to KNOWN_NON_QC_HOSTS.
  */
+
+// Known Neon endpoints that must NEVER be wiped by QC scripts.
+// Update this list when infrastructure changes (prod launches, staging
+// rebuilds, etc.). Substring match — so `ep-blue-king-a1qufqjg` blocks
+// both the direct and `-pooler` variants of the same endpoint.
+const KNOWN_NON_QC_HOSTS: readonly string[] = [
+  'ep-blue-king-a1qufqjg', // staging Neon endpoint (2026-04-13)
+  // 'ep-XXX-prod', // TODO: add when production Neon endpoint provisioned
+]
 
 export function assertQcEnv(): void {
   const uri = process.env.DATABASE_URI ?? ''
@@ -32,24 +43,31 @@ export function assertQcEnv(): void {
     }
   })()
 
-  const hostIsQc = hostFromUri.includes('qc-test')
   const appEnvIsQc = appEnv === 'qc-test'
-  const hostIsDenylisted =
-    hostFromUri.includes('staging') || hostFromUri.includes('prod') || hostFromUri.includes('production')
+  const hostIsKnownNonQc = KNOWN_NON_QC_HOSTS.some((h) => hostFromUri.includes(h))
+  const hostContainsNonQcKeyword =
+    hostFromUri.includes('staging') ||
+    hostFromUri.includes('production') ||
+    hostFromUri.includes('.prod.')
 
-  const isQc = hostIsQc && appEnvIsQc && !hostIsDenylisted
+  const isQc = appEnvIsQc && !hostIsKnownNonQc && !hostContainsNonQcKeyword && hostFromUri !== ''
 
   if (!isQc) {
     // Redact the URI when echoing back — never dump the full connection
     // string to logs (may be surfaced by CI aggregators).
     const redactedHost = hostFromUri || '<unparseable DATABASE_URI>'
     console.error('❌ QC SAFETY BLOCK — refusing to run outside QC env.')
-    console.error(`   Detected APP_ENV="${appEnv}"`)
+    console.error(`   Detected APP_ENV="${appEnv}" (need "qc-test")`)
     console.error(`   Detected DATABASE_URI host="${redactedHost}"`)
-    console.error('   Required (BOTH):')
-    console.error('     1. APP_ENV=qc-test (env var)')
-    console.error('     2. DATABASE_URI host containing "qc-test"')
-    console.error('   Denylisted hosts: any containing "staging" | "prod" | "production".')
+    if (hostIsKnownNonQc) {
+      console.error('   ⚠ Host matches a known non-QC (staging/prod) endpoint denylist.')
+    }
+    if (hostContainsNonQcKeyword) {
+      console.error('   ⚠ Host contains "staging" | "production" | ".prod." keyword.')
+    }
+    console.error('   Required:')
+    console.error('     1. APP_ENV=qc-test')
+    console.error('     2. DATABASE_URI must NOT point at a known staging/prod endpoint')
     console.error('   Load QC env first: `set -a && . .env.qc-test && set +a` then re-run.')
     process.exit(1)
   }

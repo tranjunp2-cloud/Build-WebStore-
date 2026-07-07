@@ -2019,6 +2019,8 @@
                 "bankTransferSubtitle": "Terima pembayaran melalui pindahan bank dengan kod QR",
                 "active": "Aktif",
                 "inactive": "Tidak Aktif",
+                "seeMore": "Lihat lagi",
+                "seeLess": "Lihat kurang",
                 "uploadQrTitle": "Muat Naik Imej Kod QR",
                 "uploadQrSub": "Klik untuk muat naik Kod QR",
                 "uploadHint": "JPG atau PNG. Saiz maks: 2MB",
