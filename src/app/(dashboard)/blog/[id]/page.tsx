@@ -500,29 +500,23 @@ export default function BlogEditorPage() {
     return (
         <div className="w-full h-full space-y-6">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-[12px] w-full">
-                {/* Row 1: Back + Breadcrumb + Title */}
-                <div className="flex flex-row items-center gap-[16px] min-w-0">
-                    <Button
+                {/* Row 1: Back + Title + subtitle — GH-1511 #36: header theo đúng chuẩn Add Product
+                    (ProductForm.tsx): ArrowLeft h-6 + h1 24px font-outfit + subtitle 14px foreground/60.
+                    Breadcrumb Home > Blog bỏ theo baseline (Add Product không có breadcrumb). */}
+                <div className="flex flex-row items-center gap-4 min-w-0">
+                    <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
                         onClick={() => router.push('/blog')}
                         aria-label="Back to blog list"
-                        className="shrink-0"
+                        className="flex shrink-0 items-center justify-center text-foreground hover:text-foreground/80 transition-colors border-none bg-transparent p-0 cursor-pointer"
                     >
-                        <ArrowLeft className="w-[18px] h-[18px]" strokeWidth={1.66} />
-                    </Button>
-                    <div className="flex flex-col gap-[4px] min-w-0">
-                        <div className="flex flex-row items-center gap-[8px] flex-wrap">
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))]">&gt;</span>
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[hsl(var(--muted-foreground))] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
-                        </div>
-                        <div className="h-[32px] flex items-center">
-                            <h1 className="font-['Inter'] font-[700] text-[24px] leading-[32px] text-foreground">
-                                {isNew ? t.dashboard.blog.editor.createTitle : t.dashboard.blog.editor.editTitle}
-                            </h1>
-                        </div>
+                        <ArrowLeft className="h-6 w-6" />
+                    </button>
+                    <div className="flex flex-col gap-1 min-w-0">
+                        <h1 className="text-[24px] font-bold font-outfit text-foreground leading-[1.33] m-0 truncate">
+                            {isNew ? t.dashboard.blog.editor.createTitle : t.dashboard.blog.editor.editTitle}
+                        </h1>
+                        <p className="text-[14px] text-foreground/60 leading-[1.43] m-0">{t.dashboard.blog.editor.headerSubtitle}</p>
                     </div>
                 </div>
 
