@@ -2517,8 +2517,6 @@
             "loadFailed": "Failed to load blog posts",
             "tryAgain": "Try Again",
             "editor": {
-                "home": "Home",
-                "blog": "Blog",
                 "newPost": "New Post",
                 "editPrefix": "Edit:",
                 "createTitle": "Create Blog Post",

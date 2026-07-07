@@ -2517,8 +2517,6 @@
             "loadFailed": "Gagal memuatkan kiriman blog",
             "tryAgain": "Cuba Lagi",
             "editor": {
-                "home": "Laman Utama",
-                "blog": "Blog",
                 "newPost": "Kiriman Baru",
                 "editPrefix": "Sunting:",
                 "createTitle": "Cipta Kiriman Blog",
@@ -2538,7 +2536,7 @@
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
                 "clickToUpload": "Klik untuk memuat naik lakaran pribit",
-                "uploadHint": "PNG, JPG sehingga 10MB — nisbah 4:3, lebar ≥1200px ",
+                "uploadHint": "PNG, JPG sehingga 10MB — nisbah 4:3, lebar ≥1200px",
                 "startWriting": "Mula menulis...",
                 "postSettings": "Tetapan Kiriman",
                 "category": "Kategori",
