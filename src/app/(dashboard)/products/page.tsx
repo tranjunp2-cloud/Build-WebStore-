@@ -388,8 +388,10 @@ export default function ProductsPage() {
                         <Image src="/images/figma/ai-chat-icon.svg" width={24} height={24} alt="AI" className="shrink-0" />
                         <h2 className="text-[18px] font-semibold text-foreground">{t.dashboard.products.list.aiChatTitle}</h2>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-                        {/* Multi-line prompt box — auto-grows with content; Cmd/Ctrl+Enter submits, plain Enter = newline */}
+                    <p className="-mt-2 ml-9 text-[12.5px] text-muted-foreground">{t.dashboard.products.list.aiChatSubtitle}</p>
+                    {/* Command shell — textarea + footer (hint + Generate button) share one bordered
+                        box, chat-input style, matching the issue's design reference (ai-bulk-create.html) */}
+                    <div className="w-full rounded-xl border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] overflow-hidden focus-within:border-[hsl(var(--ring))] focus-within:ring-1 focus-within:ring-[hsl(var(--ring))] transition-colors">
                         <textarea
                             ref={aiTextareaRef}
                             value={aiPrompt}
@@ -402,39 +404,48 @@ export default function ProductsPage() {
                             }}
                             placeholder={t.dashboard.products.list.aiChatPlaceholder}
                             rows={1}
-                            className="flex-1 min-w-0 min-h-[52px] resize-none rounded-lg border border-[hsl(var(--input-border))] bg-[hsl(var(--card))] px-3 py-2 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus-visible:outline-none focus-visible:border-[hsl(var(--ring))] focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))]"
+                            className="w-full min-h-[46px] resize-none border-none bg-transparent px-4 py-3 text-[13px] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus-visible:outline-none"
                         />
-                        {/* Generate Drafts — shared dashboard primary button (size="dash") */}
-                        <Button
-                            variant="dashPrimary"
-                            size="dash"
-                            onClick={() => {
-                                if (aiPrompt.trim()) handleCreateAi()
-                            }}
-                            className="shrink-0 justify-center"
-                        >
-                            <Sparkles className="h-4 w-4" />
-                            {t.dashboard.products.list.aiChatBtn}
-                        </Button>
+                        <div className="flex items-center justify-between gap-3 border-t border-[hsl(var(--input-border))]/60 px-3 py-2">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintNewLine}</span>
+                                <span>·</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">⌘/Ctrl</kbd>
+                                <span>+</span>
+                                <kbd className="rounded border border-[hsl(var(--input-border))] bg-[hsl(var(--background))] px-1.5 py-0.5 font-sans text-[10.5px]">Enter</kbd>
+                                <span>{t.dashboard.products.list.aiChatHintGenerate}</span>
+                            </div>
+                            {/* Generate Drafts — shared dashboard primary button (size="dash") */}
+                            <Button
+                                variant="dashPrimary"
+                                size="dash"
+                                onClick={handleCreateAi}
+                                disabled={!aiPrompt.trim()}
+                                className="shrink-0 justify-center"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                                {t.dashboard.products.list.aiChatBtn}
+                            </Button>
+                        </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">{t.dashboard.products.list.aiChatHint}</p>
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[12px] text-muted-foreground">{t.dashboard.products.list.aiChatSuggestionsLabel}</span>
                         {[
-                            t.dashboard.products.list.aiChatSuggestion1,
-                            t.dashboard.products.list.aiChatSuggestion2,
-                            t.dashboard.products.list.aiChatSuggestion3,
+                            { label: t.dashboard.products.list.aiChatSuggestion1Label, fill: t.dashboard.products.list.aiChatSuggestion1 },
+                            { label: t.dashboard.products.list.aiChatSuggestion2Label, fill: t.dashboard.products.list.aiChatSuggestion2 },
+                            { label: t.dashboard.products.list.aiChatSuggestion3Label, fill: t.dashboard.products.list.aiChatSuggestion3 },
                         ].map((suggestion, i) => (
                             <button
                                 key={i}
                                 type="button"
                                 onClick={() => {
-                                    setAiPrompt(suggestion)
+                                    setAiPrompt(suggestion.fill)
                                     aiTextareaRef.current?.focus()
                                 }}
                                 className="rounded-full border border-[hsl(var(--primary))]/25 bg-[hsl(var(--background))]/50 px-3 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-[hsl(var(--primary))]/10"
                             >
-                                {suggestion}
+                                {suggestion.label}
                             </button>
                         ))}
                     </div>
