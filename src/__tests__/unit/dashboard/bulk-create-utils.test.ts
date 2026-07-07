@@ -90,6 +90,42 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.inventory).toBe(0)
     })
 
+    it('TC-F08-04-53 (review-drawer stock field): no-variant product uses the merchant-edited stock value', () => {
+        const product = {
+            selected: true,
+            name: 'Nasi Lemak',
+            price: 12.5,
+            category: 'Food',
+            variants: [],
+            stock: 25,
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(25)
+    })
+
+    it('TC-F08-04-54 (review-drawer stock field): variant product ignores top-level prod.stock — inventory is the sum of variant stocks instead', () => {
+        // Products.ts beforeChange hook recomputes inventory server-side as the sum of variant
+        // stocks regardless, but buildSavePayload computes the same sum itself so the payload it
+        // sends is internally consistent with what the review drawer's Stock field displayed
+        // (editing it there distributes the value to every variant uniformly — see
+        // updateAllVariantsStock in BulkCreateModal).
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 39.9,
+            category: 'Fashion',
+            stock: 25, // top-level stock is ignored for variant products — not summed in
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 5 },
+                { name: 'Large', price: 39.9, sku: 'TS-L', stock: 3 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.inventory).toBe(8)
+    })
+
     it('TC-F08-04-43: generates a fallback SKU when the AI omits one', () => {
         const product = {
             selected: true,

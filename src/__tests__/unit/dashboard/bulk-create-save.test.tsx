@@ -74,10 +74,10 @@ async function renderAndWaitForProducts(productList = [BASE_PRODUCT]) {
     render(
         <BulkCreateModal onClose={onClose} onSuccess={onSuccess} initialPrompt="test" />,
     )
-    // Wait until save button is enabled (products loaded + selected, not parsing/saving)
+    // Wait until the Approve All button is enabled (products loaded, not parsing/saving)
     await waitFor(
         () => {
-            const btn = screen.getByRole('button', { name: /save/i })
+            const btn = screen.getByRole('button', { name: /approve/i })
             expect(btn).not.toBeDisabled()
         },
         { timeout: 3000 },
@@ -99,7 +99,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert
@@ -123,7 +123,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert
@@ -145,7 +145,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert: per-item error toast with parsed server message
@@ -175,7 +175,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert: retried transparently — success toast shown, no error toast surfaced
@@ -202,7 +202,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert: gives up after MAX_SKU_ATTEMPTS (3) and surfaces the error
@@ -220,7 +220,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert: no-id response is treated as failure
@@ -237,7 +237,7 @@ describe('BulkCreateModal — handleSave [TC-F08-04-27]', () => {
 
         // Act
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         // Assert
@@ -293,7 +293,7 @@ describe('BulkCreateModal — handleParse variant-name dedup [TC-F08-04-52 code-
         await renderAndWaitForProducts([productWithDupeVariants])
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: /save/i }))
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
         })
 
         await waitFor(() => {
@@ -305,5 +305,102 @@ describe('BulkCreateModal — handleParse variant-name dedup [TC-F08-04-52 code-
         // First occurrence's own sku/stock survive untouched — not merged/reset.
         expect(savedVariants[0].sku).toBe('TS-R1')
         expect(savedVariants[0].stock).toBe(5)
+    })
+})
+
+describe('BulkCreateModal — review drawer: remove-draft [design-alignment follow-up]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('removing a draft excludes it from save — the review drawer has no select/deselect checkbox, only a per-draft remove button', async () => {
+        const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
+        mockSaveProduct.mockResolvedValue({ id: 1 })
+        await renderAndWaitForProducts(two)
+
+        expect(screen.getByText('2 drafts')).toBeInTheDocument()
+
+        // Remove the first draft ("Test Shirt")
+        const removeButtons = screen.getAllByRole('button', { name: /remove draft/i })
+        fireEvent.click(removeButtons[0])
+
+        expect(screen.getByText('1 draft')).toBeInTheDocument()
+        expect(screen.queryByDisplayValue('Test Shirt')).not.toBeInTheDocument()
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+        expect(mockSaveProduct.mock.calls[0][0].name).toBe('Test Pants')
+    })
+})
+
+describe('BulkCreateModal — review drawer: price coercion on parse [bug fix]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('an AI response with a non-numeric/missing price renders "0" in the Price input, not a raw invalid value', async () => {
+        // Untrusted AI output — the parse prompt asks for "0 if not specified", but on
+        // unparseable/gibberish input the model can still omit or malform this field.
+        // Reproduces a real observed bug: the Price <input type="number"> received the raw
+        // parsed value directly, showing a dash/blank instead of a coerced 0.
+        const garbageProduct = { name: 'QÉDRHG', price: null, category: '', variants: [], sku: 'X-001' }
+        await renderAndWaitForProducts([garbageProduct as unknown as typeof BASE_PRODUCT])
+
+        // Both the Price and Stock inputs legitimately default to "0" for this product (no
+        // price/stock in the AI response) — assert both render as valid "0", not an empty/raw
+        // invalid value (e.g. the design mockup's own "—" placeholder, which this must not mimic).
+        expect(screen.getAllByDisplayValue('0')).toHaveLength(2)
+
+        mockSaveProduct.mockResolvedValue({ id: 1 })
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+        expect(mockSaveProduct.mock.calls[0][0].price).toBe(0)
+    })
+})
+
+describe('BulkCreateModal — review drawer: variant-product Stock input [uniform-fill follow-up]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('editing Stock for a variant product fills the same value into every variant; saved inventory is their sum', async () => {
+        const variantProduct = {
+            name: 'T-Shirt',
+            price: 39.9,
+            category: '',
+            sku: 'TS-001',
+            variants: [
+                { name: 'Small', price: 39.9, sku: 'TS-S', stock: 0 },
+                { name: 'Large', price: 39.9, sku: 'TS-L', stock: 0 },
+            ],
+        }
+        mockSaveProduct.mockResolvedValue({ id: 1 })
+        await renderAndWaitForProducts([variantProduct as unknown as typeof BASE_PRODUCT])
+
+        // The Stock input (not disabled) is the second number input in the row — Price is first.
+        const numberInputs = document.querySelectorAll('input[type="number"]')
+        const stockInput = numberInputs[1]
+        fireEvent.change(stockInput, { target: { value: '7' } })
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+        const saved = mockSaveProduct.mock.calls[0][0]
+        expect(saved.variants.map((v: { stock: number }) => v.stock)).toEqual([7, 7])
+        expect(saved.inventory).toBe(14)
     })
 })
