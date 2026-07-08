@@ -168,7 +168,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ received: true, matched: false, reason: 'order_not_found' })
         }
 
-        const result = await applyTrackingUpdate(payload, order, epStatus)
+        // Courier free-text (topic tracking.update → latest_tracking_status) shown as the
+        // timeline entry description; display-only, never used for status mapping.
+        const trackingText = extractField(body, [
+            'latest_tracking_status',
+            'tracking_status',
+            'shipment_status',
+        ])
+        const result = await applyTrackingUpdate(payload, order, epStatus, trackingText ?? undefined)
         payload.logger.info({ orderId: order.id, awb, epStatus, result }, '[ep-webhook] processed')
         return NextResponse.json({ received: true, matched: true, result })
     } catch (error) {
