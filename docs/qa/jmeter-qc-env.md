@@ -158,6 +158,34 @@ QC PG 17 client on macOS: `brew install postgresql@17`.
 2. Log any errors in `docs/qa/qc-test-log.md` (create when first needed)
 3. Optional: reset again if you want a clean slate for the next batch
 
+## OTP bypass on QC lane
+
+Two-Step Verification is enforced globally, but the QC lane skips real
+email delivery so QA can iterate without polling a fake `@primeweb.local`
+mailbox. The bypass is **triple-guarded** in `src/lib/otp/qc-bypass.ts`
+and only activates when ALL of the following hold:
+
+1. `APP_ENV === 'qc-test'` (Vercel scope stamp — set on Preview + branch=qc-test)
+2. `QC_OTP_BYPASS_ENABLED === 'true'` (explicit opt-in per env)
+3. Email ends with `QC_OTP_BYPASS_DOMAIN` (default `@primeweb.local`)
+
+Any real customer email domain is refused even if bypass is misconfigured
+on the wrong scope. Unit tests: `src/__tests__/unit/otp/qc-bypass-guard.test.ts`
+(TC-QC-OTP-01 → 04).
+
+### For QA / JMeter runs
+
+- Use any seeded account: `qc-{admin,owner,staff}-N@primeweb.local`
+- When the OTP screen appears, enter **`123456`** (value of `QC_OTP_BYPASS_CODE`)
+- No email polling required — dev tab logs `[QC OTP] Domain bypass active`
+
+### Legacy fallback (deprecated)
+
+Before this PR the QC OTP was populated via direct SQL update on the
+`users.otp_hash` column, valid only 24 h. That hack is superseded — do not
+run it any more. If for some reason the env-driven bypass is off, request
+dev owner (anh Phuong) to re-enable rather than SQL-inject.
+
 ## Credentials management
 
 - **1Password vault: "PrimeWeb QC"** — items:
@@ -174,8 +202,10 @@ QC PG 17 client on macOS: `brew install postgresql@17`.
 | `.env.qc-test.example` | Env var reference (placeholder, safe to commit) |
 | `.jmx-config/qc-test.properties.example` | JMeter properties template |
 | `scripts/qc-guard.ts` | Safety guard preventing seed/reset from touching staging |
-| `scripts/seed-qc-data.ts` | Populates QC DB with 10 users + 5 tenants + content |
+| `scripts/seed-qc-data.ts` | Populates QC DB with 10 users + 5 tenants + 40 products + pages |
+| `scripts/qc-seed-products.ts` | Product + extra-page helpers used by the main seed |
 | `scripts/reset-qc-data.ts` | Wipes tenant-scoped data (schema preserved) |
+| `src/lib/otp/qc-bypass.ts` | Triple-guarded OTP bypass helper (envs + domain gate) |
 | `docs/qa/qc-test-runbook.md` | Operational runbook (day-to-day) |
 | `.github/workflows/ci.yml` | Job `Deploy: Vercel (qc-test)` |
 | `.github/branch-protection.md` | `qc-test` branch push restriction |

@@ -27,6 +27,7 @@
 import { getPayload, type Payload } from 'payload'
 import config from '../src/payload.config'
 import { assertQcEnv } from './qc-guard'
+import { seedTenantProducts, seedTenantExtraPages } from './qc-seed-products'
 
 // Role values MUST match `src/collections/Users.ts` field `roles` options.
 // Values: super-admin | tenant-owner | editor | viewer.
@@ -195,36 +196,39 @@ async function seedTenantContent(
   payload: Payload,
   tenantId: string | number,
   tenantName: string,
-): Promise<void> {
+): Promise<{ productsCreated: number; extraPagesCreated: number }> {
+  // Site + home page: create if missing, otherwise reuse the existing one
+  // so downstream product/page seeding still runs on re-runs.
   const existingSites = await payload.find({
     collection: 'sites',
     where: { tenant: { equals: tenantId } },
     limit: 1,
     overrideAccess: true,
   })
+  let siteId: string | number
   if (existingSites.docs.length) {
+    siteId = existingSites.docs[0].id
     console.log(`  ~ site exists for ${tenantName}`)
-    return
+  } else {
+    const site = await payload.create({
+      collection: 'sites',
+      data: { name: `${tenantName} Site`, tenant: tenantId },
+      overrideAccess: true,
+    })
+    siteId = site.id
+    await payload.create({
+      collection: 'pages',
+      data: { title: 'Home', slug: 'home', site: siteId, tenant: tenantId },
+      overrideAccess: true,
+    })
+    console.log(`  + site + home page created for ${tenantName}`)
   }
-  const site = await payload.create({
-    collection: 'sites',
-    data: {
-      name: `${tenantName} Site`,
-      tenant: tenantId,
-    },
-    overrideAccess: true,
-  })
-  await payload.create({
-    collection: 'pages',
-    data: {
-      title: 'Home',
-      slug: 'home',
-      site: site.id,
-      tenant: tenantId,
-    },
-    overrideAccess: true,
-  })
-  console.log(`  + site + home page created for ${tenantName}`)
+
+  const productsCreated = await seedTenantProducts(payload, tenantId, siteId, tenantName)
+  const extraPagesCreated = await seedTenantExtraPages(payload, tenantId, siteId, tenantName)
+  if (productsCreated) console.log(`  + ${productsCreated} products for ${tenantName}`)
+  if (extraPagesCreated) console.log(`  + ${extraPagesCreated} extra pages for ${tenantName}`)
+  return { productsCreated, extraPagesCreated }
 }
 
 async function main(): Promise<void> {
@@ -241,14 +245,21 @@ async function main(): Promise<void> {
   console.log('  Owner ↔ tenant memberships:')
   await linkOwnerships(payload, userIds, tenantIds)
   console.log('  Per-tenant content:')
+  let totalProducts = 0
+  let totalExtraPages = 0
   for (const spec of TENANTS) {
     const tid = tenantIds[spec.name]
     if (!tid) continue
-    await seedTenantContent(payload, tid, spec.name)
+    const { productsCreated, extraPagesCreated } = await seedTenantContent(payload, tid, spec.name)
+    totalProducts += productsCreated
+    totalExtraPages += extraPagesCreated
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
-  console.log(`✅ Seed done in ${elapsed}s. Password sourced from QC_SEED_PASSWORD.`)
+  console.log(
+    `✅ Seed done in ${elapsed}s. Summary: ${Object.keys(userIds).length} users, ${Object.keys(tenantIds).length} tenants, ${totalProducts} products, ${totalExtraPages} extra pages.`,
+  )
+  console.log('   Password sourced from QC_SEED_PASSWORD. Order seed deferred — schema complexity.')
   process.exit(0)
 }
 
