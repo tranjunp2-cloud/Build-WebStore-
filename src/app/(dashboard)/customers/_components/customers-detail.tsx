@@ -186,13 +186,16 @@ export function CustomersDetail({ customer }: Props) {
             }
 
             {/* Save bar — GH-1509: aligned to the same template as PaymentsFormClient.tsx /
-                Shipping's SettingsFooter (sticky floating rounded card, `--save-bar-bg`, amber
+                Shipping's SettingsFooter (floating rounded card, `--save-bar-bg`, amber
                 "unsaved changes" indicator, size="sm" buttons) instead of the old full-width
                 fixed bar. Also only renders while dirty — was previously always visible on the
-                default tab, just swapping "Unsaved changes" / "Up to date" text. */}
+                default tab, just swapping "Unsaved changes" / "Up to date" text.
+                `position: fixed` (not `sticky`) — sticky only pins once you scroll past its
+                natural flow position, so it visibly drifted with the page instead of staying
+                put. `--dash-content-pl` (CMSLayoutClient) offsets it past the sidebar at lg+. */}
             {activeTab === 'default' && dirty && (
                 <div
-                    className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                    className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
                     style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
                 >
                     <div className="flex items-center gap-2 text-[13px]">

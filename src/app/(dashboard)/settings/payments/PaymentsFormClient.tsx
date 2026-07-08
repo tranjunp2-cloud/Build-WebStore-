@@ -924,10 +924,13 @@ export function PaymentsFormClient({
                 </div>
             </section>
 
-            {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh. */}
+            {/* Save bar — CHỈ hiện khi có thay đổi chưa lưu (isDirty). Chưa sửa gì → ẩn hẳn cả thanh.
+                `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
+                regardless of content length. `--dash-content-pl` (CMSLayoutClient) clears the
+                sidebar at lg+. */}
             {isDirty && (
             <div
-                className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
                 style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
             >
                 <div className="flex items-center gap-2 text-[13px]">

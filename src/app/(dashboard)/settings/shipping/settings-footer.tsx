@@ -12,10 +12,13 @@ type Props = {
 }
 
 // GH-1509 bug #12: aligned to the same save-bar template as
-// PaymentsFormClient.tsx (sticky positioning, `--save-bar-bg` token, amber
-// "unsaved changes" indicator, `size="sm"` buttons) — was previously a
-// bespoke natural+scroll-triggered-fixed-copy layout with a different
-// background token, which read as visually inconsistent with Payments.
+// PaymentsFormClient.tsx (`--save-bar-bg` token, amber "unsaved changes"
+// indicator, `size="sm"` buttons) — was previously a bespoke
+// natural+scroll-triggered-fixed-copy layout with a different background
+// token, which read as visually inconsistent with Payments.
+// `position: fixed` (not `sticky`) so it always sits bottom-4 from the viewport
+// regardless of content length. `--dash-content-pl` (CMSLayoutClient) clears the
+// sidebar at lg+.
 export function SettingsFooter({ isDirty, isSaving, onReset, onSave }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
@@ -28,7 +31,7 @@ export function SettingsFooter({ isDirty, isSaving, onReset, onSave }: Props) {
 
     return (
         <div
-            className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+            className="fixed z-40 bottom-4 left-4 right-4 lg:left-[var(--dash-content-pl)] lg:right-8 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08]"
             style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
         >
             <div className="flex items-center gap-2 text-[13px]">
