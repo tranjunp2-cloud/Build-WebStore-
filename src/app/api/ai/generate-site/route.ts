@@ -1404,7 +1404,10 @@ export async function POST(req: NextRequest) {
         // to post-response seeding via after() exactly like the old path.
         // Internal tuning knob (tests use a tiny value to exercise the
         // pending branch deterministically) — not required in production env.
-        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS ?? 15_000)
+        // `|| 15_000` (not `?? `) so an empty-string env (the .env.*.example ship
+        // `GEN_BLOG_PREP_GRACE_MS=`) or a non-numeric value → default, not 0ms
+        // (grace 0 disables inline-persist entirely, always falling to after()).
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 15_000
         let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
         const preparedBlogs = await Promise.race([
             blogPrepPromise,

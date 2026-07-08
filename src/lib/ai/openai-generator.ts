@@ -247,6 +247,13 @@ export async function generateSiteWithAI(
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
         const modelName = selectModel('site-generation')
+        // Single source of truth for the split-path flag — used both to ACTIVATE
+        // the parallel split below AND to run syncFooterAcrossPages in the shared
+        // multi-page post-processing. These two MUST agree: a mismatch skips the
+        // footer re-sync while the split still clones footers pre-enforcer,
+        // reopening the footer-variant bug (gen-page-split.ts syncFooterAcrossPages).
+        // Default ON; GEN_PARALLEL_PAGES=false opts out.
+        const useParallelSplit = process.env.GEN_PARALLEL_PAGES !== 'false'
         let parsed: Record<string, unknown>
 
         // Phase 05 (plan 260703-1341) — split the single mega-call (home + 4
@@ -254,7 +261,7 @@ export async function generateSiteWithAI(
         // subpages batches. Wall-clock ≈ max instead of sum. Default ON — set
         // GEN_PARALLEL_PAGES=false for the legacy single-call path (emergency
         // rollback; that path stays byte-identical to pre-Phase-05 behavior).
-        if (process.env.GEN_PARALLEL_PAGES !== 'false') {
+        if (useParallelSplit) {
             parsed = await runParallelPageSplit({
                 openai,
                 model: modelName,
@@ -535,7 +542,7 @@ export async function generateSiteWithAI(
             // gen-perf phase-09: the structure enforcer above may restyle the
             // HOMEPAGE footer per its recipe — re-sync subpage footers so all
             // pages share one footer (split path clones it pre-enforcement).
-            if (process.env.GEN_PARALLEL_PAGES === 'true') {
+            if (useParallelSplit) {
                 syncFooterAcrossPages(generatedPages)
             }
 
