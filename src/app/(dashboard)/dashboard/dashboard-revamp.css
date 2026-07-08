@@ -818,21 +818,16 @@ html[data-period-pending="1"] .dash-revamp .stream {
   right: 0;
   width: max-content;
   max-width: 220px;
-  background: var(--dr-ink-1);
-  color: var(--dr-canvas);
-  font-size: 11px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground) / 0.85);
+  border: 1px solid hsl(var(--border));
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
   padding: 7px 10px;
   border-radius: 8px;
   box-shadow: var(--dr-shadow-pop);
   z-index: 50;
-}
-
-.dark .dash-revamp .cs-corner[data-tip]:hover::after {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid var(--dr-line-1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -906,11 +901,12 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .bc-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
-  background: var(--dr-ink-1);
-  color: var(--dr-canvas);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground) / 0.85);
+  border: 1px solid hsl(var(--border));
   padding: 6px 10px;
   border-radius: 8px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
@@ -919,13 +915,11 @@ html[data-period-pending="1"] .dash-revamp .stream {
   transition: opacity .1s;
 }
 
-.dark .dash-revamp .bc-tooltip {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid var(--dr-line-1);
+.dash-revamp .bc-tooltip .tt-views {
+  color: #0f766e;
 }
 
-.dash-revamp .bc-tooltip .tt-views {
+.dark .dash-revamp .bc-tooltip .tt-views {
   color: #2dd4bf;
 }
 
