@@ -13,9 +13,9 @@
  * 10/5/5 split including that forbidden sub-signal — that research doc
  * diverges from the canonical PRD and was NOT followed here.)
  *
- * Saving address + hours + category + priceRange raises the score by ≥20pts
- * vs. a bare site (AC-1): LocalBusiness schema present (+10) + hours (+5) +
- * industry subtype (+3) + priceRange (+2) = +20.
+ * Saving address + hours + category raises the score by ≥20pts vs. a bare
+ * site (AC-1): LocalBusiness schema present (+10) + hours (+5) + industry
+ * subtype (+5) = +20.
  */
 
 export interface LocalSeoScoreInput {
