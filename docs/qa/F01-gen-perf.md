@@ -91,6 +91,8 @@ Parallel 3-call split orchestration (home ∥ subpage batches) + concurrent medi
 | TC-GENPERF-BI-03 | route | blog-inline: grace fallback | ✅ PASS | src/__tests__/api/ai.test.ts | prep chưa xong tại persist site (grace GEN_BLOG_PREP_GRACE_MS) → done không bị chặn; prep xong sau response → after() task persist đủ 3 bài |
 | TC-F08-BS.24 | unit | blog prep chờ pixabayGate | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepareBlogPosts không gọi searchPhotos khi gate chưa settle (GH-1190 serialization); gate mở → thumbnail phase chạy, trả đủ 3 prepared posts |
 | TC-F08-BS.25 | unit | prepare/persist contract | ✅ PASS | src/__tests__/unit/lib/ai/seed-blog-posts.test.ts | prepare trả null khi hard-fail (count throw) để caller fallback legacy; trả [] khi tenant có posts; persistBlogPosts insert đúng prepared rows (slug prefix, thumbnail optional) |
+| TC-F01-W.18 | unit | pool size động theo block | ✅ PASS | src/__tests__/unit/ai/image-pool.test.ts | buildImagePool tôn trọng landscapeSize/squareSize; size 0 → skip Pixabay call bucket đó (không tính underfill); cả 2 = 0 → 0 call, pool rỗng |
+| TC-MI-POOLSIZE | unit | computePoolBucketSizes | ✅ PASS | src/__tests__/unit/lib/ai/media-injector.test.ts | pool size = max nhu cầu block bật ảnh (theo bucket) + buffer, cap 12/6, người→getAvatarMedia loại trừ. Default hero-only → {landscape:3, square:0} thay vì 12+6; gallery→9; products-grid→6 square |
 
 ---
 

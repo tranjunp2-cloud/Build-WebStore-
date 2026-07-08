@@ -12,7 +12,7 @@ import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -32,6 +32,7 @@ import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
 import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
+import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
@@ -454,17 +455,44 @@ export async function POST(req: NextRequest) {
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
                     const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // Translate raw user-language keywords → English before the
+                    // Pixabay POOL search (better stock-photo coverage than raw
+                    // VN/MS terms). Default ON — set GEN_TRANSLATE_POOL_KEYWORDS=false
+                    // to fall back to the raw-keyword + VN-relevance-gate path (GH-1185).
+                    // English keywords auto-skip the VN gate (detectQueryLang → undefined),
+                    // no image-pool change needed. Only the pool query is translated;
+                    // `englishKeywords` (legacy per-block search) stays RAW below.
+                    let poolKeywords = rawKeywords
+                    if (process.env.GEN_TRANSLATE_POOL_KEYWORDS !== 'false' && rawKeywords.length > 0) {
+                        const translated = await translateToEnglishKeywords({
+                            industry: businessInfo.industry,
+                            products: rawKeywords,
+                        }).catch(() => null)
+                        if (translated && translated.length > 0) {
+                            poolKeywords = translated
+                            console.info(`[image-pool] keyword translate: raw=[${rawKeywords.join(', ')}] → en=[${translated.join(', ')}]`)
+                        } else {
+                            console.warn('[image-pool] keyword translate failed/null — using raw keywords')
+                        }
+                    }
                     // Isolate buildImagePool failure so rawKeywords is always
                     // preserved for the fulfillImageNeeds legacy search path even
                     // when pool build fails (e.g. Pixabay 429 / missing key).
                     let pool: ImagePool | null = null
                     try {
+                        // Size the pool to what the enabled image blocks can
+                        // actually consume (default hero-only → ~3 landscape, 0
+                        // square) instead of a fixed 12+6 — cuts speculative
+                        // download + pre-upload and the orphan media it left.
+                        const poolSizes = computePoolBucketSizes()
                         pool = await buildImagePool({
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
-                            topProduct: rawKeywords[0],
-                            products: rawKeywords,
+                            topProduct: poolKeywords[0],
+                            products: poolKeywords,
                             seed: _themeSeedForPool,
+                            landscapeSize: poolSizes.landscape,
+                            squareSize: poolSizes.square,
                         })
                     } catch {
                         // pool stays null; rawKeywords still returned for legacy search
@@ -479,9 +507,10 @@ export async function POST(req: NextRequest) {
             // here) so it runs concurrently with the GPT call below. Post-GPT,
             // fulfillImageNeeds/batchFetchFromPool consumes the resolved map
             // and only assigns pre-uploaded Media IDs — no re-download/upload.
-            // Flag off (default) = resolves an empty Map immediately, so the
+            // Default ON — set GEN_POOL_PREUPLOAD=false to disable (emergency
+            // rollback). When off, resolves an empty Map immediately so the
             // downstream pool path is byte-identical to pre-Phase-06 behavior.
-            const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD === 'true'
+            const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
             const preUploadedPoolPromise: Promise<Map<string, number>> = GEN_POOL_PREUPLOAD
                 ? imagePoolPromise
                     .then(({ pool }) =>
@@ -514,14 +543,22 @@ export async function POST(req: NextRequest) {
                 )
             )
 
-            // gen-perf blog-inline: prepare all 3 blog posts (AI seed topics +
-            // full article bodies + thumbnails) DURING the GPT window so the
-            // blog page ships complete at `done` (was: everything post-response
-            // via after(), leaving the blog empty for ~60s). GPT article calls
-            // start immediately; the Pixabay thumbnail phase waits for
-            // sampleProductsPromise (GH-1190 rate-limit serialization).
-            // Never rejects: null = prep failed → legacy after() seeding at the
-            // persist site below.
+            // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
+            const { result, events } = await trackPhase('ai', () =>
+                withSentrySpan('ai.generateSite', () =>
+                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
+                ),
+            )
+
+            // gen-perf blog-inline: prepare 3 blog posts (AI seed topics + full
+            // article bodies + thumbnails). Kicked AFTER the site GPT resolves,
+            // NOT during it — the site's parallel split calls own the OpenAI
+            // budget in that window; blog's ~4 GPT calls competing there
+            // inflated the `ai` phase (measured 2026-07-08). It now overlaps the
+            // remaining media + db + persist-grace window (~25s), still landing
+            // the 3 posts before `done` in the common case; if it drags past the
+            // grace race below it falls back to post-response after() seeding.
+            // Never rejects: null = prep failed → legacy seeding at the persist site.
             const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
                 payload,
                 tenantId: resolvedTenantId,
@@ -532,13 +569,6 @@ export async function POST(req: NextRequest) {
                 seed: computeGenSeed(businessInfo),
                 pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
             }).catch((): null => null)
-
-            // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
-            const { result, events } = await trackPhase('ai', () =>
-                withSentrySpan('ai.generateSite', () =>
-                    generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
-                ),
-            )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null

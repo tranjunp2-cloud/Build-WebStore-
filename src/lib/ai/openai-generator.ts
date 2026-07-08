@@ -250,10 +250,11 @@ export async function generateSiteWithAI(
         let parsed: Record<string, unknown>
 
         // Phase 05 (plan 260703-1341) — split the single mega-call (home + 4
-        // subpages in one JSON response, ~60s) into 2 parallel calls: home ∥
-        // subpages. Wall-clock ≈ max(A,B) instead of A+B. Flag OFF (default)
-        // keeps the original single-call path below byte-identical.
-        if (process.env.GEN_PARALLEL_PAGES === 'true') {
+        // subpages in one JSON response, ~60s) into 3 parallel calls: home ∥
+        // subpages batches. Wall-clock ≈ max instead of sum. Default ON — set
+        // GEN_PARALLEL_PAGES=false for the legacy single-call path (emergency
+        // rollback; that path stays byte-identical to pre-Phase-05 behavior).
+        if (process.env.GEN_PARALLEL_PAGES !== 'false') {
             parsed = await runParallelPageSplit({
                 openai,
                 model: modelName,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
 import { getAvatarMedia, batchFetchFromPool } from '@/lib/ai/media-pipeline'
 
 // GH-1185: fulfillImageNeeds routes testimonials to the dedicated people-
@@ -329,4 +329,47 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(members.map((m) => m.image)).toEqual([901, 902, 903])
         })
     })
+})
+
+describe('computePoolBucketSizes — pool sized to enabled blocks', () => {
+	afterEach(() => {
+		delete process.env.PIXABAY_BLOCKS
+	})
+
+	it('default (hero-only) → 3 landscape, 0 square instead of fixed 12+6', () => {
+		delete process.env.PIXABAY_BLOCKS // default set = {hero}
+		// hero: top-level (1 slot) on the landscape bucket. base 1 → +2 = 3.
+		// No square-role block enabled → square bucket skipped (0).
+		expect(computePoolBucketSizes()).toEqual({ landscape: 3, square: 0 })
+	})
+
+	it('gallery-only → landscape sized to gallery minCount (6) + buffer, square 0', () => {
+		process.env.PIXABAY_BLOCKS = 'gallery'
+		// gallery nested minCount 6 → ceil(6*1.4)=9 (> 6+2=8). Landscape bucket.
+		expect(computePoolBucketSizes()).toEqual({ landscape: 9, square: 0 })
+	})
+
+	it('products-grid-only → square sized to products minCount (4) + buffer, landscape 0', () => {
+		process.env.PIXABAY_BLOCKS = 'products-grid'
+		// products-grid nested minCount 4 → max(4+2=6, ceil(5.6)=6)=6, cap 6.
+		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 6 })
+	})
+
+	it('people-only blocks → both buckets 0 (avatars use getAvatarMedia, not the pool)', () => {
+		process.env.PIXABAY_BLOCKS = 'team,testimonials'
+		expect(computePoolBucketSizes()).toEqual({ landscape: 0, square: 0 })
+	})
+
+	it('never exceeds the legacy 12/6 caps even with every block enabled', () => {
+		process.env.PIXABAY_BLOCKS = 'all'
+		const sizes = computePoolBucketSizes()
+		expect(sizes.landscape).toBeLessThanOrEqual(12)
+		expect(sizes.square).toBeLessThanOrEqual(6)
+		// still strictly smaller than the old fixed fetch in the common config
+		expect(sizes.landscape).toBeGreaterThan(0)
+	})
+
+	it('accepts an explicit enabled set (pure function, no env read)', () => {
+		expect(computePoolBucketSizes(new Set(['hero']))).toEqual({ landscape: 3, square: 0 })
+	})
 })

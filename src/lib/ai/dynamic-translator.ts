@@ -2,40 +2,40 @@ import OpenAI from 'openai'
 
 interface TranslatorInput {
     industry?: string
-    products?: string
+    products?: string[]
 }
 
 /**
- * Translates Vietnamese/Malay business terms to highly optimized English search keywords for Unsplash.
- * Uses a small, fast model (gpt-4o-mini).
- * Returns null if the LLM fails, ensuring the fallback dictionary takes over.
+ * Faithfully translates each Vietnamese/Malay keyword (usually a dish or
+ * product) to its accurate English equivalent — the phrase a stock-photo site
+ * would tag the SAME subject with. Preserves count + order (N terms in → N
+ * phrases out), and does NOT generalize a specific dish into a generic scene.
+ * Uses gpt-4o-mini. Returns null on failure so the caller falls back to raw.
  */
 export async function translateToEnglishKeywords(input: TranslatorInput): Promise<string[] | null> {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
 
-    const prompt = `You are a search keyword optimization assistant for Unsplash stock photography.
-Given a business industry and products (often in Vietnamese or Malay), extract 1 to 3 highly relevant English search keywords.
-These keywords MUST be visual concepts that appear in stock photography — nouns or noun phrases representing concrete scenes.
+    const terms = (input.products ?? []).map((t) => t.trim()).filter(Boolean)
+    if (terms.length === 0) return null
 
-STRICT RULES:
-- NEVER return software acronyms or company-type labels: SaaS, CRM, ERP, API, B2B, MVP, IT, HR — these return no photos on Unsplash.
-- For tech/software businesses: return visual scenes like "software team", "business dashboard", "startup workspace", "developer laptop".
-- For food/restaurant: "restaurant interior", "chef cooking", "delicious food plating".
-- For beauty/spa: "beauty salon", "spa treatment", "skincare routine".
-- Translate Vietnamese/Malay terms to their English photography equivalent.
+    const prompt = `Translate each Vietnamese/Malay term below into an accurate English phrase a stock-photo site would tag the SAME subject with. Translate the SPECIFIC meaning — for a dish, describe what is actually on the plate; do NOT replace it with a generic scene like "restaurant interior".
+
+RULES:
+- Return EXACTLY ${terms.length} phrase(s), one per input term, IN THE SAME ORDER.
+- Each phrase = 2-5 lowercase English words naming the concrete subject.
+- Faithful, specific translation. Examples: "chả cá lã vọng" → "grilled turmeric fish", "bún chả" → "grilled pork rice noodles", "phở bò" → "beef noodle soup", "cơm tấm sườn" → "grilled pork rice".
+- Only for abstract tech terms with no visual (SaaS, CRM, API) fall back to a concrete scene like "software team".
 
 Industry: ${input.industry ?? 'none'}
-Products: ${input.products ?? 'none'}
+Terms to translate (in order):
+${terms.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
-Return ONLY a valid JSON array of strings. Do not include markdown formatting or explanation.
-Example for SaaS/CRM: ["software team", "business dashboard"]
-Example for restaurant: ["restaurant interior", "chef cooking"]
-Example for spa: ["beauty salon", "spa treatment"]`
+Return ONLY a JSON array of exactly ${terms.length} strings in the same order. No markdown, no explanation.`
 
     try {
         const openai = new OpenAI({ apiKey: key })
-        
+
         const controller = new AbortController()
         // 8-second timeout — generous enough for gpt-4o-mini under load while
         // still bounding the total gen time well within maxDuration (300s).
@@ -45,7 +45,8 @@ Example for spa: ["beauty salon", "spa treatment"]`
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 30,
+                // ~12 tokens per short phrase + JSON punctuation; scales with count.
+                max_tokens: Math.min(160, 40 + terms.length * 30),
                 temperature: 0.1,
             }, { signal: controller.signal })
 
@@ -62,7 +63,12 @@ Example for spa: ["beauty salon", "spa treatment"]`
             }
 
             if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed.map(k => k.toLowerCase())
+                // Enforce the input→output count contract: trim any extra the
+                // model added; never emit more phrases than terms requested.
+                return parsed
+                    .filter((k): k is string => typeof k === 'string' && k.trim().length > 0)
+                    .slice(0, terms.length)
+                    .map((k) => k.toLowerCase().trim())
             }
             return null
         } finally {
