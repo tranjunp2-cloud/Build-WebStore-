@@ -10,9 +10,9 @@ import type { EditableFields } from './customers-detail'
 // Radix SelectItem rejects an empty-string value — sentinel for "no rank" (same convention as CategoryManager.tsx).
 const RANK_UNRANKED_VALUE = '__none__'
 
-const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full'
+const INPUT_CLS = 'h-10 px-3 rounded-[8px] border border-[var(--cus-border-medium)] bg-[var(--cus-surface-input)] text-[14px] text-[hsl(var(--foreground))] outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full'
 const INPUT_READONLY_CLS = 'h-10 px-3 rounded-[8px] border border-white/[0.04] bg-white/[0.02] text-[14px] font-mono text-white/40 w-full flex items-center select-all cursor-default'
-const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-white/[0.04] text-[14px] text-white outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full resize-none'
+const TEXTAREA_CLS = 'px-3 py-2.5 rounded-[8px] border border-[var(--cus-border-medium)] bg-[var(--cus-surface-input)] text-[14px] text-[hsl(var(--foreground))] outline-none focus:border-[hsl(var(--primary)/0.4)] transition-colors w-full resize-none'
 const LABEL_CLS = 'text-[12px] font-semibold [color:var(--cus-text-secondary)]'
 const HELP_CLS = 'text-[11px] [color:var(--cus-text-muted)]'
 const ERROR_CLS = 'text-[11px] text-[hsl(var(--destructive))] flex items-center gap-1'

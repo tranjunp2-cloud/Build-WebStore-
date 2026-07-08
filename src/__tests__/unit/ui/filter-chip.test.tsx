@@ -65,14 +65,16 @@ describe('[TC-DS1222-04-03] FilterChip selection', () => {
 describe('[TC-DS1222-04-04] FilterChip active highlight', () => {
     it('uses the active (primary teal) style when value is not the first/default option', () => {
         // GH-1192: active chip nay dùng token --primary (teal), không còn hardcode blue.
+        // Design-system pass (fix/design-system-temp): colors moved from inline `style` to
+        // Tailwind classes so `hover:` can apply (inline style would always win over CSS).
         setup('active')
-        const style = screen.getByRole('button').getAttribute('style') ?? ''
-        expect(style).toContain('hsl(var(--primary) / 0.12)')
+        const className = screen.getByRole('button').className
+        expect(className).toContain('bg-[hsl(var(--primary)/0.12)]')
     })
 
     it('uses the neutral border token when value is the default option', () => {
         setup('all')
-        const style = screen.getByRole('button').getAttribute('style') ?? ''
-        expect(style).toContain('hsl(var(--input-border))')
+        const className = screen.getByRole('button').className
+        expect(className).toContain('border-[hsl(var(--input-border))]')
     })
 })

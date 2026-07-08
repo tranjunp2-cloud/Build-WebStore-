@@ -200,7 +200,7 @@ export function ImageUploader({
                     return (
                     <div key={img.id || idx} className="flex flex-col shrink-0 w-[147px]">
                         <div className="relative w-[147px] h-[147px]">
-                            <div className="w-full h-full p-[2px] rounded-[16px] border border-white/10 bg-[#0B1120]">
+                            <div className="w-full h-full p-[2px] rounded-[16px] border border-solid border-[hsl(var(--border))] bg-[hsl(var(--card))]">
                                 <div className="w-full h-full relative overflow-hidden rounded-[14px]">
                                     <Image src={safeUrl} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
                                 </div>
@@ -290,11 +290,11 @@ export function ImageUploader({
                 {value.length < maxImages && (
                     <div
                         className={cn(
-                            "group relative shrink-0 flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
-                            variant === 'square' 
-                                ? "w-[147px] h-[147px] rounded-2xl border-2 border-dashed" 
+                            "group relative shrink-0 flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[hsl(var(--card))]",
+                            variant === 'square'
+                                ? "w-[147px] h-[147px] rounded-2xl border-2 border-dashed"
                                 : "w-full h-[92px] rounded-[12px] border border-solid gap-[6px]",
-                            dragActive ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.1)]" : "border-white/10 hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.06)]",
+                            dragActive ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.1)]" : "border-[hsl(var(--border))] hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--primary)/0.06)]",
                             isUploading && "pointer-events-none opacity-50"
                         )}
                         onDragEnter={handleDrag}
@@ -307,7 +307,7 @@ export function ImageUploader({
                             <div className="flex flex-col items-center gap-2 w-full px-2">
                                 <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
                                 {fileUploading && (
-                                    <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                                    <div className="w-full h-1 rounded-full bg-[hsl(var(--muted))] overflow-hidden">
                                         <div
                                             className="h-full rounded-full bg-blue-500 transition-all duration-150"
                                             style={{ width: `${progress}%` }}
@@ -317,10 +317,10 @@ export function ImageUploader({
                             </div>
                         ) : (
                             <div className={cn("flex items-center justify-center", variant === 'square' ? "flex-col gap-2" : "flex-col gap-[6px]")}>
-                                <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-[hsl(var(--primary))]" : "text-[#F8FAFC]/40 group-hover:text-[hsl(var(--primary))]")} />
+                                <Upload className={cn("w-6 h-6 transition-colors", dragActive ? "text-[hsl(var(--primary))]" : "text-[hsl(var(--muted-foreground))] group-hover:text-[hsl(var(--primary))]")} />
                                 <span className={cn("font-medium transition-colors",
                                     variant === 'square' ? "text-[12px] leading-[1.33]" : "text-[12px] leading-[1.21]",
-                                    dragActive ? "text-[hsl(var(--primary))]" : (variant === 'wide' ? "text-[#374151]" : "text-[#F8FAFC]/40"),
+                                    dragActive ? "text-[hsl(var(--primary))]" : "text-[hsl(var(--muted-foreground))]",
                                     !dragActive && "group-hover:text-[hsl(var(--primary))]")}>
                                     {placeholderText}
                                 </span>

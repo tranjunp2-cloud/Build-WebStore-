@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { useI18n } from '@/i18n';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
@@ -135,7 +135,7 @@ export function StaffDrawer({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--dash-overlay)] backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 animate-in fade-in duration-200" onClick={onClose}>
             <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
@@ -258,7 +258,9 @@ export function StaffDrawer({
                                                     <div
                                                         style={!isChecked ? { borderColor: 'var(--dash-border)' } : {}}
                                                         className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-[4px] border border-solid transition-colors ${isChecked ? 'bg-[hsl(var(--primary))] border-[hsl(var(--primary))]' : 'bg-transparent'}`}
-                                                    />
+                                                    >
+                                                        {isChecked && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+                                                    </div>
                                                     <span className={`text-[14px] leading-tight select-none ${isChecked ? 'text-dash-text font-medium' : 'text-dash-text-muted font-normal'}`}>
                                                         {label}
                                                     </span>
