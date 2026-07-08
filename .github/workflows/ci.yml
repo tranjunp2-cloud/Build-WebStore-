@@ -45,6 +45,11 @@ on:
       - '.github/pull_request_template.md'
       - '*.md'
       - 'LICENSE'
+  # Manual dispatch lets sync-staging-to-qc-test.yml re-trigger the
+  # deploy-qc-test job after it pushes to qc-test with GITHUB_TOKEN.
+  # GITHUB_TOKEN pushes do not fire push events, but workflow_dispatch
+  # from another workflow does create a new run.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -631,7 +636,9 @@ jobs:
   # Plan: plans/260702-1719-qc-test-env-setup/
   deploy-qc-test:
     name: "Deploy: Vercel (qc-test)"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/qc-test'
+    # Accepts both push (normal branch push) and workflow_dispatch (invoked
+    # by sync-staging-to-qc-test.yml after auto-merging staging into qc-test).
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/qc-test'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
