@@ -740,6 +740,15 @@ html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0
 .editor-shell [class*="linear-gradient"].text-white,
 .editor-shell [class*="linear-gradient"] .text-white { color: #fff !important; }
 
+/* solid blue accents keep white text both themes (block-name chip trên canvas,
+   badge undo/redo mobile, nút template modal) — blue bg không bị remap theo theme */
+.editor-shell .bg-blue-400.text-white,
+.editor-shell .bg-blue-500.text-white,
+.editor-shell .bg-blue-600.text-white,
+.editor-shell .bg-blue-400 .text-white,
+.editor-shell .bg-blue-500 .text-white,
+.editor-shell .bg-blue-600 .text-white { color: #fff !important; }
+
 /* text-white opacity variants */
 .editor-shell .text-white\/80,
 .editor-shell .text-white\/70,

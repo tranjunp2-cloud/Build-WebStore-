@@ -315,7 +315,7 @@ function LoginFormContent() {
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-full">
                 {/* Root error */}
                 {errors.root && (
-                    <div className="flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-[hsl(var(--destructive)/0.2)] bg-[hsl(var(--destructive)/0.1)] px-4 py-3 text-sm text-[hsl(var(--destructive))]">
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                         </svg>
@@ -338,12 +338,12 @@ function LoginFormContent() {
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className={`pl-9${errors.email ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`pl-9${errors.email ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('email')}
                         />
                     </div>
                     {errors.email && (
-                        <p className="text-xs text-red-400">{getFieldError(errors.email.message)}</p>
+                        <p className="text-xs text-[hsl(var(--destructive))]">{getFieldError(errors.email.message)}</p>
                     )}
                 </div>
 
@@ -362,7 +362,7 @@ function LoginFormContent() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={`pl-9 pr-9${errors.password ? ' border-red-500 focus-visible:border-red-500' : ''}`}
+                            className={`pl-9 pr-9${errors.password ? ' border-[hsl(var(--destructive))] focus-visible:border-[hsl(var(--destructive))]' : ''}`}
                             {...register('password')}
                         />
                         <button
@@ -375,7 +375,7 @@ function LoginFormContent() {
                         </button>
                     </div>
                     {errors.password && (
-                        <p className="text-xs text-red-400">{getFieldError(errors.password.message)}</p>
+                        <p className="text-xs text-[hsl(var(--destructive))]">{getFieldError(errors.password.message)}</p>
                     )}
                 </div>
 
@@ -385,8 +385,8 @@ function LoginFormContent() {
                         type="button"
                         onClick={handleForgotPassword}
                         disabled={checkingReset}
-                        className="text-sm font-medium text-white hover:text-white/80 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
-                        style={{ lineHeight: '1.43' }}
+                        className="text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
+                        style={{ lineHeight: '1.43', color: 'var(--auth-text)' }}
                     >
                         {checkingReset ? t.auth.checking : t.auth.forgotPassword}
                     </button>

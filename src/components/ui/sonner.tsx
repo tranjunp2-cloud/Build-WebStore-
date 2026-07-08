@@ -11,6 +11,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         <Sonner
             theme={theme}
             className="toaster group"
+            style={{ '--width': 'min(420px, calc(100vw - 32px))' } as React.CSSProperties}
             toastOptions={{
                 classNames: {
                     // text-white and border-white/10 use lower specificity (no group variant)
