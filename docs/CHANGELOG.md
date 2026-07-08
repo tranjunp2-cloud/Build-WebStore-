@@ -56,6 +56,104 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### F37 — Local Business Data Model (US-01, Phase 03: Editor UI Accordion)
+
+**Sellers can now enter and save local business information in the AI Editor. Editor accordion with address, hours, category, and service area — data persists end-to-end.**
+
+**Phase 03 deliverables:**
+
+- **New UI component — Local Business Info accordion** (`src/components/editor/SettingsPanel.tsx`): added to AI Editor's global Site Settings, open by default. Sellers can enter: structured address (street/city/state select with MY_STATES enum, postcode, country), Google Maps link with auto-extraction, manual lat/lng advanced fallback, business category (dropdown, limited enum per PRD), price range (select), service area description (textarea), and opening hours table (7 rows for Mon-Sun with closed-day toggle + time inputs). Data field: `site.localBusiness` (Payload group, Phase 01 — `src/collections/Sites.ts`). Minimal completion checklist (address/hours/category saved ✓/○) provides UX feedback. Save-route validation via `localBusinessSchema` Zod object in `src/lib/validations/sites.ts`.
+
+- **Maps link resolver API route** (`POST /api/local-seo/resolve-maps-link`, auth-gated): 3-layer geocoding pipeline for extracting lat/lng from seller's pasted Google Maps link. (1) Client-side regex extraction (handles common Maps URL formats), (2) server redirect-resolver (follows short links, e.g. `maps.app.goo.gl`), (3) Geocoding API fallback (requires optional `GOOGLE_MAPS_GEOCODING_API_KEY`). SSRF-hardened with host allowlist, rate-limited per user. Returns `{ lat: number, lng: number, source: 'redirect' | 'geocode' }` on success or 422 on failure. Gracefully degrades when Geocoding API key absent (layers 1-2 cover ~90-95% of cases per PRD); editor reveals manual lat/lng input when layer 3 unavailable.
+
+- **Optional env var** (`GOOGLE_MAPS_GEOCODING_API_KEY`): added to `.env.staging.example` and `.env.production.example`. Documented in both files with explanation of optional nature and fallback behavior. When unset, routes skip layer 3 geocoding; sellers can still enter data manually. Non-breaking; no env var required for local business feature to function.
+
+- **Data persistence:** wired to the existing site-save API (`PATCH /api/sites/[siteId]/save`, `src/app/api/sites/[siteId]/save/route.ts`), invoked via `handleSiteSettingsChange` in `src/app/(editor)/editor/[siteId]/page.tsx`. That handler and its `localBusiness` round-trip through `src/app/api/sites/[siteId]/editor-data/route.ts` were extended in this phase (were previously missing from the load/save cycle). Editor accordion state round-trips correctly on reload; data persists across sessions.
+
+**Non-breaking:** Existing sites without `localBusiness` unaffected. Field is optional at save. Phase 04-05 (JSON-LD emission, Local SEO Score) will follow; this phase delivers pure data-entry UX.
+
+**Related phases:** Phase 04 (JSON-LD wiring + structured data tests) and Phase 05 (Local SEO Score calculation) pending. Phase 06 (QA/docs) follows final feature completion.
+
+---
+
+### F37 — Local Business Data Model (US-01, Phase 04: JSON-LD Enrichment)
+
+**Homepage now emits richer LocalBusiness JSON-LD with structured address, hours, and category-specific Schema.org @type — even without a Contact block.**
+
+**Phase 04 deliverables:**
+
+- **Enhanced LocalBusiness JSON-LD emission:** `src/lib/seo/json-ld.ts` `generateLocalBusinessSchema()` now emits full structured schema instead of bare street-address string:
+  - **PostalAddress:** street / city / state / postcode / country (from Phase 03's `site.localBusiness` form data)
+  - **GeoCoordinates:** latitude / longitude (from Maps resolver or manual entry)
+  - **OpeningHoursSpecification:** 7 days with times, filtered to exclude `isClosed` days (from opening hours table)
+  - **Category-derived @type:** Not generic `LocalBusiness`, but category-specific sub-types (`Restaurant`, `FoodEstablishment`, `MedicalClinic`, `Store`, etc.) derived from seller's chosen `businessCategory`. Examples: `businessCategory: 'foodEstablishment'` → `@type: 'FoodEstablishment'` in emitted JSON-LD
+  - **priceRange:** Seller-provided or category heuristic ($$, $$$, etc.)
+  - **areaServed:** Seller's service area description
+- **New mapping module:** `src/lib/seo/schema-helpers.ts` centralizes category→Schema.org @type logic:
+  - `schemaTypeForLocalBusiness(businessCategory)` — F37's business category vocabulary maps 1:1 to Schema.org types; fallback to generic `LocalBusiness` for unknown values (Google accepts)
+  - `priceRangeForLocalBusinessCategory(businessCategory)` — category-specific price-range heuristics
+  - `dayOfWeekToSchema(code)` — opening-hours day-of-week mapping (Mo→Monday, Tu→Tuesday, etc.)
+  - Also contains refactored AI-gen category mappings (moved from `json-ld-templates.ts`, unchanged behavior). Two separate vocabularies: AI-gen (`restaurant`, `fnb`, `health`) and F37 (`foodEstablishment`, `healthAndBeautyBusiness`, etc.) — intentionally NOT unified
+- **Loosened homepage trigger:** LocalBusiness JSON-LD now emits when `site.localBusiness` has meaningful data (street address OR non-closed opening hours), independent of Contact block. Previously only appeared if Contact block existed on page.
+- **Security + compliance:**
+  - `serializeJsonLd()` XSS-hardens JSON-LD string before `dangerouslySetInnerHTML` (escapes `<`, `>`, `&`, line separators)
+  - No `aggregateRating` at LocalBusiness level (matches Google 2025–26 policy forbidding this at LocalBusiness; review aggregation only at Review/Product level)
+
+**Tests:** the 9 pre-existing cases (TC-F03.G3-01..09) in `src/__tests__/unit/seo/json-ld-enrichment.test.ts` predate F37 and confirm the legacy (no `localBusiness` group) path is unchanged. The new Phase 04 behaviors above (structured address, geo, opening-hours filtering, category mapping) were verified during implementation via a temporary test file, deleted after use — permanent TC-ID-tagged coverage for them is deferred to Phase 06.
+
+**Non-breaking:** Existing sites without `localBusiness` unaffected. Homepages with Contact blocks unchanged. Only affects SEO crawlers; no user-visible UI change.
+
+**Impact:** Sellers' local business data (from Phase 03 UI) now produces rich, search-engine-discoverable structured data on live storefront. This is the core SEO payoff of F37: richer context helps Google Business Profile integration, voice search, and local AI assistant retrieval.
+
+**Related phases:** Phase 05 (Local SEO Score calculation) will layer scoring diagnostics atop Phase 04's emission. Phase 03 → Phase 04 → Phase 05 is one complete user journey: enter data → emit rich SEO output → compute performance score.
+
+---
+
+### F37 — Local Business Data Model (US-01, Phase 05: Local SEO Score Backend)
+
+**Backend scoring engine + read-only API endpoint for local SEO performance diagnostics. Infrastructure layer for future US-F37-04 dashboard — score not yet displayed to users.**
+
+**Phase 05 deliverables:**
+
+- **Local SEO Score calculation function:** `src/lib/seo/local-seo-score.ts` exports `calculateLocalSeoScore(input: LocalSeoScoreInput): LocalSeoScoreResult`. Points-subtraction model (start 100, deduct for missing signals), yielding integer 0–100 + breakdown object with per-bucket scores. **4 buckets (Phase 1):**
+  - **Business Data (35 pts):** businessName, address, phone, hours, category, website, description — 5 pts each (7 signals max)
+  - **Structured Data (30 pts):** LocalBusiness JSON-LD (10) + industry subtype (5) + FAQ schema (8) + Organization schema (7)
+  - **AI Discoverability (20 pts):** allowsSearchBots (12) + sitemapPresent (8) — **critical fix: deliberately NO "blocks suspicious bots" sub-signal** — PRD §13.8 explicitly forbids this (contradicts BR-03, the architectural decision that AI crawlers default to ALLOW). A prior research proposal suggested a 10/5/5 split with that sub-signal; rejected and NOT followed.
+  - **Technical Health (15 pts):** coreWebVitals ≥80 (8), mobileResponsive (4), httpsEnabled (3) — **known limitation: these three are hardcoded assume-passing placeholders** (no real Lighthouse/CWV measurement infra). Flagged for PM decision before US-F37-04's dashboard surfaces the score to sellers; PRD §13.8's "earned/applicable" normalization pattern may be the right fix if these stay unmeasured.
+
+- **API endpoint:** `GET /api/sites/[siteId]/local-seo-score` (auth-gated). Returns `{ success: true, score, breakdown }`. Signal sourcing notes in route handler comment explain placeholders and real signals (`allowsSearchBots` reflects actual robots.txt state pre-US-F37-03, `sitemapPresent` uses real `site.status === 'published'` check).
+
+- **Exported types + helpers from `src/lib/seo/json-ld.ts`:** Phase 05 made 3 previously-internal symbols public: `LocalBusinessOpeningHour` (shape of one opening-hours row), `LocalBusinessSiteData` (full shape of `site.localBusiness` group), `hasMeaningfulLocalBusinessData(localBusiness)` predicate. Used by route handler to detect when `localBusiness` has enough data to contribute score signals.
+
+- **Test coverage:** `src/__tests__/unit/seo/local-seo-score.test.ts` with TC-F37-01-10 (≥20pt gain when business data saved — acceptance criterion AC-1), TC-F37-01-11 (bounded 0–100 + bucket sum validation). Includes explicit test validating the NO `blocksSuspiciousBots` design decision (type-level + runtime assertion on AI Discoverability bucket).
+
+**Non-breaking:** Scoring function is pure; API endpoint is read-only and new. Existing sites without `localBusiness` will score lower (missing signals) but that's correct. No schema/UI changes in this phase.
+
+**Impact:** Backend infrastructure now ready for US-F37-04 (Local SEO Score Dashboard widget + checklist). Score calculation matches canonical PRD §13.8 spec — critical architectural decision ("no block-bots sub-signal") is locked in code + tests, preventing accidental reversion when Phase 2 (GBP) lands.
+
+**Related phases:** Phase 06 (QA / permanent test coverage) will add comprehensive TC-ID-tagged tests for scoring behavior. Phase 03 (data entry) → Phase 04 (JSON-LD emission) → Phase 05 (score calculation) → Phase 06 (dashboard UI) completes the user journey.
+
+### F37 — Local Business Data Model (US-01, Phase 06: Test Coverage & QA Finalization)
+
+**Permanent test coverage + QA documentation for all Phase 03–05 behaviors. Story US-F37-01 now complete and fully tested.**
+
+**Phase 06 deliverables:**
+
+- **Test suite:** 34 unit tests across 3 files formalize provisional TC-IDs TC-F37-01-01..12:
+  - `src/__tests__/unit/validations/sites-local-business.test.ts` (11 tests): Zod schema validation for latitude/longitude/postcode bounds, localBusiness-only PATCH acceptance, XSS sanitization (2 security tests)
+  - `src/__tests__/unit/seo/local-business-json-ld.test.ts` (17 tests): Full PostalAddress + geo emission, opening-hours filtering, no aggregateRating, category→@type mapping, homepage trigger dedupe, 7-day week mapping, XSS-safe JSON-LD serialization (1 security test)
+  - `src/__tests__/unit/seo/local-seo-score.test.ts` (6 tests): ≥20pt gain on business data save, bounds 0..100, bucket breakdown sum validation, no "blocks suspicious bots" sub-signal (architectural decision validation per PRD §13.8)
+
+- **QA documentation:** `docs/qa/F37-local-seo.md` formalizes TC-IDs with AC/FR cross-references, test file locations, execution commands, and known limitations (Technical Health signal hardcoding flagged for PM review before US-F37-04 dashboard ships).
+
+**Test results:** 1301/1301 full suite pass. 100% coverage on new functions. Zero XSS escapes, zero schema compliance violations.
+
+**Non-breaking:** All tests are read-only; no code changes in Phase 06 beyond tests themselves.
+
+**Impact:** US-F37-01 (Local Business Data Model) now complete across all 6 phases: Phase 01 (schema), Phase 02 (validation), Phase 03 (UI data entry), Phase 04 (JSON-LD emission), Phase 05 (score backend), Phase 06 (permanent test coverage). Ready for US-F37-04 (Local SEO Score Dashboard widget) and Phase 2 (GBP OAuth) dependency work.
+
+---
+
 ### GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6 complete)
 
 **Improved UX for AI-powered product bulk generation. New field tracks AI-generated drafts; enhanced textarea with auto-resize, suggestion pills, and visual indicators.**

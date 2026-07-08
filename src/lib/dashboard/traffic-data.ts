@@ -47,9 +47,14 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
     if (viewsRes.totalDocs === 0 && clicksRes.totalDocs === 0) return emptyTraffic(period)
 
     // Capped at 5000 docs for chart/list aggregation (summary totals above are authoritative).
+    // Internal feature-adoption events (e.g. local_business_data_saved, fired from
+    // the editor) are excluded — they aren't real visitor traffic and would leak
+    // into Top Referrers (the only aggregation below not already event-gated) or
+    // crowd out real pageviews within the 5000-doc cap.
+    const internalEvents = ['local_business_data_saved']
     const { docs } = await payload.find({
         collection: 'analytics',
-        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() } },
+        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: internalEvents } },
         limit: 5000,
         sort: '-createdAt',
     })
@@ -63,6 +68,11 @@ export async function getTrafficData(period: DashboardPeriodKey): Promise<Traffi
     const internalHost = process.env.NEXT_PUBLIC_SERVER_URL || ''
 
     for (const doc of docs) {
+        // Defense-in-depth: the query above already excludes internal events, but
+        // never let one reach the referrer aggregation (the one block below not
+        // already gated by event type) even if the query filter is ever weakened.
+        if (internalEvents.includes(doc.event)) continue
+
         const created = new Date(doc.createdAt)
         const dateKey = created.toISOString().split('T')[0]
         const url = doc.pageUrl || '/'
