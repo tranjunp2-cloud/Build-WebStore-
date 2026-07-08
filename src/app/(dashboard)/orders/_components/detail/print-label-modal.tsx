@@ -124,7 +124,10 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
             {active.status === 'ok' && active.blobUrl ? (
               <iframe
                 key={active.blobUrl}
-                src={active.blobUrl}
+                // #toolbar=0&navpanes=0&scrollbar=0: hide the browser PDF viewer's
+                // print/download/rotate controls → preview is view-only, funnel printing
+                // through the "Print label" button (which also stamps labelPrintedAt).
+                src={`${active.blobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                 title="Shipping label PDF"
                 className="plabel-pdf-frame"
               />
@@ -215,8 +218,8 @@ export function PrintLabelModal({ orderId, awbNo, onClose, onPrinted }: PrintLab
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="dialog-foot">
+        {/* Footer — Cancel pushed left, Download + Print grouped right (content-width) */}
+        <div className="dialog-foot plabel-foot">
           <button className="btn btn-ghost" onClick={onClose}>{pl.cancel}</button>
           <button className="btn btn-outline" onClick={handleDownload} disabled={active.status !== 'ok'}>
             <Download style={{ width: 15, height: 15 }} /> {pl.download}

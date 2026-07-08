@@ -131,19 +131,28 @@ export function OrderActionsCard({
         }
     }
 
-    // Note copy: conditional per status
+    // Whether ANY actionable button shows (cancel / refund / refunded chip)
+    const hasAction = canCancel || canRefund || isRefunded
+
+    // Note copy: conditional per status. When no action is available (e.g. ready_to_ship
+    // — label bought, courier not yet collected) the generic "cancelling a paid order…"
+    // copy is misleading (there's no Cancel button), so show a state-specific note.
     const actionNote = isRefunded
         ? ti(r.noteRefunded, { amount: refundAmountFormatted })
         : canRefund
         ? r.noteCanRefund
-        : d.orderActionsNote
+        : canCancel
+        ? d.orderActionsNote
+        : d.orderActionsLocked
 
     return (
         <>
             <section className="od-card">
                 <div className="od-cap">{d.orderActionsTitle}</div>
 
-                {/* 2-col when cancel+refund both visible, 1-col otherwise */}
+                {/* Actions row only when there's a button — an empty row leaves dead space.
+                    2-col when cancel+refund both visible, 1-col otherwise. */}
+                {hasAction && (
                 <div className={`pay-actions${canCancel ? '' : ' single'}`}>
                     {canCancel && (
                         <button
@@ -171,6 +180,7 @@ export function OrderActionsCard({
                         </button>
                     ) : null}
                 </div>
+                )}
 
                 <p className="od-action-note">
                     <Info style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />

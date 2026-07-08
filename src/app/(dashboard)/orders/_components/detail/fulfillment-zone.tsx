@@ -273,18 +273,23 @@ export function FulfillmentZone({
     )
   }
 
-  // ── Cancelled ─────────────────────────────────────────────────────────────
+  // ── Cancelled / Refunded ──────────────────────────────────────────────────
+  // Both collapse to the 'cancelled' fulfill-state (no shipping action left), but a
+  // refunded order must NOT read as "cancelled" — swap the copy on the real status.
   if (state === 'cancelled') {
+    const isRefunded = order.status === 'refunded'
     return (
       <div className="action-zone">
         <div className="alert error">
           <XCircle className="lead" style={{ width: 17, height: 17, flexShrink: 0, marginTop: 1 }} />
           <div className="a-body">
-            <div className="a-t">{f.orderCancelled}</div>
-            {order.cancelledAt
-              ? ti(f.cancelledOn, { date: fmtDate(order.cancelledAt) })
-              : f.cancelledFallback}
-            {order.cancelReason ? ti(f.cancelReason, { reason: order.cancelReason }) : ''}
+            <div className="a-t">{isRefunded ? f.orderRefunded : f.orderCancelled}</div>
+            {isRefunded
+              ? f.refundedBody
+              : order.cancelledAt
+                ? ti(f.cancelledOn, { date: fmtDate(order.cancelledAt) })
+                : f.cancelledFallback}
+            {!isRefunded && order.cancelReason ? ti(f.cancelReason, { reason: order.cancelReason }) : ''}
           </div>
         </div>
       </div>
