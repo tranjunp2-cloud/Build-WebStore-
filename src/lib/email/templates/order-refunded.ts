@@ -108,7 +108,7 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
 <style>
   body{margin:0;background:transparent;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   .page-bg{background:transparent;padding:0;}
-  @media(max-width:640px){.page-bg{padding:0;}.page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}.page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}}
+  @media(max-width:640px){.page-bg{padding:0;}.page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}.page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}.page-bg .ord-info-col{display:block!important;width:100%!important;}}
   @media(max-width:420px){.page-bg{padding:0;}.page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}}
 </style>
 </head>
@@ -159,18 +159,42 @@ export function orderRefundedEmail(data: OrderRefundedData, config?: EmailTempla
         <div style="font-size:15px;font-weight:700;color:#0F172A;">${t.orderInfoHeading} — ID: ${esc(data.orderNumber)}</div>
       </td></tr>
       <tr><td style="padding:4px 40px 4px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
-            <td style="padding:8px 16px 8px 0;color:#8B5CF6;vertical-align:top;font-weight:600;">${tR.orderStatusRefunded}</td>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
-            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
+                  <td style="padding:8px 16px 8px 0;color:#8B5CF6;vertical-align:top;font-weight:600;">${tR.orderStatusRefunded}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
           <tr>
-            <td style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tR.refundDate}</td>
-            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.refundDate, locale)}</td>
-            <td style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tR.refundNote}</td>
-            <td style="padding:8px 16px 8px 0;color:#94A3B8;vertical-align:top;">${data.refundNote ? esc(data.refundNote) : '—'}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tR.refundDate}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.refundDate, locale)}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tR.refundNote}</td>
+                  <td style="padding:8px 16px 8px 0;color:#94A3B8;vertical-align:top;">${data.refundNote ? esc(data.refundNote) : '—'}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
         </table>
       </td></tr>

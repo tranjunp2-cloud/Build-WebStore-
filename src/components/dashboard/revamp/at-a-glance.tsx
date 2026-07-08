@@ -40,10 +40,10 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
     return (
         <div className={`stat-card${comingSoon ? ' stat-card-soon' : ''}`}>
             {!comingSoon && <Sparkline data={spark} color={`var(${accentVar})`} />}
+            {/* GH-1516: delta/badge moved UP beside the label (same row, right-aligned) —
+                it no longer shares the value row, so the value can't be squeezed/ellipsized
+                and the pill sits well clear of the sparkline zone at the card bottom. */}
             <div className="stat-top">
-                {/* Icon + (title + info tooltip) — the delta/badge used to live here too, on its
-                    own line above the value (GH-1491 issue 2: wasted a whole extra row). It now
-                    pairs with the value below instead, so this row is icon+label only. */}
                 <div className="stat-top-left">
                     <span className="stat-ic" style={{ background: `var(${bgVar})`, color: `var(${accentVar})` }}>
                         <Icon aria-hidden />
@@ -51,16 +51,15 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
                     {/* Title text + tooltip stay glued together (inline-flex, no justify-between) */}
                     <span className="stat-label">{label}{tip && <InfoTooltip tip={tip} />}</span>
                 </div>
-            </div>
-            {/* Value + delta/badge on ONE row (GH-1491 issue 2 fix) instead of the value sitting
-                alone on its own line below a separate delta row. */}
-            <div className="stat-bottom">
-                <span className="stat-val">{statDisplay(stat)}</span>
                 {comingSoon
                     ? <ComingSoonBadgeTooltip label={comingSoonLabel ?? ''} tip={comingSoonTip ?? ''} />
                     : <Delta value={stat.delta} />}
             </div>
-            {!comingSoon && <span className="delta-note">{note}</span>}
+            {/* Value (left) + "vs …" note (right) share one baseline row */}
+            <div className="stat-bottom">
+                <span className="stat-val">{statDisplay(stat)}</span>
+                {!comingSoon && <span className="delta-note">{note}</span>}
+            </div>
         </div>
     )
 }

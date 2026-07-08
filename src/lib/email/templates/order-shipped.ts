@@ -152,6 +152,7 @@ export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplate
     .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
     .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
     .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
+    .page-bg .ord-info-col{display:block!important;width:100%!important;}
   }
   @media(max-width:420px){
     .page-bg{padding:0;}
@@ -210,13 +211,27 @@ export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplate
         <div style="font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">${t.orderInfoHeading} — ID: ${esc(data.orderNumber)}</div>
       </td></tr>
       <tr><td style="padding:4px 40px 4px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
-            <td style="padding:8px 16px 8px 0;color:#10B981;vertical-align:top;font-weight:600;">${tS.orderStatusShipped}</td>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
-            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
+                  <td style="padding:8px 16px 8px 0;color:#10B981;vertical-align:top;font-weight:600;">${tS.orderStatusShipped}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
+        </table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
           <tr>
             <td style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tS.shippedDate}</td>
             <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.shippedDate, locale)}</td>
@@ -267,15 +282,27 @@ export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplate
 
       <!-- Payment method / shipping provider / buyer note -->
       <tr><td style="padding:14px 40px 6px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
-            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${paymentMethodLabel(data.paymentMethod, locale)}</td>
-            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.buyerNote}</td>
-            <td align="right" style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
+                  <td style="padding:6px 14px 6px 0;color:#94A3B8;">${paymentMethodLabel(data.paymentMethod, locale)}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.buyerNote}</td>
+                  <td style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
-          ${providerRow}
         </table>
+        ${providerRow ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">${providerRow}</table>` : ''}
       </td></tr>
 
       <!-- CTA -->
