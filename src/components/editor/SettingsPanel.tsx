@@ -41,6 +41,15 @@ import { toast } from 'sonner'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 import { plainText } from '@/lib/utils/rich-text-render'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BUSINESS_CATEGORY_OPTIONS, PRICE_RANGE_OPTIONS } from '@/lib/seo/local-business-constants'
+import { StateSelect } from './local-business/state-select'
+import { GeoLinkInput } from './local-business/geo-link-input'
+import { OpeningHoursTable } from './local-business/opening-hours-table'
+import { MapsEmbedPreview } from './local-business/maps-embed-preview'
+import { CompletionChecklist } from './local-business/completion-checklist'
+import type { LocalBusinessData } from './local-business/types'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -51,6 +60,20 @@ function stripHtmlForDisplay(value: unknown): string {
 /** Strip HTML tags from input to prevent XSS */
 function sanitizeInput(value: string): string {
     return value.replace(/<[^>]*>/g, '').trim()
+}
+
+/** F37 US-01: analytics `fields_completed_count` — address parts + category +
+ *  "has ≥1 open day" flag (phase-03 plan architecture note). Deliberately NOT
+ *  the same as the 3-row completion checklist (that's presence-per-group). */
+function countCompletedLocalBusinessFields(data: LocalBusinessData): number {
+    let count = 0
+    if (data.streetAddress?.trim()) count++
+    if (data.city?.trim()) count++
+    if (data.state?.trim()) count++
+    if (data.postcode?.trim()) count++
+    if (data.businessCategory?.trim()) count++
+    if (data.openingHours?.some(row => !row.isClosed && row.opens?.trim() && row.closes?.trim())) count++
+    return count
 }
 
 /** Derive a display URL from seo.ogImage which may be a populated object, string, numeric ID, or null */
@@ -235,6 +258,8 @@ interface SettingsPanelProps {
             email?: string
             address?: string
         }
+        /** F37 US-01: structured address/geo/hours for Local SEO — see `./local-business/types.ts`. */
+        localBusiness?: LocalBusinessData
         socialLinks?: {
             facebook?: string
             instagram?: string
@@ -264,11 +289,12 @@ interface SettingsPanelProps {
         name?: string
         branding?: { logo?: string; favicon?: string }
         contactInfo?: { phone?: string; email?: string; address?: string }
+        localBusiness?: LocalBusinessData
         socialLinks?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; tiktok?: string }
         seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null }
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
-    }) => void | Promise<void>
+    }) => void | boolean | Promise<void | boolean>
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
@@ -375,6 +401,7 @@ function SettingsPanelInner({
     const [openGlobalSections, setOpenGlobalSections] = useState({
         brand: true,
         contact: true,
+        localBusiness: true,
         social: true,
         theme: true,
         seo: true,
@@ -420,6 +447,7 @@ function SettingsPanelInner({
     const footerSectionRef = React.useRef<HTMLDivElement>(null)
     const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
+    const [localBusinessPostcodeError, setLocalBusinessPostcodeError] = useState<string | null>(null)
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -450,9 +478,29 @@ function SettingsPanelInner({
     }, [block, requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}
+    const siteLocalBusiness = site?.localBusiness || {}
     const siteSocialLinks = site?.socialLinks || {}
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
+
+    // F37 US-01: merge a localBusiness patch into current state, save, then fire
+    // the completion analytics event on success (architecture: "on successful
+    // save: trackEvent(...)"). Shared by every field in the accordion below so
+    // the merge-then-track sequence lives in exactly one place (DRY).
+    const handleLocalBusinessChange = async (patch: Partial<LocalBusinessData>) => {
+        const merged: LocalBusinessData = { ...siteLocalBusiness, ...patch }
+        const result = await onSiteSettingsChange?.({ localBusiness: merged })
+        // Only track on a confirmed successful save — onSiteSettingsChange resolves
+        // even on failure (errors are caught/toasted upstream), so `result === true`
+        // is the only reliable success signal.
+        if (site?.id && result === true) {
+            trackEvent({
+                siteId: site.id,
+                event: 'local_business_data_saved',
+                metadata: { fields_completed_count: countCompletedLocalBusinessFields(merged) },
+            })
+        }
+    }
 
     const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
     const globalAccordionBodyCls = 'rounded-b-xl border border-t-0 border-white/[0.08] bg-[var(--editor-surface)] px-4 py-4'
@@ -653,6 +701,191 @@ function SettingsPanelInner({
                             placeholder={s.addressPlaceholder}
                         />
                     </div>
+                </div>
+            ))}
+
+            {/* F37 US-01: Local Business Info — structured address/geo/hours for Local SEO.
+                Field order follows the approved wireframe (docs/design/F37-local-business-form.md
+                §2): address → coordinates (+ map preview) → category/offer → opening hours → checklist. */}
+            {renderGlobalAccordion('localBusiness', s.localBusinessInfo, (
+                <div className="space-y-5">
+                    <div className="space-y-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.addressGroupLabel}</p>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.streetAddress}</label>
+                            <Input
+                                defaultValue={siteLocalBusiness.streetAddress || ''}
+                                key={`lb-street-${siteLocalBusiness.streetAddress || ''}`}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ streetAddress: sanitizeInput(e.target.value) })}
+                                variant="editor"
+                                className={editorInputClassName}
+                                placeholder={s.streetAddressPlaceholder}
+                            />
+                        </div>
+                        <div className={cn('grid gap-4', fullWidth && 'min-[768px]:grid-cols-2')}>
+                            <div>
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.city}</label>
+                                <Input
+                                    defaultValue={siteLocalBusiness.city || ''}
+                                    key={`lb-city-${siteLocalBusiness.city || ''}`}
+                                    onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ city: sanitizeInput(e.target.value) })}
+                                    variant="editor"
+                                    className={editorInputClassName}
+                                    placeholder={s.cityPlaceholder}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.postcode}</label>
+                                <Input
+                                    defaultValue={siteLocalBusiness.postcode || ''}
+                                    key={`lb-postcode-${siteLocalBusiness.postcode || ''}`}
+                                    onBlur={(e: FieldBlurEvent) => {
+                                        const v = e.target.value.trim()
+                                        if (!v || /^\d{5}$/.test(v)) {
+                                            setLocalBusinessPostcodeError(null)
+                                            void handleLocalBusinessChange({ postcode: v })
+                                        } else {
+                                            setLocalBusinessPostcodeError(t.editor.settingsValidation.invalidPostcode)
+                                            toast.error(t.editor.settingsValidation.invalidPostcode)
+                                        }
+                                    }}
+                                    variant="editor"
+                                    className={cn(editorInputClassName, localBusinessPostcodeError && 'border-red-500/50')}
+                                    placeholder={s.postcodePlaceholder}
+                                />
+                                {localBusinessPostcodeError ? <p className="mt-1 text-[11px] text-red-400">{localBusinessPostcodeError}</p> : null}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.state}</label>
+                            <StateSelect
+                                value={siteLocalBusiness.state}
+                                onChange={value => void handleLocalBusinessChange({ state: value })}
+                                placeholder={s.selectState}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.country}</label>
+                            <Input
+                                value={s.countryMalaysia}
+                                disabled
+                                readOnly
+                                variant="editor"
+                                className={editorInputClassName}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.coordinatesGroupLabel}</p>
+                        <GeoLinkInput
+                            latitude={siteLocalBusiness.latitude}
+                            longitude={siteLocalBusiness.longitude}
+                            streetAddress={siteLocalBusiness.streetAddress}
+                            city={siteLocalBusiness.city}
+                            fullWidth={fullWidth}
+                            onCoordinatesChange={coords => void handleLocalBusinessChange(coords)}
+                            labels={{
+                                pasteMapsLink: s.pasteMapsLink,
+                                mapsLinkPlaceholder: s.mapsLinkPlaceholder,
+                                pasteMapsLinkHint: s.pasteMapsLinkHint,
+                                extractCoordinates: s.extractCoordinates,
+                                extracting: s.extracting,
+                                coordinatesExtracted: s.coordinatesExtracted,
+                                latitude: s.latitude,
+                                longitude: s.longitude,
+                                manualCoordinates: s.manualCoordinates,
+                                manualCoordinatesHint: s.manualCoordinatesHint,
+                                invalidLatitude: t.editor.settingsValidation.invalidLatitude,
+                                invalidLongitude: t.editor.settingsValidation.invalidLongitude,
+                                geoExtractFailed: s.geoExtractFailed,
+                            }}
+                        />
+                        <MapsEmbedPreview
+                            latitude={siteLocalBusiness.latitude}
+                            longitude={siteLocalBusiness.longitude}
+                            fullWidth={fullWidth}
+                            title={s.mapsPreviewTitle}
+                        />
+                    </div>
+
+                    <div className="space-y-4 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.categoryOfferGroupLabel}</p>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessCategory}</label>
+                            <Select
+                                value={siteLocalBusiness.businessCategory || undefined}
+                                onValueChange={value => void handleLocalBusinessChange({ businessCategory: value })}
+                            >
+                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                    <SelectValue placeholder={s.selectCategory} />
+                                </SelectTrigger>
+                                <SelectContent side="bottom" align="start">
+                                    {BUSINESS_CATEGORY_OPTIONS.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.priceRange}</label>
+                            <Select
+                                value={siteLocalBusiness.priceRange || undefined}
+                                onValueChange={value => void handleLocalBusinessChange({ priceRange: value })}
+                            >
+                                <SelectTrigger className="mt-1.5 h-9 w-full rounded-lg border border-white/10 bg-[var(--editor-surface-elevated)] px-3 text-sm text-white outline-none">
+                                    <SelectValue placeholder={s.selectPriceRange} />
+                                </SelectTrigger>
+                                <SelectContent side="bottom" align="start">
+                                    {PRICE_RANGE_OPTIONS.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.serviceAreaDescription}</label>
+                            <Textarea
+                                defaultValue={siteLocalBusiness.serviceAreaDescription || ''}
+                                key={`lb-service-area-${siteLocalBusiness.serviceAreaDescription || ''}`}
+                                onBlur={(e: FieldBlurEvent) => void handleLocalBusinessChange({ serviceAreaDescription: e.target.value })}
+                                variant="editor"
+                                className={editorTextareaClassName}
+                                placeholder={s.serviceAreaPlaceholder}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-white/[0.06] pt-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.openingHoursGroupLabel}</p>
+                        <OpeningHoursTable
+                            rows={siteLocalBusiness.openingHours}
+                            fullWidth={fullWidth}
+                            onChange={rows => void handleLocalBusinessChange({ openingHours: rows })}
+                            dayLabels={{
+                                Mo: s.openingHoursDayMo,
+                                Tu: s.openingHoursDayTu,
+                                We: s.openingHoursDayWe,
+                                Th: s.openingHoursDayTh,
+                                Fr: s.openingHoursDayFr,
+                                Sa: s.openingHoursDaySa,
+                                Su: s.openingHoursDaySu,
+                            }}
+                            closedLabel={s.openingHoursClosed}
+                            opensLabel={s.openingHoursOpens}
+                            closesLabel={s.openingHoursCloses}
+                        />
+                    </div>
+
+                    <CompletionChecklist
+                        data={siteLocalBusiness}
+                        labels={{
+                            title: s.checklistTitle,
+                            addressSaved: s.checklistAddressSaved,
+                            hoursSaved: s.checklistHoursSaved,
+                            categorySaved: s.checklistCategorySaved,
+                        }}
+                    />
                 </div>
             ))}
 

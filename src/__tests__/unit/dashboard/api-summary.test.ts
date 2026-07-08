@@ -146,4 +146,26 @@ describe('GET /api/analytics/summary [TC-F03.20]', () => {
         const res = await GET(req, {} as any)
         expect(res.status).toBe(403)
     })
+
+    it('[TC-F37-01-13] excludes internal feature-adoption events (local_business_data_saved) from views/clicks counts and the doc-list query, so they never pollute topPages/chart', async () => {
+        mockCount.mockResolvedValue({ totalDocs: 5 })
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+
+        const { GET } = await import('@/app/api/analytics/summary/route')
+        const req = new Request('http://localhost/api/analytics/summary?period=7d')
+        await GET(req, {} as any)
+
+        const notInFilter = (call: any[]) => call[0]?.where?.event?.not_in
+        const viewsCountCalls = mockCount.mock.calls.filter(call => Array.isArray(notInFilter(call)))
+        // Both current-period AND previous-period views-count queries must exclude
+        // internal events — a fix that only covers the current period would let
+        // pollution silently reappear in the week-over-week trend (prevViews).
+        expect(viewsCountCalls.length).toBe(2)
+        for (const call of viewsCountCalls) {
+            expect(notInFilter(call)).toEqual(expect.arrayContaining(['local_business_data_saved']))
+        }
+
+        const findCall = mockFind.mock.calls[0]
+        expect(findCall[0].where.event.not_in).toEqual(expect.arrayContaining(['local_business_data_saved']))
+    })
 })

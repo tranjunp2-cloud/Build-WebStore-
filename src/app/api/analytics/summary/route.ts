@@ -40,10 +40,14 @@ export const GET = withAuth(async (user, request) => {
     prevSince.setDate(prevSince.getDate() - days)
 
     const clickEvents = ['click', 'add_to_cart', 'checkout']
+    // Internal feature-adoption events (not real page views or storefront clicks) —
+    // excluded from both buckets so they don't pollute traffic metrics/Top Pages.
+    const internalEvents = ['local_business_data_saved']
+    const notViewsOrInternal = [...clickEvents, ...internalEvents]
 
     const [currentViewsRes, prevViewsRes, currentClicksRes, prevClicksRes] = await Promise.all([
-        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: clickEvents } } }),
-        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { not_in: clickEvents } } }),
+        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: notViewsOrInternal } } }),
+        payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { not_in: notViewsOrInternal } } }),
         payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { in: clickEvents } } }),
         payload.count({ collection: 'analytics', where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { in: clickEvents } } }),
     ])
@@ -63,7 +67,7 @@ export const GET = withAuth(async (user, request) => {
 
     const { docs: currentDocs } = await payload.find({
         collection: 'analytics',
-        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() } },
+        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: internalEvents } },
         limit: 5000,
         sort: '-createdAt',
     })

@@ -255,6 +255,17 @@ const MIGRATIONS = [
   { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
   { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
   { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
+  // ── Sites: Local Business Info (F37 US-01) ──
+  { name: 'sites.local_business_street_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_street_address varchar;' },
+  { name: 'sites.local_business_city', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_city varchar;' },
+  { name: 'sites.local_business_state', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_state varchar;' },
+  { name: 'sites.local_business_postcode', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_postcode varchar;' },
+  { name: 'sites.local_business_country', sql: "ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_country varchar DEFAULT 'MY';" },
+  { name: 'sites.local_business_latitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_latitude numeric;' },
+  { name: 'sites.local_business_longitude', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_longitude numeric;' },
+  { name: 'sites.local_business_business_category', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_business_category varchar;' },
+  { name: 'sites.local_business_price_range', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_price_range varchar;' },
+  { name: 'sites.local_business_service_area_description', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS local_business_service_area_description varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -434,6 +445,24 @@ const MIGRATIONS = [
   {
     name: 'sites_seo_tracked_keywords.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS sites_seo_tracked_keywords_parent_idx ON sites_seo_tracked_keywords (_parent_id);`,
+  },
+  // ── Sites: Local Business Opening Hours array table (F37 US-01) ──
+  {
+    name: 'sites_local_business_opening_hours.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS sites_local_business_opening_hours (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      day_of_week varchar,
+      opens varchar,
+      closes varchar,
+      is_closed boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'sites_local_business_opening_hours.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS sites_local_business_opening_hours_parent_idx ON sites_local_business_opening_hours (_parent_id);`,
   },
   // ── Products: Array tables ──
   {
