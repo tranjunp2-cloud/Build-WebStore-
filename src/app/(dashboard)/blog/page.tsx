@@ -347,8 +347,9 @@ export default function BlogListPage() {
                 </div>
             </div>
 
-            {/* Filters — shared <TableSearch> + <FilterChip> primitives (GH-1222 DS) */}
-            <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full mt-[32px]">
+            {/* Filters — shared <TableSearch> + <FilterChip> primitives (GH-1222 DS).
+                GH-1516: mobile tightens the header→filters gap (32px read as a dead band). */}
+            <div className="flex flex-col xl:flex-row xl:items-center gap-2 w-full mt-4 sm:mt-[32px]">
                 <TableSearch
                     value={search}
                     onSearch={setSearch}
@@ -437,7 +438,7 @@ export default function BlogListPage() {
                 ) : posts.map((post) => (
                     <div
                         key={`mobile-${post.id}`}
-                        className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] p-4 gap-3"
+                        className="flex flex-col bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-[16px] p-3 md:p-4 gap-3"
                     >
                         {/* Top Content Row */}
                         <div className="flex flex-row gap-4">
@@ -519,25 +520,25 @@ export default function BlogListPage() {
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
+                                className="flex-1 min-w-0 h-8 md:h-9 rounded-[10px] md:rounded-[12px] px-2 gap-1.5 text-[12px] md:text-[13px] font-semibold text-[hsl(var(--success))] bg-[hsl(var(--success))]/10 border border-[hsl(var(--success))]/20 hover:bg-[hsl(var(--success))]/20 hover:text-[hsl(var(--success))]"
                             >
-                                <Eye className="w-4 h-4 shrink-0" />
+                                <Eye className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.view}</span>
                             </Button>
                             <Button
                                 onClick={() => router.push(`/blog/${post.id}`)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
+                                className="flex-1 min-w-0 h-8 md:h-9 rounded-[10px] md:rounded-[12px] px-2 gap-1.5 text-[12px] md:text-[13px] font-semibold text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 border border-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/20 hover:text-[hsl(var(--primary))]"
                             >
-                                <Pencil className="w-4 h-4 shrink-0" />
+                                <Pencil className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.edit}</span>
                             </Button>
                             <Button
                                 onClick={() => openDeleteConfirm(post)}
                                 variant="ghost"
-                                className="flex-1 min-w-0 h-9 rounded-[12px] px-2 gap-1.5 text-[13px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
+                                className="flex-1 min-w-0 h-8 md:h-9 rounded-[10px] md:rounded-[12px] px-2 gap-1.5 text-[12px] md:text-[13px] font-semibold text-[hsl(var(--destructive))] bg-[hsl(var(--destructive))]/10 border border-[hsl(var(--destructive))]/20 hover:bg-[hsl(var(--destructive))]/20 hover:text-[hsl(var(--destructive))]"
                             >
-                                <Trash2 className="w-4 h-4 shrink-0" />
+                                <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
                                 <span className="truncate">{t.dashboard.blog.actions.delete}</span>
                             </Button>
                         </div>
