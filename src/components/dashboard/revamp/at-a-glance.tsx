@@ -55,10 +55,11 @@ function StatCardInner({ label, icon: Icon, accentVar, bgVar, stat, spark, note,
                     ? <ComingSoonBadgeTooltip label={comingSoonLabel ?? ''} tip={comingSoonTip ?? ''} />
                     : <Delta value={stat.delta} />}
             </div>
+            {/* Value (left) + "vs …" note (right) share one baseline row */}
             <div className="stat-bottom">
                 <span className="stat-val">{statDisplay(stat)}</span>
+                {!comingSoon && <span className="delta-note">{note}</span>}
             </div>
-            {!comingSoon && <span className="delta-note">{note}</span>}
         </div>
     )
 }

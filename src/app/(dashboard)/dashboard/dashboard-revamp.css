@@ -612,13 +612,21 @@ html[data-period-pending="1"] .dash-revamp .stream {
 
 .dash-revamp .stat-top {
   display: flex;
-  /* GH-1516: delta pill / Coming-Soon badge now lives on this row, right-aligned
-     opposite the icon+label cluster and vertically centered against it. */
+  /* GH-1516: delta pill / Coming-Soon badge lives on this row, right-aligned opposite
+     the icon+label cluster. flex-wrap is the no-overlap guarantee: when the card is too
+     narrow for label + pill, the pill wraps to its own line (still right-aligned via
+     margin-left:auto below) instead of painting over the label text. */
   align-items: center;
-  justify-content: space-between;
-  gap: 9px;
+  flex-wrap: wrap;
+  gap: 6px 9px;
   margin-bottom: 14px;
   position: relative;
+}
+
+/* Right-aligns the pill/badge whether it shares the label's line or wraps to its own */
+.dash-revamp .stat-top > .delta,
+.dash-revamp .stat-top > .cs-badge {
+  margin-left: auto;
 }
 
 /* Left block: main icon + title cluster as one unit (mirrors the % block on the right).
@@ -631,7 +639,8 @@ html[data-period-pending="1"] .dash-revamp .stream {
   min-width: 0;
 }
 
-/* GH-1516: holds the value only — the delta/badge moved up beside the label. */
+/* GH-1516: value (left) + "vs …" note (right) on one baseline row — the delta/badge
+   moved up beside the label. */
 .dash-revamp .stat-bottom {
   display: flex;
   align-items: baseline;
@@ -747,15 +756,13 @@ html[data-period-pending="1"] .dash-revamp .stream {
      Slightly smaller + tighter tracking so the longer localized strings still fit.
      Sits as its own caption line under .stat-bottom (value + delta), right-aligned
      under the delta pill it describes. */
-  display: block;
-  text-align: right;
-  margin-top: 2px;
+  /* GH-1516: sits in the .stat-bottom row, baseline-aligned right of the value */
+  margin-left: auto;
+  flex-shrink: 0;
   font-size: 10px;
   letter-spacing: -0.01em;
   white-space: nowrap;
   color: var(--dr-ink-4);
-  /* GH-1516: same paint-order fix as .stat-bottom — keep the note above the spark SVG */
-  position: relative;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2026,20 +2033,19 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
 
-  /* GH-1516: mobile keeps 2-up. Same layout as desktop — [icon + label … pill] /
-     [value] / [note] — with the sparkline in its own reserved bottom strip
-     (36px chart + 42px card padding) so text never touches the chart. The pill
-     moved up beside the label, so the value row has the full card width and
-     "RM 0" can't ellipsize anymore. */
-  .dash-revamp .stat-grid              { grid-template-columns: 1fr 1fr; }
-  .dash-revamp .stat-card              { padding: 12px 13px 42px; min-height: 96px; }
+  /* GH-1516: mobile goes 1-up — 2-up left ~170px per card, not enough for the
+     label + pill row (the Coming-Soon badge painted over "Revenue"). Full-width
+     cards fit everything on one line; same 3-band layout as desktop —
+     [icon + label … pill] / [value] / [note] / reserved chart strip. */
+  .dash-revamp .stat-grid              { grid-template-columns: 1fr; }
+  .dash-revamp .stat-card              { padding: 12px 14px 44px; min-height: 0; }
   .dash-revamp .stat-spark             { height: 36px; }
   .dash-revamp .stat-top               { margin-bottom: 8px; }
   .dash-revamp .stat-top-left          { gap: 7px; }
   .dash-revamp .stat-ic                { width: 28px; height: 28px; border-radius: 8px; }
   .dash-revamp .stat-ic svg            { width: 15px; height: 15px; }
   .dash-revamp .stat-label             { font-size: 11.5px; gap: 3px; }
-  .dash-revamp .stat-val               { font-size: 22px; }
+  .dash-revamp .stat-val               { font-size: 24px; }
   .dash-revamp .delta                  { font-size: 11px; padding: 2px 6px; }
   .dash-revamp .issues-list.cols2      { grid-template-columns: 1fr; }
   .dash-revamp .tp-row                 { grid-template-columns: 26px 1fr auto; }
