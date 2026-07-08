@@ -908,10 +908,20 @@ export async function POST(req: NextRequest) {
                 '/contact': seedNavLabels.contact,
             }
             : null
-        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => {
-            const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
-            return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
-        })
+        // Dedupe by URL — a duplicate slug (should not happen after
+        // canonicalizePageSlug trusts canonical slugs, but keep as a guard)
+        // must never render two identical nav links / a phantom entry.
+        const _seenNavUrls = new Set<string>()
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions
+            .map((p) => {
+                const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
+                return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
+            })
+            .filter((link) => {
+                if (_seenNavUrls.has(link.url)) return false
+                _seenNavUrls.add(link.url)
+                return true
+            })
 
         // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
         // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
@@ -1805,11 +1815,26 @@ function createPageHero(baseHero: AIBlock | null, options: {
 // GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
 // for well-known pages (e.g. slug "free-trial" instead of "contact").
 // Detection priority: block content (structural) > title keyword match.
-function canonicalizePageSlug(
+// The known-good sub-page slugs — a page already carrying one of these is
+// trusted verbatim (see canonicalizePageSlug).
+const CANONICAL_SUBPAGE_SLUGS: ReadonlySet<string> = new Set(['/about', '/services', '/contact', '/blog'])
+
+export function canonicalizePageSlug(
     page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
     index: number,
 ): string {
     if (page.isHomepage === true || index === 0) return '/'
+    // Trust an ALREADY-canonical incoming slug and skip title/content re-derivation.
+    // The parallel-split path (gen-page-split.ts) validates + rewrites each sub-page
+    // slug against a fixed plan; re-deriving from title here could flip a correct
+    // "/contact" back to "/about" when the page's content resembles About (nano
+    // sometimes fills the contact slot with About-ish content) — producing a
+    // duplicate "/about" that fails the unique (site, slug) create and drops
+    // /contact, leaving a duped "Giới Thiệu" nav entry (live 2026-07-08, dental).
+    // GH-820's target (arbitrary invented slugs like "free-trial") are NOT in this
+    // set, so they still get normalized below.
+    const incoming = (page.slug || '').startsWith('/') ? (page.slug || '') : `/${page.slug || ''}`
+    if (CANONICAL_SUBPAGE_SLUGS.has(incoming)) return incoming
     // Title is authoritative — AI titles are reliable signals and checked first to
     // avoid misclassifying pages that include secondary structural blocks (e.g. a
     // Services page with a contact form at the bottom must not become slug 'contact').

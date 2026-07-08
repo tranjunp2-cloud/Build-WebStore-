@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
-import { POST as GenerateSitePOST } from '@/app/api/ai/generate-site/route'
+import { POST as GenerateSitePOST, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
@@ -914,6 +914,31 @@ describe('AI Streaming APIs', () => {
             } finally {
                 delete process.env.GEN_BLOG_PREP_GRACE_MS
             }
+        })
+    })
+
+    describe('canonicalizePageSlug — trust canonical slug over title/content [GH-820 + dental /contact fix]', () => {
+        it('[TC-GENSLUG-01] keeps /contact even when the page title says "About" (would previously flip to /about)', () => {
+            // Nano filled the contact slot with About-ish content, but gen-page-split
+            // already validated + rewrote the slug to /contact. Title-first derivation
+            // used to override it back to /about → duplicate slug → /contact dropped.
+            const page = { title: 'Giới Thiệu Về Chúng Tôi (About)', slug: '/contact', blocks: [{ blockType: 'about' }] }
+            expect(canonicalizePageSlug(page, 3)).toBe('/contact')
+        })
+
+        it('[TC-GENSLUG-02] trusts each canonical sub-page slug verbatim', () => {
+            expect(canonicalizePageSlug({ title: 'x', slug: '/about', blocks: [] }, 1)).toBe('/about')
+            expect(canonicalizePageSlug({ title: 'x', slug: '/services', blocks: [] }, 2)).toBe('/services')
+            expect(canonicalizePageSlug({ title: 'x', slug: '/blog', blocks: [] }, 4)).toBe('/blog')
+        })
+
+        it('[TC-GENSLUG-03] still normalizes an ARBITRARY invented slug via title (GH-820 preserved)', () => {
+            // slug "free-trial" is NOT canonical → title-based derivation runs → /contact
+            expect(canonicalizePageSlug({ title: 'Contact Us', slug: '/free-trial', blocks: [] }, 3)).toBe('/contact')
+        })
+
+        it('[TC-GENSLUG-04] homepage always "/" regardless of slug', () => {
+            expect(canonicalizePageSlug({ title: 'Home', slug: '/about', isHomepage: true, blocks: [] }, 0)).toBe('/')
         })
     })
 
