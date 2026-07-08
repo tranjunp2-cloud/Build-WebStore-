@@ -574,6 +574,109 @@ describe('saveProductAction', () => {
             expect(mockCreate).not.toHaveBeenCalled()
         })
     })
+
+    // ── AI-review flag lifecycle (GH-1502) ────────────────────────────────────
+
+    describe('aiReviewPending lifecycle (GH-1502)', () => {
+        it('[TC-F08-04-35] update path (id provided) → forces aiReviewPending:false regardless of input', async () => {
+            await saveProductAction({ name: 'Test Product', aiReviewPending: true }, 42)
+
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ aiReviewPending: false }),
+            }))
+        })
+
+        it('[TC-F08-04-36] create path (no id) → passes through caller-provided aiReviewPending unchanged', async () => {
+            await saveProductAction({ name: 'Test Product', aiReviewPending: true })
+
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ aiReviewPending: true }),
+            }))
+        })
+    })
+
+    // ── DB-level SKU conflict translation (code-review follow-up, GH-1502) ────
+
+    describe('translateDbSkuConflict (code-review follow-up)', () => {
+        // Shape verified against the real, installed @payloadcms/drizzle source
+        // (handleUpsertError.js) and confirmed live against the docker Postgres/Payload instance:
+        // a raw pg 23505 is ALWAYS converted to this generic Payload ValidationError shape before
+        // it reaches saveProductAction — the original pg `.code`/`.message`/`.constraint` never
+        // survive. `path` is `null` for our raw-SQL indexes since Payload can't resolve a field
+        // name for a constraint it didn't create itself (see actions.ts comment for the full trace).
+        function makeUnresolvedUniqueViolation(path: string | null = null) {
+            return Object.assign(new Error('The following field is invalid: '), {
+                name: 'ValidationError',
+                data: { collection: 'products', errors: [{ message: 'Value must be unique', path }] },
+            })
+        }
+
+        it('[TC-F08-04-48] create path: unresolved unique-violation (our raw-SQL sku index) → translated into FIELD_ERRORS/baseSku shape', async () => {
+            mockCreate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction({ name: 'New Product', sku: 'DUP-001' })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('FIELD_ERRORS')
+            expect(parsed.fieldErrors.baseSku.code).toBe('SKU_ALREADY_IN_USE')
+            expect(parsed.fieldErrors.baseSku.values).toEqual(['DUP-001'])
+        })
+
+        it('[TC-F08-04-49] update path: same violation is translated identically', async () => {
+            mockUpdate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction({ name: 'Existing Product', sku: 'DUP-002' }, 42)
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('FIELD_ERRORS')
+            expect(parsed.fieldErrors.baseSku.values).toEqual(['DUP-002'])
+        })
+
+        it('[TC-F08-04-50a] a resolved slug unique-violation (path:"slug") is re-thrown unchanged, not misreported as a SKU conflict', async () => {
+            const dbErr = makeUnresolvedUniqueViolation('slug')
+            mockCreate.mockRejectedValueOnce(dbErr)
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction({ name: 'New Product' })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).toBe(dbErr) // passed through unchanged, not our JSON shape
+            expect(() => JSON.parse(thrown!.message)).toThrow()
+        })
+
+        it('[TC-F08-04-50b] KNOWN LIMITATION: a same-product variant-SKU violation is indistinguishable from a base-sku one and is also classified as baseSku', async () => {
+            // Payload's ValidationError carries no constraint name for either of our raw-SQL
+            // indexes, so a products_variants_sku_parent_uniq hit produces the identical generic
+            // shape as a products_sku_tenant_uniq hit. This test documents the accepted trade-off
+            // (see actions.ts translateDbSkuConflict comment) rather than asserting ideal behavior.
+            mockCreate.mockRejectedValueOnce(makeUnresolvedUniqueViolation())
+
+            let thrown: Error | null = null
+            try {
+                await saveProductAction({ name: 'New Product', sku: 'BASE-1', variants: [{ sku: 'DUP-VAR' }] })
+            } catch (e) { thrown = e as Error }
+
+            expect(thrown).not.toBeNull()
+            const parsed = JSON.parse(thrown!.message)
+            expect(parsed.code).toBe('FIELD_ERRORS')
+            expect(parsed.fieldErrors).toHaveProperty('baseSku') // not a variants.N.skuCode key — the limitation
+        })
+
+        it('[TC-F08-04-50c] an unrelated (non-ValidationError) error passes through untouched', async () => {
+            mockCreate.mockRejectedValueOnce(new Error('Network timeout'))
+
+            await expect(saveProductAction({ name: 'New Product' })).rejects.toThrow('Network timeout')
+        })
+    })
 })
 
 describe('updateProductFieldAction', () => {
@@ -790,6 +893,32 @@ describe('updateProductFieldAction', () => {
             expect(parsed.code).toBe('PUBLISH_BLOCKED')
             expect(parsed.missingFields).toEqual(['weight'])
             expect(mockUpdate).not.toHaveBeenCalled()
+        })
+    })
+
+    // ── AI-review flag lifecycle (GH-1502) ────────────────────────────────────
+
+    describe('aiReviewPending lifecycle (GH-1502)', () => {
+        it('[TC-F08-04-37] status:active → update data includes aiReviewPending:false', async () => {
+            await updateProductFieldAction(42, { status: 'active' })
+
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ aiReviewPending: false }),
+            }))
+        })
+
+        it('[TC-F08-04-38] status:archived → update data does NOT include aiReviewPending', async () => {
+            await updateProductFieldAction(42, { status: 'archived' })
+
+            const call = mockUpdate.mock.calls[0][0]
+            expect(call.data).not.toHaveProperty('aiReviewPending')
+        })
+
+        it('[TC-F08-04-39] deletedAt branch → update data does NOT include aiReviewPending', async () => {
+            await updateProductFieldAction(42, { deletedAt: null })
+
+            const call = mockUpdate.mock.calls[0][0]
+            expect(call.data).not.toHaveProperty('aiReviewPending')
         })
     })
 })

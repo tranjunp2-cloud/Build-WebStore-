@@ -1,0 +1,134 @@
+name: Sync staging → qc-test
+
+# Auto-syncs the qc-test branch whenever staging updates so the QC
+# preview deployment (ech-prime-web-v2-qc.vercel.app) always mirrors
+# the latest dev code. Prevents the "QA tests old code" drift class
+# (see plans/260708-1217-GH-02-qc-auto-sync/).
+#
+# Flow:
+#   1. On push to staging (or manual dispatch), fetch both branches.
+#   2. If qc-test already contains staging → no-op.
+#   3. Otherwise try merge (FF when possible, merge commit when qc-test
+#      has divergent commits like deploy-trigger chores).
+#   4. Push qc-test using GITHUB_TOKEN.
+#   5. Dispatch ci.yml with ref=qc-test → triggers deploy-qc-test job.
+#      (GITHUB_TOKEN pushes do not fire push events, but workflow_dispatch
+#      from another workflow does — this is the documented workaround.)
+#   6. On merge conflict, open a PR for a human to resolve.
+
+on:
+  push:
+    branches: [staging]
+    paths-ignore:
+      - 'docs/**'
+      - 'plans/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CONTRIBUTING.md'
+      - '.github/GIT_AND_CI_RULES.md'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-staging-to-qc-test
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync qc-test with staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync qc-test with staging
+        id: sync
+        run: |
+          set -e
+          git fetch origin staging qc-test
+          git checkout qc-test
+
+          # Already contains staging → no-op
+          if git merge-base --is-ancestor origin/staging HEAD; then
+            echo "mode=noop" >> "$GITHUB_OUTPUT"
+            echo "qc-test already contains staging @ $(git rev-parse --short origin/staging)"
+            exit 0
+          fi
+
+          # Try merge (FF when possible, merge commit when diverged)
+          if git merge origin/staging --no-edit -m "chore(qc): sync staging → qc-test (auto)"; then
+            echo "mode=merged" >> "$GITHUB_OUTPUT"
+            git push origin qc-test
+            echo "Synced qc-test with staging @ $(git rev-parse --short origin/staging)"
+          else
+            echo "mode=conflict" >> "$GITHUB_OUTPUT"
+            git merge --abort
+            echo "Merge conflict — opening PR in next step"
+          fi
+
+      - name: Dispatch ci.yml to deploy qc-test
+        if: steps.sync.outputs.mode == 'merged'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run ci.yml --ref qc-test
+          echo "Dispatched ci.yml on qc-test — deploy-qc-test job will run"
+
+      - name: Open sync PR (conflict fallback)
+        if: steps.sync.outputs.mode == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          BRANCH="sync/staging-to-qc-test-${{ github.run_id }}"
+          git checkout -B "$BRANCH" origin/staging
+          git push origin "$BRANCH"
+          gh pr create \
+            --base qc-test \
+            --head "$BRANCH" \
+            --title "chore(qc): sync staging → qc-test (manual review)" \
+            --body "$(cat <<'EOF'
+          Auto-sync from staging → qc-test failed because the two branches diverged in conflicting files. Please review, resolve, and merge to keep the QC deployment (ech-prime-web-v2-qc.vercel.app) in sync with staging.
+
+          Triggered by staging @ ${{ github.sha }}
+          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )"
+
+      - name: Notify sync success
+        if: success() && steps.sync.outputs.mode == 'merged'
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: 'sync staging → qc-test (auto-merge, deploy dispatched)'
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Notify sync conflict
+        if: steps.sync.outputs.mode == 'conflict'
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'qc-test'
+          branch: qc-test
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: 'sync staging → qc-test (conflict — manual PR opened)'
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

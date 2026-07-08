@@ -345,13 +345,17 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
         expect(payload.slug).toMatch(/^dep-to-ong-[a-z0-9]{5}$/)
     })
 
-    it('sets default inventory=10 when no variants', () => {
+    it('sets default inventory=0 when no variants (GH-1502: out of stock until merchant confirms)', () => {
         const payload = buildSavePayload({ ...baseProduct, variants: [] }, null, null)
-        expect(payload.inventory).toBe(10)
+        expect(payload.inventory).toBe(0)
         expect(payload.variants).toBeUndefined()
     })
 
-    it('sets inventory=0 and includes variants when product has variants', () => {
+    it('sets inventory to the sum of variant stocks and includes variants when product has variants', () => {
+        // GH-1502 review-drawer follow-up: Stock for a variant product is edited as one shared
+        // value distributed to every variant (updateAllVariantsStock in BulkCreateModal), and the
+        // product's own inventory is the sum — matching VariantsInventorySection's
+        // `setValue('baseInventory', total)` convention in the manual Add/Edit Product form.
         const prodWithVariants = {
             ...baseProduct,
             variants: [
@@ -360,7 +364,7 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
             ],
         }
         const payload = buildSavePayload(prodWithVariants, null, null)
-        expect(payload.inventory).toBe(0)
+        expect(payload.inventory).toBe(20)
         expect(Array.isArray(payload.variants)).toBe(true)
         if (payload.variants) {
             expect(payload.variants).toHaveLength(2)

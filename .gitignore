@@ -30,6 +30,10 @@ build/
 .jmx-results/
 *.jtl
 
+## k6 (QC perf test raw output — analyse locally, commit only summaries)
+reports/perf/
+!reports/perf/.gitkeep
+
 ## Bot config (personality controlled by PM/Lead only)
 .bot-config.json
 

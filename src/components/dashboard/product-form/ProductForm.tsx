@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
 import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
-import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Trash2, ArrowLeft, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
@@ -123,6 +123,9 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     router.push('/products')
                 }, 1000)
             }
+            // Clear isDirty so the save-bar footer doesn't flip back to "Unsaved changes"
+            // during the redirect delay right after a confirmed-successful save.
+            methods.reset(data)
         } catch (error) {
             const parsed = parseServerError(error)
             if (parsed) {
@@ -212,29 +215,45 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     <AttributesSection />
                 </div>
 
-                {/* Fixed Footer Actions */}
-                <div className="fixed bottom-0 left-0 right-0 z-40 md:left-[250px] bg-background border-t border-white/[0.08] px-8 py-[18px]">
-                    <div className="flex flex-row items-center gap-3 w-full bg-background">
-                        {/* Shared <Button> dashSecondary / dashPrimary — dash size (h-9, rounded-lg) like every other action button */}
-                        <Button
-                            type="button"
-                            variant="dashSecondary"
-                            onClick={() => router.push('/products')}
-                            className="flex-1 h-9 rounded-lg text-[13px]"
-                        >
-                            {t.dashboard.products.form.cancel}
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="dashPrimary"
-                            disabled={isSaving}
-                            className="flex-1 h-9 rounded-lg text-[13px] disabled:opacity-50"
-                        >
-                            <Save className="w-4 h-4 flex-shrink-0" />
-                            <span>{isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}</span>
-                        </Button>
+                {/* Save bar — GH-1509 design-system pass (PR #1512): sticky floating card,
+                    `--save-bar-bg` token, amber "unsaved changes" indicator, size="sm" buttons —
+                    same template now shared by Payments/Shipping/Discounts/Customers-detail.
+                    Only renders while dirty (was previously always visible, cycling
+                    "New product"/"Unsaved changes"/"Up to date" status text). */}
+                {methods.formState.isDirty && (
+                    <div
+                        className="sticky bottom-4 z-40 flex flex-wrap items-center justify-between gap-y-2 px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                        style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+                    >
+                        <div className="flex items-center gap-2 text-[13px]">
+                            <AlertCircle className="w-[14px] h-[14px] text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-amber-600 dark:text-amber-300 font-medium">{t.dashboard.products.form.unsavedChanges}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                onClick={() => router.push('/products')}
+                                disabled={isSaving}
+                                variant="dashSecondary"
+                                size="sm"
+                            >
+                                {t.dashboard.products.form.cancel}
+                            </Button>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={isSaving}
+                            >
+                                {isSaving
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <Check className="h-3.5 w-3.5" />
+                                }
+                                {isSaving ? t.dashboard.products.form.saving : isEdit ? t.dashboard.products.form.saveChanges : t.dashboard.products.form.saveDraft}
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
             </form>
         </FormProvider>
     )

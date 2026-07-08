@@ -35,13 +35,13 @@ export const POST = withAuth(async (user, req) => {
             return NextResponse.json({
                 products: [
                     {
-                        name: 'Áo thun Mẫu (Không API Key)', price: 150000, category: 'Fashion',
+                        name: 'Áo thun Mẫu (Không API Key)', price: 45, category: 'Fashion', sku: 'AT-MAU',
                         variants: [
-                            { name: 'Đen - M', price: 150000, sku: 'AT-BLK-M', stock: 10 },
-                            { name: 'Trắng - L', price: 150000, sku: 'AT-WHT-L', stock: 10 }
+                            { name: 'Đen - M', price: 45, sku: 'AT-BLK-M', stock: 0 },
+                            { name: 'Trắng - L', price: 45, sku: 'AT-WHT-L', stock: 0 }
                         ]
                     },
-                    { name: 'Dép tổ ong (Không API Key)', price: 20000, category: 'Footwear', variants: [] }
+                    { name: 'Dép tổ ong (Không API Key)', price: 15, category: 'Footwear', sku: 'DTO-MAU', variants: [] }
                 ]
             })
         }
@@ -61,7 +61,7 @@ You MUST TRANSLATE the user's input into ${targetLanguage.toUpperCase()} if they
 Parse the text and return a JSON object with a single "products" array.
 Each product item MUST have:
 - name: (string) The product name. MUST BE AT LEAST 3 CHARACTERS LONG (e.g. use "Áo Thun" instead of "Áo").
-- price: (number) The price in full VND or MYR (e.g. "45k" = 45000, "RM 89" = 89). Default to 0 if not specified.
+- price: (number) The price in RM (Malaysian Ringgit) — this store ONLY sells in MYR, never VND or any other currency. Parse "RM89" or a plain "89" as 89; "RM1.5k" or "1.5k" as 1500 (k/K = x1000 shorthand). Default to 0 if not specified.
 - compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
 - category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
 - description: (string) A comprehensive, engaging product description. Write at least 2 paragraphs separated by \\n\\n.
@@ -72,12 +72,13 @@ Each product item MUST have:
 - seoTitle: (string) A catchy SEO-friendly title under 70 characters.
 - seoDescription: (string) A compelling SEO meta description under 160 characters.
 - slug: (string) URL-friendly lowercase slug (e.g. "ao-khoac-da").
+- sku: (string) auto-generate a 6-8 char unique uppercase SKU based on the product name abbreviation (e.g. "Leather Jacket" -> "LEA-JKT"). Always required, even for products with no variants.
 - variants: (array) Generate flat 1D array of variant objects if any color/size/attribute is mentioned (2-tier Cartesian flattened). EVEN IF ONLY A SINGLE specific color or size is mentioned (e.g., "quần màu đỏ"), you MUST STILL generate exactly 1 variant for it (e.g., name: "Đỏ" or "Red").
   Each variant object MUST have:
     - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
     - price: (number) same as base price unless specified per variant
     - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
-    - stock: (number) default to 10 per variant
+    - stock: (number) default to 0 per variant (out of stock until the merchant confirms real stock)
   If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].
 - variantConfigs: (array) If variants exist, provide up to 2 tier configurations representing the dimensions.
   Each object MUST have:
@@ -86,7 +87,7 @@ Each product item MUST have:
   If no variants exist, return an empty array [].
 
 Rules:
-- Extract prices correctly: k/K = x1000, eg. 45k = 45000
+- All prices are RM (Malaysian Ringgit). Extract correctly: k/K = x1000, e.g. "45k" = 45000. Ignore any other currency symbol the user types (Rp, VND, $, etc.) — always treat the number as RM.
 - STRICT RULE for VARIANTS (MAXIMUM 2 TIERS): Our database ONLY supports a maximum of 2 variant tiers (e.g. Color and Size). 
   If the user mentions 3 or MORE attributes (e.g. Color, Size, Material, Type), YOU MUST ONLY USE THE FIRST 2 ATTRIBUTES and COMPLETELY DISCARD/IGNORE the rest. Do not merge them.
   Example: Tier 1 = Color (Xanh, Đỏ), Tier 2 = Size (S, M, L). Completely ignore attributes like "Vải len", "Loại thường".

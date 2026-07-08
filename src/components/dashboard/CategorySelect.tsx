@@ -47,8 +47,8 @@ function ColPanel({
                         className={cn(
                             "flex items-center justify-between px-4 py-2.5 text-[14px] cursor-pointer transition-colors select-none",
                             selectedId === cat.id
-                                ? "bg-[#D9D9D9] text-[#0B1120]"
-                                : "text-[#F8FAFC] hover:bg-[#D9D9D9] hover:text-[#0B1120]"
+                                ? "bg-muted text-foreground"
+                                : "text-popover-foreground hover:bg-muted hover:text-foreground"
                         )}
                     >
                         <span className="truncate">{cat.name}</span>
@@ -156,19 +156,22 @@ export function CategorySelect({ categories, selectedIds, onChange, error, class
             <div
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    "flex min-h-[48px] w-full items-center rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] outline-none cursor-pointer transition-colors",
-                    error ? "border-red-500" : "border-white/[0.08] hover:border-white/20",
-                    isOpen && !error && "border-white ring-1 ring-white"
+                    "flex min-h-[48px] w-full items-center rounded-lg border bg-[hsl(var(--card))] px-4 py-3 text-[16px] outline-none cursor-pointer transition-colors",
+                    error ? "border-[hsl(var(--destructive))]" : "border-[hsl(var(--input-border))]",
+                    isOpen && !error && "ring-1 ring-[hsl(var(--ring))]"
                 )}
             >
-                <span className={label ? "text-[#F8FAFC]" : "text-[#F8FAFC]/40"}>
+                <span className={label ? "text-[hsl(var(--foreground))]" : "text-[hsl(var(--muted-foreground))]"}>
                     {label ?? t.dashboard.products.form.categories.select}
                 </span>
-                <ChevronDown className={cn("ml-auto h-4 w-4 shrink-0 text-gray-500 transition-transform", isOpen && "rotate-180")} />
+                <ChevronDown className={cn("ml-auto h-4 w-4 shrink-0 text-[hsl(var(--muted-foreground))] transition-transform", isOpen && "rotate-180")} />
             </div>
 
             {isOpen && (
-                <div className="absolute z-50 mt-1 left-0 flex flex-row divide-x divide-white/10 border border-white/20 bg-[#0B1120] animate-in fade-in slide-in-from-top-1" style={{ minWidth: '100%' }}>
+                <div
+                    className="absolute z-50 mt-1 left-0 flex flex-row divide-x divide-border border border-border animate-in fade-in slide-in-from-top-1"
+                    style={{ minWidth: '100%', backgroundColor: 'hsl(var(--popover))', color: 'hsl(var(--popover-foreground))' }}
+                >
                     <ColPanel
                         items={l1}
                         selectedId={hoveredL1}

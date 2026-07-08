@@ -351,6 +351,98 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 - Phase 3 (alt-fallback implementation): Shipped 2026-07-03
 - Phase 4 (inline warnings + alt-text Popover): Shipped 2026-07-03; category-required reverted same day
 
+## 7. GH-1502 — AI Bulk-Create UX Redesign (Phases 1–6, complete)
+
+**Enhanced user experience for the AI chat bulk-product-generation feature. New field tracks AI-generated drafts, improved textarea input, suggestion pills, and visual indicators for AI-created products.**
+
+### Data Model Changes
+
+**New collection field:**
+- `aiReviewPending: boolean` — default `false`. Set to `true` by `BulkCreateModal.buildSavePayload()` on every product created via AI chat. Cleared to `false` by `saveProductAction()` on any manual product edit, or by `updateProductFieldAction()` when transitioning product status to `'active'`. Used to visually distinguish AI-bulk-created products in the Products list until merchant review.
+
+### Frontend Component: `BulkCreateModal.tsx`
+
+**Enhanced prompt input:**
+- Replaced single-line `<Input>` with multi-line auto-growing `<textarea>` (new hook: `src/hooks/use-auto-resize-textarea.ts` handles dynamic height on content change).
+- Submit behavior changed: plain **Enter** inserts newline; **Cmd/Ctrl+Enter** submits. Encourages multi-sentence descriptions without accidental submission.
+- Added 3 clickable **suggestion pills** below textarea (e.g. "Describe your product", "Add features", "Include materials"). Each pill pre-fills the textarea with a contextual prompt starter, reducing friction for first-time users.
+
+**Modal state & persistence:**
+- `buildSavePayload()` creates each product with `aiReviewPending: true`.
+- Removed `router.refresh()` call from `handleSave` — parent page's `onSuccess` callback now refetches via `loadProducts()` without full page reload, improving performance.
+
+### Frontend Component: `AiReviewIndicator.tsx`
+
+**Visual indicator for AI-generated products:**
+- New component rendered in ProductsPage (both desktop table rows and mobile cards).
+- Display: emerald-colored pulsing dot + tooltip ("Created by AI — needs review").
+- Auto-clears (optimistically + server-confirmed) when product status transitions to `'active'`.
+- Merchant-facing cue: "These drafts came from AI and may need adjustments before publishing."
+
+### Page Behavior After Bulk-Generate
+
+After successful AI product generation:
+1. Page auto-switches to **Draft tab** (shows draft products only).
+2. Sort order resets to **"Latest"** so newly created AI-drafted products appear on top.
+3. Existing products remain unaffected; no full-page reload.
+
+### i18n Updates
+
+New and updated strings in `src/i18n/locales/en.json` and `ms.json`:
+- `dashboard.products.bulkCreate.submitButton` — "Generate Drafts" (was "Create")
+- `dashboard.products.bulkCreate.suggestPills` — array of 3 suggestion texts
+- `dashboard.products.bulkCreate.aiReviewTooltip` — "Created by AI — needs review"
+- Button label changes (Malay: "Cipta" → "Jana Draf")
+- Placeholder copy refinements
+
+### State Lifecycle
+
+```
+User types prompt → Clicks "Generate Drafts" (or Cmd+Enter)
+           ↓
+POST /api/ai/products-bulk-parse
+           ↓
+AI generates N product drafts
+           ↓
+buildSavePayload() sets aiReviewPending: true for each
+           ↓
+saveProductAction() creates products in DB
+           ↓
+Page resets to Draft tab + Latest sort
+           ↓
+AiReviewIndicator renders on each AI product
+           ↓
+Merchant reviews AI draft → edits → saves
+           ↓
+saveProductAction() clears aiReviewPending: false
+           ↓
+AiReviewIndicator disappears
+           ↓
+Merchant toggles status: draft → active
+           ↓
+updateProductFieldAction() enforces publishGateHook (sees aiReviewPending still false, gate still applies)
+           ↓
+If complete: product goes live. AiReviewIndicator already gone.
+```
+
+### Testing
+
+**New test cases:** TC-F08-04-34 through 41 in:
+- `src/__tests__/unit/dashboard/bulk-create-save.test.tsx` — textarea, suggestion pills, form submission
+- `src/__tests__/unit/dashboard/bulk-create-utils.test.ts` — `buildSavePayload()` sets `aiReviewPending: true`
+- `src/__tests__/unit/actions/save-product-action.test.ts` — server-side `aiReviewPending` state management
+- `src/__tests__/unit/dashboard/ai-review-indicator.test.tsx` — indicator rendering, tooltip, optimistic clear
+
+**Amended test:** TC-F08-04-27 — assertion updated due to `router.refresh()` removal from modal's `handleSave`.
+
+### Related
+
+- CHANGELOG entry: GH-1502
+- Bulk-create API: `/api/ai/products-bulk-parse` (GH-1410, unchanged)
+- Publishing gate (GH-1458): applies to all products, AI-generated or manual
+
+---
+
 ## 6. Error Matrix
 
 | Error | User Sees | Recovery |
@@ -360,3 +452,4 @@ Example: A Nike Air Force 1 product in "TradeHub Store" renders as `alt="Nike Ai
 | AI description fail | Toast + manual input | Retry button |
 | Stock = 0 | Auto-hide from storefront | Restock to show |
 | Toggle Active without price/sku/inventory | Modal: "Cannot publish yet" + missing fields list | Fill required fields, retry toggle |
+| Bulk-generate fails (API timeout) | Toast error + retry button | Adjust prompt or retry |

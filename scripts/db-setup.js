@@ -274,6 +274,7 @@ const MIGRATIONS = [
   { name: 'products.dimensions_length', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_length numeric DEFAULT 0;` },
   { name: 'products.dimensions_width', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_width numeric DEFAULT 0;` },
   { name: 'products.dimensions_height', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_height numeric DEFAULT 0;` },
+  { name: 'products.ai_review_pending', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS ai_review_pending boolean DEFAULT false;` },
   // ── Orders: Stripe fields ──
   {
     name: 'orders.stripe_session_id',

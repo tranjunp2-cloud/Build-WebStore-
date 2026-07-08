@@ -38,12 +38,25 @@ export function PaymentMethodCard({
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const isActive = on && !locked;
+    // GH-1499 issue 2: long descriptions overflow the card unbounded — truncate to
+    // 2 lines with a "See more" toggle instead. Only show the toggle when truncation
+    // would actually kick in (short descriptions never wrap to 3+ lines anyway).
+    // Known limitation: this is a raw character count, not a measured/rendered check,
+    // so it's locale-fragile — a translation could push one locale's copy past 120
+    // chars while another stays under for equivalent content (verified this can happen:
+    // a sibling payments string has en=107/ms=123 chars). Currently all 4 descriptions
+    // routed through this component agree across en/ms, so no live bug, but re-verify
+    // this threshold (or switch to a real scrollHeight/clientHeight overflow check) if
+    // a translation update or new payment method starts showing inconsistent behavior.
+    const [expanded, setExpanded] = React.useState(false);
+    const isLongDesc = desc.length > 120;
 
     return (
         <div className={cn(
             // preflight OFF → class `border` thiếu border-style; phải có `border-solid` mới hiện viền.
+            // GH-1511 #38: no drop shadow — the old 6px black shadow read as a faint line under
+            // each card; the Xendit connect block (the reference) has none.
             'rounded-[16px] p-[20px_22px] border border-solid transition-all duration-200',
-            'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
             locked ? 'bg-[hsl(var(--background))] border-dash-border' : 'bg-[hsl(var(--card))] border-dash-border',
             // Viền đồng nhất xám (dash-border) cho mọi card bất kể bật/tắt — trạng thái active
             // đã thể hiện qua toggle + pill "Active". (Trước đây bật thì viền xanh info → lệch nhau.)
@@ -66,7 +79,24 @@ export function PaymentMethodCard({
                                     </span>
                                 )}
                             </h3>
-                            <p className="text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]">{desc}</p>
+                            {/* Truncate + "see more" on mobile/tablet only — desktop (xl+) keeps
+                                showing the full description untouched (issue AC: no desktop regression). */}
+                            <p className={cn(
+                                'text-[13px] text-slate-400 m-0 leading-[1.5] max-w-[480px]',
+                                !expanded && isLongDesc && 'line-clamp-2 xl:line-clamp-none',
+                            )}>
+                                {desc}
+                            </p>
+                            {isLongDesc && (
+                                <button
+                                    type="button"
+                                    onClick={() => setExpanded(v => !v)}
+                                    aria-expanded={expanded}
+                                    className="text-[12px] text-[hsl(var(--primary))] font-medium mt-[2px] hover:underline xl:hidden"
+                                >
+                                    {expanded ? pt.seeLess : pt.seeMore}
+                                </button>
+                            )}
                         </div>
 
                         {/* Toggle switch — shared <Switch> (GH-1222) for consistency with Shipping

@@ -526,6 +526,12 @@ export const Products: CollectionConfig = {
             admin: { description: 'Toggle to mark product as Halal Certified (JAKIM)' },
         },
         {
+            name: 'aiReviewPending',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'Marks a product created via AI bulk-create as pending human review. Cleared on manual edit or activation.' },
+        },
+        {
             name: 'halalCertImage',
             type: 'upload',
             relationTo: 'media',

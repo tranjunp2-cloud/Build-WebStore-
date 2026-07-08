@@ -277,7 +277,7 @@ export function EditorToolbar({
 
         return (
             <>
-            <header className="flex h-12 shrink-0 items-center justify-between overflow-hidden border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-3">
+            <header className="flex h-12 shrink-0 items-center justify-between overflow-hidden border-b border-white/[0.06] backdrop-blur-sm px-3">
                 <div className="flex min-w-0 items-center gap-0.5">
                     <button
                         type="button"
@@ -470,7 +470,7 @@ export function EditorToolbar({
 
     return (
         <>
-        <header className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/[0.06] bg-[var(--editor-surface)]/90 backdrop-blur-sm px-5">
+        <header className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/[0.06] backdrop-blur-sm px-5">
             {/* LEFT: page tools. Text labels collapse only at tier 2 (< 1024px). */}
             <div className="flex shrink-0 items-center gap-2">
                 <button

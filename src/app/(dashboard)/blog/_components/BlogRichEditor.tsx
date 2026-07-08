@@ -480,6 +480,10 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     box-shadow: none !important;
                     outline: none !important;
                 }
+                /* Light mode: writing area reads as a white sheet (dark keeps the wrapper surface). */
+                html:not(.dark) .blog-ckeditor-wrapper .ck.ck-editor__editable {
+                    background: #ffffff !important;
+                }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-placeholder::before {
                     color: var(--dash-text-muted) !important;
                     font-family: 'Inter', sans-serif !important;
