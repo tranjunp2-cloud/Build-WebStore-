@@ -32,7 +32,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
     const images = watch('images')
 
     return (
-        <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-6">
+        <div className="rounded-2xl border border-solid border-slate-200 dark:border-white/[0.15] bg-white dark:bg-[hsl(var(--card))] p-[25px] flex flex-col gap-6">
             <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.general || 'General Information'}</h2>
             
             {/* Product Name */}

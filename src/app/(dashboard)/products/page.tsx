@@ -548,8 +548,10 @@ export default function ProductsPage() {
                                 size="dash"
                                 onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
                                 style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                    ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                    : isAdvancedFiltersOpen ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)' } : { background: 'hsl(var(--card))' }}
+                                    ? { background: 'hsl(var(--primary)/0.12)', border: '1px solid hsl(var(--primary)/0.4)', color: 'hsl(var(--primary))' }
+                                    : isAdvancedFiltersOpen
+                                        ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary)/0.5)', color: 'var(--dash-text-muted)' }
+                                        : { background: 'hsl(var(--card))', border: '1px solid hsl(var(--input-border))', color: 'var(--dash-text-muted)' }}
                                 className="shrink-0 rounded-[16px]"
                             >
                                 <Filter size={16} className="shrink-0" />
@@ -589,8 +591,8 @@ export default function ProductsPage() {
                             onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
                             className="whitespace-nowrap"
                             style={(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
-                                ? { background: 'hsl(var(--card))', border: '1px solid hsl(var(--primary) / 0.4)', color: 'hsl(var(--primary))' }
-                                : { background: 'hsl(var(--card))' }}
+                                ? { background: 'hsl(var(--primary)/0.12)', border: '1px solid hsl(var(--primary)/0.4)', color: 'hsl(var(--primary))' }
+                                : { background: 'hsl(var(--card))', border: '1px solid hsl(var(--input-border))', color: 'var(--dash-text-muted)' }}
                         >
                             <Filter size={16} className="shrink-0" />
                             {t.dashboard.products.list.filterBtn}

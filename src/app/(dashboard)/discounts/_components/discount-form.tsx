@@ -223,7 +223,7 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
 
             <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div
-                    className="rounded-lg border p-6"
+                    className="rounded-lg border border-solid p-6"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
                     <DiscountFormFields

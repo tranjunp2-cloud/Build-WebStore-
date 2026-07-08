@@ -36,7 +36,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
     return (
         <div className="flex flex-col gap-3">
             {/* Live preview card */}
-            <div className="rounded-lg border p-4" style={cardStyle}>
+            <div className="rounded-lg border border-solid p-4" style={cardStyle}>
                 <p style={labelStyle} className="mb-3">{d.heading}</p>
 
                 {/* Code chip + type badge */}
@@ -81,7 +81,7 @@ export function DiscountLivePreview({ draft, tenantName, usageCount, isNew }: Di
             </div>
 
             {/* Tenant-scoped card */}
-            <div className="rounded-lg border p-4" style={cardStyle}>
+            <div className="rounded-lg border border-solid p-4" style={cardStyle}>
                 <div className="flex items-center gap-2 mb-2">
                     <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: 'hsl(var(--info))' }} />
                     <span style={{ ...labelStyle, color: 'hsl(var(--info))' }}>{d.tenantScopedLabel}</span>
