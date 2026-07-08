@@ -1746,7 +1746,7 @@
                     "name": "Nama produk",
                     "price": "Harga (RM)",
                     "stock": "Stok",
-                    "stockFromVariants": "Diisi automatik daripada varian",
+                    "stockFromVariants": "Menyunting menetapkan nilai ini kepada setiap varian",
                     "variants": "Varian",
                     "removeDraft": "Buang draf",
                     "empty": "Senarai produk kosong.",

@@ -107,6 +107,15 @@ export function sanitizeXSS(text: string) {
     return safe.replace(/<[^>]*>?/gm, '').trim();
 }
 
+// Untrusted AI output — a malformed/omitted numeric field parses to NaN via `Number(v)`, and
+// `NaN ?? fallback` does NOT catch it (NaN is neither null nor undefined, unlike what `??`
+// checks for), so a bare `Number(v ?? fallback)` still lets a raw NaN through into a
+// controlled <input type="number">. Coerce with an explicit finiteness check instead.
+function coerceFiniteNumber(value: unknown, fallback = 0): number {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
+}
+
 export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | number | null, categoryId: string | number | null, defaultVariantName: string = 'Default') {
     const hasVariants = Boolean(prod.variants?.length)
     const baseSlug = prod.slug || slugify(prod.name)
@@ -183,7 +192,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         variants: hasVariants ? safeVariants!.map(v => ({
             name: sanitizeXSS(v.name || defaultVariantName),
             price: Number(v.price || prod.price) || 0,
-            stock: Number(v.stock ?? 0),
+            stock: coerceFiniteNumber(v.stock),
             sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
         })) : undefined,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
@@ -191,7 +200,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         // payload is internally consistent with what the review drawer displayed (Stock there
         // edits every variant uniformly; base "inventory" = sum, matching VariantsInventorySection's
         // `setValue('baseInventory', total)` convention in the manual Add/Edit Product form).
-        inventory: hasVariants ? safeVariants!.reduce((sum, v) => sum + (Number(v.stock) || 0), 0) : Number(prod.stock ?? 0),
+        inventory: hasVariants ? safeVariants!.reduce((sum, v) => sum + coerceFiniteNumber(v.stock), 0) : coerceFiniteNumber(prod.stock),
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
     }
 }
@@ -251,7 +260,10 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                             const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ');
                             const key = truncatedName.toLowerCase();
                             if (!uniqueMap.has(key)) {
-                                uniqueMap.set(key, { ...v, name: truncatedName });
+                                // Same untrusted-AI-input coercion as the top-level price/stock below —
+                                // fixed here (parse time) so the drawer's per-variant Stock display
+                                // (variants[0].stock) and buildSavePayload both see a clean value.
+                                uniqueMap.set(key, { ...v, name: truncatedName, stock: coerceFiniteNumber(v.stock) });
                             }
                         });
                         cleanedVariants = Array.from(uniqueMap.values());
@@ -264,11 +276,11 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         category: p.category || '',
                         // Untrusted AI output — the prompt asks for "0 if not specified", but the
                         // model can still omit/malform this on unparseable input (e.g. gibberish
-                        // with no price mentioned). Coerce here (not just later in
+                        // with no price/stock mentioned). Coerce here (not just later in
                         // buildSavePayload) so the review drawer's <input type="number"> never
                         // receives a raw non-numeric value as `value`.
-                        price: Number.isFinite(Number(p.price)) ? Number(p.price) : 0,
-                        stock: Number(p.stock ?? 0),
+                        price: coerceFiniteNumber(p.price),
+                        stock: coerceFiniteNumber(p.stock),
                     };
                 });
                 setProducts(initProducts)
@@ -526,15 +538,19 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                         min="0"
                                                         // For a variant product this drawer has no per-variant matrix (that's
                                                         // ProductForm's job) — so Stock is one shared value distributed to
-                                                        // every variant uniformly. Displaying the first variant's stock
-                                                        // assumes that uniformity holds until the merchant edits it here.
+                                                        // every variant uniformly on edit. Displays the first variant's own
+                                                        // stock (not a sum) since that's what re-editing this field would
+                                                        // apply everywhere. The AI parse prompt instructs stock:0 uniformly
+                                                        // across variants (route.ts), but that's not an enforced constraint —
+                                                        // the tooltip is explicit about the "applies to every variant"
+                                                        // semantics so a non-uniform AI response is never misread as a total.
                                                         value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
                                                         onChange={(e) => {
                                                             const next = Math.max(0, parseInt(e.target.value, 10) || 0)
                                                             if (hasVariants) updateAllVariantsStock(p._id!, next)
                                                             else updateProduct(p._id!, 'stock', next)
                                                         }}
-                                                        title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Applies to every variant') : undefined}
+                                                        title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
                                                         className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
                                                     />
                                                     <div className="hidden md:block w-[110px] shrink-0 self-center text-[12px] text-[hsl(var(--muted-foreground))] truncate">

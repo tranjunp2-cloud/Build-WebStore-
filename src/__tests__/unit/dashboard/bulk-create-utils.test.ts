@@ -126,6 +126,36 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.inventory).toBe(8)
     })
 
+    it('TC-F08-04-59 (adversarial-review follow-up): buildSavePayload itself coerces a non-numeric variant/top-level stock — not just the drawer parse-time path', () => {
+        // TC-F08-04-58 (bulk-create-save.test.tsx) only exercises coerceFiniteNumber's parse-time
+        // call site (the uniqueMap dedup step) — by the time buildSavePayload runs in that test,
+        // stock is already clean. This calls buildSavePayload directly with raw non-numeric stock,
+        // exercising its own two coerceFiniteNumber call sites (variant stock + inventory sum).
+        const variantProduct = {
+            selected: true,
+            name: 'Weird Stock Product',
+            price: 10,
+            category: '',
+            variants: [{ name: 'Default', price: 10, sku: 'WS-001-D', stock: 'N/A' }],
+        }
+        const variantPayload = buildSavePayload(variantProduct, null, null)
+
+        expect(variantPayload.variants![0].stock).toBe(0)
+        expect(variantPayload.inventory).toBe(0)
+
+        const noVariantProduct = {
+            selected: true,
+            name: 'Weird Stock Product 2',
+            price: 10,
+            category: '',
+            variants: [],
+            stock: 'N/A',
+        }
+        const noVariantPayload = buildSavePayload(noVariantProduct, null, null)
+
+        expect(noVariantPayload.inventory).toBe(0)
+    })
+
     it('TC-F08-04-43: generates a fallback SKU when the AI omits one', () => {
         const product = {
             selected: true,

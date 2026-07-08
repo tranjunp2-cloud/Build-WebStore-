@@ -308,12 +308,12 @@ describe('BulkCreateModal — handleParse variant-name dedup [TC-F08-04-52 code-
     })
 })
 
-describe('BulkCreateModal — review drawer: remove-draft [design-alignment follow-up]', () => {
+describe('BulkCreateModal — review drawer: remove-draft [TC-F08-04-55 design-alignment follow-up]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('removing a draft excludes it from save — the review drawer has no select/deselect checkbox, only a per-draft remove button', async () => {
+    it('TC-F08-04-55: removing a draft excludes it from save — the review drawer has no select/deselect checkbox, only a per-draft remove button', async () => {
         const two = [BASE_PRODUCT, { ...BASE_PRODUCT, name: 'Test Pants', sku: 'PANTS-001' }]
         mockSaveProduct.mockResolvedValue({ id: 1 })
         await renderAndWaitForProducts(two)
@@ -338,12 +338,12 @@ describe('BulkCreateModal — review drawer: remove-draft [design-alignment foll
     })
 })
 
-describe('BulkCreateModal — review drawer: price coercion on parse [bug fix]', () => {
+describe('BulkCreateModal — review drawer: price coercion on parse [TC-F08-04-56 bug fix]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('an AI response with a non-numeric/missing price renders "0" in the Price input, not a raw invalid value', async () => {
+    it('TC-F08-04-56: an AI response with a non-numeric/missing price renders "0" in the Price input, not a raw invalid value', async () => {
         // Untrusted AI output — the parse prompt asks for "0 if not specified", but on
         // unparseable/gibberish input the model can still omit or malform this field.
         // Reproduces a real observed bug: the Price <input type="number"> received the raw
@@ -366,14 +366,44 @@ describe('BulkCreateModal — review drawer: price coercion on parse [bug fix]',
         })
         expect(mockSaveProduct.mock.calls[0][0].price).toBe(0)
     })
+
+    it('TC-F08-04-58 (review-comment follow-up): a non-numeric string variant stock ("N/A") also coerces to "0" — `?? 0` alone does not catch NaN', async () => {
+        // `Number("N/A") ?? 0` still evaluates to NaN — NaN is neither null nor undefined, so the
+        // `??` fallback never fires. Only an explicit Number.isFinite check (coerceFiniteNumber)
+        // catches this, applied at parse time to the variant's own stock (drives both the
+        // drawer's Stock display, which reads variants[0].stock, and the saved payload).
+        const garbageStockProduct = {
+            name: 'Weird Stock Product',
+            price: 10,
+            category: '',
+            sku: 'WS-001',
+            variants: [{ name: 'Default', price: 10, sku: 'WS-001-D', stock: 'N/A' }],
+        }
+        mockSaveProduct.mockResolvedValue({ id: 1 })
+        await renderAndWaitForProducts([garbageStockProduct as unknown as typeof BASE_PRODUCT])
+
+        // Stock input (second number input in the row, after Price) renders "0", not "N/A" or blank.
+        expect(document.querySelectorAll('input[type="number"]')[1]).toHaveValue(0)
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+        })
+
+        await waitFor(() => {
+            expect(mockSaveProduct).toHaveBeenCalledOnce()
+        })
+        const saved = mockSaveProduct.mock.calls[0][0]
+        expect(saved.inventory).toBe(0)
+        expect(saved.variants[0].stock).toBe(0)
+    })
 })
 
-describe('BulkCreateModal — review drawer: variant-product Stock input [uniform-fill follow-up]', () => {
+describe('BulkCreateModal — review drawer: variant-product Stock input [TC-F08-04-57 uniform-fill follow-up]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('editing Stock for a variant product fills the same value into every variant; saved inventory is their sum', async () => {
+    it('TC-F08-04-57: editing Stock for a variant product fills the same value into every variant; saved inventory is their sum', async () => {
         const variantProduct = {
             name: 'T-Shirt',
             price: 39.9,

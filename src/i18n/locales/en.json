@@ -1746,7 +1746,7 @@
                     "name": "Product name",
                     "price": "Price (RM)",
                     "stock": "Stock",
-                    "stockFromVariants": "Auto-filled from variants",
+                    "stockFromVariants": "Editing applies this value to every variant",
                     "variants": "Variants",
                     "removeDraft": "Remove draft",
                     "empty": "Product list is empty.",
