@@ -46,8 +46,9 @@ Existing sidebar
 	Dashboard
 	    Analytics tab
 	      Website activity overview (existing tab, updated)
-	      Simple chart (new)
-	      Top pages / products (new)
+	      Traffic: visitors/pageviews (Vercel) + clicks/orders/sales (Payload)
+	      Views + clicks chart (new)
+	      Where visitors come from (Vercel) / Top products (Payload)
 	    SEO tab
 	      SEO Health Overview (existing)
 	      Local SEO card (new)
@@ -65,7 +66,7 @@ Existing sidebar
 
 ## 4. Screen A - Dashboard > Analytics Tab
 
-Purpose: show website activity from PostHog in the existing Analytics tab. This is where sellers see traffic, clicks, and orders.
+Purpose: show website activity in the existing Analytics tab. Two data sources, split by funnel stage — **Vercel Web Analytics** (audience: visitors, pageviews, country/device, referrer) + **Payload analytics** (conversion: clicks, orders, sales, top products). No PostHog, no GA4/GSC. Source of each block noted in `( )` for dev only — never surfaced in UI.
 
 ### Desktop
 
@@ -79,21 +80,22 @@ Analytics                                           [7 days v]
 [Overview] [Analytics *] [SEO]                      existing tabs
 
 +------------------+ +------------------+ +------------------+ +------------------+
-| Visitors         | | Clicks           | | Orders           | | Sales            |
+| Visitors (Vercel)| | Clicks (Payload) | | Orders (Payload) | | Sales (Payload)  |
 | 1,240            | | 86               | | 24               | | RM 2,860         |
 +------------------+ +------------------+ +------------------+ +------------------+
 
 +--------------------------------------+ +------------------------------+
-| Visitors by day                      | | Top pages                    |
-|                                      | | 1. Home              520     |
-|  bar chart, 7 days                   | | 2. Nasi Lemak        184     |
-|                                      | | 3. Contact            76     |
+| Views + clicks by day                | | Top products (Payload)       |
+|                                      | | Nasi Lemak Special  182  21o |
+|  bar chart, 7 days                   | | Teh Tarik Set        94   8o |
+|  views=Vercel · clicks=Payload       | | Kopi Bundle          61   5o |
 +--------------------------------------+ +------------------------------+
 
 +-------------------------------------------------------------+
-| Top products                                                |
-| Nasi Lemak Special        182 views       21 orders          |
-| Teh Tarik Set             94 views        8 orders           |
+| Where visitors come from (Vercel)                           |
+| Country:  MY 78%  ·  SG 11%  ·  Other 11%                    |
+| Device:   Mobile 82%  ·  Desktop 18%                         |
+| Referrer: google 40%  ·  facebook 22%  ·  direct 26%         |
 +-------------------------------------------------------------+
 ```
 
@@ -106,30 +108,29 @@ Dashboard
 Analytics
 [7 days v]
 
-Visitors 1,240
-Clicks 86
-Orders 24
-Sales RM 2,860
+Visitors 1,240          (Vercel)
+Clicks 86               (Payload)
+Orders 24               (Payload)
+Sales RM 2,860          (Payload)
 
-Visitors by day
-[simple bar chart]
+Views + clicks by day
+[simple bar chart]      views=Vercel · clicks=Payload
 
-Top pages
-Home 520
-Nasi Lemak 184
-Contact 76
+Top products            (Payload)
+Nasi Lemak Special  21o
+Teh Tarik Set        8o
 
-Top products
-Nasi Lemak Special
-Teh Tarik Set
+Where visitors come from (Vercel)
+MY 78% · Mobile 82% · google 40%
 ```
 
 ### Rules
 
 - Reuse the existing Analytics tab.
-- Do not show PostHog as a seller-facing brand in UI.
+- Two sources, split by funnel: Vercel = visitors/pageviews/country/device/referrer; Payload = clicks/orders/sales/top products. Each metric has exactly ONE source — never show pageviews from both (two mismatched numbers confuse sellers).
+- Do not show "Vercel", "Payload", or any tool name as a seller-facing brand in UI — source labels here are dev-only.
 - No GA4, Search Console, impressions, average position, or technical analytics terms.
-- Keep one simple chart and two ranked lists.
+- Keep one simple chart and a couple of ranked lists.
 
 ## 5. Screen B - Dashboard > SEO Tab
 
@@ -382,7 +383,7 @@ Do not create seller screens for:
 - `llms.txt`
 - AI crawler rules
 - GBP token refresh
-- PostHog event capture
+- Analytics event capture (Vercel auto / Payload track)
 - Score bucket calculation
 
 Only show these when seller action is needed.
@@ -395,4 +396,4 @@ Only show these when seller action is needed.
 - Show website analytics on existing Dashboard Analytics tab.
 - Show Local SEO on existing Dashboard SEO tab.
 - Show editable business data under Settings > Business Info.
-- Keep PostHog + Google Business Profile only; no GA4/Search Console screen.
+- Analytics sources = Vercel Web Analytics (audience) + Payload analytics (conversion); Google Business Profile for local actions only. No PostHog, no GA4/Search Console screen.

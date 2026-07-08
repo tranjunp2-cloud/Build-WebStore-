@@ -38,13 +38,64 @@ SME seller ở Malaysia xây dựng storefront qua PrimeCommerce nhưng phần l
 
 ---
 
-## 1.5 Analytics Source Decision — PostHog + GBP Only
+## 1.5 Analytics Source Decision — Payload + Vercel + GBP (No PostHog, No GA4/GSC)
 
-Most sellers primarily use platform subdomains like `*.web.ecommercehub.unifi.com.my`, so they cannot reliably own a Search Console property or install seller-owned GA4. F37 must not require GA4 or Google Search Console.
+Most sellers primarily use platform subdomains like `*.web.ecommercehub.unifi.com.my`, so they cannot reliably own a Search Console property or install seller-owned GA4. F37 must not require GA4 or Google Search Console. **PostHog is dropped** — it was never implemented in the repo and would add a dependency for data the platform already owns. F37 combines two sources already present in the stack, split by funnel stage:
 
-**PostHog** = product/website analytics: pageviews, clicks, funnels, session behavior. Repo already has internal analytics collection + `/api/analytics/track`; if `posthog-js` is not present in v2, integrate PostHog in this step and keep internal analytics as fallback/backward compatibility.
+**Payload analytics** (first-party, already live) = **behavior & conversion** (bottom of funnel). Existing `analytics` Payload collection + `/api/analytics/track` + `/api/analytics/summary`, already per-tenant (`tenant` + `site` on every row). Owns commerce events tied to real actions: click, add-to-cart, checkout, **purchase**, top products/pages/blogs. Data lives in our own Neon Postgres — unlimited retention, no external quota.
 
-**Google Business Profile (GBP)** = the only Google integration in F37. It provides local actions sellers understand: calls, directions, and website visits from the Google profile. Google authorization scope is GBP-only: `https://www.googleapis.com/auth/business.manage`.
+**Vercel Web Analytics** (already installed: `@vercel/analytics/next`) = **audience & acquisition** (top of funnel). Queried server-side via the Web Analytics API filtered per-tenant by `route`/`requestPath` (`/sites/[slug]/*`). Owns bot-filtered unique **visitors**, **pageviews**, `country`, `deviceType`, `browserName`, referrer hostname / UTM. Zero data pipeline to maintain.
+
+> **No double-count rule:** each metric has exactly ONE source. Visitors/pageviews/geo/device/referrer → Vercel. Clicks→purchase + top products → Payload. Never show pageview from both (two mismatched numbers confuse low-tech sellers).
+
+**Google Business Profile (GBP)** = the only Google integration in F37. It provides local actions sellers understand: calls, directions, and website visits from the Google profile. Shown in `Dashboard > SEO`, not Analytics. Google authorization scope is GBP-only: `https://www.googleapis.com/auth/business.manage`.
+
+### Metric ownership (authoritative)
+
+| Metric / Card | Source | Where |
+|---|---|---|
+| Unique visitors (bot-filtered) | **Vercel** | Dashboard > Analytics |
+| Pageviews | **Vercel** | Dashboard > Analytics |
+| Country / device / browser breakdown | **Vercel** | Dashboard > Analytics |
+| Traffic sources (referrer hostname, UTM) | **Vercel** | Dashboard > Analytics |
+| Clicks (CTA / links) | **Payload** | Dashboard > Analytics |
+| Add-to-cart / checkout | **Payload** | Dashboard > Analytics |
+| **Purchases** (conversion) | **Payload** | Dashboard > Analytics |
+| Top products / top pages / top blogs | **Payload** | Dashboard > Analytics |
+| Local actions: calls, directions, website visits | **GBP** | Dashboard > SEO |
+
+**Constraints (Vercel API):** aggregate/trend limited to the plan's reporting window (Pro needed for a useful range); one team token sees all sites → **tenant isolation MUST be enforced server-side** (seller A can never query seller B's path); rate-limited → cache responses (reuse the existing summary cache, ~6h like GBP). Payload has none of these limits.
+
+### Final `Dashboard > Analytics` layout (MVP)
+
+Một trang, period switch 7d/30d ở đầu. Mỗi card ghi rõ nguồn để dev không đấu nhầm. Không funnel, không session replay — seller low-tech.
+
+```
+┌─ Dashboard > Analytics ───────────────── [ 7 days | 30 days ] ┐
+│                                                                │
+│  ┌── Traffic (Vercel) ──────────────────────────────────────┐ │
+│  │  👁  Visitors 1,240 ▲12%   📄 Pageviews 3,110 ▲9%        │ │  ← Vercel
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌── Engagement (Payload) ──────────────────────────────────┐ │
+│  │  🖱 Clicks 512   🛒 Add-to-cart 88   ✅ Purchases 21     │ │  ← Payload
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌── Trend chart (views + clicks per day) ──────────────────┐ │
+│  │   ▁▂▃▅▆▇▆▅  views (Vercel pageviews) · clicks (Payload)   │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌─ Where visitors come from (Vercel) ─┐ ┌─ Top products (Payload) ─┐
+│  │ 🌐 Country:  MY 78% · SG 11% · …     │ │ 1. Nasi Lemak Set    42  │
+│  │ 📱 Device:   Mobile 82% · Desktop 18 │ │ 2. Kopi Bundle       31  │
+│  │ 🔗 Referrer: google 40% · fb 22% · … │ │ 3. Roti Combo        19  │
+│  └──────────────────────────────────────┘ └──────────────────────────┘
+│                                                                │
+│  (Local actions — Calls / Directions — sống ở Dashboard > SEO, từ GBP)
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Nguồn từng khối:** Traffic + Country/Device/Referrer + trend "views" = **Vercel**. Engagement (clicks/cart/purchase) + Top products + trend "clicks" = **Payload** (reuse `/api/analytics/summary`). Calls/Directions = **GBP**, nằm ở tab SEO — không nhân đôi sang đây.
 
 ---
 
@@ -63,7 +114,7 @@ F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, th
 
 1. **Dữ liệu nền tảng (P0):** Mở rộng Sites collection với địa chỉ cấu trúc, giờ mở cửa, tọa độ GPS, danh mục kinh doanh — làm nguồn sự thật duy nhất cho toàn bộ tính năng Local SEO. Nâng cấp `generateLocalBusinessSchema()` hiện có để emit đầy đủ geo, openingHoursSpecification, priceRange, areaServed theo chuẩn Schema.org. Mở AI crawlers (hiện đang bị chặn trong `robots.txt/route.ts:53–69`) + thêm toggle opt-out per-seller.
 2. **Business Info + GBP Integration (P1):** Màn `Settings > Business Info` là nơi seller nhập/sửa thông tin kinh doanh và kết nối Google Business Profile. Sau khi connect, hệ thống pull thông tin GBP về cùng màn này để seller review, import và sync lại khi cần.
-3. **Local SEO status in Dashboard (P1):** Không tạo tab Local SEO mới. Reuse tab `Dashboard > SEO` hiện có để hiển thị một card Local SEO đơn giản: điểm 0–100, tối đa 3 việc cần làm, và Google activity từ GBP khi đã connect. Website activity nằm ở `Dashboard > Analytics` qua PostHog.
+3. **Local SEO status in Dashboard (P1):** Không tạo tab Local SEO mới. Reuse tab `Dashboard > SEO` hiện có để hiển thị một card Local SEO đơn giản: điểm 0–100, tối đa 3 việc cần làm, và Google activity từ GBP khi đã connect. Website activity nằm ở `Dashboard > Analytics` (Vercel = visitors/traffic, Payload = clicks→purchase).
 4. **Malaysia Market Optimization (P0/P1):** Bốn đòn bẩy dành riêng cho thị trường MY: (a) Waze deep-link button từ lat/lng — Waze visibility đến 100% qua GBP sync, không cần API riêng; (b) hreflang `en-MY` + `ms-MY` + `x-default` trong `generateMetadata` cho tất cả trang tenant — cả hai ngôn ngữ đều quan trọng do search behavior code-switching tại MY; (c) Halal toggle + `additionalProperty` schema injection — JAKIM là cơ quan duy nhất, toàn bộ e-Cert số hoá từ tháng 5/2025; (d) MY states dropdown (13 tỉnh + 3 vùng liên bang), MYR currency schema, phone format `+60`.
 5. **Auto-Generation & AEO (P0/P1):** Mọi trang tenant storefront PHẢI luôn có metadata SEO đầy đủ ngay cả khi seller để trống — hệ thống tự fallback từ dữ liệu có sẵn (tên trang, tên site, danh mục). Ngoài ra, tự động emit FAQPage JSON-LD từ FAQ block có sẵn để tối ưu cho AI answer engines (ChatGPT, Perplexity, Gemini). Lưu ý: `llms.txt` là một tín hiệu nhỏ và thực nghiệm — các đòn bẩy AEO thực sự là structured data + auto metadata + FAQ. Toàn bộ auto-gen chỉ áp dụng cho `/sites/[slug]/*` (tenant storefront), KHÔNG áp dụng cho platform main site.
 
@@ -81,7 +132,7 @@ F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, th
 - **Actionable Local Checklist:** Checklist "Việc cần làm" seller-facing, tối đa 3 items đang quan trọng nhất, có action rõ ràng. (US-F37-04)
 - **GBP Authorization Integration:** Thêm Google Business Profile API scope vào dedicated Google authorization flow. Seller connect từ `Settings > Business Info`; seller chưa có GBP thì mở link tạo mới trên Google. Không dùng GA4/GSC. (US-F37-05)
 - **GBP Data Sync:** Sync giờ mở cửa và ảnh từ platform lên GBP; pull GBP info về platform để hiển thị. (US-F37-05)
-- **Google Activity in SEO Dashboard:** Hiển thị tối giản trong `Dashboard > SEO`: local actions từ GBP (calls, direction requests, website visits). Website activity từ PostHog nằm trong `Dashboard > Analytics`. Các số liệu nâng cao/chart trend để phase sau nếu seller cần. (US-F37-06)
+- **Google Activity in SEO Dashboard:** Hiển thị tối giản trong `Dashboard > SEO`: local actions từ GBP (calls, direction requests, website visits). Website activity nằm trong `Dashboard > Analytics` (Vercel visitors/traffic + Payload clicks→purchase). Các số liệu nâng cao/chart trend để phase sau nếu seller cần. (US-F37-06)
 - **Business Info Difference Checker:** Validate tên, địa chỉ, số điện thoại giữa Sites collection và GBP data đã kết nối; surface bằng wording dễ hiểu như "Phone number is different", không dùng thuật ngữ NAP trong UI. (US-F37-07)
 - **Auto SEO Metadata Fallback (P0):** Đảm bảo hệ thống mọi trang tenant (page, product, blog) LUÔN render đầy đủ title, meta description, OG tags, canonical — dù seller để trống SEO fields. Tái dụng `generateMetadata()` hiện có trong các route `/sites/[slug]/*`. (US-F37-08)
 - **Auto FAQ + FAQPage JSON-LD (P1, AEO):** Tự động emit FAQPage JSON-LD từ FAQ block có trên trang. Tái dụng generator hiện có trong `src/lib/seo/json-ld.ts`. Cải thiện khả năng được trích dẫn bởi AI answer engines. (US-F37-08)
@@ -115,7 +166,7 @@ F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, th
 | Seller connect GBP | ≥ 30% active sites trong 60 ngày | GBP connected site count / active sites |
 | AI crawlers unblocked | 100% storefronts (mặc định allow) | robots.txt audit |
 | Local metrics load time | < 2s | Timing |
-| Local checklist completion rate | ≥ 40% sellers hoàn thành ≥ 3 items | PostHog / F22 event tracking |
+| Local checklist completion rate | ≥ 40% sellers hoàn thành ≥ 3 items | Payload analytics / F22 event tracking |
 
 ---
 
@@ -138,7 +189,7 @@ SO THAT khách hàng gần đó có thể tìm thấy tôi trên Google Maps, Go
 
 Timeline is tight; GBP authorization is the longest-pole dependency. Split into 2 phases:
 
-- **Phase 1 (P0, No Google authorization):** FR-01,02,03 (data model), FR-04,05,06 (JSON-LD), FR-07,08,09 (crawlers+llms.txt), FR-10,11,12,13 (score+checklist), FR-22,23,24 (auto SEO/AEO), FR-25,27,28 (Waze/Halal/MY states), PostHog web analytics setup if missing.
+- **Phase 1 (P0, No Google authorization):** FR-01,02,03 (data model), FR-04,05,06 (JSON-LD), FR-07,08,09 (crawlers+llms.txt), FR-10,11,12,13 (score+checklist), FR-22,23,24 (auto SEO/AEO), FR-25,27,28 (Waze/Halal/MY states). Analytics = wire Vercel Web Analytics API into `Dashboard > Analytics` alongside existing Payload analytics; Vercel script already installed.
 - **Phase 2 (P1, Requires GBP authorization):** FR-14,15,16 (Google Business Profile connect + sync), FR-17,18,19 (simple GBP metrics), FR-20,21 (business info differences). **PREREQUISITE:** Build GBP-only Google authorization + submit Google verification early (4–6 weeks lead time).
 - **Deferred (P2):** FR-26 hreflang (blocked by client-side i18n — requires F21 URL-based routing).
 
@@ -160,7 +211,8 @@ Timeline is tight; GBP authorization is the longest-pole dependency. Split into 
 | FR-14 | Hệ thống PHẢI BUILD FROM SCRATCH GBP-only Google authorization infrastructure (consent URL builder, callback handler, encrypted token storage, auto-refresh logic, CSRF state validation). Scope duy nhất: `https://www.googleapis.com/auth/business.manage`. Token GBP (access_token, refresh_token, token_expiry) và `gbp_location_id` lưu trên **Sites collection** (per-site, không phải per-tenant) — cho phép seller có nhiều sites, mỗi site kết nối GBP listing riêng. KHÔNG tạo GA4/GSC scopes hoặc Tenant-level Google analytics/search tokens trong F37. | US-F37-05 | P1 | **CRITICAL PREREQUISITE:** Build GBP authorization client. GCP project cần enable GBP API + submit Google verification sớm (~4–6 tuần lead time). Xem Dependencies §14. |
 | FR-15 | `Settings > Business Info` PHẢI có card "Connect Google Business Profile". Click connect dẫn qua Google authorization flow. Seller chưa có GBP → hiển thị link tạo mới tại business.google.com và quay lại connect sau. Không tạo modal connect riêng trong MVP. | US-F37-05 | P1 | <40% SME SE Asia có GBP |
 | FR-16 | Sau khi connect GBP, `Settings > Business Info` PHẢI cho phép seller import thông tin từ Google, review differences, và sync giờ mở cửa từ platform → Google bằng một nút "Sync to Google". | US-F37-05 | P1 | Platform là nguồn sự thật sau khi seller xác nhận |
-| FR-17 | Hệ thống PHẢI dùng PostHog cho website activity trong `Dashboard > Analytics` và GBP Performance API cho local actions trong `Dashboard > SEO`. | US-F37-06 | P1 | Không dùng GA4/GSC |
+| FR-17 | `Dashboard > Analytics` PHẢI hiển thị website activity từ 2 nguồn theo phân vai cố định: **Vercel Web Analytics** (visitors, pageviews, country/device, referrer/UTM) + **Payload analytics** (click, add-to-cart, checkout, purchase, top products). GBP Performance API chỉ cho local actions trong `Dashboard > SEO`. Mỗi metric đúng 1 nguồn (§1.5). | US-F37-06 | P1 | Không dùng GA4/GSC/PostHog |
+| FR-17a | Query Vercel Web Analytics PHẢI chạy server-side, lọc theo `route`/`requestPath` của tenant (`/sites/[slug]/*`), và enforce tenant isolation — seller không bao giờ đọc được data site của seller khác. Cache response (~6h) để tránh rate limit. | US-F37-06 | P1 | 1 Vercel token thấy mọi site → phải lọc ở server |
 | FR-18 | `Dashboard > SEO` PHẢI hiển thị Google activity từ GBP. Khi chưa connect GBP, phần Google hiển thị empty state dẫn về `Settings > Business Info`. | US-F37-06 | P1 | Không build 6-card dashboard trong MVP |
 | FR-19 | Trend chart cho local metrics KHÔNG thuộc MVP UI. API có thể trả dữ liệu theo period để dùng sau, nhưng first UI chỉ cần snapshot 7/30 ngày. | US-F37-06 | P2 | Tránh overengineering cho low-tech SME |
 | FR-20 | Hệ thống PHẢI kiểm tra business info differences: so sánh `name` (site name), `address` (từ localBusiness fields), `phone` (từ contactInfo) giữa Sites record và GBP data đã pull về; surface bằng nội dung cụ thể như "Phone number is different". | US-F37-07 | P1 | Chỉ check khi GBP đã connected |
@@ -196,7 +248,7 @@ Timeline is tight; GBP authorization is the longest-pole dependency. Split into 
 | FR-14 | GBP API là nguồn Google duy nhất cho calls/directions; cần authorization để truy cập data riêng tư của seller |
 | FR-15 | >60% SME SE Asia chưa có GBP → phải hướng dẫn tạo, không chỉ connect |
 | FR-16 | Tránh seller nhập 2 nơi; platform là nguồn sự thật → push 1 chiều lên GBP |
-| FR-17 | PostHog đo website activity trong Analytics; GBP đo local actions từ Google trong SEO. Hai nguồn này đủ cho seller dùng subdomain |
+| FR-17 | Vercel (audience) + Payload (conversion) đo website activity trong Analytics; GBP đo local actions từ Google trong SEO. Đủ cho seller dùng subdomain, không cần GA4/GSC/PostHog |
 | FR-18 | Tập trung metric gắn doanh thu, bỏ vanity → seller hiểu giá trị thật |
 | FR-19 | Thấy xu hướng theo thời gian để biết nỗ lực có hiệu quả không |
 | FR-20 | Business info khác nhau giữa website và Google làm giảm trust; phát hiện tự động bằng wording seller-friendly |
@@ -222,7 +274,7 @@ Timeline is tight; GBP authorization is the longest-pole dependency. Split into 
 | **CF-5** | FR-22 fallback: chưa rõ checkout/orders routes có thuộc `/sites/[slug]/*` không | BOUNDARY / Med | **Implementation verify sớm:** tìm route checkout/orders; nếu nằm trong `/sites/[slug]/*` thì thêm `generateMetadata()`. Đã ghi trong FR-22 |
 | **CF-6** | hreflang (FR-26) phụ thuộc F21 chưa có URL locale routing | DEFERRED / Low | Đã defer P2; F21 nếu làm subpath routing thì báo F37. Không block |
 
-> **Không conflict (đã verify):** Google authorization chỉ phục vụ GBP trong F37, F19 settings form (F37 thêm section mới riêng), F22/PostHog events (tên event mới, không trùng), F36 address (warehouse address ≠ business address — khác level).
+> **Không conflict (đã verify):** Google authorization chỉ phục vụ GBP trong F37, F19 settings form (F37 thêm section mới riêng), F22/Payload analytics events (tên event mới, không trùng), F36 address (warehouse address ≠ business address — khác level).
 
 ---
 
@@ -234,8 +286,8 @@ Timeline is tight; GBP authorization is the longest-pole dependency. Split into 
 - **BR-04:** `aggregateRating` KHÔNG được emit trong LocalBusiness JSON-LD (policy Google 2025–2026). Chỉ emit trên Product và Service schema types.
 - **BR-05:** Token GBP authorization (access_token, refresh_token, token_expiry, location_id) lưu trong **Sites collection**, field group `gbpIntegration` — per-site, không phải per-tenant. Mỗi site kết nối GBP listing riêng. F37 không tạo GSC/GA token. **[RESOLVED: GBP token = Site-level]**
 - **BR-06:** Sync giờ mở cửa từ platform → GBP là one-way push. GBP không phải source of truth cho platform data.
-- **BR-07:** Local SEO Score được tính lại mỗi khi seller save site settings hoặc khi GBP metrics snapshot được refresh (max 1 lần/24h). PostHog website analytics không ảnh hưởng Local SEO Score.
-- **BR-08:** GBP metrics data cache tối đa 6h — Google Business Profile API có quota giới hạn. Hiển thị timestamp "Cập nhật lần cuối: X giờ trước". PostHog dashboard data dùng PostHog/internal analytics source, không qua Google.
+- **BR-07:** Local SEO Score được tính lại mỗi khi seller save site settings hoặc khi GBP metrics snapshot được refresh (max 1 lần/24h). Website analytics (Vercel/Payload) không ảnh hưởng Local SEO Score.
+- **BR-08:** GBP metrics data cache tối đa 6h — Google Business Profile API có quota giới hạn. Hiển thị timestamp "Cập nhật lần cuối: X giờ trước". Website analytics: Payload đọc trực tiếp Neon (không quota); Vercel Web Analytics API cache ~6h vì rate-limited. Không qua Google.
 - **BR-09:** `llms.txt` được generate động tại runtime, không cache lâu dài — đảm bảo luôn phản ánh nội dung mới nhất của seller.
 - **BR-10:** Checklist "Việc cần làm" chỉ hiển thị items chưa hoàn thành. Items đã done tự động ẩn khỏi danh sách (hoặc hiển thị trong "Đã hoàn thành" collapsible section).
 - **BR-11:** Thị trường Malaysia (duy nhất): PostalAddress chuẩn MY (streetAddress, addressLocality = city/town, postalCode 5 chữ số, addressCountry = "MY"). Field `state` dùng dropdown cố định 13 tỉnh + 3 vùng liên bang (FR-28) — không free-text. `telephone` format `+60 12 345 6789`. Schema Offer dùng `priceCurrency="MYR"`.
@@ -628,7 +680,7 @@ THEN  Local SEO card và Google activity cards hiển thị rõ trên mobile
 | **Accessibility** | WCAG 2.1 AA. Metric cards, Business Info form, and checklist items keyboard navigable. | |
 | **Browser Support** | Chrome, Safari, Edge (latest 2 versions). Mobile Safari iOS 16+. | |
 | **Device Support** | Mobile 375px, Tablet 768px, Desktop 1280px+ | |
-| **Data / Privacy** | GBP/PostHog metrics dùng số liệu aggregate theo seller; không expose token hoặc dữ liệu cá nhân trong UI. | |
+| **Data / Privacy** | GBP/Vercel/Payload metrics dùng số liệu aggregate theo seller; không expose token hoặc dữ liệu cá nhân trong UI. Payload IP đã hash SHA-256. | |
 | **Reliability** | GBP API lỗi KHÔNG làm crash dashboard. Graceful fallback về cache hoặc empty state. | |
 | **Quota** | GBP metrics API: max 5 requests/tenant/giờ. Implement request throttling. | Google Business Profile API quota |
 
@@ -651,7 +703,8 @@ THEN  Local SEO card và Google activity cards hiển thị rõ trên mobile
 | `localSEOScore` | `src/lib/seo/local-seo-score.ts` (new) | Pure function tính Local SEO Score từ site data |
 | `businessInfoDiffChecker` | `src/lib/seo/business-info-diff-checker.ts` (new) | So sánh name/address/phone giữa Sites record và GBP data |
 | `gbpClient` | `src/lib/gbp/gbp-client.ts` (new) | GBP API client — fetch insights, sync hours |
-| `posthogClient` | existing/new PostHog integration | Website analytics source for pageviews, clicks, funnels; no GA4/GSC |
+| `vercelAnalyticsClient` | `src/lib/analytics/vercel-client.ts` (new) | Server-side Vercel Web Analytics API query, per-tenant `route` filter + tenant isolation + cache; visitors/pageviews/country/device/referrer |
+| Payload analytics (existing) | `/api/analytics/summary`, `/api/analytics/track`, `src/collections/Analytics.ts` | First-party clicks→purchase + top products; already per-tenant, reuse as-is |
 | `llms.txt route` | `src/app/sites/[slug]/llms.txt/route.ts` (new) | Dynamic llms.txt per-tenant |
 | `robots.txt route` | `src/app/sites/[slug]/robots.txt/route.ts` (modify) | Remove blanket AI crawler block; add per-site toggle logic |
 
@@ -761,7 +814,7 @@ GET  /sites/[slug]/llms.txt
 
 ### 13.5 Codebase Reuse
 
-- **Reuse:** Existing Dashboard SEO tab/content pattern, `DashboardStats.tsx` card pattern, `(dashboard)/settings` route group, existing internal analytics during PostHog migration, `src/lib/seo/json-ld.ts` (extend `generateLocalBusinessSchema()`), `contactInfo`/`socialLinks` trên Sites, `formatPrice()` currency formatter, `generateMetadata()` pattern, existing FAQSchema generator.
+- **Reuse:** Existing Dashboard SEO tab/content pattern, `DashboardStats.tsx` card pattern, `(dashboard)/settings` route group, existing Payload analytics (`/api/analytics/summary`, `AnalyticsView.tsx`, `DashboardStats.tsx`) reused as-is for conversion metrics, `src/lib/seo/json-ld.ts` (extend `generateLocalBusinessSchema()`), `contactInfo`/`socialLinks` trên Sites, `formatPrice()` currency formatter, `generateMetadata()` pattern, existing FAQSchema generator.
 - **New files — GBP authorization:** `src/lib/google/gbp-auth-client.ts`, `/api/google/gbp/auth`, `/api/google/gbp/callback`.
 - **New files — Local SEO:** `src/lib/gbp/gbp-client.ts`, `src/lib/seo/local-seo-score.ts`, `src/lib/seo/business-info-diff-checker.ts`, `src/lib/seo/map-links.ts`, `src/app/sites/[slug]/llms.txt/route.ts`, dashboard card components trong `src/components/dashboard/local-seo/`, settings components trong `src/components/settings/business-info/`, modify `src/app/sites/[slug]/robots.txt/route.ts` để thêm toggle logic.
 - **REUSE (không tạo mới):** `MY_STATES` từ `src/lib/shipping/constants.ts` (F36), `formatPrice()` từ `src/lib/utils.ts`, `generateLocalBusinessSchema()` + `generateFAQSchema()` từ `src/lib/seo/json-ld.ts`, `generateMetadata()` cascading hiện có, `DashboardStats` card pattern. KHÔNG tạo `src/lib/seo/my-states.ts` hay `src/lib/seo/currency.ts`.
@@ -837,7 +890,8 @@ Seller KHÔNG gõ toạ độ. Họ dán link Google Maps → hệ thống tríc
 |-----------|--------|---------------|
 | **GBP Google Authorization (PREREQUISITE)** | **BLOCKED** | **BUILD GBP-ONLY AUTH CLIENT FROM SCRATCH** (`src/lib/google/gbp-auth-client.ts`). No existing GBP auth in codebase. **CRITICAL: Submit Google verification form immediately (~4–6 tuần lead time).** This is the longest-pole dependency; blocks Google Business Profile connect. |
 | Google Business Profile API (My Business API v4) | Pending | Enable trong GCP Console — cùng project; requires successful Google verification |
-| PostHog web analytics | Pending in repo / active project available | Add `posthog-js` Next.js integration if missing; use as website analytics source instead of GA4/GSC |
+| Vercel Web Analytics API | `@vercel/analytics` already installed; API needs Pro plan for useful reporting window | Build server-side query client (`route` filter + tenant isolation + cache); no GA4/GSC/PostHog |
+| Payload analytics | Already live in repo | Reuse `/api/analytics/summary` for conversion metrics; no work beyond wiring into unified Analytics view |
 | Google Maps Geocoding API | Pending (fallback layer) | Enable trong GCP Console — chỉ là lớp fallback 3 của geocoding (§13.9). Phần lớn seller dùng paste-link (lớp 1-2) không tốn quota. $5/1k, free tier phủ phần lớn. |
 | F03 Dashboard Suite (existing SEO dashboard, existing generateMetadata) | Done | Reuse existing Dashboard > SEO surface; do not add a separate dashboard tab |
 | F02 Auth (Tenants, session) | Done | |
@@ -897,7 +951,7 @@ Response: {
 
 > Không còn open question — tất cả đã chốt thành decision:
 > - **#1 GBP authorization verification timeline** → Dependencies: submit verification sớm (~4–6 tuần lead time)
-> - **#2 Google activity fields** → MVP chỉ hiển thị Calls, Directions, Website visits từ GBP trong SEO; website activity nằm ở Dashboard > Analytics qua PostHog
+> - **#2 Google activity fields** → MVP chỉ hiển thị Calls, Directions, Website visits từ GBP trong SEO; website activity nằm ở Dashboard > Analytics (Vercel + Payload)
 > - **#3 Geocoding** → RESOLVED: seller dán link Google Maps → trích lat/lng 3 lớp; Geocoding API chỉ là fallback (§13.9)
 > - **#4 Multi-site GBP token scope** → token + location_id per-Site (FR-14, BR-05, §13.2)
 > - **#5 Local SEO Score Phase 1 (CF-4)** → RESOLVED: normalize trên bucket áp dụng; Phase 1 đạt 100; Phase 2 signals unlock later (§13.8)
@@ -933,7 +987,7 @@ Response: {
 - [ ] GBP API đã được enable trong GCP Console (hoặc test account setup)
 - [ ] Architecture doc exists: `docs/architecture/F37-local-seo.md`
 - [ ] Schema migration entries drafted và review bởi Dev lead
-- [ ] Dependencies confirmed (PostHog tracking, GBP API access)
+- [ ] Dependencies confirmed (Vercel Web Analytics API + Pro plan, Payload analytics live, GBP API access)
 
 ---
 

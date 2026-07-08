@@ -296,7 +296,7 @@ flowchart TD
       <!-- FLOW 6 -->
       <div class="section" id="flow6">
         <div class="section-head"><h2>Luồng 6 — Kết nối Google Business Profile</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> GBP là nguồn Google cho cuộc gọi, chỉ đường và website visits từ Google profile. Website analytics dùng PostHog. Đây là blocker của Luồng 7/8/9 → vì vậy dời sang Phase 2.</div>
+        <div class="why"><b>🎯 Tại sao:</b> GBP là nguồn Google cho cuộc gọi, chỉ đường và website visits từ Google profile. Website analytics dùng Vercel (audience) + Payload (conversion). Đây là blocker của Luồng 7/8/9 → vì vậy dời sang Phase 2.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-05</span></div>
         <div class="note"><b>⚠️ Tiền đề quan trọng:</b> codebase chưa có GBP authorization — phải build từ đầu (consent builder, callback, token store mã hoá, auto-refresh, CSRF). Scope chỉ có business.manage. Cần Google verification (~4–6 tuần).</div>
         <div class="card" style="margin-top:14px"><div class="diagram"><pre class="mermaid">
@@ -334,12 +334,12 @@ flowchart TD
       <!-- FLOW 8 -->
       <div class="section" id="flow8">
         <div class="section-head"><h2>Luồng 8 — Local Performance trong Dashboard &gt; SEO</h2></div>
-        <div class="why"><b>🎯 Tại sao:</b> seller cần số liệu dễ hiểu: website activity từ PostHog, Google activity từ GBP. Không dùng GA4/GSC vì phần lớn seller dùng platform subdomain.</div>
+        <div class="why"><b>🎯 Tại sao:</b> seller cần số liệu dễ hiểu: website activity từ Vercel (visitors/traffic) + Payload (clicks→purchase), Google activity từ GBP. Không dùng GA4/GSC/PostHog vì phần lớn seller dùng platform subdomain.</div>
         <div class="badges"><span class="badge actor">👤 Seller</span><span class="badge p2">Phase 2 · P1</span><span class="badge story">US-F37-06</span></div>
         <div class="card"><div class="diagram"><pre class="mermaid">
 flowchart TD
     A["Vào Dashboard → SEO"] --> B["Skeleton shimmer"]
-    B --> C["Load website activity từ PostHog"]
+    B --> C["Website activity ở tab Analytics<br/>(Vercel + Payload)"]
     B --> D{"GBP connected?"}
     D -->|"Chưa"| E["Google activity empty state<br/>→ mở Business Info"]
     D -->|"Rồi"| F{"GBP cache < 6h?"}
