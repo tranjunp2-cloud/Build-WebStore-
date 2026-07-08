@@ -60,7 +60,7 @@ export interface CompactEditorLayoutProps {
     onBlockUpdate: (index: number, changes: Record<string, unknown>) => void
     onHeaderUpdate: (changes: Record<string, unknown>) => void
     onFooterUpdate: (changes: Record<string, unknown>) => void
-    onSiteSettingsChange: (changes: Partial<SiteData>) => void | Promise<void>
+    onSiteSettingsChange: (changes: Partial<SiteData>) => void | boolean | Promise<void | boolean>
     onPageUpdate: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
 
     // F05 FR-3x: bottom bar → 4-tab Tools sheet (bsChat/bsSite unified) + empty-page FAB.

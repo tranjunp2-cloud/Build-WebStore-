@@ -13,6 +13,7 @@
  */
 
 import type { BusinessSample } from './content/types'
+import { schemaTypeFor, deriveDefaultPriceRange } from '@/lib/seo/schema-helpers'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -58,30 +59,6 @@ export interface FaqPageSchema {
 
 export type JsonLdSchema = LocalBusinessSchema | FaqPageSchema
 
-// ── Category → @type mapping ────────────────────────────────────────────────
-
-/**
- * Map composer category to schema.org @type. Defaults to LocalBusiness
- * for unknown categories — Google accepts this as a generic fallback.
- */
-function schemaTypeFor(category: string): LocalBusinessSchema['@type'] {
-  switch (category.toLowerCase()) {
-    case 'restaurant':
-    case 'fnb':
-      return 'Restaurant'
-    case 'health':
-      return 'MedicalClinic'
-    case 'education':
-      return 'EducationalOrganization'
-    case 'ecommerce':
-      return 'Store'
-    case 'beauty':
-      return 'BeautySalon'
-    default:
-      return 'LocalBusiness'
-  }
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /**
@@ -102,28 +79,6 @@ function parseAddress(raw: string | undefined): LocalBusinessSchema['address'] {
   return result
 }
 
-/**
- * Derive a priceRange hint from the category. Purely heuristic — real
- * pricing data isn't available at gen time.
- */
-function defaultPriceRange(category: string): string | undefined {
-  switch (category.toLowerCase()) {
-    case 'restaurant':
-    case 'fnb':
-      return '$$'
-    case 'health':
-    case 'realestate':
-      return '$$$'
-    case 'beauty':
-    case 'fitness':
-      return '$$'
-    case 'tech':
-      return '$$$'
-    default:
-      return undefined
-  }
-}
-
 // ── Public builders ─────────────────────────────────────────────────────────
 
 /**
@@ -140,7 +95,7 @@ export function buildLocalBusinessJsonLd(args: {
   const { biz, category, siteUrl, heroImageUrl } = args
   const schema: LocalBusinessSchema = {
     '@context': 'https://schema.org',
-    '@type': schemaTypeFor(category),
+    '@type': schemaTypeFor(category) as LocalBusinessSchema['@type'],
     name: biz.name,
   }
 
@@ -153,7 +108,7 @@ export function buildLocalBusinessJsonLd(args: {
   const address = parseAddress(biz.address)
   if (address) schema.address = address
 
-  const priceRange = defaultPriceRange(category)
+  const priceRange = deriveDefaultPriceRange(category)
   if (priceRange) schema.priceRange = priceRange
 
   // Restaurant-specific: derive cuisines from user products (Phase 01 mapper
