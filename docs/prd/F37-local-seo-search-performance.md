@@ -302,7 +302,7 @@ Timeline is tight; GBP authorization is the longest-pole dependency. Split into 
 
 ## 9. User Flow
 
-> Current wireframe: [`docs/design/F37-local-seo-wireframes.md`](../design/F37-local-seo-wireframes.md) and [`docs/design/F37-local-seo-wireframes.html`](../design/F37-local-seo-wireframes.html). This section shows the primary happy-path flows.
+> Current wireframe: [`docs/design/F37-local-seo-wireframes.md`](../design/F37-local-seo-wireframes.md). This section shows the primary happy-path flows.
 
 ### Flow A: Seller thiết lập Local Business Data (P0 - Happy Path)
 
@@ -374,7 +374,7 @@ Click checklist item → đi tới `Settings > Business Info` hoặc quick fix
   - **Next steps:** tối đa 3 items, ví dụ "Add opening hours", "Connect Google Business Profile", "Review phone number".
   - **Google activity:** GBP metrics sau khi connect: Calls, Directions, Website visits. Empty state dẫn về `Settings > Business Info`.
 - **Empty State:** Nếu thiếu business info, card dẫn seller tới `Settings > Business Info`.
-- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md` và `docs/design/F37-local-seo-wireframes.html`
+- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md`
 
 ### 10.2. Settings > Business Info
 
@@ -386,7 +386,7 @@ Click checklist item → đi tới `Settings > Business Info` hoặc quick fix
   - **Address:** street, city, state dropdown 13 states + 3 federal territories MY, postcode, country default Malaysia.
   - **Opening hours:** 7-day table with closed toggle and open/close time.
   - **Service area + Halal:** service area example "Kuala Lumpur, Petaling Jaya, Shah Alam"; Halal Certified toggle + optional JAKIM cert number.
-- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md` và `docs/design/F37-local-seo-wireframes.html`
+- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md`
 
 ### 10.3. Connected Google State
 
