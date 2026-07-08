@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, X, ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { saveProductAction } from '@/app/(dashboard)/products/actions'
 import { useI18n } from '@/i18n'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { Input } from '@/components/ui/input'
 
 import { getOrCreateCrateCartonIdAction } from '@/app/(dashboard)/actions/media'
 import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/products/categories/actions'
@@ -21,7 +22,10 @@ interface VariantPayload {
 
 interface ParsedProduct {
     _id?: string // for grid keys
-    selected: boolean
+    // No longer read — the review drawer removes an unwanted draft outright (removeProduct)
+    // instead of a select/deselect checkbox. Left optional rather than deleted so existing
+    // callers/fixtures that still set it don't need updating.
+    selected?: boolean
     name: string
     price: number
     compareAtPrice?: number
@@ -31,6 +35,10 @@ interface ParsedProduct {
     seoDescription?: string
     slug?: string
     sku?: string
+    // Editable in the review drawer for non-variant products only — for products with variants,
+    // the server recomputes `inventory` as the sum of variant stocks (Products.ts beforeChange
+    // hook), so this value is ignored/overwritten and the field is shown disabled instead.
+    stock?: number
     weight?: number
     length?: number
     width?: number
@@ -97,6 +105,15 @@ export function sanitizeXSS(text: string) {
     if (!text) return text;
     let safe = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
     return safe.replace(/<[^>]*>?/gm, '').trim();
+}
+
+// Untrusted AI output — a malformed/omitted numeric field parses to NaN via `Number(v)`, and
+// `NaN ?? fallback` does NOT catch it (NaN is neither null nor undefined, unlike what `??`
+// checks for), so a bare `Number(v ?? fallback)` still lets a raw NaN through into a
+// controlled <input type="number">. Coerce with an explicit finiteness check instead.
+function coerceFiniteNumber(value: unknown, fallback = 0): number {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : fallback
 }
 
 export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | number | null, categoryId: string | number | null, defaultVariantName: string = 'Default') {
@@ -175,10 +192,15 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         variants: hasVariants ? safeVariants!.map(v => ({
             name: sanitizeXSS(v.name || defaultVariantName),
             price: Number(v.price || prod.price) || 0,
-            stock: Number(v.stock ?? 0),
+            stock: coerceFiniteNumber(v.stock),
             sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
         })) : undefined,
-        inventory: 0, // Out of stock by default until the merchant confirms real stock; mapped to `inventory` in schema
+        // Server recomputes this as the sum of variant stocks for hasVariants products anyway
+        // (Products.ts beforeChange hook overrides whatever is sent) — computed here too so the
+        // payload is internally consistent with what the review drawer displayed (Stock there
+        // edits every variant uniformly; base "inventory" = sum, matching VariantsInventorySection's
+        // `setValue('baseInventory', total)` convention in the manual Add/Edit Product form).
+        inventory: hasVariants ? safeVariants!.reduce((sum, v) => sum + coerceFiniteNumber(v.stock), 0) : coerceFiniteNumber(prod.stock),
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
     }
 }
@@ -238,7 +260,10 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                             const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ');
                             const key = truncatedName.toLowerCase();
                             if (!uniqueMap.has(key)) {
-                                uniqueMap.set(key, { ...v, name: truncatedName });
+                                // Same untrusted-AI-input coercion as the top-level price/stock below —
+                                // fixed here (parse time) so the drawer's per-variant Stock display
+                                // (variants[0].stock) and buildSavePayload both see a clean value.
+                                uniqueMap.set(key, { ...v, name: truncatedName, stock: coerceFiniteNumber(v.stock) });
                             }
                         });
                         cleanedVariants = Array.from(uniqueMap.values());
@@ -249,6 +274,13 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         _id: Math.random().toString(36).substring(2, 11),
                         selected: true,
                         category: p.category || '',
+                        // Untrusted AI output — the prompt asks for "0 if not specified", but the
+                        // model can still omit/malform this on unparseable input (e.g. gibberish
+                        // with no price/stock mentioned). Coerce here (not just later in
+                        // buildSavePayload) so the review drawer's <input type="number"> never
+                        // receives a raw non-numeric value as `value`.
+                        price: coerceFiniteNumber(p.price),
+                        stock: coerceFiniteNumber(p.stock),
                     };
                 });
                 setProducts(initProducts)
@@ -269,8 +301,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     }
 
     const handleSave = async () => {
-        const selectedProducts = products.filter(p => p.selected)
-        if (selectedProducts.length === 0) {
+        if (products.length === 0) {
             toast.error(t.dashboard?.products?.bulkCreate?.saveEmptyError || 'Please select at least 1 product')
             return
         }
@@ -295,7 +326,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                 console.warn('Could not fetch categories', err)
             }
 
-            for (const prod of selectedProducts) {
+            for (const prod of products) {
                 // Determine Category Mapping
                 let categoryId: string | number | null = null
                 if (prod.category) {
@@ -380,8 +411,19 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         setProducts(prev => prev.map(p => p._id === id ? { ...p, [field]: value } : p))
     }
 
-    const toggleSelectAll = (checked: boolean) => {
-        setProducts(prev => prev.map(p => ({ ...p, selected: checked })))
+    // Stock for a variant product is edited here as one shared value distributed to every
+    // variant — this drawer has no per-variant matrix (that's ProductForm's job), so a single
+    // input filling all variants uniformly is the only stock input available at this stage.
+    // The product's own `inventory` is then derived server-side as the sum of variant stocks
+    // (Products.ts beforeChange hook), matching the manual Add/Edit Product form's convention.
+    const updateAllVariantsStock = (id: string, stock: number) => {
+        setProducts(prev => prev.map(p =>
+            p._id === id ? { ...p, variants: p.variants.map(v => ({ ...v, stock })) } : p
+        ))
+    }
+
+    const removeProduct = (id: string) => {
+        setProducts(prev => prev.filter(p => p._id !== id))
     }
 
     const handleClose = () => {
@@ -392,7 +434,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         onClose()
     }
 
-    const selectedCount = products.filter(p => p.selected).length
+    const draftCount = products.length
 
     if (!mounted) return null
 
@@ -404,156 +446,158 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         // itself), silently falling back to Tailwind's flat bg-black/60 (0.6) in both themes.
         <div className="dash-shell">
         <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 backdrop-blur-sm antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
         >
-            <div className="flex flex-col max-h-[90vh] w-full max-w-[896px] rounded-[24px] bg-[#1E293B] shadow-2xl border border-white/[0.08] overflow-hidden">
-                {/* Header Container 30963:11535 */}
-                <div className="flex flex-col gap-1 p-[24px_24px_24px_24px] border-b border-white/[0.08]">
-                    {/* Header Row */}
-                    <div className="flex items-center gap-[10px]">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10 2L12.5 8.5L19 11L12.5 13.5L10 20L7.5 13.5L1 11L7.5 8.5L10 2Z" stroke="#2DD4BF" strokeWidth="2" strokeLinejoin="round"/>
-                            <path d="M19 2L20.25 5.25L23.5 6.5L20.25 7.75L19 11L17.75 7.75L14.5 6.5L17.75 5.25L19 2Z" fill="#FBBF24"/>
-                        </svg>
-                        <h2 className="text-[20px] font-bold text-[#F8FAFC]">
-                            {t.dashboard?.products?.bulkCreate?.title || 'Confirm Create Products (AI Preview)'}
-                        </h2>
+            {/* Design-system tokens (not the design mockup's raw hex) — bg/border/text/focus all
+                resolve to the same --card/--border/--muted-foreground/--ring vars used by the
+                shared <Input> and every other dashboard form (ProductForm, discount-form). */}
+            <div className="flex flex-col max-h-[82vh] w-full max-w-[720px] rounded-t-[18px] bg-[hsl(var(--card))] shadow-2xl border border-solid border-[hsl(var(--border))] border-b-0 overflow-hidden">
+                {/* Header — drawer style: title + subtitle (left), close button (right) */}
+                <div className="flex items-start justify-between gap-3 p-[18px_22px_14px] border-b border-solid border-[hsl(var(--border))]/30">
+                    <div className="flex flex-col gap-[3px]">
+                        <div className="flex items-center gap-[9px]">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2L12.5 8.5L19 11L12.5 13.5L10 20L7.5 13.5L1 11L7.5 8.5L10 2Z" stroke="#2DD4BF" strokeWidth="2" strokeLinejoin="round"/>
+                                <path d="M19 2L20.25 5.25L23.5 6.5L20.25 7.75L19 11L17.75 7.75L14.5 6.5L17.75 5.25L19 2Z" fill="#FBBF24"/>
+                            </svg>
+                            <h2 className="text-[15px] font-bold text-[hsl(var(--foreground))]">
+                                {t.dashboard?.products?.bulkCreate?.title || 'Review AI drafts'}
+                            </h2>
+                        </div>
+                        <p className="text-[12px] text-[hsl(var(--muted-foreground))]">
+                            {t.dashboard?.products?.bulkCreate?.subtitle || 'Edit anything before adding these to your store. Nothing is published yet.'}
+                        </p>
                     </div>
-                    {/* Description */}
-                    <p className="text-[14px] text-dash-text-muted">
-                        {t.dashboard?.products?.bulkCreate?.subtitle || 'Review and edit before saving'}
-                    </p>
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        disabled={isSaving}
+                        className="shrink-0 p-1.5 rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label={t.dashboard?.products?.bulkCreate?.cancel || 'Close'}
+                    >
+                        <X className="w-[18px] h-[18px]" />
+                    </button>
                 </div>
 
-                {/* Body Container 30963:11547 */}
-                <div className="flex-1 overflow-y-auto px-[24px] pt-[24px] pb-6 flex flex-col">
+                {/* Body — drawer-style scrollable draft list */}
+                <div className="flex-1 overflow-y-auto px-[24px] pt-[18px] pb-6 flex flex-col">
                     {isParsing ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <Loader2 className="w-10 h-10 animate-spin text-teal-400" />
-                            <p className="text-dash-text-muted text-[14px] font-medium">{t.dashboard?.products?.bulkCreate?.aiWorking || 'AI magic is working...'}</p>
+                            <Loader2 className="w-10 h-10 animate-spin text-[hsl(var(--ring))]" />
+                            <p className="text-[hsl(var(--muted-foreground))] text-[14px] font-medium">{t.dashboard?.products?.bulkCreate?.aiWorking || 'AI magic is working...'}</p>
                         </div>
                     ) : (
                         <>
-                            {/* Table Container 30963:11548 */}
-                            <div className="rounded-2xl bg-black/[0.04] dark:bg-[#0B1120]/30 overflow-hidden shrink-0">
-                                <table className="w-full text-left border-collapse table-fixed">
-                                    {/* Table Header 30963:11550 */}
-                                    <thead className="bg-black/[0.06] dark:bg-[#0B1120]/60 h-[48px]">
-                                        <tr>
-                                            <th className="w-[48px] align-middle text-center pl-2">
-                                                <label className="relative flex items-center justify-center cursor-pointer w-[14px] h-[14px]">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={products.length > 0 && products.every(p => p.selected)}
-                                                        onChange={(e) => toggleSelectAll(e.target.checked)}
-                                                        className="peer sr-only"
-                                                    />
-                                                    <div className="w-[14px] h-[14px] rounded-[3px] border border-white/20 bg-[#1E293B] peer-checked:bg-[#93C5FD] peer-checked:border-[#93C5FD] flex items-center justify-center transition-colors">
-                                                        {(products.length > 0 && products.every((p) => p.selected)) && (
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-[10px] h-[10px] text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                </label>
-                                            </th>
-                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[110px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.name || 'NAME'}</th>
-                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[90px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.price || 'PRICE'}</th>
-                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[70px] md:w-auto px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.variants || 'VARIANTS'}</th>
-                                        </tr>
-                                    </thead>
-                                    {/* Table Body 30963:11560 */}
-                                    <tbody>
-                                        {products.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={4} className="h-[62px] text-center text-dash-text-muted text-[14px]">
-                                                    {t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}
-                                                </td>
-                                            </tr>
-                                        ) : products.map((p) => {
-                                            // Calculate approximate lines for textarea auto-sizing (assuming ~15 chars per line on mobile 110px width)
-                                            const nameLines = Math.max(1, Math.ceil((p.name.length || 1) / 14));
-                                            
-                                            return (
-                                                <tr key={p._id} className="h-[64px] border-t border-white/[0.04]">
-                                                    <td className="w-[48px] align-middle text-center pl-2">
-                                                        <label className="relative flex items-center justify-center cursor-pointer w-[14px] h-[14px]">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={p.selected}
-                                                                onChange={(e) => updateProduct(p._id!, 'selected', e.target.checked)}
-                                                                className="peer sr-only"
-                                                            />
-                                                            <div className="w-[14px] h-[14px] rounded-[3px] border border-white/20 bg-[#1E293B] peer-checked:bg-[#93C5FD] peer-checked:border-[#93C5FD] flex items-center justify-center transition-colors">
-                                                                {p.selected && (
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-[10px] h-[10px] text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                        </label>
-                                                    </td>
-                                                    <td className="align-middle px-2 py-3">
-                                                        <textarea
-                                                            value={p.name}
-                                                            onChange={(e) => updateProduct(p._id!, 'name', e.target.value)}
-                                                            rows={nameLines}
-                                                            className="w-[calc(100%-4px)] md:w-full min-h-[36px] bg-[#1E293B] border border-white/[0.08] rounded-xl px-3 py-2 text-[13px] md:text-[14px] text-[#F8FAFC] placeholder-gray-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-colors resize-none overflow-hidden"
-                                                            style={{ height: `${Math.max(36, nameLines * 20 + 16)}px` }}
-                                                        />
-                                                    </td>
-                                                    <td className="align-middle px-2">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            value={p.price}
-                                                            onChange={(e) => updateProduct(p._id!, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
-                                                            className="w-[calc(100%-4px)] md:w-full h-[36px] bg-[#1E293B] border border-white/[0.08] rounded-xl px-3 py-2 text-[13px] md:text-[14px] text-[#F8FAFC] placeholder-gray-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-colors"
-                                                        />
-                                                    </td>
-                                                    <td className="align-middle px-2">
-                                                        <div className="text-[12px] md:text-[14px] text-dash-text-muted max-w-[60px] md:max-w-full truncate break-words whitespace-normal leading-tight">
-                                                            {p.variants?.length ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                            {/* Draft cards — one per AI-generated product, matching the design's
+                                drawer draft-card pattern (thumbnail + editable fields + remove).
+                                Colors/borders/inputs use the same design-system tokens as every
+                                other dashboard form (--border, --muted-foreground, shared <Input>),
+                                not the design mockup's own one-off hex palette. */}
+                            <div className="flex flex-col gap-3 shrink-0">
+                                {products.length === 0 ? (
+                                    <div className="h-[62px] flex items-center justify-center text-center text-[hsl(var(--muted-foreground))] text-[13px] rounded-xl border border-solid border-[hsl(var(--border))]">
+                                        {t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}
+                                    </div>
+                                ) : products.map((p) => {
+                                    const hasVariants = Boolean(p.variants?.length)
 
-                            {/* Note Container 30963:11573 */}
-                            {products.length > 0 && (
-                                <div className="rounded-2xl bg-teal-400/5 border border-teal-400/20 p-4 mt-6 shrink-0">
-                                    <p className="text-[14px] leading-snug">
-                                        <span className="font-bold text-[#2DD4BF]">{t.dashboard?.products?.bulkCreate?.note?.label || 'Note: '}</span>
-                                        <span className="text-dash-text-muted">{t.dashboard?.products?.bulkCreate?.note?.description || 'Products will be saved as Draft'}</span>
-                                    </p>
-                                </div>
-                            )}
+                                    return (
+                                        <div key={p._id} className="flex gap-3 items-start rounded-xl border border-solid border-[hsl(var(--border))] p-3">
+                                            <div className="shrink-0 w-[52px] h-[52px] rounded-[10px] bg-[hsl(var(--muted))] flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+                                                <ImageIcon className="w-5 h-5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                                <div className="flex gap-2 text-[10px] text-[hsl(var(--muted-foreground))]">
+                                                    <span className="flex-1">{t.dashboard?.products?.bulkCreate?.table?.name || 'Product name'}</span>
+                                                    <span className="w-[72px] md:w-[100px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.price || 'Price (RM)'}</span>
+                                                    <span className="w-[64px] md:w-[72px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.stock || 'Stock'}</span>
+                                                    <span className="hidden md:block w-[110px] shrink-0">{t.dashboard?.products?.bulkCreate?.table?.variants || 'Variants'}</span>
+                                                </div>
+                                                <div className="flex gap-2 items-start">
+                                                    {/* Single-line input, matching the design reference (ai-bulk-create.html
+                                                        uses <input class="f-name">, not a textarea) — guarantees this field
+                                                        is always the same fixed height as Price/Stock/Variants next to it;
+                                                        a long name scrolls horizontally within the box rather than
+                                                        wrapping/growing the row. */}
+                                                    <Input
+                                                        type="text"
+                                                        value={p.name}
+                                                        onChange={(e) => updateProduct(p._id!, 'name', e.target.value)}
+                                                        className="flex-1 min-w-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                    />
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        value={p.price}
+                                                        onChange={(e) => updateProduct(p._id!, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
+                                                        className="w-[72px] md:w-[100px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                    />
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        // For a variant product this drawer has no per-variant matrix (that's
+                                                        // ProductForm's job) — so Stock is one shared value distributed to
+                                                        // every variant uniformly on edit. Displays the first variant's own
+                                                        // stock (not a sum) since that's what re-editing this field would
+                                                        // apply everywhere. The AI parse prompt instructs stock:0 uniformly
+                                                        // across variants (route.ts), but that's not an enforced constraint —
+                                                        // the tooltip is explicit about the "applies to every variant"
+                                                        // semantics so a non-uniform AI response is never misread as a total.
+                                                        value={hasVariants ? (p.variants[0]?.stock ?? 0) : (p.stock ?? 0)}
+                                                        onChange={(e) => {
+                                                            const next = Math.max(0, parseInt(e.target.value, 10) || 0)
+                                                            if (hasVariants) updateAllVariantsStock(p._id!, next)
+                                                            else updateProduct(p._id!, 'stock', next)
+                                                        }}
+                                                        title={hasVariants ? (t.dashboard?.products?.bulkCreate?.table?.stockFromVariants || 'Editing applies this value to every variant') : undefined}
+                                                        className="w-[64px] md:w-[72px] shrink-0 h-8 px-2.5 py-1.5 text-[12.5px]"
+                                                    />
+                                                    <div className="hidden md:block w-[110px] shrink-0 self-center text-[12px] text-[hsl(var(--muted-foreground))] truncate">
+                                                        {hasVariants ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeProduct(p._id!)}
+                                                className="shrink-0 p-1.5 rounded-lg text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                                aria-label={t.dashboard?.products?.bulkCreate?.table?.removeDraft || 'Remove draft'}
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </>
                     )}
                 </div>
 
-                {/* Footer Container 30963:11576 */}
-                <div className="flex w-full gap-[12px] p-[24px_24px_24px_24px] border-t border-white/[0.08]">
-                    <button
-                        onClick={handleClose}
-                        disabled={isSaving}
-                        className="flex-1 h-[50px] rounded-2xl bg-transparent border border-solid border-[#F8FAFC]/30 text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {t.dashboard?.products?.bulkCreate?.cancel || 'Cancel'}
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving || isParsing || selectedCount === 0}
-                        className="flex-1 h-[50px] rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-[16px] font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        {t.dashboard?.products?.bulkCreate?.saveButton || 'Save'} {selectedCount} {t.dashboard?.products?.bulkCreate?.productsItem || 'Products'}
-                    </button>
+                {/* Footer — drawer style: draft count (left), Discard/Approve All (right) */}
+                <div className="flex w-full items-center justify-between gap-3 p-[18px_24px_18px] border-t border-solid border-[hsl(var(--border))]/30">
+                    <span className="text-[13px] text-[hsl(var(--muted-foreground))]">
+                        {draftCount === 1
+                            ? (t.dashboard?.products?.bulkCreate?.draftCountOne || '1 draft')
+                            : (t.dashboard?.products?.bulkCreate?.draftCountMany?.replace('{count}', draftCount.toString()) || `${draftCount} drafts`)}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleClose}
+                            disabled={isSaving}
+                            className="h-[42px] px-5 rounded-2xl bg-transparent border border-solid border-[hsl(var(--border))] text-[14px] font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {t.dashboard?.products?.bulkCreate?.discard || 'Discard'}
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving || isParsing || draftCount === 0}
+                            className="h-[42px] px-5 rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-[14px] font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                            {t.dashboard?.products?.bulkCreate?.approveAll || 'Approve All'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

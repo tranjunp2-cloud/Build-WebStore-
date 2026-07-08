@@ -1705,8 +1705,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Sahkan Pembuatan Produk (Pratonton AI)",
-                "subtitle": "Semak dan sunting sebelum menyimpan",
+                "title": "Semak draf AI",
+                "subtitle": "Sunting apa-apa sebelum menambah ke kedai anda. Belum ada yang diterbitkan.",
                 "promptLabel": "Gesaan / Senarai Item",
                 "promptPlaceholder": "Contoh: 2 capybara coklat rantai kunci $15, 1 selipar merah saiz M $5...",
                 "parseEmptyError": "Sila masukkan penerangan senarai produk",
@@ -1732,24 +1732,25 @@
                 "unsavedWarning": "Anda mempunyai data yang belum disimpan. Menutup akan membuang semua perubahan. Adakah anda pasti?",
                 "stayButton": "Kekal",
                 "exitButton": "Keluar",
-                "saveButton": "Simpan",
-                "productsItem": "Produk",
-                "saveEmptyError": "Sila pilih sekurang-kurangnya 1 produk untuk disunting",
+                "discard": "Buang",
+                "approveAll": "Luluskan Semua",
+                "draftCountOne": "1 draf",
+                "draftCountMany": "{count} draf",
+                "saveEmptyError": "Tiada draf untuk disimpan",
                 "saveSuccessOne": "Telah dibina 1 produk draf. Sila isikan imej sebelum menyiarkannya.",
                 "saveSuccessMany": "Telah dibina {count} produk draf. Sila isikan imej sebelum menyiarkannya.",
                 "saveFailed": "Gagal melakar produk",
                 "saveError": "Kesalahan menyimpan produk",
                 "aiWorking": "AI sedang memproses...",
                 "table": {
-                    "name": "NAMA",
-                    "price": "HARGA",
-                    "variants": "VARIAN",
+                    "name": "Nama produk",
+                    "price": "Harga (RM)",
+                    "stock": "Stok",
+                    "stockFromVariants": "Menyunting menetapkan nilai ini kepada setiap varian",
+                    "variants": "Varian",
+                    "removeDraft": "Buang draf",
                     "empty": "Senarai produk kosong.",
                     "defaultVariant": "Lalai"
-                },
-                "note": {
-                    "label": "Nota: ",
-                    "description": "Produk akan disimpan sebagai Draf"
                 },
                 "toast": {
                     "invalidFormat": "Format produk yang diterima daripada AI tidak sah",

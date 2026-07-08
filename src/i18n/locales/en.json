@@ -1705,8 +1705,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Confirm Create Products (AI Preview)",
-                "subtitle": "Review and edit before saving",
+                "title": "Review AI drafts",
+                "subtitle": "Edit anything before adding these to your store. Nothing is published yet.",
                 "promptLabel": "Prompt / Item List",
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
@@ -1732,24 +1732,25 @@
                 "unsavedWarning": "You have unsaved data. Closing will discard all changes. Are you sure?",
                 "stayButton": "Stay",
                 "exitButton": "Exit",
-                "saveButton": "Save",
-                "productsItem": "Products",
-                "saveEmptyError": "Please select at least 1 product to save",
+                "discard": "Discard",
+                "approveAll": "Approve All",
+                "draftCountOne": "1 draft",
+                "draftCountMany": "{count} drafts",
+                "saveEmptyError": "No drafts to save",
                 "saveSuccessOne": "Created 1 draft product. Please add images before publishing.",
                 "saveSuccessMany": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
                 "saveError": "Error saving products",
                 "aiWorking": "AI magic is working...",
                 "table": {
-                    "name": "NAME",
-                    "price": "PRICE",
-                    "variants": "VARIANTS",
+                    "name": "Product name",
+                    "price": "Price (RM)",
+                    "stock": "Stock",
+                    "stockFromVariants": "Editing applies this value to every variant",
+                    "variants": "Variants",
+                    "removeDraft": "Remove draft",
                     "empty": "Product list is empty.",
                     "defaultVariant": "Default"
-                },
-                "note": {
-                    "label": "Note: ",
-                    "description": "Products will be saved as Draft"
                 },
                 "toast": {
                     "invalidFormat": "Invalid products format received from AI",
