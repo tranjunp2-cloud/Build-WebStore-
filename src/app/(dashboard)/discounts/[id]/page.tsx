@@ -8,7 +8,7 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { DiscountForm, type DiscountDoc } from '../_components/discount-form'
 
-export const metadata: Metadata = { title: 'Edit Discount | PrimeWeb' }
+export const metadata: Metadata = { title: 'Edit Discount | Web Store' }
 
 export default async function EditDiscountPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params

@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { DiscountsUsageHistoryLayout } from '../_components/discounts-usage-history-layout'
 
-export const metadata: Metadata = { title: 'Discount Usage History | PrimeWeb' }
+export const metadata: Metadata = { title: 'Discount Usage History | Web Store' }
 
 export default function DiscountUsageHistoryPage() {
     return (

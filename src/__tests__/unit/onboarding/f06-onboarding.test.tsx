@@ -35,7 +35,7 @@ vi.mock('@/i18n', () => ({
         t: {
             onboarding: {
                 welcome: {
-                    title: "Welcome to PrimeWeb",
+                    title: "Welcome to Web Store",
                     subtitle: "Start building your store. Complete it in just 5 minutes.",
                     createStore: "Create My Store",
                     skip: "Skip & Go to Dashboard",

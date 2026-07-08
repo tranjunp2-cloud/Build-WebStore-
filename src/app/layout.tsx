@@ -4,18 +4,18 @@ import { FONT_VARIABLES } from '@/lib/fonts/variables'
 
 export const metadata: Metadata = {
     title: {
-        template: '%s | PrimeWeb',
-        default: 'PrimeWeb — Build Beautiful Websites in Minutes',
+        template: '%s | Web Store',
+        default: 'Web Store — Build Beautiful Websites in Minutes',
     },
     description:
         'AI-powered website builder for SMEs. Create stunning, SEO-optimized websites with just a few clicks.',
     keywords: ['website builder', 'AI website', 'SME website', 'online store builder'],
-    authors: [{ name: 'PrimeWeb' }],
-    creator: 'PrimeWeb',
+    authors: [{ name: 'Web Store' }],
+    creator: 'Web Store',
     openGraph: {
         type: 'website',
         locale: 'en_US',
-        siteName: 'PrimeWeb',
+        siteName: 'Web Store',
     },
     twitter: {
         card: 'summary_large_image',

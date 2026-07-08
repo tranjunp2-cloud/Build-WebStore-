@@ -4,7 +4,7 @@
  * AdminSidebar — matches design bundle shell.jsx:37-72 exactly.
  *
  * Structure:
- *   sidebar-head: logo-mark "PW" + "Prime Web · Admin" + collapse chevron (top-right)
+ *   sidebar-head: logo-mark "WS" + "Web Store · Admin" + collapse chevron (top-right)
  *   scroll body: nav-section-title (uppercase) + nav-item rows (icon + label + count/liveDot)
  *   sidebar-foot: avatar (initials) + name + role
  *
@@ -220,8 +220,8 @@ export function AdminSidebar({
         >
             {/* ── Head: logo-mark + label + collapse chevron ─── */}
             <div className="sidebar-head">
-                <div className="logo-mark" aria-hidden>PW</div>
-                <span className="sidebar-label">Prime Web · Admin</span>
+                <div className="logo-mark" aria-hidden>WS</div>
+                <span className="sidebar-label">Web Store · Admin</span>
                 <button
                     type="button"
                     className="icon-btn"

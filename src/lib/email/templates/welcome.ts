@@ -1,6 +1,6 @@
 /**
  * Welcome email HTML template.
- * Sent when a new user registers on PrimeWeb.
+ * Sent when a new user registers on Web Store.
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  */
 
