@@ -1102,6 +1102,13 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
     border-style: solid;
   }
 
+  /* Radix <Select> item hover/highlight (ui/select.tsx SelectItem) — written as plain CSS
+     instead of a Tailwind data-[highlighted]: class because the class doesn't reliably
+     paint on this portaled content (same issue as the SelectContent bg-popover fix). */
+  .select-item[data-highlighted] {
+    background-color: hsl(var(--muted));
+  }
+
   textarea {
     resize: vertical;
   }
