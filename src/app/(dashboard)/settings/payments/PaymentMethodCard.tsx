@@ -54,8 +54,9 @@ export function PaymentMethodCard({
     return (
         <div className={cn(
             // preflight OFF → class `border` thiếu border-style; phải có `border-solid` mới hiện viền.
+            // GH-1511 #38: no drop shadow — the old 6px black shadow read as a faint line under
+            // each card; the Xendit connect block (the reference) has none.
             'rounded-[16px] p-[20px_22px] border border-solid transition-all duration-200',
-            'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
             locked ? 'bg-[hsl(var(--background))] border-dash-border' : 'bg-[hsl(var(--card))] border-dash-border',
             // Viền đồng nhất xám (dash-border) cho mọi card bất kể bật/tắt — trạng thái active
             // đã thể hiện qua toggle + pill "Active". (Trước đây bật thì viền xanh info → lệch nhau.)

@@ -1404,17 +1404,22 @@ function SettingsPanelInner({
     return (
         <div
             className={cn(
-                'flex h-full flex-col bg-[var(--editor-surface)]',
-                fullWidth ? 'w-full flex-1' : 'shrink-0 border-l border-white/5',
+                // GH-1511 #45.2 (PR #1522 review): panel cố ý KHÔNG paint bg — kế thừa nền shell
+                // (--editor-bg), y hệt EditorToolbar (nav) nên 2 surface liền một khối. Trước đây
+                // dùng `bg-[var(--editor-surface)]/90` nhưng Tailwind v3 không compile alpha trên
+                // var đục (class chết) — visual này là look QA đã duyệt, giờ code nói thật.
+                'flex h-full flex-col',
+                // border-l bỏ theo cùng lý do: thiếu border-solid nên chưa từng paint (class chết).
+                fullWidth ? 'w-full flex-1' : 'shrink-0',
             )}
             style={fullWidth ? undefined : { width: SETTINGS_PANEL_WIDTH }}
         >
             {!hideChrome && (
             <div className={cn(
-                // Preflight is off — bare `border-*` utilities emit no border-style and render
-                // invisible, so `border-solid` must be declared explicitly (see globals.css note).
-                'border-solid px-4 py-4',
-                fullWidth ? 'border-y border-[var(--editor-border)]' : 'border-b border-white/5',
+                // Bỏ đường kẻ quanh hàng tab (design call 07/07, PR #1522): panel liền khối với
+                // nav nên kẻ ngăn thừa — xóa hẳn border classes thay vì chỉ bỏ border-solid
+                // (preflight off: border không style sẽ thành class chết gây hiểu lầm).
+                'px-4 py-4',
             )}>
                 <div className={cn('grid gap-2', fullWidth ? 'grid-cols-3' : 'grid-cols-2')}>
                     {tabs.map(tab => (
