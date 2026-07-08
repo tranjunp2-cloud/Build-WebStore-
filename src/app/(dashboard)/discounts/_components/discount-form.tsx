@@ -221,7 +221,7 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 onRevert={handleRevert}
             />
 
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+            <div className="pt-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div
                     className="rounded-lg border border-solid p-6"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
