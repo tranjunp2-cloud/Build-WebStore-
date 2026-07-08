@@ -148,6 +148,7 @@ export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplate
     .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
     .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
     .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
+    .page-bg .ord-info-col{display:block!important;width:100%!important;}
   }
   @media(max-width:420px){
     .page-bg{padding:0;}
@@ -223,18 +224,42 @@ export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplate
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">${t.orderInfoHeading} — ID: ${esc(data.orderNumber)}</div>
       </td></tr>
       <tr><td style="padding:4px 40px 4px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;">
           <tr>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
-            <td style="padding:8px 16px 8px 0;color:#EF4444;vertical-align:top;font-weight:600;">${tA.orderStatusCancelled}</td>
-            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
-            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
+                  <td style="padding:8px 16px 8px 0;color:#EF4444;vertical-align:top;font-weight:600;">${tA.orderStatusCancelled}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
           <tr>
-            <td style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tA.cancellationDate}</td>
-            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.cancellationDate, locale)}</td>
-            <td style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tA.cancellationReason}</td>
-            <td style="padding:8px 16px 8px 0;color:#94A3B8;vertical-align:top;">${tA.cancellationReasonValue}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tA.cancellationDate}</td>
+                  <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.cancellationDate, locale)}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tA.cancellationReason}</td>
+                  <td style="padding:8px 16px 8px 0;color:#94A3B8;vertical-align:top;">${tA.cancellationReasonValue}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
         </table>
       </td></tr>
@@ -289,12 +314,24 @@ export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplate
 
       <!-- Payment info row -->
       <tr><td style="padding:14px 40px 6px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;">
           <tr>
-            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
-            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${tA.paymentMethodValue}</td>
-            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${tA.paymentStatusLabel}</td>
-            <td align="right" style="padding:6px 0;color:#94A3B8;">${tA.paymentStatusValue}</td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
+                  <td style="padding:6px 14px 6px 0;color:#94A3B8;">${tA.paymentMethodValue}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="ord-info-col" width="50%" style="vertical-align:top;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+                <tr>
+                  <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${tA.paymentStatusLabel}</td>
+                  <td align="right" style="padding:6px 0;color:#94A3B8;">${tA.paymentStatusValue}</td>
+                </tr>
+              </table>
+            </td>
           </tr>
         </table>
       </td></tr>
