@@ -10,7 +10,7 @@
 > [!IMPORTANT]
 > **Stories-First Rule:** PRD này được xây dựng từ User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
-> **Boundary quan trọng:** F03 đã sở hữu General SEO score, AI Fix-All, keyword tracker, GSC/GA OAuth, sitemap, basic SEO dashboard. F37 KHÔNG tái implement các tính năng đó — chỉ mở rộng và bổ sung scope Local SEO.
+> **Boundary quan trọng:** F03 đã sở hữu General SEO score, AI Fix-All, manual keyword tracker, sitemap, basic SEO dashboard, và analytics dashboard. F37 KHÔNG tái implement các tính năng đó — chỉ mở rộng Local SEO. F37 KHÔNG phụ thuộc GA4 hoặc Google Search Console.
 
 ---
 
@@ -22,9 +22,9 @@
 | US-F37-02 | Enhanced LocalBusiness JSON-LD | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
 | US-F37-03 | AI Crawler Permissions & llms.txt | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
 | US-F37-04 | Local SEO Score & Checklist | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
-| US-F37-05 | Google Business Profile OAuth & Sync | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
-| US-F37-06 | GBP Insights Dashboard | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
-| US-F37-07 | NAP Consistency Checker | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
+| US-F37-05 | Google Business Profile Connect & Sync | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
+| US-F37-06 | Google Metrics in SEO Dashboard | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
+| US-F37-07 | Business Info Difference Checker | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
 | US-F37-08 | Auto SEO/AEO Generation for Tenant Sites | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
 | US-F37-09 | Malaysia Market Optimization | [F37-local-seo-stories.md](../stories/F37-local-seo-stories.md) | Draft |
 
@@ -38,13 +38,64 @@ SME seller ở Malaysia xây dựng storefront qua PrimeCommerce nhưng phần l
 
 ---
 
-## 1.5 Why Connect to Google (GBP + GSC) — For Developers
+## 1.5 Analytics Source Decision — Payload + Vercel + GBP (No PostHog, No GA4/GSC)
 
-**GBP Performance API** = the ONLY source of local action metrics: calls, direction requests, maps profile views, review interactions. These metrics directly power Maps/Local Pack visibility and prove search ROI. Without GBP connection, sellers see zero data in "Local SEO" dashboard even if storefront ranks.
+Most sellers primarily use platform subdomains like `*.web.ecommercehub.unifi.com.my`, so they cannot reliably own a Search Console property or install seller-owned GA4. F37 must not require GA4 or Google Search Console. **PostHog is dropped** — it was never implemented in the repo and would add a dependency for data the platform already owns. F37 combines two sources already present in the stack, split by funnel stage:
 
-**GSC (Google Search Console)** = organic search performance: queries, impressions, CTR, average position. Planned in F03-08; currently only manual text fields (`googleAnalyticsId`, `googleVerificationToken`) on Sites.seo exist — NOT authorized API access.
+**Payload analytics** (first-party, already live) = **behavior & conversion** (bottom of funnel). Existing `analytics` Payload collection + `/api/analytics/track` + `/api/analytics/summary`, already per-tenant (`tenant` + `site` on every row). Owns commerce events tied to real actions: click, add-to-cart, checkout, **purchase**, top products/pages/blogs. Data lives in our own Neon Postgres — unlimited retention, no external quota.
 
-**Why OAuth 2.0 now:** Both require secure credential exchange + refresh tokens + Google verification for sensitive scopes. Building shared OAuth infrastructure once (this sprint) unblocks both GBP (F37) and GSC (F03-08 future). Google verification alone takes 4–6 weeks; do NOT wait until implementation.
+**Vercel Web Analytics** (already installed: `@vercel/analytics/next`) = **audience & acquisition** (top of funnel). Queried server-side via the Web Analytics API filtered per-tenant by `route`/`requestPath` (`/sites/[slug]/*`). Owns bot-filtered unique **visitors**, **pageviews**, `country`, `deviceType`, `browserName`, referrer hostname / UTM. Zero data pipeline to maintain.
+
+> **No double-count rule:** each metric has exactly ONE source. Visitors/pageviews/geo/device/referrer → Vercel. Clicks→purchase + top products → Payload. Never show pageview from both (two mismatched numbers confuse low-tech sellers).
+
+**Google Business Profile (GBP)** = the only Google integration in F37. It provides local actions sellers understand: calls, directions, and website visits from the Google profile. Shown in `Dashboard > SEO`, not Analytics. Google authorization scope is GBP-only: `https://www.googleapis.com/auth/business.manage`.
+
+### Metric ownership (authoritative)
+
+| Metric / Card | Source | Where |
+|---|---|---|
+| Unique visitors (bot-filtered) | **Vercel** | Dashboard > Analytics |
+| Pageviews | **Vercel** | Dashboard > Analytics |
+| Country / device / browser breakdown | **Vercel** | Dashboard > Analytics |
+| Traffic sources (referrer hostname, UTM) | **Vercel** | Dashboard > Analytics |
+| Clicks (CTA / links) | **Payload** | Dashboard > Analytics |
+| Add-to-cart / checkout | **Payload** | Dashboard > Analytics |
+| **Purchases** (conversion) | **Payload** | Dashboard > Analytics |
+| Top products / top pages / top blogs | **Payload** | Dashboard > Analytics |
+| Local actions: calls, directions, website visits | **GBP** | Dashboard > SEO |
+
+**Constraints (Vercel API):** aggregate/trend limited to the plan's reporting window (Pro needed for a useful range); one team token sees all sites → **tenant isolation MUST be enforced server-side** (seller A can never query seller B's path); rate-limited → cache responses (reuse the existing summary cache, ~6h like GBP). Payload has none of these limits.
+
+### Final `Dashboard > Analytics` layout (MVP)
+
+Một trang, period switch 7d/30d ở đầu. Mỗi card ghi rõ nguồn để dev không đấu nhầm. Không funnel, không session replay — seller low-tech.
+
+```
+┌─ Dashboard > Analytics ───────────────── [ 7 days | 30 days ] ┐
+│                                                                │
+│  ┌── Traffic (Vercel) ──────────────────────────────────────┐ │
+│  │  👁  Visitors 1,240 ▲12%   📄 Pageviews 3,110 ▲9%        │ │  ← Vercel
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌── Engagement (Payload) ──────────────────────────────────┐ │
+│  │  🖱 Clicks 512   🛒 Add-to-cart 88   ✅ Purchases 21     │ │  ← Payload
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌── Trend chart (views + clicks per day) ──────────────────┐ │
+│  │   ▁▂▃▅▆▇▆▅  views (Vercel pageviews) · clicks (Payload)   │ │
+│  └──────────────────────────────────────────────────────────┘ │
+│                                                                │
+│  ┌─ Where visitors come from (Vercel) ─┐ ┌─ Top products (Payload) ─┐
+│  │ 🌐 Country:  MY 78% · SG 11% · …     │ │ 1. Nasi Lemak Set    42  │
+│  │ 📱 Device:   Mobile 82% · Desktop 18 │ │ 2. Kopi Bundle       31  │
+│  │ 🔗 Referrer: google 40% · fb 22% · … │ │ 3. Roti Combo        19  │
+│  └──────────────────────────────────────┘ └──────────────────────────┘
+│                                                                │
+│  (Local actions — Calls / Directions — sống ở Dashboard > SEO, từ GBP)
+└────────────────────────────────────────────────────────────────┘
+```
+
+**Nguồn từng khối:** Traffic + Country/Device/Referrer + trend "views" = **Vercel**. Engagement (clicks/cart/purchase) + Top products + trend "clicks" = **Payload** (reuse `/api/analytics/summary`). Calls/Directions = **GBP**, nằm ở tab SEO — không nhân đôi sang đây.
 
 ---
 
@@ -59,11 +110,11 @@ SME seller ở Malaysia xây dựng storefront qua PrimeCommerce nhưng phần l
 
 ## 3. Solution Overview
 
-F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, gồm 3 lớp chính:
+F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, theo IA đã duyệt:
 
 1. **Dữ liệu nền tảng (P0):** Mở rộng Sites collection với địa chỉ cấu trúc, giờ mở cửa, tọa độ GPS, danh mục kinh doanh — làm nguồn sự thật duy nhất cho toàn bộ tính năng Local SEO. Nâng cấp `generateLocalBusinessSchema()` hiện có để emit đầy đủ geo, openingHoursSpecification, priceRange, areaServed theo chuẩn Schema.org. Mở AI crawlers (hiện đang bị chặn trong `robots.txt/route.ts:53–69`) + thêm toggle opt-out per-seller.
-2. **GBP Integration (P1):** Wizard setup cho seller chưa có GBP (ước tính >60% tại SE Asia), OAuth Google Business Profile API, sync giờ/ảnh hai chiều, kéo GBP Insights (cuộc gọi, chỉ đường, website clicks, lượt xem profile, AI overview appearances).
-3. **Local Performance Dashboard (P1):** Tab "Local SEO" mới trong `/dashboard` — hiển thị điểm Local SEO riêng biệt với F03's general SEO score, checklist "Việc cần làm" ưu tiên cao/trung/thấp, và 4–6 card GBP Insights tập trung vào metric kết nối doanh thu (cuộc gọi, chỉ đường, leads). Mobile-first, reuse Recharts + DashboardStats components.
+2. **Business Info + GBP Integration (P1):** Màn `Settings > Business Info` là nơi seller nhập/sửa thông tin kinh doanh và kết nối Google Business Profile. Sau khi connect, hệ thống pull thông tin GBP về cùng màn này để seller review, import và sync lại khi cần.
+3. **Local SEO status in Dashboard (P1):** Không tạo tab Local SEO mới. Reuse tab `Dashboard > SEO` hiện có để hiển thị một card Local SEO đơn giản: điểm 0–100, tối đa 3 việc cần làm, và Google activity từ GBP khi đã connect. Website activity nằm ở `Dashboard > Analytics` (Vercel = visitors/traffic, Payload = clicks→purchase).
 4. **Malaysia Market Optimization (P0/P1):** Bốn đòn bẩy dành riêng cho thị trường MY: (a) Waze deep-link button từ lat/lng — Waze visibility đến 100% qua GBP sync, không cần API riêng; (b) hreflang `en-MY` + `ms-MY` + `x-default` trong `generateMetadata` cho tất cả trang tenant — cả hai ngôn ngữ đều quan trọng do search behavior code-switching tại MY; (c) Halal toggle + `additionalProperty` schema injection — JAKIM là cơ quan duy nhất, toàn bộ e-Cert số hoá từ tháng 5/2025; (d) MY states dropdown (13 tỉnh + 3 vùng liên bang), MYR currency schema, phone format `+60`.
 5. **Auto-Generation & AEO (P0/P1):** Mọi trang tenant storefront PHẢI luôn có metadata SEO đầy đủ ngay cả khi seller để trống — hệ thống tự fallback từ dữ liệu có sẵn (tên trang, tên site, danh mục). Ngoài ra, tự động emit FAQPage JSON-LD từ FAQ block có sẵn để tối ưu cho AI answer engines (ChatGPT, Perplexity, Gemini). Lưu ý: `llms.txt` là một tín hiệu nhỏ và thực nghiệm — các đòn bẩy AEO thực sự là structured data + auto metadata + FAQ. Toàn bộ auto-gen chỉ áp dụng cho `/sites/[slug]/*` (tenant storefront), KHÔNG áp dụng cho platform main site.
 
@@ -77,16 +128,16 @@ F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, g�
 - **Enhanced LocalBusiness JSON-LD:** Nâng cấp `src/lib/seo/json-ld.ts` function `generateLocalBusinessSchema()` — emit geo, openingHoursSpecification, priceRange, areaServed, hasMap, @type sub-type chính xác. (US-F37-02)
 - **AI Crawler Permissions:** Mở GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot trong `robots.txt/route.ts` (default allow). Thêm toggle opt-out per-site trong site settings. (US-F37-03)
 - **Dynamic llms.txt route:** Route `/llms.txt` per-tenant tự động tạo từ dữ liệu site (tóm tắt kinh doanh, sản phẩm nổi bật, contact, giờ mở cửa). (US-F37-03)
-- **Local SEO Score:** Điểm Local SEO riêng (0–100), tách biệt với F03 general SEO score, tính từ completeness của business data, JSON-LD, GBP connection status, NAP consistency. (US-F37-04)
-- **Actionable Local Checklist:** Checklist "Việc cần làm" seller-facing, ưu tiên high/medium/low, có one-click fix hoặc hướng dẫn từng bước. (US-F37-04)
-- **GBP OAuth Integration:** Thêm Google Business Profile API scope vào OAuth flow của F03 (tách riêng GBP token từ GSC/GA token). Setup wizard cho seller chưa có GBP. (US-F37-05)
+- **Local SEO Score:** Điểm Local SEO riêng (0–100), hiển thị trong tab `Dashboard > SEO` hiện có, tính từ completeness của business data, JSON-LD, Google Business Profile connection status, và business info consistency. (US-F37-04)
+- **Actionable Local Checklist:** Checklist "Việc cần làm" seller-facing, tối đa 3 items đang quan trọng nhất, có action rõ ràng. (US-F37-04)
+- **GBP Authorization Integration:** Thêm Google Business Profile API scope vào dedicated Google authorization flow. Seller connect từ `Settings > Business Info`; seller chưa có GBP thì mở link tạo mới trên Google. Không dùng GA4/GSC. (US-F37-05)
 - **GBP Data Sync:** Sync giờ mở cửa và ảnh từ platform lên GBP; pull GBP info về platform để hiển thị. (US-F37-05)
-- **GBP Insights Dashboard:** Tab "Local SEO" trong `/dashboard` với 4–6 card: phone calls, direction requests, GBP→site clicks, profile views, review rating, AI overview appearances (nếu API có). Recharts line chart trend 7/30 ngày. (US-F37-06)
-- **NAP Consistency Checker:** Validate Name/Address/Phone nhất quán giữa Sites collection và GBP data đã kết nối; surface mismatches trong checklist. (US-F37-07)
+- **Google Activity in SEO Dashboard:** Hiển thị tối giản trong `Dashboard > SEO`: local actions từ GBP (calls, direction requests, website visits). Website activity nằm trong `Dashboard > Analytics` (Vercel visitors/traffic + Payload clicks→purchase). Các số liệu nâng cao/chart trend để phase sau nếu seller cần. (US-F37-06)
+- **Business Info Difference Checker:** Validate tên, địa chỉ, số điện thoại giữa Sites collection và GBP data đã kết nối; surface bằng wording dễ hiểu như "Phone number is different", không dùng thuật ngữ NAP trong UI. (US-F37-07)
 - **Auto SEO Metadata Fallback (P0):** Đảm bảo hệ thống mọi trang tenant (page, product, blog) LUÔN render đầy đủ title, meta description, OG tags, canonical — dù seller để trống SEO fields. Tái dụng `generateMetadata()` hiện có trong các route `/sites/[slug]/*`. (US-F37-08)
 - **Auto FAQ + FAQPage JSON-LD (P1, AEO):** Tự động emit FAQPage JSON-LD từ FAQ block có trên trang. Tái dụng generator hiện có trong `src/lib/seo/json-ld.ts`. Cải thiện khả năng được trích dẫn bởi AI answer engines. (US-F37-08)
 - **Tenant-Only Auto-Gen Scope Guarantee (P0):** Toàn bộ auto-generation (SEO metadata, JSON-LD, llms.txt, sitemap, robots) chỉ áp dụng cho các route `/sites/[slug]/*`. Platform main site (`/`, `/admin`, v.v.) KHÔNG bị ảnh hưởng. (US-F37-08)
-- **Waze Deep-Link (P1):** Storefront render nút "Navigate with Waze" từ lat/lng của seller — URL format `https://waze.com/ul?ll={LAT},{LNG}&navigate=yes`. Waze visibility của seller đến từ GBP sync (xem FR-15 GBP wizard), không cần API Waze riêng. (US-F37-09)
+- **Waze Deep-Link (P1):** Storefront render nút "Navigate with Waze" từ lat/lng của seller — URL format `https://waze.com/ul?ll={LAT},{LNG}&navigate=yes`. Waze visibility của seller đến từ GBP sync (xem FR-15 Google connect), không cần API Waze riêng. (US-F37-09)
 - **Hreflang en-MY + ms-MY (P1):** Emit `alternates.languages` (`en-MY`, `ms-MY`, `x-default`) trong `generateMetadata` cho tất cả trang tenant. Phục vụ search behavior code-switching tại Malaysia. (US-F37-09)
 - **Halal Toggle + Schema (P1):** Seller bật toggle "Halal Certified" (+ tùy chọn nhập số chứng nhận JAKIM) trong site settings → render badge Halal trên storefront + inject `additionalProperty` vào LocalBusiness/Product JSON-LD. (US-F37-09)
 - **MY States Dropdown + MYR + Phone Format (P0):** Thay free-text `state` bằng dropdown 13 tỉnh + 3 vùng liên bang Malaysia (tên tiếng Anh + Bahasa Melayu). Schema Offer dùng `priceCurrency="MYR"`, hiển thị "RM 25.50". `telephone` format `+60 12 345 6789`. (US-F37-09)
@@ -112,10 +163,10 @@ F37 bổ sung **tầng Local SEO** lên trên F03 Dashboard Suite hiện có, g�
 |--------|--------|-------------|
 | Seller hoàn thiện local business data | ≥ 60% trong 7 ngày sau khi feature live | DB query — % sites có latitude + openingHours |
 | Local SEO score trung bình | Tăng từ ~30 lên ≥ 60 sau 30 ngày | Dashboard score tracking |
-| Seller connect GBP | ≥ 30% active sites trong 60 ngày | GBP OAuth token count / active sites |
+| Seller connect GBP | ≥ 30% active sites trong 60 ngày | GBP connected site count / active sites |
 | AI crawlers unblocked | 100% storefronts (mặc định allow) | robots.txt audit |
-| GBP Insights dashboard load time | < 2s | Timing |
-| Local checklist completion rate | ≥ 40% sellers hoàn thành ≥ 3 items | Event tracking (F22) |
+| Local metrics load time | < 2s | Timing |
+| Local checklist completion rate | ≥ 40% sellers hoàn thành ≥ 3 items | Payload analytics / F22 event tracking |
 
 ---
 
@@ -134,12 +185,12 @@ SO THAT khách hàng gần đó có thể tìm thấy tôi trên Google Maps, Go
 
 > **Ký hiệu Priority:** P0 = MVP bắt buộc / P1 = quan trọng, sprint kế tiếp / P2 = nice to have
 
-### 7.0 Phasing & OAuth Blocker
+### 7.0 Phasing & Google Authorization Blocker
 
-Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 phases:
+Timeline is tight; GBP authorization is the longest-pole dependency. Split into 2 phases:
 
-- **Phase 1 (P0, No OAuth):** FR-01,02,03 (data model), FR-04,05,06 (JSON-LD), FR-07,08,09 (crawlers+llms.txt), FR-10,11,12,13 (score+checklist — note: GBP 25% + NAP 10% scores cannot be earned without OAuth; either re-weight for Phase 1 or mark as "locked"), FR-22,23,24 (auto SEO/AEO), FR-25,27,28 (Waze/Halal/MY states).
-- **Phase 2 (P1, Requires OAuth):** FR-14,15,16 (GBP OAuth+wizard+sync), FR-17,18,19 (insights+charts), FR-20,21 (NAP). **PREREQUISITE:** Build shared Google OAuth infra + submit Google verification early (4–6 weeks lead time).
+- **Phase 1 (P0, No Google authorization):** FR-01,02,03 (data model), FR-04,05,06 (JSON-LD), FR-07,08,09 (crawlers+llms.txt), FR-10,11,12,13 (score+checklist), FR-22,23,24 (auto SEO/AEO), FR-25,27,28 (Waze/Halal/MY states). Analytics = wire Vercel Web Analytics API into `Dashboard > Analytics` alongside existing Payload analytics; Vercel script already installed.
+- **Phase 2 (P1, Requires GBP authorization):** FR-14,15,16 (Google Business Profile connect + sync), FR-17,18,19 (simple GBP metrics), FR-20,21 (business info differences). **PREREQUISITE:** Build GBP-only Google authorization + submit Google verification early (4–6 weeks lead time).
 - **Deferred (P2):** FR-26 hreflang (blocked by client-side i18n — requires F21 URL-based routing).
 
 | FR-ID | Requirement | Story Ref | Priority | Notes |
@@ -153,22 +204,23 @@ Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 pha
 | FR-07 | Hệ thống PHẢI mở AI crawlers trong `robots.txt/route.ts`: flip GPTBot, ClaudeBot, Google-Extended, CCBot từ Disallow sang Allow (hiện tại bị chặn ở lines 53–69). Thêm PerplexityBot nếu cần (chưa trong blocklist hiện tại). Mặc định = allow. Per-site toggle để opt-out. | US-F37-03 | P0 | Quyết định đã được stakeholder approve |
 | FR-08 | Site settings PHẢI có toggle "Cho phép AI crawlers index website" (default = ON). Khi OFF → robots.txt inject Disallow cho các AI user-agents tương ứng của site đó | US-F37-03 | P0 | Per-seller opt-out, không phải global |
 | FR-09 | Hệ thống PHẢI tạo route `/llms.txt` per-tenant, trả về nội dung Markdown gồm: tên và mô tả doanh nghiệp, danh sách top 10 URL quan trọng (homepage, products, contact, blog posts mới nhất), thông tin liên lạc, giờ mở cửa, service area | US-F37-03 | P1 | Experimental — không oversell impact; low cost |
-| FR-10 | Dashboard PHẢI hiển thị "Local SEO Score" (0–100) riêng biệt với F03 General SEO Score. Điểm **normalize trên các bucket đang áp dụng** (không có trần giả). **Phase 1** (4 bucket = 100%): Business Data 35% + Structured Data 30% + AI Discoverability 20% + Technical Health 15%. **Phase 2** thêm bucket GBP/Reviews/NAP/Citations và re-weight. Công thức + sub-signal chi tiết ở **§13.8**. | US-F37-04 | P0 | **RESOLVED (CF-4):** Phase 1 seller làm hết → đạt 100; bucket Phase 2 hiển thị "🔒 unlock" từ đầu nên không bị cảm giác tụt điểm. Xem §13.8 |
-| FR-11 | Dashboard PHẢI hiển thị checklist "Việc cần làm" ưu tiên cao/trung/thấp. Mỗi item có: mô tả seller-friendly (không dùng thuật ngữ kỹ thuật), impact label (VD: "Tăng lượt gọi điện"), nút hành động (one-click fix hoặc "Xem hướng dẫn") | US-F37-04 | P0 | Tối đa 10 items — không overwhelm |
-| FR-12 | Checklist items P0 (high impact): Thêm địa chỉ cấu trúc, Cập nhật giờ mở cửa, Kết nối Google Business Profile, Bật AI crawlers (nếu đang tắt), Thêm danh mục kinh doanh | US-F37-04 | P0 | |
-| FR-13 | Checklist items P1 (medium impact): Thêm tọa độ GPS, Điền đủ thông tin liên lạc, Sync ảnh lên GBP, Kiểm tra NAP nhất quán | US-F37-04 | P1 | |
-| FR-14 | Hệ thống PHẢI BUILD FROM SCRATCH shared Google OAuth infrastructure (consent URL builder, callback handler, encrypted token storage, auto-refresh logic, CSRF state validation) cho GBP + GSC (F03-08, future). OAuth scope: `https://www.googleapis.com/auth/business.manage` (GBP). Token GBP (access_token, refresh_token, token_expiry) và `gbp_location_id` lưu trên **Sites collection** (per-site, không phải per-tenant) — cho phép seller có nhiều sites, mỗi site kết nối GBP listing riêng. Tách biệt với GSC/GA tokens của F03 trên Tenants. **NOTE: Không có reuse infrastructure từ F03 — Google OAuth chưa được implement.** | US-F37-05 | P1 | **CRITICAL PREREQUISITE:** Build shared OAuth client. GCP project cần enable GBP API + submit Google OAuth verification sớm (~4–6 tuần lead time). Xem Dependencies §14. |
-| FR-15 | Wizard "Kết nối Google Business Profile" PHẢI có 3 bước: (1) Chọn hoặc tạo GBP listing, (2) Xác nhận thông tin khớp với platform, (3) Authorize sync. Seller chưa có GBP → hướng dẫn tạo mới trên Google | US-F37-05 | P1 | <40% SME SE Asia có GBP |
-| FR-16 | Sau khi connect GBP, hệ thống PHẢI cho phép seller sync giờ mở cửa từ platform → GBP bằng một nút "Đồng bộ lên GBP" | US-F37-05 | P1 | One-way push — platform là nguồn sự thật |
-| FR-17 | Hệ thống PHẢI pull GBP Insights qua API, lưu cache, hiển thị trong dashboard: số cuộc gọi điện, số lượt chỉ đường, số website clicks từ GBP, tổng lượt xem profile, điểm đánh giá trung bình + số lượng reviews | US-F37-06 | P1 | Data từ GBP Business Profile Performance API |
-| FR-18 | Dashboard "Local SEO" PHẢI hiển thị tối đa 6 metric cards (mobile-first 2x3 grid): Cuộc gọi, Chỉ đường, Clicks từ GBP, Lượt xem GBP, Đánh giá, AI appearances (nếu API có). Mỗi card có % change so với kỳ trước | US-F37-06 | P1 | Tập trung vào revenue-connected metrics, không vanity |
-| FR-19 | Dashboard PHẢI có chart trend (line chart Recharts) cho 3 metrics chính: cuộc gọi, chỉ đường, website clicks — theo 7 ngày hoặc 30 ngày | US-F37-06 | P1 | Reuse Recharts đang dùng ở F03 Analytics |
-| FR-20 | Hệ thống PHẢI kiểm tra NAP consistency: so sánh `name` (site name), `address` (từ localBusiness fields), `phone` (từ contactInfo) giữa Sites record và GBP data đã pull về; surface mismatch trong checklist với nội dung cụ thể ("Số điện thoại trên GBP khác với website") | US-F37-07 | P1 | Chỉ check khi GBP đã connected |
-| FR-21 | Dashboard hiển thị trạng thái "NAP Consistency: Khớp / Không khớp" với badge màu rõ ràng. Khi không khớp, có nút "Xem chi tiết" dẫn đến item trong checklist | US-F37-07 | P1 | |
+| FR-10 | Existing tab `Dashboard > SEO` PHẢI hiển thị card "Local SEO" với score 0–100, trạng thái ngắn, và CTA chính. Không tạo tab/route Local SEO riêng. Điểm **normalize trên các bucket đang áp dụng** (không có trần giả). **Phase 1** (4 bucket = 100%): Business Data 35% + Structured Data 30% + AI Discoverability 20% + Technical Health 15%. **Phase 2** thêm Google Business Profile/Reviews/Business Info Differences/Citations và re-weight. Công thức + sub-signal chi tiết ở **§13.8**. | US-F37-04 | P0 | **RESOLVED (CF-4):** Phase 1 seller làm hết → đạt 100; Phase 2 signals không làm tụt điểm Phase 1. Xem §13.8 |
+| FR-11 | Dashboard PHẢI hiển thị checklist "Việc cần làm" tối đa 3 items quan trọng nhất. Mỗi item có mô tả seller-friendly, impact label (VD: "Tăng lượt gọi điện"), và nút hành động rõ ràng. | US-F37-04 | P0 | Giữ UI nhẹ cho low-tech SME |
+| FR-12 | Checklist items P0 (high impact): Add business info, update opening hours, connect Google Business Profile, allow AI search, add business category. | US-F37-04 | P0 | Seller-facing copy dùng câu đơn giản, không dùng thuật ngữ kỹ thuật |
+| FR-13 | Checklist items P1 (medium impact): Add map location, fill phone number, sync photos to Google, review business info differences, sync opening hours. | US-F37-04 | P1 | |
+| FR-14 | Hệ thống PHẢI BUILD FROM SCRATCH GBP-only Google authorization infrastructure (consent URL builder, callback handler, encrypted token storage, auto-refresh logic, CSRF state validation). Scope duy nhất: `https://www.googleapis.com/auth/business.manage`. Token GBP (access_token, refresh_token, token_expiry) và `gbp_location_id` lưu trên **Sites collection** (per-site, không phải per-tenant) — cho phép seller có nhiều sites, mỗi site kết nối GBP listing riêng. KHÔNG tạo GA4/GSC scopes hoặc Tenant-level Google analytics/search tokens trong F37. | US-F37-05 | P1 | **CRITICAL PREREQUISITE:** Build GBP authorization client. GCP project cần enable GBP API + submit Google verification sớm (~4–6 tuần lead time). Xem Dependencies §14. |
+| FR-15 | `Settings > Business Info` PHẢI có card "Connect Google Business Profile". Click connect dẫn qua Google authorization flow. Seller chưa có GBP → hiển thị link tạo mới tại business.google.com và quay lại connect sau. Không tạo modal connect riêng trong MVP. | US-F37-05 | P1 | <40% SME SE Asia có GBP |
+| FR-16 | Sau khi connect GBP, `Settings > Business Info` PHẢI cho phép seller import thông tin từ Google, review differences, và sync giờ mở cửa từ platform → Google bằng một nút "Sync to Google". | US-F37-05 | P1 | Platform là nguồn sự thật sau khi seller xác nhận |
+| FR-17 | `Dashboard > Analytics` PHẢI hiển thị website activity từ 2 nguồn theo phân vai cố định: **Vercel Web Analytics** (visitors, pageviews, country/device, referrer/UTM) + **Payload analytics** (click, add-to-cart, checkout, purchase, top products). GBP Performance API chỉ cho local actions trong `Dashboard > SEO`. Mỗi metric đúng 1 nguồn (§1.5). | US-F37-06 | P1 | Không dùng GA4/GSC/PostHog |
+| FR-17a | Query Vercel Web Analytics PHẢI chạy server-side, lọc theo `route`/`requestPath` của tenant (`/sites/[slug]/*`), và enforce tenant isolation — seller không bao giờ đọc được data site của seller khác. Cache response (~6h) để tránh rate limit. | US-F37-06 | P1 | 1 Vercel token thấy mọi site → phải lọc ở server |
+| FR-18 | `Dashboard > SEO` PHẢI hiển thị Google activity từ GBP. Khi chưa connect GBP, phần Google hiển thị empty state dẫn về `Settings > Business Info`. | US-F37-06 | P1 | Không build 6-card dashboard trong MVP |
+| FR-19 | Trend chart cho local metrics KHÔNG thuộc MVP UI. API có thể trả dữ liệu theo period để dùng sau, nhưng first UI chỉ cần snapshot 7/30 ngày. | US-F37-06 | P2 | Tránh overengineering cho low-tech SME |
+| FR-20 | Hệ thống PHẢI kiểm tra business info differences: so sánh `name` (site name), `address` (từ localBusiness fields), `phone` (từ contactInfo) giữa Sites record và GBP data đã pull về; surface bằng nội dung cụ thể như "Phone number is different". | US-F37-07 | P1 | Chỉ check khi GBP đã connected |
+| FR-21 | `Settings > Business Info` PHẢI hiển thị review panel khi có difference giữa website và Google. Seller chọn giữ website value hoặc import Google value từng dòng. Dashboard chỉ cần checklist item dẫn về panel này. | US-F37-07 | P1 | Không dùng badge "NAP" trong seller UI |
 | FR-22 | Hệ thống PHẢI EXTEND + VERIFY existing metadata fallback cascading (SEO field → content field → site.name) trong `generateMetadata()` + ensure ultimate hardcoded fallback khi tất cả fields trống — đảm bảo mọi trang tenant storefront (page, product, blog post) LUÔN render đầy đủ title tag (50–60 chars), meta description (150–160 chars), OG tags (`og:title`, `og:description`, `og:url`, `og:image`), canonical — ngay cả khi seller để trống tất cả SEO fields. Verify routes missing generateMetadata (checkout/orders). Đây là systematic fallback guarantee — phân biệt với F03 AI Fix-All (on-demand bulk optimizer). Tái dụng `generateMetadata()` trong `src/app/sites/[slug]/...` routes + `seo` fields trên Sites/Pages/Products. | US-F37-08 | P0 | Không duplicate F03 AI Fix-All; F37 là systematic default |
 | FR-23 | FAQPage JSON-LD schema emission ĐANG HOẠT ĐỘNG trong production qua `generateFAQSchema()` + `generatePageSchemas()` trong `src/lib/seo/json-ld.ts`. Công việc mới: thêm AI-generated FAQ draft (reuse OpenAI tại `src/lib/ai/generate-meta.ts`) để seller có cơ sở sửa đổi trước khi publish. Mục tiêu: cải thiện khả năng được trích dẫn bởi AI answer engines. **Nguồn FAQ content: AI-generated draft (reuse OpenAI đang có), seller có thể edit trước khi publish.** | US-F37-08 | P1 | Schema emission DONE; new work = AI draft + seller editorial workflow |
 | FR-24 | Toàn bộ auto-generation (SEO metadata fallback, JSON-LD, llms.txt, sitemap, robots.txt AI crawler logic) PHẢI chỉ áp dụng cho các route thuộc tenant storefront (`/sites/[slug]/*`). Các route của platform main site (`/`, `/dashboard`, `/admin`, `/api/*` platform routes) KHÔNG được bị ảnh hưởng bởi bất kỳ auto-gen nào của F37. | US-F37-08 | P0 | Business rule cứng — scope isolation giữa tenant storefront và platform |
-| FR-25 | Storefront PHẢI render nút "Navigate with Waze" trên section contact/maps khi site có latitude + longitude. URL format: `https://waze.com/ul?ll={latitude},{longitude}&navigate=yes`. Nút hiển thị song song với nút Google Maps. Lưu ý: Waze visibility của seller đến 100% qua GBP sync (~24h) — FR-15 GBP wizard chính là chiến lược Waze. Tùy chọn: include Waze URL vào `hasMap` trong LocalBusiness JSON-LD cùng với Google Maps URL. | US-F37-09 | P1 | Không cần API Waze riêng; deep-link hoạt động ngay khi có lat/lng |
+| FR-25 | Storefront PHẢI render nút "Navigate with Waze" trên section contact/maps khi site có latitude + longitude. URL format: `https://waze.com/ul?ll={latitude},{longitude}&navigate=yes`. Nút hiển thị song song với nút Google Maps. Lưu ý: Waze visibility của seller đến 100% qua GBP sync (~24h) — FR-15 Google connect chính là chiến lược Waze. Tùy chọn: include Waze URL vào `hasMap` trong LocalBusiness JSON-LD cùng với Google Maps URL. | US-F37-09 | P1 | Không cần API Waze riêng; deep-link hoạt động ngay khi có lat/lng |
 | FR-26 | ~~Emit `alternates.languages` (hreflang `en-MY`, `ms-MY`, `x-default`) trong `generateMetadata` cho tất cả trang tenant storefront.~~ **DEFERRED → P2.** Lý do: i18n hiện tại là client-side only (localStorage/cookie, một URL duy nhất phục vụ cả en+ms — confirmed `src/i18n/index.tsx`); hreflang đúng chuẩn yêu cầu URL-based locale routing (`/en/`, `/ms/`) chưa tồn tại. Storefront vẫn rank theo ngôn ngữ render mặc định trong thời gian này. Unblock khi F21 triển khai subpath routing. | US-F37-09 | **P2** | **DEFERRED:** blocked by client-side i18n; requires URL-based locale routing first (future) |
 | FR-27 | EXTEND halal field from Product level (`halalCertified` checkbox + `halalCertImage`) lên Site level: thêm field Payload `halalCertified` (boolean, default OFF — camelCase KHỚP convention Product, DB col `local_business_halal_certified`) + `halalCertNumber` (text, optional). Khi toggle ON: (a) render badge Halal trên storefront; (b) inject `additionalProperty` → `PropertyValue` vào LocalBusiness JSON-LD; (c) nếu có cert number → thêm link đến JAKIM registry. Reuse existing pattern từ Product level — không build từ zero. Schema.org không có property Halal native — `additionalProperty` là cách tiếp cận chuẩn. Google chưa có SERP feature Halal riêng nhưng cải thiện E-E-A-T + AI consumption. | US-F37-09 | P1 | **RESOLVED:** trust seller toggle + optional JAKIM cert number; không validate cert trong MVP. **Semantic tách bạch (CF-2 §7.2):** Site-level = doanh nghiệp đạt JAKIM → LocalBusiness schema + badge storefront; Product-level (`halalCertified`+`halalCertImage`, F08 giữ nguyên) = từng sản phẩm → Product schema. JAKIM = cơ quan duy nhất, e-Cert số hoá 5/2025. Xem BR-15 |
 | FR-28 | Hệ thống PHẢI thay free-text field `state` bằng dropdown chọn từ danh sách cố định 13 tỉnh + 3 vùng liên bang Malaysia (lưu cả tên tiếng Anh + Bahasa Melayu, VD: "Penang / Pulau Pinang", "Wilayah Persekutuan Kuala Lumpur"). Dropdown dùng cho `areaServed` trong LocalBusiness schema và location pages tương lai. Schema Offer PHẢI dùng `priceCurrency="MYR"` và UI hiển thị "RM 25.50" — REUSE `formatPrice()` existing formatter trong `src/lib/utils.ts`, không tạo `src/lib/seo/currency.ts` mới (DRY). Field `telephone` trong LocalBusiness JSON-LD PHẢI format `+60 12 345 6789` (E.164 với khoảng cách). Amend FR-01: `state` field sử dụng dropdown Malaysia thay vì free-text cho thị trường MY. | US-F37-09 | P0 | **REUSE** `MY_STATES` đã có trong `src/lib/shipping/constants.ts` (F36) — KHÔNG tạo `src/lib/seo/my-states.ts`. Bổ sung bản đồ nhãn EN/MS (`MY_STATE_LABELS`) cùng file đó (single source of truth). MYR reuse `formatPrice()`. Xem CF-1 §7.2 |
@@ -193,13 +245,13 @@ Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 pha
 | FR-10 | General SEO score (F03) không phản ánh local; cần điểm riêng để đo tiến độ + thúc đẩy hành vi |
 | FR-11 | Seller không biết làm gì → checklist ưu tiên + ngôn ngữ đơn giản dẫn dắt hành động |
 | FR-12/13 | Định nghĩa item cụ thể theo impact → seller làm đúng thứ tự giá trị |
-| FR-14 | GBP API là nguồn **DUY NHẤT** của local metrics (calls/directions); cần OAuth để truy cập data riêng tư của seller |
+| FR-14 | GBP API là nguồn Google duy nhất cho calls/directions; cần authorization để truy cập data riêng tư của seller |
 | FR-15 | >60% SME SE Asia chưa có GBP → phải hướng dẫn tạo, không chỉ connect |
 | FR-16 | Tránh seller nhập 2 nơi; platform là nguồn sự thật → push 1 chiều lên GBP |
-| FR-17 | Data thực (calls/directions) là giá trị cốt lõi seller thấy được ROI của Local SEO |
+| FR-17 | Vercel (audience) + Payload (conversion) đo website activity trong Analytics; GBP đo local actions từ Google trong SEO. Đủ cho seller dùng subdomain, không cần GA4/GSC/PostHog |
 | FR-18 | Tập trung metric gắn doanh thu, bỏ vanity → seller hiểu giá trị thật |
 | FR-19 | Thấy xu hướng theo thời gian để biết nỗ lực có hiệu quả không |
-| FR-20 | NAP không nhất quán làm tụt local ranking + giảm trust; phát hiện tự động |
+| FR-20 | Business info khác nhau giữa website và Google làm giảm trust; phát hiện tự động bằng wording seller-friendly |
 | FR-21 | Surface rõ ràng (badge) để seller hành động ngay |
 | FR-22 | Seller để trống SEO → trang "undefined"/vô hình; fallback đảm bảo LUÔN index được |
 | FR-23 | FAQ tốt tăng khả năng được AI trích dẫn; seller lười viết → AI draft giảm ma sát |
@@ -218,11 +270,11 @@ Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 pha
 | **CF-1** | MY states: F37 định tạo `src/lib/seo/my-states.ts` trùng `MY_STATES` đã có ở `src/lib/shipping/constants.ts` (F36) | DUPLICATION / High | **REUSE** `MY_STATES`; thêm `MY_STATE_LABELS` (en/ms) cùng file F36. Không tạo file mới. (Đã sửa FR-28, §13.5, §13.7) |
 | **CF-2** | Halal: Site-level (F37) vs Product-level `halalCertified`+`halalCertImage` (F08) — naming + semantic | COLLISION / High | **Naming:** dùng `halalCertified` camelCase ở Site (khớp Product). **Semantic:** Site = business JAKIM cert (LocalBusiness schema + badge); Product = per-item (Product schema, giữ nguyên). Site ON auto-badge product. (Đã sửa FR-27, §13.7) |
 | **CF-3** | robots.txt AI-crawler logic: route `/sites/[slug]/robots.txt` chưa feature nào sở hữu rõ | OWNERSHIP / High | **F37 sở hữu trọn** AI-crawler toggle + render. Ghi rõ trong Sites fields + comment route. Không đụng scope F09 (products/checkout/orders). Actionable |
-| **CF-4** | Local SEO score Phase 1: GBP 25% + NAP 10% chưa earn được khi chưa có OAuth | CONTRADICTION / Med | **RESOLVED:** score normalize trên bucket đang áp dụng → Phase 1 (Data 35/Schema 30/AI 20/Tech 15) đạt 100; bucket GBP/Reviews/NAP/Citations hiện "🔒 unlock Phase 2" từ đầu → không tụt điểm. Chi tiết §13.8 |
+| **CF-4** | Local SEO score Phase 1: Google/Profile signals chưa earn được khi chưa có GBP connection | CONTRADICTION / Med | **RESOLVED:** score normalize trên bucket đang áp dụng → Phase 1 (Data 35/Schema 30/AI 20/Tech 15) đạt 100; Google/Reviews/Business Info/Citations hiện "unlock Phase 2" từ đầu → không tụt điểm. Chi tiết §13.8 |
 | **CF-5** | FR-22 fallback: chưa rõ checkout/orders routes có thuộc `/sites/[slug]/*` không | BOUNDARY / Med | **Implementation verify sớm:** tìm route checkout/orders; nếu nằm trong `/sites/[slug]/*` thì thêm `generateMetadata()`. Đã ghi trong FR-22 |
 | **CF-6** | hreflang (FR-26) phụ thuộc F21 chưa có URL locale routing | DEFERRED / Low | Đã defer P2; F21 nếu làm subpath routing thì báo F37. Không block |
 
-> **Không conflict (đã verify):** OAuth (F03 không hề có OAuth — F37 build mới hoàn toàn), F19 settings form (F37 thêm section mới riêng), F22 events (tên event mới, không trùng), F36 address (warehouse address ≠ business address — khác level).
+> **Không conflict (đã verify):** Google authorization chỉ phục vụ GBP trong F37, F19 settings form (F37 thêm section mới riêng), F22/Payload analytics events (tên event mới, không trùng), F36 address (warehouse address ≠ business address — khác level).
 
 ---
 
@@ -232,10 +284,10 @@ Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 pha
 - **BR-02:** Địa chỉ cấu trúc (`localBusiness` group) là nguồn sự thật cho JSON-LD và GBP sync. Trường free-text `contactInfo.address` giữ nguyên cho backward compat nhưng không được dùng để generate LocalBusiness JSON-LD khi `localBusiness.streetAddress` đã có giá trị.
 - **BR-03:** AI crawlers **mặc định = ALLOW** cho toàn bộ storefronts mới và hiện tại sau khi deploy F37. Seller có thể opt-out per-site; quyết định này được stakeholder approve.
 - **BR-04:** `aggregateRating` KHÔNG được emit trong LocalBusiness JSON-LD (policy Google 2025–2026). Chỉ emit trên Product và Service schema types.
-- **BR-05:** Token GBP OAuth (access_token, refresh_token, token_expiry, location_id) lưu trong **Sites collection**, field group `gbpIntegration` — per-site, không phải per-tenant. Mỗi site kết nối GBP listing riêng. GSC/GA tokens của F03 vẫn nằm trên Tenants — không ảnh hưởng. **[RESOLVED: GBP token = Site-level]**
+- **BR-05:** Token GBP authorization (access_token, refresh_token, token_expiry, location_id) lưu trong **Sites collection**, field group `gbpIntegration` — per-site, không phải per-tenant. Mỗi site kết nối GBP listing riêng. F37 không tạo GSC/GA token. **[RESOLVED: GBP token = Site-level]**
 - **BR-06:** Sync giờ mở cửa từ platform → GBP là one-way push. GBP không phải source of truth cho platform data.
-- **BR-07:** Local SEO Score được tính lại mỗi khi seller save site settings hoặc khi GBP Insights được refresh (max 1 lần/24h).
-- **BR-08:** GBP Insights data cache tối đa 6h — GBP Insights API có quota giới hạn. Hiển thị timestamp "Cập nhật lần cuối: X giờ trước".
+- **BR-07:** Local SEO Score được tính lại mỗi khi seller save site settings hoặc khi GBP metrics snapshot được refresh (max 1 lần/24h). Website analytics (Vercel/Payload) không ảnh hưởng Local SEO Score.
+- **BR-08:** GBP metrics data cache tối đa 6h — Google Business Profile API có quota giới hạn. Hiển thị timestamp "Cập nhật lần cuối: X giờ trước". Website analytics: Payload đọc trực tiếp Neon (không quota); Vercel Web Analytics API cache ~6h vì rate-limited. Không qua Google.
 - **BR-09:** `llms.txt` được generate động tại runtime, không cache lâu dài — đảm bảo luôn phản ánh nội dung mới nhất của seller.
 - **BR-10:** Checklist "Việc cần làm" chỉ hiển thị items chưa hoàn thành. Items đã done tự động ẩn khỏi danh sách (hoặc hiển thị trong "Đã hoàn thành" collapsible section).
 - **BR-11:** Thị trường Malaysia (duy nhất): PostalAddress chuẩn MY (streetAddress, addressLocality = city/town, postalCode 5 chữ số, addressCountry = "MY"). Field `state` dùng dropdown cố định 13 tỉnh + 3 vùng liên bang (FR-28) — không free-text. `telephone` format `+60 12 345 6789`. Schema Offer dùng `priceCurrency="MYR"`.
@@ -243,25 +295,25 @@ Timeline is tight; Google OAuth is the longest-pole dependency. Split into 2 pha
 - **BR-13:** Auto-generation scope isolation — mọi tính năng auto-gen của F37 (SEO metadata fallback, FAQPage JSON-LD, llms.txt, robots.txt AI crawler logic, sitemap tenant) chỉ được kích hoạt trong context route `/sites/[slug]/*`. Platform main site không được import, extend, hoặc bị side-effect bởi bất kỳ middleware hay route handler nào của F37.
 - **BR-14:** SEO metadata fallback thực thi tại render time (`generateMetadata()`) — không phải job batch hay AI call. Độ trễ thêm vào phải < 1ms (pure function, không async). F03 AI Fix-All vẫn là lớp tối ưu riêng biệt, không thay thế fallback này.
 - **BR-15:** Halal schema PHẢI dùng `additionalProperty` → `PropertyValue` — KHÔNG tạo property Schema.org tùy tiện. Nội dung: `name: "Halal Certified"`, `value: "JAKIM Certified"` (hoặc cert number nếu seller nhập). Google không có SERP snippet riêng cho Halal hiện tại — implement để cải thiện E-E-A-T + AI consumption; không oversell kết quả SERP tức thì.
-- **BR-16:** Waze deep-link button PHẢI chỉ render khi site có đủ `latitude` VÀ `longitude`. Không render nút rỗng hoặc URL thiếu tọa độ. Waze không có listing API riêng — visibility qua Waze đến 100% từ GBP sync (BR liên quan: FR-15 GBP wizard).
+- **BR-16:** Waze deep-link button PHẢI chỉ render khi site có đủ `latitude` VÀ `longitude`. Không render nút rỗng hoặc URL thiếu tọa độ. Waze không có listing API riêng — visibility qua Waze đến 100% từ GBP sync (BR liên quan: FR-15 Google connect).
 - **BR-17:** hreflang chỉ emit khi platform có URL locale tương ứng thực tế. Không emit hreflang trỏ đến URL 404. **[FR-26 DEFERRED P2 — BR này không active trong MVP; unblock khi F21 triển khai subpath routing `/en/`, `/ms/`]**
 
 ---
 
 ## 9. User Flow
 
-> **Detailed flow diagrams** (Mermaid, dev-presentation HTML) for all 9 user flows + 2 automatic processes are at [`docs/design/F37-local-seo-user-flows.html`](../design/F37-local-seo-user-flows.html). This section shows 3 primary happy-path flows; open the HTML for comprehensive coverage.
+> Current wireframe: [`docs/design/F37-local-seo-wireframes.md`](../design/F37-local-seo-wireframes.md). This section shows the primary happy-path flows.
 
 ### Flow A: Seller thiết lập Local Business Data (P0 - Happy Path)
 
 ```text
-Seller vào /dashboard → Click tab [Local SEO]
+Seller vào /dashboard → tab SEO
   ↓
-Thấy Local SEO Score = 20/100 + checklist với 5 items "Việc cần làm"
+Thấy Local SEO card trong `Dashboard > SEO`: score 20/100 + 3 việc cần làm
   ↓
 Click item đầu tiên: "Thêm địa chỉ kinh doanh"
   ↓
-Mở form "Thông tin doanh nghiệp địa phương" trong Site Settings
+Mở `Settings > Business Info`
   ↓
 Điền: Địa chỉ, thành phố, mã bưu điện, quốc gia
 Điền giờ mở cửa theo ngày (bảng 7 hàng cho T2–CN)
@@ -271,42 +323,39 @@ Save → Hệ thống tính lại Local SEO Score → hiện 55/100
   ↓
 JSON-LD LocalBusiness tự động cập nhật trên storefront (verified via Google Rich Results Test)
   ↓
-Quay về checklist → Item "Thêm địa chỉ" đã tick xanh
+Quay về `Dashboard > SEO` → Item "Thêm địa chỉ" đã tick xanh
   └── Tiếp theo: "Kết nối Google Business Profile"
 ```
 
 ### Flow B: Kết nối Google Business Profile (P1)
 
 ```text
-Seller click "Kết nối Google Business Profile" trong checklist hoặc tab Local SEO
+Seller click "Connect Google Business Profile" trong `Settings > Business Info`
   ↓
-Hệ thống kiểm tra GBP OAuth token
-  ├── Chưa có GBP → Hiện wizard: Bước 1 "Bạn có Google Business Profile chưa?"
-  │     ├── Có → Bước 2: Chọn listing từ danh sách GBP của Google account
-  │     └── Chưa có → Hiện link + hướng dẫn tạo GBP trên Google (business.google.com)
+Hệ thống kiểm tra GBP connection
+  ├── Chưa có GBP → Hiện link tạo GBP trên Google (business.google.com)
   │
-  └── Đã có → Redirect Google OAuth consent (scope: business.manage)
+  └── Đã có → Redirect Google authorization consent (scope: business.manage)
         ↓
-      Callback → Lưu token vào Sites.gbpIntegration (per-site)
+      Callback → Lưu GBP token vào Sites.gbpIntegration (per-site)
         ↓
-      Hệ thống pull GBP info → So sánh NAP với platform data
-        ├── Khớp → Hiện "Đã kết nối ✓" + nút "Đồng bộ giờ mở cửa lên GBP"
-        └── Không khớp → Hiện chi tiết mismatch + hướng dẫn fix
+      Hệ thống pull Google info → So sánh với Business Info
+        ├── Khớp → Hiện "Connected" + nút "Sync to Google"
+        └── Có khác biệt → Hiện review panel để chọn website value hoặc Google value
 ```
 
-### Flow C: Xem Local SEO Dashboard (P1)
+### Flow C: Xem Local SEO trong Dashboard > SEO (P1)
 
 ```text
-Seller vào /dashboard → Tab [Local SEO]
+Seller vào /dashboard → tab SEO
   ↓
-Thấy 6 metric cards: Cuộc gọi / Chỉ đường / Clicks từ GBP / Lượt xem / Đánh giá / AI appearances
+Thấy Local SEO card + Google activity từ GBP
   ↓
 Chọn khoảng thời gian: 7 ngày / 30 ngày
   ↓
-Xem line chart trend 3 metrics chính
+Xem snapshot metrics và last updated
   ↓
-Cuộn xuống → Local SEO Checklist → Các items còn lại
-  └── Click item → one-click fix hoặc modal hướng dẫn
+Click checklist item → đi tới `Settings > Business Info` hoặc quick fix
 ```
 
 ---
@@ -316,59 +365,57 @@ Cuộn xuống → Local SEO Checklist → Các items còn lại
 > **[Global CMS Constraint]** Render bên trong Main Content Area của F18 CMS Layout.
 > **[Wireframe & Design Rule]** Không dùng ASCII để minh hoạ; dẫn nguồn từ wireframe nếu có.
 
-### 10.1. Tab "Local SEO" trong Dashboard
+### 10.1. Dashboard > SEO
 
-- **Mô tả:** Tab mới thêm vào thanh tabs của F03 Dashboard. Cấu trúc: extend `TabId` union type tại `src/components/dashboard/DashboardTabContent.tsx` to add `'local-seo'`, create `LocalSEOView` component, add entry to `TABS` array. Không tạo route file riêng — tab navigation dùng query param `?tab=local-seo`.
+- **Mô tả:** Reuse tab SEO hiện có trong Dashboard. Không thêm tab `local-seo`, không tạo `LocalSEOView`, không dùng query param mới.
 - **Components chính:**
-  - **Header:** Tiêu đề "Local SEO", Time Period Filter (7 ngày / 30 ngày), badge trạng thái GBP (Đã kết nối / Chưa kết nối).
-  - **Local SEO Score Card:** Vòng tròn điểm (0–100) + nhãn hạng (Yếu / Trung bình / Tốt / Xuất sắc), nút "Cải thiện điểm".
-  - **GBP Insights Cards (2x3 grid, mobile 2x3):** 6 card: Cuộc gọi, Chỉ đường, Clicks từ GBP, Lượt xem GBP, Đánh giá trung bình (+ số reviews), AI appearances. Mỗi card: số liệu lớn + % change + mũi tên xu hướng.
-  - **Trend Chart:** Line chart (Recharts) — 3 series: Cuộc gọi / Chỉ đường / Clicks. Period selector tích hợp.
-  - **NAP Consistency Badge:** Một dòng status: "NAP: Khớp ✓" hoặc "NAP: Có sự khác biệt ⚠" + nút "Xem chi tiết".
-  - **Checklist "Việc cần làm":** Card dọc có accordion. Items nhóm High/Medium impact. Mỗi item: icon trạng thái + mô tả ngắn + badge impact + nút action.
-- **Empty State (chưa kết nối GBP):** Card placeholder cho GBP Insights với nút "Kết nối Google Business Profile" nổi bật.
-- **Empty State (chưa có local business data):** Prompt "Bắt đầu với Local SEO" — dẫn đến form thiết lập.
-- **Design / Wireframe:** `docs/design/F37-local-seo-dashboard.md` (sẽ tạo khi vào sprint)
+  - **SEO Health Overview hiện có:** giữ nguyên layout hiện tại.
+  - **Local SEO Card:** score 0–100, status ngắn, CTA chính "Update business info" hoặc "Connect Google".
+  - **Next steps:** tối đa 3 items, ví dụ "Add opening hours", "Connect Google Business Profile", "Review phone number".
+  - **Google activity:** GBP metrics sau khi connect: Calls, Directions, Website visits. Empty state dẫn về `Settings > Business Info`.
+- **Empty State:** Nếu thiếu business info, card dẫn seller tới `Settings > Business Info`.
+- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md`
 
-### 10.2. Form "Thông tin doanh nghiệp địa phương" (trong Site Settings)
+### 10.2. Settings > Business Info
 
-- **Mô tả:** Section mới trong Site Settings, phía dưới thông tin chung.
+- **Mô tả:** Leaf mới trong Settings, cùng cấp các setting hiện có. Đây là nguồn quản lý thông tin doanh nghiệp và Google Business Profile.
 - **Components chính:**
-  - **Địa chỉ cấu trúc:** Số nhà/Đường, Thành phố/Quận, Bang (dropdown 13 tỉnh + 3 vùng liên bang MY), Mã bưu điện (5 số), Quốc gia mặc định Malaysia.
-  - **Vị trí (toạ độ):** input "Dán link Google Maps của bạn" → tự trích lat/lng (3 lớp, §13.9). Map preview cập nhật ngay. Fallback nâng cao: 2 ô Latitude/Longitude tay nếu trích thất bại.
-  - **Danh mục kinh doanh:** Select dropdown với nhóm: Ăn uống (Restaurant, Cafe, Bar, Bakery...) / Bán lẻ (Store, Supermarket, Pharmacy...) / Dịch vụ (HairSalon, Spa, AutoRepair...) / Khác (LocalBusiness generic).
-  - **Khoảng giá:** Select 4 mức: Bình dân ($) / Trung bình ($$) / Cao cấp ($$$) / Cao nhất ($$$$).
-  - **Khu vực phục vụ:** Textarea tự do (VD: "Quận 1, Quận 3, TP.HCM").
-  - **Giờ mở cửa:** Table 7 hàng (Thứ 2 → Chủ nhật), mỗi hàng: checkbox "Đóng cửa" + time picker Mở/Đóng.
-- **Design / Wireframe:** `docs/design/F37-local-business-form.md` (sẽ tạo khi vào sprint)
+  - **Google Business Profile card:** Connect Google, trạng thái connected, last synced, import from Google, sync to Google.
+  - **Basic info:** business name, phone, website, business category, price range.
+  - **Location:** Google Maps link input, map preview, latitude/longitude advanced fallback.
+  - **Address:** street, city, state dropdown 13 states + 3 federal territories MY, postcode, country default Malaysia.
+  - **Opening hours:** 7-day table with closed toggle and open/close time.
+  - **Service area + Halal:** service area example "Kuala Lumpur, Petaling Jaya, Shah Alam"; Halal Certified toggle + optional JAKIM cert number.
+- **Design / Wireframe:** `docs/design/F37-local-seo-wireframes.md`
 
-### 10.3. Wizard "Kết nối Google Business Profile"
+### 10.3. Connected Google State
 
-- **Mô tả:** Modal wizard 3 bước, xuất hiện khi click "Kết nối GBP" từ checklist hoặc dashboard.
-- **Bước 1:** Câu hỏi "Bạn đã có Google Business Profile chưa?" — 2 nút Yes/No.
-- **Bước 2a (Có GBP):** Nút "Đăng nhập bằng Google" → OAuth flow.
-- **Bước 2b (Chưa có GBP):** Card hướng dẫn + link "Tạo GBP tại business.google.com" (external) + nút "Tôi đã tạo xong → Tiếp tục".
-- **Bước 3:** Hiện thông tin GBP đã kết nối + NAP comparison + nút "Đồng bộ".
+- **Mô tả:** Sau khi Google connect thành công, seller quay lại `Settings > Business Info`.
+- **Components chính:**
+  - **Connected badge:** Google Business Profile connected + listing name.
+  - **Imported data preview:** fields pulled from Google: name, phone, address, opening hours, photos if available.
+  - **Difference review:** rows with simple labels: "Phone number is different", "Address is different". Seller chooses website value or Google value.
+  - **Sync controls:** primary action "Sync to Google"; secondary action "Import from Google".
 
 ### 10.4. UI States
 
-- **Loading State:** Skeleton shimmer cho GBP Insights cards và chart — không dùng spinner.
-- **Error State (GBP API lỗi):** Toast "Không thể tải dữ liệu GBP" + nút "Thử lại". Cards hiện số liệu cache nếu có.
-- **GBP Token hết hạn:** Banner inline "Kết nối GBP đã ngắt — Vui lòng kết nối lại" + nút reconnect.
-- **Modal NAP Mismatch:** Bảng so sánh 2 cột: "Trên website" vs "Trên GBP" — highlight dòng không khớp.
+- **Loading State:** Skeleton shimmer cho cards/forms; không cần chart skeleton.
+- **Google API error:** Toast "Could not load Google data" + retry. Business Info form vẫn usable.
+- **Google connection expired:** Inline banner in Business Info with reconnect button.
+- **Difference Review:** Inline panel trong Business Info, không dùng modal riêng.
 
 ---
 
 ## 11. Acceptance Criteria
 
-> **[BẮT BUỘC]** AC copy từ story đã approve. AC kỹ thuật bổ sung qua story file trước.
+> **[BẮT BUỘC]** AC bên dưới phản ánh PRD hiện tại. Story file cần được sync trước sprint nếu vẫn chứa wording cũ.
 
 ### AC-1: Local Business Data Model — Happy Path
 
 > Source: US-F37-01 — AC-1: Seller thiết lập địa chỉ cấu trúc
 
 ```gherkin
-GIVEN seller đang trong Site Settings → tab "Thông tin doanh nghiệp địa phương"
+GIVEN seller đang trong `Settings > Business Info`
 WHEN  điền đầy đủ streetAddress, city, postcode, country, chọn businessCategory, nhập giờ mở cửa
   AND nhấn Save
 THEN  dữ liệu được lưu vào Sites collection, localBusiness group
@@ -440,15 +487,15 @@ THEN  response là text/plain, HTTP 200
 > Source: US-F37-04 — AC-1: Score phản ánh completeness
 
 ```gherkin
-GIVEN site chưa có local business data, chưa kết nối GBP
-WHEN  vào tab Local SEO trong dashboard
+GIVEN site chưa có local business data, chưa kết nối Google Business Profile
+WHEN  seller vào `Dashboard > SEO`
 THEN  Local SEO Score hiển thị ≤ 30/100
-  AND checklist hiển thị ≥ 4 items "Việc cần làm" với priority High
+  AND checklist hiển thị tối đa 3 items "Việc cần làm" quan trọng nhất
 
-GIVEN seller hoàn thành: địa chỉ cấu trúc + giờ mở cửa + connect GBP + bật AI crawlers
+GIVEN seller hoàn thành Phase 1: địa chỉ cấu trúc + giờ mở cửa + bật AI search
 WHEN  hệ thống tính lại score
-THEN  Local SEO Score ≥ 75/100
-  AND số items High priority trong checklist = 0
+THEN  Local SEO Score có thể đạt 100/100 trong Phase 1 bucket
+  AND số items High priority không phụ thuộc Google trong checklist = 0
 ```
 
 ### AC-8: Checklist — One-click fix
@@ -464,17 +511,17 @@ THEN  toggle "Cho phép AI crawlers" trong Site Settings tự động bật
   AND Local SEO Score tăng 10 điểm
 ```
 
-### AC-9: GBP OAuth — Connect flow
+### AC-9: GBP Authorization — Connect flow
 
-> Source: US-F37-05 — AC-1: OAuth connect thành công
+> Source: US-F37-05 — AC-1: Google Business Profile connect thành công
 
 ```gherkin
-GIVEN seller click "Kết nối Google Business Profile" (chưa connect)
-WHEN  hoàn thành Google OAuth flow với account có GBP listing
+GIVEN seller click "Connect Google Business Profile" trong `Settings > Business Info`
+WHEN  hoàn thành Google authorization flow với account có GBP listing
 THEN  hệ thống lưu access_token + refresh_token vào Sites.gbpIntegration (per-site)
-  AND dashboard hiển thị badge "GBP: Đã kết nối ✓"
-  AND hệ thống tự động pull GBP Insights trong vòng 30 giây
-  AND GBP Insights cards hiển thị data thực (không còn empty state)
+  AND `Settings > Business Info` hiển thị trạng thái "Connected"
+  AND hệ thống tự động pull Google Business Profile info trong vòng 30 giây
+  AND `Dashboard > SEO` có thể hiển thị GBP metrics khi API có data
 ```
 
 ### AC-10: GBP Sync — Giờ mở cửa
@@ -483,48 +530,49 @@ THEN  hệ thống lưu access_token + refresh_token vào Sites.gbpIntegration (
 
 ```gherkin
 GIVEN seller đã connect GBP và đã thiết lập giờ mở cửa trên platform
-WHEN  click nút "Đồng bộ giờ mở cửa lên GBP"
+WHEN  click nút "Sync to Google" trong `Settings > Business Info`
 THEN  hệ thống gọi GBP API cập nhật opening hours trên GBP listing
-  AND hiện toast "Đồng bộ thành công" sau khi API confirm
+  AND hiện toast "Synced to Google" sau khi API confirm
   AND nếu API lỗi → hiện toast lỗi với thông báo cụ thể (không nuốt lỗi)
 ```
 
-### AC-11: GBP Insights — Hiển thị metric cards
+### AC-11: Google Activity — Hiển thị metric cards
 
 > Source: US-F37-06 — AC-1: Dashboard hiển thị đúng metrics
 
 ```gherkin
 GIVEN seller đã connect GBP và chọn khoảng 7 ngày
-WHEN  vào tab Local SEO trong dashboard
-THEN  hiển thị ≥ 4 metric cards (Cuộc gọi, Chỉ đường, Clicks từ GBP, Lượt xem GBP)
-  AND mỗi card hiển thị: số liệu tuyệt đối + % change + mũi tên lên/xuống
+WHEN  seller vào `Dashboard > SEO`
+THEN  hiển thị Google activity từ GBP (Calls, Directions, Website visits)
+  AND mỗi card hiển thị số liệu tuyệt đối
   AND timestamp "Cập nhật: X giờ trước" hiển thị dưới cards
   AND loading state là skeleton shimmer (không phải spinner)
 ```
 
-### AC-12: GBP Insights — Cache và fallback
+### AC-12: GBP Metrics — Cache và fallback
 
 > Source: US-F37-06 — AC-2: Graceful handling khi API không khả dụng
 
 ```gherkin
-GIVEN GBP Insights API trả về lỗi hoặc timeout
-WHEN  seller vào tab Local SEO
+GIVEN GBP metrics API trả về lỗi hoặc timeout
+WHEN  seller vào `Dashboard > SEO`
 THEN  hệ thống hiển thị data từ cache (nếu cache < 6h)
   AND hiển thị banner "Đang dùng dữ liệu cache từ X giờ trước"
   AND nếu không có cache → hiện empty state với nút "Thử tải lại"
   AND không crash toàn bộ dashboard
 ```
 
-### AC-13: NAP Consistency — Phát hiện mismatch
+### AC-13: Business Info Difference — Phát hiện mismatch
 
-> Source: US-F37-07 — AC-1: NAP checker hoạt động đúng
+> Source: US-F37-07 — AC-1: Business info difference checker hoạt động đúng
 
 ```gherkin
 GIVEN seller đã connect GBP và GBP listing có số điện thoại khác với Sites.contactInfo.phone
-WHEN  hệ thống chạy NAP check (sau khi GBP connected hoặc sau khi seller save site settings)
-THEN  dashboard hiển thị badge "NAP: Có sự khác biệt ⚠"
-  AND checklist có item "Số điện thoại không khớp với GBP" với nội dung cụ thể: giá trị trên website vs trên GBP
-  AND Local SEO Score trừ 10 điểm cho inconsistency
+WHEN  hệ thống chạy business info difference check
+THEN  `Settings > Business Info` hiển thị row "Phone number is different"
+  AND row hiển thị giá trị trên website và giá trị trên Google
+  AND seller có thể chọn giữ website value hoặc import Google value
+  AND `Dashboard > SEO` có checklist item dẫn về review panel này
 ```
 
 ### AC-15: Auto SEO Metadata Fallback — Empty Fields
@@ -611,10 +659,10 @@ THEN  badge Halal KHÔNG hiển thị
 
 ```gherkin
 GIVEN screen width < 768px
-WHEN  seller vào tab Local SEO
-THEN  GBP Insights cards hiển thị dạng 2 cột (2x3 grid)
-  AND Trend chart thu nhỏ phù hợp viewport, có thể scroll ngang
-  AND Checklist items hiển thị đầy đủ, nút action rõ ràng (min touch target 44px)
+WHEN  seller vào `Dashboard > SEO`
+THEN  Local SEO card và Google activity cards hiển thị rõ trên mobile
+  AND không có trend chart trong MVP UI
+  AND checklist tối đa 3 items, nút action rõ ràng (min touch target 44px)
   AND không có horizontal overflow
 ```
 
@@ -624,17 +672,17 @@ THEN  GBP Insights cards hiển thị dạng 2 cột (2x3 grid)
 
 | Category | Requirement | Notes |
 |----------|-------------|-------|
-| **Performance** | Tab Local SEO load < 2s (skeleton → real data). GBP Insights cache 6h. | Cache key: `gbp_insights_{siteId}_{period}` |
+| **Performance** | `Dashboard > SEO` Local SEO card load < 2s (skeleton → real data). GBP metrics cache 6h. | Cache key: `gbp_metrics_{siteId}_{period}` |
 | **Performance** | `generateLocalBusinessSchema()` không làm chậm render — pure function, < 5ms | Không có async call trong JSON-LD generator |
 | **Security** | GBP access_token KHÔNG bao giờ expose ra client. Mọi GBP API call qua server-side route. | Token encrypt at rest nếu có thể |
-| **Security** | Route `/api/local-seo/*` yêu cầu auth token + tenant validation. 401 → redirect /login | |
-| **Security** | GBP OAuth redirect URI phải match chính xác URI trong GCP console. CSRF state param bắt buộc. | |
-| **Accessibility** | WCAG 2.1 AA. Metric cards có aria-label rõ ràng. Checklist items keyboard navigable. | |
+| **Security** | Route `/api/local-seo/*` và `/api/google/gbp/*` yêu cầu auth token + tenant validation. 401 → redirect /login | Public callback vẫn verify state |
+| **Security** | GBP Google redirect URI phải match chính xác URI trong GCP console. CSRF state param bắt buộc. | |
+| **Accessibility** | WCAG 2.1 AA. Metric cards, Business Info form, and checklist items keyboard navigable. | |
 | **Browser Support** | Chrome, Safari, Edge (latest 2 versions). Mobile Safari iOS 16+. | |
 | **Device Support** | Mobile 375px, Tablet 768px, Desktop 1280px+ | |
-| **Data / Privacy** | GBP Insights data không chứa PII. Số liệu aggregated theo seller, không track cá nhân. | |
+| **Data / Privacy** | GBP/Vercel/Payload metrics dùng số liệu aggregate theo seller; không expose token hoặc dữ liệu cá nhân trong UI. Payload IP đã hash SHA-256. | |
 | **Reliability** | GBP API lỗi KHÔNG làm crash dashboard. Graceful fallback về cache hoặc empty state. | |
-| **Quota** | GBP Insights API: max 5 requests/tenant/giờ. Implement request throttling. | Google Business Profile API quota |
+| **Quota** | GBP metrics API: max 5 requests/tenant/giờ. Implement request throttling. | Google Business Profile API quota |
 
 ---
 
@@ -644,18 +692,19 @@ THEN  GBP Insights cards hiển thị dạng 2 cột (2x3 grid)
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `LocalSEOView` | `src/components/local-seo/LocalSEOView.tsx` | Tab Local SEO view component — extends F03 dashboard TabId union to include 'local-seo' |
-| `LocalSEOScoreWidget` | `src/components/local-seo/LocalSEOScoreWidget.tsx` | Score circle + breakdown |
-| `GBPInsightsCards` | `src/components/local-seo/GBPInsightsCards.tsx` | 6 metric cards (reuse DashboardStats pattern) |
-| `LocalSEOTrendChart` | `src/components/local-seo/LocalSEOTrendChart.tsx` | Line chart Recharts — calls/directions/clicks |
-| `LocalSEOChecklist` | `src/components/local-seo/LocalSEOChecklist.tsx` | Actionable checklist với one-click fixes |
-| `NAPStatusBadge` | `src/components/local-seo/NAPStatusBadge.tsx` | Inline NAP consistency status |
-| `GBPConnectWizard` | `src/components/local-seo/GBPConnectWizard.tsx` | Modal wizard 3 bước kết nối GBP |
-| `LocalBusinessForm` | `src/components/local-seo/LocalBusinessForm.tsx` | Form địa chỉ cấu trúc + giờ mở cửa trong Site Settings |
+| `LocalSEOCard` | `src/components/dashboard/local-seo/LocalSEOCard.tsx` | Card hiển thị trong existing Dashboard > SEO tab; không thêm tab mới |
+| `LocalSEONextSteps` | `src/components/dashboard/local-seo/LocalSEONextSteps.tsx` | Tối đa 3 checklist items seller-facing |
+| `GoogleActivityCards` | `src/components/dashboard/local-seo/GoogleActivityCards.tsx` | GBP activity: calls, directions, website visits |
+| `BusinessInfoPage` | `src/app/(dashboard)/settings/business-info/page.tsx` | Settings leaf quản lý business info + Google Business Profile |
+| `BusinessInfoForm` | `src/components/settings/business-info/BusinessInfoForm.tsx` | Form địa chỉ cấu trúc, phone, category, map link, opening hours |
+| `GoogleBusinessProfileCard` | `src/components/settings/business-info/GoogleBusinessProfileCard.tsx` | Connect/import/sync Google Business Profile inside Business Info |
+| `BusinessInfoDifferenceReview` | `src/components/settings/business-info/BusinessInfoDifferenceReview.tsx` | Review differences giữa website và Google bằng wording seller-friendly |
 | `generateLocalBusinessSchema` | `src/lib/seo/json-ld.ts` (extend lines 127–156) | Nâng cấp JSON-LD function — thêm geo, hours, priceRange |
 | `localSEOScore` | `src/lib/seo/local-seo-score.ts` (new) | Pure function tính Local SEO Score từ site data |
-| `napChecker` | `src/lib/seo/nap-checker.ts` (new) | So sánh NAP giữa Sites record và GBP data |
+| `businessInfoDiffChecker` | `src/lib/seo/business-info-diff-checker.ts` (new) | So sánh name/address/phone giữa Sites record và GBP data |
 | `gbpClient` | `src/lib/gbp/gbp-client.ts` (new) | GBP API client — fetch insights, sync hours |
+| `vercelAnalyticsClient` | `src/lib/analytics/vercel-client.ts` (new) | Server-side Vercel Web Analytics API query, per-tenant `route` filter + tenant isolation + cache; visitors/pageviews/country/device/referrer |
+| Payload analytics (existing) | `/api/analytics/summary`, `/api/analytics/track`, `src/collections/Analytics.ts` | First-party clicks→purchase + top products; already per-tenant, reuse as-is |
 | `llms.txt route` | `src/app/sites/[slug]/llms.txt/route.ts` (new) | Dynamic llms.txt per-tenant |
 | `robots.txt route` | `src/app/sites/[slug]/robots.txt/route.ts` (modify) | Remove blanket AI crawler block; add per-site toggle logic |
 
@@ -708,22 +757,26 @@ GET  /api/local-seo/score?siteId=X
      → { score: number, breakdown: object, checklistItems: Array }
      Auth: tenant-scoped
 
-GET  /api/local-seo/gbp-insights?siteId=X&period=7d|30d
-     → { calls, directions, websiteClicks, profileViews, reviewRating, reviewCount, aiAppearances }
+GET  /api/google/gbp/insights?siteId=X&period=7d|30d
+     → { calls, directions, websiteVisits }
      Auth: tenant-scoped | Cache: 6h
 
-POST /api/local-seo/gbp-sync-hours
+GET  /api/local-seo/google-activity?siteId=X&period=7d|30d
+     → { calls, directions, websiteVisits }
+     Auth: tenant-scoped | Source: GBP
+
+POST /api/google/gbp/sync-business-info
      Body: { siteId: string }
      → { success: boolean, syncedAt: string }
      Auth: tenant-scoped
 
 GET  /api/google/gbp/auth?siteId=X
-     → Redirect to Google OAuth (scope: business.manage)
+     → Redirect to Google authorization (scope: business.manage)
 
 GET  /api/google/gbp/callback
-     → Exchange code → store token → redirect /dashboard/local-seo
+     → Exchange code → store token → redirect /settings/business-info?google=connected
 
-POST /api/local-seo/nap-check?siteId=X
+POST /api/local-seo/business-info-diff?siteId=X
      → { consistent: boolean, mismatches: Array<{ field, platform, gbp }> }
      Auth: tenant-scoped
 
@@ -731,44 +784,44 @@ GET  /sites/[slug]/llms.txt
      → text/plain, dynamic content per tenant (public route)
 ```
 
-### 13.4 GBP OAuth Flow (BUILD FROM SCRATCH)
+### 13.4 GBP Google Authorization Flow (BUILD FROM SCRATCH)
 
-**IMPORTANT:** Google OAuth infrastructure does NOT exist in codebase. No `src/app/api/google/` directory, no token storage on Tenants, no GSC/GA OAuth. Implement shared OAuth client for GBP + GSC (future).
+**IMPORTANT:** Google authorization infrastructure for GBP does NOT exist in codebase. No `src/app/api/google/` directory, no GBP token storage. Implement GBP-only authorization. Do not add GA4/GSC scopes.
 
 ```text
 1. GCP Console: Enable "My Business Business Information API" + "My Business Account Management API"
    Add scope: https://www.googleapis.com/auth/business.manage
    Thêm redirect URI: https://{cms-domain}/api/google/gbp/callback
-   **ACTION:** Submit OAuth verification form (~4–6 tuần lead time)
+   **ACTION:** Submit Google verification form (~4–6 tuần lead time)
 
-2. Build shared OAuth infra: `src/lib/google/oauth-client.ts` (consent URL, callback, token exchange, refresh)
+2. Build GBP authorization infra: `src/lib/google/gbp-auth-client.ts` (consent URL, callback, token exchange, refresh)
    Routes: `/api/google/gbp/auth?siteId=X`, `/api/google/gbp/callback?code=...&state=...`
 
 3. Seller click "Kết nối GBP" → POST /api/google/gbp/auth?siteId=X
-   → Build OAuth URL với state=siteId (CSRF)
+   → Build Google authorization URL với state=siteId (CSRF)
    → Redirect seller → Google consent screen (scope: business.manage)
 
 4. Google redirect về /api/google/gbp/callback?code=X&state=siteId
    → Verify state parameter → Exchange code → access_token + refresh_token
    → Encrypt + store vào Sites.gbpIntegration (per-site)
    → Fetch seller's GBP location_id qua GBP Locations API
-   → Lưu location_id vào Sites.gbpIntegration → redirect /dashboard?tab=local-seo
+   → Lưu location_id vào Sites.gbpIntegration → redirect /settings/business-info?google=connected
 
 5. Mọi GBP API call sau đó:
    → Check token expiry (Sites.gbpIntegration.token_expiry) → auto-refresh với refresh_token nếu cần
-   → Gọi GBP API → Cache response 6h theo key gbp_insights_{siteId}_{period}
+   → Gọi GBP API → Cache response 6h theo key gbp_metrics_{siteId}_{period}
 ```
 
 ### 13.5 Codebase Reuse
 
-- **Reuse:** `(dashboard)` route group + tab pattern của F03 (TabId union + TabPanel), Recharts, `DashboardStats.tsx` pattern, `src/lib/seo/json-ld.ts` (extend `generateLocalBusinessSchema()`), `contactInfo`/`socialLinks` trên Sites, `formatPrice()` currency formatter, `generateMetadata()` pattern, existing FAQSchema generator.
-- **New files — Shared OAuth infra:** `src/lib/google/oauth-client.ts` (shared for GBP + GSC future), `/api/google/gbp/auth`, `/api/google/gbp/callback`.
-- **New files — Local SEO:** `src/lib/gbp/gbp-client.ts`, `src/lib/seo/local-seo-score.ts`, `src/lib/seo/nap-checker.ts`, `src/lib/seo/map-links.ts`, `src/app/sites/[slug]/llms.txt/route.ts`, components trong `src/components/local-seo/`, modify `src/app/sites/[slug]/robots.txt/route.ts` để thêm toggle logic.
-- **REUSE (không tạo mới):** `MY_STATES` từ `src/lib/shipping/constants.ts` (F36), `formatPrice()` từ `src/lib/utils.ts`, `generateLocalBusinessSchema()` + `generateFAQSchema()` từ `src/lib/seo/json-ld.ts`, `generateMetadata()` cascading hiện có, `DashboardStats` + Recharts. KHÔNG tạo `src/lib/seo/my-states.ts` hay `src/lib/seo/currency.ts`.
+- **Reuse:** Existing Dashboard SEO tab/content pattern, `DashboardStats.tsx` card pattern, `(dashboard)/settings` route group, existing Payload analytics (`/api/analytics/summary`, `AnalyticsView.tsx`, `DashboardStats.tsx`) reused as-is for conversion metrics, `src/lib/seo/json-ld.ts` (extend `generateLocalBusinessSchema()`), `contactInfo`/`socialLinks` trên Sites, `formatPrice()` currency formatter, `generateMetadata()` pattern, existing FAQSchema generator.
+- **New files — GBP authorization:** `src/lib/google/gbp-auth-client.ts`, `/api/google/gbp/auth`, `/api/google/gbp/callback`.
+- **New files — Local SEO:** `src/lib/gbp/gbp-client.ts`, `src/lib/seo/local-seo-score.ts`, `src/lib/seo/business-info-diff-checker.ts`, `src/lib/seo/map-links.ts`, `src/app/sites/[slug]/llms.txt/route.ts`, dashboard card components trong `src/components/dashboard/local-seo/`, settings components trong `src/components/settings/business-info/`, modify `src/app/sites/[slug]/robots.txt/route.ts` để thêm toggle logic.
+- **REUSE (không tạo mới):** `MY_STATES` từ `src/lib/shipping/constants.ts` (F36), `formatPrice()` từ `src/lib/utils.ts`, `generateLocalBusinessSchema()` + `generateFAQSchema()` từ `src/lib/seo/json-ld.ts`, `generateMetadata()` cascading hiện có, `DashboardStats` card pattern. KHÔNG tạo `src/lib/seo/my-states.ts` hay `src/lib/seo/currency.ts`.
 
 ### 13.7 Malaysia Market Optimization — Technical Notes
 
-- **Waze deep-link helper:** Pure function `getWazeUrl(lat, lng): string` trong `src/lib/seo/map-links.ts` — trả về `https://waze.com/ul?ll={lat},{lng}&navigate=yes`. Render trong storefront contact section chỉ khi cả `latitude` lẫn `longitude` có giá trị. **Không cần Waze API:** Waze seller visibility đến 100% từ GBP sync (~24h latency) — GBP wizard (FR-15) chính là chiến lược Waze. Tùy chọn: thêm Waze URL vào `hasMap` array của LocalBusiness JSON-LD song song Google Maps URL.
+- **Waze deep-link helper:** Pure function `getWazeUrl(lat, lng): string` trong `src/lib/seo/map-links.ts` — trả về `https://waze.com/ul?ll={lat},{lng}&navigate=yes`. Render trong storefront contact section chỉ khi cả `latitude` lẫn `longitude` có giá trị. **Không cần Waze API:** Waze seller visibility đến 100% từ GBP sync (~24h latency) — Google connect (FR-15) chính là chiến lược Waze. Tùy chọn: thêm Waze URL vào `hasMap` array của LocalBusiness JSON-LD song song Google Maps URL.
 - **hreflang via `alternates.languages`:** **[FR-26 DEFERRED P2 — không implement trong sprint này.]** i18n hiện tại là client-side only (localStorage/cookie, single URL); hreflang yêu cầu URL-based subpath routing chưa có. Implement khi F21 triển khai `/en/`, `/ms/` subpath routing.
 - **Halal field + schema injection:** Thêm field Payload `halalCertified` (boolean, camelCase khớp Product) + `halalCertNumber` (varchar, nullable) vào group `localBusiness` của Sites. Trong `generateLocalBusinessSchema()`: khi `halalCertified = true`, append `additionalProperty` block. Storefront đọc flag để render badge. Dùng `PropertyValue` chuẩn. **Tách bạch với Product-level Halal (F08):** Site = business JAKIM cert (LocalBusiness schema); Product = per-item (`halalCertified`+`halalCertImage` giữ nguyên, Product schema). Site ON có thể auto-badge product.
 - **MY states — REUSE từ F36:** dùng `MY_STATES` đã có trong `src/lib/shipping/constants.ts` (16 entries). Bổ sung bản đồ nhãn song ngữ `MY_STATE_LABELS` (`{ en, ms }`) NGAY trong file đó để dùng chung cho cả shipping lẫn SEO (single source of truth). KHÔNG tạo `src/lib/seo/my-states.ts`. MYR reuse `formatPrice()` (`src/lib/utils.ts`) — KHÔNG tạo `currency.ts`.
@@ -810,10 +863,10 @@ Per-tenant scope isolation (FR-24) ALREADY met by existing codebase: `robots.txt
 | Business Data | 20% |
 | Structured Data | 12% |
 | On-Page signals | 10% |
-| NAP consistency | 10% |
+| Business info consistency | 10% |
 | Citations & links | 8% |
 
-**No-drop rule:** item Phase 2 (GBP/Reviews/NAP/Citations) PHẢI hiển thị "🔒 +X điểm — mở khoá khi kết nối Google" ngay trong Phase 1. Headline ghi rõ "Phase 1 — Nền tảng". Khi Phase 2 deploy, mẫu số mở rộng nhưng vì đã thấy trước nên seller hiểu là cơ hội tăng thêm, không phải reset.
+**No-drop rule:** item Phase 2 (Google Business Profile/Reviews/Business Info/Citations) PHẢI hiển thị "unlock Phase 2" ngay trong Phase 1. Headline ghi rõ "Phase 1 — Nền tảng". Khi Phase 2 deploy, mẫu số mở rộng nhưng vì đã thấy trước nên seller hiểu là cơ hội tăng thêm, không phải reset.
 
 ### 13.9 Geocoding — Paste Google Maps Link → lat/lng
 
@@ -835,14 +888,16 @@ Seller KHÔNG gõ toạ độ. Họ dán link Google Maps → hệ thống tríc
 
 | Dependency | Status | Action Needed |
 |-----------|--------|---------------|
-| **Google OAuth Infrastructure (PREREQUISITE)** | **BLOCKED** | **BUILD SHARED OAUTH CLIENT FROM SCRATCH** (`src/lib/google/oauth-client.ts`) for GBP + GSC (future). No existing Google OAuth in codebase. **CRITICAL: Submit Google OAuth verification form immediately (~4–6 tuần lead time).** This is the longest-pole dependency; blocks GBP wizard implementation. |
-| Google Business Profile API (My Business API v4) | Pending | Enable trong GCP Console — cùng project; requires successful OAuth verification |
+| **GBP Google Authorization (PREREQUISITE)** | **BLOCKED** | **BUILD GBP-ONLY AUTH CLIENT FROM SCRATCH** (`src/lib/google/gbp-auth-client.ts`). No existing GBP auth in codebase. **CRITICAL: Submit Google verification form immediately (~4–6 tuần lead time).** This is the longest-pole dependency; blocks Google Business Profile connect. |
+| Google Business Profile API (My Business API v4) | Pending | Enable trong GCP Console — cùng project; requires successful Google verification |
+| Vercel Web Analytics API | `@vercel/analytics` already installed; API needs Pro plan for useful reporting window | Build server-side query client (`route` filter + tenant isolation + cache); no GA4/GSC/PostHog |
+| Payload analytics | Already live in repo | Reuse `/api/analytics/summary` for conversion metrics; no work beyond wiring into unified Analytics view |
 | Google Maps Geocoding API | Pending (fallback layer) | Enable trong GCP Console — chỉ là lớp fallback 3 của geocoding (§13.9). Phần lớn seller dùng paste-link (lớp 1-2) không tốn quota. $5/1k, free tier phủ phần lớn. |
-| F03 Dashboard Suite (tab pattern, Recharts, existing generateMetadata) | Done | Reuse existing TabId pattern + tab components |
+| F03 Dashboard Suite (existing SEO dashboard, existing generateMetadata) | Done | Reuse existing Dashboard > SEO surface; do not add a separate dashboard tab |
 | F02 Auth (Tenants, session) | Done | |
 | F22 Analytics Tracking (event tracking cho checklist completion) | Pending | Cần track `local_seo_checklist_completed` event |
 | `scripts/db-setup.js` migration entries | Pending | Dev thêm migration cho sites_opening_hours + sites.local_business_* + sites.gbp_integration_* fields |
-| Waze deep-link (FR-25) | Depends on FR-15 GBP wizard | Waze visibility = GBP sync; không cần API riêng. Deep-link chỉ cần lat/lng |
+| Waze deep-link (FR-25) | Depends on FR-15 Google connect in Business Info | Waze visibility = GBP sync; không cần API riêng. Deep-link chỉ cần lat/lng |
 | hreflang en-MY + ms-MY (FR-26) | **DEFERRED P2** | FR-26 hoãn sang P2 — i18n client-side only hiện tại; cần F21 URL-based locale routing trước |
 
 ---
@@ -850,27 +905,14 @@ Seller KHÔNG gõ toạ độ. Họ dán link Google Maps → hệ thống tríc
 ## 15. API Contract
 
 ```text
-GET /api/local-seo/gbp-insights
+GET /api/google/gbp/insights
 Request: ?siteId={string}&period={7d|30d}
 Response: {
   success: boolean,
   data: {
     calls: number,
-    callsChange: number,          // % so với kỳ trước
     directions: number,
-    directionsChange: number,
-    websiteClicks: number,
-    websiteClicksChange: number,
-    profileViews: number,
-    reviewRating: number,         // 0–5
-    reviewCount: number,
-    aiAppearances: number | null, // null nếu API chưa cung cấp
-    trend: Array<{
-      date: string,               // YYYY-MM-DD
-      calls: number,
-      directions: number,
-      websiteClicks: number
-    }>,
+    websiteVisits: number,
     cachedAt: string,             // ISO timestamp
     cacheAge: number              // seconds
   },
@@ -884,11 +926,12 @@ Response: {
   data: {
     score: number,                // 0–100
     breakdown: {
-      businessData: number,       // 0–30
-      jsonLd: number,             // 0–25
-      gbpConnected: number,       // 0–25
-      aiCrawlers: number,         // 0–10
-      napConsistency: number      // 0–10
+      businessData: number,
+      structuredData: number,
+      aiDiscoverability: number,
+      technicalHealth: number,
+      googleBusinessProfile?: number,
+      businessInfoConsistency?: number
     },
     checklistItems: Array<{
       id: string,
@@ -907,11 +950,11 @@ Response: {
 ## 16. Open Questions
 
 > Không còn open question — tất cả đã chốt thành decision:
-> - **#1 GBP OAuth verification timeline** → Dependencies: submit verification sớm (~4–6 tuần lead time)
-> - **#2 AI Overview appearances field** → render card nếu API trả về field; ẩn nếu không (FR-18)
+> - **#1 GBP authorization verification timeline** → Dependencies: submit verification sớm (~4–6 tuần lead time)
+> - **#2 Google activity fields** → MVP chỉ hiển thị Calls, Directions, Website visits từ GBP trong SEO; website activity nằm ở Dashboard > Analytics (Vercel + Payload)
 > - **#3 Geocoding** → RESOLVED: seller dán link Google Maps → trích lat/lng 3 lớp; Geocoding API chỉ là fallback (§13.9)
 > - **#4 Multi-site GBP token scope** → token + location_id per-Site (FR-14, BR-05, §13.2)
-> - **#5 Local SEO Score Phase 1 (CF-4)** → RESOLVED: normalize trên bucket áp dụng; Phase 1 đạt 100; bucket Phase 2 "🔒 unlock" (§13.8)
+> - **#5 Local SEO Score Phase 1 (CF-4)** → RESOLVED: normalize trên bucket áp dụng; Phase 1 đạt 100; Phase 2 signals unlock later (§13.8)
 > - **#5 FAQ auto-gen source** → RESOLVED: AI-generated draft (reuse OpenAI hiện có), seller-editable (xem FR-23)
 > - **#6 hreflang URL routing** → RESOLVED: FR-26 DEFERRED P2 — i18n client-side only hiện tại; unblock khi F21 có URL-based routing
 > - **#7 Halal verification model** → RESOLVED: trust seller toggle + optional JAKIM cert number, không validate trong MVP (xem FR-27, BR-15)
@@ -920,31 +963,31 @@ Response: {
 
 ## 17. 9-Point Done Checklist
 
-- [ ] Loading State — Skeleton shimmer cho GBP Insights cards, trend chart, và score widget
-- [ ] Empty State — Chưa có GBP: prompt connect; chưa có local business data: prompt thiết lập
+- [ ] Loading State — Skeleton shimmer cho Local SEO card, Google activity cards, và Business Info form
+- [ ] Empty State — Chưa connect Google Business Profile: prompt connect trong Business Info; chưa có business data: prompt thiết lập
 - [ ] Error State — GBP API lỗi: toast + fallback cache; token hết hạn: banner reconnect
 - [ ] Form Validation — Postcode MY (5 digits); lat range -90 đến 90; lng range -180 đến 180; opens/closes HH:MM format
-- [ ] Button States — "Đồng bộ lên GBP" disabled khi đang gọi API; "Bật ngay" disabled sau khi đã toggle
+- [ ] Button States — "Sync to Google" disabled khi đang gọi API; "Bật ngay" disabled sau khi đã toggle
 - [ ] Toast Feedback — Thành công / Lỗi cho: Save local business data, GBP sync, GBP connect/disconnect
 - [ ] Auth Redirect — 401 → /login; GBP token expired → reconnect flow
-- [ ] Mobile 375px — GBP Insights 2x3 grid, checklist full width, wizard modal bottom-sheet friendly
-- [ ] TypeScript Clean — `tsc --noEmit` pass; không có `any` mới trong local-seo components
+- [ ] Mobile 375px — Local SEO card, Google activity cards, Business Info form, checklist full width
+- [ ] TypeScript Clean — `tsc --noEmit` pass; không có `any` mới trong Local SEO / Business Info components
 
 ---
 
 ## 18. Definition of Ready
 
 - [ ] User Stories F37 approved và linked ở Section 0
-- [ ] AC ở Section 11 đã được copy/approve từ story file
+- [ ] Story file đã sync với AC hiện tại trong Section 11
 - [ ] FR ở Section 7 có đầy đủ Story Ref
-- [x] ~~Open Question #1 (GBP OAuth verification timeline)~~ → Action item trong Dependencies: submit verification sớm
+- [x] ~~Open Question #1 (GBP authorization verification timeline)~~ → Action item trong Dependencies: submit verification sớm
 - [x] ~~Open Question #4 (multi-site GBP token scope)~~ → RESOLVED: token per-Site (xem FR-14, BR-05, §13.2)
 - [x] Geocoding approach decided → paste Google Maps link, 3-layer (§13.9)
 - [x] Local SEO Score formula decided → Phase 1/2 normalized buckets (§13.8)
 - [ ] GBP API đã được enable trong GCP Console (hoặc test account setup)
 - [ ] Architecture doc exists: `docs/architecture/F37-local-seo.md`
 - [ ] Schema migration entries drafted và review bởi Dev lead
-- [ ] Dependencies confirmed (F22 tracking, GBP API access)
+- [ ] Dependencies confirmed (Vercel Web Analytics API + Pro plan, Payload analytics live, GBP API access)
 
 ---
 
@@ -957,6 +1000,6 @@ Response: {
 - [ ] `generateLocalBusinessSchema()` output validated bằng Google Rich Results Test
 - [ ] robots.txt AI crawler behavior verified bằng automated test
 - [ ] Mobile responsive verified (375px)
-- [ ] GBP OAuth flow tested end-to-end với real Google account
+- [ ] GBP authorization flow tested end-to-end với real Google account
 - [ ] Schema migration pass `scripts/check-migrations.js` gate
 - [ ] Non-Functional Requirements validated (performance < 2s, GBP cache working)
