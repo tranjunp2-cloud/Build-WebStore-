@@ -24,7 +24,7 @@ F36 gồm 5 surface chính, theo 4 phase PRD:
 - **Screen B — Checkout Rate (Phase B):** Buyer nhập địa chỉ (reuse F14 cascade) → phí ship thật vào thẳng Order Summary (1 dòng "Shipping", KHÔNG section vận chuyển, KHÔNG SST). Hybrid: chưa cấu hình → giữ UI fee đơn F14.
 - **Screen C — Create Label (Phase C):** KHÔNG màn riêng. Mua label gắn vào nút **"Ready to Ship"** có sẵn trong `OrderDetailPanel` → AWB + label PDF; in label; pickup/dropoff. Non-EP: `ShipOrderModal` manual giữ nguyên (nhánh do config tenant, KHÔNG tab toggle).
 - **Screen D — Order Tracking (Phase C):** KHÔNG màn riêng — làm giàu component có sẵn của trang đơn buyer (`OrderTrackingClient`: `OtShippingCard` + `OtTimeline`) + badge tracking trong `OrderDetailPanel` merchant. Dual-field: `order.status` (lifecycle, manual) tách khỏi `shippingTrackingStatus` (13 status chuẩn EasyParcel, cron poll 30–60′).
-- **Screen E — Returns (Phase D):** KHÔNG dựng RMA/buyer-request UI. 2 luồng phân biệt bằng banner: **Case 1 Courier RTS** (auto khi `shippingTrackingStatus=RETURNED`) + **Case 2 Buyer RMA** (merchant tự mở, buyer tự gửi + nhập tracking tay). Cả 2 reuse `/refund` + `/cancel`; cancel refund = message theo trạng thái label gốc. Reverse label = cắt khỏi MVP (§8).
+- **Screen E — Returns (Phase D):** KHÔNG dựng RMA/buyer-request UI. 2 luồng phân biệt bằng banner: **Case 1 Courier RTS** (auto khi `shippingTrackingStatus=RETURNED`) + **Case 2 Buyer RMA** (merchant tự mở, buyer tự gửi + nhập tracking tay). Cả 2 reuse `/refund` + `/cancel`; cancel pre-pickup phải hủy EP shipment trước, picked-up trở đi dùng Refund/Return. Reverse label = cắt khỏi MVP (§8).
 
 ### Design Principles
 - **KISS:** Mirror pattern `echIntegration` cho connect; reuse Card form của F14/F19.
@@ -446,16 +446,19 @@ CASE 2 — Buyer Return (THỦ CÔNG, ngoài EP)
 
 ```text
 Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nhận hủy]
-Đã mua, chưa pickup: → "Refund tiền hàng. Cước: hủy đơn trên dashboard EasyParcel
-                        để hoàn ví." [Đi tới EasyParcel ↗] [Xác nhận]
-Đã pickup:       → "Refund tiền hàng. ⚠️ Cước đã mất." [Xác nhận]
+Đã mua, chưa pickup: → "Đang hủy vận đơn EasyParcel trước khi hủy đơn..."
+                       [Xác nhận hủy] → EP success mới refund/restock/email
+EP cancel failed: → "Không hủy được vận đơn EasyParcel. Đơn chưa bị hủy,
+                    chưa hoàn tiền, chưa nhập kho." [Thử lại]
+Đã pickup:       → "Không thể hủy đơn vì courier đã pickup. Dùng Refund/Return.
+                    ⚠️ Cước đã mất."
 ```
 
 **Components:**
 - Case 1 banner: `<Alert variant="destructive">` tự render khi `shippingTrackingStatus = RETURNED` (0 field mới — dùng lại tracking enum của Screen D).
 - Case 2 trigger + fields: nút "Khách xin trả hàng" mở `<Alert>` + input tracking tay + `<RadioGroup>` ai chịu phí. **Field lưu DB chưa chốt — xem §10.**
 - Refund + restock (chung cả 2 case): **REUSE nút Refund/Cancel có sẵn** trong `OrderDetailPanel` (`/api/orders/[id]/{refund,cancel}`). KHÔNG component refund mới.
-- Cancel tiers: `<Alert>` text theo trạng thái label chọn endpoint — chưa label → `/cancel` (full refund+restock); đã label → `/refund` + message hủy cước trên dashboard EP.
+- Cancel tiers: `<Alert>` text theo trạng thái label — chưa label → `/cancel` (full refund+restock); đã label + pre-pickup → `/cancel` refresh tracking + EP `POST /shipment/cancel`, EP success mới local cancel; picked-up trở đi → block Cancel, chuyển sang Refund/Return.
 - Refund tiền hàng qua provider có sẵn (Stripe live; manual COD/bank; Xendit = F34) — KHÔNG qua EasyParcel.
 
 **States:**
@@ -464,9 +467,10 @@ Chưa mua label:  → "Refund FULL (hàng + ship) + nhập kho lại"   [Xác nh
 | Case 1 — EP báo `RETURNED` | Banner đỏ tự hiện; gợi ý kiểm hàng → Refund; cảnh báo cước/COD đã mất |
 | Case 2 — merchant mở RMA | Banner vàng; input tracking tay + radio ai chịu phí |
 | Nhận hàng về (cả 2) | Bấm nút Refund có sẵn → refund + restock (reuse) |
-| Cancel chưa label | `/cancel` có sẵn: refund full + restock ngay |
-| Cancel chưa pickup | `/refund` có sẵn: refund hàng; link EasyParcel hủy cước thủ công |
-| Cancel đã pickup | `/refund` có sẵn: refund hàng; cảnh báo cước mất |
+| Cancel chưa label | `/cancel` có sẵn: refund full + restock + discount release/email ngay |
+| Cancel chưa pickup | `/cancel`: refresh EP tracking → EP cancel shipment → local cancel/refund/restock/email |
+| EP cancel failed | Không local cancel/refund/restock; Alert lỗi + Thử lại |
+| Cancel đã pickup | Cancel disabled/blocked; dùng Refund/Return; cảnh báo cước mất |
 
 ---
 
@@ -571,7 +575,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md)
 - ❌ Insurance / parcel-protection toggle
 - ❌ Multi-warehouse picker (1 origin/merchant cho MVP)
 - ❌ COD reconciliation dashboard (chỉ lưu `codAmount`; đối soát xem trên EasyParcel)
-- ❌ Auto-cancel shipment trong app (xử lý trên dashboard EasyParcel)
+- ❌ Force-cancel shipment sau pickup hoặc sau khi courier đã xử lý
 - ❌ Màn/route "Tạo vận đơn" riêng + tab toggle manual/EP (label gắn vào nút "Ready to Ship" có sẵn)
 - ❌ RMA collection + buyer return-request UI (return = reuse nút Refund/Cancel có sẵn)
 - ❌ **Reverse label / EP-paid return pickup** (đảo origin↔dest qua `POST /shipment/submit_orders`) — buyer tự gửi + nhập tracking tay đã đủ cho MVP; pickup tại địa chỉ buyer lẻ chưa chắc mọi courier MY hỗ trợ. Backlog post-MVP.

@@ -158,7 +158,7 @@ Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate vi
 
 **Dual-field:** `order.status` (lifecycle, merchant bấm tay — vd "Đánh dấu hoàn tất") **tách biệt** `shippingTrackingStatus` (13 status EasyParcel, cron poll). Delivered → KHÔNG auto-complete; merchant tự bấm.
 
-**Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** `[ Hoàn Tiền ]` + `[ Huỷ Đơn ]` có sẵn (`/refund` + `/cancel`, tự restock, idempotent); refund phân tier theo trạng thái label (chưa mua → full; chưa pickup → hủy trên dashboard EasyParcel; đã pickup → cước mất). **Reverse label cắt khỏi MVP.**
+**Returns / Refund (Phase D):** KHÔNG dựng RMA UI mới — **reuse** `[ Hoàn Tiền ]` + `[ Huỷ Đơn ]` có sẵn (`/refund` + `/cancel`, tự restock, idempotent); cancel phân tier theo trạng thái label (chưa mua → full; pre-pickup → Primeweb hủy vận đơn EP trước rồi mới local cancel; picked-up trở đi → block Cancel, dùng Refund/Return, cước mất). **Reverse label cắt khỏi MVP.**
 
 **Non-EP tenant:** hiển thị ô nhập `trackingNumber` **thủ công ngay trên panel chính** (không có nút Ready to Ship EasyParcel, KHÔNG gộp vào modal/tab).
 
@@ -209,10 +209,10 @@ Actor: Merchant — KHÔNG có RMA UI mới, reuse nút có sẵn
 1. Buyer/Merchant → yêu cầu trả/hủy
 2. Merchant → bấm [Huỷ Đơn] hoặc [Hoàn Tiền] trên drawer (nút có sẵn)
    System   → /cancel hoặc /refund (idempotent, tự restock)
-3. System   → refund phân tier theo trạng thái label:
-   ├─ chưa mua label     → refund FULL (hàng + ship) + restock
-   ├─ đã mua, chưa pickup → refund tiền hàng; cước: hủy trên dashboard EasyParcel hoàn ví
-   └─ đã pickup          → refund tiền hàng; ⚠️ cước mất (ghi rõ)
+3. System   → cancel/refund phân tier theo trạng thái label:
+   ├─ chưa mua label     → refund FULL (hàng + ship) + restock + discount release/email
+   ├─ đã mua, chưa pickup → refresh tracking → EP cancel shipment → local cancel/refund/restock/email
+   └─ đã pickup          → block Cancel; dùng Refund/Return sau khi hàng quay về; ⚠️ cước mất
    (Reverse label: KHÔNG hỗ trợ ở MVP)
 ```
 

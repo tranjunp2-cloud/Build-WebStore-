@@ -960,34 +960,60 @@ So that tiền hàng và cước được xử lý công bằng, không thất t
 GIVEN order chưa mua label (chưa có awbNo)
 WHEN  hủy đơn → POST /api/orders/[id]/cancel (F10, có sẵn)
 THEN  refund FULL (tiền hàng + ship) + restock atomic ngay (reuse)
+  AND discount release + email behavior giữ nguyên như F10 hiện tại
 ```
 
 > 📌 Source: PRD FR D-4, §8 Phase D AC#3
 
-#### AC-2: Đã mua label, chưa pickup → /refund có sẵn + message hủy cước
+#### AC-2: Đã mua label, pre-pickup → EP cancel success rồi mới local cancel
 
 ```gherkin
-GIVEN order đã mua label nhưng chưa pickup
-WHEN  hủy đơn → POST /api/orders/[id]/refund (có sẵn, Stripe/manual)
-THEN  refund tiền HÀNG + restock (reuse)
-  AND ship: message hướng dẫn merchant tự hủy shipment trên dashboard EasyParcel (credit hoàn ví)
-  AND MVP không wire cancel programmatic (product decision — `POST /shipment/cancel` có sẵn nhưng out-of-scope MVP)
+GIVEN order đã mua label và shippingTrackingStatus còn pre-pickup
+WHEN  merchant hủy đơn → POST /api/orders/[id]/cancel
+THEN  backend refresh tracking từ EasyParcel lần cuối
+  AND gọi EasyParcel `POST /shipment/cancel` với `cancel_list[{ shipment_number: easyParcelOrderNo, remark }]`
+  AND chỉ sau khi EP item `data[].status` thành công mới chạy local cancel: refund/restock/email
 ```
 
-> 📌 Source: PRD FR D-5, D-6 + §8 (cancel endpoint có sẵn; MVP defer sang dashboard)
+> 📌 Source: PRD FR D-5, D-6 + §8 (cancel endpoint Phase D in-scope)
 
-#### AC-3: Đã pickup → /refund có sẵn: refund hàng, cước mất
+#### AC-3: EP cancel item error → không local cancel
 
 ```gherkin
-GIVEN order đã pickup
-WHEN  hủy đơn → POST /api/orders/[id]/refund (có sẵn)
-THEN  refund tiền hàng + restock (reuse)
+GIVEN order đã mua label và đang pre-pickup trong Primeweb
+WHEN  EasyParcel `POST /shipment/cancel` trả HTTP 200 nhưng item `data[].status` lỗi
+THEN  Primeweb KHÔNG chạy local cancel
+  AND KHÔNG restock/refund/email
+  AND hiển thị lỗi để seller thử lại hoặc xử lý thủ công với EasyParcel support
+```
+
+> 📌 Source: PRD FR D-5 + §8 item-level error rule
+
+#### AC-4: Final tracking refresh thấy picked-up → block cancel
+
+```gherkin
+GIVEN order đang hiện pre-pickup trong Primeweb
+WHEN  merchant bấm hủy và final EP tracking refresh trả `picked_up` hoặc trạng thái sau đó
+THEN  Primeweb block cancel order
+  AND KHÔNG gọi local cancel/restock/refund
+  AND hướng seller sang Refund/Return; cước vận chuyển đã mất
+```
+
+> 📌 Source: PRD FR D-5b
+
+#### AC-5: Picked-up/shipped order → Refund/Return only
+
+```gherkin
+GIVEN order đã picked-up hoặc shipped
+WHEN  merchant muốn xử lý hủy/hoàn
+THEN  nút Cancel order bị disabled hoặc bị backend reject
+  AND seller chỉ dùng Refund/Return sau khi hàng quay về/đã kiểm
   AND cước MẤT (không hoàn) — ghi rõ cho merchant
 ```
 
-> 📌 Source: PRD FR D-5, §8 Phase D AC#5
+> 📌 Source: PRD FR D-5b, §8 Phase D AC#5
 
-#### AC-4: Refund tiền hàng KHÔNG qua EasyParcel
+#### AC-6: Refund tiền hàng KHÔNG qua EasyParcel
 
 ```gherkin
 GIVEN bất kỳ case refund tiền hàng
@@ -1001,7 +1027,11 @@ THEN  refund qua provider: Stripe (live) / manual (COD-bank) / Xendit (khi F34 x
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass
-- [ ] Test: 3 case (chưa label / chưa pickup / đã pickup) refund đúng nhánh
+- [ ] Test: no-label cancel keeps full refund + restock + discount release + email unchanged
+- [ ] Test: label pre-pickup + EP cancel success → local cancel proceeds
+- [ ] Test: label pre-pickup + EP item error → no local cancel/restock/refund
+- [ ] Test: final tracking refresh returns `picked_up` → cancel blocked
+- [ ] Test: picked-up/shipped order → Refund/Return only
 - [ ] Refund tiền hàng qua provider thanh toán, không qua EasyParcel
 
 ---

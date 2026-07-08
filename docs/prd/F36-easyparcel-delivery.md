@@ -300,7 +300,7 @@ Sub-PRDs reference these NFRs by ID. No duplication needed.
 
 **Wallet:** `GET /open_api/2026-03/wallet` — returns array of wallet objects (by currency).
 
-**Cancel:** `POST /shipment/cancel` → body `{cancel_list: [{shipment_number, remark}]}` (7-day window, NOT `shipment[{tracking_number}]`). **Not wired to Phase B** — merchant cancels via EP dashboard or support; Phase D may wire to `/api/orders/[id]/cancel` refund flow.
+**Cancel (Phase D in-scope):** `POST /shipment/cancel` → body `{cancel_list: [{shipment_number, remark}]}` (7-day window). Use `shipment_number = order.easyParcelOrderNo`; do **NOT** use `awbNo`, `tracking_number`, or `shipment[{tracking_number}]`. Before cancel, refresh EP tracking and allow only pre-pickup statuses (`order_created`, `pending_pickup`). EP HTTP/status_code 200 can still contain item-level failures — Prime must inspect each `data[].status`; only item success allows local `/api/orders/[id]/cancel` refund/restock/email to continue. Picked-up or later is blocked and handled by Refund/Return.
 
 **COD (Phase B — resolved):** `cod_amount` (RM float) param in submit_orders when COD enabled. Rate quotation exposes COD availability + pricing via `features[].cod` (available/min/max per courier). **NO region hardcode — COD eligibility follows rules R1–R5 PER-ROUTE, LIVE from quotation response.**
 

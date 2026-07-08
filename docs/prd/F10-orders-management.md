@@ -641,7 +641,7 @@ POST /api/orders/:id/cancel                → cancel + inventory restore
 
 ### EasyParcel — Returns & Cancel
 
-**Scope:** Return logistics (auto-return case + manual buyer-return with fee tracking) + cancel order (pre-label and post-label). Reuses F10 `/refund` and `/cancel` 100% — no new refund/restock logic.
+**Scope:** Return logistics (auto-return case + manual buyer-return with fee tracking) + cancel order (pre-label and post-label). Reuses F10 `/refund` and `/cancel` local refund/restock logic after the EasyParcel cancel gate — no new stock/payment logic.
 
 **Stories:** US-F36-10 (courier auto-return), US-F36-11 (cancel), US-F36-12 (manual buyer-return RMA).
 
@@ -683,9 +683,9 @@ Return fee + payer recorded informationally (seller dashboard only, NOT in Order
 
 **Cancel by Label State:**
 ```
-No label yet → POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock.
-Label bought, not picked up → POST /api/orders/[id]/refund (F10): goods refunded + restock; merchant msg "Cancel on EP dashboard to recover freight".
-Label bought, picked up → POST /api/orders/[id]/refund (F10): goods refunded + restock; merchant msg "Freight lost — courier processing".
+No label yet → POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock + discount release + existing email behavior.
+Label bought, pre-pickup → POST /api/orders/[id]/cancel (F10): refresh EP tracking, call EP POST /shipment/cancel, then local cancel/restock/refund/email only after EP item success.
+Label bought, picked up or later → cancel blocked; merchant must use Refund/Return after return/inspection. Freight lost — courier processing.
 ```
 
 **Functional Requirements:**
@@ -694,9 +694,10 @@ Label bought, picked up → POST /api/orders/[id]/refund (F10): goods refunded +
 |---|---|---|
 | **D-1** | **Case A — auto-return:** Cron receives 'Returned' → set shippingTrackingStatus='Returned'. No EP API call. Merchant clicks Refund (F10 /refund) → goods refund + restock; outbound fee lost. | US-F36-10 |
 | **D-2** | **Case B — manual return record:** Merchant records return (shipped/completed status) with return_tracking_code (required), return_tracking_url (optional), return_reason (optional), return_fee_payer (buyer\|seller), return_shipping_fee (sen), return_status (requested→in_transit→received). No EP API. | US-F36-12 |
-| **D-3** | **Refund + restock reuse F10 100%:** `/api/orders/[id]/refund` + `/api/orders/[id]/cancel` unchanged. After merchant confirms goods received (return_status='received'), click Refund → endpoint handles payment reversal + restock. | US-F36-10 |
-| **D-4** | **Cancel, no label:** POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock. | US-F36-11 |
-| **D-5** | **Cancel, label bought:** POST /api/orders/[id]/refund (F10): goods refund + restock. Show merchant context msg: (a) not picked up → "Cancel on EP dashboard to recover freight"; (b) picked up → "Freight fee lost — courier processing". | US-F36-11 |
+| **D-3** | **Refund + restock reuse F10:** `/api/orders/[id]/refund` and the local cancel path keep existing payment reversal + restock behavior. EasyParcel only gates pre-pickup label cancellation before local cancel runs. | US-F36-10 |
+| **D-4** | **Cancel, no label:** POST /api/orders/[id]/cancel (F10): full refund (goods + shipping) + restock + discount release + existing email behavior. | US-F36-11 |
+| **D-5** | **Cancel, label bought but pre-pickup:** Backend refreshes EasyParcel tracking first, then calls `POST /shipment/cancel` with `cancel_list[{ shipment_number: easyParcelOrderNo, remark }]`. Only EP item success allows local `/cancel` behavior to continue (full cancel/restock/refund/email). EP item error blocks local cancel. | US-F36-11 |
+| **D-5b** | **Cancel, picked up or later:** Cancel order is blocked. Merchant uses Refund/Return after return/inspection; outbound freight is lost. | US-F36-11 |
 | **D-6** | **Refund via existing provider:** Refund money Stripe (live), manual (COD/BT), or Xendit (F34). NOT via EasyParcel. | US-F36-11 |
 | **D-7** | **Capture return fee + payer (informational):** On Case B, merchant records return_shipping_fee (sen) + return_fee_payer (buyer\|seller). Both nullable. Displayed seller dashboard (return block), NOT in OrderSummary, NOT in revenue (record-only per PM). All 6 return fields seller-only per NFR-10 — NEVER in `/api/orders/track/[orderNumber]`, `/api/orders/stream/[orderNumber]`, or buyer OrderTrackingClient. | US-F36-12 |
 
@@ -706,10 +707,11 @@ Label bought, picked up → POST /api/orders/[id]/refund (F10): goods refunded +
 2. GIVEN 'Returned' WHEN merchant Refund THEN F10 /refund called; goods refunded; inventory restocked; outbound freight NOT refunded (lost).
 3. GIVEN shipped/completed order WHEN merchant records return (tracking code, fee, payer) THEN all 6 fields persisted; return_status transitions none→requested→in_transit; no EP API; return_fee informational only.
 4. GIVEN merchant receives goods (return_status='received') WHEN click Refund THEN F10 /refund executes; return_status='refunded'; inventory restocked.
-5. GIVEN no label WHEN cancel THEN /api/orders/[id]/cancel (F10): full refund + restock.
-6. GIVEN label not picked up WHEN cancel THEN /api/orders/[id]/refund (F10): goods refund + restock; UI msg "Cancel on EP dashboard to recover freight".
-7. GIVEN label picked up WHEN cancel THEN /api/orders/[id]/refund (F10): goods refund + restock; UI msg "Freight lost — courier processing".
-8. GIVEN return fields populated WHEN buyer endpoint (track, stream, OrderTrackingClient) THEN none of return_status, return_tracking_code, return_tracking_url, return_shipping_fee, return_fee_payer, return_reason appear.
+5. GIVEN no label WHEN cancel THEN /api/orders/[id]/cancel (F10): full refund + restock + discount release + existing email behavior.
+6. GIVEN label pre-pickup WHEN cancel THEN backend refreshes EP tracking, calls `POST /shipment/cancel`, and only after EP item success runs local cancel/restock/refund/email.
+7. GIVEN label pre-pickup WHEN EP cancel returns item-level error THEN local cancel/restock/refund/email do NOT run; seller sees recoverable error.
+8. GIVEN final EP tracking refresh returns `picked_up` or later WHEN cancel THEN cancel is blocked; seller uses Refund/Return; freight is lost.
+9. GIVEN return fields populated WHEN buyer endpoint (track, stream, OrderTrackingClient) THEN none of return_status, return_tracking_code, return_tracking_url, return_shipping_fee, return_fee_payer, return_reason appear.
 
 **Order Schema (new columns):**
 
@@ -722,7 +724,7 @@ Label bought, picked up → POST /api/orders/[id]/refund (F10): goods refunded +
 | `return_fee_payer` | varchar | buyer \| seller, nullable | Who paid return postage. |
 | `return_reason` | text | free-text, nullable | Optional reason text. |
 
-**Cross-ref & Reuse:** `/api/orders/[id]/refund` + `/api/orders/[id]/cancel` = 100% reused from F10 (no new logic). Tracking cron `/api/cron/sync-tracking` = shared with Phase C fulfillment.
+**Cross-ref & Reuse:** No new DB field required. Existing `shippingTrackingStatus` drives cancel button disable. `/api/orders/[id]/cancel` owns the pre-pickup EP cancel gate, then reuses existing F10 local cancel behavior. `/api/orders/[id]/refund` remains the Refund/Return path after pickup/return. Tracking cron `/api/cron/sync-tracking` = shared with Phase C fulfillment.
 
 ---
 
