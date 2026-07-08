@@ -4,7 +4,7 @@
  */
 export function trackEvent(params: {
     siteId: string
-    event: 'click' | 'add_to_cart' | 'checkout' | 'purchase'
+    event: 'click' | 'add_to_cart' | 'checkout' | 'purchase' | 'local_business_data_saved'
     pageUrl?: string
     metadata?: Record<string, unknown>
     isOwner?: boolean

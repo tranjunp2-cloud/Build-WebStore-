@@ -19,6 +19,7 @@ import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
+import type { LocalBusinessData } from '@/components/editor/local-business/types'
 import { useEditorStore, BLOCK_TYPE_TO_KEY, PAGE_META_LOCALE_KEY, getDisplayPageTitle, type SiteLocale } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
@@ -58,6 +59,8 @@ export type SiteData = {
         email?: string
         address?: string
     }
+    /** F37 US-01: structured address/geo/hours for Local SEO. */
+    localBusiness?: LocalBusinessData
     socialLinks?: {
         facebook?: string
         instagram?: string
@@ -704,6 +707,10 @@ export default function EditorPage() {
                     ...(prev.contactInfo || {}),
                     ...(changes.contactInfo || {}),
                 },
+                localBusiness: {
+                    ...(prev.localBusiness || {}),
+                    ...(changes.localBusiness || {}),
+                },
                 socialLinks: {
                     ...(prev.socialLinks || {}),
                     ...(changes.socialLinks || {}),
@@ -762,6 +769,7 @@ export default function EditorPage() {
                 body: JSON.stringify({
                     ...(changes.name ? { siteName: changes.name } : {}),
                     contactInfo: changes.contactInfo,
+                    localBusiness: changes.localBusiness,
                     socialLinks: changes.socialLinks,
                     branding: changes.branding,
                     seo: changes.seo,
@@ -793,10 +801,12 @@ export default function EditorPage() {
             }
             if (changes.branding) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
+            return true
         } catch (error) {
             console.error('Failed to update site settings', error)
             const errMsg = error instanceof Error ? error.message : null
             toast.error(errMsg || 'Failed to update site settings', { description: errMsg ? undefined : 'Please try again later.' })
+            return false
         }
     }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
