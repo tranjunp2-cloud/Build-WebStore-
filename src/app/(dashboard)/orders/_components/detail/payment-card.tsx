@@ -98,10 +98,9 @@ export interface PaymentCardOrder {
 export function PaymentCard({ order }: { order: PaymentCardOrder }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- i18n nested labels not typed
-    const methodLabels = (d as any).paymentMethods as Record<string, string>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const statusLabels = (d as any).paymentStatuses as Record<string, string>
+    // i18n nested label maps aren't in the generated dict type — cast via unknown
+    const methodLabels = (d as unknown as { paymentMethods: Record<string, string> }).paymentMethods
+    const statusLabels = (d as unknown as { paymentStatuses: Record<string, string> }).paymentStatuses
 
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [proofHovered, setProofHovered] = useState(false)

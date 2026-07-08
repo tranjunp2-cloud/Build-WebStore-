@@ -81,7 +81,6 @@ export async function getValidToken(
     await payload.update({
         collection: 'tenants',
         id: tenantId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: {
             easyParcelIntegration: {
                 accessToken: refreshed.access_token,
