@@ -2,19 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
-import { checkUploadSize } from '@/lib/media/upload-limits'
+import { checkContentLength, checkUploadSize } from '@/lib/media/upload-limits'
 
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // GH-1284 — reject over the absolute ceiling from the declared Content-Length
+    // BEFORE formData() parses and buffers the whole body into memory. This is
+    // the real "reject before buffering" guard; it is best-effort since the
+    // header is client-set (an understated/missing header falls through to the
+    // precise per-type check below, which runs once the body is parsed).
+    const lengthError = checkContentLength(Number(req.headers.get('content-length') ?? 0))
+    if (lengthError) return NextResponse.json({ error: lengthError }, { status: 413 })
+
     const formData = await req.formData()
     const file = formData.get('file') as File
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
-    // GH-1284 — reject oversized files BEFORE buffering them into memory. An
-    // oversized upload otherwise buffers fully in RAM then runs the S3 write
-    // into the 120s function timeout instead of failing fast.
+    // Precise per-type limit now that the real parsed size is known.
     const sizeError = checkUploadSize(file.type, file.size)
     if (sizeError) return NextResponse.json({ error: sizeError }, { status: 413 })
 

@@ -9,6 +9,8 @@
 import { describe, it, expect } from 'vitest'
 import {
     UPLOAD_LIMITS,
+    MAX_UPLOAD_BYTES,
+    checkContentLength,
     checkUploadSize,
     uploadKindFromMime,
     uploadLimitLabel,
@@ -35,6 +37,13 @@ describe('TC-F30-HMO-011: upload size limits', () => {
         expect(err).toContain('100MB')
     })
 
+    it('rounds the displayed size UP so a just-over file never reads as equal to the limit', () => {
+        // 10.4MB image: over the 10MB limit — must display > 10MB, not "10MB".
+        const err = checkUploadSize('image/png', Math.round(10.4 * 1024 * 1024))
+        expect(err).toContain('11MB')
+        expect(err).not.toMatch(/\(10MB\)/)
+    })
+
     it('applies the image limit independently of the video limit', () => {
         // A 20MB file: over the 10MB image limit, under the 100MB video limit.
         const twentyMb = 20 * 1024 * 1024
@@ -49,5 +58,27 @@ describe('TC-F30-HMO-011: upload size limits', () => {
     it('formats a human-readable limit label', () => {
         expect(uploadLimitLabel('video')).toBe('100MB')
         expect(uploadLimitLabel('image')).toBe('10MB')
+    })
+
+    it('exposes the absolute ceiling as the largest per-type limit', () => {
+        expect(MAX_UPLOAD_BYTES).toBe(UPLOAD_LIMITS.video)
+    })
+})
+
+describe('TC-F30-HMO-011: Content-Length pre-parse ceiling', () => {
+    it('allows a missing/zero Content-Length (falls through to the per-type check)', () => {
+        expect(checkContentLength(0)).toBeNull()
+        expect(checkContentLength(Number.NaN)).toBeNull()
+    })
+
+    it('allows a Content-Length within the ceiling + multipart slack', () => {
+        // A 100MB video plus small framing overhead must still pass the coarse guard.
+        expect(checkContentLength(MAX_UPLOAD_BYTES + 500 * 1024)).toBeNull()
+    })
+
+    it('rejects a Content-Length well over the ceiling with a size message', () => {
+        const err = checkContentLength(500 * 1024 * 1024)
+        expect(err).toContain('too large')
+        expect(err).toContain('100MB')
     })
 })
