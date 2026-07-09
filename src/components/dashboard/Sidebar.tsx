@@ -266,12 +266,12 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                                 >
                                     <img
                                         src="/images/logo-icon-3c4d76.png"
-                                        alt="PrimeWeb Logo"
+                                        alt="Web Store Logo"
                                         className="h-[28px] w-[28px] object-contain drop-shadow-[0px_0px_12px_rgba(6,182,212,0.6)]"
                                     />
                                     <div className="flex items-center text-[16px] font-bold leading-none tracking-tight">
-                                        <span className="text-dash-text">Prime</span>
-                                        <span className="text-[#06B6D4]">Web</span>
+                                        <span className="text-dash-text">Web </span>
+                                        <span className="text-[#06B6D4]">Store</span>
                                     </div>
                                 </Link>
                             </div>

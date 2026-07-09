@@ -315,6 +315,7 @@ SO THAT website preview luon consistent voi brand color moi
 | `split` | Form left, map/info right | 2-col split | `surface`, `primary`, `shadowMd` | Stack mobile |
 | `card-float` | Form in floating card, centered on gradient bg | Floating card effect | `primary`, `surface`, `shadowLg` | Card full width mobile |
 | `map-split` | Google Maps full left half, info right | Map integration | `primary`, `surface` | Map on top mobile |
+| | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. | | |
 | `minimal-inline` | Inline single-line form (email + submit), horizontal | Compact inline | `primary`, `surface`, `radiusFull` | Stack on mobile |
 
 ---

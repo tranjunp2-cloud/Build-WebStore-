@@ -225,8 +225,11 @@ export function ShippingSettingsClient({ siteId, tenantId, initial, epConfig }: 
     const epLive = epConfig?.enabled === true
     const epConnected = Boolean(epConfig?.testedAt)
 
+    // GH-1538: pb-4 -> pb-24 — SettingsFooter is `position: fixed`, doesn't push
+    // content up on its own; matches pb-24 used by ProductForm/customers-detail's
+    // same fixed-save-bar pattern so the bar stops overlapping the last field.
     return (
-        <div className="w-full pb-4">
+        <div className="w-full pb-24">
             <div className="mb-6">
                 <h1 className="text-[32px] font-black text-[var(--dash-text)] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
                 <p className="mt-2 text-[14px] text-[var(--dash-text-muted)]">{s.pageSubtitle}</p>

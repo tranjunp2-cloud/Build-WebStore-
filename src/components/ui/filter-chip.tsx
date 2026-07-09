@@ -83,14 +83,20 @@ export function FilterChip<T extends string>({
                             key={o.key}
                             type="button"
                             onClick={() => { onChange(o.key); setOpen(false) }}
-                            // Theme-aware hover: subtle dark wash on light, light wash on dark
-                            // (preflight is off, so utility hovers still need both directions).
-                            className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                            // bg moved from inline style to className so hover: can apply — inline
+                            // `background` always wins over a CSS class and was blocking the hover
+                            // wash on non-selected rows. Theme-aware hover: subtle dark wash on
+                            // light, light wash on dark (preflight is off, needs both directions).
+                            className={cn(
+                                "w-full px-4 py-[10px] text-left text-[13px] transition-colors cursor-pointer",
+                                o.key === value
+                                    ? "bg-[hsl(var(--primary)/0.1)]"
+                                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                            )}
                             style={{
-                                // Selected option → teal (primary) text + nền teal nhạt: trạng thái active rõ ràng.
+                                // Selected option → teal (primary) text: trạng thái active rõ ràng.
                                 color: o.key === value ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                                 fontWeight: o.key === value ? 600 : 400,
-                                background: o.key === value ? 'hsl(var(--primary) / 0.1)' : 'transparent',
                             }}
                         >
                             {o.label}

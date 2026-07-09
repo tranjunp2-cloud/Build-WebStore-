@@ -7,6 +7,7 @@
 import { create } from 'zustand'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 import { resolveBlockContent } from '@/lib/ai/add-section-content'
+import { stripStructuralFields } from '@/lib/editor/structural-block-fields'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -201,6 +202,13 @@ type EditorActions = {
     setSecondaryLocale: (locale: string | null) => void
     setPendingLocale: (locale: string | null) => void
     setLocaleOverride: (blockId: string, locale: string, fields: Record<string, unknown>) => void
+    /**
+     * Remove a field from every locale slot of a block's overrides. Used when a
+     * structural field (variant, backgroundColor, …) is written to the flat
+     * block — stale per-locale copies would otherwise shadow the flat value in
+     * getDisplayBlock and silently revert the edit on the next render.
+     */
+    clearLocaleOverrideField: (blockId: string, field: string) => void
     initLocaleFromBlock: (blockId: string, localeInit: { en: Record<string, unknown>; ms: Record<string, unknown> }) => void
     /**
      * Merge localeOverrides[block.id][activeLocale] onto block for rendering.
@@ -882,6 +890,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         })
     },
 
+    clearLocaleOverrideField: (blockId, field) => {
+        const { localeOverrides } = get()
+        const forBlock = localeOverrides[blockId]
+        if (!forBlock) return
+        const cleaned = Object.fromEntries(
+            Object.entries(forBlock).map(([locale, fields]) => [
+                locale,
+                Object.fromEntries(Object.entries(fields).filter(([k]) => k !== field)),
+            ]),
+        )
+        set({ localeOverrides: { ...localeOverrides, [blockId]: cleaned } })
+    },
+
     initLocaleFromBlock: (blockId, localeInit) => {
         const { localeOverrides } = get()
         // Seed both EN and MS slots with template defaults — only for blocks that have no user edits yet.
@@ -903,9 +924,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const { activeLocale, siteLocale, generationLocale, localeOverrides, siteName } = get()
 
         // 1. User override wins for any locale (custom edit takes priority).
+        //    Structural fields (variant, backgroundColor, …) are stripped from the
+        //    patch: they are site-wide, always sourced from the flat block. A stale
+        //    per-locale copy (from pre-fix sessions or persisted _localeContent)
+        //    must never shadow the flat value.
         const override = block.id ? localeOverrides[block.id as string]?.[activeLocale] : null
         if (override && Object.keys(override).length > 0) {
-            return { ...block, ...override }
+            return { ...block, ...stripStructuralFields(override) }
         }
 
         // 2. Embedded translation (header/footer with _localeContent[locale]).
@@ -913,7 +938,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             | Record<string, Record<string, unknown>>
             | undefined
         if (embedded?.[activeLocale] && Object.keys(embedded[activeLocale]).length > 0) {
-            return { ...block, ...embedded[activeLocale] }
+            return { ...block, ...stripStructuralFields(embedded[activeLocale]) }
         }
 
         // 3. Native view — viewing the actual language base blocks were authored in.

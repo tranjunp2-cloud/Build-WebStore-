@@ -137,7 +137,7 @@ export const Users: CollectionConfig = {
                 return html
             },
             generateEmailSubject: () => {
-                return 'Reset your PrimeWeb password \uD83D\uDD10'
+                return 'Reset your Web Store password \uD83D\uDD10'
             },
         },
     },

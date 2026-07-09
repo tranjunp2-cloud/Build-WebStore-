@@ -186,6 +186,17 @@ Bộ testcase này kiểm thử đầy đủ F26 — làm cho nội dung dự á
 | **TC-F26-09-06** | `lang-detect.ts` | `[Edge]` | lang-detect: Empty string → fallback contentLang='en', không crash | 1. Gọi `detectLanguage("")` và `detectLanguage("   ")` từ `lang-detect.ts`.<br>2. Inspect kết quả. | - Không throw error.<br>- `contentLang = 'en'` (safe default).<br>- `gpLang` là `'English'` hoặc equivalent. | High | [x] |
 | **TC-F26-09-07** | `AddSectionContext`, `FR-03` | `[Logic]` | AddSectionContext.locale populated khi add block trên ms site | 1. Unit test: setup editor context với `siteLocale = 'ms'`.<br>2. Trigger add-block action.<br>3. Capture `AddSectionContext` object passed to block factory. | - `AddSectionContext.locale === 'ms'`.<br>- Block factory nhận đúng locale → chọn BM defaults (root cause fix).<br>- Nếu `AddSectionContext.locale` absent → fallback EN + `needsTranslation = true`. | Blocker | [x] |
 
+### NHÓM 10 — Structural Fields vs Locale Slots (variant-revert bug, 4 TCs)
+
+> Bug gốc: site generation-locale `vi` (Sites.locale chỉ có en/ms) → đổi hero variant chỉ ghi vào `localeOverrides['vi']`, flat block giữ variant cũ → canvas revert sau save/re-render trong khi settings tab vẫn hiện variant mới.
+
+| TC ID | Module | Loại | Mô tả | Bước | Kỳ vọng | Ưu tiên | Status |
+|---|---|---|---|---|---|---|---|
+| **TC-F26-10-01** | `structural-block-fields.ts` | `[Logic]` | splitStructuralChanges tách structural (variant, backgroundColor, locale-controls) khỏi content | 1. Gọi `splitStructuralChanges({variant, backgroundColor, headline, videoUrl})`. | - structural = {variant, backgroundColor}.<br>- content = {headline, videoUrl}.<br>- `stripStructuralFields` loại mọi key trong `STRUCTURAL_BLOCK_FIELDS`. | Blocker | [x] |
+| **TC-F26-10-02** | `editorStore.getDisplayBlock` | `[State]` | Locale override/embedded `_localeContent` không được che structural field của flat block | 1. Flat block variant='split-right'; set override vi {variant:'video', headline:'Đã sửa'}.<br>2. Gọi getDisplayBlock. | - `display.variant = 'split-right'` (flat thắng).<br>- `display.headline = 'Đã sửa'` (content override vẫn áp).<br>- Tương tự cho embedded `_localeContent`. | Blocker | [x] |
+| **TC-F26-10-03** | `editorStore.clearLocaleOverrideField` | `[State]` | Xoá 1 field khỏi mọi locale slot của block, giữ content khác | 1. Set override vi+en đều có {variant, headline}.<br>2. Gọi clearLocaleOverrideField(blockId,'variant'). | - Cả 2 slot chỉ còn {headline}.<br>- Block không có override → no-op, không throw. | High | [x] |
+| **TC-F26-10-04** | `routeBlockChanges` (nguồn routing của `handleBlockUpdate`) | `[Regression]` | Ma trận routing: vi-native ghi flat đủ; non-base chỉ structural vào flat; id-less ghi flat toàn bộ (echo raw, không qua template fallback) | 1. Gọi `routeBlockChanges` với các ctx: vi/vi/en (native), en/vi/en (non-base), hasBlockId=false, generationLocale rỗng.<br>2. Integration: áp routing vi-native vào store có override bẩn → đọc flat + getDisplayBlock. | - vi-native: flatChanges = toàn bộ patch; contentOverride = content; purgeKeys = structural.<br>- non-base: flatChanges CHỈ structural (không leak content vào flat vi).<br>- id-less: tất cả flat, không override/purge.<br>- Gate so với `generationLocale`, KHÔNG phải `Sites.locale`.<br>- Integration: display = 'video', không revert. | Blocker | [x] |
+
 ---
 
 ## 5. 10-Point Checklist (Sign-Off)

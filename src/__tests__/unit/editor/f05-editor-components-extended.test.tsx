@@ -287,7 +287,7 @@ describe('PreviewFrame utility functions', () => {
     })
 
     it('findStringFieldPath finds partial match', () => {
-        const block = { title: 'Hello World from PrimeWeb' }
+        const block = { title: 'Hello World from Web Store' }
         expect(findStringFieldPath(block, 'Hello World')).toEqual(['title'])
     })
 

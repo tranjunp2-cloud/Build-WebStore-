@@ -3,7 +3,7 @@ import { Metadata } from 'next'
 import { OrdersClientLayout } from './_components/OrdersClientLayout'
 
 export const metadata: Metadata = {
-    title: 'Orders | PrimeWeb',
+    title: 'Orders | Web Store',
     description: 'Manage and track your orders',
 }
 

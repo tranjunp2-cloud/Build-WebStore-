@@ -502,12 +502,12 @@ describe('[TC-S2-011..012] Navigation — Sprint 2 variant schema validation', (
 // TC-S2: Contact — Sprint 2 new variant (map-split)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('[TC-S2-013] Contact — Sprint 2 map-split variant schema validation', () => {
-    it('contactMeta lists map-split variant', () => {
-        expect(contactMeta.variants).toContain('map-split')
+describe('[TC-S2-013] Contact — map-split variant removed from selectable list (GH-1465)', () => {
+    it('contactMeta does NOT include map-split in selectable variants', () => {
+        expect(contactMeta.variants).not.toContain('map-split')
     })
 
-    it('ContactConfigSchema accepts variant=map-split with address', () => {
+    it('ContactConfigSchema accepts legacy variant=map-split (non-breaking for existing content)', () => {
         // Arrange
         const input = {
             blockType: 'contact' as const,

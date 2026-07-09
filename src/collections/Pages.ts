@@ -172,7 +172,6 @@ const ContactBlock = {
                 { label: 'Info Only', value: 'info-only' },
                 { label: 'Split (form left, info right)', value: 'split' },
                 { label: 'Card Float', value: 'card-float' },
-                { label: 'Map Split', value: 'map-split' },
                 { label: 'Minimal Inline', value: 'minimal-inline' },
             ],
         },

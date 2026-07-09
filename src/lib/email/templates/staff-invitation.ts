@@ -1,6 +1,6 @@
 /**
  * Staff Invitation email HTML template.
- * Sent when a user is invited to join a PrimeWeb workspace.
+ * Sent when a user is invited to join a Web Store workspace.
  */
 
 import { mergeTemplateConfig } from '../merge-template-config'
@@ -21,15 +21,15 @@ export function staffInvitationEmail(data: StaffInvitationEmailData, config?: Em
 
     const base = {
         // Hardcoded en for now
-        subject: `You've been invited to join ${workspaceName} on PrimeWeb`,
+        subject: `You've been invited to join ${workspaceName} on Web Store`,
         heading: 'Workspace Invitation',
-        subheading: 'Join your team on PrimeWeb',
+        subheading: 'Join your team on Web Store',
         greeting: 'Hello {inviteeName}',
         body: `You have been invited to join the workspace <strong>${workspaceName}</strong> as a staff member. Please log in to accept the invitation and access the workspace dashboard.`,
         cta: 'Log In to Accept',
-        footer: 'PrimeWeb \u00A9 2026. All rights reserved.',
+        footer: 'Web Store \u00A9 2026. All rights reserved.',
     }
-    const vars = { inviteeName: userName, inviterName: '', brandName: 'PrimeWeb', dashboardUrl: loginUrl }
+    const vars = { inviteeName: userName, inviterName: '', brandName: 'Web Store', dashboardUrl: loginUrl }
     const t = mergeTemplateConfig(base, config ?? null, vars, {
         subject: 'subject',
         greeting: 'greeting',

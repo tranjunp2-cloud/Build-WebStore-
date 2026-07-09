@@ -85,7 +85,7 @@
             "label": "Platform",
             "title": "Satu platform untuk menjalankan perniagaan anda",
             "titleHighlight": "dari hujung ke hujung",
-            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — PrimeWeb membantu anda mengurus segalanya dalam satu sistem.",
+            "subtitle": "Dari menarik pelanggan dan menutup jualan hingga menguruskan operasi dalaman — Web Store membantu anda mengurus segalanya dalam satu sistem.",
             "pillars": {
                 "website": {
                     "title": "Laman Web & Jualan",
@@ -100,7 +100,7 @@
                     "desc": "Pengurusan tugasan mengikut jabatan, aliran kerja piawai, dan pemantauan prestasi operasi."
                 }
             },
-            "cta": "Terokai ekosistem PrimeWeb"
+            "cta": "Terokai ekosistem Web Store"
         },
         "product": {
             "label": "Produk",
@@ -317,7 +317,7 @@
             }
         },
         "why": {
-            "title": "Mengapa memilih PrimeWeb?",
+            "title": "Mengapa memilih Web Store?",
             "subtitle": "Platform laman web AI terkemuka — pelopor laman web bina AI dengan pemasaran & jualan serba lengkap.",
             "stats": {
                 "customers": {
@@ -419,7 +419,7 @@
         },
         "heroDemo": {
             "appSuite": "Suite aplikasi",
-            "homeCrumb": "PrimeWeb · Laman Utama",
+            "homeCrumb": "Web Store · Laman Utama",
             "experienceTitle": "Pengalaman laman web profesional",
             "experienceDesc": "Dibina oleh AI dalam 5 minit. Sunting seret & lepas, terbitkan serta-merta.",
             "viewDetails": "Lihat butiran",
@@ -495,7 +495,7 @@
         "step3Title": "Sesuaikan laman anda",
         "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda.",
         "welcome": {
-            "title": "Selamat datang ke PrimeWeb",
+            "title": "Selamat datang ke Web Store",
             "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
             "createStore": "Cipta Kedai Saya dengan AI",
             "skip": "Langkau & Pergi ke Papan Pemuka",
@@ -663,49 +663,49 @@
     },
     "email": {
         "welcome": {
-            "subject": "Selamat Datang ke PrimeWeb! 🎉",
+            "subject": "Selamat Datang ke Web Store! 🎉",
             "heading": "Selamat Datang! 🎉",
-            "subheading": "Selamat datang ke PrimeWeb",
+            "subheading": "Selamat datang ke Web Store",
             "greeting": "Hai {userName}",
-            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan PrimeWeb! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
+            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan Web Store! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
             "stepsTitle": "Mula dalam 3 langkah",
             "step1": "Huraikan laman web yang anda mahu cipta",
             "step2": "Sesuaikan kandungan dan reka bentuk",
             "step3": "Terbitkan dan kongsi!",
             "cta": "Mula Sekarang →",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia"
         },
         "forgotPassword": {
-            "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
+            "subject": "Tetapkan semula kata laluan Web Store anda 🔐",
             "heading": "Tetapan Semula Kata Laluan",
             "subheading": "Kami menerima permintaan tetapan semula anda",
             "greeting": "Hai {userName}",
-            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
+            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun Web Store anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
             "cta": "Tetapkan Semula Kata Laluan →",
             "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
             "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia",
             "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
         },
         "otp": {
-            "subject": "Kod pengesahan PrimeWeb anda 🔐",
+            "subject": "Kod pengesahan Web Store anda 🔐",
             "heading": "Pengesahan E-mel",
             "subheading": "Sahkan identiti anda untuk meneruskan",
             "greeting": "Hai <strong>{userName}</strong>",
             "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
             "expiry": "Kod ini tamat tempoh dalam 5 minit",
             "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
-            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia",
+            "copyright": "© 2026 Web Store · Kuala Lumpur, Malaysia"
         },
         "passwordChanged": {
-            "subject": "Kata laluan PrimeWeb anda telah ditukar 🔐",
+            "subject": "Kata laluan Web Store anda telah ditukar 🔐",
             "heading": "Kata Laluan Ditukar",
             "subheading": "Kata laluan akaun anda telah dikemas kini",
             "greeting": "Hai {userName}",
-            "body": "Kata laluan akaun PrimeWeb anda telah berjaya ditukar.",
+            "body": "Kata laluan akaun Web Store anda telah berjaya ditukar.",
             "warning": "Jika anda tidak membuat perubahan ini, hubungi pentadbir ruang kerja anda dengan segera dan tetapkan semula kata laluan anda.",
-            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+            "footer": "Dikuasakan oleh Web Store — Pembina Laman Web AI untuk SME Malaysia"
         },
         "order": {
             "subject": "Pesanan Disahkan",
@@ -721,7 +721,7 @@
             "sst": "SST (6%)",
             "total": "Jumlah Besar",
             "shippingAddress": "Alamat Penghantaran",
-            "footer": "Dikuasakan oleh PrimeWeb",
+            "footer": "Dikuasakan oleh Web Store",
             "recipientInfoHeading": "Maklumat penerima",
             "fullName": "Nama penuh",
             "phone": "Telefon",
@@ -861,7 +861,7 @@
             "morning": "pagi",
             "afternoon": "petang",
             "evening": "malam",
-            "welcomeTitle": "Selamat datang ke Papan Pemuka PrimeWeb",
+            "welcomeTitle": "Selamat datang ke Papan Pemuka Web Store",
             "welcomeSubtitle": "Pantau prestasi kedai anda dan urus perniagaan dalam talian anda dari satu tempat.",
             "pendingLabel": "Tertangguh",
             "itemsLabel": "item",
@@ -2046,7 +2046,7 @@
         },
         "customers": {
             "title": "Kenalan",
-            "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
+            "subtitle": "Jejak dan urus pertanyaan pelanggan yang dihantar melalui borang laman web anda.",
             "searchPlaceholder": "Cari mengikut nama atau e-mel…",
             "sourceAll": "Semua Sumber",
             "sourceContact": "Borang Hubungi",
@@ -2247,7 +2247,7 @@
                 "failSaveSettings": "Gagal menyimpan tetapan pembayaran.",
                 "failClearQR": "Gagal memadam tetapan imej QR.",
                 "stripeConnectTitle": "Sambungkan akaun Stripe untuk mula menerima Kad & FPX",
-                "stripeConnectDesc": "Dana terus masuk ke akaun bank anda — Prime Web tidak menyentuhnya. Kaedah manual di bawah terus berfungsi semasa anda menyediakan ini.",
+                "stripeConnectDesc": "Dana terus masuk ke akaun bank anda — Web Store tidak menyentuhnya. Kaedah manual di bawah terus berfungsi semasa anda menyediakan ini.",
                 "stripeConnectCta": "Sambungkan Akaun Stripe",
                 "stripeStep1": "Klik \"Sambung Akaun Stripe\"",
                 "stripeStep2": "Masukkan kelayakan Stripe anda",
@@ -2318,7 +2318,7 @@
                 "xenditSectionTitle": "Kaedah Pembayaran Xendit",
                 "xenditPoweredBy": "Dikuasakan oleh Xendit Checkout",
                 "xenditConnectTitle": "Sambungkan akaun Xendit untuk terima pembayaran Malaysia",
-                "xenditConnectDesc": "Dana terus masuk ke akaun bank anda — Prime Web tidak menyentuhnya. Kaedah manual di bawah kekal berfungsi semasa persediaan.",
+                "xenditConnectDesc": "Dana terus masuk ke akaun bank anda — Web Store tidak menyentuhnya. Kaedah manual di bawah kekal berfungsi semasa persediaan.",
                 "xenditConnectCta": "Sambungkan Akaun Xendit",
                 "xenditConnecting": "Mengalih ke Xendit...",
                 "xenditStep1": "Klik \"Sambungkan Akaun Xendit\"",
@@ -2341,7 +2341,7 @@
                 "xenditCallbackTokenStep3": "Salin token dan tampal di sini",
                 "xenditSaveBtn": "Simpan sambungan Xendit",
                 "xenditModalTitle": "Sambungkan Akaun Xendit Anda",
-                "xenditModalSubtitle": "Tampal kelayakan Xendit anda di bawah untuk menghubungkan akaun dengan Prime Web. Kad, FPX & E-Wallet aktif sebaik pengesahan.",
+                "xenditModalSubtitle": "Tampal kelayakan Xendit anda di bawah untuk menghubungkan akaun dengan Web Store. Kad, FPX & E-Wallet aktif sebaik pengesahan.",
                 "xenditConnectAccountBtn": "Sambungkan Akaun",
                 "xenditWebhookConfirmTitle": "Daftarkan ECH sebagai penerima webhook anda",
                 "xenditWebhookConfirmDesc": "ECH akan mendaftarkan dirinya sebagai endpoint webhook Invoice pada akaun Xendit anda. Jika sistem lain sedang menerima webhook Invoice Xendit daripada akaun ini, ia akan berhenti menerimanya.",
@@ -2762,6 +2762,7 @@
                 "titleMaxLength": "Tajuk mestilah kurang daripada 255 aksara",
                 "slugInvalid": "Slug hanya boleh mengandungi huruf kecil, nombor, dan sempang",
                 "urlSlugLabel": "Slug URL (dijana secara auto, boleh disunting)",
+                "slugLockedHint": "Dikunci kerana pos ini telah diterbitkan — menukar URL akan merosakkan pautan sedia ada dan kedudukan carian.",
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
                 "clickToUpload": "Klik untuk memuat naik lakaran pribit",

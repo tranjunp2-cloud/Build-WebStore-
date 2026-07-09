@@ -217,3 +217,27 @@ describe('TC-F30-HMO-010: showImageButton=false hides Change Image button', () =
         expect(screen.getByText('Change Video')).toBeTruthy()
     })
 })
+
+describe('TC-F30-HMO-012: oversized video rejected before upload (GH-1284)', () => {
+    it('shows an error toast and does NOT call upload when the video exceeds the size limit', () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        const { container } = render(
+            <HeroMediaOverlay field="image.url" showVideoButton={true} videoField="videoUrl">
+                <div />
+            </HeroMediaOverlay>
+        )
+        const videoInput = container.querySelector('input[accept="video/mp4,video/webm"]') as HTMLInputElement
+        // 101MB webm — one byte over the 100MB video limit.
+        const bigVideo = makeFile('video/webm', 'huge.webm')
+        Object.defineProperty(bigVideo, 'size', { value: 101 * 1024 * 1024 })
+
+        fireEvent.change(videoInput, { target: { files: [bigVideo] } })
+
+        expect(mockUpload).not.toHaveBeenCalled()
+        expect(postMessageSpy).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'SHOW_TOAST', variant: 'error', message: expect.stringContaining('too large') }),
+            expect.anything(),
+        )
+    })
+})

@@ -117,7 +117,12 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
                 </div>
                 <Toaster
                     position="top-right"
-                    style={{ '--width': '207px' } as React.CSSProperties}
+                    // GH-1538 #12: was 207px — way too narrow, wrapped normal-length messages
+                    // (e.g. "Sitemap submitted — N URLs sent to Google") onto 3 lines. This
+                    // Toaster's own style/toastOptions here fully override the shared defaults
+                    // in components/ui/sonner.tsx (props spread, not merged) so the width had
+                    // to be fixed at this call site, not just the shared wrapper.
+                    style={{ '--width': '300px' } as React.CSSProperties}
                     toastOptions={{
                         classNames: {
                             toast: "bg-dash-surface border border-dash-border shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[16px] px-[24px] flex items-center gap-[8px] min-h-[46px] w-full",

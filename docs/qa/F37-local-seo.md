@@ -1,12 +1,14 @@
-# QA Test Plan — F37 Local Business Data Model (Local SEO)
+# QA Test Plan — F37 Local SEO & Search Performance (Phase 1)
 
-> **Version:** 1.1 | **Updated:** 2026-07-07 (pre-commit adversarial review, cycle 2 — added TC-F37-01-13/14 regression tests) | **Owner:** QA Team
+> **Version:** 2.1 | **Updated:** 2026-07-09 | **Owner:** QA Team
 > **PRD ref:** [`docs/prd/F37-local-seo-search-performance.md`](../prd/F37-local-seo-search-performance.md) v2.0
-> **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (US-F37-01)
+> **Stories ref:** [`docs/stories/F37-local-seo-stories.md`](../stories/F37-local-seo-stories.md) (US-F37-01..09)
 > **Architecture ref:** [`docs/architecture/F37-local-seo.md`](../architecture/F37-local-seo.md)
 
 ### Changelog
 
+- **v2.1 (2026-07-09)** — `/qa-full:check` verify + gap-fill. Đọc code thật (`map-links.ts`, `resolve-maps-link/route.ts`, `local-seo-score/route.ts`, `json-ld.ts`) + ck:scenario 12-dimension. Thêm §3.10 (16 TC: TC-F37-02-10/11, 04-15/16, 08-12/13/14, 09-17..25) phủ branch bỏ sót ở surface built-nhưng-chưa-test: `parseMapLink` pin-out-of-range fallthrough + boundary, `resolve-maps-link` SSRF (relative Location re-check, 3xx-no-Location, url+address precedence, neither→400), score API 403-null-tenant + faq-empty-not-earned, `serializeJsonLd` U+2028/2029, incomplete-hours drop, `parseAddress` part-count, metadata length boundary. Baseline F37 tests: 6 files / 80 pass. Tổng **89 TC-ID**.
+- **v2.0 (2026-07-09)** — Mở rộng scope từ chỉ US-F37-01 → **toàn bộ Phase 1** (US-01,02,03,04,08,09). Thêm §3.5–§3.9 (TC-F37-02/03/04/08/09-NN). Dựa trên 2 vòng review song song (requirements + code-reality scan). Đánh dấu trạng thái implementation: **US-02/US-08 FULLY BUILT** (bổ sung TC generator/branch chưa test), **US-04/US-09 PARTIAL** (ưu tiên API route + parser **built-nhưng-chưa-test**: `local-seo-score` API, `resolve-maps-link` SSRF, `parseMapLink`), **US-03 NOT-BUILT** (llms.txt + per-site toggle chưa có; robots.txt đang chặn AI bot NGƯỢC spec — TC spec-based + flag §9 #2). Waze/Halal (US-09) + checklist one-click (US-04) đánh `[NOT-BUILT]`. hreflang (AC-20) DEFERRED, không viết TC.
 - **v1.1 (2026-07-07)** — Pre-commit `/code-review` adversarial pass (2 cycles) found `local_business_data_saved` polluting seller-facing traffic dashboards. Cycle 1 fixed the (later found to be orphaned) `analytics/summary/route.ts`. Cycle 2's re-review caught that the actual LIVE dashboard path (`src/lib/dashboard/traffic-data.ts`) was still exposed via its ungated Top Referrers aggregation — fixed there too, with defense-in-depth. Added **TC-F37-01-13/14** (§3.4). 14 TC-IDs, 38 tests total.
 - **v1.0 (2026-07-07)** — Phase 06 complete. Formalized 12 TC-IDs (TC-F37-01-01..12) from unit tests across 3 test files: `src/__tests__/unit/validations/sites-local-business.test.ts` (4 TCs + 2 security), `src/__tests__/unit/seo/local-business-json-ld.test.ts` (6 TCs + 1 security), `src/__tests__/unit/seo/local-seo-score.test.ts` (2 TCs). All 34 tests passing (1301/1301 in full suite). XSS hardening verified; no aggregateRating bloat; Tech Health signals flagged for PM review before US-F37-04 dashboard ships.
 
@@ -14,20 +16,25 @@
 
 ## 1. Objective
 
-Comprehensive test coverage for **F37 Local Business Data Model**, spanning:
+Test coverage cho **F37 Local SEO — Phase 1** (6 story không phụ thuộc Google connection): US-F37-01, 02, 03, 04, 08, 09.
 
-- **Phase 02 (Data Validation):** Zod schema validation for seller-entered local business fields (lat/lng range, postcode format, structured address)
-- **Phase 04 (JSON-LD Emission):** Structured data output on homepage + subpages (PostalAddress, GeoCoordinates, OpeningHoursSpecification, category-mapped @type, priceRange, no aggregateRating)
-- **Phase 05 (Local SEO Score Backend):** Points-subtraction scoring engine (100 baseline, 4 buckets: Business Data 35pts, Structured Data 30pts, AI Discoverability 20pts, Technical Health 15pts)
+| Story | Nội dung | Trạng thái code |
+|---|---|---|
+| **US-F37-01** | Local Business Data Model (Zod validation + geo/postcode) | ✅ BUILT + tested (§3.1–3.4) |
+| **US-F37-02** | Enhanced LocalBusiness JSON-LD (PostalAddress, geo, hours, @type, priceRange, no aggregateRating) | ✅ BUILT (§3.5) |
+| **US-F37-03** | AI Crawler permissions + llms.txt | 🔴 NOT BUILT (§3.6) |
+| **US-F37-04** | Local SEO Score + Actionable Checklist | 🟡 PARTIAL — engine+API built, checklist chưa (§3.7) |
+| **US-F37-08** | Auto SEO/AEO Generation (metadata fallback + FAQPage + scope isolation) | ✅ BUILT (§3.8) |
+| **US-F37-09** | Malaysia opt (MY geo/state, Waze, Halal) | 🟡 PARTIAL — geo built; Waze/Halal chưa (§3.9) |
 
-**12 TC-IDs** cover:
-- Zod schema boundary cases (AC-3 geolocation/postcode validation)
-- JSON-LD richness (AC-1 PostalAddress, AC-2 opening-hours filtering, AC-1 homepage trigger)
-- Category-specific schema types (FR-04 @type mapping)
-- Security hardening (XSS sanitization, safe JSON-LD serialization)
-- Score bounds and bucket correctness (AC-1 ≥20pt gain, FR-10 0..100 bounds)
+### Legend — Implementation status marker
 
-**Out of scope:** US-F37-04 (Local SEO Score Dashboard UI), US-F37-02 (GBP OAuth), US-F37-03 (AI Crawler Allowlist), multi-language improvement hints.
+- `[BUILT]` — code có + đã có test (chỉ cần regression/verify)
+- `[UNTESTED]` — code **đã có nhưng chưa có test** → **ưu tiên QA cao nhất** (API route, parser, component)
+- `[NOT-BUILT]` — chưa implement → TC spec-based, dùng làm acceptance khi build
+- **Type** = `Func` / `Sec` (security/auth) / `Edge` (boundary) · **Impact** = user-facing / backend
+
+**Out of scope:** Phase 2 (US-F37-05 GBP Connect, US-06 Google Activity, US-07 Info Diff — cần GBP OAuth chưa build) · hreflang (AC-20, DEFERRED P2) · SERP-impact assertions (không kiểm thứ hạng thật).
 
 ---
 
@@ -100,6 +107,155 @@ Two dashboard code paths read the shared `analytics` collection:
 |---|---|---|---|---|---|---|
 | **TC-F37-01-13** | Regression | Sec/Data | `local_business_data_saved` excluded from orphaned `analytics/summary` route aggregation | `src/__tests__/unit/dashboard/api-summary.test.ts` (`GET /api/analytics/summary` describe block) | Both current- AND previous-period views-count queries (`payload.count`) exclude `local_business_data_saved` from their `where.event.not_in` filter; the doc-list query (`payload.find`) also excludes it. Manually verified red→green. | Defensive fix on a route with no confirmed live caller — see §3.4 note |
 | **TC-F37-01-14** | Regression | Sec/Data | `local_business_data_saved` excluded from the LIVE `getTrafficData()` dashboard path (query + defense-in-depth loop guard) | `src/__tests__/unit/dashboard/traffic-data.test.ts` | (1) `payload.find`'s `where.event.not_in` includes `local_business_data_saved`. (2) Even if a misbehaving/mocked query still returned such a doc, the loop-level guard prevents its referrer from reaching `top.referrers`. Both assertions manually verified red→green. | Prevents the seller's own editor activity from polluting the real, user-facing Top Referrers widget |
+
+---
+
+## 3.5 US-F37-02: Enhanced LocalBusiness JSON-LD **[FULLY BUILT]**
+
+> Code: `src/lib/seo/json-ld.ts` + `src/lib/seo/schema-helpers.ts`. Core generators đã test (TC-F37-01-05..12). TC dưới nhắm **surface chưa test** (breadcrumb/website/webpage generators, geo edge, aggregator resilience). `[UNTESTED]` = code có nhưng chưa có test.
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-02-01** | AC-3 | Func | `generateBreadcrumbSchema` — slug `encodeURIComponent`, home-slug skip | `json-ld.ts` `[UNTESTED]` | BreadcrumbList itemListElement đúng thứ tự; slug có ký tự đặc biệt được encode; trang home KHÔNG tự thêm crumb trùng. | Breadcrumb rich result |
+| **TC-F37-02-02** | AC-3 | Func | `generateWebSiteSchema` chỉ emit ở homepage | `json-ld.ts` `[UNTESTED]` | WebSite schema có ở homepage, vắng ở subpage; url = site root. | Sitelinks searchbox eligibility |
+| **TC-F37-02-03** | AC-3 | Func | `generateWebPageSchema` fallback `seo.title`→`page.name` + home URL | `json-ld.ts` `[UNTESTED]` | WebPage.name lấy seo.title, thiếu thì page.name; home-slug ra URL gốc (không `/home`). | Per-page schema đúng |
+| **TC-F37-02-04** | AC-3 / NFR | Edge | `generatePageSchemas` resilience — 1 block throw KHÔNG crash trang | `json-ld.ts` `[UNTESTED]` | try/catch: 1 generator ném lỗi thì các schema khác vẫn emit, trang không 500. | Robustness storefront |
+| **TC-F37-02-05** | FR-04 | Edge | `priceRangeForLocalBusinessCategory` per-category branch | `schema-helpers.ts` `[UNTESTED]` | Mỗi businessCategory ra priceRange đúng (vd food `$$`); category lạ → default. | priceRange chính xác |
+| **TC-F37-02-06** | AC-3 | Edge | geo omit khi chỉ có 1 trong lat/lng finite | `json-ld.ts` `[UNTESTED]` | Chỉ lat (thiếu lng) → KHÔNG emit GeoCoordinates (không phần tử null/nửa vời). | Invalid geo không lọt schema |
+| **TC-F37-02-07** | BR-02 | Edge | Address precedence: `localBusiness.streetAddress` ưu tiên, fallback `contactInfo.address` | `json-ld.ts` | streetAddress có → dùng; rỗng → fallback contact block. | Address đúng nguồn |
+| **TC-F37-02-08** | BR-11 | Func | telephone format `+60 12 345 6789` trong schema | `json-ld.ts` | telephone chuẩn hoá E.164-ish MY trong JSON-LD. | NAP consistency |
+| **TC-F37-02-09** | AC-3 | Func | Full LocalBusiness schema — Rich Results validator 0 error | manual/validator | @context/@type hợp lệ, đủ address+geo+hours+priceRange+areaServed, 0 error trên Google Rich Results Test. | Search discoverability (E2E validate) |
+
+---
+
+## 3.6 US-F37-03: AI Crawler Permissions & llms.txt **[NOT BUILT — spec-based]**
+
+> **🔴 BLOCKER / SPEC CONFLICT** — TC section này **chưa chạy được**, code chưa build đúng spec:
+> - `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03 "default ALLOW" (BR-03).
+> - **KHÔNG có** route `llms.txt`. **KHÔNG có** field per-site toggle (`ai_crawlers_enabled`). Score engine hardcode `allowsSearchBots: false` "until US-F37-03 ships".
+> - TC spec-based, đánh dấu `[NOT-BUILT]` — dùng làm acceptance spec khi implement. **Xem §9 câu hỏi #2.**
+
+| ID | AC/FR | Type | Title | Status | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-03-01** | AC-4 | Func | Default robots.txt **ALLOW** AI bot (no `Disallow: /` cho GPTBot/ClaudeBot/Google-Extended/CCBot) | `[NOT-BUILT]` | Tenant mới → robots.txt KHÔNG chặn AI bot chính. | BR-03 default open |
+| **TC-F37-03-02** | FR-07 | Func | Field `ai_crawlers_enabled` boolean default `true` trên Sites | `[NOT-BUILT]` | Schema default true; migration entry (NFR-9). | Toggle backend |
+| **TC-F37-03-03** | AC-5 | Func | Seller opt-out OFF → robots.txt inject `Disallow: /` cho AI UA | `[NOT-BUILT]` | Toggle off → Disallow xuất hiện cho GPTBot/ClaudeBot/Google-Extended/PerplexityBot/CCBot. | Opt-out hoạt động |
+| **TC-F37-03-04** | AC-5 | Func | Opt-out KHÔNG chặn Googlebot/Bingbot | `[NOT-BUILT]` | Search bot thường vẫn crawl bình thường. | SEO không vỡ |
+| **TC-F37-03-05** | AC-6 | Func | `GET /llms.txt` → 200 `text/plain` | `[NOT-BUILT]` | Route tồn tại, status 200, MIME text/plain. | AEO signal |
+| **TC-F37-03-06** | AC-6 | Func | llms.txt content: tên, mô tả, ≥5 URL, contact, giờ, markdown | `[NOT-BUILT]` | Đủ element cấu trúc markdown. | llms.txt hợp lệ |
+| **TC-F37-03-07** | BR-09 | Func | llms.txt runtime-generated, cache ngắn | `[NOT-BUILT]` | Không long-cache; phản ánh data mới. | Freshness |
+| **TC-F37-03-08** | NFR-3 | Sec | Toggle per-site isolated (site A opt-out ≠ site B) | `[NOT-BUILT]` | robots.txt site B không đổi khi site A toggle. | Cross-tenant isolation |
+| **TC-F37-03-09** | Conflict | Sec | **Current robots.txt chặn 9 AI bot (ngược spec)** — confirm interim vs bug | `robots.txt/route.ts` | Ghi nhận hành vi hiện tại; PM chốt default-allow vs block trước implement. | **Spec conflict flag** |
+
+---
+
+## 3.7 US-F37-04: Local SEO Score & Checklist **[PARTIAL — engine+API built, checklist NOT built]**
+
+> Code: engine `src/lib/seo/local-seo-score.ts` (đã test TC-F37-01-10/11), API `src/app/api/sites/[siteId]/local-seo-score/route.ts` (**chưa test** — giá trị QA cao). Widget checklist one-click-fix (US-04 core) **chưa build** (chỉ có `completion-checklist.tsx` tối giản của US-01).
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-04-01** | FR-10 | Sec | Score API — unauth → 401 | `route.ts` `[UNTESTED]` | GET không session → 401. | Auth gate |
+| **TC-F37-04-02** | FR-10 | Sec | Score API — cross-tenant → 403 | `route.ts` `[UNTESTED]` | User khác tenant xin score siteId khác → 403 (ownership check). | IDOR guard |
+| **TC-F37-04-03** | FR-10 | Edge | Score API — rate-limit 30/60s → 429 | `route.ts` `[UNTESTED]` | Request thứ 31 trong 60s → 429. | Abuse guard |
+| **TC-F37-04-04** | FR-10 | Edge | Score API — site không tồn tại → 404 | `route.ts` `[UNTESTED]` | siteId sai → 404. | Error handling |
+| **TC-F37-04-05** | FR-10 | Func | Score API — signal derivation (faqBlock, hours predicate, sitemapPresent từ published) | `route.ts` `[UNTESTED]` | faq detect across pages; hours khớp `hasMeaningful`; sitemapPresent = status published. | Điểm phản ánh data thật |
+| **TC-F37-04-06** | FR-10 | Edge | Score API — lỗi nội bộ → 500 handler | `route.ts` `[UNTESTED]` | Exception → 500 sạch, không leak. | Resilience |
+| **TC-F37-04-07** | AC-7 | Func | Engine — Business Data bucket 7×5 trừ điểm per field thiếu | `local-seo-score.ts` | Mỗi field thiếu −5 (tối đa 35). | Bucket đúng |
+| **TC-F37-04-08** | AC-7 | Func | Engine — Structured Data: localBusinessSchema 10 / faq 8 / org 7 / subtype 5 | `local-seo-score.ts` | Weight từng signal đúng (tổng 30). | Bucket đúng |
+| **TC-F37-04-09** | §13.8 | Func | Engine — score normalize earned/applicable ×100; Phase-2 bucket KHÔNG vào mẫu số | `local-seo-score.ts` | Phase-1 hoàn thành đạt 100; Phase-2 locked không kéo điểm xuống. | No-drop rule |
+| **TC-F37-04-10** | AC-1 | Func | **[NOT-BUILT]** Empty site → score ≤30, checklist ≤3 item High | pending widget | Điểm ≤30 + tối đa 3 việc cần làm. | US-04 core UI |
+| **TC-F37-04-11** | AC-2 | Func | **[NOT-BUILT]** One-click "Bật ngay" AI crawler → toggle + robots.txt + item Done + score↑ | pending (phụ thuộc US-03) | Full chain 1-click fix. | US-04 core UI |
+| **TC-F37-04-12** | BR-10 | Func | **[NOT-BUILT]** Checklist tối đa 3 item, ẩn item done | pending widget | ≤3; done bị ẩn. | UX checklist |
+| **TC-F37-04-13** | BR-07 | Func | Score recalc khi save site settings (GBP refresh max 1×/24h) | integration | Save → recompute; PostHog analytics KHÔNG ảnh hưởng score. | Freshness |
+| **TC-F37-04-14** | AC-1 | Func | `completion-checklist.tsx` — addressDone cần đủ 4 field, hoursDone predicate | component `[UNTESTED]` | addressDone chỉ khi street+city+state+postcode; hoursDone khi có ≥1 ngày mở. | US-01 indicator đúng |
+
+---
+
+## 3.8 US-F37-08: Auto SEO/AEO Generation **[FULLY BUILT]**
+
+> Code: `src/lib/ai/seo-generator.ts` + `src/lib/ai/json-ld-templates.ts` + `src/app/api/seo/analyze/route.ts`. Đã test (TC-F01-W.27..35). TC dưới nhắm branch chưa test + **scope isolation** (ranh giới bảo mật platform↔tenant). FAQPage sở hữu ở story này (dedup theo agent).
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-08-01** | AC-15 | Func | Empty SEO fields → `<head>` đủ title(50–60), desc(150–160), og:*, canonical | `seo-generator.ts` | Không tag thiếu; length trong bound. | Fallback metadata |
+| **TC-F37-08-02** | AC-15 | Func | Auto-title KHÔNG "undefined"/rỗng, từ product+business name | `seo-generator.ts` | Không chuỗi "undefined", non-empty. | Không title rác |
+| **TC-F37-08-03** | AC-15 | Edge | Không tag nào `content=""` hoặc vắng | `seo-generator.ts` | Mọi meta có content thực. | Chất lượng head |
+| **TC-F37-08-04** | FR-24 | Edge | `parseAddress()` branch 1/2/3-phần, country default 'MY' | `json-ld-templates.ts` `[UNTESTED]` | Split đúng street/city/state; thiếu country → 'MY'. | Address parse đúng |
+| **TC-F37-08-05** | AC-16 | Func | `generateFAQSchema` dedup Q trùng qua nhiều faq block + empty→null (SiteRenderer path) | `json-ld.ts` `[UNTESTED]` | Merge nhiều block, bỏ Q trùng; 0 item → null (không emit FAQPage rỗng). | FAQPage đúng |
+| **TC-F37-08-06** | AC-16 | Func | Mỗi FAQ Q → `Question` + `acceptedAnswer`, validator 0 error | `seo-generator.ts` | Mapping đúng, schema hợp lệ. | AEO rich result |
+| **TC-F37-08-07** | AC-17 | Sec | **Scope isolation** — platform route (`/`, `/dashboard`, `/admin`, `/api/v1/*`) KHÔNG dính F37 fallback/llms/crawler | integration | Platform head/robots không bị F37 chèn. | **Ranh giới bảo mật** |
+| **TC-F37-08-08** | AC-17 | Sec | Platform `/llms.txt` → 404 (chỉ tenant storefront) | integration | Fetch domain platform /llms.txt → 404. | Isolation (llms chưa build) |
+| **TC-F37-08-09** | AC-17 | Sec | Platform robots.txt KHÔNG bị F37 sửa | integration | Platform robots giữ nguyên. | Isolation |
+| **TC-F37-08-10** | FR-22 | Func | `analysePage()` scoring branch (image-alt, word-count, no-contact-section) | `analyze/route.ts` | Mỗi issue type trừ điểm đúng + autoFixable flag. | SEO analyze chính xác |
+| **TC-F37-08-11** | BR-14 | Func | auto-meta fallback pure, KHÔNG gọi AI, nhanh | `seo-generator.ts` | Non-async, no OpenAI call ở fallback path. | Perf/cost |
+
+---
+
+## 3.9 US-F37-09: Malaysia Market Optimization **[PARTIAL — geo built, Waze/Halal NOT built]**
+
+> Code built: `src/lib/seo/map-links.ts` `parseMapLink()` (**chưa test**), `src/app/api/local-seo/resolve-maps-link/route.ts` (**chưa test — SSRF-critical**), `state-select.tsx` + editor components (chưa test), Sites.ts MY fields. **Chưa build:** Waze link, Halal cert schema, hreflang. `hreflang (FR-26/AC-20)` **DEFERRED P2** — KHÔNG viết TC.
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-09-01** | FR-25 | Func | `parseMapLink` ưu tiên pin `!3d!4d` hơn viewport `@` | `map-links.ts` `[UNTESTED]` | Link có cả pin+viewport → lấy pin. | Toạ độ chính xác |
+| **TC-F37-09-02** | FR-25 | Edge | `parseMapLink` reject lat/lng ngoài range | `map-links.ts` `[UNTESTED]` | lat>90/lng>180 → null. | Không nhận geo rác |
+| **TC-F37-09-03** | FR-25 | Edge | `parseMapLink` link rút gọn / malformed → null | `map-links.ts` `[UNTESTED]` | goo.gl/maps short + chuỗi lỗi → null (chờ layer-2 resolve). | Graceful |
+| **TC-F37-09-04** | NFR-3 | Sec | `resolve-maps-link` unauth → 401 | `route.ts` `[UNTESTED]` | POST không session → 401. | Auth gate |
+| **TC-F37-09-05** | NFR-3 | Sec | **SSRF host-allowlist** → host lạ → 400 | `route.ts` `[UNTESTED]` | Host không thuộc allowlist (google/goo.gl) → 400, không fetch. | **SSRF guard (blocker)** |
+| **TC-F37-09-06** | NFR-3 | Sec | Redirect chain — allowlist enforce mỗi hop, cap 5 hop, HEAD-only, timeout 4s | `route.ts` `[UNTESTED]` | Mỗi redirect re-check host; >5 hop → dừng; không GET body. | **SSRF guard (blocker)** |
+| **TC-F37-09-07** | NFR | Edge | `resolve-maps-link` rate-limit → 429 | `route.ts` `[UNTESTED]` | Vượt ngưỡng → 429. | Abuse guard |
+| **TC-F37-09-08** | FR-25 | Edge | All layer fail → 422 | `route.ts` `[UNTESTED]` | Regex + redirect + geocode đều fail → 422. | Error contract |
+| **TC-F37-09-09** | FR-25 | Edge | Geocode layer no-op khi thiếu `GOOGLE_MAPS_GEOCODING_API_KEY` | `route.ts` `[UNTESTED]` | Không key → bỏ qua layer-3, không throw. | Config-safe |
+| **TC-F37-09-10** | FR-28 | Func | `state-select` 13 bang + 3 lãnh thổ LB, label EN+BM, no free-text | `state-select.tsx` `[UNTESTED]` | 16 option, bilingual, dropdown (reuse `MY_STATES`). | MY địa chỉ chuẩn |
+| **TC-F37-09-11** | FR-27 | Func | Schema Offer `priceCurrency="MYR"`, UI hiển thị "RM 25.50" | integration | Currency MYR + formatPrice reuse. | MY commerce |
+| **TC-F37-09-12** | AC-18 | Func | **[NOT-BUILT]** Waze button URL `https://waze.com/ul?ll={lat},{lng}&navigate=yes` | pending | URL đúng format khi có lat+lng. | Waze deep-link |
+| **TC-F37-09-13** | AC-18 | Edge | **[NOT-BUILT]** Thiếu lat HOẶC lng → KHÔNG render Waze button (BR-16) | pending | Không href rỗng. | Không link vỡ |
+| **TC-F37-09-14** | AC-19 | Func | **[NOT-BUILT]** Halal ON → badge + JSON-LD `additionalProperty` PropertyValue "Halal Certified" + JAKIM `sameAs` | pending | Badge render + schema property + cert/sameAs khi có số cert. | Halal signal |
+| **TC-F37-09-15** | AC-19 | Func | **[NOT-BUILT]** Halal OFF → KHÔNG badge, KHÔNG additionalProperty | pending | Vắng cả 2. | Toggle sạch |
+| **TC-F37-09-16** | AC-14 | Func | Mobile 375px — checklist ≤3 full-width, touch ≥44px, no overflow | responsive | Không tràn ngang, target đủ lớn. | Mobile UX |
+
+---
+
+## 3.10 Gap-Fill v2.1 — Edge/Branch Scenarios (from ck:scenario cycle)
+
+> 15 scenario chưa cover, grounded vào **code thật** (đọc `map-links.ts`, `resolve-maps-link/route.ts`, `local-seo-score/route.ts`, `json-ld.ts`). Ưu tiên branch ở surface built-nhưng-chưa-test → giá trị QA cao nhất.
+
+### US-F37-02 JSON-LD — branch chưa cover
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-02-10** | AC-3 | Sec | `serializeJsonLd` escape **U+2028/U+2029 + `<>&`** (không chỉ `</script>`) | `json-ld.ts` `[UNTESTED branch]` | Line-separator (U+2028) và paragraph-separator (U+2029) bị escape; `<`,`>`,`&` escape. Chống breakout `dangerouslySetInnerHTML` ngoài case </script>. | XSS defense đầy đủ |
+| **TC-F37-02-11** | AC-2 | Edge | openingHours drop row `isClosed=false` nhưng **thiếu opens/closes** | `json-ld.ts` | Row mở-nhưng-không-giờ bị loại khỏi `openingHoursSpecification` (không emit spec nửa vời). | Hours schema hợp lệ |
+
+### US-F37-04 Score API/engine — branch chưa cover
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-04-15** | FR-10 | Sec | Score API **403 khi `site.tenant` null/thiếu** (không chỉ cross-tenant) | `local-seo-score/route.ts` dòng 56 `[UNTESTED]` | `siteTenantId` null → 403 (không lọt score cho site không gắn tenant). | IDOR guard đầy đủ |
+| **TC-F37-04-16** | AC-7 | Edge | faqSchema signal: faq block có nhưng **items rỗng → KHÔNG earned** | `local-seo-score/route.ts` dòng 72-75 `[UNTESTED]` | `items.length>0` mới tính; block rỗng không +8 (parity `generateFAQSchema` empty→null). | Điểm không thổi phồng |
+
+### US-F37-08 Auto SEO/AEO — branch chưa cover
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-08-12** | FR-24 | Edge | `parseAddress` boundary: split 1/2/3/>3-part, country default 'MY' per part-count | `json-ld-templates.ts` `[UNTESTED]` | 1-part→street; 2-part→street+city; 3-part→street+city+state; >3 gộp đúng; thiếu country→'MY'. | Address parse chính xác |
+| **TC-F37-08-13** | AC-15 | Edge | Metadata boundary: title=50/60, desc=150/160 (truncate đúng, không cắt giữa entity) | `seo-generator.ts` | Đúng biên length, không vượt, không cắt cụt ký tự đặc biệt. | Meta length compliant |
+| **TC-F37-08-14** | FR-04 | Func | Industry variant: Restaurant `servesCuisine` từ products; MedicalClinic `medicalSpecialty` | `json-ld-templates.ts` `[UNTESTED]` | @type Restaurant → servesCuisine từ product list; MedicalClinic → specialty field. | Schema sub-type richness |
+
+### US-F37-09 Map parser + resolve-maps-link (SSRF) — branch chưa cover
+
+| ID | AC/FR | Type | Title | Code Ref | Key Assertions | Impact |
+|---|---|---|---|---|---|---|
+| **TC-F37-09-17** | FR-25 | Edge | `parseMapLink`: pin `!3d!4d` **out-of-range** + viewport `@` hợp lệ → **fallback viewport** (không null) | `map-links.ts` dòng 42-54 `[UNTESTED]` | Pin fail range check → KHÔNG return, rơi xuống viewport → trả viewport coords. | Không mất geo hợp lệ |
+| **TC-F37-09-18** | FR-25 | Edge | `parseMapLink` boundary lat=±90/lng=±180 **inclusive**; negative coords hợp lệ | `map-links.ts` `isValidLatLng` `[UNTESTED]` | ±90/±180 accepted; -3.14/-101.6 (nam/tây bán cầu) hợp lệ. | Boundary đúng |
+| **TC-F37-09-19** | FR-25 | Edge | `parseMapLink` null/non-string/whitespace → null | `map-links.ts` dòng 38-40 `[UNTESTED]` | `null`/số/`"  "` → null (guard, không throw). | Defensive |
+| **TC-F37-09-20** | NFR-3 | Sec | resolve: **neither url nor address** → 400 (schema `.refine`) | `resolve-maps-link/route.ts` dòng 49 `[UNTESTED]` | Body rỗng cả 2 → 400 "url or address is required". | Contract |
+| **TC-F37-09-21** | NFR | Edge | resolve: url>2048 / address>500 → 400 (schema `.max`) | `route.ts` dòng 47-48 `[UNTESTED]` | Vượt max → 400 (chống payload lớn). | Input bound |
+| **TC-F37-09-22** | NFR-3 | Sec | resolve: 3xx **thiếu Location** → null→422; **relative Location** resolved + re-check allowlist mỗi hop | `route.ts` `resolveRedirect` dòng 80-91 `[UNTESTED]` | 3xx không Location → null; relative `/x` resolve qua `new URL(loc,current)` rồi `isAllowedHost(next)`; host lạ sau redirect → null. | SSRF guard đầy đủ |
+| **TC-F37-09-23** | FR-25 | Edge | resolve: redirect OK nhưng **final URL không coords** → fallthrough address/422 | `route.ts` dòng 142-148 `[UNTESTED]` | `parseMapLink(finalUrl)` null → không return, thử address rồi 422. | Layer fallthrough |
+| **TC-F37-09-24** | FR-25 | Func | resolve: **url+address cùng gửi** — url OK → `source:'redirect'` (bỏ address); url fail → address geocode | `route.ts` dòng 137-156 `[UNTESTED]` | url resolve được → trả redirect, KHÔNG chạy geocode; url fail → mới geocode address. | Layer precedence |
+| **TC-F37-09-25** | NFR | Edge | resolve: HEAD **timeout/abort 4s** → null; geocode key có nhưng API !ok/empty/non-finite → null→422 | `route.ts` `fetchWithTimeout`/`geocodeAddress` `[UNTESTED]` | AbortController 4s → fetch null → unresolvable; geocode results rỗng/lat-lng NaN → null. | Error cascade |
 
 ---
 
@@ -203,4 +359,17 @@ See `docs/architecture/F37-local-seo.md` § "Known limitation — flagged for Ph
 
 ---
 
-**Last Verified:** 2026-07-07 (all source code + test files read; field names, function signatures, and TC-ID mappings verified against actual code)
+## 9. Unresolved Questions & Implementation Gaps (Phase 1)
+
+> Cần PM/Dev chốt trước khi các TC `[NOT-BUILT]` chạy được. Đánh dấu để QA không nhầm "chưa test" với "fail".
+
+1. **🔴 robots.txt spec conflict (US-03, BLOCKER):** `src/app/sites/[slug]/robots.txt/route.ts` hiện **hardcode `Disallow: /`** cho 9 AI bot (GPTBot, ClaudeBot, Google-Extended, CCBot, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent, CloudflareBrowserRenderingCrawler) — **NGƯỢC** với US-03/BR-03 "default ALLOW". Score engine cũng hardcode `allowsSearchBots: false`. **PM chốt:** default-allow (theo spec) hay giữ block-list? → quyết TC-F37-03-01/09. Toàn US-03 (llms.txt + per-site toggle) chưa build.
+2. **US-04 checklist widget chưa build:** Engine + GET API đã có (API **chưa test** — TC-04-01..06 giá trị cao), nhưng widget checklist one-click-fix (US-04 core, AC-1/AC-2) chưa implement → TC-04-10/11/12 spec-based. TC-04-11 (one-click enable AI crawler) **phụ thuộc US-03** build xong.
+3. **US-09 Waze/Halal chưa build:** MY geo/state/postcode đã có + test; Waze link (AC-18) + Halal cert schema (AC-19) chưa implement → TC-09-12..15 spec-based. **`resolve-maps-link` route (SSRF-critical) + `parseMapLink` parser đã build nhưng CHƯA có test** — TC-09-01..09 là ưu tiên viết automated test cao nhất.
+4. **Technical Health hardcoded (US-04):** `coreWebVitals=80`, `mobileResponsive=true`, `httpsEnabled=true` là placeholder assume-pass (chưa đo Lighthouse thật) → mọi site được +15 free. PM chốt: giữ, đo thật, hay normalize "earned/applicable" (§13.8) trước khi surface score cho seller.
+5. **CF-5 metadata fallback cho checkout/orders routes:** Chưa rõ route checkout/orders có nằm dưới `/sites/[slug]/*` và cần `generateMetadata` fallback không → TC-08 boundary chờ confirm implementation.
+6. **hreflang (AC-20/FR-26) DEFERRED P2:** blocked bởi i18n client-side, chờ F21 URL-based locale routing. KHÔNG viết TC.
+
+---
+
+**Last Verified:** 2026-07-09 (Phase-1 scope; TC-F37-02/03/04/08/09 mapped vào code thật qua 2 vòng review requirements + code-reality scan; trạng thái BUILT/UNTESTED/NOT-BUILT verified against actual `src/`)

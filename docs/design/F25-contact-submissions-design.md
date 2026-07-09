@@ -27,6 +27,7 @@ Tài liệu cung cấp wireframe + spec UI cho luồng **Contact Submissions / L
 | `split` | 2-col: info trái + form phải |
 | `card-float` | Form trong floating card có shadow trên gradient nền |
 | `map-split` | 2-col: map placeholder trái + form phải (mobile: map stack trên) |
+| | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. |
 | `minimal-inline` | Form gọn, padding nhỏ (py-8) |
 
 (Chi tiết variant: `docs/prd/F30-sprint2-variants.md` §FR-07, `docs/prd/F31-block-variant-audit.md`.)
@@ -290,6 +291,7 @@ No CAPTCHA / third-party service at MVP (YAGNI; revisit if spam volume rises).
 ## 8. Responsive / Mobile
 
 - **Public form:** block is responsive (Tailwind); single-column stack on mobile; `map-split` stacks map above form ≤768px
+  > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant.
 - **Admin:** Payload desktop-first; list horizontal-scrolls ≤768px (Payload default)
 - Contact info chips tappable on mobile (mailto/tel/maps)
 

@@ -706,4 +706,28 @@ describe('[TC-GENPERF-W2-04] runParallelPageSplit — orchestration', () => {
 		;(homeFooter.columns as Array<Record<string, unknown>>).push({ title: 'AfterSync' })
 		expect((aboutFooterSynced.columns as Array<{ title: string }>).some((c) => c.title === 'AfterSync')).toBe(false)
 	})
+
+	it('[TC-GENPERF-W2-16] syncFooterAcrossPages converges footer VARIANT — home rotated → all subpages match', () => {
+		// Reproduces the live symptom (2026-07-09): the structure enforcer rotates
+		// ONLY the homepage footer variant (simple → minimal), leaving subpages on
+		// the pre-enforcement clone (simple). syncFooterAcrossPages runs AFTER the
+		// enforcer and must re-propagate the home variant so every page matches.
+		const pages = [
+			{ blocks: [{ blockType: 'hero' }, { blockType: 'footer', variant: 'simple' }] },
+			{ blocks: [{ blockType: 'about' }, { blockType: 'footer', variant: 'simple' }] },
+			{ blocks: [{ blockType: 'services' }, { blockType: 'footer', variant: 'simple' }] },
+		]
+		// Enforcer rotates HOME footer only:
+		;(pages[0]!.blocks[1] as Record<string, unknown>).variant = 'minimal'
+
+		syncFooterAcrossPages(pages)
+
+		const variantOf = (pgIdx: number) =>
+			(pages[pgIdx]!.blocks.find((b) => (b as Record<string, unknown>).blockType === 'footer') as Record<string, unknown>).variant
+		expect(variantOf(0)).toBe('minimal')
+		expect(variantOf(1)).toBe('minimal') // was 'simple' → synced
+		expect(variantOf(2)).toBe('minimal')
+		// exactly one footer per subpage (no dup)
+		expect(pages[1]!.blocks.filter((b) => (b as Record<string, unknown>).blockType === 'footer')).toHaveLength(1)
+	})
 })

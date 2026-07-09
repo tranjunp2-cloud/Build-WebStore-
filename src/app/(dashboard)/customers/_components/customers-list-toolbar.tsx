@@ -79,8 +79,13 @@ function FilterChip<T extends string>({
                             key={o.key}
                             type="button"
                             onClick={() => { onChange(o.key); setOpen(false) }}
-                            className="w-full px-4 py-[10px] flex items-center justify-between text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
-                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)' }}
+                            className={cn(
+                                "w-full px-4 py-[10px] flex items-center justify-between text-left text-[13px] transition-colors cursor-pointer",
+                                o.key === value
+                                    ? "bg-[hsl(var(--primary)/0.1)]"
+                                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                            )}
+                            style={{ color: o.key === value ? 'hsl(var(--primary))' : 'var(--dash-text-muted)' }}
                         >
                             {o.badge ?? <span className={o.key === value ? 'font-medium' : ''}>{o.label}</span>}
                             {o.count !== undefined && (
@@ -176,8 +181,13 @@ function DateFilterChip({
                             key={o.key}
                             type="button"
                             onClick={() => { onChange(o.key); setOpen(false) }}
-                            className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
-                            style={{ color: o.key === value ? 'var(--dash-text)' : 'var(--dash-text-muted)', fontWeight: o.key === value ? 500 : 400 }}
+                            className={cn(
+                                "w-full px-4 py-[10px] text-left text-[13px] transition-colors cursor-pointer",
+                                o.key === value
+                                    ? "bg-[hsl(var(--primary)/0.1)]"
+                                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                            )}
+                            style={{ color: o.key === value ? 'hsl(var(--primary))' : 'var(--dash-text-muted)', fontWeight: o.key === value ? 500 : 400 }}
                         >
                             {o.label}
                         </button>
@@ -185,7 +195,12 @@ function DateFilterChip({
                     <button
                         type="button"
                         onClick={() => onChange('customRange')}
-                        className="w-full px-4 py-[10px] text-left text-[13px] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] cursor-pointer"
+                        className={cn(
+                            "w-full px-4 py-[10px] text-left text-[13px] transition-colors cursor-pointer",
+                            value === 'customRange'
+                                ? "bg-[hsl(var(--primary)/0.1)]"
+                                : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                        )}
                         style={{
                             color: value === 'customRange' ? 'hsl(var(--primary))' : 'var(--dash-text-muted)',
                             fontWeight: value === 'customRange' ? 500 : 400,
