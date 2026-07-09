@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { checkUploadSize } from '@/lib/media/upload-limits'
 
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser()
@@ -10,6 +11,12 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const file = formData.get('file') as File
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+    // GH-1284 — reject oversized files BEFORE buffering them into memory. An
+    // oversized upload otherwise buffers fully in RAM then runs the S3 write
+    // into the 120s function timeout instead of failing fast.
+    const sizeError = checkUploadSize(file.type, file.size)
+    if (sizeError) return NextResponse.json({ error: sizeError }, { status: 413 })
 
     const altRaw = formData.get('alt')
     const alt = typeof altRaw === 'string' && altRaw.trim() ? altRaw.trim() : file.name
