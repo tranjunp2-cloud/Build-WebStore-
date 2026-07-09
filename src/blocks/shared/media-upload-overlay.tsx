@@ -216,7 +216,17 @@ export function MediaUploadOverlay({
     }
 
     return (
-        <div ref={containerRef} data-media-overlay className={[positionClass ?? 'relative', 'group/media-overlay', className].filter(Boolean).join(' ')}>
+        <div
+            ref={containerRef}
+            data-media-overlay
+            className={[positionClass ?? 'relative', 'group/media-overlay', className].filter(Boolean).join(' ')}
+            // GH-1191: touch devices fire no mouseenter — tap toggles the control instead.
+            // Taps on the control itself (Change Image/Video buttons) must not toggle it away.
+            onClick={(e) => {
+                if ((e.target as HTMLElement).closest('[data-editor-control]')) return
+                setIsHovered(v => !v)
+            }}
+        >
             {children}
             <div
                 data-editor-control
@@ -267,11 +277,14 @@ export function MediaUploadOverlay({
                     )}
                 </div>
             </div>
+            {/* stopPropagation: the programmatic .click() on these hidden inputs bubbles to the
+                container's GH-1191 tap-toggle and would hide the control mid-interaction. */}
             <input
                 ref={imageFileRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
+                onClick={(e) => e.stopPropagation()}
                 onChange={handleImageSelect}
             />
             <input
@@ -279,6 +292,7 @@ export function MediaUploadOverlay({
                 type="file"
                 accept="video/mp4,video/webm"
                 className="hidden"
+                onClick={(e) => e.stopPropagation()}
                 onChange={handleVideoSelect}
             />
         </div>

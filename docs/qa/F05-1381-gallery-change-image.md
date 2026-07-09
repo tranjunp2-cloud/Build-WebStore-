@@ -27,9 +27,12 @@ Gallery (và 12 block khác) thay ảnh qua `MediaUploadOverlay` trong preview i
 | TC-GH1381-UO-001..019 | `src/__tests__/unit/blocks/media-upload-overlay.test.tsx` | Overlay hợp nhất: owner gate, valueShape, progress %, video, error toast | Blocker |
 | TC-GH1381-UO-020 | `src/__tests__/unit/blocks/media-upload-overlay.test.tsx` | Parent NACK → error toast kèm lý do, không có success toast | Blocker |
 | TC-GH1381-UO-021 | `src/__tests__/unit/blocks/media-upload-overlay.test.tsx` | ACK sai field/blockIndex bị bỏ qua; chỉ ACK khớp mới toast | High |
+| TC-GH1381-UO-022 | `src/__tests__/unit/blocks/media-upload-overlay.test.tsx` | Tap toggle control trên touch device (khôi phục GH-1191) | High |
 | TC-GH1381-UVP-001..003 | `src/__tests__/unit/editor/update-value-at-path.test.ts` | Regression: path có sẵn, immutability, top-level | Blocker |
 | TC-GH1381-UVP-004..008 | `src/__tests__/unit/editor/update-value-at-path.test.ts` | Fallback slot: images rỗng/thiếu/ngắn hơn index/null → tạo container + pad | Blocker |
-| (UX) | `src/__tests__/unit/editor/f05-gh1381-upload-ux.test.tsx`, `gh-1381-image-toolbar-ux.test.tsx` | Suppress double ImageToolbar, upload UX 13 blocks | High |
+| TC-GH1381-UVP-009..012 | `src/__tests__/unit/editor/update-value-at-path.test.ts` | Guards: index cap (chống OOM), non-index key trên array, blocked segments, empty path | Blocker |
+| TC-GH1381-UX-001..015 | `src/__tests__/unit/editor/f05-gh1381-upload-ux.test.tsx` | Upload UX 13 blocks: spinner/disabled/i18n/persistence (renumber từ TC-GH1381-01..15, tránh trùng namespace) | High |
+| TC-GH1381-ITB-001..008 | `src/__tests__/unit/editor/gh-1381-image-toolbar-ux.test.tsx` | ImageToolbar suppression + Path B UX (renumber từ TC-GH1381-01..08) | High |
 
 ## 3. Manual Verification Checklist (QC re-test)
 

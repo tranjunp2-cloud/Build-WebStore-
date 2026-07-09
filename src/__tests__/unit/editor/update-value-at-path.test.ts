@@ -1,6 +1,6 @@
 /**
  * Unit Tests: updateValueAtPath — immutable deep-set for editor block data
- * TC-IDs: TC-GH1381-UVP-001 → TC-GH1381-UVP-008
+ * TC-IDs: TC-GH1381-UVP-001 → TC-GH1381-UVP-012
  * Convention: docs/TEST_CONVENTION.md
  * QA doc: docs/qa/F05-1381-gallery-change-image.md
  *
@@ -86,5 +86,37 @@ describe('GH-1381: updateValueAtPath creates missing containers (QC re-test fix)
         const images = next.images as Array<Record<string, unknown>>
         expect(images[0]!.image).toEqual(newImage)
         expect(images[0]!.caption).toBe('c')
+    })
+})
+
+describe('GH-1381: updateValueAtPath rejects invalid paths (adversarial review F1/F6/Q3)', () => {
+    // TC-GH1381-UVP-009 — F1: forged postMessage with a huge index must not OOM the tab
+    it('TC-GH1381-UVP-009: array index beyond cap → throws instead of padding millions of items', () => {
+        const block = { images: [] as unknown[] }
+        expect(() => updateValueAtPath(block, ['images', 99999999, 'image'], newImage)).toThrow(/out of range/)
+        expect(() => updateValueAtPath(block, ['images', 501, 'image'], newImage)).toThrow(/out of range/)
+        // Boundary: max allowed index still works
+        expect(() => updateValueAtPath(block, ['images', 500, 'image'], newImage)).not.toThrow()
+    })
+
+    // TC-GH1381-UVP-010 — F6: string keys on arrays would corrupt the array shape
+    it('TC-GH1381-UVP-010: non-index segment on an array → throws (no own string props on arrays)', () => {
+        const block = { images: [{ image: null }] }
+        expect(() => updateValueAtPath(block, ['images', '-1', 'image'], newImage)).toThrow(/non-index key/)
+        expect(() => updateValueAtPath(block, ['images', '', 'image'], newImage)).toThrow(/empty path segment/)
+    })
+
+    // TC-GH1381-UVP-011 — Q3: lib guards prototype-chain keys itself (defense in depth vs caller filter)
+    it('TC-GH1381-UVP-011: blocked segments (__proto__/constructor/prototype) → throws', () => {
+        const block = { images: [] as unknown[] }
+        expect(() => updateValueAtPath(block, ['__proto__', 'polluted'], 'x')).toThrow(/blocked path segment/)
+        expect(() => updateValueAtPath(block, ['images', 0, 'constructor'], 'x')).toThrow(/blocked path segment/)
+        expect(() => updateValueAtPath(block, ['prototype'], 'x')).toThrow(/blocked path segment/)
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    })
+
+    // TC-GH1381-UVP-012 — Q3: empty path would write a literal "undefined" key
+    it('TC-GH1381-UVP-012: empty path → throws', () => {
+        expect(() => updateValueAtPath({ a: 1 }, [], 'x')).toThrow(/empty path/)
     })
 })

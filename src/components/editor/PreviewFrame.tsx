@@ -700,16 +700,19 @@ function PreviewFrameInner({
                         replyResult(false, 'Invalid change payload')
                         return
                     }
+                    // Reject (don't silently filter) blocked segments — dropping a segment would
+                    // change WHERE the write lands. updateValueAtPath re-validates and throws on
+                    // empty/blocked/out-of-range segments; the catch below turns that into a NACK.
                     const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
-                    const path = (field as string).split('.').map((seg: string) =>
-                        /^\d+$/.test(seg) ? Number(seg) : seg
-                    ).filter((seg) => !BLOCKED_PATH_SEGMENTS.has(String(seg))) as Array<string | number>
-                    if (path.length === 0) {
+                    const rawSegments = (field as string).split('.')
+                    if (rawSegments.some((seg) => BLOCKED_PATH_SEGMENTS.has(seg))) {
                         replyResult(false, 'Invalid field path')
                         return
                     }
-                    const clone = JSON.parse(JSON.stringify(currentBlocks))
-                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
+                    const path = rawSegments.map((seg: string) =>
+                        /^\d+$/.test(seg) ? Number(seg) : seg
+                    ) as Array<string | number>
+                    const nextBlock = updateValueAtPath(currentBlocks[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
                     updateBlock(blockIndex, nextBlock)
                     // Push updated block back to iframe so React re-renders with new field values
                     // without a full iframe reload (which would lose scroll position).

@@ -6,12 +6,12 @@
  * ImagePlus icon + "changeImage" label.
  *
  * Coverage Map (QA Doc Traceability):
- *   TC-GH1381-01  → ImageToolbar with isProcessing=true renders Loader2 spinner + animate-spin
- *   TC-GH1381-02  → ImageToolbar with isProcessing=true button is disabled
- *   TC-GH1381-03  → ImageToolbar with isProcessing=true shows i18n 'uploading' label
- *   TC-GH1381-04  → ImageToolbar with isProcessing=false renders ImagePlus icon
- *   TC-GH1381-05  → ImageToolbar with isProcessing=false shows i18n 'changeImage' label
- *   TC-GH1381-06  → ImageToolbar with isProcessing=false button is enabled
+ *   TC-GH1381-ITB-001  → ImageToolbar with isProcessing=true renders Loader2 spinner + animate-spin
+ *   TC-GH1381-ITB-002  → ImageToolbar with isProcessing=true button is disabled
+ *   TC-GH1381-ITB-003  → ImageToolbar with isProcessing=true shows i18n 'uploading' label
+ *   TC-GH1381-ITB-004  → ImageToolbar with isProcessing=false renders ImagePlus icon
+ *   TC-GH1381-ITB-005  → ImageToolbar with isProcessing=false shows i18n 'changeImage' label
+ *   TC-GH1381-ITB-006  → ImageToolbar with isProcessing=false button is enabled
  *
  * Source:
  *   src/components/editor/ImageToolbar.tsx
@@ -52,8 +52,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         vi.clearAllMocks()
     })
 
-    // TC-GH1381-01: Spinner visible when isProcessing=true
-    it('TC-GH1381-01: isProcessing=true renders Loader2 spinner with animate-spin class', () => {
+    // TC-GH1381-ITB-001: Spinner visible when isProcessing=true
+    it('TC-GH1381-ITB-001: isProcessing=true renders Loader2 spinner with animate-spin class', () => {
         const { container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={true} />
         )
@@ -64,8 +64,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(spinner?.classList.contains('animate-spin')).toBe(true)
     })
 
-    // TC-GH1381-02: Button disabled when isProcessing=true
-    it('TC-GH1381-02: isProcessing=true disables the button (prevents duplicate uploads)', () => {
+    // TC-GH1381-ITB-002: Button disabled when isProcessing=true
+    it('TC-GH1381-ITB-002: isProcessing=true disables the button (prevents duplicate uploads)', () => {
         const { container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={true} />
         )
@@ -76,8 +76,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(button?.className).toContain('disabled:opacity-50')
     })
 
-    // TC-GH1381-03: Shows "uploading" label when isProcessing=true
-    it('TC-GH1381-03: isProcessing=true displays "Uploading..." label from i18n', () => {
+    // TC-GH1381-ITB-003: Shows "uploading" label when isProcessing=true
+    it('TC-GH1381-ITB-003: isProcessing=true displays "Uploading..." label from i18n', () => {
         render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={true} />
         )
@@ -86,8 +86,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(uploadingLabel).toBeTruthy()
     })
 
-    // TC-GH1381-04: ImagePlus icon visible when isProcessing=false
-    it('TC-GH1381-04: isProcessing=false renders ImagePlus icon (not spinner)', () => {
+    // TC-GH1381-ITB-004: ImagePlus icon visible when isProcessing=false
+    it('TC-GH1381-ITB-004: isProcessing=false renders ImagePlus icon (not spinner)', () => {
         const { container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={false} />
         )
@@ -101,8 +101,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(button).toBeTruthy()
     })
 
-    // TC-GH1381-05: Shows "changeImage" label when isProcessing=false
-    it('TC-GH1381-05: isProcessing=false displays "Change Image" label from i18n', () => {
+    // TC-GH1381-ITB-005: Shows "changeImage" label when isProcessing=false
+    it('TC-GH1381-ITB-005: isProcessing=false displays "Change Image" label from i18n', () => {
         render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={false} />
         )
@@ -111,8 +111,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(changeLabel).toBeTruthy()
     })
 
-    // TC-GH1381-06: Button enabled when isProcessing=false
-    it('TC-GH1381-06: isProcessing=false enables the button (allows user interaction)', () => {
+    // TC-GH1381-ITB-006: Button enabled when isProcessing=false
+    it('TC-GH1381-ITB-006: isProcessing=false enables the button (allows user interaction)', () => {
         const { container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={false} />
         )
@@ -122,8 +122,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(button?.disabled).toBe(false)
     })
 
-    // TC-GH1381-07: Undefined isProcessing defaults to false
-    it('TC-GH1381-07: isProcessing prop undefined defaults to false (enabled state)', () => {
+    // TC-GH1381-ITB-007: Undefined isProcessing defaults to false
+    it('TC-GH1381-ITB-007: isProcessing prop undefined defaults to false (enabled state)', () => {
         const { container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} />
         )
@@ -133,8 +133,8 @@ describe('ImageToolbar — loading state display (GH-1381)', () => {
         expect(screen.getByText('Change Image')).toBeTruthy()
     })
 
-    // TC-GH1381-08: Transition between loading states
-    it('TC-GH1381-08: re-render with isProcessing change updates button state and label', () => {
+    // TC-GH1381-ITB-008: Transition between loading states
+    it('TC-GH1381-ITB-008: re-render with isProcessing change updates button state and label', () => {
         const { rerender, container } = render(
             <ImageToolbar onImageSelect={mockOnImageSelect} isProcessing={false} />
         )

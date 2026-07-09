@@ -1,6 +1,6 @@
 /**
  * Unit Tests: MediaUploadOverlay — unified shared overlay component for image/video uploads
- * TC-IDs: TC-GH1381-UO-001 → TC-GH1381-UO-021
+ * TC-IDs: TC-GH1381-UO-001 → TC-GH1381-UO-022
  * Convention: docs/TEST_CONVENTION.md
  * QA doc: docs/qa/F05-1381-gallery-change-image.md
  * GH-1381: Extracted from HeroMediaOverlay, now used across 10+ blocks (gallery, carousel, team, etc.)
@@ -198,6 +198,33 @@ describe('TC-GH1381-UO-020: parent NACK → error toast with reason', () => {
             expect.objectContaining({ type: 'SHOW_TOAST', variant: 'success' }),
             expect.any(String),
         )
+    })
+})
+
+describe('TC-GH1381-UO-022: tap toggles the control (GH-1191 touch support)', () => {
+    it('click on the wrapper shows the control, second click hides it, control clicks are ignored', () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        const { container } = render(
+            <MediaUploadOverlay field="image" altText="alt">
+                <img data-testid="child" src="/img.jpg" alt="test" />
+            </MediaUploadOverlay>
+        )
+        const wrapper = container.querySelector('[data-media-overlay]') as HTMLElement
+        const controlLayer = wrapper.querySelector('[data-editor-control]') as HTMLElement
+        expect(controlLayer.className).toContain('opacity-0')
+
+        // Tap 1 (touch devices fire click without mouseenter) → control shows
+        fireEvent.click(screen.getByTestId('child'))
+        expect(controlLayer.className).toContain('opacity-100')
+
+        // Click on the control itself (e.g. Change Image button) must NOT toggle it away
+        fireEvent.click(screen.getByText('Change Image'))
+        expect(controlLayer.className).toContain('opacity-100')
+
+        // Tap 2 on the media → control hides again
+        fireEvent.click(screen.getByTestId('child'))
+        expect(controlLayer.className).toContain('opacity-0')
     })
 })
 
