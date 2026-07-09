@@ -312,7 +312,10 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
     }[state]
 
     return createPortal(
-        <div className="dash-shell fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-200">
+        <div
+            className="dash-shell fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-[3px] animate-in fade-in duration-200"
+            style={{ backgroundColor: 'var(--dash-overlay)' }}
+        >
             <div className="flex flex-col w-full max-w-[672px] max-h-[85vh] bg-[#1E293B] border border-white/10 rounded-2xl shadow-[0px_25px_50px_-12px_rgba(59,130,246,0.2)] overflow-hidden animate-in zoom-in-95 duration-200 antialiased" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
                 {/* Header */}

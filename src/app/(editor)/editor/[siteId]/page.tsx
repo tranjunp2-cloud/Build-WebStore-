@@ -7,6 +7,7 @@ import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
+import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -880,7 +881,7 @@ export default function EditorPage() {
             // media group) — snapshotting `images` freezes the array into localeOverrides, and
             // since getDisplayBlock merges override-over-flat, a later image upload (which only
             // updates the flat block) would be masked by the stale snapshot even across reloads.
-            const SKIP = new Set(['id', 'blockType', 'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', 'variant', 'backgroundColor', '_localeContent', '__localeInit', 'showLanguageSwitcher', 'multilingualEnabled', 'primaryLocale', 'secondaryLocale'])
+            const SKIP = new Set(['id', 'blockType', 'logo', 'image', 'backgroundImage', 'images', 'icon', 'avatar', 'media', '_localeContent', '__localeInit', ...STRUCTURAL_BLOCK_FIELDS])
             const extractContent = (block: BlockData) =>
                 Object.fromEntries(
                     Object.entries(block as Record<string, unknown>).filter(([k]) => !SKIP.has(k)),
@@ -1266,48 +1267,51 @@ export default function EditorPage() {
         }
     }, [handleSave])
 
-    const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
-        const rawBlock = useEditorStore.getState().blocks[index]
-        const blockId = rawBlock?.id as string | undefined
-        if (blockId) {
-            // F-26: Store edit in localeOverrides so EN defaults (seeded by initLocaleFromBlock)
-            // never mask user content when switching locales.
-            setLocaleOverride(blockId, activeLocale, { [field]: value })
-            // Also update the flat block for the site's primary locale — the live renderer reads
-            // flat blocks from DB, so edits must propagate there too (dual-write for primary locale).
-            if (activeLocale === (site?.locale ?? 'en')) {
-                updateBlock(index, { [field]: value })
-            }
-            const displayBlock = useEditorStore.getState().getDisplayBlock(rawBlock)
-            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: displayBlock })
-        } else {
-            // No blockId — block not yet persisted; fall back to flat block update
-            updateBlock(index, { [field]: value })
-            const updatedBlock = useEditorStore.getState().blocks[index]
-            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
-        }
-        void saveWithRetry({ showToast: false, refreshPreview: false })
-    }, [updateBlock, setLocaleOverride, activeLocale, site, saveWithRetry])
-
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
-        const rawBlock = useEditorStore.getState().blocks[index]
+        const store = useEditorStore.getState()
+        const rawBlock = store.blocks[index]
         const blockId = rawBlock?.id as string | undefined
-        if (blockId) {
-            // F-26: Same dual-write as handleBlockFieldChange — localeOverrides for editor display,
-            // flat block for live renderer (primary locale only, to avoid overwriting BM with EN).
-            setLocaleOverride(blockId, activeLocale, changes)
-            if (activeLocale === (site?.locale ?? 'en')) {
-                updateBlock(index, changes)
-            }
-            const displayBlock = useEditorStore.getState().getDisplayBlock(rawBlock)
-            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: displayBlock })
-        } else {
-            updateBlock(index, changes)
-            const updatedBlock = useEditorStore.getState().blocks[index]
-            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
+
+        // Structural fields (variant, backgroundColor, locale controls) are site-wide:
+        // they ALWAYS write the flat block and never enter a locale slot. Routing them
+        // through localeOverrides desynced canvas vs settings — e.g. picking the hero
+        // "video" variant on a vi-generated site stored it only in overrides['vi'], so
+        // the next flat-block render silently reverted to the old variant. The full
+        // decision (incl. the generationLocale base-language gate) lives in
+        // routeBlockChanges() so unit tests pin it.
+        const { flatChanges, contentOverride, purgeKeys } = routeBlockChanges(changes, {
+            hasBlockId: Boolean(blockId),
+            activeLocale,
+            generationLocale: store.generationLocale,
+            siteLocale: store.siteLocale,
+        })
+
+        if (Object.keys(flatChanges).length > 0) {
+            updateBlock(index, flatChanges)
         }
+        if (blockId) {
+            // Purge stale per-locale copies of structural keys (pre-fix sessions) so
+            // they can't shadow the flat value in getDisplayBlock.
+            for (const key of purgeKeys) store.clearLocaleOverrideField(blockId, key)
+            if (Object.keys(contentOverride).length > 0) {
+                // F-26: Store edit in localeOverrides so EN defaults (seeded by
+                // initLocaleFromBlock) never mask user content when switching locales.
+                setLocaleOverride(blockId, activeLocale, contentOverride)
+            }
+        }
+
+        const updatedBlock = useEditorStore.getState().blocks[index]
+        // Id-less blocks (pre-save) echo the RAW block: getDisplayBlock's template
+        // fallback for no-id blocks would overwrite the just-typed value with EN/MS
+        // locale defaults when editing on a non-base locale view.
+        const blockData = blockId ? useEditorStore.getState().getDisplayBlock(updatedBlock) : updatedBlock
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData })
         void saveWithRetry({ showToast: false, refreshPreview: false })
-    }, [updateBlock, setLocaleOverride, activeLocale, site, saveWithRetry])
+    }, [updateBlock, setLocaleOverride, activeLocale, saveWithRetry])
+
+    const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
+        handleBlockUpdate(index, { [field]: value })
+    }, [handleBlockUpdate])
 
     // ─── F26 Quick Language helpers (shared by desktop + mobile SettingsPanel) ───
     // Push the merged header to the iframe so the nav preview reflects the latest locale fields.

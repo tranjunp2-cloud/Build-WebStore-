@@ -24,9 +24,11 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
     const showHelper = freeEnabled && freeAboveRm !== '' && !isNaN(parsedAmount)
 
     return (
-        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[hsl(var(--card))] overflow-hidden">
-            {/* Card header: icon + title + subtitle + toggle — separated by border-b */}
-            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
+        <div className="flex flex-col rounded-[16px] border border-solid border-dash-border bg-[hsl(var(--card))] overflow-hidden">
+            {/* Card header: icon + title + subtitle + toggle. GH-1538 #7: dropped the border-b
+                divider here — PaymentMethodCard (the sync target) uses a single outer border
+                only, no internal header/body separator. */}
+            <div className="flex items-start justify-between gap-4 px-6 py-5">
                 <div className="flex items-start gap-4">
                     <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-warning/10 border border-warning/20 shrink-0">
                         <Gift className="h-5 w-5 text-warning" />

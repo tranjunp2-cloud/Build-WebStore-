@@ -1831,7 +1831,7 @@
         },
         "customers": {
             "title": "Contact Leads",
-            "subtitle": "Contact form submissions & newsletter subscribers",
+            "subtitle": "Track and manage customer inquiries submitted through your website forms.",
             "searchPlaceholder": "Search by name or email…",
             "sourceAll": "All Sources",
             "sourceContact": "Contact Form",
@@ -2547,6 +2547,7 @@
                 "titleMaxLength": "Title must be less than 255 characters",
                 "slugInvalid": "Slug can only contain lowercase letters, numbers, and hyphens",
                 "urlSlugLabel": "URL Slug (auto-generated, editable)",
+                "slugLockedHint": "Locked because this post is published — changing the URL breaks existing links and search rankings.",
                 "thumbnailLabel": "Featured Thumbnail",
                 "replace": "Replace",
                 "clickToUpload": "Click to upload thumbnail",

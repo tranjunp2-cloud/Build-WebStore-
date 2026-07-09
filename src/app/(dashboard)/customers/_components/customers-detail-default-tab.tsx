@@ -61,7 +61,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
             open (~710px) is too narrow for 1fr+300px, so stack to 1 col below xl. */}
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-6 items-start">
             {/* Left: form card */}
-            <div className="rounded-[16px] p-6" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
+            <div className="rounded-[16px] p-6" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
 
                     {/* Email — read-only identity (col 1) */}
@@ -183,7 +183,7 @@ export function CustomersDetailDefaultTab({ draft, onChange, errors, original }:
             {/* Right: stats rail */}
             <div className="flex flex-col gap-4 sticky top-4">
                 {/* Stats card */}
-                <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--cus-surface-card)', border: '1px solid var(--cus-border-medium)' }}>
+                <div className="rounded-[14px] overflow-hidden" style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}>
                     {[
                         { k: cd.statTotalOrder,    v: String(original.orderCount) },
                         { k: cd.statTotalSpending, v: fmtCurrency(original.lifetime) },
