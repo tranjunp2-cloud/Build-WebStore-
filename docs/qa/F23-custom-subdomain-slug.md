@@ -846,6 +846,50 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 
 ---
 
+#### TC-F23-053: Subdomain input — IME tiếng Việt không rớt ký tự (composition)
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, đang ở chế độ "Change subdomain" (input slug hiển thị)
+- **Steps:**
+  1. `compositionStart` trên input (mô phỏng IME Telex/VNI/Unikey bắt đầu compose)
+  2. `change` với giá trị `"shopđ"` khi đang compose
+  3. `compositionEnd` với giá trị `"shopđ"`
+- **Expected:** Trong lúc compose, buffer giữ nguyên `"shopđ"` (KHÔNG bị sanitize giữa chừng → không rớt ký tự); sau `compositionEnd` giá trị được lọc còn `"shop"` (`[a-z0-9-]`)
+- **Test Data:** Chuỗi compose `"shopđ"` → kết quả `"shop"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-054: Subdomain input — EN keyboard vẫn lowercase + strip khi gõ
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain", không có composition
+- **Steps:**
+  1. `change` với giá trị `"My-Shop!@#"`
+- **Expected:** Không regression — giá trị được lowercase + strip ký tự lạ ngay lập tức → `"my-shop"`
+- **Test Data:** `"My-Shop!@#"` → `"my-shop"`
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
+#### TC-F23-055: Subdomain input — không còn bị chốt cứng 280px
+- **Priority:** P1
+- **Type:** Unit (component)
+- **AC Reference:** — (BUG #1459)
+- **Scenario Reference:** — (regression)
+- **Precondition:** `/settings/domains`, chế độ "Change subdomain"
+- **Steps:**
+  1. Render input, đọc className của container + input
+- **Expected:** Container KHÔNG chứa `max-w-[280px]`, có `sm:max-w-[520px]`; input giữ `flex-1` + `min-w-0` để slug dài tới 63 ký tự luôn hiển thị
+- **Test Data:** —
+- **Automated:** `src/__tests__/unit/dashboard/f19-domains-client.test.tsx`
+
+---
+
 ## 4. Traceability Matrix — AC → TC
 
 | AC | Mô tả | Test Cases | Coverage |
@@ -1016,4 +1060,5 @@ Tính năng F23 cho phép người dùng chọn custom subdomain (slug) thay vì
 ---
 
 *Tài liệu này cover 13/13 ACs, 6/6 Critical scenarios, 10/10 High scenarios, 12/12 Medium scenarios.*
-*Tổng: 52 Test Cases — 10 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*Tổng: 55 Test Cases — 13 Unit, 18 Integration, 8 E2E, 6 Security, 10 Edge Cases.*
+*TC-F23-053..055 bổ sung cho BUG #1459 (subdomain input width + IME tiếng Việt).*
