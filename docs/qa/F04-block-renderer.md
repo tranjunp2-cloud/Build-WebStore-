@@ -195,3 +195,28 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 - TC-EDIT-01..05: Mock `caretRangeFromPoint` per test case to simulate text vs background hits. Assert postMessage type.
 - TC-EDIT-06..09: Render real `BlockActionBar` component; query className strings + simulate pointerDown on grip button.
 - All tests: No fake data, import real components, follow AAA pattern.
+
+---
+
+## 7. GH-1461 Builder-Preview Read-Only Enforcement (TC-GH1461-01..05, TC-GH1461-WA-01..02)
+
+**Scope:** AI Builder read-only preview screens (`?builder=1`, non-editor) must disable all edit affordances (Change Image overlay, WhatsApp/cart click) while leaving the real editor and storefront untouched. Mapped to Block Renderer feature family (`SiteRenderer.tsx` provides the context both editor and preview consume).
+
+| TC-ID | Layer | Test File | Assertion |
+|:---|:---|:---|:---|
+| **TC-GH1461-01** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` returns `true` inside a block when `SiteRenderer` receives `isBuilderPreview={true}` |
+| **TC-GH1461-02** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` returns `false` when `isBuilderPreview={false}` (real editor) |
+| **TC-GH1461-03** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useIsBuilderPreview()` defaults to `false` when the prop is omitted (storefront) |
+| **TC-GH1461-04** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useBlockEditCallback()` resolves to `null` when `isBuilderPreview={true}`, even with a real `onBlockFieldChange` provided — locks the single-source-of-truth invariant the fix depends on |
+| **TC-GH1461-05** | Unit (RTL) | `src/__tests__/unit/site-renderer/f05-site-renderer.test.tsx` | `useBlockEditCallback()` resolves to a real callback when `isBuilderPreview={false}`, same `onBlockFieldChange` input |
+| **TC-GH1461-WA-01** | Unit (RTL) | `src/__tests__/unit/blocks/whatsapp-button.test.tsx` | callback=null (builder-preview/storefront) → anchor has no `onclick` handler, real navigation not suppressed |
+| **TC-GH1461-WA-02** | Unit (RTL) | `src/__tests__/unit/blocks/whatsapp-button.test.tsx` | callback present (real editor) → click is prevented so it doesn't navigate away from the editor canvas |
+
+Also see **TC-F30-HMO-013** (`docs/qa/F30-hero-media-overlay.md`) — same GH-1461 invariant verified at the `HeroMediaOverlay` component level.
+
+**Root Cause & Fix:** `isOwner` is dual-purpose (also gates analytics-exclusion), so it can't be reused to hide edit UI in the AI Builder's read-only preview without breaking real-storefront-traffic analytics. Added a dedicated `BuilderPreviewContext` (`src/components/site-renderer/BuilderPreviewContext.tsx`) and made `SiteRenderer.tsx`'s callback resolution the single source of truth: `callbackValue = onBlockFieldChange && !isBuilderPreview ? {...} : null` — every consumer (hero/logo/gallery overlays, WhatsApp button, cart widget, CTA) reads `useBlockEditCallback()`/`useIsBuilderPreview()` and gets `null`/`true` automatically in builder-preview, instead of each caller needing its own `isBuilderPreview` check.
+
+**Test Coverage Strategy:**
+- TC-GH1461-01..03: probe-block pattern (`mockGetComponent.mockReturnValue(ProbeBlock)`) captures the raw context value seen inside a rendered block tree.
+- TC-GH1461-04..05: same probe pattern but asserts the *derived* callback, not just the raw flag — verified by temporarily reverting the `SiteRenderer.tsx` fix and confirming TC-GH1461-04 fails with the pre-fix behavior (not a tautological test).
+- TC-GH1461-WA-01/02: render the real `WhatsappButtonBlock` with `useBlockEditCallback` mocked directly (no SiteRenderer needed) to lock the block's own click-suppression contract independent of the context-propagation tests above.
