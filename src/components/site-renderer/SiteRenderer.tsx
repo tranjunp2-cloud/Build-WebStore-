@@ -554,7 +554,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
             ? block.__editorBlockIndex
             : index
-        const callbackValue = onBlockFieldChange
+        // GH-1461 adversarial-review fix: enforce isBuilderPreview -> null callback HERE
+        // (single source of truth for every SiteRenderer caller) instead of at each caller's
+        // prop-passing site — a future caller could otherwise pass isBuilderPreview=true
+        // alongside a real onBlockFieldChange and reintroduce the bug this PR fixes.
+        const callbackValue = onBlockFieldChange && !isBuilderPreview
             ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
             : null
 

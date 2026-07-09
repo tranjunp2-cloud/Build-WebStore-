@@ -28,7 +28,10 @@ export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Prop
     const [isHovered, setIsHovered] = useState(false)
 
     useEffect(() => {
-        if (!isOwner || !callback) return
+        // GH-1461 adversarial-review fix: match the JSX render guard below so this effect
+        // never attaches listeners in builder-preview even if the isBuilderPreview->null
+        // callback invariant (enforced in SiteRenderer.tsx) is ever bypassed by a future caller.
+        if (!isOwner || !callback || isBuilderPreview) return
         const onBlur = () => {
             clearTimeout(hideTimer.current)
             setIsHovered(false)
@@ -38,7 +41,7 @@ export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Prop
             window.removeEventListener('blur', onBlur)
             clearTimeout(hideTimer.current)
         }
-    }, [isOwner, callback])
+    }, [isOwner, callback, isBuilderPreview])
 
     // GH-1461: AI Builder read-only preview panel — hide edit overlay even though
     // isOwner is true there (isOwner stays true for analytics-exclusion purposes).

@@ -166,8 +166,9 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             // PreviewFrame.tsx — in builder-preview (?builder=1) nothing reads this postMessage,
             // so wiring it up was vestigial and left edit-callback-gated UI (WhatsApp button
             // preventDefault, cart-widget onClick disabled, CTA isEditing) silently broken in
-            // read-only preview. Omit it there; the real editor (isBuilderPreview=false) is unaffected.
-            onBlockFieldChange={isBuilderPreview ? undefined : handleBlockFieldChange}
+            // read-only preview. SiteRenderer itself nullifies the callback whenever
+            // isBuilderPreview is true (single source of truth), so this can stay unconditional.
+            onBlockFieldChange={handleBlockFieldChange}
         />
     )
 }

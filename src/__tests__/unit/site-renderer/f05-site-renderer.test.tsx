@@ -24,6 +24,7 @@ vi.mock('@/components/site-renderer/GoogleFontsLoader', () => ({
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { blockRegistry } from '@/blocks/registry'
 import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1946,5 +1947,62 @@ describe('[GH-1461] SiteRenderer BuilderPreviewContext wiring', () => {
         )
 
         expect(captured).toEqual([false])
+    })
+
+    // ── Adversarial-review follow-up: the PR's actual fix (SiteRenderer nullifying
+    // onBlockFieldChange whenever isBuilderPreview=true) was previously exercised by
+    // ZERO tests — every existing test either passed isBuilderPreview alone (no callback)
+    // or a callback alone (no isBuilderPreview). These 2 tests render BOTH together,
+    // proving the exact interaction the fix depends on. ────────────────────────────────
+
+    it('TC-GH1461-04: useBlockEditCallback() resolves to null when isBuilderPreview=true, even with a real onBlockFieldChange provided', () => {
+        const captured: unknown[] = []
+        const ProbeBlock = () => {
+            captured.push(useBlockEditCallback())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+        const onBlockFieldChange = vi.fn()
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={true}
+                onBlockFieldChange={onBlockFieldChange}
+            />
+        )
+
+        // This is the exact invariant PreviewSiteRenderer.tsx relies on for WhatsApp button
+        // preventDefault, cart-widget onClick, and CTA isEditing to behave correctly in
+        // the read-only AI Builder preview.
+        expect(captured).toEqual([null])
+    })
+
+    it('TC-GH1461-05: useBlockEditCallback() resolves to a real callback when isBuilderPreview=false (real editor), same onBlockFieldChange input', () => {
+        const captured: unknown[] = []
+        const ProbeBlock = () => {
+            captured.push(useBlockEditCallback())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+        const onBlockFieldChange = vi.fn()
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={false}
+                onBlockFieldChange={onBlockFieldChange}
+            />
+        )
+
+        expect(captured).toHaveLength(1)
+        expect(captured[0]).not.toBeNull()
+        expect((captured[0] as { blockIndex: number }).blockIndex).toBe(0)
     })
 })
