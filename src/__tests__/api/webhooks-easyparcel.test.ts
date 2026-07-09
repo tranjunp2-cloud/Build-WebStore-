@@ -643,10 +643,9 @@ describe('applyTrackingUpdate (unit)', () => {
     expect(mockPayload.update).not.toHaveBeenCalled()
   })
 
-  it('[TC-F36.OD.046] unknown EP status → maps to "unknown", update called', async () => {
-    // Arrange
-    // F8 re-read: mock find() to return no docs so applyTrackingUpdate falls back to the
-    // caller-supplied `order` object below (unit test isolates from the DB entirely).
+  it('[TC-F36.OD.046] unknown EP status → skipped, never overwrites a valid status', async () => {
+    // Arrange — F6 (review #1434): an unmapped EP status must NOT clobber a valid tracking
+    // state with "unknown"/"Processing". Writer returns 'unchanged' and never calls update.
     const mockPayload = {
       find: vi.fn().mockResolvedValue({ docs: [] }),
       update: vi.fn().mockResolvedValue({}),
@@ -663,14 +662,8 @@ describe('applyTrackingUpdate (unit)', () => {
     const result = await applyTrackingUpdate(mockPayload as any, order, 'UnknownStatusCode')
 
     // Assert
-    expect(result).toBe('updated')
-    expect(mockPayload.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          shippingTrackingStatus: 'unknown',
-        }),
-      })
-    )
+    expect(result).toBe('unchanged')
+    expect(mockPayload.update).not.toHaveBeenCalled()
   })
 
   it('[TC-F36.OD.047] history appended with ISO eventTime', async () => {

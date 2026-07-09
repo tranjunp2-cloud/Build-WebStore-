@@ -54,6 +54,12 @@ export async function applyTrackingUpdate(
         ? mapShipmentStatusCode(epRawStatus)
         : mapTrackingStatus(epRawStatus)
 
+    // F6 (review #1434): never overwrite a real status with 'unknown' (buyer label "Processing").
+    // An unmapped EP code/string must not clobber a valid tracking state. Guarding here — in the
+    // SHARED writer — covers BOTH callers (webhook + cron); the webhook additionally reports the
+    // anomaly to Sentry before it reaches here.
+    if (mapped.internal === 'unknown') return 'unchanged'
+
     if (order.shippingTrackingStatus === mapped.internal) return 'unchanged'
 
     // F7 (review #1434): a terminal status must never regress to a non-terminal one — e.g. a
@@ -95,9 +101,13 @@ export async function applyTrackingUpdate(
         eventTime: new Date().toISOString(),
     }
 
+    // F8 (review #1434): gate auto-complete on the FRESH order status, not the stale caller copy.
+    // Otherwise a concurrent cancel (status→cancelled) racing a 'delivered' update would be
+    // resurrected to 'completed' because the stale copy still reads 'shipped'/'ready_to_ship'.
+    const freshOrderStatus = fresh?.status ?? order.status
     const autoComplete =
         mapped.internal === 'delivered' &&
-        (order.status === 'shipped' || order.status === 'ready_to_ship')
+        (freshOrderStatus === 'shipped' || freshOrderStatus === 'ready_to_ship')
 
     await payload.update({
         collection: 'orders',

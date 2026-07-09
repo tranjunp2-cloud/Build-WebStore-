@@ -60,7 +60,10 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         const existingShipmentNo = (order as any).easyParcelOrderNo as string | null | undefined
         const existingAwbNo = (order as any).awbNo as string | null | undefined
         const existingLabelUrl = (order as any).labelUrl as string | null | undefined
-        if (existingShipmentNo) {
+        // A "CLAIM:" sentinel is an in-progress claim (see the CAS below), NOT a created
+        // shipment — treat it as not-yet-created so it falls through to the CAS (which returns
+        // 409 for an active claim, or reclaims a stale one). Only a real shipment_number counts.
+        if (existingShipmentNo && !existingShipmentNo.startsWith('CLAIM:')) {
             return NextResponse.json({ success: true, data: { alreadyCreated: true, awbNo: existingAwbNo, labelUrl: existingLabelUrl } })
         }
 
@@ -192,14 +195,19 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // UPDATE (only succeeds while easy_parcel_order_no IS NULL) so only ONE request proceeds
         // to submitOrder; the loser gets 409. This reuses the existing idempotency column rather
         // than adding a new lock table/field (KISS) — release back to NULL on any failure path so
-        // retries aren't permanently blocked. Residual risk: a crash between claim and
-        // release-on-failure leaves the order stuck claimed until the next successful retry
-        // (which fails fast, safe) or manual ops intervention — acceptable narrow window, not a
-        // full distributed lock.
+        // release-on-failure resets it to NULL. Self-healing on crash: the token embeds a
+        // timestamp, and a claim older than CLAIM_TTL_MS is reclaimable — a real in-flight submit
+        // finishes well within the TTL (epFetch timeout is 10s), so reclaiming a stale claim can
+        // never double-charge an active submit. No permanent stuck state, no distributed lock.
+        const CLAIM_TTL_MS = 120_000
         const claimToken = `CLAIM:${Date.now()}:${Math.random().toString(36).slice(2)}`
+        const staleBefore = Date.now() - CLAIM_TTL_MS
         const claimResult = await (payload.db.drizzle as any).execute(sql`
             UPDATE orders SET easy_parcel_order_no = ${claimToken}
-            WHERE id = ${orderId} AND easy_parcel_order_no IS NULL
+            WHERE id = ${orderId}
+              AND (easy_parcel_order_no IS NULL
+                   OR (easy_parcel_order_no LIKE 'CLAIM:%'
+                       AND (split_part(easy_parcel_order_no, ':', 2))::bigint < ${staleBefore}))
             RETURNING id
         `)
         if (!claimResult.rows?.length) {
@@ -253,6 +261,9 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
                 labelUrl,
                 labelUrls,
                 shippingTrackingStatus: 'pending_pickup',
+                // Seed the sync cursor so the cron's oldest-first (shippingTrackingLastUpdated ASC)
+                // ordering includes this order instead of parking it at NULLS-LAST and starving it.
+                shippingTrackingLastUpdated: new Date().toISOString(),
                 // Collection date the label was actually bought with (post-clamp) —
                 // shown as the locked "Pickup · DD/MM" line on the order detail.
                 pickupScheduledAt: collection.date,
