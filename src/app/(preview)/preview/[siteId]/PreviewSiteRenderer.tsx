@@ -162,7 +162,12 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             isBuilderPreview={isBuilderPreview}
             isEditorIframe={isEditorIframe}
             isOwner={true}
-            onBlockFieldChange={handleBlockFieldChange}
+            // GH-1461: BLOCK_FIELD_CHANGED is only ever listened to by the real editor's
+            // PreviewFrame.tsx — in builder-preview (?builder=1) nothing reads this postMessage,
+            // so wiring it up was vestigial and left edit-callback-gated UI (WhatsApp button
+            // preventDefault, cart-widget onClick disabled, CTA isEditing) silently broken in
+            // read-only preview. Omit it there; the real editor (isBuilderPreview=false) is unaffected.
+            onBlockFieldChange={isBuilderPreview ? undefined : handleBlockFieldChange}
         />
     )
 }

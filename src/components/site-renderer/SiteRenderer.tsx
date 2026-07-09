@@ -17,6 +17,7 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { BuilderPreviewProvider } from './BuilderPreviewContext'
 import { HiddenSlugsProvider } from './HiddenSlugsContext'
 import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 import { FloatingContainerProvider } from './FloatingContainerContext'
@@ -607,6 +608,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     return (
         <HiddenSlugsProvider value={showIndicators ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
+        {/* GH-1461: read-only preview after AI gen — isOwner stays true (analytics
+            exclusion + hiddenSlugs unaffected); edit-affordance components additionally
+            check useIsBuilderPreview() to hide Change Image / gallery-edit / add-video UI. */}
+        <BuilderPreviewProvider value={!!isBuilderPreview}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
           ${themeCSS}
@@ -744,6 +749,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     </div>
                 )
             })}
+        </BuilderPreviewProvider>
         </OwnerProvider>
         </HiddenSlugsProvider>
     )

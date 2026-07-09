@@ -12,6 +12,7 @@ const parentToast = {
 import { compressImage } from '@/lib/media/compress-image'
 import { checkUploadSize, uploadLimitLabel } from '@/lib/media/upload-limits'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 type HeroMediaOverlayProps = {
@@ -38,6 +39,7 @@ export function HeroMediaOverlay({
     onVideoUploaded,
 }: HeroMediaOverlayProps) {
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const callback = useBlockEditCallback()
     const containerRef = useRef<HTMLDivElement>(null)
     const imageFileRef = useRef<HTMLInputElement>(null)
@@ -91,7 +93,9 @@ export function HeroMediaOverlay({
         }
     }, [isOwner, callback])
 
-    if (!isOwner || !callback) return <>{children}</>
+    // GH-1461: AI Builder read-only preview panel — hide edit overlay even though
+    // isOwner is true there (isOwner stays true for analytics-exclusion purposes).
+    if (!isOwner || !callback || isBuilderPreview) return <>{children}</>
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

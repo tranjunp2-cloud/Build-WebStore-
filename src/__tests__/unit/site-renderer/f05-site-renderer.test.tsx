@@ -23,6 +23,7 @@ vi.mock('@/components/site-renderer/GoogleFontsLoader', () => ({
 // ── Imports — after mocks ──────────────────────────────────────────────────
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { blockRegistry } from '@/blocks/registry'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1870,5 +1871,80 @@ describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks',
         // Assert — navigation block should receive safe fallback "#" when homepage not found
         expect(capturedBlocks.length).toBeGreaterThan(0)
         expect(capturedBlocks[0]._logoHref).toBe('#')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GH-1461 — SiteRenderer provides isBuilderPreview via BuilderPreviewContext so
+// block-level edit-affordance components (HeroMediaOverlay, LogoImageOverlay,
+// gallery, split-video) can hide themselves in the AI Builder read-only preview
+// even though isOwner stays true there (isOwner is also used for analytics
+// exclusion — see hero-media-overlay.test.tsx for the consumer-side behavior).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[GH-1461] SiteRenderer BuilderPreviewContext wiring', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-GH1461-01: useIsBuilderPreview() returns true inside a block when isBuilderPreview=true', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={true}
+            />
+        )
+
+        expect(captured).toEqual([true])
+    })
+
+    it('TC-GH1461-02: useIsBuilderPreview() returns false inside a block when isBuilderPreview=false (real editor)', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={false}
+            />
+        )
+
+        expect(captured).toEqual([false])
+    })
+
+    it('TC-GH1461-03: useIsBuilderPreview() defaults to false when isBuilderPreview is omitted', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+            />
+        )
+
+        expect(captured).toEqual([false])
     })
 })
