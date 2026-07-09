@@ -117,6 +117,13 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     // ── Discount state ───────────────────────────────────────────────
     const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; type: 'percentage' | 'fixed'; value: number } | null>(null)
     const [discountSen, setDiscountSen] = useState(0)
+    // EasyParcel live shipping (resolved server-side; courier is not buyer-selected)
+    const [shipCalc, setShipCalc] = useState<{ feeRM: number; courierName: string; isFree: boolean; degraded: boolean; codAvailable?: boolean } | null>(null)
+    // PD-021 COD gate: reason COD is not orderable for this address/amount, probed on EVERY
+    // rate fetch (codProbeSen) — known before the buyer touches the payment method, so the
+    // COD option is pre-disabled and the selection auto-adjusts as soon as rates settle.
+    const [codBlockReason, setCodBlockReason] = useState<'no_cod_courier' | 'over_max' | 'under_min' | null>(null)
+    const [shipLoading, setShipLoading] = useState(false)
     const [showOverlay, setShowOverlay] = useState(false)
     const [overlayTakingLong, setOverlayTakingLong] = useState(false)
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -260,8 +267,72 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const discountRM = discountSen / 100
     // Free-ship gates on the POST-discount subtotal (F33 phase-07) — mirrors the server so UI total matches.
     const effectiveSub = Math.max(0, sub - discountRM)
-    const shippingFee = freeAboveRM !== null && effectiveSub >= freeAboveRM ? 0 : baseShipping
-    const total = Math.round((Math.max(0, sub - discountRM) + shippingFee) * 100) / 100
+
+    // EasyParcel live rate: resolve server-side once the destination (state + postcode) is chosen —
+    // wait for the full address so we don't quote on a half-filled form. Mirrors the backend getRates
+    // (EP courier when ready, flat fallback) so the shown total matches what's charged.
+    const addressReady = !!selectedState && !!form.postcode && sub > 0
+    useEffect(() => {
+        if (!addressReady || !siteId || items.length === 0) { setShipCalc(null); return }
+        let cancelled = false
+        setShipLoading(true)
+        fetch('/api/orders/calculate-shipping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                siteId,
+                state: selectedState!.name,
+                destPostcode: form.postcode,
+                subtotalSen: Math.round(effectiveSub * 100),
+                items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                ...(paymentMethod === 'cod' ? { codAmountSen: Math.round(effectiveSub * 100) } : {}),
+                // Always probe COD eligibility (PD-021) so the COD option can be pre-disabled
+                // on the first fetch — before the buyer ever selects a payment method.
+                codProbeSen: Math.round(effectiveSub * 100),
+            }),
+        })
+            .then(r => r.json())
+            .then(j => {
+                if (cancelled) return
+                if (j?.success && j.data) {
+                    const r0 = j.data.rates?.[0]
+                    setShipCalc({ feeRM: j.data.fee ?? 0, courierName: r0?.courierName ?? 'Standard', isFree: !!j.data.isFree, degraded: !!j.data.degraded, codAvailable: j.data.codAvailable })
+                    // Every fetch carries the probe verdict (codProbeSen above) — refresh unconditionally
+                    setCodBlockReason(j.data.codIneligibleReason ?? null)
+                } else {
+                    // API error → never leave checkout stuck; use flat fallback (matches server getRates)
+                    setShipCalc({ feeRM: baseShipping, courierName: 'Standard', isFree: false, degraded: true })
+                }
+            })
+            .catch(() => { if (!cancelled) setShipCalc({ feeRM: baseShipping, courierName: 'Standard', isFree: false, degraded: true }) })
+            .finally(() => { if (!cancelled) setShipLoading(false) })
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStateId, form.postcode, siteId, items.length, paymentMethod, effectiveSub])
+
+    const shippingSettled = addressReady && !shipLoading && shipCalc != null
+
+    // Reset the COD verdict when the destination or amount changes — eligibility is per-route/per-amount
+    useEffect(() => {
+        setCodBlockReason(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStateId, form.postcode, effectiveSub])
+
+    // PD-021 UX decision (2026-07-06): when COD is ineligible we NEVER change the buyer's
+    // payment selection — the COD option shows an actionable error (change address / adjust
+    // order value) and Place Order stays disabled until the condition is satisfied.
+
+    const shipStatus: 'empty' | 'loading' | 'rates' | 'free' | 'fallback' =
+        !addressReady ? 'empty'
+            : (shipLoading || !shipCalc) ? 'loading'
+                : shipCalc.isFree ? 'free'
+                    : shipCalc.degraded ? 'fallback'
+                        : 'rates'
+    const courierName = shipCalc?.courierName ?? 'Standard'
+    const shippingFee = shipStatus === 'free' ? 0 : (shipCalc ? shipCalc.feeRM : baseShipping)
+    // Shipping only counts toward the total once resolved — before the address is entered the total
+    // is just subtotal − discount (matches the "Enter address" shipping line + disabled Place Order).
+    const total = Math.round((Math.max(0, sub - discountRM) + (shippingSettled ? shippingFee : 0)) * 100) / 100
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
@@ -363,7 +434,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.line1.trim() && form.city && form.postcode && items.length > 0 &&
-        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit')
+        shippingSettled &&
+        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe' || paymentMethod === 'xendit') &&
+        // PD-021: COD not orderable on this route/amount (server would 422 COD_NOT_ELIGIBLE anyway)
+        !(paymentMethod === 'cod' && codBlockReason)
     )
 
     const dismissOverlay = () => {
@@ -547,7 +621,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         >
             {isPlacing
                 ? <><Loader2 size={16} className="spin" /> {ck.placingOrder}</>
-                : <><Rocket size={16} /> {ck.placeOrder}</>}
+                : shipStatus === 'empty'
+                    ? <><MapPin size={16} /> Enter address to continue</>
+                    : shipStatus === 'loading'
+                        ? <><Loader2 size={16} className="spin" /> Calculating shipping…</>
+                        : <><Rocket size={16} /> {ck.placeOrder}</>}
         </button>
     )
 
@@ -640,11 +718,17 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-ch">
                                 <span className="ck-num">02</span>
                                 <h2 className="ck-ct">{ck.shippingAddress}</h2>
-                                <span className="ck-aux">
-                                    <Truck size={12} />
-                                    {selectedState?.zone === 'east' ? 'East Malaysia' : 'West Malaysia'}
-                                    {' · '}{shippingFee === 0 ? 'Free' : formatPrice(shippingFee, currency)}
-                                </span>
+                                {(form.city || selectedState) ? (
+                                    <span className="ck-aux" style={{ color: 'var(--tl)' }}>
+                                        <MapPin size={12} />
+                                        {form.city || selectedState?.name}
+                                    </span>
+                                ) : (
+                                    <span className="ck-aux">
+                                        <AlertCircle size={12} />
+                                        Required
+                                    </span>
+                                )}
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
@@ -812,7 +896,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                 <h3 className="pm-title">{ck.cod}</h3>
                                                 <p className="pm-desc">{ck.codDetail}</p>
                                                 <div className="pm-pills">
-                                                    <span className="pm-pill"><MapPin size={11} /> {ck.westMalaysiaOnly}</span>
                                                     <span className="pm-pill">{ck.noExtraFee}</span>
                                                 </div>
                                             </div>
@@ -885,8 +968,24 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 </div>
                             )}
                             <div className="sum-row">
-                                <span className="sr-l">{ck.shipping} ({selectedState?.zone === 'east' ? 'East MY' : 'West MY'})</span>
-                                <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
+                                {shipStatus === 'empty' ? (
+                                    <>
+                                        <span className="sr-l">{ck.shipping}</span>
+                                        <span className="sr-v" style={{ color: 'var(--f4)', fontFamily: 'inherit', fontWeight: 500 }}>Enter address</span>
+                                    </>
+                                ) : shipStatus === 'loading' ? (
+                                    <>
+                                        <span className="sr-l">{ck.shipping}</span>
+                                        <span className="sr-v" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--f3)', fontFamily: 'inherit', fontWeight: 500 }}>
+                                            <Loader2 size={12} className="spin" /> Calculating…
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="sr-l">{ck.shipping} <span style={{ color: 'var(--f4)' }}>(via {courierName})</span></span>
+                                        <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
+                                    </>
+                                )}
                             </div>
                             {sub > 0 && freeAboveRM !== null && (
                                 <>
@@ -906,6 +1005,22 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 <span className="st-l">{ck.total}</span>
                                 <span className="st-v"><span className="st-ccy">RM</span>{total.toFixed(2)}</span>
                             </div>
+
+                            {/* PD-021 R1/R2/R3: COD selected but not orderable — actionable error in the
+                                summary explains why Place Order is blocked (change address / adjust order
+                                value); the buyer's payment selection is never changed automatically.
+                                Gated on shippingSettled: while a rate fetch is in flight the (stale)
+                                verdict stays hidden and only re-appears once the fresh result lands. */}
+                            {paymentMethod === 'cod' && codBlockReason && shippingSettled && (
+                                <div className="sum-cod-err" role="alert">
+                                    <AlertCircle size={14} />
+                                    <span>
+                                        {codBlockReason === 'no_cod_courier' ? ck.codNoCourier
+                                            : codBlockReason === 'over_max' ? ck.codOverMax
+                                                : ck.codUnderMin}
+                                    </span>
+                                </div>
+                            )}
 
                             {PlaceOrderBtn}
 
@@ -1075,6 +1190,17 @@ const CK_CSS = `
 .po-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;border-radius:10px;font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--tl);color:#fff;box-shadow:0 6px 16px -6px rgba(var(--accent-rgb,14,117,86),.55);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;padding:0 14px;}
 .po-btn:hover:not(.dis){background:var(--tl7);transform:translateY(-1px);}
 .po-btn.dis{background:#d9dde2;color:#8a929b;box-shadow:none;cursor:not-allowed;}
+/* COD-ineligible error (PD-021) — danger tint mixed against the theme card so it
+   adapts to light AND dark templates, mirroring the --inp/--bd color-mix idiom. */
+.sum-cod-err{
+  --dgr:#dc2626;
+  margin:12px 0 14px;display:flex;align-items:flex-start;gap:8px;
+  padding:10px 12px;border-radius:10px;font-size:12.5px;font-weight:500;line-height:1.55;
+  color:color-mix(in srgb,var(--dgr) 65%,var(--f1) 35%);
+  background:color-mix(in srgb,var(--card) 87%,var(--dgr) 13%);
+  border:1px solid color-mix(in srgb,var(--card) 60%,var(--dgr) 40%);
+}
+.sum-cod-err svg{flex-shrink:0;margin-top:2px;color:color-mix(in srgb,var(--dgr) 75%,var(--f1) 25%);}
 .sum-trust{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
 .sum-trust.note{font-size:11.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--f3);text-align:left;align-items:flex-start;line-height:1.5;padding:0 4px;white-space:normal;}
 .sum-trust.note svg{color:#8a5c0a;}

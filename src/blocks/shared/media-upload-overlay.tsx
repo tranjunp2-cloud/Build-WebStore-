@@ -6,6 +6,7 @@ import { useUploadProgress } from '@/hooks/use-upload-progress'
 import { compressImage } from '@/lib/media/compress-image'
 import { checkUploadSize, uploadLimitLabel } from '@/lib/media/upload-limits'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 // Toast bridge — overlay runs inside the preview iframe; routes to the parent editor.
@@ -83,6 +84,7 @@ export function MediaUploadOverlay({
     onVideoUploaded,
 }: MediaUploadOverlayProps) {
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const callback = useBlockEditCallback()
     const containerRef = useRef<HTMLDivElement>(null)
     const imageFileRef = useRef<HTMLInputElement>(null)
@@ -117,7 +119,10 @@ export function MediaUploadOverlay({
 
     // Track hover on the parent element so the control shows even when sibling content sits on top.
     useEffect(() => {
-        if (!isOwner || !callback) return
+        // GH-1461 adversarial-review fix: match the JSX render guard below so this effect
+        // never attaches listeners in builder-preview even if the isBuilderPreview->null
+        // callback invariant (enforced in SiteRenderer.tsx) is ever bypassed by a future caller.
+        if (!isOwner || !callback || isBuilderPreview) return
         const parent = containerRef.current?.parentElement
         if (!parent) return
         const onEnter = () => setIsHovered(true)
@@ -132,9 +137,11 @@ export function MediaUploadOverlay({
             parent.removeEventListener('mouseleave', onLeave)
             window.removeEventListener('blur', onWindowBlur)
         }
-    }, [isOwner, callback])
+    }, [isOwner, callback, isBuilderPreview])
 
-    if (!isOwner || !callback) return <>{children}</>
+    // GH-1461: AI Builder read-only preview panel — hide edit overlay even though
+    // isOwner is true there (isOwner stays true for analytics-exclusion purposes).
+    if (!isOwner || !callback || isBuilderPreview) return <>{children}</>
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

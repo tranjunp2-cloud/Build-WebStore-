@@ -16,6 +16,7 @@ import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { MediaUploadOverlay } from '@/blocks/shared/media-upload-overlay'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -69,6 +70,7 @@ const ASPECT_CLASS = {
  */
 function GalleryImageCard({ item, index, aspect = 'square', className = '', overlayClickable = false }: GalleryImageCardProps) {
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const aspectCls = ASPECT_CLASS[aspect]
 
     if (item.image?.url) {
@@ -113,7 +115,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
                         <span className="opacity-0 group-hover:opacity-100 text-white text-2xl transition-opacity duration-300" aria-hidden="true">⊕</span>
                     </div>
                 )}
-                {isOwner && !overlayClickable && (
+                {isOwner && !isBuilderPreview && !overlayClickable && (
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center pointer-events-none">
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 rounded-full p-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -138,7 +140,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
             aria-hidden="true"
         >
             <span className="text-2xl opacity-20">📷</span>
-            {isOwner && (
+            {isOwner && !isBuilderPreview && (
                 <div className="absolute inset-0 group-hover:bg-black/10 transition-colors duration-300 rounded-2xl flex items-center justify-center pointer-events-none">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 rounded-full p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

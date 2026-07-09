@@ -15,6 +15,30 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F36 — Order Detail Redesign (Full-Page 2-Column with EasyParcel Fulfillment, GH-1333)
+
+**Order fulfillment CMS screen moved from right-slide drawer to full-page route:**
+
+- **Routing:** New full-page route `src/app/(dashboard)/orders/[id]/page.tsx` (2-column layout). Old drawer removed from OrdersClientLayout; OrdersTable row click now navigates to `/orders/[id]`. Legacy `?order=` deep-link redirects via route handler.
+- **Schema:** New fields on Orders collection: `selfDeliveryCourier` (text, manual courier for self-delivery), `pickupScheduledAt` (date, seller-selected pickup), `pickupSlot` (text, e.g. "08:00–12:00", informational). Migration in `scripts/db-setup.js` MIGRATIONS array per schema rule (CI hard-gate `check-migrations.js`).
+- **Fulfillment State Machine:** 7 states based on order status + EasyParcel + label creation + tracking:
+  - **pending→confirm** — weight wizard → create label
+  - **ready→create-label** — missing weight form
+  - **success** — print label modal + schedule pickup popover + COD recovery (if applicable)
+  - **shipping/completed** — tracking timeline from `shippingTrackingHistory`
+  - **cancelled** — reason display
+  - **cod-blocked** — East Malaysia (Sabah/Sarawak/Labuan) COD orders recover via self-delivery only
+  - **missing-weight** — parcelWeight input + confirm
+- **New API Routes:** `POST /api/orders/[id]/self-deliver` (body: `{courier, trackingNumber}`), `POST /api/orders/[id]/pickup` (body: `{scheduledAt, slot}`). Both handler-authenticated.
+- **New Components** under `src/app/(dashboard)/orders/_components/detail/`: fulfillment-zone (dispatcher), create-label-flow, schedule-pickup-popover, print-label-modal, missing-weight-form, self-delivery-zone, cod-recovery, tracking-timeline, order-items-card (SKU/weight/thumbnail), customer-card, payment-card, order-actions-card, courier-logo. Styles: order-detail.css, fulfillment.css, items-table.css, side.css using `--dash-*` design tokens.
+- **Helper Module** `src/lib/shipping/cod-block.ts` exports `isCodBlocked(order): boolean` — detects COD + East MY state for recovery routing.
+- **i18n:** 9 new key groups under `dashboard.orders` + extended detail.* (en.json + ms.json): fulfillment, createLabel, pickup, printLabel, missingWeight, selfDelivery, codRecovery, tracking + milestone statuses (pending, confirmed, picked-up, in-transit, out-for-delivery, delivered).
+- **Note:** EasyParcel create-label is single-step (returns awbNo + labelUrl PDF). Pickup scheduling is local-state only (no EP reschedule API call). Wallet balance not shown (API doesn't return it).
+
+**Files modified:** `src/collections/Orders.ts` (schema), `src/app/(dashboard)/orders/**` (routing + layout changes), `src/app/(dashboard)/orders/[id]/page.tsx` (RSC), `src/app/(dashboard)/orders/_components/detail/**` (12 new components), `src/app/api/orders/[id]/{self-deliver,pickup}/route.ts` (2 new endpoints), `src/lib/shipping/cod-block.ts` (new helper), `scripts/db-setup.js` (migration), `src/i18n/locales/{en,ms}.json` (9 key groups). **Tests:** Unit + component tests in `src/__tests__/unit/dashboard/` + `src/__tests__/api/` covering state machine, COD detection, API routes. See `docs/qa/F14-shipping.md` § 3.16+ for new TC-IDs (F36 order detail tests). See `docs/architecture/F14-shipping.md` § 16 for full architecture.
+
+---
+
 ### Bug Fixes
 
 - **GH-1337** fix(contact-leads): badge figma redesign + font portal fix — **Badges:** new `_lib/badge-tokens.ts` is the single source of truth for tinted rgba colors (STATUS_COLORS + SOURCE_COLORS, Figma node-id 32179-5360/5364). `customer-status-badge.tsx` + `customer-source-badge.tsx` rewritten: dropped shadcn Badge variants, now use inline `style={}` from badge-tokens (pill shape, rgba bg/border/text per status/source). `customer-detail-panel.tsx` removed duplicate STATUS_COLORS definition, imports from badge-tokens; StatusDropdown and text sizes normalized to Tailwind semantic tokens (`text-sm`, `text-xs`, `text-lg`, `text-xl`, `text-2xl`). Tests: TC-CUST-26..29 assertions migrated from `className.toContain()` to `toHaveStyle({ color })` (7/7 pass). **Font:** `src/lib/fonts/variables.ts` aggregates all next/font CSS variable class names; applied to `<html>` in root layout so `--font-*` vars are available in portals (CustomerDetailPanel createPortal). Removed `--font-inter/outfit: system-ui` fallback from `globals.css` `:root` that was overriding Inter via equal CSS specificity. **Impact:** Contact Leads badges exactly match Figma spec; Inter font renders correctly in portal-rendered detail panel.

@@ -42,5 +42,10 @@ Module._load = function (request, parent, isMain) {
     shim.default = shim
     return shim
   }
+  // 'server-only' throws outside a Next server bundle — scripts ARE server-side, so noop it
+  // (lets dev scripts import src/lib server modules like the EasyParcel client directly).
+  if (request === 'server-only') {
+    return {}
+  }
   return originalLoad.apply(this, arguments)
 }

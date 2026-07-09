@@ -189,6 +189,8 @@ function getNewFieldsFromDiff() {
 const KNOWN_GROUP_PREFIXES = [
   'theme', 'seo', 'payments', 'badge', 'ai_generation_metadata',
   'payment_config', 'shipping_config', 'local_business',
+  // F36 EasyParcel (GH-1333): Tenants.easyParcelIntegration group → prefixed columns
+  'easy_parcel_integration',
 ]
 
 function getMigrationColumns() {

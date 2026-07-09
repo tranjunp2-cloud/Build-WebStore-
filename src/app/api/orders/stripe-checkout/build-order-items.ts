@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { Payload } from 'payload'
+import { productWeightToGrams } from '@/lib/shipping/product-weight'
 
 /** Minimal shape of a product document used in build-order-items flow. */
 interface ProductDoc {
@@ -12,6 +13,7 @@ interface ProductDoc {
     variants?: Array<{ name: string; price: number; stock?: number | null }>
     tenant?: string | number | { id: string | number }
     images?: Array<{ url?: string }>
+    weight?: number | null // kg (GH-1458 canonical unit)
 }
 
 export interface OrderItemRow {
@@ -20,6 +22,8 @@ export interface OrderItemRow {
     variant: string
     quantity: number
     unitPrice: number
+    /** Per-unit parcel weight in grams (from Products.weight kg; 500 g default) — used for EP rate quotes. */
+    weightGrams: number
 }
 
 export interface CheckoutItemRow {
@@ -157,7 +161,7 @@ export async function buildOrderItems(
 
         currency = p.currency || 'MYR'
         subtotal += unitPrice * item.quantity
-        orderItems.push({ product: productId, productName: p.name, variant: item.variant || '', quantity: item.quantity, unitPrice })
+        orderItems.push({ product: productId, productName: p.name, variant: item.variant || '', quantity: item.quantity, unitPrice, weightGrams: productWeightToGrams(p.weight) })
         // Stripe expects smallest unit: 100 sen = RM 1; include variant name so customer sees "Shirt (Red)" on Stripe page
         const displayName = variant ? `${p.name} (${variant.name})` : p.name
         checkoutItems.push({ name: displayName, price: Math.round(unitPrice * 100), quantity: item.quantity, images: p.images?.[0]?.url ? [p.images[0].url] : [] })

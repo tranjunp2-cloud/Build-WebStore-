@@ -77,6 +77,7 @@ Each product item MUST have:
   Each variant object MUST have:
     - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
     - price: (number) same as base price unless specified per variant
+    - compareAtPrice: (number) same as the product-level compareAtPrice unless specified per variant, or omit if the product-level compareAtPrice was omitted
     - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
     - stock: (number) default to 0 per variant (out of stock until the merchant confirms real stock)
   If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].

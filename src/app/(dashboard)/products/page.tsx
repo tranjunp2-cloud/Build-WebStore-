@@ -20,6 +20,8 @@ import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { MissingInfoIndicator } from '@/components/dashboard/MissingInfoIndicator'
 import { AiReviewIndicator } from '@/components/dashboard/AiReviewIndicator'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableActionButton } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +39,7 @@ import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
 import { getDisplayPrice } from '@/lib/products/display-price'
 import { getMissingFields } from '@/lib/products/missing-fields'
+import { computeStockDisplay, singleSeverity, type StockSeverity } from '@/lib/products/stock-display'
 import { productPublishBlocks } from '@/lib/products/publish-guard'
 
 type ProductImage = {
@@ -85,6 +88,27 @@ function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
     if (currency === 'SGD') return `S$${price.toFixed(2)}`
     return `$${price.toFixed(2)}`
+}
+
+// Mobile Stock chip styling keyed by `computeStockDisplay` severity (GH-1525 #4).
+const STOCK_CHIP_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'bg-[hsl(var(--destructive)/0.1)] border-[hsl(var(--destructive)/0.3)] text-[hsl(var(--destructive))]',
+    warning: 'bg-[hsl(var(--warning)/0.1)] border-[hsl(var(--warning)/0.3)] text-[hsl(var(--warning))]',
+    success: 'bg-[hsl(var(--success))]/10 border-[#05DF72]/30 text-[hsl(var(--success))]',
+}
+
+// Per-variant breakdown row styling (Tooltip/Popover stock detail) — same severity
+// tokens as STOCK_CHIP_CLASSES, applied per row via `singleSeverity(v.stock)` so the
+// color reflects THAT variant's own stock, not the row's overall range severity.
+const STOCK_ROW_DOT_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'bg-[hsl(var(--destructive))]',
+    warning: 'bg-[hsl(var(--warning))]',
+    success: 'bg-[hsl(var(--success))]',
+}
+const STOCK_ROW_TEXT_CLASSES: Record<StockSeverity, string> = {
+    destructive: 'text-[hsl(var(--destructive))]',
+    warning: 'text-[hsl(var(--warning))]',
+    success: 'text-[hsl(var(--success))]',
 }
 
 function getImageUrl(image: ProductImage | string | null): string | null {
@@ -789,7 +813,7 @@ export default function ProductsPage() {
                                             const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                             const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                             const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
-                                            const inv = product.inventory || 0
+                                            const stockDisplay = computeStockDisplay(product)
                                             const missing = getMissingFields(product)
 
                                             return (
@@ -832,12 +856,41 @@ export default function ProductsPage() {
 
                                                     {/* Stock */}
                                                     <TableCell>
-                                                        {inv === 0 ? (
-                                                            <Badge variant="destructive" dot>{inv}</Badge>
-                                                        ) : inv <= 5 ? (
-                                                            <Badge variant="warning" dot>{inv}</Badge>
+                                                        {stockDisplay.breakdown && stockDisplay.breakdown.length > 1 ? (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        tabIndex={0}
+                                                                        role="button"
+                                                                        aria-label={`${t.dashboard.products.list.colStock}: ${stockDisplay.label}`}
+                                                                        className="inline-flex cursor-help"
+                                                                    >
+                                                                        <Badge variant={stockDisplay.severity} dot>{stockDisplay.label}</Badge>
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent onClick={(e) => e.stopPropagation()} className="w-52 p-0 overflow-hidden">
+                                                                    <p className="border-b border-[hsl(var(--border))] px-3 py-2 text-[12px] font-semibold text-foreground">
+                                                                        {t.dashboard.products.list.colStock}
+                                                                    </p>
+                                                                    <ul className="max-h-48 list-none space-y-0.5 overflow-y-auto p-1.5">
+                                                                        {stockDisplay.breakdown.map((v, i) => {
+                                                                            const rowSeverity = singleSeverity(v.stock)
+                                                                            return (
+                                                                                <li key={i} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1">
+                                                                                    <span className="flex min-w-0 items-center gap-1.5">
+                                                                                        <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STOCK_ROW_DOT_CLASSES[rowSeverity])} />
+                                                                                        <span className="truncate text-foreground/70">{v.name}</span>
+                                                                                    </span>
+                                                                                    <span className={cn("shrink-0 font-semibold tabular-nums", STOCK_ROW_TEXT_CLASSES[rowSeverity])}>{v.stock}</span>
+                                                                                </li>
+                                                                            )
+                                                                        })}
+                                                                    </ul>
+                                                                </TooltipContent>
+                                                            </Tooltip>
                                                         ) : (
-                                                            <Badge variant="success" dot>{inv}</Badge>
+                                                            <Badge variant={stockDisplay.severity} dot>{stockDisplay.label}</Badge>
                                                         )}
                                                     </TableCell>
 
@@ -885,7 +938,7 @@ export default function ProductsPage() {
                         <div className="min-[820px]:hidden grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
-                                const inv = product.inventory || 0
+                                const stockDisplay = computeStockDisplay(product)
                                 const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                 const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                 const missing = getMissingFields(product)
@@ -942,21 +995,53 @@ export default function ProductsPage() {
                                             {/* Stock (Left) */}
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[12px] font-normal text-foreground/60 leading-[16px]">{t.dashboard.products.list.colStock}</span>
-                                                {inv === 0 ? (
-                                                        <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--destructive)/0.1)] border border-[hsl(var(--destructive)/0.3)]">
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--destructive))]">{inv}</span>
-                                                        </div>
-                                                    ) : inv <= 5 ? (
-                                                        <div className="inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] px-2 bg-[hsl(var(--warning)/0.1)] border border-[hsl(var(--warning)/0.3)]">
+                                                {stockDisplay.breakdown && stockDisplay.breakdown.length > 1 ? (
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className={`inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] border px-2 ${STOCK_CHIP_CLASSES[stockDisplay.severity]}`}
+                                                            >
+                                                                {stockDisplay.severity === 'warning' && (
+                                                                    <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                                                )}
+                                                                <span className="text-[13px] font-semibold">{stockDisplay.label}</span>
+                                                            </button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent
+                                                            align="start"
+                                                            className="w-52 p-0 overflow-hidden"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <p className="border-b border-[hsl(var(--border))] px-3 py-2 text-[12px] font-semibold text-foreground">
+                                                                {t.dashboard.products.list.colStock}
+                                                            </p>
+                                                            <ul className="max-h-48 list-none space-y-0.5 overflow-y-auto p-1.5">
+                                                                {stockDisplay.breakdown.map((v, i) => {
+                                                                    const rowSeverity = singleSeverity(v.stock)
+                                                                    return (
+                                                                        <li key={i} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1 text-[12px]">
+                                                                            <span className="flex min-w-0 items-center gap-1.5">
+                                                                                <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STOCK_ROW_DOT_CLASSES[rowSeverity])} />
+                                                                                <span className="truncate text-foreground/70">{v.name}</span>
+                                                                            </span>
+                                                                            <span className={cn("shrink-0 font-semibold tabular-nums", STOCK_ROW_TEXT_CLASSES[rowSeverity])}>{v.stock}</span>
+                                                                        </li>
+                                                                    )
+                                                                })}
+                                                            </ul>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                ) : (
+                                                    <div className={`inline-flex h-[26px] items-center justify-center gap-1 rounded-[8px] border px-2 ${STOCK_CHIP_CLASSES[stockDisplay.severity]}`}>
+                                                        {stockDisplay.severity === 'warning' && (
                                                             <svg width="10" height="10" viewBox="0 0 20 20" fill="none"><path d="M10.0003 2.5L2.50033 15.8333H17.5003L10.0003 2.5Z" stroke="hsl(var(--warning))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--warning))]">{inv}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="inline-flex h-[26px] items-center justify-center rounded-[8px] px-2 bg-[hsl(var(--success))]/10 border border-[#05DF72]/30">
-                                                            <span className="text-[13px] font-semibold text-[hsl(var(--success))]">{inv}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                        )}
+                                                        <span className="text-[13px] font-semibold">{stockDisplay.label}</span>
+                                                    </div>
+                                                )}
+                                            </div>
 
                                                 {/* Status Toggle - Compacted */}
                                                 <div

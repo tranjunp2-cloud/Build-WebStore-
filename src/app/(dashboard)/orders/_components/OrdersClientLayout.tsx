@@ -1,24 +1,32 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { OrdersMetrics } from './OrdersMetrics'
 import { OrdersActionBar } from './OrdersActionBar'
 import { OrdersTable, Order } from './OrdersTable'
-import { OrderDetailPanel } from './OrderDetailPanel'
 import { AwaitingVerificationChip } from './AwaitingVerificationChip'
 
 // ─── ORDERS CLIENT LAYOUT ───
-// Table stays full width at all times.
-// OrderDetailPanel slides in as a FIXED overlay from the right edge of the screen.
+// Table spans full width; clicking a row navigates to /orders/[id] (full-page route).
+// The old right-slide drawer has been removed — see Phase 02 plan for history.
 export function OrdersClientLayout() {
     const { t, ti } = useI18n()
     const o = t.dashboard.orders
     const searchParams = useSearchParams()
     const router = useRouter()
+
+    // Redirect legacy ?order=<id> deep-links to /orders/[id].
+    // Intentional: the table renders for one frame before router.replace fires — acceptable flash for
+    // a deep-link-only path and not worth an SSR redirect given the dashboard's client-only layout.
+    useEffect(() => {
+        const legacyOrderId = searchParams.get('order')
+        if (legacyOrderId) {
+            router.replace(`/orders/${legacyOrderId}`)
+        }
+    }, [searchParams, router])
 
     // Refresh the orders table/metrics (client) AND re-render server components so the
     // sidebar pending-orders badge updates without a manual reload (server hook busts its cache).
@@ -26,9 +34,7 @@ export function OrdersClientLayout() {
         setRefreshCounter(prev => prev + 1)
         router.refresh()
     }
-    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(
-        searchParams.get('order')
-    )
+
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
     const [currentOrders, setCurrentOrders] = useState<Order[]>([])
     const [refreshCounter, setRefreshCounter] = useState(0)
@@ -62,16 +68,9 @@ export function OrdersClientLayout() {
         return () => window.removeEventListener('notification-toast', handleNotification)
     }, [])
 
-    const isOpen = selectedOrderId !== null
-
-    function handleSelectOrder(orderId: string) {
-        // Toggle: click the same row again to close
-        setSelectedOrderId(prev => prev === orderId ? null : orderId)
-    }
-
     const pendingSelectedOrders = Array.from(selectedRows)
-        .map(id => currentOrders.find(o => o.id === id))
-        .filter(o => o && o.status === 'pending')
+        .map(id => currentOrders.find(ord => ord.id === id))
+        .filter(ord => ord && ord.status === 'pending')
 
     const pendingCount = pendingSelectedOrders.length
 
@@ -79,8 +78,8 @@ export function OrdersClientLayout() {
         if (pendingCount === 0 || isConfirming) return
         setIsConfirming(true)
         try {
-            await Promise.all(pendingSelectedOrders.map(async (o) => {
-                const res = await fetch(`/api/orders/${o!.id}`, {
+            await Promise.all(pendingSelectedOrders.map(async (ord) => {
+                const res = await fetch(`/api/orders/${ord!.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: 'confirmed' })
@@ -90,7 +89,7 @@ export function OrdersClientLayout() {
             toast.success(ti(t.dashboard.orders.toast.bulkSuccess, { count: pendingCount }))
             setSelectedRows(new Set())
             refreshAfterMutation()
-        } catch (error) {
+        } catch {
             toast.error(t.dashboard.orders.toast.loadFailed)
         } finally {
             setIsConfirming(false)
@@ -98,7 +97,6 @@ export function OrdersClientLayout() {
     }
 
     return (
-        // Main content always takes full width
         <div className="relative flex flex-col gap-[22px] w-full">
             {/* Page Header */}
             <div className="flex flex-col gap-1 w-full">
@@ -124,8 +122,6 @@ export function OrdersClientLayout() {
                 onSort={setSortOrder}
             />
             <OrdersTable
-                onSelectOrder={handleSelectOrder}
-                selectedOrderId={selectedOrderId}
                 selectedRows={selectedRows}
                 onSelectionChange={setSelectedRows}
                 onOrdersLoaded={setCurrentOrders}
@@ -137,34 +133,6 @@ export function OrdersClientLayout() {
                 paymentMethodFilter={paymentMethodFilter}
                 sortOrder={sortOrder}
             />
-
-            {/* Backdrop + panel via portal — escapes ancestor stacking contexts so backdrop covers header + sidebar */}
-            {typeof document !== 'undefined' && createPortal(
-                <>
-                    {isOpen && (
-                        <div
-                            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
-                            onClick={() => setSelectedOrderId(null)}
-                        />
-                    )}
-                    {/* Order Detail Panel — fixed overlay, slides in from right, full-screen height */}
-                    <div
-                        className={`fixed z-[101] overflow-y-auto transition-transform duration-300 shadow-2xl right-0 w-full top-0 h-[100dvh] md:w-[488px] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
-                        style={{
-                            background: 'var(--dash-surface)',
-                            borderLeft: '1px solid var(--dash-border)',
-                        }}
-                    >
-                        <OrderDetailPanel
-                            orderId={selectedOrderId}
-                            onClose={() => setSelectedOrderId(null)}
-                            onUpdate={refreshAfterMutation}
-                        />
-                    </div>
-                </>,
-                document.body
-            )}
         </div>
     )
 }
-

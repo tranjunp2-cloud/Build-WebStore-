@@ -12,11 +12,13 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 import { getHeroImage } from '@/lib/images/industry-images'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 
 export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, videoUrl: initialVideoUrl, image } = block
     const primaryColor = CSS_VARS.primary
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const category = (site?.siteType as string) || 'business'
     const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
@@ -116,7 +118,7 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                                         className="absolute bottom-4 right-4"
                                     />
                                 </div>
-                            ) : isOwner ? (
+                            ) : (isOwner && !isBuilderPreview) ? (
                                 // Editor only: placeholder so the owner can add a video
                                 <div
                                     className="w-full aspect-video rounded-2xl flex items-center justify-center"

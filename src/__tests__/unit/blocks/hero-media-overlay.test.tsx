@@ -15,6 +15,10 @@ vi.mock('@/components/site-renderer/OwnerContext', () => ({
     useIsOwner: vi.fn(() => false),
 }))
 
+vi.mock('@/components/site-renderer/BuilderPreviewContext', () => ({
+    useIsBuilderPreview: vi.fn(() => false),
+}))
+
 vi.mock('@/components/site-renderer/BlockEditCallbackContext', () => ({
     useBlockEditCallback: vi.fn(() => null),
 }))
@@ -35,6 +39,7 @@ Object.defineProperty(window, 'parent', { value: { postMessage: postMessageSpy }
 // ── Imports (after mocks) ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 import { HeroMediaOverlay } from '@/blocks/hero/hero-media-overlay'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useUploadProgress } from '@/hooks/use-upload-progress'
 
@@ -50,6 +55,9 @@ let mockUpload: Mock
 
 beforeEach(() => {
     vi.clearAllMocks()
+    // Default false so existing owner/callback-driven tests are unaffected;
+    // GH-1461 test below overrides this locally.
+    vi.mocked(useIsBuilderPreview).mockReturnValue(false)
     mockUpload = vi.fn()
     vi.mocked(useUploadProgress).mockReturnValue({
         upload: mockUpload,
@@ -222,6 +230,22 @@ describe('TC-F30-HMO-010: showImageButton=false hides Change Image button', () =
         )
         expect(screen.queryByText('Change Image')).toBeNull()
         expect(screen.getByText('Change Video')).toBeTruthy()
+    })
+})
+
+describe('TC-F30-HMO-013: builder preview mode hides overlay (GH-1461)', () => {
+    it('renders children without overlay wrapper when isBuilderPreview=true, even with isOwner+callback', () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        vi.mocked(useIsBuilderPreview).mockReturnValue(true)
+        const { container } = render(
+            <HeroMediaOverlay field="image.url">
+                <img data-testid="child" src="/img.jpg" alt="test" />
+            </HeroMediaOverlay>
+        )
+        expect(screen.getByTestId('child')).toBeTruthy()
+        expect(container.querySelector('[class*="group/media-overlay"]')).toBeNull()
+        expect(screen.queryByText('Change Image')).toBeNull()
     })
 })
 
