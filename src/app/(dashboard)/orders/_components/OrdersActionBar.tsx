@@ -87,16 +87,18 @@ export function OrdersActionBar({
     const [paymentVal, setPaymentVal] = useState('all')
     const [sortVal, setSortVal] = useState('-createdAt')
 
-    // Always 2 rows: search (row 1) + filters (row 2) — stays clean even at 1280 with the
-    // sidebar open (inline 1-row gets cramped there). Search caps width on desktop.
+    // GH-1516: desktop (xl+) puts search + all 4 filter chips on ONE row — search
+    // flexes between a 220px floor (still usable at 1280 with the sidebar open) and a
+    // 480px cap, chips keep their auto width; flex-wrap is the safety net if a locale's
+    // labels outgrow the row. Below xl stays 2 rows: search (row 1) + filters (row 2).
     return (
-        <div className="flex flex-col gap-3 w-full">
+        <div className="flex flex-col gap-3 w-full xl:flex-row xl:flex-wrap xl:items-center">
             <TableSearch
                 value={search}
                 onSearch={(q) => onSearch?.(q)}
                 placeholder={o.search}
                 debounceMs={0}
-                className="w-full xl:max-w-[480px]"
+                className="w-full xl:w-auto xl:flex-1 xl:min-w-[220px] xl:max-w-[480px]"
             />
 
             {/* All 4 selects on ONE row at every width below xl (grid-cols-4) → search +
@@ -110,7 +112,7 @@ export function OrdersActionBar({
                   • padding/font shrink on the smallest widths.
                 All tweaks target `.chip-trigger` (not the dropdown options) and reset at
                 xl so desktop stays byte-identical. */}
-            <div className="grid grid-cols-4 gap-1.5 md:gap-2 w-full
+            <div className="grid grid-cols-4 gap-1.5 md:gap-2 w-full xl:w-auto
                             xl:flex xl:items-center xl:flex-wrap
                             [&_.chip-trigger]:w-full xl:[&_.chip-trigger]:w-auto
                             [&_.chip-trigger]:px-2 min-[820px]:[&_.chip-trigger]:px-3

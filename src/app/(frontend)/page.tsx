@@ -105,7 +105,7 @@ export default function HomePage() {
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="font-heading font-bold text-xl text-zinc-900">
-              PrimeWeb
+              Web Store
             </span>
           </Link>
 
@@ -768,7 +768,7 @@ export default function HomePage() {
                 <Sparkles className="w-3 h-3 text-white" />
               </div>
               <span className="font-heading font-semibold text-zinc-900">
-                PrimeWeb
+                Web Store
               </span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-600">

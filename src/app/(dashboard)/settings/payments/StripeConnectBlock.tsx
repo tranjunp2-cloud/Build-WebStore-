@@ -34,6 +34,9 @@ export function StripeConnectBlock({
     const pt = t.dashboard.settings.payments;
     const [accountEmail, setAccountEmail] = useState<string | null>(null);
     const [isDisconnecting, setIsDisconnecting] = useState(false);
+    // GH-1516: mobile collapses the long body (desc clamped to 2 lines + steps hidden)
+    // behind a "See more" toggle — same convention as PaymentMethodCard. sm+ always full.
+    const [expanded, setExpanded] = useState(false);
 
     const isVerifyMode = mode === 'verify';
     const isOnboardMode = mode === 'onboard';
@@ -66,29 +69,36 @@ export function StripeConnectBlock({
             }}
         >
 
-            {/* Icon */}
-            <div
-                className="w-[48px] h-[48px] rounded-[14px] grid place-items-center shrink-0"
-                style={{
-                    border: isVerifyMode ? '1px solid rgba(251,191,36,0.40)' : '1px solid rgba(14,165,233,0.35)',
-                    color: isVerifyMode ? '#fbbf24' : '#7dd3fc',
-                    background: isVerifyMode
-                        ? 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.12))'
-                        : 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(45,212,191,0.18))',
-                    boxShadow: isVerifyMode
-                        ? '0 8px 20px -6px rgba(251,191,36,0.30)'
-                        : '0 8px 20px -6px rgba(14,165,233,0.40)',
-                }}
-            >
-                {isVerifyMode ? <BadgeCheck className="w-5 h-5" /> : <Link className="w-5 h-5" />}
+            {/* Icon + mobile title. GH-1516: on mobile the title sits beside the icon on one
+                row; `sm:contents` dissolves this wrapper on sm+ so the icon stays a direct
+                grid child and the desktop 3-column layout is untouched. */}
+            <div className="flex items-center gap-[14px] sm:contents">
+                <div
+                    className="w-[48px] h-[48px] rounded-[14px] grid place-items-center shrink-0"
+                    style={{
+                        border: isVerifyMode ? '1px solid rgba(251,191,36,0.40)' : '1px solid rgba(14,165,233,0.35)',
+                        color: isVerifyMode ? '#fbbf24' : '#7dd3fc',
+                        background: isVerifyMode
+                            ? 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.12))'
+                            : 'linear-gradient(135deg, rgba(14,165,233,0.18), rgba(45,212,191,0.18))',
+                        boxShadow: isVerifyMode
+                            ? '0 8px 20px -6px rgba(251,191,36,0.30)'
+                            : '0 8px 20px -6px rgba(14,165,233,0.40)',
+                    }}
+                >
+                    {isVerifyMode ? <BadgeCheck className="w-5 h-5" /> : <Link className="w-5 h-5" />}
+                </div>
+                <h4 className="sm:hidden text-[17px] font-bold text-slate-50 tracking-tight m-0 min-w-0">
+                    {title}
+                </h4>
             </div>
 
             {/* Body */}
             <div className="min-w-0">
-                <h4 className="text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
+                <h4 className="hidden sm:block text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
                     {title}
                 </h4>
-                <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]">
+                <p className={`text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]${expanded ? '' : ' line-clamp-2 sm:line-clamp-none'}`}>
                     {desc}
                 </p>
                 {(isOnboardMode || isVerifyMode) && connectedAccountId && (
@@ -120,7 +130,7 @@ export function StripeConnectBlock({
                     </div>
                 )}
                 {steps && (
-                    <ul className="flex flex-wrap gap-[14px_24px] list-none m-0 p-0">
+                    <ul className={`${expanded ? 'flex' : 'hidden sm:flex'} flex-wrap gap-[14px_24px] list-none m-0 p-0`}>
                         {steps.map((step, i) => (
                             <li key={i} className="inline-flex items-center gap-2 text-[12.5px] text-slate-300">
                                 <span className="w-5 h-5 rounded-full border border-sky-500/[0.28] bg-sky-500/[0.12] text-sky-300 font-mono text-[11px] font-bold grid place-items-center shrink-0">
@@ -131,10 +141,21 @@ export function StripeConnectBlock({
                         ))}
                     </ul>
                 )}
+                {/* Mobile-only toggle revealing the full desc + the 3 steps */}
+                <button
+                    type="button"
+                    onClick={() => setExpanded(v => !v)}
+                    aria-expanded={expanded}
+                    className={`sm:hidden text-[12px] text-[hsl(var(--primary))] font-medium hover:underline${expanded ? ' mt-[10px]' : ''}`}
+                >
+                    {expanded ? pt.seeLess : pt.seeMore}
+                </button>
             </div>
 
-            {/* CTA */}
-            <div className="flex flex-col items-end gap-2 shrink-0 relative z-[1]">
+            {/* CTA. GH-1516 mobile: one row — trust note left, button right (row-reverse
+                keeps the button first in DOM/tab order). sm+ restores the stacked
+                right-aligned column of the desktop grid. */}
+            <div className="flex w-full flex-row-reverse flex-wrap items-center justify-between gap-2 shrink-0 relative z-[1] sm:w-auto sm:flex-col sm:items-end sm:justify-start">
                 <Button
                     type="button"
                     onClick={handleClick}

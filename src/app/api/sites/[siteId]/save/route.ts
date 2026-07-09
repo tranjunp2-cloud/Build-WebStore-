@@ -109,7 +109,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, localBusiness, socialLinks, branding, seo, isDraft, localeContent, pendingLocaleConfirm } = data!
         // Navigation: allow draft links (empty/#) but reject malformed external URLs
         if (headerBlock && typeof headerBlock === 'object') {
             const hb = headerBlock as Record<string, unknown>
@@ -137,6 +137,7 @@ export async function PATCH(
             pendingFooterBlock: unknown;
             pendingGlobalBlocks: unknown;
             contactInfo: unknown;
+            localBusiness: unknown;
             socialLinks: unknown;
             branding: unknown;
             seo: unknown;
@@ -165,6 +166,7 @@ export async function PATCH(
             )
         }
         if (contactInfo) siteUpdateData.contactInfo = contactInfo
+        if (localBusiness) siteUpdateData.localBusiness = localBusiness
         if (socialLinks) siteUpdateData.socialLinks = socialLinks
         if (branding) siteUpdateData.branding = branding
         if (seo) siteUpdateData.seo = seo

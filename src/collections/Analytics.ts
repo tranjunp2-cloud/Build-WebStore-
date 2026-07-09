@@ -45,6 +45,7 @@ export const Analytics: CollectionConfig = {
                 { label: 'Add to Cart', value: 'add_to_cart' },
                 { label: 'Checkout', value: 'checkout' },
                 { label: 'Purchase', value: 'purchase' },
+                { label: 'Local Business Data Saved', value: 'local_business_data_saved' },
             ],
         },
         {

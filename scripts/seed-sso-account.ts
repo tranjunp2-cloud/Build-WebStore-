@@ -93,7 +93,7 @@ async function seedAccounts() {
             email: ADMIN_EMAIL,
             password: ADMIN_PASSWORD,
             firstName: 'Admin',
-            lastName: 'PrimeWeb',
+            lastName: 'Web Store',
             label: 'Admin',
         })
     }

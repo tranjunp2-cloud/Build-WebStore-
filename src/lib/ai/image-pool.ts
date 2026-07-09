@@ -69,8 +69,8 @@ export interface BuildPoolCtx {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_LANDSCAPE_SIZE = 12
-const DEFAULT_SQUARE_SIZE = 6
+export const DEFAULT_LANDSCAPE_SIZE = 12
+export const DEFAULT_SQUARE_SIZE = 6
 
 
 /**
@@ -293,18 +293,26 @@ export async function buildImagePool(ctx: BuildPoolCtx): Promise<ImagePool> {
   let underfill = false
 
   // ── Landscape bucket (hero, gallery wide) ────────────────────────
-  const landscape = await searchBucket(
-    ctx, query, 'landscape', landscapeSize, 1200, Math.max(3, Math.floor(landscapeSize / 2)),
-  )
-  const landscapePhotos = landscape.photos
-  if (landscape.usedFallback || landscapePhotos.length === 0) underfill = true
+  // Size 0 = no landscape-role block enabled for this gen — skip the Pixabay
+  // call entirely (empty bucket is intentional here, NOT an underfill).
+  let landscapePhotos: PixabayPhoto[] = []
+  if (landscapeSize > 0) {
+    const landscape = await searchBucket(
+      ctx, query, 'landscape', landscapeSize, 1200, Math.max(3, Math.floor(landscapeSize / 2)),
+    )
+    landscapePhotos = landscape.photos
+    if (landscape.usedFallback || landscapePhotos.length === 0) underfill = true
+  }
 
   // ── Square bucket (team, product flatlay) ─────────────────────────
-  const square = await searchBucket(
-    ctx, query, 'squarish', squareSize, 1000, Math.max(2, Math.floor(squareSize / 2)),
-  )
-  const squarePhotos = square.photos
-  if (square.usedFallback || squarePhotos.length === 0) underfill = true
+  let squarePhotos: PixabayPhoto[] = []
+  if (squareSize > 0) {
+    const square = await searchBucket(
+      ctx, query, 'squarish', squareSize, 1000, Math.max(2, Math.floor(squareSize / 2)),
+    )
+    squarePhotos = square.photos
+    if (square.usedFallback || squarePhotos.length === 0) underfill = true
+  }
 
   return {
     landscape: landscapePhotos.map((p) => normalize(p, 'gallery')),
@@ -343,7 +351,7 @@ function mulberry32(seed: number): () => number {
  * Map a block role to which aspect bucket supplies its photos.
  * `any` defaults to landscape (most flexible).
  */
-function bucketForRole(role: ImageRole): AspectBucket {
+export function bucketForRole(role: ImageRole): AspectBucket {
   switch (role) {
     case 'hero':
     case 'gallery':

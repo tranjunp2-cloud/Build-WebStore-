@@ -85,7 +85,7 @@
             "label": "Platform",
             "title": "One platform to run your business",
             "titleHighlight": "end-to-end",
-            "subtitle": "From attracting customers and closing sales to running internal operations — PrimeWeb helps you manage everything on a single system.",
+            "subtitle": "From attracting customers and closing sales to running internal operations — Web Store helps you manage everything on a single system.",
             "pillars": {
                 "website": {
                     "title": "Website & Sales",
@@ -100,7 +100,7 @@
                     "desc": "Department task management, standardised workflows, and operational performance monitoring."
                 }
             },
-            "cta": "Explore the PrimeWeb ecosystem"
+            "cta": "Explore the Web Store ecosystem"
         },
         "product": {
             "label": "Products",
@@ -317,7 +317,7 @@
             }
         },
         "why": {
-            "title": "Why choose PrimeWeb?",
+            "title": "Why choose Web Store?",
             "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
             "stats": {
                 "customers": {
@@ -419,7 +419,7 @@
         },
         "heroDemo": {
             "appSuite": "App suite",
-            "homeCrumb": "PrimeWeb · Home",
+            "homeCrumb": "Web Store · Home",
             "experienceTitle": "A professional website experience",
             "experienceDesc": "Built by AI in 5 minutes. Drag-and-drop edits, publish instantly.",
             "viewDetails": "View details",
@@ -495,7 +495,7 @@
         "step3Title": "Customize your site",
         "step3Subtitle": "Add your brand details to make it yours.",
         "welcome": {
-            "title": "Welcome to PrimeWeb",
+            "title": "Welcome to Web Store",
             "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
             "createStore": "Create My Store with AI",
             "skip": "Skip & Go to Dashboard",
@@ -663,49 +663,49 @@
     },
     "email": {
         "welcome": {
-            "subject": "Welcome to PrimeWeb! 🎉",
+            "subject": "Welcome to Web Store! 🎉",
             "heading": "Welcome! 🎉",
-            "subheading": "Welcome to PrimeWeb",
+            "subheading": "Welcome to Web Store",
             "greeting": "Hi {userName}",
-            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "body": "You're ready to create your first website with Web Store! Just describe your idea, and AI will help you build a professional website in minutes.",
             "stepsTitle": "Get started in 3 steps",
             "step1": "Describe the website you want to create",
             "step2": "Customize the content and design",
             "step3": "Publish and share!",
             "cta": "Get Started →",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "forgotPassword": {
-            "subject": "Reset your PrimeWeb password 🔐",
+            "subject": "Reset your Web Store password 🔐",
             "heading": "Password Reset",
             "subheading": "We received your reset request",
             "greeting": "Hi {userName}",
-            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "body": "We received a request to reset the password for your Web Store account. Click the button below to set a new password. This link will expire in 1 hour.",
             "cta": "Reset Password →",
             "fallback": "If the button doesn't work, copy and paste this link into your browser:",
             "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
             "ignore": "If you didn't request a password reset, no action is needed."
         },
         "otp": {
-            "subject": "Your PrimeWeb verification code 🔐",
+            "subject": "Your Web Store verification code 🔐",
             "heading": "Email Verification",
             "subheading": "Verify your identity to continue",
             "greeting": "Hi <strong>{userName}</strong>",
             "body": "Enter this code to verify your identity:",
             "expiry": "This code expires in 5 minutes",
             "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
-            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
+            "copyright": "© 2026 Web Store · Kuala Lumpur, Malaysia"
         },
         "passwordChanged": {
-            "subject": "Your PrimeWeb password has been changed 🔐",
+            "subject": "Your Web Store password has been changed 🔐",
             "heading": "Password Changed",
             "subheading": "Your account password was updated",
             "greeting": "Hi {userName}",
-            "body": "Your PrimeWeb account password has been successfully changed.",
+            "body": "Your Web Store account password has been successfully changed.",
             "warning": "If you didn't make this change, contact your workspace admin immediately and reset your password.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "order": {
             "subject": "Order Confirmed",
@@ -721,7 +721,7 @@
             "sst": "SST (6%)",
             "total": "Total",
             "shippingAddress": "Shipping Address",
-            "footer": "Powered by PrimeWeb",
+            "footer": "Powered by Web Store",
             "recipientInfoHeading": "Recipient Information",
             "fullName": "Full name",
             "phone": "Phone",
@@ -861,7 +861,7 @@
             "morning": "morning",
             "afternoon": "afternoon",
             "evening": "evening",
-            "welcomeTitle": "Welcome to PrimeWeb Dashboard",
+            "welcomeTitle": "Welcome to Web Store Dashboard",
             "welcomeSubtitle": "Monitor your store performance and manage your online business from one place.",
             "pendingLabel": "Pending",
             "itemsLabel": "items",
@@ -1705,8 +1705,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Confirm Create Products (AI Preview)",
-                "subtitle": "Review and edit before saving",
+                "title": "Review AI drafts",
+                "subtitle": "Edit anything before adding these to your store. Nothing is published yet.",
                 "promptLabel": "Prompt / Item List",
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
@@ -1732,24 +1732,25 @@
                 "unsavedWarning": "You have unsaved data. Closing will discard all changes. Are you sure?",
                 "stayButton": "Stay",
                 "exitButton": "Exit",
-                "saveButton": "Save",
-                "productsItem": "Products",
-                "saveEmptyError": "Please select at least 1 product to save",
+                "discard": "Discard",
+                "approveAll": "Approve All",
+                "draftCountOne": "1 draft",
+                "draftCountMany": "{count} drafts",
+                "saveEmptyError": "No drafts to save",
                 "saveSuccessOne": "Created 1 draft product. Please add images before publishing.",
                 "saveSuccessMany": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
                 "saveError": "Error saving products",
                 "aiWorking": "AI magic is working...",
                 "table": {
-                    "name": "NAME",
-                    "price": "PRICE",
-                    "variants": "VARIANTS",
+                    "name": "Product name",
+                    "price": "Price (RM)",
+                    "stock": "Stock",
+                    "stockFromVariants": "Editing applies this value to every variant",
+                    "variants": "Variants",
+                    "removeDraft": "Remove draft",
                     "empty": "Product list is empty.",
                     "defaultVariant": "Default"
-                },
-                "note": {
-                    "label": "Note: ",
-                    "description": "Products will be saved as Draft"
                 },
                 "toast": {
                     "invalidFormat": "Invalid products format received from AI",
@@ -2031,7 +2032,7 @@
                 "failSaveSettings": "Failed to save settings",
                 "failClearQR": "Failed to clear QR image setting.",
                 "stripeConnectTitle": "Connect a Stripe account to start accepting Card & FPX",
-                "stripeConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "stripeConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "stripeConnectCta": "Connect Stripe Account",
                 "stripeStep1": "Click \"Connect Stripe Account\"",
                 "stripeStep2": "Enter your Stripe credentials",
@@ -2102,7 +2103,7 @@
                 "xenditSectionTitle": "Xendit Payment Methods",
                 "xenditPoweredBy": "Powered by Xendit Checkout",
                 "xenditConnectTitle": "Connect a Xendit account to accept Malaysian payments",
-                "xenditConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "xenditConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "xenditConnectCta": "Connect Xendit Account",
                 "xenditConnecting": "Redirecting to Xendit...",
                 "xenditStep1": "Click \"Connect Xendit Account\"",
@@ -2125,7 +2126,7 @@
                 "xenditCallbackTokenStep3": "Copy the token and paste here",
                 "xenditSaveBtn": "Save Xendit connection",
                 "xenditModalTitle": "Connect your Xendit Account",
-                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Prime Web. Card, FPX & E-Wallets unlock as soon as we verify.",
+                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Web Store. Card, FPX & E-Wallets unlock as soon as we verify.",
                 "xenditConnectAccountBtn": "Connect Account",
                 "xenditWebhookConfirmTitle": "Register ECH as your webhook receiver",
                 "xenditWebhookConfirmDesc": "ECH will register itself as the Invoice webhook endpoint on your Xendit account. If another system is currently receiving Xendit Invoice webhooks from this account, it will stop receiving them.",
@@ -3963,6 +3964,53 @@
             "invalidEmail": "Please enter a valid email address",
             "address": "Address",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
+            "localBusinessInfo": "Local Business Info",
+            "addressGroupLabel": "Address",
+            "streetAddress": "Street Address",
+            "streetAddressPlaceholder": "123 Jalan Bukit Bintang",
+            "city": "City / District",
+            "cityPlaceholder": "Kuala Lumpur",
+            "postcode": "Postcode",
+            "postcodePlaceholder": "55100",
+            "state": "State / Federal Territory",
+            "selectState": "-- Select state --",
+            "country": "Country",
+            "countryMalaysia": "Malaysia",
+            "coordinatesGroupLabel": "Location (Coordinates)",
+            "pasteMapsLink": "Paste your Google Maps link",
+            "mapsLinkPlaceholder": "https://maps.app.goo.gl/xxxxx",
+            "pasteMapsLinkHint": "Paste a share link from Google Maps — we'll extract the coordinates automatically",
+            "extractCoordinates": "Extract",
+            "extracting": "Extracting...",
+            "coordinatesExtracted": "✓ Coordinates extracted",
+            "latitude": "Latitude",
+            "longitude": "Longitude",
+            "manualCoordinates": "Enter coordinates manually (advanced)",
+            "manualCoordinatesHint": "Use this when pasting a link doesn't auto-detect the coordinates",
+            "geoExtractFailed": "Couldn't extract coordinates from that link — try the manual option below",
+            "mapsPreviewTitle": "Business location map preview",
+            "categoryOfferGroupLabel": "Category & Offer",
+            "businessCategory": "Business Category",
+            "selectCategory": "-- Select category --",
+            "priceRange": "Price Range",
+            "selectPriceRange": "-- Select price range --",
+            "serviceAreaDescription": "Service Area",
+            "serviceAreaPlaceholder": "e.g. Petaling Jaya, Shah Alam, Selangor",
+            "openingHoursGroupLabel": "Opening Hours",
+            "openingHoursClosed": "Closed",
+            "openingHoursOpens": "Opens",
+            "openingHoursCloses": "Closes",
+            "openingHoursDayMo": "Mon",
+            "openingHoursDayTu": "Tue",
+            "openingHoursDayWe": "Wed",
+            "openingHoursDayTh": "Thu",
+            "openingHoursDayFr": "Fri",
+            "openingHoursDaySa": "Sat",
+            "openingHoursDaySu": "Sun",
+            "checklistTitle": "Local SEO essentials",
+            "checklistAddressSaved": "Address saved",
+            "checklistHoursSaved": "Opening hours saved",
+            "checklistCategorySaved": "Business category saved",
             "socialLinks": "Social Links",
             "socialPlatforms": {
                 "facebook": {
@@ -4304,7 +4352,10 @@
             "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
             "primaryColorLabel": "Primary color picker",
             "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
-            "phoneRequired": "Phone number is required"
+            "phoneRequired": "Phone number is required",
+            "invalidPostcode": "Malaysia postcode must be exactly 5 digits",
+            "invalidLatitude": "Latitude must be between -90 and 90",
+            "invalidLongitude": "Longitude must be between -180 and 180"
         },
         "menuDrawer": {
             "defaultUserName": "User"

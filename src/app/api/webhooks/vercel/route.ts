@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         }
 
         const deployment = payload.payload?.deployment || payload.payload || {}
-        const project = payload.payload?.project || payload.payload?.name || 'PrimeWeb'
+        const project = payload.payload?.project || payload.payload?.name || 'Web Store'
         const isSuccess = eventType === 'deployment.ready'
         const isFail = eventType === 'deployment.error' || eventType === 'deployment.canceled'
 
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         // Build smart-notify payload
         const notifyPayload = {
             event: isSuccess ? 'deploy_success' : 'deploy_fail',
-            project: projectName || 'PrimeWeb',
+            project: projectName || 'Web Store',
             branch,
             environment,
             author,

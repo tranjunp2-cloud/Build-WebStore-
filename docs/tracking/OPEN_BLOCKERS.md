@@ -47,6 +47,10 @@ the external items below block QC handover.
   - Handover doc: `plans/260611-1131-migrate-template/dev-handover-v2-block-gaps.md`. Unblock = cả 2 gap merge staging + verify editor → mở khoá Transform/Load.
 - 🚧 **Scope mở rộng Tier 0 + Tier 1** — epic [#1194](https://github.com/primeproduction/ech-prime-web-v2/issues/1194). Tier 1 (brand-identity, BẮT BUỘC đợt này): #1195 (store info) · #1196 (typography) · #1197 (mega-menu) · #1198 (footer) · #1199 (header toggle). Tier 2 hoãn (V2.1/V2.2, default ON). Đối chiếu: `plans/260611-1131-migrate-template/blocker-vs-spec-reconciliation.md`.
 
+## F37 (US-01) — Local Business Data Model
+
+- ⚠️ **Technical Health signals measurement (US-F37-04 blocker)** — Phase 05 hardcoded assume-passing values for 3 signals: coreWebVitals (80), mobileResponsive (true), httpsEnabled (true). No real Lighthouse/CWV measurement infrastructure. Flagged for PM decision before US-F37-04 dashboard ships: (1) keep hardcoding (status quo, no cost but overstates score), (2) implement real Lighthouse measurement (adds dependency, accurate), (3) apply PRD §13.8 "earned/applicable" normalization (reweight buckets per-site). See `docs/architecture/F37-local-seo.md` § "Known limitation" for full context.
+
 ## Phase 2 (v1.1) prerequisites
 
 - [ ] v1.0 staging stable (< 10 errors/day sustained for 7 days)

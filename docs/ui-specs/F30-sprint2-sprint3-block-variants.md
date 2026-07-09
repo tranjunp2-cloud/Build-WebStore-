@@ -373,6 +373,8 @@ ContactBlock (src/blocks/contact/index.tsx)
 │       └── FormSide
 │           └── ContactForm
 │
+│   > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant.
+│
 └── minimal-inline
     └── Container (py-8)
         └── InlineForm (flex, gap-4, items-end, wrap on mobile)
@@ -757,6 +759,7 @@ ProductQuickViewBlock (src/blocks/product-quick-view/)
 | **Gallery** | 2-col grid, filmstrip: thumbnails scroll | 2-3 col grid | 3-4 col grid, lightbox keyboard nav |
 | **Footer** | Stack all, links accordion | 2-col links | 4-5 col mega-footer |
 | **Contact** | Stack form, map above form | 2-col map-split | Full 2-col, inline form single row |
+| | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. | |
 | **Navigation** | Always hamburger menu | Hamburger or compact links | Full links visible, pill/transparent |
 | **menu-display** | 1-col, tabs scroll horizontally, photo 1-col | photo 2-col | 3-col photo-grid, full tabs |
 | **booking-widget** | Stack form, sidebar → inline | 2-col sidebar | 3-col sidebar layout |
@@ -1061,6 +1064,7 @@ ProductQuickViewBlock (src/blocks/product-quick-view/)
 | Gallery | 3 | 3 | 6 | lightbox, filmstrip, justified |
 | Footer | 3 | 3 | 6 | centered-stack, mega-footer, dark-gradient |
 | Contact | 3 | 3 | 6 | card-float, map-split, minimal-inline |
+| | | | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. |
 | Navigation | 3 | 3 | 6 | transparent, sidebar, pill |
 | **Total** | **26** | **34** | **60** | |
 

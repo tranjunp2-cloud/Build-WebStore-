@@ -91,32 +91,67 @@ function getNewFieldsFromDiff() {
 
       if (!fullDiff) continue
 
-      // Identify group-typed fields from the diff so we can skip them.
-      // Strategy: for each added `name: 'xxx'` line, look at nearby lines (±6)
-      // for a sibling `type: 'group'` at the same indentation.
+      // Identify fields to skip when extracting new top-level columns:
+      // - Fields typed 'group'/'array' themselves (no direct column on this table).
+      // - Fields nested inside an 'array' ancestor (array-row fields live in a
+      //   separate {collection}_..._{field} table, never a column on this table).
+      // Group sub-fields are NOT skipped — they map to prefixed columns on this
+      // same table, matched via KNOWN_GROUP_PREFIXES in getMigrationColumns().
       const diffLines = fullDiff.split('\n')
-      const groupFieldNames = new Set()
+      const skipFieldNames = new Set()
+      const scopeStack = [] // { indent, type }
       for (let i = 0; i < diffLines.length; i++) {
-        const nameMatch = diffLines[i].match(/^\+(\s*)name:\s*['"](\w+)['"]/)
+        // Support both multi-line (`name:` starts the line) and compact
+        // single-line (`{ name: 'x', type: 'y' },`) field definitions —
+        // indent = leading whitespace after '+'; `name:` may appear anywhere
+        // after that on the same added line.
+        const wsMatch = diffLines[i].match(/^\+(\s*)/)
+        if (!wsMatch) continue
+        const nameMatch = diffLines[i].slice(1).match(/name:\s*['"](\w+)['"]/)
         if (!nameMatch) continue
-        const indent = nameMatch[1].length
-        const fieldName = nameMatch[2]
-        for (let j = Math.max(0, i - 2); j <= Math.min(diffLines.length - 1, i + 8); j++) {
-          if (j === i) continue
-          const typeMatch = diffLines[j].match(/^\+(\s*)type:\s*['"](\w+)['"]/)
-          if (typeMatch && typeMatch[1].length === indent && typeMatch[2] === 'group') {
-            groupFieldNames.add(fieldName)
-            break
+        const indent = wsMatch[1].length
+        const fieldName = nameMatch[1]
+
+        // Pop scopes we've exited (same or shallower indent than this field).
+        while (scopeStack.length && scopeStack[scopeStack.length - 1].indent >= indent) {
+          scopeStack.pop()
+        }
+
+        // Nested inside an array ancestor → array-row field, different table.
+        if (scopeStack.some((s) => s.type === 'array')) {
+          skipFieldNames.add(fieldName)
+        }
+
+        // Determine this field's own type — same line first (compact form),
+        // then fall back to nearby lines at the same indent (multi-line form).
+        let ownType = null
+        const inlineTypeMatch = diffLines[i].match(/type:\s*['"](\w+)['"]/)
+        if (inlineTypeMatch) {
+          ownType = inlineTypeMatch[1]
+        } else {
+          for (let j = Math.max(0, i - 2); j <= Math.min(diffLines.length - 1, i + 8); j++) {
+            if (j === i) continue
+            const typeMatch = diffLines[j].match(/^\+(\s*)type:\s*['"](\w+)['"]/)
+            if (typeMatch && typeMatch[1].length === indent) {
+              ownType = typeMatch[2]
+              break
+            }
           }
+        }
+
+        if (ownType === 'group' || ownType === 'array') {
+          skipFieldNames.add(fieldName) // groups/arrays have no direct column themselves
+          scopeStack.push({ indent, type: ownType })
         }
       }
 
-      // Extract field names from added `name:` lines, skipping group fields.
+      // Extract field names from added `name:` lines, skipping group/array
+      // fields and any field nested inside an array.
       const nameDiff = diffLines.filter(l => l.includes('name:')).join('\n')
       const regex = /name:\s*['"](\w+)['"]/g
       let match
       while ((match = regex.exec(nameDiff)) !== null) {
-        if (groupFieldNames.has(match[1])) continue // groups have no DB column
+        if (skipFieldNames.has(match[1])) continue
         newFields.push({
           field: match[1],
           snake: toSnakeCase(match[1]),
@@ -153,7 +188,7 @@ function getNewFieldsFromDiff() {
 // the unprefixed form `merchant_qr_code_id` and (for uploads) `merchant_qr_code`.
 const KNOWN_GROUP_PREFIXES = [
   'theme', 'seo', 'payments', 'badge', 'ai_generation_metadata',
-  'payment_config', 'shipping_config',
+  'payment_config', 'shipping_config', 'local_business',
 ]
 
 function getMigrationColumns() {

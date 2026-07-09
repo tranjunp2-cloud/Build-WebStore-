@@ -169,3 +169,43 @@ describe('seedImageLibraryForSite [TC-GH-727-01]', () => {
         expect(mockDownload).toHaveBeenCalled()
     })
 })
+
+/**
+ * TC-GENPERF-W1-03 — imglib seeder idempotency in Wave 1 context
+ * Thin addition verifying integration point: gen-perf-wave1.test.ts has full coverage.
+ * This verifies the seeder is called idempotently from the after() task.
+ */
+describe('TC-GENPERF-W1-03 — imglib seeder idempotency (Wave 1 integration)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-GENPERF-W1-03: second regeneration with same site → returns empty, skips uploads', async () => {
+        // Arrange: First call finds nothing (new site) → proceeds
+        const payload = buildPayload(() => ({ docs: [], totalDocs: 0 }))
+        mockSearch.mockResolvedValue(makePhotos(10))
+        mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
+        let id = 0
+        mockUpload.mockImplementation(async () => ++id)
+
+        // First call: happy path
+        const result1 = await seedImageLibraryForSite(payload as never, 1, 10, 'restaurant')
+        expect(result1.gallery.length).toBeGreaterThan(0)
+        const searchCallsAfterFirst = mockSearch.mock.calls.length
+        const downloadCallsAfterFirst = mockDownload.mock.calls.length
+        const uploadCountAfterFirst = mockUpload.mock.calls.length
+
+        // Arrange: Second call finds existing media (idempotent) → skips
+        const payloadSecondGen = buildPayload(() => ({ docs: [{ id: 42, alt: 'imglib:s10:gallery[0]' }], totalDocs: TOTAL_SLOTS }))
+
+        // Second call: should skip all work
+        const result2 = await seedImageLibraryForSite(payloadSecondGen as never, 1, 10, 'restaurant')
+
+        // Assert: Second call returns empty (idempotent)
+        expect(result2).toEqual({ hero: [], gallery: [], about: null, team: [], features: [] })
+        // No new calls after second invocation (idempotency check found existing media)
+        expect(mockUpload.mock.calls.length).toBe(uploadCountAfterFirst)
+        expect(mockSearch.mock.calls.length).toBe(searchCallsAfterFirst) // No new searches
+        expect(mockDownload.mock.calls.length).toBe(downloadCallsAfterFirst) // No new downloads
+    })
+})

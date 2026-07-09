@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F37 — Thông tin doanh nghiệp địa phương (wireframe demo)</title>
+<style>
+  :root {
+    --editor-bg: #0B1120;
+    --editor-surface: #0F172A;
+    --editor-surface-elevated: #1E293B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px;
+    background: #05070d;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    color: #e2e8f0;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  h1 { width: 100%; font-size: 15px; color: #94a3b8; font-weight: 500; }
+  .frame-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: #64748b; margin-bottom: 8px;
+  }
+  .panel {
+    background: var(--editor-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .panel.desktop { width: 320px; }
+  .panel.mobile { width: 375px; }
+
+  .accordion-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px 12px 0 0;
+    color: #e2e8f0; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  .chev { transform: rotate(180deg); color: #64748b; transition: transform .15s; }
+  .accordion-body {
+    background: var(--editor-surface);
+    border: 1px solid rgba(255,255,255,0.08); border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 16px;
+  }
+  .group-label {
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #94a3b8; margin: 20px 0 10px;
+  }
+  .group-label:first-child { margin-top: 0; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 6px;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--editor-surface-elevated);
+    color: #e2e8f0; font-size: 12.5px; outline: none;
+  }
+  textarea { min-height: 56px; resize: vertical; font-family: inherit; }
+  input:disabled {
+    color: #64748b; background: rgba(255,255,255,0.02);
+    cursor: not-allowed; border-color: rgba(255,255,255,0.05);
+  }
+  input.error, input.error:focus { border-color: rgba(248,113,113,0.5); }
+  .err-msg { margin-top: 4px; font-size: 11px; color: #f87171; }
+  .hint { margin-top: 4px; font-size: 10.5px; color: #64748b; }
+  .paste-row { display: flex; gap: 8px; }
+  .paste-row input { flex: 1; }
+  .btn {
+    padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 12px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+  }
+  .success-row {
+    display: flex; align-items: center; gap: 6px; margin: 10px 0;
+    font-size: 12px; color: #34d399;
+  }
+  .chip-row { display: flex; gap: 16px; margin-bottom: 10px; }
+  .chip { font-size: 11.5px; color: #cbd5e1; }
+  .chip b { display: block; font-size: 13px; color: #e2e8f0; }
+  .disclosure {
+    font-size: 12px; color: #94a3b8; cursor: pointer; margin: 6px 0 12px;
+  }
+  .map-embed {
+    width: 100%; height: 140px; border-radius: 8px;
+    background: repeating-linear-gradient(45deg, #1e293b, #1e293b 10px, #172033 10px, #172033 20px);
+    display: flex; align-items: center; justify-content: center;
+    color: #64748b; font-size: 11px; margin-bottom: 6px;
+  }
+  table.hours { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.hours th {
+    text-align: left; font-weight: 500; color: #64748b; font-size: 10.5px;
+    text-transform: uppercase; padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  table.hours td { padding: 6px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  table.hours input[type=text] { width: 58px; padding: 5px 6px; font-size: 11.5px; }
+  .closed-row td { opacity: 0.55; }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: #3b82f6; }
+
+  /* mobile stacked hours cards */
+  .hours-card {
+    border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+    padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,0.02);
+  }
+  .hours-card .day-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; font-weight: 500; margin-bottom: 8px;
+  }
+  .hours-card .day-row label { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #94a3b8; font-weight: 400; }
+  .hours-card .time-row { display: flex; gap: 10px; }
+  .hours-card .time-row > div { flex: 1; }
+  .hours-card .time-row label { font-size: 10px; color: #64748b; margin-bottom: 3px; }
+  .full-btn { width: 100%; }
+</style>
+</head>
+<body>
+<h1>F37 — "Thông tin doanh nghiệp địa phương" accordion — wireframe demo (see F37-local-business-form.md for full spec)</h1>
+
+<!-- ═══ DESKTOP 320px — expanded, coordinates parsed, one error shown ═══ -->
+<div>
+  <div class="frame-label">Desktop panel · 320px · expanded, coords parsed, postcode error</div>
+  <div class="panel desktop">
+    <div class="accordion-btn">
+      <span>Thông tin doanh nghiệp địa phương</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="accordion-body">
+
+      <div class="group-label">Địa chỉ</div>
+      <div class="field">
+        <label>Số nhà / Đường</label>
+        <input type="text" value="123 Jalan Bukit Bintang">
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Thành phố / Quận</label>
+          <input type="text" value="Kuala Lumpur">
+        </div>
+        <div class="field">
+          <label>Mã bưu điện</label>
+          <input type="text" class="error" value="551">
+        </div>
+      </div>
+      <div class="err-msg">Mã bưu điện Malaysia phải có đúng 5 chữ số</div>
+      <div class="field">
+        <label>Bang / Vùng liên bang</label>
+        <select>
+          <option>Kuala Lumpur / WP Kuala Lumpur</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Quốc gia</label>
+        <input type="text" value="Malaysia" disabled>
+      </div>
+
+      <div class="group-label">Vị trí (toạ độ)</div>
+      <div class="field">
+        <label>Dán link Google Maps của bạn</label>
+        <div class="paste-row">
+          <input type="text" value="https://maps.app.goo.gl/xxxxx">
+          <button class="btn">Trích ▸</button>
+        </div>
+      </div>
+      <div class="success-row">✓ Đã lấy được toạ độ</div>
+      <div class="chip-row">
+        <div class="chip">Latitude<b>3.146900</b></div>
+        <div class="chip">Longitude<b>101.695500</b></div>
+      </div>
+      <div class="disclosure">▸ Nhập toạ độ thủ công (nâng cao)</div>
+      <div class="map-embed">[ Google Maps iframe — output=embed ]</div>
+
+      <div class="group-label">Danh mục &amp; dịch vụ</div>
+      <div class="field">
+        <label>Danh mục kinh doanh</label>
+        <select>
+          <optgroup label="Ăn uống"><option>Nhà hàng</option></optgroup>
+          <optgroup label="Bán lẻ"><option>Cửa hàng</option></optgroup>
+        </select>
+      </div>
+      <div class="field">
+        <label>Khoảng giá</label>
+        <select><option>$$ · Trung bình</option></select>
+      </div>
+      <div class="field">
+        <label>Khu vực phục vụ</label>
+        <textarea>Quận 1, Quận 3, TP.HCM</textarea>
+      </div>
+
+      <div class="group-label">Giờ mở cửa</div>
+      <table class="hours">
+        <tr><th>Ngày</th><th>Đóng cửa</th><th>Mở</th><th>Đóng</th></tr>
+        <tr><td>T2</td><td><input type="checkbox"></td><td><input type="text" value="09:00"></td><td><input type="text" value="18:00"></td></tr>
+        <tr><td>T3</td><td><input type="checkbox"></td><td><input type="text" value="09:00"></td><td><input type="text" value="18:00"></td></tr>
+        <tr><td>T4</td><td><input type="checkbox"></td><td><input type="text" value="09:00"></td><td><input type="text" value="18:00"></td></tr>
+        <tr><td>T5</td><td><input type="checkbox"></td><td><input type="text" value="09:00"></td><td><input type="text" value="18:00"></td></tr>
+        <tr><td>T6</td><td><input type="checkbox"></td><td><input type="text" value="09:00"></td><td><input type="text" value="18:00"></td></tr>
+        <tr class="closed-row"><td>T7</td><td><input type="checkbox" checked></td><td><input type="text" value="--:--" disabled></td><td><input type="text" value="--:--" disabled></td></tr>
+        <tr class="closed-row"><td>CN</td><td><input type="checkbox" checked></td><td><input type="text" value="--:--" disabled></td><td><input type="text" value="--:--" disabled></td></tr>
+      </table>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MOBILE 375px — hours as stacked cards ═══ -->
+<div>
+  <div class="frame-label">Mobile · 375px · opening-hours as stacked cards</div>
+  <div class="panel mobile">
+    <div class="accordion-btn">
+      <span>Thông tin doanh nghiệp địa phương</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="accordion-body">
+
+      <div class="group-label">Địa chỉ</div>
+      <div class="field"><label>Số nhà / Đường</label><input type="text" value="123 Jalan Bukit Bintang"></div>
+      <div class="field"><label>Thành phố / Quận</label><input type="text" value="Kuala Lumpur"></div>
+      <div class="field"><label>Mã bưu điện</label><input type="text" value="55100"></div>
+      <div class="field"><label>Bang / Vùng liên bang</label><select><option>Kuala Lumpur / WP Kuala Lumpur</option></select></div>
+      <div class="field"><label>Quốc gia</label><input type="text" value="Malaysia" disabled></div>
+
+      <div class="group-label">Vị trí (toạ độ)</div>
+      <div class="field">
+        <label>Dán link Google Maps của bạn</label>
+        <input type="text" value="https://maps.app.goo.gl/xxxxx" style="margin-bottom:8px;">
+        <button class="btn full-btn">Trích toạ độ</button>
+      </div>
+
+      <div class="group-label">Giờ mở cửa</div>
+      <div class="hours-card">
+        <div class="day-row">Thứ 2 <label><input type="checkbox"> Đóng cửa</label></div>
+        <div class="time-row">
+          <div><label>Mở</label><input type="text" value="09:00"></div>
+          <div><label>Đóng</label><input type="text" value="18:00"></div>
+        </div>
+      </div>
+      <div class="hours-card">
+        <div class="day-row">Thứ 7 <label><input type="checkbox" checked> Đóng cửa</label></div>
+        <div class="time-row">
+          <div><label>Mở</label><input type="text" value="--:--" disabled></div>
+          <div><label>Đóng</label><input type="text" value="--:--" disabled></div>
+        </div>
+      </div>
+      <div class="hint">... T3–T6, CN theo cùng mẫu card ...</div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

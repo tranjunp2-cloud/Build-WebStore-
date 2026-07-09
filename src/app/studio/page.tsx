@@ -271,7 +271,7 @@ export default async function StudioDashboardPage() {
             <div className="page-head">
                 <div>
                     <h1 className="page-title">Dashboard</h1>
-                    <p className="page-sub">Tổng quan luồng template của Prime Web</p>
+                    <p className="page-sub">Tổng quan luồng template của Web Store</p>
                 </div>
                 <div className="page-actions">
                     <Link href="/studio/templates" className="btn btn-primary">

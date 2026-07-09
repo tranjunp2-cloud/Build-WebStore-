@@ -9,7 +9,7 @@ export const ContactConfigSchema = BaseBlockSchema.extend({
     submitLabel: z.string().optional(), phoneLabel: z.string().optional(), addressLabel: z.string().optional(), emailLabel: z.string().optional(),
     formFields: z.array(z.object({ label: z.string(), fieldName: z.string(), fieldType: z.string().default('text'), placeholder: z.string().optional(), required: z.boolean().default(false) })).default([]),
 })
-export const contactMeta = { type: 'contact' as const, name: 'Contact', description: 'Contact form and business info', icon: '📬', variants: ['form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline'], defaultVariant: 'form', editableFields: ['headline', 'email', 'phone', 'address', 'formFields'], quickActions: ['Add field', 'Change layout'], category: 'form' as const }
+export const contactMeta = { type: 'contact' as const, name: 'Contact', description: 'Contact form and business info', icon: '📬', variants: ['form', 'info-only', 'split', 'card-float', 'minimal-inline'], defaultVariant: 'form', editableFields: ['headline', 'email', 'phone', 'address', 'formFields'], quickActions: ['Add field', 'Change layout'], category: 'form' as const }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = ContactConfigSchema

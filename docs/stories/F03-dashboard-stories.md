@@ -107,7 +107,7 @@ THEN  empty state: icon + "Tạo website đầu tiên" + CTA → /onboarding
 
 ```
 As a   site owner
-I want xem chi tiết traffic và pages hiệu quả nhất
+I want xem website activity bằng số liệu dễ hiểu
 So that tôi hiểu hành vi khách hàng
 ```
 
@@ -116,20 +116,20 @@ So that tôi hiểu hành vi khách hàng
 #### AC-1: Analytics View
 
 ```gherkin
-GIVEN user ở /dashboard/analytics
+GIVEN user ở `Dashboard > Analytics`
 WHEN  page load
-THEN  hiện Daily Bar Chart (theo Today, 7d, 30d)
-  AND hiện danh sách hạng mục hiệu quả nhất (chia tab hoặc list):
+THEN  hiện 4 stat cards: Visitors, Clicks, Orders, Sales
+  AND hiện Daily Bar Chart (theo Today, 7d, 30d)
+  AND hiện danh sách hạng mục hiệu quả nhất:
       - Top Pages (Lượt mở trang nhiều nhất)
       - Top Products (Sản phẩm được click nhiều nhất)
-      - Top Blogs (Bài blog nhiều page views nhất)
-  AND có so sánh % change so với kỳ trước đó
+  AND không hiển thị GA4/Search Console hoặc thuật ngữ kỹ thuật
 ```
 
 #### AC-2: Empty Data State
 
 ```gherkin
-GIVEN user ở /dashboard/analytics
+GIVEN user ở `Dashboard > Analytics`
 WHEN  chưa có dữ liệu tracking nào trong kỳ được chọn
 THEN  hiện empty state cho chart: "Chưa có dữ liệu trong khoảng thời gian này"
   AND giá trị các metrics đều là 0
@@ -138,7 +138,7 @@ THEN  hiện empty state cho chart: "Chưa có dữ liệu trong khoảng thời
 #### AC-3: API Failure
 
 ```gherkin
-GIVEN user đang ở /dashboard/analytics
+GIVEN user đang ở `Dashboard > Analytics`
 WHEN  fetch data bị lỗi (timeout hoặc server error)
 THEN  hiển thị toast error "Không thể tải dữ liệu Analytics"
   AND cho phép user nhấn "Thử lại"
@@ -429,7 +429,7 @@ THEN  instead of drag-and-drop, the user can reorder widgets using large native 
 
 ---
 
-## US-F03-08: Google API Integration & Domain Verification
+## US-F03-08: PostHog Analytics Integration
 
 **Wave 3** | **P0 🌟** | **L** | **Status:** Ready
 
@@ -437,33 +437,32 @@ THEN  instead of drag-and-drop, the user can reorder widgets using large native 
 
 ```
 As a   site owner trên hệ thống
-I want kết nối tự động tài khoản Google và Custom Domain
-So that tôi nhận được dữ liệu Analytics mà không cần copy paste HTML Code
+I want dashboard analytics tự động hoạt động trên platform subdomain
+So that tôi xem được traffic/clicks mà không cần tự cài GA4 hoặc Search Console
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: OAuth 2.0 Access Token
+#### AC-1: PostHog client tracking
 ```gherkin
 GIVEN user đang ở Dashboard nhưng chưa có Data
-WHEN  click "Kết nối"
-THEN  hệ thống mở OAuth Popup, hỏi quyền GSC và GA4
-  AND lưu trữ Access Token cấp Tenant vào Database
+WHEN  storefront nhận visitor/click events
+THEN  hệ thống gửi events vào PostHog
+  AND dashboard có thể đọc website traffic/click/funnel metrics
 ```
 
-#### AC-2: Auto Verification (Custom Domain)
+#### AC-2: Internal analytics fallback
 ```gherkin
-GIVEN user đã uỷ quyền Google thành công
-WHEN  user đổi Tên miền (Custom Domain)
-THEN  backend tự động xin chuỗi Hash qua Verification API
-  AND frontend Next.js tự động inject `<meta>` vào Header tên miền
-  AND backend ping Webmaster để verify Ownership trong nền
+GIVEN PostHog chưa có data hoặc query lỗi
+WHEN  user mở Dashboard hoặc Analytics Detail
+THEN  hệ thống fallback về `/api/analytics/track` + `analytics` collection nếu có data
+  AND UI không bị trắng
 ```
 
-#### AC-3: Fallback Rate Limit (Cache Database)
+#### AC-3: Empty state
 ```gherkin
-GIVEN user truy cập dữ liệu quá đà gây lỗi HTTP 429
-WHEN  hệ thống fetch data thất bại
-THEN  giao diện không bị trắng (crash)
-  AND hệ thống tự động đổ raw snapshot Data từ Redis Cache vào View hiển thị
+GIVEN cả PostHog và internal analytics đều chưa có data
+WHEN  user mở Dashboard hoặc Analytics Detail
+THEN  UI hiển thị empty state rõ ràng
+  AND không yêu cầu user tự connect GA4/Search Console
 ```

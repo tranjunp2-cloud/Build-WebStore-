@@ -89,7 +89,7 @@ export default buildConfig({
   email: process.env.MAIL_HOST
     ? nodemailerAdapter({
         defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
-        defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+        defaultFromName: process.env.MAIL_FROM_NAME || 'Web Store',
         transportOptions: {
           host: process.env.MAIL_HOST,
           port: parseInt(process.env.MAIL_PORT || '587'),
@@ -102,7 +102,7 @@ export default buildConfig({
       })
     : nodemailerAdapter({
         defaultFromAddress: 'noreply@primeweb.app',
-        defaultFromName: 'PrimeWeb',
+        defaultFromName: 'Web Store',
         // No SMTP configured — use stream transport (logs to console, no crash)
         transportOptions: {
           streamTransport: true,
@@ -168,6 +168,12 @@ export default buildConfig({
       // Remote DB (Neon): require valid SSL cert.
       // Local dev: no SSL needed.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: true } } : {}),
+      // Bumped 10 → 25 (2026-07-06) for QC beta event 200 concurrent users.
+      // Payload session pooling + Drizzle needs ~25 conns for 200 VU load test.
+      // Applied to all envs (QC + staging + prod) so staging load tests
+      // reproduce prod behaviour. Plan: plans/260706-1653-GH-02-.../plan.md
+      // (Validation Summary decision #3).
+      max: 25,
     },
     // Push schema only when explicitly requested to avoid expensive sync on every
     // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
