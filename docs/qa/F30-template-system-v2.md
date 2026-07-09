@@ -1080,7 +1080,85 @@
 
 ---
 
-## 8. Traceability Matrix
+## 8. Test Cases — GH-1465: Remove Google Maps Contact Block
+
+**Issue:** Contact block `map-split` variant embedded Google Maps iframes that resolved to incorrect locations (#1465).
+
+**Resolution:** `map-split` variant removed from Block Library + AI generator (Phase 01). Zod schema still accepts legacy content for backward compatibility; renders as `split` layout without iframe/embed.
+
+### TC-1465-01: Map-split excluded from meta variants and Pages contact options
+- **Priority:** P0
+- **Type:** Unit
+- **Issue Reference:** GH-1465
+- **Precondition:** `src/blocks/contact/config.ts` and `src/collections/Pages.ts` exist
+- **Steps:**
+  1. Import `contactMeta` from `src/blocks/contact/config.ts`
+  2. Assert `contactMeta.variants` does NOT include `'map-split'`
+  3. Import Pages.ts contact option config
+  4. Assert Pages.ts contact block variant options does NOT include `'map-split'` (picker hidden)
+- **Expected:** `map-split` not in either list; 5 variants only (form, info-only, split, card-float, minimal-inline)
+
+### TC-1465-02: ContactConfigSchema still accepts legacy map-split content
+- **Priority:** P1
+- **Type:** Unit
+- **Issue Reference:** GH-1465
+- **Precondition:** ContactConfigSchema Zod exists
+- **Steps:**
+  1. Import ContactConfigSchema
+  2. Call `ContactConfigSchema.safeParse({blockType: 'contact', variant: 'map-split', ...})`
+  3. Assert `result.success === true` (non-breaking, legacy content survives)
+- **Expected:** Legacy saved content with `variant: 'map-split'` remains Zod-valid
+
+### TC-1465-03: AI recipe pools exclude map-split for all categories
+- **Priority:** P1
+- **Type:** Unit
+- **Issue Reference:** GH-1465
+- **Precondition:** `src/lib/ai/openai-generator.ts` has `CATEGORY_VARIANT_WEIGHTS` and `src/lib/ai/category-requirements.ts` has `CONTACT_VARIANT_BY_CATEGORY`
+- **Steps:**
+  1. Import `CATEGORY_VARIANT_WEIGHTS` from openai-generator
+  2. For each category with a contact variant pool, assert `contact` pool does NOT include `'map-split'`
+  3. Import `CONTACT_VARIANT_BY_CATEGORY`
+  4. For each category, assert contact variant list does NOT include `'map-split'`
+- **Expected:** No category's contact recipe/pool includes `'map-split'`
+
+### TC-1465-04: Rendered map-split produces no iframe/embed, matches split layout
+- **Priority:** P0
+- **Type:** Component (render)
+- **Issue Reference:** GH-1465
+- **Precondition:** ContactBlock component exists, test setup from gold-standard `f21-localization.test.tsx`
+- **Steps:**
+  1. Render `<ContactBlock variant="map-split" address="123 Main St" {...requiredProps} />`
+  2. Query DOM for `<iframe>` elements → expect none
+  3. Query for `output=embed` or Google Maps embed patterns → expect none
+  4. Assert rendered output matches split layout structure (form + info card present)
+- **Expected:** No iframe/embed tag; split layout rendered without error
+
+### TC-1465-05: External Google Maps link still present in contact variants
+- **Priority:** P1
+- **Type:** Component (render)
+- **Issue Reference:** GH-1465
+- **Precondition:** ContactBlock with address field populated
+- **Steps:**
+  1. Render `<ContactBlock variant="split" address="123 Main St" {...requiredProps} />`
+  2. Query for anchor with `href="https://maps.google.com/?q=123 Main St"` and `target="_blank"`
+  3. Repeat for `variant="form"` and `variant="card-float"` with address
+- **Expected:** External "Open in Google Maps" link present in all variants with address; clicking opens new tab to Google Maps
+
+### TC-1465-06: Regression — remaining 5 variants render without throwing
+- **Priority:** P1
+- **Type:** Component (render)
+- **Issue Reference:** GH-1465
+- **Precondition:** ContactBlock component exists
+- **Steps:**
+  1. For each variant in ['form', 'info-only', 'split', 'card-float', 'minimal-inline']:
+     - Render `<ContactBlock variant={variant} address="123 Main St" {...requiredProps} />`
+     - Assert render completes without throwing
+     - Assert rendered output is not empty
+- **Expected:** All 5 variants render cleanly; no errors; output present
+
+---
+
+## 9. Traceability Matrix
 
 ### Sprint 1 ACs → Test Cases
 

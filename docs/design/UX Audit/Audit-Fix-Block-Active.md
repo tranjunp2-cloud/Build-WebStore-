@@ -753,6 +753,7 @@ Khi xong 1 block → cập nhật trạng thái + link PR/issue.
   | 3 | `split` | Form một bên, thông tin/địa chỉ một bên |
   | 4 | `card-float` | Form dạng card nổi có shadow trên nền |
   | 5 | `map-split` | Form một bên, bản đồ Google Maps một bên |
+  | | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. |
   | 6 | `minimal-inline` | Form nhỏ gọn inline — chỉ email + nút gửi |
 - **Bug phát hiện:**
   - [Variant `minimal-inline` / `split` / `form` lỗi layout chưa cân đối]
@@ -771,7 +772,7 @@ Khi xong 1 block → cập nhật trạng thái + link PR/issue.
     - Giữ consistent height cho input fields
   - [P1] Responsive fix
     - split → auto stack (column → row) trên mobile
-    - map-split → map xuống dưới form trên mobile
+    - ~~map-split → map xuống dưới form trên mobile~~ (N/A — map-split removed per #1465, no map rendered)
     - minimal-inline → luôn stack dọc trên small screen
   - [P2] UX cải thiện hiển thị
     - Form focus state rõ ràng (highlight border)
@@ -779,7 +780,7 @@ Khi xong 1 block → cập nhật trạng thái + link PR/issue.
     - Loading state khi submit form
   - [P2] CMS guard
     - Warning khi thiếu required field (email/phone/map config)
-    - Validate map API key cho map-split
+    - ~~Validate map API key cho map-split~~ (N/A — map-split removed per #1465, no map rendered)
   - [P2] Fallback
     - Nếu map fail → fallback sang info-only
     - Nếu form error → giữ UI nhưng disable submit (không crash layout)
