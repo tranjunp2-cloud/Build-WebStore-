@@ -626,7 +626,7 @@ export default function ProductsPage() {
                                             const cat = category.name;
                                             const isSelected = selectedCategories.includes(cat);
                                             return (
-                                                <label key={cat} className="flex items-center gap-[8px] cursor-pointer group min-h-[28px]"
+                                                <label key={category.id} className="flex items-center gap-[8px] cursor-pointer group min-h-[28px]"
                                                     onClick={(e) => { e.preventDefault(); setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]); }}>
                                                     {isSelected ? (
                                                         <div className="w-5 h-5 flex shrink-0 items-center justify-center rounded-[4px] bg-[hsl(var(--primary))] group-hover:opacity-80 transition-opacity">

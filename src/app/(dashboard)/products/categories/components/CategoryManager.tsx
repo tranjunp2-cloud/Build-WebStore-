@@ -15,7 +15,7 @@ import {
     AlertTriangle,
     FolderOpen,
     File,
-    ChevronLeft,
+    ArrowLeft,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -388,20 +388,26 @@ export default function CategoryManager() {
 
     return (
         <div className="w-full pb-12">
-            {/* Header */}
+            {/* Header — GH-1538: back arrow synced to Discount page style
+                (ArrowLeft icon-only, inline with title, no text label/underline link). */}
             <div className="flex flex-col gap-4 mb-6">
-                <Link href="/products" className="flex items-center gap-1 text-[hsl(var(--primary))] text-[13px] no-underline hover:underline w-fit">
-                    <ChevronLeft className="w-4 h-4" />
-                    {t.dashboard.products.categories.backToProducts || 'Products'}
-                </Link>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex flex-col">
-                        <h1 className="text-[24px] font-bold text-[var(--dash-text)] m-0 tracking-tight">
-                            {t.dashboard.products.categories.title || 'Category Management'}
-                        </h1>
-                        <p className="text-[14px] text-[var(--dash-text-muted)] mt-1 m-0">
-                            {t.dashboard.products.categories.subtitle || 'Manage product categories (up to 3 levels deep)'}
-                        </p>
+                    <div className="flex items-center gap-4 min-w-0">
+                        <Link
+                            href="/products"
+                            className="flex shrink-0 items-center justify-center text-foreground hover:text-foreground/80 transition-colors"
+                            title={t.dashboard.products.categories.backToProducts || 'Products'}
+                        >
+                            <ArrowLeft className="h-6 w-6" />
+                        </Link>
+                        <div className="flex flex-col">
+                            <h1 className="text-[24px] font-bold text-[var(--dash-text)] m-0 tracking-tight">
+                                {t.dashboard.products.categories.title || 'Category Management'}
+                            </h1>
+                            <p className="text-[14px] text-[var(--dash-text-muted)] mt-1 m-0">
+                                {t.dashboard.products.categories.subtitle || 'Manage product categories (up to 3 levels deep)'}
+                            </p>
+                        </div>
                     </div>
                     <Button
                         onClick={() => handleOpenForm()}
