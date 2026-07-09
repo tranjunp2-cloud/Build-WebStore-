@@ -1880,7 +1880,7 @@
                     "derivedMaxCompareLabel": "/ maks. banding",
                     "removeTierConfirmTitle": "Buang pilihan ini?",
                     "removeTierConfirmDesc": "Ini akan mengalih keluar semua varian yang mengandungi pilihan ini. Kombinasi yang tinggal akan dipelihara.",
-                    "autoFilledFromVariants": "Diisi secara automatik daripada varian — edit harga varian individu di bawah",
+                    "masterLockedTooltip": "Produk ini mempunyai varian — edit stok/harga pada setiap baris varian di bawah",
                     "removeTierConfirmBtn": "Buang",
                     "removeTierCancelBtn": "Batal",
                     "createSkuTable": "Jana varian",

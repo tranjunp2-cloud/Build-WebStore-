@@ -16,6 +16,7 @@ import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/produ
 interface VariantPayload {
     name: string
     price: number
+    compareAtPrice?: number
     sku: string
     stock: number
 }
@@ -189,16 +190,24 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             width: Number(prod.width) || 0,
             height: Number(prod.height) || 0
         },
-        variants: hasVariants ? safeVariants!.map(v => ({
-            name: sanitizeXSS(v.name || defaultVariantName),
-            price: Number(v.price || prod.price) || 0,
-            stock: coerceFiniteNumber(v.stock),
-            sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
-        })) : undefined,
+        variants: hasVariants ? safeVariants!.map(v => {
+            const variantPrice = Number(v.price || prod.price) || 0
+            // Fall back to the product-level compareAtPrice when the AI omits a per-variant
+            // one (the bulk-parse prompt only asks the AI for compareAtPrice at product level
+            // in some responses) — otherwise variants silently lose the "was" price entirely.
+            const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
+            return {
+                name: sanitizeXSS(v.name || defaultVariantName),
+                price: variantPrice,
+                compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+                stock: coerceFiniteNumber(v.stock),
+                sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
+            }
+        }) : undefined,
         // Server recomputes this as the sum of variant stocks for hasVariants products anyway
         // (Products.ts beforeChange hook overrides whatever is sent) — computed here too so the
         // payload is internally consistent with what the review drawer displayed (Stock there
-        // edits every variant uniformly; base "inventory" = sum, matching VariantsInventorySection's
+        // edits every variant uniformly; base "inventory" = sum, matching VariantOptionsSection's
         // `setValue('baseInventory', total)` convention in the manual Add/Edit Product form).
         inventory: hasVariants ? safeVariants!.reduce((sum, v) => sum + coerceFiniteNumber(v.stock), 0) : coerceFiniteNumber(prod.stock),
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
