@@ -34,7 +34,7 @@ describe('TC-F08-VAR-UTILS: isNonEmptyTier', () => {
 })
 
 // ── computeDuplicateIndicesForOptions ──────────────────────────────────────────
-// Covers the duplicate-value highlight logic in VariantsInventorySection.
+// Covers the duplicate-value highlight logic in VariantOptionsSection.
 // Critical: BOTH the first and subsequent occurrences must be included in the
 // returned Set so every conflicting input gets a red border, not just the second.
 
@@ -106,7 +106,7 @@ describe('F08-bug-1032-03: isNonEmptyTier AND-logic regression guard', () => {
 // and replaces rows that still match the last-generated base price.
 
 describe('F08-bug-1032-04: buildVariantMatrix preserve logic', () => {
-    const base = { price: 20, inventory: 5, sku: 'SKU' }
+    const base = { price: 20, inventory: 5, sku: 'SKU', compareAtPrice: 39 }
     const combos = [['Red', 'S'], ['Red', 'M']]
 
     it('F08-bug-1032-04a: row with user-customized price is preserved on re-generate', () => {
@@ -163,6 +163,122 @@ describe('F08-bug-1032-04: buildVariantMatrix preserve logic', () => {
         const redS = result.find(r => r.variantName === 'Red - S')!
         expect(redS.id).toBeTruthy()   // generated UUID, not undefined
         expect(redS.price).toBe(15)    // still preserved
+    })
+
+    // ── TC-F08-1525-50..52: compareAtPrice tracked independently from price ───
+    // Reported bug: regenerating silently reset a row's manually-edited compareAtPrice
+    // back to the master value whenever that row's PRICE happened to be unchanged —
+    // compareAtPrice customization piggybacked on the price-customized check instead
+    // of being tracked on its own.
+
+    it('TC-F08-1525-50: row compareAtPrice customized (differs from prevBaseCompareAtPrice) is preserved even when price is unchanged', () => {
+        // Arrange: "Red - M" price still matches prevBase(10) — falls into the
+        // "price not customized" path — but its compareAtPrice (35) differs from
+        // prevBaseCompareAtPrice (39), meaning the USER edited it independently.
+        const current = [
+            { variantName: 'Red - S', price: 10, compareAtPrice: 39, skuCode: 'SKU-RED-S', stock: 3 },
+            { variantName: 'Red - M', price: 10, compareAtPrice: 35, skuCode: 'SKU-RED-M', stock: 5 },
+        ]
+        const result = buildVariantMatrix(combos, base, current, 10, undefined, 39)
+
+        const redM = result.find(r => r.variantName === 'Red - M')!
+        const redS = result.find(r => r.variantName === 'Red - S')!
+        expect(redM.compareAtPrice).toBe(35)  // preserved — differs from prevBaseCompareAtPrice
+        expect(redS.compareAtPrice).toBe(base.compareAtPrice ?? undefined)  // unchanged → synced to base
+    })
+
+    it('TC-F08-1525-51: prevBaseCompareAtPrice=null (unknown baseline) → always preserves existing compareAtPrice', () => {
+        // Mirrors F08-bug-1032-04d's price behavior: first generate in an edit session
+        // (prevBaseCompareAtPrice unknown) must never wipe pre-existing customized data.
+        const current = [
+            { variantName: 'Red - S', price: 10, compareAtPrice: 99, skuCode: 'CUSTOM', stock: 1 },
+        ]
+        const result = buildVariantMatrix(combos, base, current, 10, undefined, null)
+        const redS = result.find(r => r.variantName === 'Red - S')!
+        expect(redS.compareAtPrice).toBe(99)
+    })
+
+    it('TC-F08-1525-52: new combo (no existing row) seeds compareAtPrice from base, independent of price-customization state', () => {
+        const result = buildVariantMatrix([['Blue', 'L']], base, [], 10, undefined, 39)
+        expect(result[0].compareAtPrice).toBe(base.compareAtPrice)
+    })
+
+    // ── TC-F08-1525-32: stock compounding regression (GH-1525 follow-up) ──────
+    // Reported: clicking "Generate variants" a 2nd time multiplied total stock by
+    // the variant count (32 → 128 → ...). Root cause: an existing row's price
+    // matching prevBasePrice took the "reset" branch, which used to reset `stock`
+    // to `base.inventory` too — and `base.inventory` is itself kept in sync as the
+    // SUM of all variant stocks by a separate effect in VariantOptionsSection, so
+    // every regenerate multiplied the total by the row count.
+
+    it('TC-F08-1525-32a: existing row stock is preserved on regenerate even when price matches prevBasePrice (reset branch)', () => {
+        // Arrange: base.inventory=32 mirrors a baseInventory field already inflated
+        // by the sum-sync effect after a prior generate; existing rows sit at 8 each
+        // (their real, user-visible stock) and price is unchanged from prevBase.
+        const inflatedBase = { price: 20, inventory: 32, sku: 'SKU' }
+        const current = [
+            { variantName: 'Red - S', price: 20, skuCode: 'SKU-RED-S', stock: 8 },
+            { variantName: 'Red - M', price: 20, skuCode: 'SKU-RED-M', stock: 8 },
+        ]
+
+        // Act: regenerate with prevBasePrice matching every row's price (reset branch)
+        const result = buildVariantMatrix(combos, inflatedBase, current, 20)
+
+        // Assert: stock stays at each row's own value — never overwritten by base.inventory
+        expect(result.find(r => r.variantName === 'Red - S')!.stock).toBe(8)
+        expect(result.find(r => r.variantName === 'Red - M')!.stock).toBe(8)
+    })
+
+    it('TC-F08-1525-32b: 4-row compounding scenario from GH-1525 bug report — sum stays stable across repeated regenerate', () => {
+        // Arrange: 4 variants at stock=8 each (sum=32, matches base.inventory after
+        // the sum-sync effect ran once) — mirrors the exact reported repro.
+        const fourCombos = [['Red', 'S'], ['Red', 'M'], ['Blue', 'S'], ['Blue', 'M']]
+        const base32 = { price: 100, inventory: 32, sku: 'KSU' }
+        const current = fourCombos.map(combo => ({
+            variantName: combo.join(' - '),
+            price: 100,
+            skuCode: `KSU-${combo.map(c => c.slice(0, 3).toUpperCase()).join('-')}`,
+            stock: 8,
+        }))
+
+        // Act: click "Generate variants" again (prevBasePrice=100 matches every row → reset branch)
+        const result = buildVariantMatrix(fourCombos, base32, current, 100)
+
+        // Assert: total stays 32 (8×4), not 128 (32×4) — no compounding
+        const total = result.reduce((sum, r) => sum + r.stock, 0)
+        expect(total).toBe(32)
+        result.forEach(r => expect(r.stock).toBe(8))
+    })
+
+    // ── TC-F08-1525-60..61: new-row stock default depends on first-generate vs. later ──
+    // Reported: "nếu product đã có variant và user muốn generate variant mới, stock của
+    // các variant mới phải là 0" — seeding a brand-new row from base.inventory is only
+    // correct on the very first generate (base.inventory is the user's typed seed value);
+    // once variants already exist, base.inventory is the auto-synced SUM of all variant
+    // stocks, so a new row inheriting it would be wildly inflated.
+
+    it('TC-F08-1525-60: first-ever generate (no prior variants) → new rows seed from base.inventory', () => {
+        const result = buildVariantMatrix([['Red', 'S'], ['Red', 'M']], base, [], null)
+        expect(result[0].stock).toBe(base.inventory)
+        expect(result[1].stock).toBe(base.inventory)
+    })
+
+    it('TC-F08-1525-61: product already has variants → a genuinely new combo defaults to stock=0, not base.inventory', () => {
+        // Arrange: product already has 2 variants (Red-S, Red-M) — base.inventory=32
+        // mirrors the auto-synced SUM after those were generated, not a real seed value.
+        const inflatedBase = { price: 20, inventory: 32, sku: 'SKU' }
+        const current = [
+            { variantName: 'Red - S', price: 20, skuCode: 'SKU-RED-S', stock: 16 },
+            { variantName: 'Red - M', price: 20, skuCode: 'SKU-RED-M', stock: 16 },
+        ]
+
+        // Act: user adds a new "L" combo and regenerates
+        const result = buildVariantMatrix([['Red', 'S'], ['Red', 'M'], ['Red', 'L']], inflatedBase, current, 20)
+
+        // Assert: existing rows keep their own stock; the new "Red - L" row starts at 0
+        expect(result.find(r => r.variantName === 'Red - S')!.stock).toBe(16)
+        expect(result.find(r => r.variantName === 'Red - M')!.stock).toBe(16)
+        expect(result.find(r => r.variantName === 'Red - L')!.stock).toBe(0)
     })
 })
 

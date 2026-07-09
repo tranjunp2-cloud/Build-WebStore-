@@ -15,6 +15,7 @@ import { getCategoriesAction, saveCategoryAction } from '@/app/(dashboard)/produ
 interface VariantPayload {
     name: string
     price: number
+    compareAtPrice?: number
     sku: string
     stock: number
 }
@@ -172,12 +173,20 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             width: Number(prod.width) || 0,
             height: Number(prod.height) || 0
         },
-        variants: hasVariants ? safeVariants!.map(v => ({
-            name: sanitizeXSS(v.name || defaultVariantName),
-            price: Number(v.price || prod.price) || 0,
-            stock: Number(v.stock ?? 0),
-            sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
-        })) : undefined,
+        variants: hasVariants ? safeVariants!.map(v => {
+            const variantPrice = Number(v.price || prod.price) || 0
+            // Fall back to the product-level compareAtPrice when the AI omits a per-variant
+            // one (the bulk-parse prompt only asks the AI for compareAtPrice at product level
+            // in some responses) — otherwise variants silently lose the "was" price entirely.
+            const compareAtPriceCandidate = v.compareAtPrice ?? prod.compareAtPrice
+            return {
+                name: sanitizeXSS(v.name || defaultVariantName),
+                price: variantPrice,
+                compareAtPrice: (compareAtPriceCandidate && Number(compareAtPriceCandidate) > variantPrice) ? Number(compareAtPriceCandidate) : null,
+                stock: Number(v.stock ?? 0),
+                sku: sanitizeXSS(v.sku || '').trim() || generateFallbackSku(`${safeName}-${v.name || defaultVariantName}`)
+            }
+        }) : undefined,
         inventory: 0, // Out of stock by default until the merchant confirms real stock; mapped to `inventory` in schema
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
     }

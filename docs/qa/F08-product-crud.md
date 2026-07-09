@@ -512,3 +512,131 @@ Added in phase-05 to lock in the P0 fixes from GH-1032.
 | **TC-F08-L2-01** | Variant row with price=undefined mid-edit → derivedMinPrice | treats undefined as 0 (null-check guard) | Manual |
 | **TC-F08-L3-01** | Save variant row with compareAtPrice=0 | DB receives undefined (filtered by \|\| undefined) | Manual / integration |
 
+## F) GH-1525 Product Detail + List UX fixes (TC-F08-1525-*)
+
+### Stock Display Helper — computeStockDisplay (pure function)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-01** | No variants → returns single inventory as label, isRange=false | label='15', breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-02** | Exactly 1 variant → single number with breakdown populated | label='8', breakdown=[{name, stock}] | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-03** | All variants equal stock → single number, isRange=false, breakdown populated | label='5', isRange=false | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-04** | Variants differ → range label "{min} - {max}", isRange=true | label='2 - 10', isRange=true | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-05** | String stock values coerced to number | min=3, max=7 numeric | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-06** | Range severity: max=0 → destructive | severity='destructive' | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-07** | Range severity: min=0 && max>0 → warning | severity='warning' | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-08** | Range severity: min>5 → success | severity='success' | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-09** | Empty variants array → returns single inventory as label | label='12', breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-15** | Missing inventory → defaults to 0, severity=destructive (renumbered — 10-14 claimed by master-fields-disable.test.tsx) | label='0', severity='destructive' | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-16** | Range severity: 0<min<=5 → warning | severity='warning' | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-17** | hasVariants=false (even with a populated variants array) → ignores variants, uses inventory | label='5', isRange=false, breakdown=null | src/__tests__/unit/products/stock-display.test.ts |
+| **TC-F08-1525-18** | Negative stock (corrupted/legacy data) clamped to 0, never rendered as false-healthy | severity≠'success', label uses 0 not negative | src/__tests__/unit/products/stock-display.test.ts |
+
+### MasterFieldsSection — Master fields disable/enable logic (React component)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-10** | No variants → all master fields visible + enabled (basePrice, compareAtPrice, baseInventory), no locked note | disabled=false, no locked note text | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+| **TC-F08-1525-11** | hasVariants=true + 1+ variants → price/compareAtPrice/inventory HIDDEN entirely (issue-1 update: hide, not disable), baseSku stays visible | 3 fields absent from DOM (`queryByDisplayValue` null), baseSku.disabled=false | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+| **TC-F08-1525-12** | Locked → single explanatory note replaces the 3 hidden fields (not per-field tooltip) | exactly 1 note element with locked-explainer text | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+| **TC-F08-1525-13** | Delete all variants → fields reappear, prior values retained (no reset) | fields back in DOM, disabled=false, values unchanged, note gone | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+| **TC-F08-1525-14** | hasVariants=true but empty variants → fields visible + enabled (toggle-on-before-generate) | disabled=false, no locked note | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+| **TC-F08-1525-70** | Code-review fix: dead "auto-filled from variants" note removed entirely (was shown exactly before auto-fill happens, hidden exactly when it does) | no "auto-filled" text in any state | src/__tests__/unit/dashboard/master-fields-disable.test.tsx |
+
+### Products List Stock Cell Rendering
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-20** | Single stock number → renders plain Badge with label | Badge visible, label='15' | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-21** | Range with breakdown → Tooltip wrapper + Badge + breakdown content visible | Tooltip trigger, breakdown list rendered | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-22** | Single variant (1 option) → single number badge, breakdown still populated | label='8', isRange=false, breakdown populated | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-23** | breakdown.length > 1 with range → Tooltip; breakdown.length === 1 → plain Badge | Conditional rendering logic verified | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-24** | ProductForm section order: MasterFieldsSection before VariantOptionsSection | Master section appears before Variant section in DOM | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+| **TC-F08-1525-42** | Breakdown popup visual polish (issue 4 follow-up): each row colored by its OWN stock severity, not the outer range severity | mixed rows (0/3/20 stock) → destructive/warning/success independently | src/__tests__/unit/dashboard/products-stock-cell.test.tsx |
+
+### baseSku Regen Post-Split (VariantOptionsSection)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-30** | baseSku prefix change (debounced 300ms) after matrix generated → SKU prefixes regenerate, suffixes preserved | 'SKU-001-RED/BLU' → 'NEWSKU-RED/BLU' | src/__tests__/unit/dashboard/variant-options-sku-regen.test.tsx |
+| **TC-F08-1525-30b** | Rapid baseSku edits within debounce window → only final value regenerates matrix | Intermediate 'MID' prefix never applied, only 'FINAL' | src/__tests__/unit/dashboard/variant-options-sku-regen.test.tsx |
+
+### MasterFieldsSection ↔ VariantOptionsSection Tier Sync (code-review fix)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-31** | Toggling hasVariants on (real Switch click, not seeded defaultValues) → first tier row appears in VariantOptionsSection | Exactly 1 tier row renders, no ghost/duplicate tier | src/__tests__/unit/dashboard/master-fields-tier-toggle-sync.test.tsx |
+
+### Stock Compounding on Repeated Generate (user-reported bug, GH-1525 follow-up)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-32a** | Regenerate with an existing row's price matching prevBasePrice (reset branch) → row's stock must NOT reset to base.inventory | stock stays at row's own value (8), not base.inventory (32) | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-32b** | 4-variant reported repro: stock=8×4 (sum=32) → click Generate again → total must stay 32, not jump to 128 | total=32 after regenerate, each row stays 8 | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+
+### AI-Generated Product: Variant compareAtPrice Fallback (user-reported bug, GH-1525 follow-up)
+
+Root cause: `products-bulk-parse`'s AI prompt only asked for `compareAtPrice` at the
+product level, never per variant — and `buildSavePayload`'s variant mapping didn't
+pass `compareAtPrice` through at all, even if the AI had provided one.
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-40** | Variant with no AI-provided compareAtPrice → falls back to product-level compareAtPrice | variant.compareAtPrice = product.compareAtPrice (390) | src/__tests__/unit/dashboard/bulk-create-utils.test.ts |
+| **TC-F08-1525-41a** | Variant-level compareAtPrice (when AI does provide one) takes priority over product-level fallback | variant.compareAtPrice = variant's own value, not product's | src/__tests__/unit/dashboard/bulk-create-utils.test.ts |
+| **TC-F08-1525-41b** | Fallback dropped when it would not exceed the variant's own (overridden) price | variant.compareAtPrice = null, not an invalid value | src/__tests__/unit/dashboard/bulk-create-utils.test.ts |
+| **TC-F08-1525-41c** | No product-level or variant-level compareAtPrice → null, not an error | variant.compareAtPrice = null | src/__tests__/unit/dashboard/bulk-create-utils.test.ts |
+
+### "Generate variants" Bar Visibility (user-requested UX, GH-1525 follow-up)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-43** | Insufficient tier info (empty name/options) → bar hidden | no "Generate variants" button in DOM | src/__tests__/unit/dashboard/variant-options-generate-bar-visibility.test.tsx |
+| **TC-F08-1525-44** | Sufficient info → bar visible; hides again after a successful generate | button visible before, hidden after click | src/__tests__/unit/dashboard/variant-options-generate-bar-visibility.test.tsx |
+| **TC-F08-1525-45** | Editing an option value after a successful generate re-shows the bar | button reappears once tiers no longer match the matrix | src/__tests__/unit/dashboard/variant-options-generate-bar-visibility.test.tsx |
+| **TC-F08-1525-46** | Code-review fix: edit-mode mount with pre-loaded variants matching tiers → bar hidden immediately, not shown by default | bar absent on mount (ref lazy-initialized from loaded state) | src/__tests__/unit/dashboard/variant-options-generate-bar-visibility.test.tsx |
+
+### compareAtPrice Tracked Independently From Price on Regenerate (user-reported bug, GH-1525 follow-up)
+
+Root cause: `buildVariantMatrix`'s "was this row customized" check only looked at
+`price`. A row's `compareAtPrice` customization piggybacked on that same check, so
+regenerating silently reset a manually-edited `compareAtPrice` back to the master
+value whenever the row's price happened to be unchanged.
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-50** | Row compareAtPrice customized (differs from prevBaseCompareAtPrice) → preserved even when price is unchanged | compareAtPrice stays at row's own value, not base | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-51** | prevBaseCompareAtPrice=null (unknown baseline, e.g. first generate in edit session) → always preserves existing compareAtPrice | compareAtPrice never wiped on unknown baseline | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-52** | New combo (no existing row) → seeds compareAtPrice from base, independent of price-customization state | compareAtPrice = base.compareAtPrice | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-53** | Component-level: lowering one row's compareAtPrice survives a real Generate-button regenerate triggered by adding a new option | edited row preserved, other rows track master | src/__tests__/unit/dashboard/variant-options-price-baseline-regen.test.tsx |
+
+### Regenerate Baseline Desync — "Spooky Action at a Distance" Price Reset (adversarial-review Critical fix)
+
+Root cause: the "auto-fill basePrice/compareAtPrice from variant matrix" effect (Bug 7)
+silently syncs the hidden master `basePrice`/`compareAtPrice` fields to min/max of all
+variants whenever ANY row's price changes — but never updated
+`lastGeneratedBasePriceRef`/`lastGeneratedCompareAtPriceRef`. Editing ONE row's price
+drifted the master field away from what the ref remembered; a LATER regenerate
+(triggered by an unrelated tier-option change) then compared *other, untouched* rows
+against the stale ref and silently reset their price to the drifted master value —
+real revenue-affecting data loss with zero warning, reachable through ordinary usage
+(edit a row → add an option → click the button the UI itself prompts you to click).
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-54** | Editing one row's price, then regenerating for an unrelated tier change → untouched row's price must NOT be reset | untouched row keeps its price; edited row keeps its edit | src/__tests__/unit/dashboard/variant-options-price-baseline-regen.test.tsx |
+
+### New-Variant Stock Defaults to 0 Once Product Already Has Variants (user-reported bug, GH-1525 follow-up)
+
+Root cause: a genuinely new row (no existing match) always seeded stock from
+`base.inventory`. On the FIRST-ever generate that's the user's typed seed value
+(correct), but once variants already exist, `base.inventory` is the auto-synced SUM
+of all variant stocks — so a new row (e.g. from adding an option) inherited a wildly
+inflated number instead of starting at 0.
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-60** | First-ever generate (no prior variants) → new rows still seed from base.inventory | stock = base.inventory (unchanged behavior) | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-61** | Product already has variants → a genuinely new combo defaults to stock=0, not the inflated base.inventory | new row stock=0; existing rows keep their own | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-62** | Component-level: real Generate-button click flow — first generate seeds 40 per row (Inventory=40), adding an option later → new row stock=0, not the inflated 80 | M/L stay 40, new XL row=0 | src/__tests__/unit/dashboard/variant-options-new-row-stock.test.tsx |
+

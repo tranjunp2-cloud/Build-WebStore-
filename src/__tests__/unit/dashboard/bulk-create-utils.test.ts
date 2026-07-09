@@ -148,6 +148,79 @@ describe('buildSavePayload [TC-F08-04-01]', () => {
         expect(payload.variants![0].stock).toBe(0)
     })
 
+    // ── TC-F08-1525-40..41: variant compareAtPrice fallback (GH-1525 follow-up) ──
+    // Reported: AI-generated products showed compareAtPrice at the product level
+    // (e.g. 390 vs price 300) but each variant row's Compare Price was blank —
+    // the bulk-parse AI prompt never asked for a per-variant compareAtPrice, and
+    // even if it had, buildSavePayload's variant map didn't pass it through at all.
+
+    it('TC-F08-1525-40: variant with no AI-provided compareAtPrice falls back to the product-level value', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'M', price: 300, sku: 'TS-M', stock: 0 },
+                { name: 'L', price: 300, sku: 'TS-L', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBe(390)
+        expect(payload.variants![1].compareAtPrice).toBe(390)
+    })
+
+    it('TC-F08-1525-41a: variant-level compareAtPrice (when AI does provide one) takes priority over the product-level fallback', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'XL', price: 300, compareAtPrice: 450, sku: 'TS-XL', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBe(450)
+    })
+
+    it('TC-F08-1525-41b: fallback compareAtPrice is dropped (null) when it would not exceed the variant\'s own price', () => {
+        // Variant price (500) overridden higher than the product-level compareAtPrice (390) —
+        // applying 390 as-is would violate the "compareAtPrice > price" invariant.
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            compareAtPrice: 390,
+            category: 'Fashion',
+            variants: [
+                { name: 'XL (premium)', price: 500, sku: 'TS-XL', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBeNull()
+    })
+
+    it('TC-F08-1525-41c: no product-level compareAtPrice and no variant-level one → null, not an error', () => {
+        const product = {
+            selected: true,
+            name: 'T-Shirt',
+            price: 300,
+            category: 'Fashion',
+            variants: [
+                { name: 'M', price: 300, sku: 'TS-M', stock: 0 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variants![0].compareAtPrice).toBeNull()
+    })
+
     it('TC-F08-04-34: marks the payload as pending AI review', () => {
         const product = {
             selected: true,

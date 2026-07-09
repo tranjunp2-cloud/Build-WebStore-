@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,7 +14,8 @@ import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { parseServerError, localizeFieldError } from '@/lib/products/server-errors'
 import { GeneralInfoSection } from './GeneralInfoSection'
-import { VariantsInventorySection } from './VariantsInventorySection'
+import { MasterFieldsSection } from './MasterFieldsSection'
+import { VariantOptionsSection } from './VariantOptionsSection'
 import { ShippingDimensionsSection } from './ShippingDimensionsSection'
 import { DescriptionSeoSection } from './DescriptionSeoSection'
 import { AttributesSection } from './AttributesSection'
@@ -187,9 +189,20 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
     if (!mounted) return null;
 
+    // Prevent the browser's native "submit form on Enter" behavior when the user is
+    // typing in a plain text/number field — pressing Enter while filling in any field
+    // (e.g. Price, SKU) should never silently trigger Save Draft/Save Changes.
+    // Scoped to <input> elements only: textareas (Description) keep Enter for
+    // newlines, and buttons/custom widgets are unaffected.
+    const handleFormKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            e.preventDefault()
+        }
+    }
+
     return (
         <FormProvider {...methods}>
-            <form onSubmit={methods.handleSubmit(onSubmit, onInvalid)} className="relative flex flex-col w-full">
+            <form onSubmit={methods.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="relative flex flex-col w-full">
                 
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
@@ -209,7 +222,11 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 {/* Form sections */}
                 <div className="flex flex-col gap-6 pb-24">
                     <GeneralInfoSection categories={categories} isEdit={isEdit} />
-                    <VariantsInventorySection />
+                    <div className="rounded-2xl border border-white/[0.08] bg-secondary/60 p-[25px] flex flex-col gap-6">
+                        <h2 className="text-[18px] font-semibold text-foreground leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.variants || 'Variants & Inventory'}</h2>
+                        <MasterFieldsSection />
+                        <VariantOptionsSection />
+                    </div>
                     <ShippingDimensionsSection />
                     <DescriptionSeoSection />
                     <AttributesSection />

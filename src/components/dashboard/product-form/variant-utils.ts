@@ -50,7 +50,12 @@ export type VariantRow = Required<Pick<VariantRowInput, 'variantName'>> & {
 
 /**
  * Builds the variant matrix from cartesian combinations.
- * Preserves a row only when the user customized its price (differs from prevBasePrice).
+ * Preserves a row's price only when the user customized it (differs from prevBasePrice),
+ * and independently preserves a row's compareAtPrice only when THAT was customized
+ * (differs from prevBaseCompareAtPrice) — price and compareAtPrice are tracked
+ * separately so editing one doesn't gate protection of the other (GH-1525 follow-up
+ * bug: regenerating silently overwrote a row's manually-edited compareAtPrice back to
+ * the master value whenever that row's price happened to be unchanged).
  * When prevBaseSku is provided, auto-generated SKUs (matching `${prevBaseSku}-${suffix}`)
  * are updated to use the new base.sku prefix; manually customized SKUs are preserved.
  */
@@ -60,6 +65,7 @@ export function buildVariantMatrix(
     currentVariants: VariantRowInput[],
     prevBasePrice: number | null,
     prevBaseSku?: string,
+    prevBaseCompareAtPrice?: number | null,
 ): VariantRow[] {
     return combinations.map((combo) => {
         const variantName = combo.join(' - ')
@@ -71,23 +77,53 @@ export function buildVariantMatrix(
         const resolveSku = (existingSku?: string) =>
             existingSku && existingSku !== autoSkuOld ? existingSku : newAutoSku
 
-        if (existing && (prevBasePrice === null || Number(existing.price) !== prevBasePrice)) {
+        // An existing row's stock is NEVER reset by (re)generate — only a genuinely new
+        // combo seeds a default. Regenerating used to overwrite every non-price-customized
+        // row's stock with `base.inventory`, which is itself kept in sync as the SUM of
+        // all variant stocks (see VariantOptionsSection's baseInventory-sync effect) — so
+        // each Generate click multiplied total stock by the variant count (GH-1525
+        // follow-up bug: "stock cộng dồn cực lớn").
+        //
+        // A brand-new row's default depends on whether the product already had variants
+        // BEFORE this generate call:
+        // - First-ever generate (currentVariants empty) → seed from base.inventory (the
+        //   value the user typed into Inventory before turning variants on — a real seed).
+        // - Product already has variants → base.inventory is the auto-synced SUM of all
+        //   existing stock, not a meaningful per-row seed, so a genuinely new row (e.g.
+        //   from adding an option to an existing matrix) starts at 0 (out of stock until
+        //   the merchant confirms — matches the AI bulk-create convention elsewhere).
+        const isFirstEverGenerate = currentVariants.length === 0
+        const stock = existing?.stock != null
+            ? Number(existing.stock)
+            : (isFirstEverGenerate ? base.inventory : 0)
+
+        if (!existing) {
             return {
-                id: existing.id || crypto.randomUUID(),
-                variantName: existing.variantName,
-                skuCode: resolveSku(existing.skuCode),
-                price: existing.price != null ? Number(existing.price) : base.price,
-                stock: existing.stock != null ? existing.stock : base.inventory,
-                compareAtPrice: existing.compareAtPrice ?? base.compareAtPrice,
+                id: crypto.randomUUID(),
+                variantName,
+                skuCode: resolveSku(undefined),
+                price: base.price,
+                stock,
+                compareAtPrice: base.compareAtPrice || undefined,
             }
         }
+
+        // Price and compareAtPrice are tracked independently — a row can have its
+        // compareAtPrice customized without its price ever changing (or vice versa),
+        // so neither field's "was this customized" check may gate the other's.
+        // prevBasePrice/prevBaseCompareAtPrice === null (unknown baseline, e.g. first
+        // generate in an edit session) → always preserve, never wipe pre-existing data.
+        const priceCustomized = prevBasePrice === null || Number(existing.price) !== prevBasePrice
+        const existingCompare = existing.compareAtPrice != null ? Number(existing.compareAtPrice) : undefined
+        const compareCustomized = prevBaseCompareAtPrice == null || existingCompare !== prevBaseCompareAtPrice
+
         return {
-            id: existing?.id || crypto.randomUUID(),
-            variantName,
-            skuCode: resolveSku(existing?.skuCode),
-            price: base.price,
-            stock: base.inventory,
-            compareAtPrice: base.compareAtPrice || undefined,
+            id: existing.id || crypto.randomUUID(),
+            variantName: existing.variantName,
+            skuCode: resolveSku(existing.skuCode),
+            price: priceCustomized && existing.price != null ? Number(existing.price) : base.price,
+            stock,
+            compareAtPrice: compareCustomized ? existingCompare : (base.compareAtPrice || undefined),
         }
     })
 }

@@ -1665,7 +1665,7 @@
                     "derivedMaxCompareLabel": "/ max compare",
                     "removeTierConfirmTitle": "Remove this option?",
                     "removeTierConfirmDesc": "This will remove all variants containing this option. Remaining combinations will be preserved.",
-                    "autoFilledFromVariants": "Auto-filled from variants — edit individual variant prices below",
+                    "masterLockedTooltip": "This product has variants — edit stock/price on each variant row below",
                     "removeTierConfirmBtn": "Remove",
                     "removeTierCancelBtn": "Cancel",
                     "createSkuTable": "Generate variants",
