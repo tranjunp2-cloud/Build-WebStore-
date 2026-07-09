@@ -171,7 +171,10 @@ function resolveNavCtaUrl(pages: string[]): string {
   return '/#contact'
 }
 
-function buildNavigation(
+// Exported for gen-page-split (gen-perf phase-09): the parallel-split path
+// injects this deterministic navigation on every page instead of letting GPT
+// write it — identical links guaranteed, ~200 output tokens saved per call.
+export function buildNavigation(
   biz: BusinessSample,
   pages: string[],
   category: string = 'business',
@@ -184,10 +187,15 @@ function buildNavigation(
     'about': i18n.navigation.about,
     'services': i18n.navigation.services,
     'contact': i18n.navigation.contact,
+    // gen-perf phase-09: split path passes '/blog' — label it properly
+    // instead of the capitalize fallback (which rendered a raw "/blog").
+    // "Blog" is the label across every locale seed (vi/ms/en/ja all use it).
+    'blog': 'Blog',
   }
   const links = pages.map((p) => {
     const slug = p === '/' ? '/' : p.replace(/^\/+/, '').toLowerCase()
-    const label = SLUG_LABELS[slug] ?? (p.charAt(0).toUpperCase() + p.slice(1))
+    // Capitalize fallback works on the SLASH-STRIPPED slug ('/team' → 'Team').
+    const label = SLUG_LABELS[slug] ?? (slug.charAt(0).toUpperCase() + slug.slice(1))
     return { label, url: p === '/' ? '/' : `/${slug}` }
   })
   return {

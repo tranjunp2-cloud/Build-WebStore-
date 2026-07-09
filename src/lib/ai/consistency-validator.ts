@@ -215,7 +215,9 @@ function checkRecipeAdherence(result: GenerationResult): ConsistencyWarning[] {
   for (const page of pagesOf(result)) {
     if (!page.isHomepage) continue
     const types = new Set(blocksOf(page).map((b) => b.blockType))
-    if (!types.has('nav')) {
+    // gen-perf phase-09 fix: the registered blockType is 'navigation' —
+    // checking 'nav' made this warning fire on EVERY ai-first gen (latent).
+    if (!types.has('navigation')) {
       warnings.push({ rule: 'C5', message: 'homepage missing nav block', page: page.title, block: 'nav' })
     }
     if (!types.has('hero')) {
