@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { applyTrackingUpdate } from '@/lib/shipping/easyparcel/apply-tracking-update'
+import { mapShipmentStatusCode, mapTrackingStatus } from '@/lib/shipping/easyparcel/status-map'
+import { echoWebhookPayload, reportWebhookAnomaly } from './report-webhook'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -95,6 +97,11 @@ export async function POST(req: Request) {
     // 5 = "Delivered"). ECH does not use EP's on-demand courier product, so these
     // payloads must never reach the shipment status mapper.
     const topic = typeof body.topic === 'string' ? body.topic : null
+
+    // Mirror the raw (PII-redacted) payload to Sentry for observation — the only way
+    // to see EP's real shape without Vercel log access. Gated by EASYPARCEL_WEBHOOK_DEBUG.
+    echoWebhookPayload(body, { topic })
+
     if (topic && topic.startsWith('ondemand')) {
         payload.logger.info({ topic }, '[ep-webhook] unsupported ondemand topic — skipped')
         return NextResponse.json({ received: true, matched: false, reason: 'unsupported_topic' })
@@ -133,11 +140,14 @@ export async function POST(req: Request) {
             )
             return NextResponse.json({ received: true, matched, reason: 'non_status_event' })
         }
-        // Keys-only log → calibrate the real EP payload shape without leaking PII
+        // Keys-only log → calibrate the real EP payload shape without leaking PII.
+        // Also surface to Sentry: on production this is the ONLY signal that EP's
+        // real payload shape differs from our tolerant parser (sandbox never fires).
         payload.logger.warn(
             { keys: Object.keys(body) },
             '[ep-webhook] payload missing awb/status — check EP schema',
         )
+        reportWebhookAnomaly('missing_fields', { topic, keys: Object.keys(body) })
         return NextResponse.json({ received: true, matched: false, reason: 'missing_fields' })
     }
 
@@ -146,6 +156,7 @@ export async function POST(req: Request) {
             { keys: Object.keys(body) },
             '[ep-webhook] payload missing awb/status — check EP schema',
         )
+        reportWebhookAnomaly('missing_fields', { topic, statusRaw: epStatus, keys: Object.keys(body) })
         return NextResponse.json({ received: true, matched: false, reason: 'missing_fields' })
     }
 
@@ -165,7 +176,18 @@ export async function POST(req: Request) {
         if (!order) {
             // 200 (not 404) — permanent mismatch must not trigger EP retry storms
             payload.logger.warn({ awb }, '[ep-webhook] no order matches AWB')
+            reportWebhookAnomaly('order_not_found', { topic, awb, statusRaw: epStatus })
             return NextResponse.json({ received: true, matched: false, reason: 'order_not_found' })
+        }
+
+        // Unknown status — EP sent a code/string outside our map. Surface it so an
+        // unmapped real code (e.g. a new EP status) doesn't silently become 'unknown'.
+        const mapped = typeof epStatus === 'number'
+            ? mapShipmentStatusCode(epStatus)
+            : mapTrackingStatus(epStatus)
+        if (mapped.internal === 'unknown') {
+            payload.logger.warn({ awb, epStatus }, '[ep-webhook] unmapped status code')
+            reportWebhookAnomaly('unknown_status', { topic, awb, statusRaw: epStatus })
         }
 
         // Courier free-text (topic tracking.update → latest_tracking_status) shown as the
