@@ -39,8 +39,15 @@ const SYSTEM_PROMPT = [
     'Return JSON {"keywords": ["term1", "term2"]} of 2-4 concrete visual',
     'image-search terms for a stock-photo search, in the SAME language as',
     'the business inputs below. Prefer concrete nouns/scenes over abstract',
-    'words. Each term should be short (1-3 words).',
+    // 1-2 words per term: merged terms are space-joined into ONE AND-matched
+    // Pixabay query — longer terms make the query too specific (zero hits).
+    'words. Each term must be short (1-2 words).',
 ].join(' ')
+
+/** Truncate a keyword to at most `max` whitespace-separated words. */
+function capWords(term: string, max: number): string {
+    return term.split(/\s+/).slice(0, max).join(' ')
+}
 
 /**
  * Extract 2-4 short, concrete visual keywords from business info via a cheap
@@ -88,7 +95,10 @@ export async function extractImageKeywords(
                 max_tokens: 120,
                 response_format: { type: 'json_object' },
             },
-            { timeout: 10000 }, // fail-fast — falls back to [] on timeout
+            // fail-fast — falls back to [] on timeout. maxRetries: 0 disables
+            // the SDK's default 2 retries; without it a degraded OpenAI turns
+            // the "10s" budget into ~30s+ at the head of the pool chain.
+            { timeout: 10000, maxRetries: 0 },
         )
 
         const content = completion.choices[0]?.message?.content
@@ -100,7 +110,9 @@ export async function extractImageKeywords(
 
         return rawKeywords
             .filter((k): k is string => typeof k === 'string' && k.trim().length > 0)
-            .map((k) => k.trim())
+            // Hard-cap each term at 2 words even if the model ignores the
+            // prompt — keeps the merged AND-matched Pixabay query answerable.
+            .map((k) => capWords(k.trim(), 2))
             .slice(0, 4)
     } catch (err) {
         console.warn(

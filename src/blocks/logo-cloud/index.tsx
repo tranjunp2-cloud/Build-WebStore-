@@ -49,10 +49,12 @@ function LogoFrame({ size, children }: { size: 'grid' | 'row'; children: ReactNo
 function computeMonogram(name?: string): string {
     const words = (name ?? '').trim().split(/\s+/).filter(Boolean)
     if (words.length === 0) return '?'
-    if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+    // Array.from splits by code point, not UTF-16 unit — string indexing would
+    // tear surrogate pairs (e.g. emoji-leading names) into broken half-chars.
+    if (words.length === 1) return Array.from(words[0]).slice(0, 2).join('').toUpperCase()
     return words
         .slice(0, 3)
-        .map((w) => w[0])
+        .map((w) => Array.from(w)[0])
         .join('')
         .toUpperCase()
 }

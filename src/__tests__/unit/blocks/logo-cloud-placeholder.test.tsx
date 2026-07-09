@@ -13,8 +13,11 @@ import React from 'react'
 // Mock next/image to avoid build errors in test env
 vi.mock('next/image', () => ({
     __esModule: true,
-    default: (props: any) => {
-        // Render a simple img tag for testing
+    default: ({ fill, priority, ...props }: any) => {
+        // Strip next/image boolean-only props (fill/priority) — spreading them
+        // onto <img> triggers React non-boolean-attribute warnings.
+        void fill
+        void priority
         return <img {...props} />
     },
 }))
