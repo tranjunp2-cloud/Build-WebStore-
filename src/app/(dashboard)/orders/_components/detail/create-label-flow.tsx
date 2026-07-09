@@ -94,7 +94,10 @@ export function CreateLabelFlow({
 
       if (!res.ok) {
         const code = data?.error?.code ?? 'EASYPARCEL_ERROR'
-        const msg = data?.error?.message ?? 'Failed to create shipping label'
+        // Coerce to string — a non-string message (e.g. a passthrough EP error object)
+        // rendered as a React child crashes the whole detail page.
+        const rawMsg = data?.error?.message
+        const msg = typeof rawMsg === 'string' ? rawMsg : 'Failed to create shipping label'
         if (code === 'COD_NOT_ELIGIBLE' && onCodBlocked) {
           // Live COD gate tripped (PD-021) — parent switches to the cod-blocked recovery panel
           setStep('idle')

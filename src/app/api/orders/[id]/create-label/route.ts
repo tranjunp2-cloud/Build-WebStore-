@@ -235,7 +235,45 @@ export const POST = withFeatureGuard('order_management')(withAuth<RouteContext>(
         // (courier generates the AWB asynchronously) — that is NOT a failure.
         if (!firstShipment || firstShipment.status !== 'success' || !firstShipment.shipment_number) {
             await releaseClaim()
-            const errMsg = firstShipment?.errors?.[0] ?? 'EasyParcel failed to create shipment'
+            // EP submit errors are NOT the documented string[] — verified sandbox 2026-07-09:
+            // a nested array of objects, e.g. errors = [[{message:"Insufficient Credit Balance",
+            // code:"InsufficientCreditBalance", data:{...}}]]. Flatten recursively to the first
+            // human message; anything non-string passed through crashed the client ("Objects are
+            // not valid as a React child") or degraded to the generic fallback.
+            const flattenEpError = (v: unknown): { message: string; code: string } | null => {
+                if (typeof v === 'string' && v.trim()) return { message: v, code: '' }
+                if (Array.isArray(v)) {
+                    for (const item of v) {
+                        const found = flattenEpError(item)
+                        if (found) return found
+                    }
+                    return null
+                }
+                if (v && typeof v === 'object') {
+                    const o = v as { message?: unknown; code?: unknown }
+                    if (typeof o.message === 'string' && o.message.trim()) {
+                        return { message: o.message, code: typeof o.code === 'string' ? o.code : '' }
+                    }
+                    return flattenEpError(o.message)
+                }
+                return null
+            }
+            const epErr = flattenEpError(firstShipment?.errors)
+            const errMsg = epErr?.message ?? 'EasyParcel failed to create shipment'
+            const errCode = epErr?.code ?? ''
+            // Raw errors logged whenever extraction misses — calibrates future unknown EP shapes.
+            if (!epErr && firstShipment?.errors) {
+                payload.logger.warn({ epErrors: firstShipment.errors }, '[create-label] unparsed EP error shape')
+            }
+            // Per-shipment "InsufficientCreditBalance" arrives as HTTP 200 + status:'error'
+            // (unlike the thrown wallet errors handled in the catch below) — route it to the
+            // same wallet-low code so the UI shows the Top Up panel instead of a generic error.
+            if (errCode === 'InsufficientCreditBalance' || errMsg.toLowerCase().includes('insufficient credit')) {
+                return NextResponse.json(
+                    { success: false, error: { code: 'EASYPARCEL_WALLET_LOW', message: 'Insufficient EasyParcel wallet balance. Please top up and try again.' } },
+                    { status: 402 },
+                )
+            }
             return NextResponse.json(
                 { success: false, error: { code: 'EASYPARCEL_ERROR', message: errMsg } },
                 { status: 502 },

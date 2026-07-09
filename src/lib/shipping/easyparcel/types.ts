@@ -148,7 +148,15 @@ export interface EpSubmitShipment {
     awb_urls_by_format?: { A4?: string; A5?: string; A6?: string }
     tracking_url?: string | null
     reference?: string
-    errors?: string[]
+    // Verified sandbox 2026-07-09: submit errors arrive as a NESTED array of objects, e.g.
+    // [[{message:"Insufficient Credit Balance", code:"InsufficientCreditBalance", data:{...}}]]
+    // (EP docs imply flat strings — reality differs). Consumers must flatten recursively
+    // (see create-label's flattenEpError). Union kept loose so every observed shape parses.
+    errors?: Array<
+        | string
+        | { message?: string; code?: string; data?: unknown }
+        | Array<string | { message?: string; code?: string; data?: unknown }>
+    >
 }
 
 export interface EpSubmitOrderResponse {
