@@ -78,7 +78,12 @@ function StatusDropdown({ status, disabled, onChange }: {
                             key={s}
                             type="button"
                             onClick={() => { onChange(s); setOpen(false) }}
-                            className={`w-full px-4 py-[10px] text-left text-sm transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-[var(--dash-text)]' : 'text-[var(--dash-text-muted)]'}`}
+                            className={cn(
+                                "w-full px-4 py-[10px] text-left text-sm transition-colors border-none cursor-pointer",
+                                s === status
+                                    ? "bg-[hsl(var(--primary)/0.1)] font-semibold text-[hsl(var(--primary))]"
+                                    : "bg-transparent text-[var(--dash-text-muted)] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
+                            )}
                         >
                             {statusLabels[s]}
                         </button>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
-import { POST as GenerateSitePOST } from '@/app/api/ai/generate-site/route'
+import { POST as GenerateSitePOST, canonicalizePageSlug } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
@@ -99,6 +99,32 @@ vi.mock('@/lib/subscriptions/feature-guard', () => ({
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
     generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
+}))
+
+// gen-perf Wave 1 (plan 260703-1341): capture after() callbacks so tests can
+// prove seeding is DEFERRED (scheduled, not awaited in-request) and then
+// invoke the captured tasks to assert post-response behavior. NextRequest/
+// NextResponse stay real via importOriginal.
+vi.mock('next/server', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    after: vi.fn(),
+}))
+
+// Seeder boundaries — the route schedules these via after(); mocked so tests
+// observe scheduling without running GPT/Pixabay work.
+vi.mock('@/lib/ai/seed-blog-posts', () => ({
+    seedBlogPosts: vi.fn().mockResolvedValue(0),
+    // Default: prep "failed" (null) → route takes the legacy after() seeding
+    // path, which keeps the W1 blog tests meaningful. Inline-path tests
+    // (TC-GENPERF-BI-*) override per-case.
+    prepareBlogPosts: vi.fn().mockResolvedValue(null),
+    persistBlogPosts: vi.fn().mockResolvedValue(3),
+}))
+vi.mock('@/lib/images/image-library-seeder', () => ({
+    seedImageLibraryForSite: vi.fn().mockResolvedValue({ hero: [], gallery: [], about: null, team: [], features: [] }),
+}))
+vi.mock('@/lib/sso/sso-api-client', () => ({
+    notifyStepComplete: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Mock AI Generator (SSE logic)
@@ -873,6 +899,233 @@ describe('AI Streaming APIs', () => {
             expect(json.products[0].name).toContain('Không API Key')
             
             process.env.OPENAI_API_KEY = prev
+        })
+    })
+
+    // ── gen-perf Wave 1 (plan 260703-1341, docs/qa/F01-gen-perf.md) ─────────
+    // Proves blog + imglib seeding are scheduled via next/server after() and
+    // never run inside the request. Mutation check: reverting route.ts to the
+    // old inline fire-and-forget makes W1-01 fail (seeder called in-request).
+    describe('TC-GENPERF-W1 — seeding deferred via after()', () => {
+        const genPerfReq = () =>
+            new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+        // Invoke every captured after() callback WITHOUT catching — every task
+        // the route schedules is contractually never-throw (.catch inside), so
+        // any rejection here is a real defect.
+        const runCapturedAfterTasks = async () => {
+            const { after } = await import('next/server')
+            for (const call of vi.mocked(after).mock.calls) {
+                await (call[0] as () => unknown)()
+            }
+        }
+        // Drain the event loop so any stray fire-and-forget chain (the mutant
+        // this suite guards against — dynamic import().then(seed)) gets a
+        // chance to run BEFORE the not-called assertions. Without this, an
+        // inline-fired seeder wouldn't have resolved yet and the deferral
+        // assertions would pass vacuously (verified by mutation test).
+        const drainEventLoop = async () => {
+            for (let i = 0; i < 25; i++) await new Promise((r) => setImmediate(r))
+        }
+
+        it('[TC-GENPERF-W1-01] imglib seeding scheduled via after(), not run in-request', async () => {
+            // Arrange
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { after } = await import('next/server')
+
+            // Act — full route call
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — response OK, seeder NOT called during the request
+            // (drain first: an inline-fired mutant only resolves after ticks)
+            expect(res.status).toBe(200)
+            await drainEventLoop()
+            expect(vi.mocked(seedImageLibraryForSite)).not.toHaveBeenCalled()
+            expect(vi.mocked(after)).toHaveBeenCalled()
+
+            // Post-response: captured after() tasks run the seeder exactly once
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-GENPERF-W1-02] blog seeding scheduled via after(), not run in-request', async () => {
+            // Arrange
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert
+            expect(res.status).toBe(200)
+            await drainEventLoop()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+        })
+
+        it('[TC-GENPERF-W1-05] seeder rejection is non-fatal — no captured task ever rejects', async () => {
+            // Arrange — both seeders blow up
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(seedImageLibraryForSite).mockRejectedValueOnce(new Error('imglib boom'))
+            vi.mocked(seedBlogPosts).mockRejectedValueOnce(new Error('blog boom'))
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — response unaffected; invoking tasks resolves (route wraps
+            // each in .catch), errors logged not propagated
+            expect(res.status).toBe(200)
+            await expect(runCapturedAfterTasks()).resolves.toBeUndefined()
+            expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+            errorSpy.mockRestore()
+            warnSpy.mockRestore()
+        })
+
+        it('[TC-GENPERF-W1-06] SSE done payload keys unchanged', async () => {
+            // Arrange
+            const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
+                method: 'POST',
+                body: JSON.stringify({
+                    businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' },
+                }),
+            })
+
+            // Act — read the REAL stream to the end and extract the done event
+            const res = await GenerateSitePOST(req)
+            const reader = res.body!.getReader()
+            let full = ''
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                full += new TextDecoder().decode(value)
+            }
+
+            // Assert — done event exists with the exact client-contract keys
+            const m = full.match(/event: done\ndata: (\{[^\n]*\})/)
+            expect(m).toBeTruthy()
+            expect(Object.keys(JSON.parse(m![1]!)).sort()).toEqual(
+                ['pageId', 'siteId', 'siteLanguage', 'siteName', 'timeMs', 'totalBlocks', 'totalPages'],
+            )
+        })
+
+        it('[TC-GENPERF-W1-07] after() unavailable → fallback executes seeding anyway', async () => {
+            // Arrange — simulate no-request-scope (after throws, e.g. Vitest/local)
+            const { after } = await import('next/server')
+            const { seedImageLibraryForSite } = await import('@/lib/images/image-library-seeder')
+            const { seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(after).mockImplementation(() => { throw new Error('after called outside request scope') })
+
+            try {
+                // Act
+                const res = await GenerateSitePOST(genPerfReq())
+
+                // Assert — route falls back to `void task()`: seeders still invoked
+                expect(res.status).toBe(200)
+                await vi.waitFor(() => {
+                    expect(vi.mocked(seedImageLibraryForSite)).toHaveBeenCalledTimes(1)
+                    expect(vi.mocked(seedBlogPosts)).toHaveBeenCalledTimes(1)
+                })
+            } finally {
+                vi.mocked(after).mockImplementation(() => undefined)
+            }
+        })
+
+        it('[TC-GENPERF-BI-01] prepared blog posts persist inline BEFORE done; legacy seeding unused', async () => {
+            // Arrange — prep finished during the GPT window
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([
+                { title: 'A', slug: 'a', content: '<p>a</p>', thumbnailId: 1 },
+                { title: 'B', slug: 'b', content: '<p>b</p>' },
+                { title: 'C', slug: 'c', content: '<p>c</p>' },
+            ])
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert — persisted IN-REQUEST (before any after() task runs)
+            expect(res.status).toBe(200)
+            expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+            expect(vi.mocked(persistBlogPosts).mock.calls[0]![1]).toHaveLength(3)
+            await runCapturedAfterTasks()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+        })
+
+        it('[TC-GENPERF-BI-02] tenant already has posts (prep []) → no persist, no legacy seeding', async () => {
+            // Arrange — regenerate case
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            vi.mocked(prepareBlogPosts).mockResolvedValueOnce([])
+
+            // Act
+            const res = await GenerateSitePOST(genPerfReq())
+
+            // Assert
+            expect(res.status).toBe(200)
+            await runCapturedAfterTasks()
+            expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
+            expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+        })
+
+        it('[TC-GENPERF-BI-03] prep still running at persist site → done not blocked; posts persist post-response', async () => {
+            // Arrange — prep unresolved when the route reaches the grace race;
+            // tiny grace so the pending branch fires deterministically
+            const { prepareBlogPosts, persistBlogPosts, seedBlogPosts } = await import('@/lib/ai/seed-blog-posts')
+            let resolvePrep: (v: Array<{ title: string; slug: string; content: string }>) => void = () => {}
+            vi.mocked(prepareBlogPosts).mockReturnValueOnce(new Promise((r) => { resolvePrep = r }))
+            process.env.GEN_BLOG_PREP_GRACE_MS = '50'
+
+            try {
+                // Act — response returns without waiting for prep
+                const res = await GenerateSitePOST(genPerfReq())
+
+                // Assert — nothing persisted in-request
+                expect(res.status).toBe(200)
+                expect(vi.mocked(persistBlogPosts)).not.toHaveBeenCalled()
+
+                // Prep finishes after the response → captured after() task persists
+                resolvePrep([
+                    { title: 'A', slug: 'a', content: '<p>a</p>' },
+                    { title: 'B', slug: 'b', content: '<p>b</p>' },
+                    { title: 'C', slug: 'c', content: '<p>c</p>' },
+                ])
+                await runCapturedAfterTasks()
+                expect(vi.mocked(persistBlogPosts)).toHaveBeenCalledTimes(1)
+                expect(vi.mocked(seedBlogPosts)).not.toHaveBeenCalled()
+            } finally {
+                delete process.env.GEN_BLOG_PREP_GRACE_MS
+            }
+        })
+    })
+
+    describe('canonicalizePageSlug — trust canonical slug over title/content [GH-820 + dental /contact fix]', () => {
+        it('[TC-GENSLUG-01] keeps /contact even when the page title says "About" (would previously flip to /about)', () => {
+            // Nano filled the contact slot with About-ish content, but gen-page-split
+            // already validated + rewrote the slug to /contact. Title-first derivation
+            // used to override it back to /about → duplicate slug → /contact dropped.
+            const page = { title: 'Giới Thiệu Về Chúng Tôi (About)', slug: '/contact', blocks: [{ blockType: 'about' }] }
+            expect(canonicalizePageSlug(page, 3)).toBe('/contact')
+        })
+
+        it('[TC-GENSLUG-02] trusts each canonical sub-page slug verbatim', () => {
+            expect(canonicalizePageSlug({ title: 'x', slug: '/about', blocks: [] }, 1)).toBe('/about')
+            expect(canonicalizePageSlug({ title: 'x', slug: '/services', blocks: [] }, 2)).toBe('/services')
+            expect(canonicalizePageSlug({ title: 'x', slug: '/blog', blocks: [] }, 4)).toBe('/blog')
+        })
+
+        it('[TC-GENSLUG-03] still normalizes an ARBITRARY invented slug via title (GH-820 preserved)', () => {
+            // slug "free-trial" is NOT canonical → title-based derivation runs → /contact
+            expect(canonicalizePageSlug({ title: 'Contact Us', slug: '/free-trial', blocks: [] }, 3)).toBe('/contact')
+        })
+
+        it('[TC-GENSLUG-04] homepage always "/" regardless of slug', () => {
+            expect(canonicalizePageSlug({ title: 'Home', slug: '/about', isHomepage: true, blocks: [] }, 0)).toBe('/')
         })
     })
 

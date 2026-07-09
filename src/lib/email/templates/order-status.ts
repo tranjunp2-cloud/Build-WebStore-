@@ -58,7 +58,7 @@ const STATUS_EMOJIS: Record<OrderStatus, string> = {
 }
 
 export function orderStatusEmail(data: OrderStatusEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
-    const { customerName, orderNumber, status, trackingNumber, trackingUrl, storeName = 'PrimeWeb', locale = 'en' } = data
+    const { customerName, orderNumber, status, trackingNumber, trackingUrl, storeName = 'Web Store', locale = 'en' } = data
     const base = (locales[locale] || locales.en).status
     const vars = { customerName, orderNumber }
     const t = mergeTemplateConfig(base, config ?? null, vars, {

@@ -203,8 +203,12 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
         router.push('/discounts')
     }
 
+    // GH-1538 review (levietducprime): pb-14 (56px) < save-bar footprint
+    // (~50px bar + bottom-4) — could clip the last field when the fixed
+    // bar is showing and the page is scrolled to bottom. Matches pb-24
+    // already used by ProductForm/customers-detail/shipping.
     return (
-        <div className="flex flex-col min-h-0 pb-14">
+        <div className="flex flex-col min-h-0 pb-24">
             <DiscountFormHeader
                 isNew={isNew}
                 code={discount?.code}
@@ -221,9 +225,9 @@ export function DiscountForm({ discount, tenantName }: DiscountFormProps) {
                 onRevert={handleRevert}
             />
 
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+            <div className="pt-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div
-                    className="rounded-lg border p-6"
+                    className="rounded-lg border border-solid p-6"
                     style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
                     <DiscountFormFields

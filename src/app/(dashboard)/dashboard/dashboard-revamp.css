@@ -1425,8 +1425,9 @@ html[data-period-pending="1"] .dash-revamp .stream {
   transform: translateX(-50%);
   width: max-content;
   max-width: 260px;
-  background: var(--dr-ink-1);
-  color: var(--dr-canvas);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground) / 0.85);
+  border: 1px solid hsl(var(--border));
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.5;
@@ -1436,12 +1437,6 @@ html[data-period-pending="1"] .dash-revamp .stream {
   box-shadow: var(--dr-shadow-pop);
   z-index: 60;
   white-space: normal;
-}
-
-.dark .dash-revamp .help-tip[data-tip]:hover::after {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid var(--dr-line-1);
 }
 
 /* Status badges */

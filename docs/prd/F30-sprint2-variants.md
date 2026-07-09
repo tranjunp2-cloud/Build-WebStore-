@@ -191,6 +191,7 @@ Each variant renders `ContactConfig` data shape (`headline`, `subtext`, `email`,
 |---|---|---|
 | C1 | `card-float` | Contact form inside a floating card with shadow, centered on a subtle gradient background. Contact info (email, phone, address) displayed as icon+text chips below the card. |
 | C2 | `map-split` | 2-column: left side is a map placeholder (or embedded map if `address` is provided), right side is the contact form. On mobile, map stacks above form. |
+| | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. |
 | C3 | `minimal-inline` | No card/container. Form fields displayed inline in a single row (name, email, message, submit button). Minimal styling — just bottom borders on inputs. Full-width section. |
 
 ### FR-08: Navigation Block — 3 New Variants (3 existing + 3 new = 6 total)
@@ -290,6 +291,8 @@ Each variant renders `NavigationConfig` data shape (`logoText`, `logo`, `links[]
 - **Given** a contact block with `variant: 'map-split'` and an `address` provided
 - **When** rendered on desktop
 - **Then** the left column shows a map placeholder with the address; the right column shows the contact form; on mobile (<=768px), the map stacks above the form
+
+> ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant.
 
 ### AC-14: Footer `mega-footer` variant renders with top band
 - **Given** a footer block with `variant: 'mega-footer'`
@@ -417,6 +420,7 @@ Each variant renders `NavigationConfig` data shape (`logoText`, `logo`, `links[]
 |---|---|---|---|
 | 29 | `card-float` | Floating card with shadow on gradient | `primaryColor` for submit button + card border |
 | 30 | `map-split` | Map placeholder + form side by side | `primaryColor` for map pin marker |
+| | | > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant. | |
 | 31 | `minimal-inline` | Single-row inline form fields | `primaryColor` for input focus border |
 
 ### 7.8 Navigation Block (3 new)
@@ -534,6 +538,8 @@ variant: z.enum([
 
 variants: ['form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline'],
 ```
+
+> ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant.
 
 ### 8.8 Navigation Config Updates
 

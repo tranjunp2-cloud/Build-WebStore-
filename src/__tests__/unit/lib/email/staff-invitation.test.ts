@@ -76,7 +76,7 @@ describe('staffInvitationEmail [TC-F19]', () => {
             userName: 'John',
             workspaceName: 'My Shop',
         })
-        expect(result.html).toContain('PrimeWeb')
+        expect(result.html).toContain('Web Store')
         expect(result.html).toContain('2026')
     })
 

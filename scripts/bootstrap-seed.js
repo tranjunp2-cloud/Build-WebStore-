@@ -48,7 +48,7 @@ async function bootstrapSeed(pool, env) {
           [
             account.email,
             account.label.split(' ')[0],
-            account.label.split(' ').slice(1).join(' ') || 'PrimeWeb',
+            account.label.split(' ').slice(1).join(' ') || 'Web Store',
           ],
         );
         const newId = result.rows[0].id;

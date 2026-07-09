@@ -12,8 +12,7 @@ if (typeof global.ResizeObserver === 'undefined') {
     }))
 }
 
-// IntersectionObserver is not implemented in jsdom — provide a no-op stub
-// (required by framer-motion AnimatedSection)
+// IntersectionObserver is not implemented in jsdom — provide a no-op stub for framer-motion
 if (typeof global.IntersectionObserver === 'undefined') {
     global.IntersectionObserver = vi.fn().mockImplementation(() => ({
         observe: vi.fn(),

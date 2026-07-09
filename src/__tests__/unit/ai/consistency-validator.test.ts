@@ -35,7 +35,9 @@ function heroBlock(headline = 'Short headline', image = 'https://images.unsplash
   return { blockType: 'hero', headline, subheadline: 'Sub copy', image } as GeneratedBlock
 }
 function navBlock(): GeneratedBlock {
-  return { blockType: 'nav' } as GeneratedBlock
+  // gen-perf phase-09: C5 now checks the REAL registered blockType
+  // ('navigation'); the old 'nav' literal never matched anything in prod.
+  return { blockType: 'navigation' } as GeneratedBlock
 }
 function footerBlock(): GeneratedBlock {
   return { blockType: 'footer' } as GeneratedBlock

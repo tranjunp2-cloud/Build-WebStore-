@@ -191,6 +191,7 @@ Result: bot believes it succeeded; no row created; no email sent
 ### 10.1 Public Contact Form (storefront)
 
 - **Surface:** Contact block (`src/blocks/contact/index.tsx`), 6 variants (form / info-only / split / card-float / map-split / minimal-inline)
+  > ⚠️ Removed 2026-07-09 from Block Library + AI gen per #1465 (Google Maps embed resolved wrong location). Retained only as legacy render-as-split; not a selectable variant.
 - **Fields:** name, email, phone (optional), message + hidden honeypot `website`
 - **States:** idle / loading (spinner) / success (reset + thank-you) / error (per-field + form-level message)
 - **Detail:** see [design doc](../design/F25-contact-submissions-design.md)

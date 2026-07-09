@@ -85,7 +85,7 @@
             "label": "Platform",
             "title": "One platform to run your business",
             "titleHighlight": "end-to-end",
-            "subtitle": "From attracting customers and closing sales to running internal operations — PrimeWeb helps you manage everything on a single system.",
+            "subtitle": "From attracting customers and closing sales to running internal operations — Web Store helps you manage everything on a single system.",
             "pillars": {
                 "website": {
                     "title": "Website & Sales",
@@ -100,7 +100,7 @@
                     "desc": "Department task management, standardised workflows, and operational performance monitoring."
                 }
             },
-            "cta": "Explore the PrimeWeb ecosystem"
+            "cta": "Explore the Web Store ecosystem"
         },
         "product": {
             "label": "Products",
@@ -317,7 +317,7 @@
             }
         },
         "why": {
-            "title": "Why choose PrimeWeb?",
+            "title": "Why choose Web Store?",
             "subtitle": "The leading AI website platform — pioneering AI-built sites with all-in-one marketing & sales.",
             "stats": {
                 "customers": {
@@ -419,7 +419,7 @@
         },
         "heroDemo": {
             "appSuite": "App suite",
-            "homeCrumb": "PrimeWeb · Home",
+            "homeCrumb": "Web Store · Home",
             "experienceTitle": "A professional website experience",
             "experienceDesc": "Built by AI in 5 minutes. Drag-and-drop edits, publish instantly.",
             "viewDetails": "View details",
@@ -495,7 +495,7 @@
         "step3Title": "Customize your site",
         "step3Subtitle": "Add your brand details to make it yours.",
         "welcome": {
-            "title": "Welcome to PrimeWeb",
+            "title": "Welcome to Web Store",
             "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
             "createStore": "Create My Store with AI",
             "skip": "Skip & Go to Dashboard",
@@ -663,49 +663,49 @@
     },
     "email": {
         "welcome": {
-            "subject": "Welcome to PrimeWeb! 🎉",
+            "subject": "Welcome to Web Store! 🎉",
             "heading": "Welcome! 🎉",
-            "subheading": "Welcome to PrimeWeb",
+            "subheading": "Welcome to Web Store",
             "greeting": "Hi {userName}",
-            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "body": "You're ready to create your first website with Web Store! Just describe your idea, and AI will help you build a professional website in minutes.",
             "stepsTitle": "Get started in 3 steps",
             "step1": "Describe the website you want to create",
             "step2": "Customize the content and design",
             "step3": "Publish and share!",
             "cta": "Get Started →",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "forgotPassword": {
-            "subject": "Reset your PrimeWeb password 🔐",
+            "subject": "Reset your Web Store password 🔐",
             "heading": "Password Reset",
             "subheading": "We received your reset request",
             "greeting": "Hi {userName}",
-            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "body": "We received a request to reset the password for your Web Store account. Click the button below to set a new password. This link will expire in 1 hour.",
             "cta": "Reset Password →",
             "fallback": "If the button doesn't work, copy and paste this link into your browser:",
             "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
             "ignore": "If you didn't request a password reset, no action is needed."
         },
         "otp": {
-            "subject": "Your PrimeWeb verification code 🔐",
+            "subject": "Your Web Store verification code 🔐",
             "heading": "Email Verification",
             "subheading": "Verify your identity to continue",
             "greeting": "Hi <strong>{userName}</strong>",
             "body": "Enter this code to verify your identity:",
             "expiry": "This code expires in 5 minutes",
             "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
-            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs",
+            "copyright": "© 2026 Web Store · Kuala Lumpur, Malaysia"
         },
         "passwordChanged": {
-            "subject": "Your PrimeWeb password has been changed 🔐",
+            "subject": "Your Web Store password has been changed 🔐",
             "heading": "Password Changed",
             "subheading": "Your account password was updated",
             "greeting": "Hi {userName}",
-            "body": "Your PrimeWeb account password has been successfully changed.",
+            "body": "Your Web Store account password has been successfully changed.",
             "warning": "If you didn't make this change, contact your workspace admin immediately and reset your password.",
-            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+            "footer": "Powered by Web Store — AI Website Builder for Malaysian SMEs"
         },
         "order": {
             "subject": "Order Confirmed",
@@ -721,7 +721,7 @@
             "sst": "SST (6%)",
             "total": "Total",
             "shippingAddress": "Shipping Address",
-            "footer": "Powered by PrimeWeb",
+            "footer": "Powered by Web Store",
             "recipientInfoHeading": "Recipient Information",
             "fullName": "Full name",
             "phone": "Phone",
@@ -861,7 +861,7 @@
             "morning": "morning",
             "afternoon": "afternoon",
             "evening": "evening",
-            "welcomeTitle": "Welcome to PrimeWeb Dashboard",
+            "welcomeTitle": "Welcome to Web Store Dashboard",
             "welcomeSubtitle": "Monitor your store performance and manage your online business from one place.",
             "pendingLabel": "Pending",
             "itemsLabel": "items",
@@ -1831,7 +1831,7 @@
         },
         "customers": {
             "title": "Contact Leads",
-            "subtitle": "Contact form submissions & newsletter subscribers",
+            "subtitle": "Track and manage customer inquiries submitted through your website forms.",
             "searchPlaceholder": "Search by name or email…",
             "sourceAll": "All Sources",
             "sourceContact": "Contact Form",
@@ -2032,7 +2032,7 @@
                 "failSaveSettings": "Failed to save settings",
                 "failClearQR": "Failed to clear QR image setting.",
                 "stripeConnectTitle": "Connect a Stripe account to start accepting Card & FPX",
-                "stripeConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "stripeConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "stripeConnectCta": "Connect Stripe Account",
                 "stripeStep1": "Click \"Connect Stripe Account\"",
                 "stripeStep2": "Enter your Stripe credentials",
@@ -2103,7 +2103,7 @@
                 "xenditSectionTitle": "Xendit Payment Methods",
                 "xenditPoweredBy": "Powered by Xendit Checkout",
                 "xenditConnectTitle": "Connect a Xendit account to accept Malaysian payments",
-                "xenditConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
+                "xenditConnectDesc": "Funds settle straight into your linked bank account — Web Store never touches them. Manual methods below keep working while you set this up.",
                 "xenditConnectCta": "Connect Xendit Account",
                 "xenditConnecting": "Redirecting to Xendit...",
                 "xenditStep1": "Click \"Connect Xendit Account\"",
@@ -2126,7 +2126,7 @@
                 "xenditCallbackTokenStep3": "Copy the token and paste here",
                 "xenditSaveBtn": "Save Xendit connection",
                 "xenditModalTitle": "Connect your Xendit Account",
-                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Prime Web. Card, FPX & E-Wallets unlock as soon as we verify.",
+                "xenditModalSubtitle": "Paste your Xendit credentials below to link your account with Web Store. Card, FPX & E-Wallets unlock as soon as we verify.",
                 "xenditConnectAccountBtn": "Connect Account",
                 "xenditWebhookConfirmTitle": "Register ECH as your webhook receiver",
                 "xenditWebhookConfirmDesc": "ECH will register itself as the Invoice webhook endpoint on your Xendit account. If another system is currently receiving Xendit Invoice webhooks from this account, it will stop receiving them.",
@@ -2547,6 +2547,7 @@
                 "titleMaxLength": "Title must be less than 255 characters",
                 "slugInvalid": "Slug can only contain lowercase letters, numbers, and hyphens",
                 "urlSlugLabel": "URL Slug (auto-generated, editable)",
+                "slugLockedHint": "Locked because this post is published — changing the URL breaks existing links and search rankings.",
                 "thumbnailLabel": "Featured Thumbnail",
                 "replace": "Replace",
                 "clickToUpload": "Click to upload thumbnail",

@@ -4,7 +4,7 @@ import { ContactConfigSchema, contactMeta } from '@/blocks/contact/config'
 // ── TC-S2-013: Contact Block Variants ───────────────────────────────────────
 
 const CONTACT_VARIANTS = [
-    'form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline',
+    'form', 'info-only', 'split', 'card-float', 'minimal-inline',
 ] as const
 
 const minimalContactConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -19,7 +19,7 @@ const minimalContactConfig = (overrides: Record<string, unknown> = {}) => ({
 
 describe('[TC-S2-013] Contact Block Variants', () => {
     describe('Config Schema', () => {
-        it('validates all 6 variants', () => {
+        it('validates all 5 variants', () => {
             for (const v of CONTACT_VARIANTS) {
                 const result = ContactConfigSchema.safeParse(minimalContactConfig({ variant: v }))
                 expect(result.success, `variant '${v}' should be valid`).toBe(true)
@@ -70,8 +70,8 @@ describe('[TC-S2-013] Contact Block Variants', () => {
     })
 
     describe('Meta', () => {
-        it('has exactly 6 variants', () => {
-            expect(contactMeta.variants).toHaveLength(6)
+        it('has exactly 5 variants', () => {
+            expect(contactMeta.variants).toHaveLength(5)
         })
 
         it('variants match schema enum', () => {

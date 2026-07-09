@@ -187,7 +187,7 @@ describe('F18 CMS Core Layout', () => {
         it('[TC-F18.07] Logo routes to /dashboard', () => {
             render(<TopHeader {...defaultProps} />)
             
-            const logoLink = screen.getByRole('link', { name: /PrimeWeb Logo/i })
+            const logoLink = screen.getByRole('link', { name: /Web Store Logo/i })
             expect(logoLink).toHaveAttribute('href', '/dashboard')
         })
 

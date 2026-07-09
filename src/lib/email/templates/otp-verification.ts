@@ -1,6 +1,6 @@
 /**
  * OTP Verification email HTML template.
- * Sent when a user needs to verify identity via 2FA on PrimeWeb.
+ * Sent when a user needs to verify identity via 2FA on Web Store.
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  *
  * Design: Teal gradient header · White card body · Teal OTP box · Amber notice · Light footer
@@ -22,15 +22,15 @@ interface OTPEmailOptions {
 
 export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEmailOptions, config?: EmailTemplateConfig) {
     const base = (locales[locale] || locales.en).otp || {
-        subject: 'Your PrimeWeb verification code 🔐',
+        subject: 'Your Web Store verification code 🔐',
         heading: 'Email Verification',
         subheading: 'Verify your identity to continue',
         greeting: 'Hi',
         body: 'Enter this code to verify your identity:',
         expiry: 'This code expires in 5 minutes',
         security: "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
-        footer: 'Powered by PrimeWeb — AI Website Builder for Malaysian SMEs',
-        copyright: `© ${new Date().getFullYear()} PrimeWeb · Kuala Lumpur, Malaysia`,
+        footer: 'Powered by Web Store — AI Website Builder for Malaysian SMEs',
+        copyright: `© ${new Date().getFullYear()} Web Store · Kuala Lumpur, Malaysia`,
     }
     const vars = { userName, otpCode }
     const t = mergeTemplateConfig(base, config ?? null, vars, {
@@ -39,7 +39,7 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
         closing: 'footer',
     })
 
-    const subject = t.subject || 'Your PrimeWeb verification code 🔐'
+    const subject = t.subject || 'Your Web Store verification code 🔐'
 
     // Do not inject physical spaces otherwise Gmail mobile will wrap it. Use letter-spacing instead.
     const formattedOtp = otpCode

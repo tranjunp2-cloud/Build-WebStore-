@@ -399,64 +399,6 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
         )
     }
 
-    // ── Map Split variant ─────────────────────────────────────────────────
-    if (variant === 'map-split') {
-        return (
-            <ContactSection>
-                <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
-
-                {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
-                    {/* Map + Contact Info — mt-8 = CARD_PADDING.lg so card border aligns with "Name *" in GlassCard */}
-                    <div
-                        className="rounded-xl flex flex-col px-8 pb-8 overflow-hidden mt-8"
-                        style={{
-                            background: `rgba(var(--brand-primary-rgb), 0.04)`,
-                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                        }}
-                    >
-                        {address ? (
-                            <iframe
-                                title="Location map"
-                                src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-                                className="w-full rounded-b-lg mb-4 border-0 -mx-8"
-                                style={{ width: 'calc(100% + 4rem)', minHeight: '240px' }}
-                                loading="lazy"
-                                referrerPolicy="no-referrer-when-downgrade"
-                            />
-                        ) : (
-                            <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4 mt-8"
-                                style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
-                                aria-hidden="true"
-                            >
-                                <MapPin size={28} />
-                            </div>
-                        )}
-                        {address && <Body size="small" className="font-medium opacity-70">{address}</Body>}
-                        {email && (
-                            <Body size="small" className="opacity-50 mt-2">
-                                <Mail size={12} className="inline mr-1" style={{ color: 'var(--brand-primary)' }} aria-hidden="true" />
-                                {email}
-                            </Body>
-                        )}
-                        {phone && (
-                            <Body size="small" className="opacity-50 mt-1">
-                                <Phone size={12} className="inline mr-1" style={{ color: 'var(--brand-primary)' }} aria-hidden="true" />
-                                {phone}
-                            </Body>
-                        )}
-                    </div>
-
-                    {/* Contact form — GlassCard unchanged */}
-                    <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
-                    </GlassCard>
-                </div>
-            </ContactSection>
-        )
-    }
-
     // ── Minimal Inline variant ────────────────────────────────────────────
     // Compact py-8 layout, skip blob. Inline Send button gets TOUCH_TARGET.min.
     if (variant === 'minimal-inline') {
@@ -502,7 +444,8 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     }
 
     // ── Split variant ────────────────────────────────────────────────────
-    if (variant === 'split') {
+    // GH-1465: legacy map-split renders as split (Google Maps embed removed)
+    if (variant === 'split' || variant === 'map-split') {
         return (
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
