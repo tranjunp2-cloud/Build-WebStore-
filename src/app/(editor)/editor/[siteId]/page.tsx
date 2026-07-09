@@ -7,7 +7,7 @@ import { FileText, MessageCircle, Zap } from 'lucide-react'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { patchBlockCtaUrls, patchLocaleInitCtaUrls } from '@/lib/ai/patch-block-cta-urls'
 import { hasLocaleContent, resolveBlockContent, interpolateBrand } from '@/lib/ai/add-section-content'
-import { STRUCTURAL_BLOCK_FIELDS, splitStructuralChanges } from '@/lib/editor/structural-block-fields'
+import { STRUCTURAL_BLOCK_FIELDS, routeBlockChanges } from '@/lib/editor/structural-block-fields'
 import { resolveInitialActiveLocale } from '@/lib/detect-locale'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -1272,16 +1272,15 @@ export default function EditorPage() {
         // they ALWAYS write the flat block and never enter a locale slot. Routing them
         // through localeOverrides desynced canvas vs settings — e.g. picking the hero
         // "video" variant on a vi-generated site stored it only in overrides['vi'], so
-        // the next flat-block render silently reverted to the old variant.
-        const { structural, content } = splitStructuralChanges(changes)
-
-        // F-26 dual-write for content: locale override for editor display, plus the
-        // flat block when editing the language the flat blocks were AUTHORED in.
-        // That is generationLocale ('vi', 'el', …) — NOT Sites.locale, which is only
-        // the EN/MS translation slot and can never equal 'vi', so comparing against
-        // it skipped the flat write for every native-language edit on vi/el sites.
-        const baseLocale = store.generationLocale || store.siteLocale || 'en'
-        const flatChanges = !blockId || activeLocale === baseLocale ? changes : structural
+        // the next flat-block render silently reverted to the old variant. The full
+        // decision (incl. the generationLocale base-language gate) lives in
+        // routeBlockChanges() so unit tests pin it.
+        const { flatChanges, contentOverride, purgeKeys } = routeBlockChanges(changes, {
+            hasBlockId: Boolean(blockId),
+            activeLocale,
+            generationLocale: store.generationLocale,
+            siteLocale: store.siteLocale,
+        })
 
         if (Object.keys(flatChanges).length > 0) {
             updateBlock(index, flatChanges)
@@ -1289,17 +1288,20 @@ export default function EditorPage() {
         if (blockId) {
             // Purge stale per-locale copies of structural keys (pre-fix sessions) so
             // they can't shadow the flat value in getDisplayBlock.
-            for (const key of Object.keys(structural)) store.clearLocaleOverrideField(blockId, key)
-            if (Object.keys(content).length > 0) {
+            for (const key of purgeKeys) store.clearLocaleOverrideField(blockId, key)
+            if (Object.keys(contentOverride).length > 0) {
                 // F-26: Store edit in localeOverrides so EN defaults (seeded by
                 // initLocaleFromBlock) never mask user content when switching locales.
-                setLocaleOverride(blockId, activeLocale, content)
+                setLocaleOverride(blockId, activeLocale, contentOverride)
             }
         }
 
         const updatedBlock = useEditorStore.getState().blocks[index]
-        const displayBlock = useEditorStore.getState().getDisplayBlock(updatedBlock)
-        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: displayBlock })
+        // Id-less blocks (pre-save) echo the RAW block: getDisplayBlock's template
+        // fallback for no-id blocks would overwrite the just-typed value with EN/MS
+        // locale defaults when editing on a non-base locale view.
+        const blockData = blockId ? useEditorStore.getState().getDisplayBlock(updatedBlock) : updatedBlock
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData })
         void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, setLocaleOverride, activeLocale, saveWithRetry])
 

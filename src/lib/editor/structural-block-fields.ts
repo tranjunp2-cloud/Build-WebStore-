@@ -41,3 +41,37 @@ export function stripStructuralFields(patch: Record<string, unknown>): Record<st
         Object.entries(patch).filter(([key]) => !STRUCTURAL_BLOCK_FIELDS.has(key)),
     )
 }
+
+export type BlockChangeRouting = {
+    /** Patch for the flat block — structural always; content too on the base locale or id-less blocks. */
+    flatChanges: Record<string, unknown>
+    /** Content patch for localeOverrides[blockId][activeLocale]; empty for id-less blocks. */
+    contentOverride: Record<string, unknown>
+    /** Structural keys to purge from every locale slot of the block. */
+    purgeKeys: string[]
+}
+
+/**
+ * Decide where a block edit is written. This is the heart of the variant-revert
+ * fix, extracted pure so tests can pin it:
+ *   - structural fields → flat block, always; purge stale per-locale copies
+ *   - content fields → locale override, plus the flat block when editing the
+ *     language the flat blocks were AUTHORED in. That base language is
+ *     generationLocale ('vi', 'el', …) — NOT Sites.locale, which only holds the
+ *     EN/MS translation slot and can never equal 'vi', so comparing against it
+ *     skipped the flat write for every native-language edit on vi/el sites.
+ *   - id-less blocks (pre-save) have no override slot → everything goes flat.
+ */
+export function routeBlockChanges(
+    changes: Record<string, unknown>,
+    ctx: { hasBlockId: boolean; activeLocale: string; generationLocale?: string; siteLocale?: string },
+): BlockChangeRouting {
+    const { structural, content } = splitStructuralChanges(changes)
+    const baseLocale = ctx.generationLocale || ctx.siteLocale || 'en'
+    const writeContentFlat = !ctx.hasBlockId || ctx.activeLocale === baseLocale
+    return {
+        flatChanges: writeContentFlat ? changes : structural,
+        contentOverride: ctx.hasBlockId ? content : {},
+        purgeKeys: ctx.hasBlockId ? Object.keys(structural) : [],
+    }
+}

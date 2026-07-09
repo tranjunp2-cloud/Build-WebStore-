@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useEditorStore, type BlockData } from '@/store/editorStore'
 import {
     STRUCTURAL_BLOCK_FIELDS,
+    routeBlockChanges,
     splitStructuralChanges,
     stripStructuralFields,
 } from '@/lib/editor/structural-block-fields'
@@ -93,23 +94,64 @@ describe('TC-F26-10-03: clearLocaleOverrideField purges a key from every locale 
     })
 })
 
-describe('TC-F26-10-04: regression — vi-native variant change survives a flat-block re-render', () => {
-    beforeEach(() => {
-        useEditorStore.getState().reset()
-        useEditorStore.getState().init('site-1', [heroBlock], {}, 'Test Site')
-        // vi-generated site: Sites.locale (en/ms slot) can never equal 'vi'
-        useEditorStore.setState({ activeLocale: 'vi', generationLocale: 'vi', siteLocale: 'en' })
+describe('TC-F26-10-04: routeBlockChanges — the gate that caused the variant revert', () => {
+    it('vi-native editing (activeLocale === generationLocale, Sites.locale stuck at en/ms): everything writes flat', () => {
+        // THE bug: the old gate compared activeLocale to Sites.locale ('en'/'ms' only),
+        // so 'vi' never matched and the flat write was skipped. The fixed gate compares
+        // to generationLocale — this exact ctx must route content to the flat block.
+        const routing = routeBlockChanges(
+            { variant: 'video', headline: 'Xin chào' },
+            { hasBlockId: true, activeLocale: 'vi', generationLocale: 'vi', siteLocale: 'en' },
+        )
+        expect(routing.flatChanges).toEqual({ variant: 'video', headline: 'Xin chào' })
+        expect(routing.contentOverride).toEqual({ headline: 'Xin chào' })
+        expect(routing.purgeKeys).toEqual(['variant'])
     })
 
-    it('after the fixed routing (flat write + override purge), display shows the new variant', () => {
-        const store = useEditorStore.getState()
-        // Simulate the fixed handleBlockUpdate routing for a structural change:
-        store.updateBlock(0, { variant: 'video' })
-        store.clearLocaleOverrideField('blk-1', 'variant')
+    it('non-base view (vi site edited on en tab): structural still flat, content only in override', () => {
+        const routing = routeBlockChanges(
+            { variant: 'video', headline: 'Hello' },
+            { hasBlockId: true, activeLocale: 'en', generationLocale: 'vi', siteLocale: 'en' },
+        )
+        expect(routing.flatChanges).toEqual({ variant: 'video' }) // no content leak into vi flat blocks
+        expect(routing.contentOverride).toEqual({ headline: 'Hello' })
+        expect(routing.purgeKeys).toEqual(['variant'])
+    })
+
+    it('missing generationLocale falls back to siteLocale for the base check', () => {
+        const routing = routeBlockChanges(
+            { headline: 'Hi' },
+            { hasBlockId: true, activeLocale: 'ms', generationLocale: '', siteLocale: 'ms' },
+        )
+        expect(routing.flatChanges).toEqual({ headline: 'Hi' })
+    })
+
+    it('id-less block (pre-save): everything flat, no override slot, no purge', () => {
+        const routing = routeBlockChanges(
+            { variant: 'video', headline: 'New' },
+            { hasBlockId: false, activeLocale: 'en', generationLocale: 'vi', siteLocale: 'en' },
+        )
+        expect(routing.flatChanges).toEqual({ variant: 'video', headline: 'New' })
+        expect(routing.contentOverride).toEqual({})
+        expect(routing.purgeKeys).toEqual([])
+    })
+
+    it('integration: applying the vi-native routing to the store survives a flat-block re-render', () => {
+        useEditorStore.getState().reset()
+        useEditorStore.getState().init('site-1', [heroBlock], {}, 'Test Site')
+        useEditorStore.setState({ activeLocale: 'vi', generationLocale: 'vi', siteLocale: 'en' })
+        // Stale pre-fix data: variant stuck in the vi slot
+        useEditorStore.getState().setLocaleOverride('blk-1', 'vi', { variant: 'centered' })
+
+        const routing = routeBlockChanges(
+            { variant: 'video' },
+            { hasBlockId: true, activeLocale: 'vi', generationLocale: 'vi', siteLocale: 'en' },
+        )
+        useEditorStore.getState().updateBlock(0, routing.flatChanges)
+        for (const key of routing.purgeKeys) useEditorStore.getState().clearLocaleOverrideField('blk-1', key)
 
         // The renderer path reads flat blocks — variant must be there, not in a slot.
         expect(useEditorStore.getState().blocks[0].variant).toBe('video')
-
         const display = useEditorStore.getState().getDisplayBlock(useEditorStore.getState().blocks[0])
         expect(display.variant).toBe('video')
     })
