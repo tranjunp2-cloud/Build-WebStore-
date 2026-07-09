@@ -4841,6 +4841,46 @@ const MIGRATIONS = [
     name: 'sso_step_events.idx_status_retry_created',
     sql: `CREATE INDEX IF NOT EXISTS sso_step_events_status_retry_created ON sso_step_events (status, retry_count, created_at);`,
   },
+  // GH-1333: F36 EasyParcel Delivery Integration
+  { name: 'orders.shipping_courier', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier varchar;` },
+  { name: 'orders.shipping_service_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_service_id varchar;` },
+  { name: 'orders.awb_no', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS awb_no varchar;` },
+  { name: 'orders.awb_no_idx', sql: `CREATE INDEX IF NOT EXISTS orders_awb_no_idx ON orders (awb_no);` },
+  { name: 'orders.easy_parcel_order_no', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS easy_parcel_order_no varchar;` },
+  { name: 'orders.label_url', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_url text;` },
+  { name: 'orders.shipping_tracking_status', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_tracking_status varchar;` },
+  { name: 'orders.shipping_tracking_status_idx', sql: `CREATE INDEX IF NOT EXISTS orders_shipping_tracking_status_idx ON orders (shipping_tracking_status);` },
+  { name: 'orders.shipping_tracking_last_updated', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_tracking_last_updated timestamp with time zone;` },
+  { name: 'orders.parcel_weight', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS parcel_weight integer;` },
+  { name: 'orders.cod_amount', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS cod_amount integer;` },
+  { name: 'orders.cod_status', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS cod_status varchar;` },
+  { name: 'orders.shipping_tracking_history.create_table', sql: `CREATE TABLE IF NOT EXISTS orders_shipping_tracking_history (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+    status varchar,
+    description text,
+    event_time timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+  );` },
+  { name: 'orders.shipping_tracking_history.idx_parent', sql: `CREATE INDEX IF NOT EXISTS orders_shipping_tracking_history_parent_idx ON orders_shipping_tracking_history (_parent_id);` },
+  { name: 'tenants.easy_parcel_integration_enabled', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_enabled boolean DEFAULT false;` },
+  { name: 'tenants.easy_parcel_integration_api_key', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_api_key varchar;` },
+  { name: 'tenants.easy_parcel_integration_auth_key', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_auth_key varchar;` },
+  { name: 'tenants.easy_parcel_integration_detected_env', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_detected_env varchar;` },
+  { name: 'tenants.easy_parcel_integration_warehouse', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_warehouse jsonb;` },
+  { name: 'tenants.easy_parcel_integration_selected_courier', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_selected_courier varchar DEFAULT 'flash';` },
+  { name: 'tenants.easy_parcel_integration_selected_couriers', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_selected_couriers jsonb;` },
+  { name: 'tenants.easy_parcel_integration_tested_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_tested_at timestamp with time zone;` },
+  { name: 'tenants.easy_parcel_integration_access_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_access_token varchar;` },
+  { name: 'tenants.easy_parcel_integration_refresh_token', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_refresh_token varchar;` },
+  { name: 'tenants.easy_parcel_integration_token_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_expires_at timestamp with time zone;` },
+  { name: 'tenants.easy_parcel_integration_token_refresh_expires_at', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_token_refresh_expires_at timestamp with time zone;` },
+  { name: 'tenants.easy_parcel_integration_account_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_name varchar;` },
+  { name: 'tenants.easy_parcel_integration_account_email', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_account_email varchar;` },
+  { name: 'tenants.easy_parcel_integration_warehouses', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS easy_parcel_integration_warehouses jsonb;` },
   // GH-1293: dedupe pre-existing (user_id, step) duplicates before adding the unique
   // index below — keeps 'completed' first if present in the group, else latest updated_at.
   // Must run before sso_step_events.user_step_uniq (order matters in this array).
@@ -4881,6 +4921,15 @@ const MIGRATIONS = [
     name: 'orders.locale',
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS locale varchar;`,
   },
+  // ── GH-1333 F36: order detail redesign — self-delivery + pickup schedule ──
+  { name: 'orders.self_delivery_courier', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS self_delivery_courier varchar;` },
+  { name: 'orders.pickup_scheduled_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_scheduled_at timestamp with time zone;` },
+  { name: 'orders.pickup_slot', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot varchar;` },
+  // ── GH-1333: persist friendly courier name from EP rate response (e.g. "J&T Express") ──
+  { name: 'orders.shipping_courier_name', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_courier_name text;` },
+  // ── GH-1333 F36: print-label modal — per-format label URLs + printed marker ──
+  { name: 'orders.label_urls', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_urls jsonb;` },
+  { name: 'orders.label_printed_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_printed_at timestamp with time zone;` },
   // ── F37: analytics.event enum was missing the 'local_business_data_saved'
   // value used by traffic-data.ts/analytics-summary's not_in filters, crashing
   // getTrafficData() with a Postgres "invalid input value for enum" error for

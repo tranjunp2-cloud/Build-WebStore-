@@ -3,13 +3,14 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, ZoomIn, X } from 'lucide-react'
+import { Loader2, ZoomIn, X, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { CancelOrderModal } from './CancelOrderModal'
 import { ShipOrderModal } from './ShipOrderModal'
 import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
+import { CreateLabelModal } from './create-label-modal'
 import { xenditChannelLabel } from '@/lib/email/templates/shared/email-utils'
 import { type OrderStatus } from '@/lib/orders/status-groups'
 
@@ -55,6 +56,21 @@ export interface OrderDetail {
         quantity: number
         unitPrice: number
     }[]
+    // EasyParcel fulfillment fields (added Phase 05)
+    awbNo?: string | null
+    easyParcelOrderNo?: string | null
+    labelUrl?: string | null
+    shippingCourier?: string | null
+    shippingServiceId?: string | null
+    parcelWeight?: number | null
+    tenant?: {
+        easyParcelIntegration?: {
+            enabled?: boolean
+            selectedCourier?: string      // legacy scalar; populated as selectedCouriers[0]
+            selectedCouriers?: string[]   // allowlist (phase 05)
+            detectedEnv?: string
+        }
+    } | string | number | null
 }
 
 // ─── SECTION CARD wrapper ───
@@ -311,11 +327,12 @@ function StepCompletedIcon({ isActive }: { isActive: boolean }) {
     )
 }
 
-function OrderProgress({ status }: { status: OrderStatus }) {
+export function OrderProgress({ status }: { status: OrderStatus }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const progressLabels = t.dashboard.orders.progress
     const STEPS = getProgressSteps(progressLabels)
+    const isRefundedStatus = status === 'refunded'
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
         new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
@@ -324,7 +341,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
         shipped: 3,
         completed: 4,
         cancelled: -1,
-        refunded: -1,
+        refunded: 4, // all 5 steps done; Refunded node appended separately below
         paid: 1,
         payment_failed: -1,
         processing: 1
@@ -369,13 +386,41 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: i <= currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
+                                        // Connector i joins step i → i+1: filled only once the NEXT step is
+                                        // reached (i < currentStep) — at "Confirmed" the line to "Ready" stays grey.
+                                        background: i < currentStep ? 'hsl(var(--success))' : 'var(--dash-border)',
                                     }}
                                 />
                             )}
                         </React.Fragment>
                     )
                 })}
+
+                {/* Refunded node — appended after Completed when order is refunded */}
+                {isRefundedStatus && (
+                    <React.Fragment key="refunded">
+                        {/* Refund connector — fuchsia (#d946ef) */}
+                        <div
+                            className="flex-1 shrink-0 md:shrink mx-[8px] md:mx-1 min-w-[46px] md:min-w-0"
+                            style={{ marginTop: 15, height: 2, background: '#d946ef' }}
+                        />
+                        {/* Refunded step node */}
+                        <div className="flex flex-col items-center z-10 gap-[8px] shrink-0">
+                            <div
+                                className="flex items-center justify-center shrink-0 rounded-full shadow-[0_0_0_4px_rgba(217,70,239,0.15)] md:shadow-[0_0_0_4px_rgba(217,70,239,0.1)]"
+                                style={{ width: 36, height: 36, background: 'rgba(217,70,239,.12)', border: '2px solid #d946ef', color: '#d946ef' }}
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                            </div>
+                            <span
+                                className="font-inter text-center whitespace-nowrap font-semibold text-[12px] md:text-[10px] leading-[1.25em]"
+                                style={{ color: '#e879f9' }}
+                            >
+                                {progressLabels.refunded}
+                            </span>
+                        </div>
+                    </React.Fragment>
+                )}
             </div>
         </div>
     )
@@ -384,7 +429,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
 // ─── CUSTOMER INFORMATION ───
 // layout_MW5IYR: column, gap 12px, padding 17px 17px 1px
 // layout_0B2MTA: column, gap 12px
-function CustomerInformation({ order }: { order: OrderDetail }) {
+export function CustomerInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
 
@@ -447,7 +492,7 @@ function fmtPaymentStatus(s: string | null | undefined, labels: Record<string, s
 // Status row — icon fill_A2P9AX rgba(255,105,0,0.1), text Unconfirmed style_88PH6H fill_IGVEST #FF8904
 // Receipt image — layout_NCMUFS: column, padding 1px, height 160, borderRadius 16px
 //   Image: layout_BNH1S2 fill horizontal, height 158
-function PaymentInformation({ order }: { order: OrderDetail }) {
+export function PaymentInformation({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     const methodLabels = (d as any).paymentMethods as Record<string, string>
@@ -616,7 +661,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
 // Item row: layout_LWI4PM: row, space-between, gap 260.125px
 //   Left: layout_F9PMLN column — product name style_VWFEC1 Inter 500 14px, variant style_231QNQ rgba(248,250,252,0.5)
 //   Right: layout_MOABVK — price style_88PH6H Inter 600 14px #F8FAFC
-function OrderItems({ order }: { order: OrderDetail }) {
+export function OrderItems({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     if (!order.items || order.items.length === 0) return null
@@ -685,7 +730,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
 //   layout_VS3Y5N: column, padding 13px 0 0, borderTop 1px rgba(255,255,255,0.08)
 //   label  – style_DZKK65 Inter 700 16px #F8FAFC
 //   amount – style_QOAWPZ Inter 700 20px fill_31NCV3 #2DD4BF
-function OrderSummary({ order }: { order: OrderDetail }) {
+export function OrderSummary({ order }: { order: OrderDetail }) {
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
     return (
@@ -774,14 +819,24 @@ function OrderSummary({ order }: { order: OrderDetail }) {
 
 // ─── ACTION BUTTONS ───
 // layout_KSMCIE: column, alignSelf stretch, gap 12px, height 110
-function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
+export function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
     const { t } = useI18n()
     const a = t.dashboard.orders.actions
     const p = t.dashboard.orders.progress
     const [isLoading, setIsLoading] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
     const [isShipModalOpen, setIsShipModalOpen] = useState(false)
+    const [isLabelModalOpen, setIsLabelModalOpen] = useState(false)
+    const [awbNo, setAwbNo] = useState<string | null>((order as any).awbNo ?? null)
+    const [labelUrl, setLabelUrl] = useState<string | null>((order as any).labelUrl ?? null)
     const { status, id, orderNumber } = order
+
+    // EP integration config from depth=2 resolved tenant
+    const tenantEp = typeof (order as any).tenant === 'object' && (order as any).tenant !== null
+        ? (order as any).tenant?.easyParcelIntegration
+        : null
+    const epEnabled = tenantEp?.enabled === true
+    const hasCourier = !!(order as any).shippingCourier
 
     const isTerminalStatus = status === 'completed' || status === 'cancelled' || status === 'refunded'
 
@@ -830,6 +885,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
     }
 
     const handleCancel = async (reason: string) => {
+        const hadEpLabel = !!awbNo
         setIsLoading(true)
         try {
             const res = await fetch(`/api/orders/${id}/cancel`, {
@@ -843,6 +899,9 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 throw new Error('API_ERROR')
             }
             toast.success(t.dashboard.orders.toast.updated)
+            if (hadEpLabel) {
+                toast.message('Please also cancel this AWB in your EasyParcel dashboard to release wallet funds.', { duration: 8000 })
+            }
             setIsCancelModalOpen(false)
             onUpdate()
         } catch (error: unknown) {
@@ -867,6 +926,10 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                             variant="dashPrimary"
                             onClick={() => {
                                 if (status === 'ready_to_ship') { setIsShipModalOpen(true); return }
+                                if (status === 'confirmed' && epEnabled && hasCourier && !awbNo) {
+                                    setIsLabelModalOpen(true)
+                                    return
+                                }
                                 handleAction(status === 'shipped' ? 'completed' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')
                             }}
                             disabled={primaryDisabled}
@@ -882,7 +945,13 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Bottom Row — layout_BH1FFS: row, gap 12px */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
+                    // ready_to_ship cancellable only when EP label is pre-pickup (not yet collected)
+                    const epTrackingStatus = (order as any).shippingTrackingStatus as string | null | undefined
+                    const PRE_COLLECT = new Set([undefined, null, '', 'order_created', 'pending_pickup'])
+                    const readyToShipCancellable = status === 'ready_to_ship' && !!awbNo && PRE_COLLECT.has(epTrackingStatus as any)
+                    const cancelDisabled = isLoading || isTerminal || (
+                        !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status) && !readyToShipCancellable
+                    )
                     const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
@@ -909,7 +978,40 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                         </div>
                     )
                 })()}
+
+                {/* Self-return hint for EP shipped/completed orders */}
+                {awbNo && ['shipped', 'completed'].includes(status) && (
+                    <div style={{ fontSize: 12, color: 'var(--dash-text-muted)', textAlign: 'center', paddingTop: 2 }}>
+                        Buyer self-ships items back. Click Refund after receiving the return.
+                    </div>
+                )}
             </div>
+
+            {/* AWB + Download Label — shown after label is created */}
+            {awbNo && (
+                <div style={{ padding: '12px 16px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--dash-text-muted)', marginBottom: 4 }}>AWB Number</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <code style={{ fontSize: 14, fontFamily: 'monospace', color: 'var(--dash-text)', flex: 1 }}>{awbNo}</code>
+                        <button
+                            onClick={() => navigator.clipboard.writeText(awbNo)}
+                            style={{ fontSize: 12, color: 'hsl(var(--primary))', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                            Copy
+                        </button>
+                    </div>
+                    {labelUrl && (
+                        <a
+                            href={labelUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'inline-block', marginTop: 8, fontSize: 12, color: 'hsl(var(--primary))' }}
+                        >
+                            Download Label PDF →
+                        </a>
+                    )}
+                </div>
+            )}
 
             <ShipOrderModal
                 orderNumber={orderNumber}
@@ -925,6 +1027,24 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 isLoading={isLoading}
                 onBack={() => setIsCancelModalOpen(false)}
                 onConfirm={handleCancel}
+            />
+
+            <CreateLabelModal
+                order={{
+                    id: order.id,
+                    shippingCourier: (order as any).shippingCourier,
+                    parcelWeight: (order as any).parcelWeight,
+                    shippingFee: order.shippingFee,
+                    codAmountSen: (order as any).codAmount ?? null,
+                }}
+                isOpen={isLabelModalOpen}
+                onClose={() => setIsLabelModalOpen(false)}
+                onSuccess={(newAwbNo, newLabelUrl) => {
+                    setIsLabelModalOpen(false)
+                    setAwbNo(newAwbNo)
+                    setLabelUrl(newLabelUrl)
+                    onUpdate()
+                }}
             />
         </>
     )
@@ -951,8 +1071,8 @@ export function OrderDetailPanel({
         if (!orderId) return
         setIsLoading(true)
         try {
-            // Include depth to get related items (e.g. variants/products if stored as relationships via depth=1)
-            const res = await fetch(`/api/orders/${orderId}?depth=1`)
+            // depth=2: resolves tenant.easyParcelIntegration + line items (Phase 05)
+            const res = await fetch(`/api/orders/${orderId}?depth=2`)
             if (!res.ok) throw new Error('Failed to fetch order details')
             const result = await res.json()
             setOrder(result.data || result)
