@@ -1831,7 +1831,7 @@
         },
         "customers": {
             "title": "Kenalan",
-            "subtitle": "Penghantaran borang hubungi & pelanggan newsletter",
+            "subtitle": "Jejak dan urus pertanyaan pelanggan yang dihantar melalui borang laman web anda.",
             "searchPlaceholder": "Cari mengikut nama atau e-mel…",
             "sourceAll": "Semua Sumber",
             "sourceContact": "Borang Hubungi",
@@ -2547,6 +2547,7 @@
                 "titleMaxLength": "Tajuk mestilah kurang daripada 255 aksara",
                 "slugInvalid": "Slug hanya boleh mengandungi huruf kecil, nombor, dan sempang",
                 "urlSlugLabel": "Slug URL (dijana secara auto, boleh disunting)",
+                "slugLockedHint": "Dikunci kerana pos ini telah diterbitkan — menukar URL akan merosakkan pautan sedia ada dan kedudukan carian.",
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
                 "clickToUpload": "Klik untuk memuat naik lakaran pribit",

@@ -25,7 +25,8 @@ const tabsListVariants = cva("", {
 })
 
 const tabsTriggerVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
+  // `group` lets TabsCount react to this trigger's data-state (active tab → teal badge).
+  "group inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -69,4 +70,25 @@ const TabsContent = React.forwardRef<
 ))
 TabsContent.displayName = TabsPrimitive.Content.displayName
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+// Count badge for tab labels (e.g. "Active (12)") — same circle shape as the
+// sidebar nav badge (h-5 + min-w-[20px] + centered flex, not just padding) so a
+// single-digit count renders as a true circle instead of an oval pill. Neutral
+// tint matches Badge's "secondary" variant (bg-muted is too close to white to
+// read); active tint (teal, via the `group` on TabsTrigger) matches the
+// sidebar's active-item badge (bg-primary/15 + text-primary) exactly.
+const TabsCount = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(
+  ({ className, ...props }, ref) => (
+    <span
+      ref={ref}
+      className={cn(
+        "flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-400/[0.14] px-1.5 text-[11px] font-semibold leading-none text-slate-600 dark:text-slate-300",
+        "group-data-[state=active]:bg-[hsl(var(--primary)/0.15)] group-data-[state=active]:text-[hsl(var(--primary))]",
+        className
+      )}
+      {...props}
+    />
+  )
+)
+TabsCount.displayName = "TabsCount"
+
+export { Tabs, TabsList, TabsTrigger, TabsContent, TabsCount }

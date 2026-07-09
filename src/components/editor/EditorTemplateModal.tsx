@@ -205,7 +205,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
                             onSearch={setDebouncedSearch}
                             placeholder={tt.searchPlaceholder}
                             debounceMs={300}
-                            className="min-w-0 max-w-none sm:max-w-[280px]"
+                            className="min-w-0 max-w-none w-full"
                         />
                         <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide sm:flex-wrap sm:pb-0">
                             {categories.map((cat) => (

@@ -46,7 +46,7 @@ export function DiscountFormHeader({
             {/* Main header row — GH-1511 #36: theo chuẩn Add Product (ProductForm.tsx):
                 ArrowLeft h-6 trần + h1 24px font-outfit + sub-line 14px foreground/60.
                 Bỏ bar border-b (Add Product không có); giữ badge/meta riêng của discount. */}
-            <div className="flex items-center justify-between gap-4 px-6 pt-6">
+            <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                     <button
                         onClick={onBack}

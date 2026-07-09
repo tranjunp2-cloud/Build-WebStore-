@@ -749,6 +749,12 @@ html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0
 .editor-shell .bg-blue-500 .text-white,
 .editor-shell .bg-blue-600 .text-white { color: #fff !important; }
 
+/* dark scrim overlays (bg-black/NN) keep white text/icons both themes — hover
+   preview overlay (TemplateCard), upload-progress overlay (BlockImageEditor) —
+   these always sit on a dark backdrop regardless of theme. */
+.editor-shell [class*="bg-black/"].text-white,
+.editor-shell [class*="bg-black/"] .text-white { color: #fff !important; }
+
 /* text-white opacity variants */
 .editor-shell .text-white\/80,
 .editor-shell .text-white\/70,
@@ -956,6 +962,8 @@ html:not(.dark) .editor-shell textarea::placeholder {
 .editor-portal [class*="from-"] .text-white,
 .editor-portal [class*="bg-gradient"].text-white,
 .editor-portal [class*="bg-gradient"] .text-white { color: #fff !important; }
+.editor-portal [class*="bg-black/"].text-white,
+.editor-portal [class*="bg-black/"] .text-white { color: #fff !important; }
 .editor-portal .text-white\/80,
 .editor-portal .text-white\/70 { color: var(--editor-text); }
 .editor-portal .text-white\/50,
@@ -1100,6 +1108,13 @@ html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
        browsers then fall back to the UA default `border-style: inset` (beveled:
        top/left darker than bottom/right). Force solid so borders render evenly. */
     border-style: solid;
+  }
+
+  /* Radix <Select> item hover/highlight (ui/select.tsx SelectItem) — written as plain CSS
+     instead of a Tailwind data-[highlighted]: class because the class doesn't reliably
+     paint on this portaled content (same issue as the SelectContent bg-popover fix). */
+  .select-item[data-highlighted] {
+    background-color: hsl(var(--muted));
   }
 
   textarea {
