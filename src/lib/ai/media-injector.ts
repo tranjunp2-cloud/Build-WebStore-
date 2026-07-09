@@ -14,7 +14,7 @@
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
 import { getMediaForBlock, getAvatarMedia, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
-import { pickManyFromPool, type ImageRole } from './image-pool'
+import { pickManyFromPool, bucketForRole, DEFAULT_LANDSCAPE_SIZE, DEFAULT_SQUARE_SIZE, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
 export interface BlockImageSpec {
@@ -99,6 +99,49 @@ const IMAGE_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
 // GH-1185: blocks whose image slots show PEOPLE — routed to the dedicated
 // portrait search (getAvatarMedia) instead of the product-keyword pool.
 const PEOPLE_BLOCKS: ReadonlySet<string> = new Set(['testimonials', 'team', 'doctor-profile'])
+
+// Pool sizing: fetch/pre-upload only what the enabled blocks can consume,
+// not a fixed 12+6. Buffer keeps enough surplus that pickManyFromPool can
+// shuffle DISTINCT picks across same-role blocks (anti-duplication) — a pool
+// sized to the exact count would hand every same-role block the identical set.
+const POOL_BUFFER_FACTOR = 1.4
+const POOL_MIN_EXTRA = 2
+
+/**
+ * Per-bucket pool size derived from the enabled image blocks — known entirely
+ * pre-GPT (env + static specs), so this can size the pre-GPT pool build.
+ *
+ * A bucket's base = the LARGEST single-block need mapping to it (blocks share
+ * the pool as a selection reservoir, they don't each consume a disjoint slice),
+ * then padded by the diversity buffer and capped at the legacy default. People
+ * blocks are excluded (avatars use getAvatarMedia, not the pool). A bucket with
+ * no enabled block resolves to 0 → buildImagePool skips that Pixabay call.
+ *
+ * Default config (hero-only) → { landscape: 3, square: 0 } instead of 12+6.
+ */
+export function computePoolBucketSizes(
+    enabled: ReadonlySet<string> = getImageEnabledBlocks(),
+): { landscape: number; square: number } {
+    let landscapeBase = 0
+    let squareBase = 0
+    for (const blockType of enabled) {
+        if (PEOPLE_BLOCKS.has(blockType)) continue
+        const spec = BLOCK_IMAGE_SPEC[blockType]
+        if (!spec) continue
+        const need = spec.nestedArray
+            ? Math.max(...spec.nestedArray.map((a) => a.minCount ?? 1))
+            : 1 // top-level fields share one Media ID → 1 slot per block
+        const bucket = bucketForRole(roleForBlock(blockType))
+        if (bucket === 'square') squareBase = Math.max(squareBase, need)
+        else landscapeBase = Math.max(landscapeBase, need)
+    }
+    const sized = (base: number, cap: number) =>
+        base === 0 ? 0 : Math.min(cap, Math.max(base + POOL_MIN_EXTRA, Math.ceil(base * POOL_BUFFER_FACTOR)))
+    return {
+        landscape: sized(landscapeBase, DEFAULT_LANDSCAPE_SIZE),
+        square: sized(squareBase, DEFAULT_SQUARE_SIZE),
+    }
+}
 
 
 export interface ImageNeed {

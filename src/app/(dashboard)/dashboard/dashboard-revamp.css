@@ -588,9 +588,10 @@ html[data-period-pending="1"] .dash-revamp .stream {
   border: 1px solid var(--dr-line-1);
   border-radius: var(--dr-radius-lg);
   box-shadow: var(--dr-shadow-card);
-  padding: 16px 18px;
-  /* GH-1491 issue 2: was 132px sized for value+delta on 2 separate rows. Now value+delta
-     share one row (.stat-bottom below), so the card no longer needs that much floor height. */
+  /* GH-1516: bottom padding reserves the sparkline strip (44px + 8px breathing room)
+     so the value and the "vs …" note always end ABOVE the chart's highest point —
+     text and chart can no longer overlap at any data shape. */
+  padding: 16px 18px 52px;
   min-height: 112px;
   display: flex;
   flex-direction: column;
@@ -602,17 +603,30 @@ html[data-period-pending="1"] .dash-revamp .stream {
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 54px;
+  /* GH-1516: 54px → 44px, paired with .stat-card's 52px bottom padding — the chart
+     lives in its own reserved strip under the text instead of behind it. */
+  height: 44px;
   opacity: .5;
   pointer-events: none;
 }
 
 .dash-revamp .stat-top {
   display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  /* GH-1516: delta pill / Coming-Soon badge lives on this row, right-aligned opposite
+     the icon+label cluster. flex-wrap is the no-overlap guarantee: when the card is too
+     narrow for label + pill, the pill wraps to its own line (still right-aligned via
+     margin-left:auto below) instead of painting over the label text. */
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 9px;
   margin-bottom: 14px;
   position: relative;
+}
+
+/* Right-aligns the pill/badge whether it shares the label's line or wraps to its own */
+.dash-revamp .stat-top > .delta,
+.dash-revamp .stat-top > .cs-badge {
+  margin-left: auto;
 }
 
 /* Left block: main icon + title cluster as one unit (mirrors the % block on the right).
@@ -625,14 +639,16 @@ html[data-period-pending="1"] .dash-revamp .stream {
   min-width: 0;
 }
 
-/* GH-1491 issue 2: value + delta/badge on one row instead of value alone on its own
-   line below a separate delta row — halves the vertical space the pair needs. */
+/* GH-1516: value (left) + "vs …" note (right) on one baseline row — the delta/badge
+   moved up beside the label. */
 .dash-revamp .stat-bottom {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 8px;
   margin-top: auto;
+  /* .stat-spark is position:absolute, so it paints ABOVE non-positioned siblings —
+     positioning this row (later in DOM than the spark) keeps the value on top. */
+  position: relative;
 }
 
 .dash-revamp .stat-ic {
@@ -715,14 +731,19 @@ html[data-period-pending="1"] .dash-revamp .stream {
   height: 12px;
 }
 
+/* GH-1516: the up/down tints are 12%-alpha, so the sparkline stroke behind the card
+   shows THROUGH the pill and strikes the "+100.0%" text. Compositing the same tint
+   over an opaque card layer keeps the exact same color but blocks the chart line. */
 .dash-revamp .delta.up {
   color: var(--dr-success-fg);
-  background: var(--dr-success-bg);
+  background-color: hsl(var(--card));
+  background-image: linear-gradient(var(--dr-success-bg), var(--dr-success-bg));
 }
 
 .dash-revamp .delta.down {
   color: var(--dr-danger-fg);
-  background: var(--dr-danger-bg);
+  background-color: hsl(var(--card));
+  background-image: linear-gradient(var(--dr-danger-bg), var(--dr-danger-bg));
 }
 
 .dash-revamp .delta.flat {
@@ -735,9 +756,9 @@ html[data-period-pending="1"] .dash-revamp .stream {
      Slightly smaller + tighter tracking so the longer localized strings still fit.
      Sits as its own caption line under .stat-bottom (value + delta), right-aligned
      under the delta pill it describes. */
-  display: block;
-  text-align: right;
-  margin-top: 2px;
+  /* GH-1516: sits in the .stat-bottom row, baseline-aligned right of the value */
+  margin-left: auto;
+  flex-shrink: 0;
   font-size: 10px;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -818,21 +839,16 @@ html[data-period-pending="1"] .dash-revamp .stream {
   right: 0;
   width: max-content;
   max-width: 220px;
-  background: var(--dr-ink-1);
-  color: var(--dr-canvas);
-  font-size: 11px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground) / 0.85);
+  border: 1px solid hsl(var(--border));
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
   padding: 7px 10px;
   border-radius: 8px;
   box-shadow: var(--dr-shadow-pop);
   z-index: 50;
-}
-
-.dark .dash-revamp .cs-corner[data-tip]:hover::after {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid var(--dr-line-1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -906,11 +922,12 @@ html[data-period-pending="1"] .dash-revamp .stream {
 .dash-revamp .bc-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
-  background: var(--dr-ink-1);
-  color: var(--dr-canvas);
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground) / 0.85);
+  border: 1px solid hsl(var(--border));
   padding: 6px 10px;
   border-radius: 8px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
@@ -919,13 +936,11 @@ html[data-period-pending="1"] .dash-revamp .stream {
   transition: opacity .1s;
 }
 
-.dark .dash-revamp .bc-tooltip {
-  background: #1e293b;
-  color: #f1f5f9;
-  border: 1px solid var(--dr-line-1);
+.dash-revamp .bc-tooltip .tt-views {
+  color: #0f766e;
 }
 
-.dash-revamp .bc-tooltip .tt-views {
+.dark .dash-revamp .bc-tooltip .tt-views {
   color: #2dd4bf;
 }
 
@@ -1991,16 +2006,13 @@ html[data-period-pending="1"] .dash-revamp .stream {
 }
 
 /* Mobile + tablet (<1280, matches this file's desktop cutoff elsewhere): native HTML5
-   drag-and-drop doesn't work reliably via touch, so hide the drag-dots handle icon and
-   show the up/down arrow buttons (.cz-arrows) instead as the working reorder path.
-   .cz-arrows is `display: none` unconditionally in the base rule above (pre-existing,
-   from the original dashboard revamp) — it was never actually wired to appear anywhere,
-   desktop included, so surfacing it here is a real (not cosmetic) fix, not just hiding
-   a non-functional icon. Desktop (≥1280) keeps the original drag handle, arrows still
-   hidden — byte-identical. */
+   drag-and-drop doesn't work reliably via touch → hide the drag-dots handle icon.
+   GH-1516 (quyết định 07/07): KHÔNG thay bằng nút mũi tên lên/xuống (.cz-arrows) nữa —
+   ẩn luôn cả arrows trên mobile/iPad; modal chỉ còn toggle hiển thị block. Reorder chỉ
+   khả dụng trên desktop (kéo thả). .cz-arrows vốn `display: none` ở base rule nên không
+   cần rule gì thêm. Desktop (≥1280) giữ nguyên drag handle — byte-identical. */
 @media (max-width: 1279px) {
   .dash-revamp .cz-handle { display: none; }
-  .dash-revamp .cz-arrows { display: flex; }
 }
 
 /* "Top performing" card title used a smaller inline fontSize (15px vs the default 16px
@@ -2015,21 +2027,20 @@ html[data-period-pending="1"] .dash-revamp .stream {
   .dash-revamp .dash-toolbar { flex-direction: column; align-items: stretch; }
   .dash-revamp .dt-right     { justify-content: space-between; }
 
-  /* Mobile: keep 2-up. Value + delta/badge now share one row (.stat-bottom) instead of
-     the old stacked [icon+label] → [delta/badge] → [value] layout (GH-1491 issue 2),
-     so the label row no longer needs to collide-guard against a delta/badge beside it —
-     just tighten spacing/sizing for the narrower ~160px card. */
-  .dash-revamp .stat-grid              { grid-template-columns: 1fr 1fr; }
-  .dash-revamp .stat-card              { padding: 12px 13px; min-height: 100px; }
+  /* GH-1516: mobile goes 1-up — 2-up left ~170px per card, not enough for the
+     label + pill row (the Coming-Soon badge painted over "Revenue"). Full-width
+     cards fit everything on one line; same 3-band layout as desktop —
+     [icon + label … pill] / [value] / [note] / reserved chart strip. */
+  .dash-revamp .stat-grid              { grid-template-columns: 1fr; }
+  .dash-revamp .stat-card              { padding: 12px 14px 44px; min-height: 0; }
+  .dash-revamp .stat-spark             { height: 36px; }
   .dash-revamp .stat-top               { margin-bottom: 8px; }
   .dash-revamp .stat-top-left          { gap: 7px; }
   .dash-revamp .stat-ic                { width: 28px; height: 28px; border-radius: 8px; }
   .dash-revamp .stat-ic svg            { width: 15px; height: 15px; }
   .dash-revamp .stat-label             { font-size: 11.5px; gap: 3px; }
-  .dash-revamp .stat-val               { font-size: 22px; }
+  .dash-revamp .stat-val               { font-size: 24px; }
   .dash-revamp .delta                  { font-size: 11px; padding: 2px 6px; }
-  /* secondary "vs …" note — drop on mobile to keep each card short */
-  .dash-revamp .delta-note             { display: none; }
   .dash-revamp .issues-list.cols2      { grid-template-columns: 1fr; }
   .dash-revamp .tp-row                 { grid-template-columns: 26px 1fr auto; }
   .dash-revamp .tp-share               { display: none; }

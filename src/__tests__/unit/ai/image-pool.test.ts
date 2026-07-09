@@ -511,3 +511,26 @@ describe('TC-F38-RAW — raw keyword path (Pixabay + VN keywords)', () => {
     expect(opts.orientation).toBe('landscape')
   })
 })
+
+// ── TC-F01-W.18: bucket sizing — skip zero-size buckets ─────────────────────
+describe('TC-F01-W.18 — buildImagePool honors explicit bucket sizes', () => {
+  it('squareSize 0 → only the landscape Pixabay call runs (no square search)', async () => {
+    mockSearchPhotos.mockResolvedValueOnce(landscapeFixture.slice(0, 3))
+    const pool = await buildImagePool(baseCtx({ landscapeSize: 3, squareSize: 0 }))
+    expect(mockSearchPhotos).toHaveBeenCalledTimes(1)
+    expect(mockSearchPhotos.mock.calls[0]![2]).toMatchObject({ orientation: 'landscape' })
+    // count arg forwarded from landscapeSize
+    expect(mockSearchPhotos.mock.calls[0]![1]).toBe(3)
+    // square bucket empty (not reused-from-landscape when size is 0)
+    expect(pool.square.length).toBe(0)
+    expect(pool.landscape.length).toBe(3)
+  })
+
+  it('both sizes 0 → zero Pixabay calls, empty pool, underfill stays false (intentional skip)', async () => {
+    const pool = await buildImagePool(baseCtx({ landscapeSize: 0, squareSize: 0 }))
+    expect(mockSearchPhotos).not.toHaveBeenCalled()
+    expect(pool.landscape.length).toBe(0)
+    expect(pool.square.length).toBe(0)
+    expect(pool.underfill).toBe(false)
+  })
+})

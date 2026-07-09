@@ -4930,6 +4930,14 @@ const MIGRATIONS = [
   // ── GH-1333 F36: print-label modal — per-format label URLs + printed marker ──
   { name: 'orders.label_urls', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_urls jsonb;` },
   { name: 'orders.label_printed_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_printed_at timestamp with time zone;` },
+  // ── F37: analytics.event enum was missing the 'local_business_data_saved'
+  // value used by traffic-data.ts/analytics-summary's not_in filters, crashing
+  // getTrafficData() with a Postgres "invalid input value for enum" error for
+  // any tenant with real analytics rows ──
+  {
+    name: 'enum_analytics_event.add_local_business_data_saved',
+    sql: `ALTER TYPE enum_analytics_event ADD VALUE IF NOT EXISTS 'local_business_data_saved';`,
+  },
 ];
 
 async function runMigrations(pool) {

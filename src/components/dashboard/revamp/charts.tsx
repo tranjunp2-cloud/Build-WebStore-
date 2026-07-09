@@ -146,15 +146,19 @@ export function BarChart({
                     </linearGradient>
                 </defs>
 
-                {/* Grid lines */}
-                {yTicks.map((tick) => (
-                    <g key={tick.value} className="bc-grid">
+                {/* Grid lines. Key by index, NOT tick.value — with small maxVal the rounded
+                    tick values collide (maxVal 2 → 0,1,1,2) and duplicate keys break React.
+                    A collided value also skips its label so the axis never shows "1" twice. */}
+                {yTicks.map((tick, i) => (
+                    <g key={i} className="bc-grid">
                         {/* colour + stroke-width from .bc-grid line CSS — no inline opacity */}
                         <line x1={PAD_L} y1={tick.y} x2={W - PAD_R} y2={tick.y} />
                         {/* Y-axis labels — colour/size from .bc-ylabel CSS */}
-                        <text x={PAD_L - 6} y={tick.y + 4} textAnchor="end" className="bc-ylabel">
-                            {fmtNum(tick.value)}
-                        </text>
+                        {(i === 0 || tick.value !== yTicks[i - 1].value) && (
+                            <text x={PAD_L - 6} y={tick.y + 4} textAnchor="end" className="bc-ylabel">
+                                {fmtNum(tick.value)}
+                            </text>
+                        )}
                     </g>
                 ))}
 
@@ -208,13 +212,15 @@ export function BarChart({
                 })}
             </svg>
 
-            {/* Tooltip — rendered as HTML overlay for crisp text */}
+            {/* Tooltip — rendered as HTML overlay for crisp text.
+                Anchored to the TOP OF THE HOVERED BAR (not the chart top): the svg maps
+                1:1 to px (viewBox height = rendered height), so the bar's y works as CSS top. */}
             {hoverIdx !== null && (
                 <div
                     className="bc-tooltip"
                     style={{
                         position: 'absolute',
-                        top: 0,
+                        top: `${PAD_T + chartH - Math.max(2, (days[hoverIdx].views / maxVal) * chartH)}px`,
                         left: `${
                             (PAD_L +
                                 hoverIdx * (chartW / days.length) +
@@ -222,7 +228,7 @@ export function BarChart({
                             W *
                             100
                         }%`,
-                        transform: 'translateX(-50%)',
+                        transform: 'translate(-50%, calc(-100% - 6px))',
                         pointerEvents: 'none',
                     }}
                 >

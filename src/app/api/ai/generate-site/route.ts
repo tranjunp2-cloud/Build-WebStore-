@@ -12,7 +12,7 @@ import { notifyStepComplete } from '@/lib/sso/sso-api-client'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import type { GenerationResult } from '@/lib/ai/generate-blocks'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs, computePoolBucketSizes } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -30,7 +30,9 @@ import { pickCategoryThemeWithMood } from '@/lib/ai/category-theme-picker'
 import { computeGenSeed } from '@/lib/ai/gen-seed'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool, type ImagePool } from '@/lib/ai/image-pool'
+import { preUploadPool } from '@/lib/ai/pool-preupload'
 import { translateUserInputsIfNeeded } from '@/lib/ai/user-input-translator'
+import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { buildProductAlt } from '@/lib/products/build-product-alt'
@@ -40,7 +42,7 @@ import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 import { uploadImageUrl } from '@/lib/ai/upload-media'
-import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
+import { seedBlogPosts, prepareBlogPosts, persistBlogPosts, type PreparedBlogPost } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { getNavLabels } from '@/lib/ai/block-i18n'
@@ -454,17 +456,44 @@ export async function POST(req: NextRequest) {
             const imagePoolPromise: Promise<_PoolResult> = !ENABLE_DALLE_HERO
                 ? (async (): Promise<_PoolResult> => {
                     const rawKeywords = _parsedProductsForPool.slice(0, 3).filter(Boolean)
+                    // Translate raw user-language keywords → English before the
+                    // Pixabay POOL search (better stock-photo coverage than raw
+                    // VN/MS terms). Default ON — set GEN_TRANSLATE_POOL_KEYWORDS=false
+                    // to fall back to the raw-keyword + VN-relevance-gate path (GH-1185).
+                    // English keywords auto-skip the VN gate (detectQueryLang → undefined),
+                    // no image-pool change needed. Only the pool query is translated;
+                    // `englishKeywords` (legacy per-block search) stays RAW below.
+                    let poolKeywords = rawKeywords
+                    if (process.env.GEN_TRANSLATE_POOL_KEYWORDS !== 'false' && rawKeywords.length > 0) {
+                        const translated = await translateToEnglishKeywords({
+                            industry: businessInfo.industry,
+                            products: rawKeywords,
+                        }).catch(() => null)
+                        if (translated && translated.length > 0) {
+                            poolKeywords = translated
+                            console.info(`[image-pool] keyword translate: raw=[${rawKeywords.join(', ')}] → en=[${translated.join(', ')}]`)
+                        } else {
+                            console.warn('[image-pool] keyword translate failed/null — using raw keywords')
+                        }
+                    }
                     // Isolate buildImagePool failure so rawKeywords is always
                     // preserved for the fulfillImageNeeds legacy search path even
                     // when pool build fails (e.g. Pixabay 429 / missing key).
                     let pool: ImagePool | null = null
                     try {
+                        // Size the pool to what the enabled image blocks can
+                        // actually consume (default hero-only → ~3 landscape, 0
+                        // square) instead of a fixed 12+6 — cuts speculative
+                        // download + pre-upload and the orphan media it left.
+                        const poolSizes = computePoolBucketSizes()
                         pool = await buildImagePool({
                             category: _presetCategoryForPool,
                             mood: _themeMoodForPool,
-                            topProduct: rawKeywords[0],
-                            products: rawKeywords,
+                            topProduct: poolKeywords[0],
+                            products: poolKeywords,
                             seed: _themeSeedForPool,
+                            landscapeSize: poolSizes.landscape,
+                            squareSize: poolSizes.square,
                         })
                     } catch {
                         // pool stays null; rawKeywords still returned for legacy search
@@ -472,6 +501,31 @@ export async function POST(req: NextRequest) {
                     return { pool, englishKeywords: rawKeywords }
                 })().catch((): _PoolResult => ({ pool: null, englishKeywords: [] }))
                 : Promise.resolve<_PoolResult>({ pool: null, englishKeywords: [] })
+
+            // Phase 06 (gen-perf plan 260703) — pre-download + pre-upload pool
+            // photos to Payload `media` DURING the GPT window instead of after
+            // it (Wave 2b). Chained directly off imagePoolPromise (not awaited
+            // here) so it runs concurrently with the GPT call below. Post-GPT,
+            // fulfillImageNeeds/batchFetchFromPool consumes the resolved map
+            // and only assigns pre-uploaded Media IDs — no re-download/upload.
+            // Default ON — set GEN_POOL_PREUPLOAD=false to disable (emergency
+            // rollback). When off, resolves an empty Map immediately so the
+            // downstream pool path is byte-identical to pre-Phase-06 behavior.
+            const GEN_POOL_PREUPLOAD = process.env.GEN_POOL_PREUPLOAD !== 'false'
+            const preUploadedPoolPromise: Promise<Map<string, number>> = GEN_POOL_PREUPLOAD
+                ? imagePoolPromise
+                    .then(({ pool }) =>
+                        pool
+                            ? preUploadPool(
+                                pool,
+                                String(resolvedTenantId),
+                                businessInfo.businessName,
+                                payload as unknown as Parameters<typeof preUploadPool>[3],
+                            )
+                            : new Map<string, number>(),
+                    )
+                    .catch((): Map<string, number> => new Map())
+                : Promise.resolve(new Map<string, number>())
 
             // Start sample product generation AFTER imagePool completes to avoid competing
             // for Pixabay rate limit (GH-1190). imagePool finishes ~3-5s into AI gen;
@@ -496,6 +550,26 @@ export async function POST(req: NextRequest) {
                     generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides, onEvent),
                 ),
             )
+
+            // gen-perf blog-inline: prepare 3 blog posts (AI seed topics + full
+            // article bodies + thumbnails). Kicked AFTER the site GPT resolves,
+            // NOT during it — the site's parallel split calls own the OpenAI
+            // budget in that window; blog's ~4 GPT calls competing there
+            // inflated the `ai` phase (measured 2026-07-08). It now overlaps the
+            // remaining media + db + persist-grace window (~25s), still landing
+            // the 3 posts before `done` in the common case; if it drags past the
+            // grace race below it falls back to post-response after() seeding.
+            // Never rejects: null = prep failed → legacy seeding at the persist site.
+            const blogPrepPromise: Promise<PreparedBlogPost[] | null> = prepareBlogPosts({
+                payload,
+                tenantId: resolvedTenantId,
+                category: resolveComposerCategory(businessInfo.industry),
+                businessName: businessInfo.businessName,
+                products: parseProductsString(businessInfo.products),
+                industry: businessInfo.industry,
+                seed: computeGenSeed(businessInfo),
+                pixabayGate: sampleProductsPromise.then(() => undefined, () => undefined),
+            }).catch((): null => null)
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -578,6 +652,13 @@ export async function POST(req: NextRequest) {
                         )
                     }
 
+                    // Phase 06 — await the pre-upload map kicked off alongside
+                    // imagePoolPromise above. Flag off / pool-build failed / no
+                    // pool needs = resolves an already-empty Map (0ms wait),
+                    // and batchFetchFromPool treats an empty map exactly like
+                    // an absent one (legacy inline download+upload path).
+                    const preUploadedPool = await preUploadedPoolPromise
+
                     await trackPhase('media', () =>
                         fulfillImageNeeds(
                             needs,
@@ -593,6 +674,7 @@ export async function POST(req: NextRequest) {
                                 mood: _themeMoodForPool,
                                 pool: imagePool ?? undefined,
                                 englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
+                                preUploadedPool: preUploadedPool.size > 0 ? preUploadedPool : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
@@ -857,10 +939,20 @@ export async function POST(req: NextRequest) {
                 '/contact': seedNavLabels.contact,
             }
             : null
-        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => {
-            const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
-            return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
-        })
+        // Dedupe by URL — a duplicate slug (should not happen after
+        // canonicalizePageSlug trusts canonical slugs, but keep as a guard)
+        // must never render two identical nav links / a phantom entry.
+        const _seenNavUrls = new Set<string>()
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions
+            .map((p) => {
+                const url = p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`
+                return { label: SLUG_NAV_LABELS?.[url] ?? p.title, url }
+            })
+            .filter((link) => {
+                if (_seenNavUrls.has(link.url)) return false
+                _seenNavUrls.add(link.url)
+                return true
+            })
 
         // Fix hero/cta CTA URLs to use canonical page slugs from the generated site.
         // Covers both multi-page (result.pages[].blocks) and single-page fallback paths —
@@ -1130,19 +1222,10 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
-        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
-        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
-        if (resolvedTenantId) {
-            const _seedCategory = safeSiteType
-            import('@/lib/images/image-library-seeder')
-                .then(({ seedImageLibraryForSite }) =>
-                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
-                )
-                .catch(err =>
-                    console.error('[generate-site] image-library seed failed',
-                        err instanceof Error ? err.message : err),
-                )
-        }
+        // GH-727 imglib seeding moved to after() — scheduled next to the blog
+        // seed below (gen-perf plan 260703 phase-02). Raw fire-and-forget here
+        // was killed on Vercel function freeze and its ~15 media creates
+        // contended with critical-path uploads before `done`.
 
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
@@ -1334,24 +1417,86 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
         }
 
-        // Seed 3 blog posts after response is sent (non-fatal, skips on regenerate).
-        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
-        const _blogSeedTask = () =>
-            seedBlogPosts(
-                payload,
-                resolvedTenantId,
-                site.id as string | number,
-                resolveComposerCategory(businessInfo.industry),
-                businessInfo.businessName,
-                user.id,
-                parseProductsString(businessInfo.products),
-                businessInfo.industry,
-                computeGenSeed(businessInfo),
-            ).catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
-        try {
-            after(_blogSeedTask)
-        } catch {
-            void _blogSeedTask()
+        // gen-perf blog-inline: blog prep overlapped the GPT window (kicked
+        // pre-AI above) — persist the 3 prepared posts BEFORE `done` so the
+        // blog page ships complete. The grace race bounds the worst case: if
+        // prep is still running (Pixabay/GPT drag) or failed (null), fall back
+        // to post-response seeding via after() exactly like the old path.
+        // Internal tuning knob (tests use a tiny value to exercise the
+        // pending branch deterministically) — not required in production env.
+        // `|| 15_000` (not `?? `) so an empty-string env (the .env.*.example ship
+        // `GEN_BLOG_PREP_GRACE_MS=`) or a non-numeric value → default, not 0ms
+        // (grace 0 disables inline-persist entirely, always falling to after()).
+        const BLOG_PREP_GRACE_MS = Number(process.env.GEN_BLOG_PREP_GRACE_MS) || 15_000
+        let blogGraceTimer: ReturnType<typeof setTimeout> | undefined
+        const preparedBlogs = await Promise.race([
+            blogPrepPromise,
+            new Promise<'pending'>((resolve) => { blogGraceTimer = setTimeout(() => resolve('pending'), BLOG_PREP_GRACE_MS) }),
+        ])
+        if (blogGraceTimer) clearTimeout(blogGraceTimer)
+        if (Array.isArray(preparedBlogs) && preparedBlogs.length > 0) {
+            const blogsCreated = await persistBlogPosts(payload, preparedBlogs, resolvedTenantId, site.id as string | number, user.id)
+                .catch(err => { console.warn('[generate-site] inline blog persist failed (non-fatal):', (err as Error).message); return 0 })
+            console.info(`[generate-site] blog posts inline: ${blogsCreated}/${preparedBlogs.length}`)
+        } else if (preparedBlogs === 'pending' || preparedBlogs === null) {
+            // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+            const _blogSeedTask = () =>
+                blogPrepPromise
+                    .then((prepared) => {
+                        if (Array.isArray(prepared) && prepared.length > 0) {
+                            return persistBlogPosts(payload, prepared, resolvedTenantId, site.id as string | number, user.id)
+                        }
+                        if (prepared === null) {
+                            // Prep failed entirely — legacy full seeding (skips on regenerate).
+                            return seedBlogPosts(
+                                payload,
+                                resolvedTenantId,
+                                site.id as string | number,
+                                resolveComposerCategory(businessInfo.industry),
+                                businessInfo.businessName,
+                                user.id,
+                                parseProductsString(businessInfo.products),
+                                businessInfo.industry,
+                                computeGenSeed(businessInfo),
+                            )
+                        }
+                        return 0
+                    })
+                    .catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+            try {
+                after(_blogSeedTask)
+            } catch {
+                void _blogSeedTask()
+            }
+        }
+        // preparedBlogs === [] → tenant already has posts (regenerate) — nothing to seed.
+
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category.
+        // gen-perf phase-02: scheduled via after() (was mid-pipeline raw
+        // fire-and-forget) so it runs reliably post-response on Vercel and
+        // its media creates never contend with critical-path uploads.
+        // Use safeSiteType (same key used by storefront blocks) so seeder
+        // alt keys match resolver lookups. Seeder is idempotent + never
+        // throws; until rows land, blocks fall back to static CDN images.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            const _imglibSeedTask = () => {
+                const t = Date.now()
+                console.info(`[generate-site] imglib seed start t=${t - startTime}ms site=${site.id}`)
+                return import('@/lib/images/image-library-seeder')
+                    .then(({ seedImageLibraryForSite }) =>
+                        seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                    )
+                    .catch(err =>
+                        console.error('[generate-site] image-library seed failed',
+                            err instanceof Error ? err.message : err),
+                    )
+            }
+            try {
+                after(_imglibSeedTask)
+            } catch {
+                void _imglibSeedTask()
+            }
         }
 
             const timeMs = Date.now() - startTime
@@ -1723,11 +1868,26 @@ function createPageHero(baseHero: AIBlock | null, options: {
 // GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
 // for well-known pages (e.g. slug "free-trial" instead of "contact").
 // Detection priority: block content (structural) > title keyword match.
-function canonicalizePageSlug(
+// The known-good sub-page slugs — a page already carrying one of these is
+// trusted verbatim (see canonicalizePageSlug).
+const CANONICAL_SUBPAGE_SLUGS: ReadonlySet<string> = new Set(['/about', '/services', '/contact', '/blog'])
+
+export function canonicalizePageSlug(
     page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
     index: number,
 ): string {
     if (page.isHomepage === true || index === 0) return '/'
+    // Trust an ALREADY-canonical incoming slug and skip title/content re-derivation.
+    // The parallel-split path (gen-page-split.ts) validates + rewrites each sub-page
+    // slug against a fixed plan; re-deriving from title here could flip a correct
+    // "/contact" back to "/about" when the page's content resembles About (nano
+    // sometimes fills the contact slot with About-ish content) — producing a
+    // duplicate "/about" that fails the unique (site, slug) create and drops
+    // /contact, leaving a duped "Giới Thiệu" nav entry (live 2026-07-08, dental).
+    // GH-820's target (arbitrary invented slugs like "free-trial") are NOT in this
+    // set, so they still get normalized below.
+    const incoming = (page.slug || '').startsWith('/') ? (page.slug || '') : `/${page.slug || ''}`
+    if (CANONICAL_SUBPAGE_SLUGS.has(incoming)) return incoming
     // Title is authoritative — AI titles are reliable signals and checked first to
     // avoid misclassifying pages that include secondary structural blocks (e.g. a
     // Services page with a contact form at the bottom must not become slug 'contact').
