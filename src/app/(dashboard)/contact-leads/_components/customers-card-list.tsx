@@ -25,7 +25,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
     const c = t.dashboard.customers
 
     if (records.length === 0) {
-        return <TableEmptyState icon={<Users />} title={c.empty} />
+        return <TableEmptyState icon={<Users />} title={c.empty} subtitle={c.emptySubtitle} />
     }
 
     return (

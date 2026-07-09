@@ -68,7 +68,7 @@ export function CustomersTable({ records, loading = false, total, page, limit, s
 
     if (!loading && records.length === 0) {
         return (
-            <TableEmptyState icon={<Users />} title={c.empty} />
+            <TableEmptyState icon={<Users />} title={c.empty} subtitle={c.emptySubtitle} />
         )
     }
 
