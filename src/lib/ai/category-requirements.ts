@@ -110,23 +110,23 @@ export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
  * landing on the default `form` layout.
  *
  * All listed variant ids must exist in `src/blocks/contact/config.ts`.
- * Supported set: form / info-only / split / card-float / map-split / minimal-inline.
+ * Supported set: form / info-only / split / card-float / minimal-inline.
  */
 export const CONTACT_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
-    beauty: ['card-float', 'form', 'map-split'],
-    restaurant: ['map-split', 'split', 'form'],
-    fnb: ['map-split', 'card-float', 'split'],
+    beauty: ['card-float', 'form'],
+    restaurant: ['split', 'form'],
+    fnb: ['card-float', 'split'],
     tech: ['form', 'split', 'card-float'],
-    health: ['map-split', 'form', 'split'],
+    health: ['form', 'split'],
     education: ['split', 'form', 'card-float'],
-    realestate: ['map-split', 'form', 'split'],
+    realestate: ['form', 'split'],
     fitness: ['split', 'card-float', 'form'],
     creative: ['card-float', 'split', 'form'],
-    business: ['form', 'split', 'map-split'],
+    business: ['form', 'split'],
     ecommerce: ['form', 'card-float', 'split'],
-    events: ['map-split', 'split', 'card-float'],
+    events: ['split', 'card-float'],
     blog: ['form', 'info-only', 'split'],
-    travel: ['map-split', 'card-float', 'split'],
+    travel: ['card-float', 'split'],
 }
 
 /**

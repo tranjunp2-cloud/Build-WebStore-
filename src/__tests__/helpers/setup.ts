@@ -11,3 +11,12 @@ if (typeof global.ResizeObserver === 'undefined') {
         unobserve: vi.fn(),
     }))
 }
+
+// IntersectionObserver is not implemented in jsdom — provide a no-op stub for framer-motion
+if (typeof global.IntersectionObserver === 'undefined') {
+    global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+        observe: vi.fn(),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+    }))
+}

@@ -62,7 +62,7 @@ Template path (không qua AI):
 | testimonials | cards, carousel, simple, masonry, spotlight, minimal-quote, avatar-row, video-text | cards |
 | navigation | simple, centered, mega-menu, transparent, sidebar, pill | simple |
 | footer | simple, expanded, minimal, centered-stack, mega-footer, dark-gradient | simple |
-| contact | form, info-only, split, card-float, map-split, minimal-inline | form |
+| contact | form, info-only, split, card-float, minimal-inline | form |
 | pricing | cards, table, horizontal, toggle, tiered, comparison, minimal, slider | cards |
 | gallery | grid, masonry, carousel, lightbox, filmstrip, justified | grid |
 | cta | banner, inline, floating | banner |
