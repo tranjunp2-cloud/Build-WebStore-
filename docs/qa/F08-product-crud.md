@@ -647,3 +647,87 @@ inflated number instead of starting at 0.
 | **TC-F08-1525-61** | Product already has variants → a genuinely new combo defaults to stock=0, not the inflated base.inventory | new row stock=0; existing rows keep their own | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
 | **TC-F08-1525-62** | Component-level: real Generate-button click flow — first generate seeds 40 per row (Inventory=40), adding an option later → new row stock=0, not the inflated 80 | M/L stay 40, new XL row=0 | src/__tests__/unit/dashboard/variant-options-new-row-stock.test.tsx |
 
+### Clear-All-Variants → Regenerate Re-Inflate (PR code-review adversarial finding H1)
+
+Root cause: `isFirstEverGenerate` (`currentVariants.length === 0`) can't distinguish
+"never had variants" from "had variants, all options cleared" — both collapse to the
+same check. Re-adding options and regenerating re-seeded every row from a possibly-stale
+`baseInventory`.
+
+First fix attempt force-reset `baseInventory` to 0 whenever variants transitioned
+non-empty→empty. This fixed H1 but was itself a regression: it violated the separately
+documented, separately tested GH-1525 issue-2 "decision #1" contract — master fields
+must retain their prior value when variants are cleared, never force-reset (see
+`plans/260708-1525-product-detail-list-ux/phase-02-master-fields-disable.md`,
+TC-F08-1525-13). That regression was invisible to TC-F08-1525-13 because it renders
+`MasterFieldsSection` in isolation, so `VariantOptionsSection`'s sync effect never runs
+there — confirmed via a new integration test (TC-F08-1525-64) that mounts both sibling
+components together as `ProductForm.tsx` does in production.
+
+Corrected fix: the `baseInventory`-sync effect is left as it always was (sync UP only,
+never force-reset). Instead, `VariantOptionsSection` tracks a session-level
+`hasEverGeneratedRef` (true once any non-empty matrix has been generated; lazy-inits
+true when editing a product that already has variants) and passes it into
+`buildVariantMatrix` as `hasEverGeneratedNonEmpty`. A brand-new row now only seeds from
+`base.inventory` when `currentVariants.length === 0 && !hasEverGeneratedNonEmpty` — a
+genuinely first-ever generate. Once the session has generated before, new rows seed 0
+regardless of what `currentVariants.length` currently reads, so a stale-but-intact
+`baseInventory` can never re-inflate stock, and the field itself is never touched by a
+forced reset.
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-63** | Inventory=100 → generate 2 rows (sum-synced to 200) → clear all options → re-add → generate again → new rows must start at 0, not the stale sum | new rows seed at 0; baseInventory itself is never force-reset (stays intact at whatever it last synced to) | src/__tests__/unit/dashboard/variant-options-new-row-stock.test.tsx |
+| **TC-F08-1525-64** | Integration: MasterFieldsSection + VariantOptionsSection mounted together (matches ProductForm.tsx) — generate → delete all options → baseInventory must NOT be forced to 0; Inventory field re-shows the retained value | baseInventory retained (not 0); Inventory input re-shown, enabled, with that value | src/__tests__/unit/dashboard/master-fields-baseinventory-retained-on-clear.test.tsx |
+
+### Cleared Numeric Field Freezes at 0 on Regenerate (PR code-review finding L4)
+
+Root cause: `existing.field != null` in `buildVariantMatrix` treated a user-cleared
+input as a real value. RHF's plain `register()` on a `type="number"` input stores the
+raw DOM value, so a cleared field is the runtime string `''`, not `undefined` — and
+`'' != null` is `true`, so `Number('')` (`=== 0`) got baked into the row on the very
+next regenerate-triggering action (an unrelated tier edit, a debounced baseSku change,
+tier deletion — not just an explicit "Generate" click). Fixed by a `hasNumericValue()`
+helper (`variant-utils.ts`) that excludes `''` alongside `null`/`undefined`, used at all
+3 sites reading an existing row's own price/stock/compareAtPrice. A cleared price now
+correctly falls back to `base.price` (was silently freezing at `$0` — a real sell-for-
+free risk); a cleared compareAtPrice now correctly resolves to `undefined` (was `0`).
+Stock's behavior is unchanged (still falls to `0`, the existing out-of-stock-until-
+confirmed convention) since an existing row is never `isFirstEverGenerate`.
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-65** | Existing row's price cleared (`''`) → regenerate | falls back to `base.price`, not frozen at `0` | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-66** | Existing row's compareAtPrice cleared (`''`), baseline unknown (`null`) → regenerate | resolves to `undefined`, not `0` | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+| **TC-F08-1525-67** | Existing row's stock cleared (`''`) → regenerate | resolves to `0` (unchanged — regression guard) | src/__tests__/unit/dashboard/products-variant-utils.test.ts |
+
+**Correction (adversarial review, same session):** this section originally deferred
+`VariantOptionsSection.tsx`'s `basePrice`/`compareAtPrice` auto-fill effect as
+"display-only, not persisted" — that claim was **wrong** and has been fixed, not
+deferred (see below). Only the `baseInventory` sum-sync effect is genuinely display-only
+(a running total recomputed from `variantsLive` on every render, never the sole source
+written to the submit payload) and remains correctly out of scope.
+
+### Auto-Fill Effect Freezes basePrice at $0 — Sell-For-Free Risk (adversarial-review finding, same pattern as L4)
+
+The `basePrice`/`compareAtPrice` auto-fill effect ("Bug 7", `VariantOptionsSection.tsx`)
+had the identical `v.price != null ? Number(v.price) : 0` flaw as L4, but unlike the
+sum-sync effect it **does** persist: clearing one variant row's price immediately
+force-writes the (hidden, invisible while variants exist) `basePrice` field to `0` via
+`setValue`. Any unrelated regenerate afterward (editing a different tier, deleting a
+tier, a debounced baseSku change) then bakes that corrupted `0` into `base.price`, which
+`buildVariantMatrix`'s (correct) `hasNumericValue` fallback faithfully applies to the
+cleared row — reaching the submit payload as a literal `price: 0`. Fixed by excluding
+mid-clear rows from the `Math.min`/`Math.max` computation (via the same exported
+`hasNumericValue` helper) instead of counting them as `0`, and skipping the `basePrice`
+write entirely on a render where every row is currently mid-clear (never force it to a
+fabricated value). `compareAtPrice`'s `Math.max` was not actually exploitable the same
+way (a spurious `0` can never win a max against real positive prices) but was aligned
+for consistency. The `derivedMinPrice`/`derivedMaxCompareAt` display hint above the SKU
+matrix had the same pattern and was fixed too (lower severity — display-only, but why
+leave a matching bug two lines away).
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-1525-68** | Real `fireEvent.change` clears an existing row's price input → basePrice must not freeze at 0 → unrelated regenerate → row price must fall back to base.price, not 0 | basePrice stays intact through the clear; regenerated row price = base.price, never 0 | src/__tests__/unit/dashboard/variant-options-price-baseline-regen.test.tsx |
+

@@ -1,3 +1,13 @@
+// RHF's plain `register()` on a `type="number"` input stores the raw DOM value, so a
+// cleared field is the empty string `''` at runtime — not `undefined` — even though
+// VariantRowInput types it as `number | undefined`. `x != null` alone treats `''` as a
+// real value (`Number('') === 0`), silently baking a user's in-progress clear into a
+// permanent 0 on the next regenerate (code-review finding L4). Use this everywhere an
+// existing row's numeric field is read as "does this have a real value".
+export function hasNumericValue(v: unknown): v is number {
+    return v !== undefined && v !== null && v !== ''
+}
+
 /** Returns true if the tier has a name AND at least one non-empty option value. */
 export function isNonEmptyTier(tier: { name?: string; options?: string[] }): boolean {
     return !!(tier.name?.trim() && (tier.options || []).some(o => o?.trim()))
@@ -58,6 +68,13 @@ export type VariantRow = Required<Pick<VariantRowInput, 'variantName'>> & {
  * the master value whenever that row's price happened to be unchanged).
  * When prevBaseSku is provided, auto-generated SKUs (matching `${prevBaseSku}-${suffix}`)
  * are updated to use the new base.sku prefix; manually customized SKUs are preserved.
+ * hasEverGeneratedNonEmpty distinguishes a genuinely first-ever generate from a
+ * cleared-then-regenerated one (both look like `currentVariants.length === 0`) so new
+ * rows don't seed from a possibly-stale base.inventory (H1).
+ * An existing row's own price/stock/compareAtPrice that the user cleared to '' is
+ * treated as "no value" (not the number 0) via hasNumericValue — regenerating a
+ * cleared price/compareAtPrice falls back to base.price/undefined instead of freezing
+ * at 0 (L4).
  */
 export function buildVariantMatrix(
     combinations: string[][],
@@ -66,6 +83,7 @@ export function buildVariantMatrix(
     prevBasePrice: number | null,
     prevBaseSku?: string,
     prevBaseCompareAtPrice?: number | null,
+    hasEverGeneratedNonEmpty?: boolean,
 ): VariantRow[] {
     return combinations.map((combo) => {
         const variantName = combo.join(' - ')
@@ -84,17 +102,23 @@ export function buildVariantMatrix(
         // each Generate click multiplied total stock by the variant count (GH-1525
         // follow-up bug: "stock cộng dồn cực lớn").
         //
-        // A brand-new row's default depends on whether the product already had variants
-        // BEFORE this generate call:
-        // - First-ever generate (currentVariants empty) → seed from base.inventory (the
-        //   value the user typed into Inventory before turning variants on — a real seed).
-        // - Product already has variants → base.inventory is the auto-synced SUM of all
-        //   existing stock, not a meaningful per-row seed, so a genuinely new row (e.g.
-        //   from adding an option to an existing matrix) starts at 0 (out of stock until
-        //   the merchant confirms — matches the AI bulk-create convention elsewhere).
-        const isFirstEverGenerate = currentVariants.length === 0
-        const stock = existing?.stock != null
-            ? Number(existing.stock)
+        // A brand-new row's default depends on whether the product has EVER had a
+        // non-empty variant matrix this session, not just on whether currentVariants is
+        // empty right now — `currentVariants.length === 0` alone can't tell "genuinely
+        // first-ever generate" apart from "had variants, user cleared all options, now
+        // regenerating" (code-review adversarial finding H1). In the latter case
+        // base.inventory is likely a stale auto-synced SUM from before the clear (per
+        // GH-1525 issue-2 decision #1, master fields are never force-reset when variants
+        // are cleared — see VariantOptionsSection's baseInventory-sync effect), so it is
+        // NOT a meaningful per-row seed there even though currentVariants is [].
+        // - Genuinely first-ever generate → seed from base.inventory (the value the user
+        //   typed into Inventory before turning variants on — a real seed).
+        // - Otherwise (already generated before, incl. cleared-then-regenerated, or a
+        //   genuinely new row added to an existing matrix) → starts at 0 (out of stock
+        //   until the merchant confirms — matches the AI bulk-create convention elsewhere).
+        const isFirstEverGenerate = currentVariants.length === 0 && !hasEverGeneratedNonEmpty
+        const stock = hasNumericValue(existing?.stock)
+            ? Number(existing!.stock)
             : (isFirstEverGenerate ? base.inventory : 0)
 
         if (!existing) {
@@ -114,14 +138,14 @@ export function buildVariantMatrix(
         // prevBasePrice/prevBaseCompareAtPrice === null (unknown baseline, e.g. first
         // generate in an edit session) → always preserve, never wipe pre-existing data.
         const priceCustomized = prevBasePrice === null || Number(existing.price) !== prevBasePrice
-        const existingCompare = existing.compareAtPrice != null ? Number(existing.compareAtPrice) : undefined
+        const existingCompare = hasNumericValue(existing.compareAtPrice) ? Number(existing.compareAtPrice) : undefined
         const compareCustomized = prevBaseCompareAtPrice == null || existingCompare !== prevBaseCompareAtPrice
 
         return {
             id: existing.id || crypto.randomUUID(),
             variantName: existing.variantName,
             skuCode: resolveSku(existing.skuCode),
-            price: priceCustomized && existing.price != null ? Number(existing.price) : base.price,
+            price: priceCustomized && hasNumericValue(existing.price) ? Number(existing.price) : base.price,
             stock,
             compareAtPrice: compareCustomized ? existingCompare : (base.compareAtPrice || undefined),
         }

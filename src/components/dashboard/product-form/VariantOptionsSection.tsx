@@ -9,7 +9,7 @@ import { cn, formatPrice } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { useDebounce } from '@/hooks/useDebounce'
 import { SkuMatrixMobile } from './SkuMatrixMobile'
-import { computeDuplicateIndicesForOptions, isNonEmptyTier, buildVariantMatrix, cartesianProductOfTiers } from './variant-utils'
+import { computeDuplicateIndicesForOptions, isNonEmptyTier, buildVariantMatrix, cartesianProductOfTiers, hasNumericValue } from './variant-utils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -47,26 +47,47 @@ export function VariantOptionsSection() {
     const currency = useWatch({ control, name: 'currency' }) ?? 'MYR'
     const baseSku = useWatch({ control, name: 'baseSku' })
 
-    const derivedMinPrice = useMemo(
-        () => variantsLive?.length
-            ? Math.min(...variantsLive.map(v => v.price != null ? Number(v.price) : 0))
-            : null,
-        [variantsLive]
-    )
-    const derivedMaxCompareAt = useMemo(
-        () => variantsLive?.length
-            ? Math.max(...variantsLive.map(v => v.compareAtPrice != null ? Number(v.compareAtPrice) : 0)) || null
-            : null,
-        [variantsLive]
-    )
+    // hasNumericValue excludes a row mid-clear ('') from the derived min/max — otherwise
+    // a row the user is about to retype a price into drags the displayed hint to 0 (L4-
+    // adjacent bug: same '' != null pitfall as buildVariantMatrix, caught by adversarial
+    // review while verifying the auto-fill effect below).
+    const derivedMinPrice = useMemo(() => {
+        const priced = (variantsLive || []).filter(v => hasNumericValue(v.price))
+        return priced.length ? Math.min(...priced.map(v => Number(v.price))) : null
+    }, [variantsLive])
+    const derivedMaxCompareAt = useMemo(() => {
+        const compared = (variantsLive || []).filter(v => hasNumericValue(v.compareAtPrice))
+        return compared.length ? Math.max(...compared.map(v => Number(v.compareAtPrice))) || null : null
+    }, [variantsLive])
 
-    // Sync baseInventory = sum of all variant stocks whenever variants change
+    // Sync baseInventory = sum of all variant stocks whenever variants change.
+    // Deliberately does NOT reset baseInventory when variants become empty (all tiers/
+    // options cleared) — MasterFieldsSection's re-shown Inventory field must retain its
+    // prior value verbatim (GH-1525 issue-2 "decision #1", see
+    // plans/260708-1525-product-detail-list-ux/phase-02-master-fields-disable.md:
+    // "Never call setValue/reset on toggle"). A field-array-cleared value staying stale
+    // is fine — the user can see/edit it; what must NOT happen is silently seeding new
+    // variant rows FROM that stale sum, which is guarded separately via
+    // `hasEverGeneratedRef` below (code-review adversarial finding H1).
     useEffect(() => {
         if (!hasVariants || !variantsLive?.length) return
         const total = variantsLive.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
         setValue('baseInventory', total, { shouldDirty: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [variantsLive, hasVariants])
+
+    // Tracks whether a non-empty variant matrix has EVER been generated this session —
+    // separate from `variants.length` (which goes back to 0 when the user clears all
+    // options) and separate from `baseInventory` (which per decision #1 above must stay
+    // whatever it was). Lazy-inits true when editing an existing product that already
+    // has variants on mount, same rationale as lastGeneratedTiersSignatureRef below.
+    // buildVariantMatrix uses this to tell "genuinely first-ever generate" (safe to seed
+    // new rows from base.inventory) apart from "cleared then regenerated" (base.inventory
+    // may be a stale sum — new rows must start at 0 instead; H1).
+    const hasEverGeneratedRef = useRef(false)
+    if (!hasEverGeneratedRef.current) {
+        hasEverGeneratedRef.current = (getValues('variants') || []).length > 0
+    }
 
     const isAllTiersEmpty = watchedTiers.every(
         t => !t.name?.trim() && (t.options || []).every(o => !o?.trim())
@@ -138,30 +159,49 @@ export function VariantOptionsSection() {
             null,
             lastGeneratedBaseSkuRef.current ?? undefined,
             null,
+            hasEverGeneratedRef.current,
         )
         replaceVariants(next)
+        hasEverGeneratedRef.current = true
         lastGeneratedBaseSkuRef.current = baseSkuValue
         lastGeneratedTiersSignatureRef.current = tiersSignature(allTiers)
     }
 
     // Auto-fill basePrice/compareAtPrice from variant matrix (Bug 7)
-    // Keeps root DB fields accurate without requiring manual entry
+    // Keeps root DB fields accurate without requiring manual entry.
+    // Rows mid-clear ('') are excluded from min/max via hasNumericValue, NOT counted as
+    // 0 — the old `v.price != null ? Number(v.price) : 0` treated a cleared row's price
+    // as a real $0 and force-wrote it into the (hidden, invisible) basePrice field on
+    // every keystroke; the next unrelated regenerate then baked that corrupted $0 into
+    // base.price for every row via buildVariantMatrix, reaching the submit payload as a
+    // literal price:0 — a real sell-for-free risk (adversarial-review finding, caught
+    // while verifying the L4 fix). If EVERY row's price is currently mid-clear, skip the
+    // basePrice write entirely this render rather than force it to a fabricated 0 —
+    // same "never force a master field from incomplete derived data" principle as the
+    // baseInventory-sync effect above.
     useEffect(() => {
         if (!hasVariants || !variantsLive?.length) return
-        const minPrice = Math.min(...variantsLive.map(v => v.price != null ? Number(v.price) : 0))
-        const maxCompare = Math.max(...variantsLive.map(v => v.compareAtPrice != null ? Number(v.compareAtPrice) : 0))
+        const pricedRows = variantsLive.filter(v => hasNumericValue(v.price))
+        const comparedRows = variantsLive.filter(v => hasNumericValue(v.compareAtPrice))
         const curBase = Number(getValues('basePrice')) || 0
         const curCompare = Number(getValues('compareAtPrice')) || 0
-        if (minPrice !== curBase) {
-            setValue('basePrice', minPrice, { shouldDirty: false, shouldValidate: false })
-            // Keep the "last generated" baseline in lockstep with this auto-sync — otherwise
-            // editing ONE row's price (which shifts min/max here) leaves lastGeneratedBasePriceRef
-            // stale, so a LATER regenerate (e.g. triggered by adding an unrelated tier option)
-            // compares OTHER untouched rows against the wrong baseline and silently resets their
-            // price (adversarial-review bug: "spooky action at a distance" price reset).
-            lastGeneratedBasePriceRef.current = minPrice
+        if (pricedRows.length > 0) {
+            const minPrice = Math.min(...pricedRows.map(v => Number(v.price)))
+            if (minPrice !== curBase) {
+                setValue('basePrice', minPrice, { shouldDirty: false, shouldValidate: false })
+                // Keep the "last generated" baseline in lockstep with this auto-sync — otherwise
+                // editing ONE row's price (which shifts min/max here) leaves lastGeneratedBasePriceRef
+                // stale, so a LATER regenerate (e.g. triggered by adding an unrelated tier option)
+                // compares OTHER untouched rows against the wrong baseline and silently resets their
+                // price (adversarial-review bug: "spooky action at a distance" price reset).
+                lastGeneratedBasePriceRef.current = minPrice
+            }
         }
-        // Collapses set+clear into one guarded write: undefined when no variant has a sale price
+        // compareAtPrice uses Math.max, not Math.min — a cleared row's excluded '' can
+        // never fabricate a spurious max the way it could a spurious min, so (unlike
+        // price above) this branch always runs, preserving the original "no variant has
+        // a sale price → undefined" sync behavior exactly.
+        const maxCompare = comparedRows.length > 0 ? Math.max(...comparedRows.map(v => Number(v.compareAtPrice))) : 0
         const newCompare = maxCompare > 0 ? maxCompare : undefined
         if (newCompare !== (curCompare || undefined)) {
             setValue('compareAtPrice', newCompare, { shouldDirty: false, shouldValidate: false })
@@ -226,12 +266,14 @@ export function VariantOptionsSection() {
                 prevBase,
                 lastGeneratedBaseSkuRef.current ?? undefined,
                 prevCompareAtPrice,
+                hasEverGeneratedRef.current,
             )
             lastGeneratedBasePriceRef.current = Number(basePrice)
             lastGeneratedCompareAtPriceRef.current = Number(compareAtPrice) || null
             lastGeneratedTiersSignatureRef.current = tiersSignature(currentTiers)
             lastGeneratedBaseSkuRef.current = String(baseSkuValue)
             replaceVariants(newVariants)
+            hasEverGeneratedRef.current = true
         } finally {
             setIsGenerating(false)
         }

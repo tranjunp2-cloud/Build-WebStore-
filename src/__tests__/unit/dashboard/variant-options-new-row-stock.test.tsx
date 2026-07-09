@@ -81,3 +81,73 @@ describe('[TC-F08-1525-62] VariantOptionsSection new-row stock defaults to 0 onc
         expect(result.find(v => v.variantName === 'XL')!.stock).toBe(0)
     })
 })
+
+// ── TC-F08-1525-63: clear-then-regenerate no longer re-inflates stock, AND baseInventory
+// stays intact (does not violate GH-1525 issue-2 "decision #1" — no reset) ──
+// Code-review adversarial finding (H1): `isFirstEverGenerate` in buildVariantMatrix can't
+// distinguish "product never had variants" from "product HAD variants, all options were
+// cleared" — both present as `currentVariants.length === 0`. After Inventory=100 →
+// generate 2 rows (each 100, synced total 200) → delete all options → re-add + generate
+// again, every new row was re-seeded from the STALE total (200 each, not 0) — the exact
+// "stock cộng dồn" bug class this file's other tests already guard against, just reachable
+// via a clear-then-regenerate path instead of a repeated-Generate-click path.
+// First fix attempt force-reset baseInventory to 0 on clear, which fixed H1 but broke the
+// separately-documented, separately-tested "decision #1" contract (master fields retain
+// their prior value when variants are cleared — phase-02-master-fields-disable.md,
+// TC-F08-1525-13 in master-fields-disable.test.tsx). The correct fix tracks a session-level
+// `hasEverGeneratedRef` (see VariantOptionsSection) so new-row seeding no longer trusts a
+// possibly-stale baseInventory once the session has generated before — WITHOUT ever
+// force-resetting the field itself.
+
+describe('[TC-F08-1525-63] VariantOptionsSection: clear-then-regenerate seeds 0, baseInventory stays intact', () => {
+    function deleteOptionRowFor(displayValue: string) {
+        const input = screen.getByDisplayValue(displayValue)
+        const row = input.closest('div.flex.items-center.gap-2') as HTMLElement
+        const btn = row.querySelector('button') as HTMLButtonElement
+        fireEvent.click(btn)
+    }
+
+    it('TC-F08-1525-63: Inventory=100 → generate → clear all options → re-add → generate again → rows start at 0, baseInventory left intact (not reset, not re-inflated)', async () => {
+        // Arrange: generate Red/Blue at Inventory=100 (each row seeds 100, sum-synced to 200)
+        render(<Wrapper />)
+        const methods = getMethods()
+        await act(async () => {
+            methods.setValue('tiers', [{ id: 't1', name: 'Color', options: ['Red', 'Blue'] }])
+            methods.setValue('baseInventory', 100)
+        })
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /generate variants/i }))
+            await Promise.resolve()
+        })
+        expect(Number(methods.getValues('baseInventory'))).toBe(200)
+
+        // Act: delete both option rows — clears the matrix entirely (combinations=0)
+        await act(async () => { deleteOptionRowFor('Red') })
+        await act(async () => { deleteOptionRowFor('Blue') })
+
+        // Assert: variants cleared, but baseInventory is left INTACT (not force-reset to 0) —
+        // per decision #1, clearing variants must never force-reset a master field (matches
+        // TC-F08-1525-13). Deleting one option row at a time means the sync effect re-fires
+        // on the Red deletion (matrix shrinks to just Blue, stock 100) BEFORE the Blue
+        // deletion empties the matrix entirely — so the last-synced value carried forward is
+        // 100 (Blue's own stock), not the original 200 sum. Either way, the key invariant is
+        // it's never force-reset to 0.
+        expect(methods.getValues('variants')).toEqual([])
+        expect(Number(methods.getValues('baseInventory'))).toBe(100)
+
+        // Act: re-add the same options and generate again
+        await act(async () => {
+            methods.setValue('tiers', [{ id: 't1', name: 'Color', options: ['Red', 'Blue'] }])
+        })
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /generate variants/i }))
+            await Promise.resolve()
+        })
+
+        // Assert: new rows start at 0 — the session already generated once before, so the
+        // still-intact-but-stale baseInventory (200) must NOT be used as a per-row seed
+        const result = methods.getValues('variants') as Array<{ variantName: string; stock: number }>
+        expect(result.find(v => v.variantName === 'Red')!.stock).toBe(0)
+        expect(result.find(v => v.variantName === 'Blue')!.stock).toBe(0)
+    })
+})

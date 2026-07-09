@@ -282,6 +282,47 @@ describe('F08-bug-1032-04: buildVariantMatrix preserve logic', () => {
     })
 })
 
+// ── TC-F08-1525-65..67: cleared existing-row numeric fields must not freeze at 0 ──
+// Code-review finding L4: `existing.field != null` treated a user-cleared input
+// (runtime value '' from RHF's plain `type="number"` registration) as a real value —
+// `Number('') === 0` — so any regenerate-triggering action (unrelated tier edit,
+// debounced baseSku change, etc.) silently baked the cleared field to a permanent 0
+// instead of falling back to "not customized" / the master value.
+
+describe('TC-F08-1525-65..67: buildVariantMatrix treats a cleared (\'\') existing field as no-value, not 0', () => {
+    const base = { price: 20, inventory: 5, sku: 'SKU', compareAtPrice: 39 }
+    const combos = [['Red', 'S']]
+
+    it('TC-F08-1525-65: existing row with price cleared (\'\') falls back to base.price on regenerate, not frozen at 0', () => {
+        const current = [
+            { variantName: 'Red - S', price: '' as unknown as number, skuCode: 'SKU-RED-S', stock: 3 },
+        ]
+        const result = buildVariantMatrix(combos, base, current, 10)
+        const redS = result.find(r => r.variantName === 'Red - S')!
+        expect(redS.price).toBe(base.price)
+        expect(redS.price).not.toBe(0)
+    })
+
+    it('TC-F08-1525-66: existing row with compareAtPrice cleared (\'\') resolves to undefined, not 0', () => {
+        const current = [
+            { variantName: 'Red - S', price: 10, compareAtPrice: '' as unknown as number, skuCode: 'SKU-RED-S', stock: 3 },
+        ]
+        // prevBaseCompareAtPrice=null → "unknown baseline, always preserve existing" path
+        const result = buildVariantMatrix(combos, base, current, 10, undefined, null)
+        const redS = result.find(r => r.variantName === 'Red - S')!
+        expect(redS.compareAtPrice).toBeUndefined()
+    })
+
+    it('TC-F08-1525-67: existing row with stock cleared (\'\') resolves to 0 (out-of-stock default), same as before — no regression', () => {
+        const current = [
+            { variantName: 'Red - S', price: 20, skuCode: 'SKU-RED-S', stock: '' as unknown as number },
+        ]
+        const result = buildVariantMatrix(combos, base, current, 20)
+        const redS = result.find(r => r.variantName === 'Red - S')!
+        expect(redS.stock).toBe(0)
+    })
+})
+
 // ── F08-bug-1032-07: cartesianProductOfTiers ──────────────────────────────────
 // Pure helper extracted from generateSkuTable to power both the manual Generate
 // button and the auto-regenerate-on-delete path.
