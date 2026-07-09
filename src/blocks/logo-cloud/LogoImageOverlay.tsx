@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2 } from 'lucide-react'
 import { compressImage } from '@/lib/media/compress-image'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 const parentToast = {
@@ -19,6 +20,7 @@ type Props = {
 
 export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Props) {
     const isOwner = useIsOwner()
+    const isBuilderPreview = useIsBuilderPreview()
     const callback = useBlockEditCallback()
     const fileRef = useRef<HTMLInputElement>(null)
     const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -26,7 +28,10 @@ export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Prop
     const [isHovered, setIsHovered] = useState(false)
 
     useEffect(() => {
-        if (!isOwner || !callback) return
+        // GH-1461 adversarial-review fix: match the JSX render guard below so this effect
+        // never attaches listeners in builder-preview even if the isBuilderPreview->null
+        // callback invariant (enforced in SiteRenderer.tsx) is ever bypassed by a future caller.
+        if (!isOwner || !callback || isBuilderPreview) return
         const onBlur = () => {
             clearTimeout(hideTimer.current)
             setIsHovered(false)
@@ -36,9 +41,11 @@ export function LogoImageOverlay({ children, logoIndex, altText = 'Logo' }: Prop
             window.removeEventListener('blur', onBlur)
             clearTimeout(hideTimer.current)
         }
-    }, [isOwner, callback])
+    }, [isOwner, callback, isBuilderPreview])
 
-    if (!isOwner || !callback) return <>{children}</>
+    // GH-1461: AI Builder read-only preview panel — hide edit overlay even though
+    // isOwner is true there (isOwner stays true for analytics-exclusion purposes).
+    if (!isOwner || !callback || isBuilderPreview) return <>{children}</>
 
     const handleMouseEnter = () => {
         clearTimeout(hideTimer.current)

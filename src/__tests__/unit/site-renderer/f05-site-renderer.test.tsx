@@ -23,6 +23,8 @@ vi.mock('@/components/site-renderer/GoogleFontsLoader', () => ({
 // ── Imports — after mocks ──────────────────────────────────────────────────
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { blockRegistry } from '@/blocks/registry'
+import { useIsBuilderPreview } from '@/components/site-renderer/BuilderPreviewContext'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1870,5 +1872,137 @@ describe('[TC-F04-SR-07] SiteRenderer injects _logoHref into navigation blocks',
         // Assert — navigation block should receive safe fallback "#" when homepage not found
         expect(capturedBlocks.length).toBeGreaterThan(0)
         expect(capturedBlocks[0]._logoHref).toBe('#')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GH-1461 — SiteRenderer provides isBuilderPreview via BuilderPreviewContext so
+// block-level edit-affordance components (HeroMediaOverlay, LogoImageOverlay,
+// gallery, split-video) can hide themselves in the AI Builder read-only preview
+// even though isOwner stays true there (isOwner is also used for analytics
+// exclusion — see hero-media-overlay.test.tsx for the consumer-side behavior).
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[GH-1461] SiteRenderer BuilderPreviewContext wiring', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-GH1461-01: useIsBuilderPreview() returns true inside a block when isBuilderPreview=true', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={true}
+            />
+        )
+
+        expect(captured).toEqual([true])
+    })
+
+    it('TC-GH1461-02: useIsBuilderPreview() returns false inside a block when isBuilderPreview=false (real editor)', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={false}
+            />
+        )
+
+        expect(captured).toEqual([false])
+    })
+
+    it('TC-GH1461-03: useIsBuilderPreview() defaults to false when isBuilderPreview is omitted', () => {
+        const captured: boolean[] = []
+        const ProbeBlock = () => {
+            captured.push(useIsBuilderPreview())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+            />
+        )
+
+        expect(captured).toEqual([false])
+    })
+
+    // ── Adversarial-review follow-up: the PR's actual fix (SiteRenderer nullifying
+    // onBlockFieldChange whenever isBuilderPreview=true) was previously exercised by
+    // ZERO tests — every existing test either passed isBuilderPreview alone (no callback)
+    // or a callback alone (no isBuilderPreview). These 2 tests render BOTH together,
+    // proving the exact interaction the fix depends on. ────────────────────────────────
+
+    it('TC-GH1461-04: useBlockEditCallback() resolves to null when isBuilderPreview=true, even with a real onBlockFieldChange provided', () => {
+        const captured: unknown[] = []
+        const ProbeBlock = () => {
+            captured.push(useBlockEditCallback())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+        const onBlockFieldChange = vi.fn()
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={true}
+                onBlockFieldChange={onBlockFieldChange}
+            />
+        )
+
+        // This is the exact invariant PreviewSiteRenderer.tsx relies on for WhatsApp button
+        // preventDefault, cart-widget onClick, and CTA isEditing to behave correctly in
+        // the read-only AI Builder preview.
+        expect(captured).toEqual([null])
+    })
+
+    it('TC-GH1461-05: useBlockEditCallback() resolves to a real callback when isBuilderPreview=false (real editor), same onBlockFieldChange input', () => {
+        const captured: unknown[] = []
+        const ProbeBlock = () => {
+            captured.push(useBlockEditCallback())
+            return React.createElement('div', { 'data-testid': 'probe-block' })
+        }
+        mockGetComponent.mockReturnValue(ProbeBlock)
+        const onBlockFieldChange = vi.fn()
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={defaultPage}
+                pages={[]}
+                isOwner={true}
+                isBuilderPreview={false}
+                onBlockFieldChange={onBlockFieldChange}
+            />
+        )
+
+        expect(captured).toHaveLength(1)
+        expect(captured[0]).not.toBeNull()
+        expect((captured[0] as { blockIndex: number }).blockIndex).toBe(0)
     })
 })
