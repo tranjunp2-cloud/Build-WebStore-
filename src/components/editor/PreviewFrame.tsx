@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
 import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
+import { updateValueAtPath } from '@/lib/editor/update-value-at-path'
 
 const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText', 'tagline'])
 
@@ -183,24 +184,6 @@ function findStringFieldPathTwoPass(
     const exactMatch = findStringFieldPath(value, searchKey, oldHtml, [], true)
     if (exactMatch) return exactMatch
     return findStringFieldPath(value, searchKey, oldHtml, [], false)
-}
-
-function updateValueAtPath(
-    source: Record<string, unknown>,
-    path: Array<string | number>,
-    nextValue: string | number | Record<string, unknown>,
-): Record<string, unknown> {
-    const clone = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
-    let cursor: Record<string, unknown> | Array<unknown> = clone
-
-    for (let index = 0; index < path.length - 1; index += 1) {
-        cursor = (cursor as Record<string, unknown>)[path[index] as string] as Record<string, unknown> | Array<unknown>
-    }
-
-    const finalKey = path[path.length - 1]
-        ; (cursor as Record<string, unknown>)[finalKey as string] = nextValue
-
-    return clone
 }
 
 function getValueAtPath(source: Record<string, unknown>, path: Array<string | number>): unknown {
@@ -667,26 +650,57 @@ function PreviewFrameInner({
                 void (onInlineEditSaveRef.current?.() ?? performSave(false))
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
-                const currentBlocks = blocksRef.current
-                const isAllowedValue = (v: unknown): v is string | number | Record<string, unknown> =>
-                    typeof v === 'string' || typeof v === 'number' ||
-                    (v !== null && typeof v === 'object' && !Array.isArray(v))
-                if (currentBlocks[blockIndex] && isAllowedValue(value)) {
+                // GH-1381: ACK back to the iframe overlay so it toasts success only after the
+                // change is applied AND the save settles — the overlay used to toast success
+                // before this handler even ran, hiding apply/save failures (silent data loss).
+                const replyResult = (ok: boolean, error?: string) => {
+                    frameElementRef.current?.contentWindow?.postMessage(
+                        { type: 'BLOCK_FIELD_CHANGE_RESULT', blockIndex, field, ok, ...(error ? { error } : {}) },
+                        window.location.origin,
+                    )
+                }
+                try {
+                    const currentBlocks = blocksRef.current
+                    const isAllowedValue = (v: unknown): v is string | number | Record<string, unknown> =>
+                        typeof v === 'string' || typeof v === 'number' ||
+                        (v !== null && typeof v === 'object' && !Array.isArray(v))
+                    if (!currentBlocks[blockIndex] || !isAllowedValue(value)) {
+                        replyResult(false, 'Invalid change payload')
+                        return
+                    }
                     const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
                     const path = (field as string).split('.').map((seg: string) =>
                         /^\d+$/.test(seg) ? Number(seg) : seg
                     ).filter((seg) => !BLOCKED_PATH_SEGMENTS.has(String(seg))) as Array<string | number>
-                    if (path.length === 0) return
+                    if (path.length === 0) {
+                        replyResult(false, 'Invalid field path')
+                        return
+                    }
                     const clone = JSON.parse(JSON.stringify(currentBlocks))
                     const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
                     updateBlock(blockIndex, nextBlock)
                     // Push updated block back to iframe so React re-renders with new field values
                     // without a full iframe reload (which would lose scroll position).
+                    // Send the locale-MERGED display block: on a non-primary locale the panel stores
+                    // edits like `variant` in localeOverrides, so the raw flat block would render
+                    // the wrong variant (mirrors handleImageReplace + handleBlockFieldChange).
+                    const store = useEditorStore.getState()
+                    const updatedRaw = store.blocks[blockIndex]
+                    const displayBlock = updatedRaw ? store.getDisplayBlock(updatedRaw) : nextBlock
                     frameElementRef.current?.contentWindow?.postMessage(
-                        { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: nextBlock },
+                        { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: displayBlock },
                         window.location.origin,
                     )
-                    performSave(true)
+                    void performSave(true).then(saved => {
+                        // false + pendingManualSave means this save was queued behind an in-flight
+                        // one and re-fires with the same store blocks — the change WILL persist.
+                        const queued = useEditorStore.getState().pendingManualSave
+                        if (saved || queued) replyResult(true)
+                        else replyResult(false, 'Could not save the change — please try again')
+                    }).catch(() => replyResult(false, 'Could not save the change — please try again'))
+                } catch (err) {
+                    console.error('[PreviewFrame] BLOCK_FIELD_CHANGED failed:', err)
+                    replyResult(false, err instanceof Error ? err.message : 'Failed to apply change')
                 }
             } else if (e.data?.type === 'SHOW_TOAST') {
                 const { variant, message } = e.data as { variant: string; message: string }

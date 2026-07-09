@@ -1,8 +1,8 @@
 /**
  * Unit Tests: MediaUploadOverlay — unified shared overlay component for image/video uploads
- * TC-IDs: TC-GH1381-UO-001 → TC-GH1381-UO-019
+ * TC-IDs: TC-GH1381-UO-001 → TC-GH1381-UO-021
  * Convention: docs/TEST_CONVENTION.md
- * QA doc: docs/qa/F05-editor.md (GH-1381 follow-up)
+ * QA doc: docs/qa/F05-1381-gallery-change-image.md
  * GH-1381: Extracted from HeroMediaOverlay, now used across 10+ blocks (gallery, carousel, team, etc.)
  * valueShape: 'media' (object {id,url,alt}) vs 'url-group' (Payload group {url,alt} without id)
  */
@@ -45,6 +45,15 @@ const mockCallback = { blockIndex: 0, onFieldChange: mockOnFieldChange }
 
 function makeFile(type: string, name = 'test.jpg'): File {
     return new File(['bytes'], name, { type })
+}
+
+// GH-1381: simulate the parent editor's apply/persist ACK (BLOCK_FIELD_CHANGE_RESULT)
+// that gates the overlay's success/error toast.
+function dispatchFieldChangeAck(blockIndex: number, field: string, ok: boolean, error?: string) {
+    window.dispatchEvent(new MessageEvent('message', {
+        origin: window.location.origin,
+        data: { type: 'BLOCK_FIELD_CHANGE_RESULT', blockIndex, field, ok, ...(error ? { error } : {}) },
+    }))
 }
 
 let mockUpload: Mock
@@ -148,10 +157,79 @@ describe('TC-GH1381-UO-006: valueShape=media image upload sends {id,url,alt} to 
         await waitFor(() => {
             expect(mockOnFieldChange).toHaveBeenCalledWith('image', { id: 101, url: 'https://cdn/img.jpg', alt: 'Test alt' })
         })
-        expect(postMessageSpy).toHaveBeenCalledWith(
-            { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+        // GH-1381: success toast now waits for the parent's apply/persist ACK
+        expect(postMessageSpy).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'SHOW_TOAST' }),
             expect.any(String),
         )
+        dispatchFieldChangeAck(0, 'image', true)
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+                expect.any(String),
+            )
+        })
+    })
+})
+
+describe('TC-GH1381-UO-020: parent NACK → error toast with reason', () => {
+    it('shows error toast with parent-provided reason when ACK is ok=false', async () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        mockUpload.mockResolvedValue({ id: 103, url: 'https://cdn/img.jpg' })
+        const { container } = render(
+            <MediaUploadOverlay field="images.3.image" altText="Slot 4" valueShape="media">
+                <div />
+            </MediaUploadOverlay>
+        )
+        const input = container.querySelector('input[accept="image/jpeg,image/png,image/webp"]') as HTMLInputElement
+        fireEvent.change(input, { target: { files: [makeFile('image/jpeg')] } })
+        await waitFor(() => {
+            expect(mockOnFieldChange).toHaveBeenCalledWith('images.3.image', expect.objectContaining({ id: 103 }))
+        })
+        dispatchFieldChangeAck(0, 'images.3.image', false, 'Could not save the change — please try again')
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'error', message: 'Could not save the change — please try again' },
+                expect.any(String),
+            )
+        })
+        expect(postMessageSpy).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'SHOW_TOAST', variant: 'success' }),
+            expect.any(String),
+        )
+    })
+})
+
+describe('TC-GH1381-UO-021: ACK for a different field/block is ignored', () => {
+    it('does not toast on mismatched BLOCK_FIELD_CHANGE_RESULT, toasts on the matching one', async () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        mockUpload.mockResolvedValue({ id: 104, url: 'https://cdn/img.jpg' })
+        const { container } = render(
+            <MediaUploadOverlay field="image" altText="alt" valueShape="media">
+                <div />
+            </MediaUploadOverlay>
+        )
+        const input = container.querySelector('input[accept="image/jpeg,image/png,image/webp"]') as HTMLInputElement
+        fireEvent.change(input, { target: { files: [makeFile('image/jpeg')] } })
+        await waitFor(() => {
+            expect(mockOnFieldChange).toHaveBeenCalled()
+        })
+        // Mismatched field and mismatched blockIndex — both ignored
+        dispatchFieldChangeAck(0, 'backgroundImage', false, 'wrong field')
+        dispatchFieldChangeAck(7, 'image', false, 'wrong block')
+        expect(postMessageSpy).not.toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'SHOW_TOAST' }),
+            expect.any(String),
+        )
+        dispatchFieldChangeAck(0, 'image', true)
+        await waitFor(() => {
+            expect(postMessageSpy).toHaveBeenCalledWith(
+                { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+                expect.any(String),
+            )
+        })
     })
 })
 

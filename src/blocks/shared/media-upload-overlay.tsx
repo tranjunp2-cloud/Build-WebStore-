@@ -13,6 +13,31 @@ const parentToast = {
     error: (msg: string) => window.parent.postMessage({ type: 'SHOW_TOAST', variant: 'error', message: msg }, window.location.origin),
 }
 
+/**
+ * GH-1381: wait for the parent editor's BLOCK_FIELD_CHANGE_RESULT ACK so the success
+ * toast fires only after the change is actually applied and the save settled. The old
+ * fire-and-forget toast reported success even when the parent handler crashed
+ * (silent data loss). Falls back to ok after `timeoutMs` if no ACK arrives (e.g. a
+ * host that doesn't implement the reply), preserving legacy behavior.
+ */
+function waitForFieldChangeResult(blockIndex: number, field: string, timeoutMs = 10000): Promise<{ ok: boolean; error?: string }> {
+    return new Promise((resolve) => {
+        const cleanup = () => {
+            window.clearTimeout(timer)
+            window.removeEventListener('message', onMessage)
+        }
+        const onMessage = (e: MessageEvent) => {
+            if (e.origin !== window.location.origin) return
+            const d = e.data as { type?: string; blockIndex?: number; field?: string; ok?: boolean; error?: string } | null
+            if (d?.type !== 'BLOCK_FIELD_CHANGE_RESULT' || d.blockIndex !== blockIndex || d.field !== field) return
+            cleanup()
+            resolve({ ok: d.ok === true, error: typeof d.error === 'string' ? d.error : undefined })
+        }
+        const timer = window.setTimeout(() => { cleanup(); resolve({ ok: true }) }, timeoutMs)
+        window.addEventListener('message', onMessage)
+    })
+}
+
 export type MediaUploadOverlayProps = {
     children: ReactNode
     /** Payload field path: "image", "backgroundImage", nested array "images.2.image", or "videoUrl". */
@@ -123,20 +148,27 @@ export function MediaUploadOverlay({
             formData.append('file', compressed)
             formData.append('alt', altText)
             const uploaded = await upload(formData)
+            let changedField: string
+            let changedValue: unknown
             if (valueShape === 'url-group') {
                 // Payload group field {url,alt,label}: set ONLY the .url subfield (as a string) so
                 // sibling fields (alt/label) are preserved. Sending the whole object would drop them,
                 // and an {id,...} object would be nulled by normalizeUploadField on save.
-                const urlField = field.endsWith('.url') ? field : `${field}.url`
-                callback.onFieldChange(urlField, uploaded.url)
+                changedField = field.endsWith('.url') ? field : `${field}.url`
+                changedValue = uploaded.url
             } else {
                 // Media relation: strip a trailing ".url" to target the field root (e.g. "image.url" →
                 // "image") and send {id,url,alt} so the block renders now and save extracts the id.
-                const imageField = field.endsWith('.url') ? field.slice(0, -4) : field
-                callback.onFieldChange(imageField, { id: uploaded.id, url: uploaded.url, alt: altText })
+                changedField = field.endsWith('.url') ? field.slice(0, -4) : field
+                changedValue = { id: uploaded.id, url: uploaded.url, alt: altText }
             }
+            // Attach the ACK listener BEFORE dispatching so the reply can't be missed.
+            const ack = waitForFieldChangeResult(callback.blockIndex, changedField)
+            callback.onFieldChange(changedField, changedValue)
             onImageUploaded?.(uploaded.url)
-            parentToast.success('Image updated')
+            const result = await ack
+            if (result.ok) parentToast.success('Image updated')
+            else parentToast.error(result.error ?? 'Failed to save image — please try again')
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Upload failed')
         } finally {
